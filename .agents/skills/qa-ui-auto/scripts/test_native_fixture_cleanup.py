@@ -1,6 +1,9 @@
-"""Runner fixture ownership; all driver and operating-system operations mocked."""
+"""Fixture ownership, including an isolated Windows process-tree lock probe."""
 from pathlib import Path
+import subprocess
+import sys
 from tempfile import TemporaryDirectory
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, patch
@@ -11,7 +14,7 @@ from qa_ui_auto.steps import StepError
 
 
 class NativeFixtureCleanupTest(unittest.TestCase):
-    def run_case(self, failure=None, setup_failure=False, cleanup_failure=False):
+    def run_case(self, failure=None, setup_failure=False, cleanup_failure=False, close_failure=False):
         events = []
         first = Fixture("first", lambda ctx: events.append("first-setup"),
                         lambda ctx: events.append("first-cleanup"))
@@ -34,7 +37,12 @@ class NativeFixtureCleanupTest(unittest.TestCase):
         harness.__enter__.return_value = harness
         session = harness.create_session.return_value
         session.console_entries.return_value = []
-        session.close.side_effect = lambda: events.append("session-close")
+        def close():
+            events.append("session-close")
+            if close_failure:
+                raise RuntimeError("owned process cleanup failed")
+
+        session.close.side_effect = close
         with TemporaryDirectory() as directory, \
              patch("tauri_webdriver.NativeHarness", return_value=harness), \
              patch.object(runner.platform, "system", return_value="Linux"), \
@@ -76,6 +84,63 @@ class NativeFixtureCleanupTest(unittest.TestCase):
                     self.assertEqual(result["failure"]["message"], "original step failure")
                 else:
                     self.assertEqual(result["failure"]["verb"], "<fixture-cleanup>")
+
+    def test_session_cleanup_failure_is_reported_without_hiding_step_failure(self):
+        for failure in [None, StepError("original step failure")]:
+            with self.subTest(failure=failure):
+                events, result = self.run_case(failure, close_failure=True)
+                self.assertEqual(events[-2:], ["second-cleanup", "first-cleanup"])
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["session_cleanup_error"], "owned process cleanup failed")
+                self.assertEqual(result["failure"]["message"],
+                                 "original step failure" if failure else "owned process cleanup failed")
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows file locks and process trees")
+    def test_windows_session_close_releases_child_file_lock_and_leaves_unowned_process(self):
+        from tauri_webdriver import TauriDriverProcess
+
+        child_code = (
+            "import ctypes, pathlib, sys, time; "
+            "api = ctypes.WinDLL('kernel32', use_last_error=True); "
+            "api.CreateFileW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, "
+            "ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]; "
+            "api.CreateFileW.restype = ctypes.c_void_p; "
+            "handle = api.CreateFileW(sys.argv[1], 0x40000000, 0, None, 2, 0, None); "
+            "assert handle != ctypes.c_void_p(-1).value; "
+            "pathlib.Path(sys.argv[2]).write_text('locked'); time.sleep(60)"
+        )
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            locked, ready = root / "history.db", root / "ready"
+            parent_code = (
+                "import subprocess, sys, time; "
+                f"subprocess.Popen([sys.executable, '-c', {child_code!r}, {str(locked)!r}, {str(ready)!r}], "
+                "creationflags=subprocess.CREATE_NO_WINDOW); time.sleep(60)"
+            )
+            driver = TauriDriverProcess({}, root)
+            driver.proc = subprocess.Popen([sys.executable, "-c", parent_code],
+                                           creationflags=subprocess.CREATE_NO_WINDOW)
+            owned = driver.proc
+            unrelated = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                                         creationflags=subprocess.CREATE_NO_WINDOW)
+            try:
+                end = time.monotonic() + 10
+                while not ready.exists() and time.monotonic() < end:
+                    time.sleep(0.05)
+                self.assertTrue(ready.exists(), "owned child did not acquire the test lock")
+                with self.assertRaises(PermissionError):
+                    locked.unlink()
+                driver.mark_session_closed()
+                locked.unlink()
+                self.assertIsNotNone(owned.poll())
+                self.assertIsNone(unrelated.poll())
+            finally:
+                if owned.poll() is None:
+                    subprocess.run(["taskkill", "/PID", str(owned.pid), "/T", "/F"],
+                                   capture_output=True, timeout=20)
+                    owned.wait(timeout=5)
+                unrelated.terminate()
+                unrelated.wait(timeout=5)
 
 
 if __name__ == "__main__":

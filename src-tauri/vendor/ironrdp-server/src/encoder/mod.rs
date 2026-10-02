@@ -1188,6 +1188,30 @@ mod bulk_tests {
     }
 
     #[test]
+    fn scanlines_larger_than_mstsc_bitmap_buffers_use_remotefx() {
+        for omit_header in [false, true] {
+            let (width, height) = (8192u16, 2u16);
+            let bitmap = BitmapUpdate {
+                x: 0,
+                y: 0,
+                width: NonZeroU16::new(width).unwrap(),
+                height: NonZeroU16::new(height).unwrap(),
+                format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+                data: vec![42; usize::from(width) * usize::from(height) * 4].into(),
+                stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+            };
+            let mut handler = AdaptiveHandler {
+                bitmap: BitmapHandler::for_bulk_compression(omit_header),
+                rfx: RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height }),
+            };
+            assert_eq!(
+                handler.handle(&bitmap).unwrap().code,
+                UpdateCode::SurfaceCommands
+            );
+        }
+    }
+
+    #[test]
     fn photo_after_a_plain_planar_prefix_uses_remotefx() {
         let (width, height) = (704u16, 384u16);
         let mut pixels = vec![48; usize::from(width) * usize::from(height) * 4];

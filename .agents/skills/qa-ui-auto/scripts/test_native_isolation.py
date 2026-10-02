@@ -458,6 +458,42 @@ class NativeIsolationTest(unittest.TestCase):
             live_proc.terminate.assert_called_once_with()
             start.assert_called_once_with()
 
+    def test_windows_failed_delete_stops_only_owned_tree_before_restarting(self):
+        with TemporaryDirectory() as directory:
+            driver = native.TauriDriverProcess({}, Path(directory))
+            process = Mock(pid=31415)
+            process.poll.return_value = None
+            driver.proc = process
+            session = native.NativeSession(driver.url, driver.application, driver.mark_session_closed)
+            session.session_id = "lost-session"
+            session.request = Mock(side_effect=native.WebDriverError("no such session"))
+            with patch.object(native.platform, "system", return_value="Windows"), \
+                 patch.object(native.subprocess, "run", return_value=Mock(returncode=0)) as kill, \
+                 patch.object(native, "_tcp_ok", return_value=False), \
+                 patch.object(driver, "start") as start:
+                with self.assertRaisesRegex(native.WebDriverError, "no such session"):
+                    session.close()
+                kill.assert_called_once_with(
+                    ["taskkill", "/PID", "31415", "/T", "/F"],
+                    capture_output=True, text=True, timeout=20,
+                )
+                process.wait.assert_called_once_with(timeout=5)
+                self.assertIsNone(driver.proc)
+                driver.ensure_running()
+                start.assert_called_once_with()
+
+    def test_windows_tree_cleanup_failure_is_observable_and_retriable(self):
+        with TemporaryDirectory() as directory:
+            driver = native.TauriDriverProcess({}, Path(directory))
+            driver.proc = Mock(pid=31415)
+            driver.proc.poll.return_value = None
+            with patch.object(native.platform, "system", return_value="Windows"), \
+                 patch.object(native.subprocess, "run", return_value=Mock(returncode=1, stderr="denied")):
+                with self.assertRaisesRegex(native.WebDriverError, "owned native driver tree"):
+                    driver.mark_session_closed()
+            self.assertIsNotNone(driver.proc)
+            self.assertTrue(driver._restart_required)
+
     def test_native_run_stops_darwin_app_before_fixtures(self):
         # reset_db deletes the run-owned profile tree. On macOS the QA app
         # itself is the driver child and is already alive for the run's

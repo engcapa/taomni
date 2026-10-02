@@ -516,8 +516,10 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                             json.dumps(console[-500:], ensure_ascii=False, indent=1),
                             encoding="utf-8",
                         )
-                        with suppress(Exception):
+                        try:
                             session.close()
+                        except Exception as exc:
+                            r["session_cleanup_error"] = str(exc)
                         # ED-FOLLOW-002: the app is dead here (session.close
                         # ends its process), so reaping its orphaned jdtls
                         # children cannot dangle any live session map. Never
@@ -556,6 +558,12 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     "artifacts": {},
                 }
             finally:
+                if r.get("session_cleanup_error") and r["status"] != "failed":
+                    r["status"] = "failed"
+                    r["failure"] = {
+                        "step_index": 0, "verb": "<session-cleanup>", "args": None,
+                        "message": r["session_cleanup_error"], "artifacts": {},
+                    }
                 fixture_cleanup_started = time.monotonic()
                 cleanup_errors = []
                 for fix in reversed(applied_fixtures):

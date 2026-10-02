@@ -13,6 +13,13 @@ use ironrdp_pdu::geometry::InclusiveRectangle;
 
 use crate::BitmapUpdate;
 
+// mstsc's bitmap-update decoder initially allocates 32,000-byte output and
+// planar scratch buffers. Mixing SurfaceCommands and Bitmap updates can leave
+// its advertised scratch capacity larger than the allocation. A u16-sized
+// strip (e.g. 64x255 at 32 bpp) then overruns that buffer in DecodeRLEBytes.
+// Bound the decoded pixels, even when RLE/bulk makes the wire payload tiny.
+const MAX_DECODED_BITMAP_BYTES: u16 = 32_000;
+
 // PERF: we could also remove the need for this buffer
 #[derive(Clone)]
 pub(crate) struct BitmapEncoder {
@@ -39,7 +46,8 @@ impl BitmapEncoder {
     }
 
     pub(crate) fn supports_width(&self, width: u16) -> bool {
-        self.omit_compression_header || width.is_multiple_of(4)
+        width <= MAX_DECODED_BITMAP_BYTES / 4
+            && (self.omit_compression_header || width.is_multiple_of(4))
     }
 
     pub(crate) fn output_size_hint(&self, bitmap: &BitmapUpdate) -> usize {
@@ -63,7 +71,7 @@ impl BitmapEncoder {
         if !self.supports_width(bitmap.width.get()) {
             return Err(BitmapEncodeError::Encode(invalid_field_err!(
                 "bitmap",
-                "Width must be a multiple of 4"
+                "Width exceeds the planar scanline limit or requires compression header omission"
             )));
         }
         // Raw planar has an exact size and byte layout. Read the same four
@@ -73,7 +81,7 @@ impl BitmapEncoder {
         let row_len = bitmap.width.get().checked_mul(4).ok_or_else(|| {
             BitmapEncodeError::Encode(invalid_field_err!("bitmap", "Row size exceeds u16"))
         })?;
-        let chunk_height = usize::from(u16::MAX / row_len);
+        let chunk_height = usize::from(MAX_DECODED_BITMAP_BYTES / row_len);
         let stride = bitmap.stride.get();
         let chunks: Vec<_> = bitmap.data.chunks(stride * chunk_height).collect();
         let mut update_header = [0; 4];
@@ -189,7 +197,7 @@ impl BitmapEncoder {
         if !self.supports_width(bitmap.width.get()) {
             return Err(BitmapEncodeError::Encode(invalid_field_err!(
                 "bitmap",
-                "Width must be a multiple of 4"
+                "Width exceeds the planar scanline limit or requires compression header omission"
             )));
         }
 
@@ -207,7 +215,7 @@ impl BitmapEncoder {
             .ok_or_else(|| {
                 BitmapEncodeError::Encode(invalid_field_err!("bitmap", "Row size exceeds u16"))
             })?;
-        let chunk_height = u16::MAX / row_len;
+        let chunk_height = MAX_DECODED_BITMAP_BYTES / row_len;
 
         let mut cursor = WriteCursor::new(output);
         let stride = bitmap.stride.get();
@@ -446,6 +454,81 @@ mod tests {
     use core::num::NonZeroU16;
     use ironrdp_core::decode;
     use ironrdp_graphics::rdp6::BitmapStreamDecoder;
+
+    #[test]
+    fn planar_rectangles_fit_mstsc_decode_buffers_and_preserve_cropped_pixels() {
+        // CI mstsc crossed its 32,000-byte scratch allocation while decoding
+        // the second plane of a 64x255 RLE rectangle. Also cover raw planar,
+        // wide scanlines, omitted/retained headers and the parent-stride tail.
+        for width in [64u16, 252, 640, 1920, 7680] {
+            let height = 255u16;
+            let stride = usize::from(width + 11) * 4;
+            for noisy in [false, true] {
+                let mut seed = 0x9e3779b9u32;
+                let mut pixels =
+                    vec![0xcc; usize::from(height - 1) * stride + usize::from(width) * 4];
+                for y in 0..usize::from(height) {
+                    for x in 0..usize::from(width) {
+                        seed ^= seed << 13;
+                        seed ^= seed >> 17;
+                        seed ^= seed << 5;
+                        let pixel = if noisy {
+                            [(seed >> 16) as u8, (seed >> 8) as u8, seed as u8, 255]
+                        } else {
+                            [x as u8, y as u8, 64, 255]
+                        };
+                        pixels[y * stride + x * 4..][..4].copy_from_slice(&pixel);
+                    }
+                }
+                for omit_header in [false, true] {
+                    let bitmap = BitmapUpdate {
+                        x: 7,
+                        y: 13,
+                        width: NonZeroU16::new(width).unwrap(),
+                        height: NonZeroU16::new(height).unwrap(),
+                        format: PixelFormat::BgrA32,
+                        data: pixels.clone().into(),
+                        stride: NonZeroUsize::new(stride).unwrap(),
+                    };
+                    let mut encoder = BitmapEncoder::for_bulk_compression(omit_header);
+                    let mut output = vec![0; encoder.output_size_hint(&bitmap)];
+                    let length = encoder.encode(&bitmap, &mut output).unwrap();
+                    let update: BitmapUpdateData<'_> = decode(&output[..length]).unwrap();
+                    let mut rows = 0;
+                    for rect in update.rectangles {
+                        assert!(
+                            usize::from(rect.width) * usize::from(rect.height) * 4 <= 32_000,
+                            "mstsc decode buffer exceeded: {}x{}",
+                            rect.width,
+                            rect.height
+                        );
+                        assert_eq!(rect.rectangle.left, 7);
+                        assert_eq!(rect.rectangle.right, 7 + width - 1);
+                        assert_eq!(rect.rectangle.top, 13 + rows);
+                        assert_eq!(rect.rectangle.bottom, 13 + rows + rect.height - 1);
+                        let mut rgb = Vec::new();
+                        BitmapStreamDecoder::default()
+                            .decode_bitmap_stream_to_rgb24(
+                                rect.bitmap_data,
+                                &mut rgb,
+                                usize::from(width),
+                                usize::from(rect.height),
+                            )
+                            .unwrap();
+                        for (y, row) in rgb.chunks_exact(usize::from(width) * 3).rev().enumerate() {
+                            for (x, pixel) in row.chunks_exact(3).enumerate() {
+                                let source =
+                                    &pixels[(usize::from(rows) + y) * stride + x * 4..][..4];
+                                assert_eq!(pixel, [source[2], source[1], source[0]]);
+                            }
+                        }
+                        rows += rect.height;
+                    }
+                    assert_eq!(rows, height);
+                }
+            }
+        }
+    }
 
     #[test]
     fn lazy_raw_planar_samples_match_materialized_bytes_across_crops_and_layouts() {
