@@ -1531,6 +1531,7 @@
 - `.rdp-options-form input[type="number"][min="320"]` — interactive [optional] — F9.7.screen-width
 - `[data-testid="session-section-rdp"]` — interactive [optional] — F9.7.options-section
 - `.rdp-options-form input[type="number"][min="200"]` — interactive [optional] — F9.7.screen-height
+- `.rdp-options-form fieldset:first-of-type input[type="checkbox"]` — interactive [optional] — F9.7.nla
 - `[data-testid="rdp-scale-toggle"]` — interactive — F9.7.scale-toggle
 - `[data-testid="rdp-reconnect"]` — interactive — F9.7.reconnect
 - `[data-testid="rdp-chat-toggle"]` — interactive [optional] — F9.7.chat-toggle

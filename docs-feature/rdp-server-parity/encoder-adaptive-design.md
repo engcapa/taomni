@@ -104,7 +104,7 @@ EXP-06 的自适应选择器原型（planar+XCRUSH 与 RemoteFX 取小者）需�
 | DEC-06 压缩级别选择 | 客户端声明什么就用什么，或固定一种 | 按客户端 Client Info 的 `compression_type` 用其声明的最高级别：RDP6.1 → XCRUSH，RDP6 → NCRUSH，K64 → MPPC-64K，K8 → MPPC-8K；未置 `INFO_COMPRESSION` 则不压缩 | agent 自决 | MS-RDPBCGR 2.2.1.11.1.1；`ironrdp-bulk` 四种都支持 | AC-E03/E04、TASK-E1 |
 | DEC-07 V-21 是否在 Linux runner 安装 xrdp | ① 安装 `xrdp xorgxrdp`，建一次性用户，Openbox + `rdp_target.py`：CI 时间增加约 2–3 min，需要 sudo 改系统服务；② 只做 Windows TermService 部分，xrdp 记为能力缺口 | 推荐 ①（上游 §4.9 已按此规划了 `xrdp_server_required` capability，`ci.py` 已映射）；不影响编码器任务 | 已批准：CI 可用 sudo 安装并启动 xrdp | 上游设计 §4.9；`.agents/skills/qa-ui-auto/scripts/qa_ui_auto/ci.py` 第 116–117 行已有 `xrdp_server_required → xrdp` | AC-E08、TASK-E7 |
 
-DEC-07 的问题是：是否允许在 GitHub Linux runner 上用 sudo 安装并启动 xrdp 服务。在答复前，TASK-E7 先完成 Windows TermService 部分。
+DEC-07 已由用户批准：GitHub Linux runner 可用 sudo 安装并启动 xrdp，TASK-E7 同时验收 Windows TermService 与 Linux xrdp。
 
 ### 4.2 编码路径（TASK-E1、TASK-E2）
 
@@ -437,6 +437,12 @@ EncoderIter::next(rect)
 - 重置缺陷注入：仅移除 `UpdateEncoder::set_desktop_size` 的 `bulk.reset()`，`desktop_resize_flushes_history_even_when_reusing_the_encoder` 实际失败（第 3 包缺少 FLUSHED）；恢复代码后重新执行。真实网络重激活另有独立用例，避免只靠创建新 encoder 掩盖未重置缺陷。
 - 新增 TC-RDPS-PERF-03、TC-RDPS-NAT-08、TC-RDPC-REF-01/02，以及 hosted 三平台 unit contracts；未在本机运行 browser/native 自动化。
 - 本地日志均在未提交的 `qa-ui-auto-report/_local/encoder-*.log`。CI 最终证据必须包含运行号、实际 summary、像素/探针 JSON 与服务器日志，不能以 workflow success 代替逐用例通过。
+
+### 8.2 GitHub CI 循环记录
+
+- 第一轮运行 [36949925667](https://github.com/engcapa/taomni/actions/runs/36949925667)，源码 `7c88ebf6`：三平台 browser 均为 4 passed / 0 failed / 0 skipped，已读取 summary、receipt 与 ci-outcome。Linux native 的 acceptor/bulk/server unit 为 1/135/17 passed；根库测试链接失败，错误为 `unable to find library -lgbm`，未开始 native cases。补齐 workflow 的 `libgbm-dev`，并将 RDP unit 输出保存为产物中的 `rdp-unit.log`。Windows/macOS native 仍在运行，待真实报告后回填。
+- CI 等待期间审查发现两个参考服务器 case 残留对未创建的 `qa-rdp-loopback` 会话的等待，已移除并校正验收编号；xrdp 用例明确关闭 NLA，使用其支持的 TLS/Client Info 自动登录。探针补处理独立 `AT_FRONT` 控制包，回归验证后续 MPPC back-reference 使用已回绕的历史；探针 unit 15 passed（`encoder-probe-history.log`）。
+- 后续全量回归增加上游 V-15 的真实 ID `TC-auto-F-Servers-1-servers-dialog`，与原来的 20 个 RDP case 一起选择。
 
 ## 9. 验收追踪与交付条件
 

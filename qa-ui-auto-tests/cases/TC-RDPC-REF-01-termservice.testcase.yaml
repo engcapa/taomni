@@ -48,7 +48,6 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-rdp-termservice
 - click: '[data-testid="session-save"]'
-- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-rdp-loopback"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-rdp-termservice"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-rdp-termservice"]'
 - wait_for: '[data-testid="auth-prompt"]'
@@ -153,54 +152,54 @@ verification:
   - id: R1
     requirement: The product client connects to the reference desktop and decodes its known target pixels.
     actions:
-    - 19
-    - 22
-    - 24
+    - 18
+    - 21
+    - 23
     checkpoints:
-    - step: 25
+    - step: 24
       expectation: Connected status after authentication/certificate confirmation.
-    - step: 26
+    - step: 25
       expectation: The reference target reports ready in its own session.
-    - step: 27
+    - step: 26
       expectation: Known colors arrived through the product decoder.
     results:
+    - 24
     - 25
     - 26
-    - 27
   - id: R2
     requirement: Input reaches the reference session and the changed pixels return to the product client.
     actions:
-    - 28
+    - 27
     checkpoints:
-    - step: 29
+    - step: 28
       expectation: The session's own state file records a flip.
-    - step: 30
+    - step: 29
       expectation: The decoded center pixel changed from black to white.
     results:
+    - 28
     - 29
-    - 30
   - id: R3
     requirement: Full screen, quality indicator, restore and disconnect work with the reference server.
     actions:
-    - 31
-    - 36
-    - 38
-    - 39
-    - 41
-    checkpoints:
-    - step: 32
-      expectation: Full screen connection bar is visible.
-    - step: 35
-      expectation: The actual quality value is recorded (0..4).
-    - step: 37
-      expectation: Restore removes the connection bar.
-    - step: 42
-      expectation: Disconnect ends the reference session.
-    results:
-    - 32
+    - 30
     - 35
     - 37
-    - 42
+    - 38
+    - 40
+    checkpoints:
+    - step: 31
+      expectation: Full screen connection bar is visible.
+    - step: 34
+      expectation: The actual quality value is recorded (0..4).
+    - step: 36
+      expectation: Restore removes the connection bar.
+    - step: 41
+      expectation: Disconnect ends the reference session.
+    results:
+    - 31
+    - 34
+    - 36
+    - 41
   native:
   - check: Real termservice service and desktop on Windows; product client framebuffer and remote input.
     method: automated

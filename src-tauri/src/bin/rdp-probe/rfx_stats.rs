@@ -178,7 +178,9 @@ impl RfxStats {
             if packet_flags & flags::PACKET_COMPRESSED != 0 {
                 self.compressed_updates += 1;
             }
-            let decoded = if packet_flags & (flags::PACKET_COMPRESSED | flags::PACKET_FLUSHED) != 0
+            let decoded = if packet_flags
+                & (flags::PACKET_COMPRESSED | flags::PACKET_AT_FRONT | flags::PACKET_FLUSHED)
+                != 0
             {
                 match self
                     .decompressor
@@ -421,6 +423,10 @@ mod tests {
         } else {
             data
         };
+        wire_pdu(wire, packet_flags, fragment)
+    }
+
+    fn wire_pdu(wire: &[u8], packet_flags: u32, fragment: u8) -> Vec<u8> {
         let mut body = vec![
             FASTPATH_UPDATETYPE_BITMAP | (fragment << 4) | 0x80,
             packet_flags as u8,
@@ -431,6 +437,29 @@ mod tests {
         let mut pdu = vec![0, 0x80 | (total >> 8) as u8, total as u8];
         pdu.extend(body);
         pdu
+    }
+
+    #[test]
+    fn uncompressed_at_front_moves_history_before_the_next_back_reference() {
+        let mut stats = RfxStats::new(Some(CompressionType::K64)).unwrap();
+        // MPPC literals put ABC at the beginning of the 64K history.
+        stats.inspect_fast_path(&wire_pdu(
+            b"ABC",
+            1 | flags::PACKET_COMPRESSED | flags::PACKET_AT_FRONT,
+            0,
+        ));
+        stats.inspect_fast_path(&wire_pdu(b"raw", 1 | flags::PACKET_AT_FRONT, 0));
+        // MPPC offset 1, length 3: 11111 000001 0, then byte padding.
+        // After AT_FRONT this wraps to the zeroed end of history. Ignoring the
+        // control packet instead yields CCC from the previous write position.
+        let decoded = stats
+            .decompressor
+            .as_mut()
+            .unwrap()
+            .decompress(&[0xF8, 0x20], 1 | flags::PACKET_COMPRESSED)
+            .unwrap();
+        assert_eq!(decoded, &[0, 0, 0]);
+        assert_eq!(stats.report()["bulk"]["decompression_errors"], 0);
     }
 
     #[test]

@@ -2796,6 +2796,10 @@ controls:
     selector: '.rdp-options-form input[type="number"][min="200"]'
     kind: interactive
     optional: true
+  - id: nla
+    selector: '.rdp-options-form fieldset:first-of-type input[type="checkbox"]'
+    kind: interactive
+    optional: true
   - id: scale-toggle
     selector: '[data-testid="rdp-scale-toggle"]'
     kind: interactive
