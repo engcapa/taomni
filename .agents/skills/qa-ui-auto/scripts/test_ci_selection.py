@@ -29,6 +29,21 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(entry['selected_ids'], [cid.removesuffix('-restore'), cid])
             self.assertIn('mysql', entry['capabilities'])
 
+    def test_ard_case_runs_only_natively_on_macos_with_screen_sharing(self):
+        plan = make_plan(args(scope='selected', case_ids='TC-152'))
+        self.assertEqual([e['id'] for e in plan['entries']], ['macos-native'])
+        self.assertIn('ard', plan['entries'][0]['capabilities'])
+        reasons = {(n['platform'], n['mode']) for n in plan['not_applicable'] if n['case'] == 'TC-152'}
+        self.assertEqual(reasons, {('linux', 'browser'), ('linux', 'native'), ('windows', 'browser'),
+                                   ('windows', 'native'), ('macos', 'browser')})
+
+    def test_vnc_fixture_case_requests_the_vnc_service_everywhere(self):
+        plan = make_plan(args(scope='selected', case_ids='TC-151'))
+        self.assertEqual(len(plan['entries']), 6)
+        for entry in plan['entries']:
+            self.assertEqual(entry['selected_ids'], ['TC-151'])
+            self.assertIn('vnc', entry['capabilities'])
+
     def test_external_project_is_reported_as_gap_and_explicit_selection_fails(self):
         cid = 'TC-IDE-C6-06-java-definition-realproject-native'
         plan = make_plan(args(scope='all', modes='native'))

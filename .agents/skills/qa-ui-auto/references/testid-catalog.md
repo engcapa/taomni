@@ -179,7 +179,25 @@
 - `[data-testid="code-workspace-tree-root"]` — interactive [optional] — F25.5.tree-root-row
 - `[data-testid="code-workspace-tree-file"]` — interactive [optional] — F25.5.tree-file-row
 - `[data-testid="code-workspace-tree-dir"]` — interactive [optional] — F25.5.tree-dir-row
-- `[data-testid="code-workspace-view-tree"]` — display [optional] — F25.5.tree-view
+- `[data-testid="code-workspace-tree-view-selector"]` — interactive [optional] — F25.5.tree-view
+  ↳ `[data-testid="code-workspace-tree-view-project"]` — alias
+  ↳ `[data-testid="code-workspace-tree-view-project-files"]` — alias
+- `[data-testid="code-workspace-tree-new"]` — interactive [optional] — F25.5.tree-new-menu
+- `[data-testid="code-workspace-tree-open-file"]` — interactive [optional] — F25.5.tree-open-file
+- `[data-testid="code-workspace-tree-menu-appearance"]` — interactive [optional] — F25.5.tree-options-appearance
+  ↳ `[data-testid="code-workspace-tree-menu-details"]` — alias
+  ↳ `[data-testid="code-workspace-tree-menu-compact"]` — alias
+  ↳ `[data-testid="code-workspace-tree-zoom-in"]` — alias
+  ↳ `[data-testid="code-workspace-tree-zoom-out"]` — alias
+  ↳ `[data-testid="code-workspace-tree-zoom-reset"]` — alias
+- `[data-testid="code-workspace-tree-toolbar-more"]` — interactive [optional] — F25.5.tree-options
+  ↳ `[data-testid="code-workspace-tree-collapse"]` — alias
+  ↳ `[data-testid="code-workspace-tree-menu-expand-all"]` — alias
+- `[data-testid="code-workspace-tree-speed-search"]` — display [optional] — F25.5.tree-speed-search
+- `[data-testid="code-workspace-tree-speed-search-close"]` — interactive [optional] — F25.5.tree-speed-search-close
+- `[data-testid="code-workspace-tree-root-path"]` — display [optional] — F25.5.tree-row-details
+  ↳ `[data-testid="code-workspace-tree-file-details"]` — alias
+  ↳ `[data-testid="code-workspace-tree-empty"]` — alias
 - `[data-testid="new-java-class-package"]` — display [optional] — F25.5.new-java-class-package
 - `[data-testid="new-java-class-submit"]` — interactive [optional] — F25.5.new-java-class-submit
 - `[data-testid="external-file-conflict-dialog"]` — display [optional] — F25.5.external-file-conflict-dialog
@@ -370,6 +388,28 @@
   ↳ `[data-testid="code-workspace-tool-rail-structure"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-commit"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-documentation"]` — alias
+- `[data-testid="code-workspace-tool-rail-left-resize"]` — interactive [optional] — F25.5.tool-rail-resize
+  ↳ `[data-testid="code-workspace-tool-rail-right-resize"]` — alias
+- `[data-testid="code-workspace-tool-rail-menu-move"]` — interactive [optional] — F25.5.tool-rail-menu
+  ↳ `[data-testid="code-workspace-tool-rail-menu-move-right-top"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-remove"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-show-names"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-toggle"]` — alias
+- `[data-testid="code-workspace-tool-window-problems"]` — display [optional] — F25.5.tool-window-pane
+  ↳ `[data-testid="code-workspace-tool-window-structure"]` — alias
+  ↳ `[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]` — alias
+- `[data-testid="code-workspace-tool-window-options-problems"]` — interactive [optional] — F25.5.tool-window-options-menu
+  ↳ `[data-testid="code-workspace-tool-window-options-terminal"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-move"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-move-bottom-left"]` — alias
+- `[data-testid="code-workspace-bottom-tab-overflow-run"]` — interactive [optional] — F25.5.tool-window-more-item
+- `[data-testid="code-workspace-tree-expand-all"]` — interactive [optional] — F25.5.project-header-actions
+  ↳ `[data-testid="code-workspace-tree-collapse-all"]` — alias
+  ↳ `[data-testid="code-workspace-tree-select-opened"]` — alias
+- `[data-testid="search-everywhere-tab-files"]` — interactive [optional] — F25.5.search-everywhere-tab
+  ↳ `[data-testid="search-everywhere-tab-classes"]` — alias
+  ↳ `[data-testid="search-everywhere-tab-symbols"]` — alias
+  ↳ `[data-testid="search-everywhere-tab-actions"]` — alias
 - `[data-testid="code-workspace-tool-window-header"]` — display [optional] — F25.5.tool-window-header
 - `[data-testid="code-workspace-tool-window-title"]` — display [optional] — F25.5.tool-window-title
 - `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide
@@ -436,6 +476,9 @@
 - `[data-testid="search-everywhere-assign-shortcut-hint"]` — display [optional] — F25.5.search-everywhere-assign-shortcut-hint
 - `[data-testid="code-workspace-parameter-info"]` — display [optional] — F25.5.parameter-info-tooltip
 - `[data-testid="code-workspace-quick-doc"]` — display [optional] — F25.5.quick-doc-popup
+- `[data-testid="code-workspace-hover-doc"]` — display [optional] — F25.5.hover-doc-popup
+- `[data-testid="code-workspace-hover-doc-pin"]` — interactive [optional] — F25.5.hover-doc-pin
+- `[data-testid="code-workspace-documentation-pane"]` — display [optional] — F25.5.documentation-pane
 - `[data-testid="code-workspace-editor-banners"]` — display [optional] — F25.5.editor-banners
 - `[data-testid="banner-action-open-settings"]` — interactive [optional] — F25.5.editor-banner-open-settings
 - `[data-testid="banner-action-error-open-settings"]` — display [optional] — F25.5.editor-banner-action-error
@@ -572,6 +615,34 @@
 - `[data-testid^="tests-rerun-"]` — interactive [optional] — F25.1.tests-rerun
 - `[data-testid^="tests-failure-details-"]` — interactive [optional] — F25.1.tests-failure-details
 - `[data-testid="debug-panel"]` — display — F25.1.debug-panel
+- `[data-testid="debug-continue"]` — interactive [optional] — F25.1.debug-toolbar-resume
+- `[data-testid="debug-subtab-console"]` — interactive [optional] — F25.1.debug-subtab-console
+- `[data-testid="debug-console-output"]` — display [optional] — F25.1.debug-console-output
+- `[data-testid="debug-frames-list"]` — display [optional] — F25.1.debug-frames-list
+- `[data-testid="debug-thread-select"]` — display [optional] — F25.1.debug-thread-select
+- `[data-testid="debug-variables-tree"]` — display [optional] — F25.1.debug-variables-tree
+- `[data-testid="debug-watch-input"]` — interactive [optional] — F25.1.debug-watch-input
+- `[data-testid="debug-evaluate-inline-result"]` — display [optional] — F25.1.debug-evaluate-inline-result
+- `[data-testid="debug-breakpoint-popup"]` — display [optional] — F25.1.debug-breakpoint-popup
+  ↳ `[data-testid="debug-breakpoint-popup-title"]` — alias
+  ↳ `[data-testid="debug-breakpoint-popup-log-stack"]` — alias
+  ↳ `[data-testid="debug-breakpoint-popup-log-message"]:checked` — alias
+- `[data-testid="debug-breakpoint-popup-condition"]` — interactive [optional] — F25.1.debug-breakpoint-popup-condition
+  ↳ `[data-testid="debug-breakpoint-popup-condition"]:focus` — alias
+- `[data-testid="debug-breakpoint-popup-done"]` — interactive [optional] — F25.1.debug-breakpoint-popup-actions
+  ↳ `[data-testid="debug-breakpoint-popup-more"]` — alias
+- `[data-testid="debug-gutter-menu-add-conditional"]` — interactive [optional] — F25.1.debug-gutter-menu
+- `[data-testid="debug-breakpoints-dialog"]` — display [optional] — F25.1.debug-breakpoints-dialog
+  ↳ `[data-testid="debug-breakpoints-dialog-condition"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-enabled-2"]:checked` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-remove-once-hit"]:checked` — alias
+- `[data-testid="debug-breakpoints-dialog-tree"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-tree
+  ↳ `[data-testid="debug-breakpoints-dialog-line"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-line"][data-breakpoint-line="7"]` — alias
+- `[data-testid="debug-breakpoints-dialog-suspend"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-properties
+  ↳ `[data-testid="debug-breakpoints-dialog-log-stack"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-remove-once-hit"]` — alias
+- `[data-testid="debug-breakpoints-dialog-done"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-done
 - `[data-testid="debug-stop"]` — interactive [optional] — F25.1.debug-stop
 - `.taomni-debug-current-line` — display [optional] — F25.1.debug-current-line
 - `[data-testid="debug-active-configuration"]` — interactive [optional] — F25.1.debug-active-configuration
@@ -1218,6 +1289,8 @@
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail
+- `[data-testid="sidebar-tool-window-rail"]` — display [optional] — F1.2.sidebar-tool-window-rail
+  ↳ `[data-testid="sidebar-rail"]` — alias
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
 
 ## main/commands (F1.9)
@@ -1354,6 +1427,7 @@
 - `[data-testid="app-titlebar"]` — display — F1.3.titlebar
 - `[data-testid="titlebar-tray"]` — display — F1.3.tray
 - `[data-testid="control-bar"]` — display — F1.3.control-bar
+- `[data-testid="tab-action-slot"]` — display [optional] — F1.3.tab-action-slot
 - `[data-testid="window-drag-handle"]` — display — F1.3.window-drag-handle
 - `[data-testid="titlebar-actions-more"]` — interactive [optional] — F1.3.titlebar-actions-more
 - `[data-testid="theme-cycle"]` — interactive — F1.3.theme-cycle
@@ -1454,11 +1528,25 @@
 - `[data-testid="rdp-panel"]` — display — F9.7.panel-root
 - `[data-testid="rdp-status"]` — display — F9.7.status
 - `[data-testid="rdp-canvas"]` — display — F9.7.canvas
+- `.rdp-options-form input[type="number"][min="320"]` — interactive [optional] — F9.7.screen-width
+- `[data-testid="session-section-rdp"]` — interactive [optional] — F9.7.options-section
+- `.rdp-options-form input[type="number"][min="200"]` — interactive [optional] — F9.7.screen-height
+- `.rdp-options-form fieldset:first-of-type input[type="checkbox"]` — interactive [optional] — F9.7.nla
 - `[data-testid="rdp-scale-toggle"]` — interactive — F9.7.scale-toggle
 - `[data-testid="rdp-reconnect"]` — interactive — F9.7.reconnect
 - `[data-testid="rdp-chat-toggle"]` — interactive [optional] — F9.7.chat-toggle
 - `[data-testid="rdp-detach"]` — interactive — F9.7.detach
 - `[data-testid="rdp-view-cycle"]` — interactive — F9.7.view-cycle
+- `[data-testid="rdp-ctrl-alt-del"]` — interactive — F9.7.ctrl-alt-del
+- `[data-testid="rdp-connection-bar"]` — display [optional] — F9.7.connection-bar
+- `[data-testid="rdp-bar-hotzone"]` — display [optional] — F9.7.bar-hotzone
+- `[data-testid="rdp-bar-pin"]` — interactive [optional] — F9.7.bar-pin
+- `[data-testid="rdp-bar-quality"]` — display [optional] — F9.7.bar-quality
+- `[data-testid="rdp-bar-title"]` — display [optional] — F9.7.bar-title
+- `[data-testid="rdp-bar-ctrl-alt-del"]` — interactive [optional] — F9.7.bar-ctrl-alt-del
+- `[data-testid="rdp-bar-minimize"]` — interactive [optional] — F9.7.bar-minimize
+- `[data-testid="rdp-bar-restore"]` — interactive [optional] — F9.7.bar-restore
+- `[data-testid="rdp-bar-disconnect"]` — interactive [optional] — F9.7.bar-disconnect
 
 ## screenshot/screen-record (F27.1)
 
@@ -1588,6 +1676,35 @@
 - `[data-testid="server-log"]` — display [optional] — F-Servers-1.server-log
 - `[data-testid="server-log-autoscroll"]` — interactive [optional] — F-Servers-1.server-log-autoscroll
 - `[data-testid="server-log-clear"]` — display [optional] — F-Servers-1.server-log-clear
+
+## servers/rdp (F-RdpServer-1)
+
+- `[data-testid="server-field-port"]` — interactive [optional] — F-RdpServer-1.server-field-port
+- `[data-testid="server-field-bind-address"]` — interactive [optional] — F-RdpServer-1.server-field-bind-address
+- `[data-testid="server-field-auto-stop"]` — interactive [optional] — F-RdpServer-1.server-field-auto-stop
+- `[data-testid="server-field-auto-stop-seconds"]` — interactive [optional] — F-RdpServer-1.server-field-auto-stop-seconds
+- `[data-testid="server-field-start-on-launch"]` — interactive [optional] — F-RdpServer-1.server-field-start-on-launch
+- `[data-testid="server-row-rdp-start"]` — interactive [optional] — F-RdpServer-1.server-row-rdp-start
+- `[data-testid="server-row-rdp-stop"]` — interactive [optional] — F-RdpServer-1.server-row-rdp-stop
+- `[data-testid="rdp-field-username"]` — interactive [optional] — F-RdpServer-1.rdp-field-username
+- `[data-testid="rdp-field-password"]` — interactive [optional] — F-RdpServer-1.rdp-field-password
+- `[data-testid="rdp-field-domain"]` — interactive [optional] — F-RdpServer-1.rdp-field-domain
+- `[data-testid="rdp-field-view-only"]` — interactive [optional] — F-RdpServer-1.rdp-field-view-only
+- `[data-testid="rdp-field-control-approval"]` — interactive [optional] — F-RdpServer-1.rdp-field-control-approval
+- `[data-testid="rdp-field-public-bind"]` — interactive [optional] — F-RdpServer-1.rdp-field-public-bind
+- `[data-testid="rdp-field-display"]` — interactive [optional] — F-RdpServer-1.rdp-field-display
+- `[data-testid="rdp-system-card"]` — display [optional] — F-RdpServer-1.rdp-system-card
+- `[data-testid="rdp-system-message"]` — display [optional] — F-RdpServer-1.rdp-system-message
+- `[data-testid="rdp-system-open-settings"]` — interactive [optional] — F-RdpServer-1.rdp-system-open-settings
+- `[data-testid="rdp-system-refresh"]` — interactive [optional] — F-RdpServer-1.rdp-system-refresh
+- `[data-testid="rdp-system-choice"]` — display [optional] — F-RdpServer-1.rdp-system-choice
+- `[data-testid="rdp-system-choice-reset"]` — interactive [optional] — F-RdpServer-1.rdp-system-choice-reset
+- `[data-testid="rdp-field-clipboard-to-client"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-client
+- `[data-testid="rdp-field-clipboard-to-server"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-server
+- `[data-testid="rdp-field-clipboard-file-max-mb"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-file-max-mb
+- `[data-testid="rdp-field-audio-playback"]` — interactive [optional] — F-RdpServer-1.rdp-field-audio-playback
+- `[data-testid="rdp-field-microphone"]` — interactive [optional] — F-RdpServer-1.rdp-field-microphone
+- `[data-testid="rdp-field-microphone-device"]` — interactive [optional] — F-RdpServer-1.rdp-field-microphone-device
 
 ## sessions (F6.2)
 
@@ -1813,6 +1930,7 @@
 
 - `[data-testid="settings-panel"]` — display — F11.1.panel-root
 - `[data-testid="settings-welcome-recent-session-limit"]` — interactive — F11.1.welcome-recent-session-limit
+- `[data-testid="settings-merge-tool-window-rail"]` — interactive [optional] — F11.1.settings-merge-tool-window-rail
 - `[data-testid="settings-search-input"]` — interactive — F11.1.search-input
 - `[data-testid="settings-search-count"]` — display — F11.1.search-count
 - `[data-testid="settings-search-empty"]` — display — F11.1.search-empty
@@ -1830,6 +1948,24 @@
 - `[data-testid="sql-completion-accept-tab"]` — interactive — F11.1.sql-completion-accept-tab
 - `[data-testid="sql-completion-accept-enter"]` — interactive — F11.1.sql-completion-accept-enter
 - `[data-testid="sql-completion-reset"]` — interactive — F11.1.sql-completion-reset
+
+## settings/backup (F-BACKUP-1)
+
+- `[data-testid="backup-auto-toggle"]` — interactive — F-BACKUP-1.auto-toggle
+- `[data-testid="backup-frequency"]` — interactive — F-BACKUP-1.frequency
+- `[data-testid="backup-retained-copies"]` — interactive — F-BACKUP-1.retained-copies
+- `[data-testid="backup-last-success"]` — display — F-BACKUP-1.last-success
+- `[data-testid="backup-history-refresh"]` — interactive — F-BACKUP-1.history-refresh
+
+## settings/backup (F-MFA-3)
+
+- `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup
+- `[data-testid="backup-create-now"]` — interactive — F-MFA-3.create-now
+- `[data-testid="backup-action-success"]` — display — F-MFA-3.action-success
+- `[data-testid="backup-history-row"]` — display — F-MFA-3.history-row
+- `[data-testid="backup-history-restore"]` — interactive — F-MFA-3.history-restore
+- `[data-testid="backup-restore-files"]` — display — F-MFA-3.restore-files
+- `[data-testid="backup-restore-cancel"]` — interactive — F-MFA-3.restore-cancel
 
 ## settings/code-workspace (F11.2)
 
@@ -2022,6 +2158,7 @@
 
 - `[data-testid="terminal-pane"]` — interactive — F2.2.terminal-pane
 - `[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea` — interactive — F2.2.terminal-keyboard-target
+- `button[title="Copy (Ctrl+C)"]` — interactive [optional] — F2.2.terminal-selection-copy
 - `[data-testid="attached-sftp-toggle"]` — interactive [optional] — F2.2.attached-sftp-toggle
 - `[data-testid="tab-chat-toggle"]` — interactive [optional] — F2.2.tab-chat-toggle
 - `[data-testid="context-menu"]` — display [optional] — F2.2.context-menu
@@ -2050,12 +2187,15 @@
 - `input[placeholder="Find"]` — interactive [optional] — F4.1.find-input
 - `span:has-text("Match")` — display [optional] — F4.1.find-match-info
 - `role=button[name="Close"]` — interactive [optional] — F4.1.find-close
+  ↳ `xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']` — alias
 
 ## terminal/right-menu (F4.2)
 
 - `text="Zoom in"` — interactive [optional] — F4.2.zoom-in
+  ↳ `[data-testid="context-menu-item-zoom-in"]` — alias
 - `text="Zoom out"` — interactive [optional] — F4.2.zoom-out
 - `text="Reset zoom"` — interactive [optional] — F4.2.zoom-reset
+  ↳ `[data-testid="context-menu-item-reset-zoom"]` — alias
 - `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
 - `[data-testid="context-menu-item-terminal-display"]` — interactive [optional] — F4.2.terminal-display-menu-item
@@ -2132,6 +2272,115 @@
 - `[data-testid="welcome-wsl-card"]` — display [optional] — F9.8.welcome-wsl-card
 - `[data-testid="welcome-wsl-distro"]` — interactive [optional] — F9.8.welcome-wsl-distro
 - `[data-testid="welcome-wsl-open"]` — interactive [optional] — F9.8.welcome-wsl-open
+
+## tools/mfa (F-MFA-1)
+
+- `[data-testid="sidebar-tool-mfa"]` — interactive — F-MFA-1.open-sidebar
+- `[data-testid="context-menu-item-mfa"]` — interactive [optional] — F-MFA-1.open-menu
+- `[data-testid="mfa-tab"]` — display — F-MFA-1.tab
+- `[data-testid="vault-gate-placeholder"]` — display — F-MFA-1.gate-placeholder
+- `[data-testid="vault-gate-action"]` — interactive — F-MFA-1.gate-action
+- `[data-testid="mfa-panel"]` — display — F-MFA-1.panel
+- `[data-testid="mfa-search"]` — interactive — F-MFA-1.search
+- `[data-testid="mfa-group-filter"]` — interactive — F-MFA-1.group-filter
+- `[data-testid="mfa-sort-mode"]` — interactive — F-MFA-1.sort-mode
+- `[data-testid="mfa-add"]` — interactive — F-MFA-1.add
+- `[data-testid="mfa-empty"]` — display — F-MFA-1.empty
+- `[data-testid="mfa-empty-add-secret"]` — interactive — F-MFA-1.empty-add-secret
+- `[data-testid="mfa-empty-add-image"]` — interactive — F-MFA-1.empty-add-image
+- `[data-testid="mfa-empty-add-screen"]` — interactive — F-MFA-1.empty-add-screen
+- `[data-testid="mfa-empty-add-camera"]` — interactive — F-MFA-1.empty-add-camera
+- `[data-testid="mfa-no-results"]` — display — F-MFA-1.no-results
+- `[data-testid="mfa-list"]` — display [optional] — F-MFA-1.list
+- `[data-testid="mfa-status"]` — display — F-MFA-1.status
+- `[data-testid="mfa-account-row"]` — interactive — F-MFA-1.row
+- `[data-testid="mfa-account-code"]` — interactive — F-MFA-1.code
+- `[data-testid="mfa-account-next-code"]` — interactive [optional] — F-MFA-1.next-code
+- `[data-testid="mfa-account-countdown"]` — display — F-MFA-1.countdown
+- `[data-testid="mfa-account-group"]` — display — F-MFA-1.group-pill
+- `[data-testid="mfa-account-issuer"]` — display [optional] — F-MFA-1.issuer-label
+- `[data-testid="mfa-account-name"]` — display [optional] — F-MFA-1.account-label
+- `[data-testid="mfa-account-hotp-next"]` — interactive — F-MFA-1.hotp-next
+- `[data-testid="mfa-account-copy"]` — interactive — F-MFA-1.copy
+- `[data-testid="mfa-account-pin"]` — interactive — F-MFA-1.pin
+- `[data-testid="mfa-account-menu"]` — interactive — F-MFA-1.menu
+- `[data-testid="mfa-account-drag"]` — interactive — F-MFA-1.drag
+- `[data-testid="mfa-menu-edit"]` — interactive — F-MFA-1.menu-edit
+- `[data-testid="mfa-menu-qr"]` — interactive — F-MFA-1.menu-qr
+- `[data-testid="mfa-menu-pin"]` — interactive — F-MFA-1.menu-pin
+- `[data-testid="mfa-menu-move-up"]` — interactive — F-MFA-1.menu-move-up
+- `[data-testid="mfa-menu-move-down"]` — interactive — F-MFA-1.menu-move-down
+- `[data-testid="mfa-menu-delete"]` — interactive — F-MFA-1.menu-delete
+- `[data-testid="mfa-edit-dialog"]` — display — F-MFA-1.edit-dialog
+- `[data-testid="mfa-edit-issuer"]` — interactive — F-MFA-1.edit-issuer
+- `[data-testid="mfa-edit-account"]` — interactive — F-MFA-1.edit-account
+- `[data-testid="mfa-edit-group"]` — interactive — F-MFA-1.edit-group
+- `[data-testid="mfa-edit-note"]` — interactive — F-MFA-1.edit-note
+- `[data-testid="mfa-edit-error"]` — display — F-MFA-1.edit-error
+- `[data-testid="mfa-edit-save"]` — interactive — F-MFA-1.edit-save
+- `[data-testid="mfa-edit-cancel"]` — interactive — F-MFA-1.edit-cancel
+- `[data-testid="mfa-qr-dialog"]` — display — F-MFA-1.qr-dialog
+- `[data-testid="mfa-qr-password"]` — interactive — F-MFA-1.qr-password
+- `[data-testid="mfa-qr-reveal"]` — interactive — F-MFA-1.qr-reveal
+- `[data-testid="mfa-qr-image"]` — display — F-MFA-1.qr-image
+- `[data-testid="mfa-qr-error"]` — display — F-MFA-1.qr-error
+- `[data-testid="mfa-qr-close"]` — interactive — F-MFA-1.qr-close
+- `[data-testid="mfa-error"]` — display [optional] — F-MFA-1.error-banner
+- `[data-testid="mfa-loading"]` — display [optional] — F-MFA-1.loading
+- `[data-testid="mfa-load-error"]` — display [optional] — F-MFA-1.load-error
+- `[data-testid="mfa-retry"]` — interactive [optional] — F-MFA-1.retry
+- `[data-testid="mfa-key-error"]` — display [optional] — F-MFA-1.key-error
+- `[data-testid="mfa-reset-store"]` — interactive [optional] — F-MFA-1.reset-store
+
+## tools/mfa (F-MFA-2)
+
+- `[data-testid="mfa-add-dialog"]` — display — F-MFA-2.dialog
+- `[data-testid="mfa-add-close"]` — interactive — F-MFA-2.close
+- `[data-testid="mfa-add-mode-secret"]` — interactive — F-MFA-2.mode-secret
+- `[data-testid="mfa-add-mode-image"]` — interactive — F-MFA-2.mode-image
+- `[data-testid="mfa-add-mode-screen"]` — interactive — F-MFA-2.mode-screen
+- `[data-testid="mfa-add-mode-camera"]` — interactive — F-MFA-2.mode-camera
+- `[data-testid="mfa-secret-form"]` — display [optional] — F-MFA-2.secret-form
+- `[data-testid="mfa-add-uri"]` — interactive — F-MFA-2.uri
+- `[data-testid="mfa-add-issuer"]` — interactive — F-MFA-2.issuer
+- `[data-testid="mfa-add-account"]` — interactive — F-MFA-2.account
+- `[data-testid="mfa-add-secret"]` — interactive — F-MFA-2.secret
+- `[data-testid="mfa-add-group"]` — interactive — F-MFA-2.group
+- `[data-testid="mfa-add-advanced"]` — interactive — F-MFA-2.advanced
+- `[data-testid="mfa-add-advanced-panel"]` — display — F-MFA-2.advanced-panel
+- `[data-testid="mfa-add-kind"]` — interactive — F-MFA-2.kind
+- `[data-testid="mfa-add-counter"]` — interactive — F-MFA-2.counter
+- `[data-testid="mfa-add-algorithm"]` — interactive [optional] — F-MFA-2.algorithm
+- `[data-testid="mfa-add-digits"]` — interactive [optional] — F-MFA-2.digits
+- `[data-testid="mfa-add-period"]` — interactive [optional] — F-MFA-2.period
+- `[data-testid="mfa-add-notice"]` — display — F-MFA-2.notice
+- `[data-testid="mfa-add-error"]` — display — F-MFA-2.error
+- `[data-testid="mfa-add-cancel"]` — interactive — F-MFA-2.cancel
+- `[data-testid="mfa-add-submit"]` — interactive — F-MFA-2.submit
+- `[data-testid="mfa-image-dropzone"]` — interactive — F-MFA-2.image-dropzone
+- `[data-testid="mfa-image-paste"]` — interactive — F-MFA-2.image-paste
+- `[data-testid="mfa-image-choose"]` — interactive [optional] — F-MFA-2.image-choose
+- `[data-testid="mfa-image-file"]` — interactive — F-MFA-2.image-file
+- `[data-testid="mfa-image-status"]` — display — F-MFA-2.image-status
+- `[data-testid="mfa-screen-scan"]` — interactive — F-MFA-2.screen-scan
+- `[data-testid="mfa-screen-status"]` — display — F-MFA-2.screen-status
+- `[data-testid="mfa-camera-state"]` — display — F-MFA-2.camera-state
+- `[data-testid="mfa-camera-video"]` — display — F-MFA-2.camera-video
+- `[data-testid="mfa-camera-retry"]` — interactive — F-MFA-2.camera-retry
+- `[data-testid="mfa-camera-device"]` — interactive [optional] — F-MFA-2.camera-device
+- `[data-testid="mfa-import-preview"]` — display — F-MFA-2.import-preview
+- `[data-testid="mfa-import-item"]` — display — F-MFA-2.import-item
+- `[data-testid="mfa-import-item-check"]` — interactive — F-MFA-2.import-item-check
+- `[data-testid="mfa-import-item-label"]` — display — F-MFA-2.import-item-label
+- `[data-testid="mfa-import-issuer"]` — interactive — F-MFA-2.import-issuer
+- `[data-testid="mfa-import-account"]` — interactive — F-MFA-2.import-account
+- `[data-testid="mfa-import-group"]` — interactive — F-MFA-2.import-group
+- `[data-testid="mfa-import-duplicate"]` — display — F-MFA-2.import-duplicate
+- `[data-testid="mfa-import-all-duplicates"]` — display — F-MFA-2.import-all-duplicates
+- `[data-testid="mfa-import-invalid"]` — display [optional] — F-MFA-2.import-invalid
+- `[data-testid="mfa-import-error"]` — display [optional] — F-MFA-2.import-error
+- `[data-testid="mfa-import-back"]` — interactive — F-MFA-2.import-back
+- `[data-testid="mfa-import-confirm"]` — interactive — F-MFA-2.import-confirm
 
 ## tunnel (F8.2)
 
@@ -2238,7 +2487,18 @@
 - `[data-testid="vnc-panel"]` — display — F9.6.panel-root
 - `[data-testid="vnc-canvas"]` — display — F9.6.canvas
 - `[data-testid="vnc-scale-toggle"]` — interactive [optional] — F9.6.scale-toggle
+- `[data-testid="vnc-send-cad"]` — interactive [optional] — F9.6.send-ctrl-alt-del
+- `[data-testid="vnc-fullscreen"]` — interactive [optional] — F9.6.fullscreen
+- `[data-testid="vnc-session-menu"]` — interactive [optional] — F9.6.session-menu
+- `[data-testid="vnc-menu-info"]` — interactive [optional] — F9.6.menu-info
+- `[data-testid="vnc-menu-quality"]` — interactive [optional] — F9.6.menu-quality
+- `[data-testid="vnc-quality-low"]` — interactive [optional] — F9.6.quality-low
+- `[data-testid="vnc-menu-send-f8"]` — interactive [optional] — F9.6.menu-send-f8
+- `[data-testid="vnc-session-info"]` — display [optional] — F9.6.session-info
 - `[data-testid="vnc-reconnect"]` — interactive [optional] — F9.6.reconnect
+- `[data-testid="vnc-unencrypted-continue"]` — interactive [optional] — F9.6.unencrypted-continue
+- `[data-testid="vnc-auth-password"]` — interactive [optional] — F9.6.vnc-auth-password
+- `[data-testid="vnc-auth-ok"]` — interactive [optional] — F9.6.vnc-auth-ok
 - `[data-testid="session-vnc-policies"]` — display [optional] — F9.6.policy-settings
 - `[data-testid="session-vnc-security-policy"]` — interactive [optional] — F9.6.security-policy
 - `[data-testid="session-vnc-clipboard-policy"]` — interactive [optional] — F9.6.clipboard-policy

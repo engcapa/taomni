@@ -111,9 +111,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 Pillow==11.3.0
+      - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_dev_contract test_screenshot_scenarios test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_mouse_steps test_screenshot_scenarios test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - name: Plan exact cases and dependencies
         id: plan
         env:
@@ -155,7 +155,12 @@ jobs:
         if: runner.os == 'Linux' && matrix.mode == 'native'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev libgbm-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim gstreamer1.0-libav gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
+          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev libgbm-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip imagemagick python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim gstreamer1.0-libav gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
+          # RDP audio cases (rdp_audio_required): a per-session PipeWire graph
+          # with a null sink; pipewire-alsa routes cpal/ALSA tones into it.
+          if [[ ",${{ join(matrix.capabilities, ',') }}," == *",audio,"* ]]; then
+            sudo apt-get install -y pipewire wireplumber pipewire-pulse pipewire-alsa pulseaudio-utils
+          fi
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native'
       - uses: arduino/setup-protoc@v3
@@ -192,6 +197,13 @@ jobs:
           choco install tesseract --yes --no-progress
           if ($LASTEXITCODE -ne 0) { throw 'Tesseract installation failed' }
           'C:\Program Files\Tesseract-OCR' >> $env:GITHUB_PATH
+      # RDP audio cases (rdp_audio_required): hosted Windows/macOS runners have
+      # no audio output. This installs VB-CABLE (Windows, devcon with its
+      # publisher certificate trusted) or Background Music (macOS); the fixture
+      # only verifies the device. Linux uses PipeWire packages above.
+      - name: Virtual audio output
+        if: runner.os != 'Linux' && contains(matrix.capabilities, 'audio')
+        uses: LABSN/sound-ci-helpers@d08c889a7bba7d9b1b059f8f76dac4672ea3a9cf # v1.0.4
       - name: macOS build dependencies
         if: runner.os == 'macOS' && matrix.mode == 'native'
         run: |
@@ -225,10 +237,29 @@ jobs:
         with:
           gradle-version: '9.1.0'
       - name: Prepare local service packages
-        if: contains(matrix.capabilities, 'ssh') || contains(matrix.capabilities, 'mysql')
+        if: contains(matrix.capabilities, 'ssh') || contains(matrix.capabilities, 'mysql') || contains(matrix.capabilities, 'vnc') || contains(matrix.capabilities, 'xrdp')
         env:
           QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
         run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
+      - name: RDP unit contracts on the native platform
+        if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        env:
+          CARGO_TARGET_DIR: target/qa-ui-auto
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'
+          CARGO_PROFILE_RELEASE_INCREMENTAL: 'true'
+        run: |
+          mkdir -p 'qa-ui-auto-report/${{ matrix.id }}'
+          (
+            set -e
+            pnpm build
+            if [[ "$RUNNER_OS" == "macOS" ]]; then bash scripts/bundle-krb5-macos.sh stage; fi
+            cd src-tauri
+            cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server --lib
+            cargo test --locked --release --lib servers::rdp::
+            cargo test --locked --release --lib rdp::session::tests
+            cargo test --locked --release --lib rdp::ws::tests
+            cargo test --locked --release --bin rdp-probe
+          ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/rdp-unit.log'
       - name: Run selected cases (Linux native desktop)
         if: runner.os == 'Linux' && matrix.mode == 'native'
         env:

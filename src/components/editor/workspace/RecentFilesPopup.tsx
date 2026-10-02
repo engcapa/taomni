@@ -48,15 +48,22 @@ export function RecentFilesPopup({
   onActivateToolWindow,
   onOpenRecentLocations,
 }: RecentFilesPopupProps) {
-  const aside = toolWindows.length > 0 || onOpenRecentLocations ? (
+  // IDEA Switcher: Left moves the keyboard selection into this column,
+  // Up/Down walk it, Enter activates, Right returns to the files.
+  const asideItemCount = toolWindows.length + (onOpenRecentLocations ? 1 : 0);
+  const aside = asideItemCount > 0 ? ({ selectedIndex }: { selectedIndex: number | null }) => (
     <div data-testid="code-workspace-recent-files-tool-windows" role="list" aria-label="Tool windows">
-      {toolWindows.map((toolWindow) => (
+      {toolWindows.map((toolWindow, index) => (
         <button
           key={toolWindow.id}
           type="button"
           role="listitem"
+          tabIndex={-1}
           data-testid={`code-workspace-recent-files-tool-window-${toolWindow.id}`}
-          className="h-6 w-full min-w-0 flex items-center gap-2 px-3 text-left text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+          data-selected={selectedIndex === index || undefined}
+          aria-current={selectedIndex === index || undefined}
+          className="h-6 w-full min-w-0 flex items-center gap-2 px-3 text-left text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-selection-match-bg)]"
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => onActivateToolWindow?.(toolWindow.id)}
         >
           <span className="min-w-0 flex-1 truncate">{toolWindow.label}</span>
@@ -67,8 +74,12 @@ export function RecentFilesPopup({
         <button
           type="button"
           role="listitem"
+          tabIndex={-1}
           data-testid="code-workspace-recent-files-recent-locations"
-          className="mt-1 h-6 w-full min-w-0 flex items-center gap-2 border-t border-[var(--taomni-code-border)] px-3 text-left text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+          data-selected={selectedIndex === toolWindows.length || undefined}
+          aria-current={selectedIndex === toolWindows.length || undefined}
+          className="mt-1 h-6 w-full min-w-0 flex items-center gap-2 border-t border-[var(--taomni-code-border)] px-3 text-left text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-selection-match-bg)]"
+          onMouseDown={(event) => event.preventDefault()}
           onClick={onOpenRecentLocations}
         >
           <span className="min-w-0 flex-1 truncate">Recent Locations</span>
@@ -77,6 +88,11 @@ export function RecentFilesPopup({
       )}
     </div>
   ) : null;
+  const activateAside = (index: number) => {
+    const toolWindow = toolWindows[index];
+    if (toolWindow) onActivateToolWindow?.(toolWindow.id);
+    else if (index === toolWindows.length) onOpenRecentLocations?.();
+  };
   const filterItems = useCallback(
     (query: string, all: RecentFileEntry[]) =>
       query.trim()
@@ -137,7 +153,9 @@ export function RecentFilesPopup({
           </label>
         </div>
       ) : undefined}
-      aside={aside}
+      aside={aside ?? undefined}
+      asideItemCount={asideItemCount}
+      onAsideActivate={activateAside}
       footer={(selected) => (
         <>
           {/* IDEA: the full path of the selected file. */}

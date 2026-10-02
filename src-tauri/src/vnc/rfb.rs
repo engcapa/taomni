@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::vnc::clipboard::{
@@ -8,11 +9,14 @@ use crate::vnc::clipboard::{
     parse_extended_body_with_limits,
 };
 use crate::vnc::encodings::{
-    self, DecodedCursor, DecodedPointerPosition, DecodedRect, ENCODING_DESKTOP_SIZE,
-    ENCODING_POINTER_POS, ENCODING_RICH_CURSOR, ENCODING_X_CURSOR, HextileState, ZrleDecoder,
+    self, DecodedCursor, DecodedPointerPosition, ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS,
+    ENCODING_RICH_CURSOR, ENCODING_X_CURSOR, HextileState, ZrleDecoder,
 };
+use crate::vnc::framebuffer::{FbRect, Framebuffer, SharedFramebuffer};
 use crate::vnc::limits::DecodeLimits;
+use crate::vnc::pixel::{PixelConverter, PixelFormat};
 use crate::vnc::policy::VncSecurityPolicy;
+use crate::vnc::tight::{self, ENCODING_TIGHT, TightDecoder};
 
 const SEC_TYPE_NONE: u8 = 1;
 const SEC_TYPE_VNC_AUTH: u8 = 2;
@@ -21,6 +25,36 @@ const SEC_TYPE_RA2NE_128: u8 = 6;
 pub(crate) const SEC_TYPE_ANONYMOUS_TLS: u8 = 18;
 const SEC_TYPE_RA2_256: u8 = 129;
 const SEC_TYPE_RA2NE_256: u8 = 130;
+/// Apple Remote Desktop (macOS Screen Sharing).
+const SEC_TYPE_ARD: u8 = 30;
+/// Diffie-Hellman modulus sizes accepted for ARD (macOS sends 128 bytes).
+const ARD_MIN_KEY_BYTES: usize = 64;
+const ARD_MAX_KEY_BYTES: usize = 1024;
+/// Username and password are NUL-terminated in 64-byte fields.
+const ARD_FIELD_BYTES: usize = 64;
+
+/// The chosen security type needs a password the caller did not supply; the
+/// attempt stops before any challenge is answered so the viewer can ask
+/// (DEC-VNC-21). `VncError::classify` maps it to `credentials-required`.
+pub(crate) const CREDENTIALS_REQUIRED: &str =
+    "credentials required: the server asks for a password to log in";
+
+/// Security types that authenticate with a password.
+fn needs_password(sec_type: u8) -> bool {
+    matches!(
+        sec_type,
+        SEC_TYPE_VNC_AUTH
+            | SEC_TYPE_RA2_128
+            | SEC_TYPE_RA2NE_128
+            | SEC_TYPE_RA2_256
+            | SEC_TYPE_RA2NE_256
+            | SEC_TYPE_ARD
+    )
+}
+
+fn missing_password(password: Option<&str>) -> bool {
+    password.is_none_or(str::is_empty)
+}
 
 const RA2_SUBTYPE_USER_PASS: u8 = 1;
 const RA2_SUBTYPE_PASS: u8 = 2;
@@ -79,7 +113,15 @@ pub struct RfbConnection {
     pub height: u16,
     pub name: String,
     pub security_type: Option<u8>,
-    pub framebuffer: Vec<u8>,
+    /// Authoritative RGBA framebuffer shared with the relay, which reads the
+    /// newest pixels of damaged regions when the WebView is ready.
+    framebuffer: SharedFramebuffer,
+    /// Reused per-rectangle decode target (`w*h*4`).
+    scratch: Vec<u8>,
+    /// Userspace read buffer for the plaintext runtime stream. Decoders issue
+    /// many 1-4 byte reads; without it each was a socket syscall.
+    read_buffer: ReadBuffer,
+    stats: RuntimeStats,
     limits: DecodeLimits,
     security_policy: VncSecurityPolicy,
     pending_security: Option<PendingSecurity>,
@@ -90,6 +132,15 @@ pub struct RfbConnection {
     hextile_state: HextileState,
     /// ZRLE uses a single zlib stream for the whole session.
     zrle_decoder: ZrleDecoder,
+    /// Tight keeps four zlib streams for the whole session.
+    tight_decoder: TightDecoder,
+    /// Wire pixel format of the rectangles currently being decoded.
+    pixel: PixelConverter,
+    /// A SetPixelFormat the writer sent while no update was outstanding; the
+    /// next FramebufferUpdate is the first one in that format.
+    pending_pixel_format: Arc<Mutex<Option<PixelFormat>>>,
+    /// ClientInit shared flag (RealVNC `Shared`, default true).
+    shared: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -103,6 +154,7 @@ pub struct RfbWriter {
     secure_output: Option<AesEax>,
     width: u16,
     height: u16,
+    pending_pixel_format: Arc<Mutex<Option<PixelFormat>>>,
 }
 
 impl RfbConnection {
@@ -199,7 +251,10 @@ impl RfbConnection {
             height: 0,
             name: String::new(),
             security_type: None,
-            framebuffer: Vec::new(),
+            framebuffer: Framebuffer::empty().shared(),
+            scratch: Vec::new(),
+            read_buffer: ReadBuffer::new(RUNTIME_READ_BUFFER_BYTES),
+            stats: RuntimeStats::default(),
             limits,
             security_policy,
             pending_security,
@@ -207,7 +262,16 @@ impl RfbConnection {
             proto_minor,
             hextile_state: HextileState::new(),
             zrle_decoder: ZrleDecoder::new(),
+            tight_decoder: TightDecoder::new(),
+            pixel: PixelConverter::default(),
+            pending_pixel_format: Arc::new(Mutex::new(None)),
+            shared: true,
         })
+    }
+
+    /// ClientInit shared flag; set before authenticating.
+    pub fn set_shared(&mut self, shared: bool) {
+        self.shared = shared;
     }
 
     pub fn protocol_version(&self) -> String {
@@ -286,12 +350,16 @@ impl RfbConnection {
             return self.authenticate_v33_with_policy(password, policy, None);
         }
 
+        let has_username = username.is_some_and(|name| !name.trim().is_empty());
         let (chosen, write_selection) = match self.pending_security.take() {
             Some(PendingSecurity::Selected(chosen)) => (chosen, false),
             Some(PendingSecurity::V33(_)) => unreachable!(),
-            None => (self.read_and_choose_security_type()?, true),
+            None => (self.read_and_choose_security_type(has_username)?, true),
         };
         self.security_type = Some(chosen);
+        if needs_password(chosen) && missing_password(password) {
+            return Err(CREDENTIALS_REQUIRED.into());
+        }
 
         if write_selection {
             self.write_all(&[chosen])
@@ -308,6 +376,9 @@ impl RfbConnection {
             SEC_TYPE_RA2_128 | SEC_TYPE_RA2NE_128 | SEC_TYPE_RA2_256 | SEC_TYPE_RA2NE_256 => {
                 let pwd = password.unwrap_or("");
                 self.vnc_auth_ra2(chosen, username.unwrap_or(""), pwd)?;
+            }
+            SEC_TYPE_ARD => {
+                self.vnc_auth_ard(username.unwrap_or("").trim(), password.unwrap_or(""))?;
             }
             _ => unreachable!(),
         }
@@ -345,14 +416,14 @@ impl RfbConnection {
         }
 
         // ClientInit: send shared flag
-        self.write_all(&[1])
+        self.write_all(&[u8::from(self.shared)])
             .map_err(|e| format!("write client init: {}", e))?;
         self.flush().map_err(|e| format!("flush: {}", e))?;
 
         self.read_server_init()
     }
 
-    fn read_and_choose_security_type(&mut self) -> Result<u8, String> {
+    fn read_and_choose_security_type(&mut self, has_username: bool) -> Result<u8, String> {
         let mut sec_buf = [0u8; 1];
         self.read_exact(&mut sec_buf)
             .map_err(|e| authentication_read_error("reading the security type count", e))?;
@@ -378,7 +449,9 @@ impl RfbConnection {
         let mut types = vec![0u8; num_types];
         self.read_exact(&mut types)
             .map_err(|e| authentication_read_error("reading the security types", e))?;
-        self.security_policy.choose(&types).map_err(|e| e.0)
+        self.security_policy
+            .choose_with_username(&types, has_username)
+            .map_err(|e| e.0)
     }
 
     /// RFB 3.3 security handshake: server sends a u32 security type, no client choice.
@@ -410,13 +483,16 @@ impl RfbConnection {
         match sec_type {
             1 => {
                 // None — no authentication, proceed directly to ClientInit
-                self.write_all(&[1])
+                self.write_all(&[u8::from(self.shared)])
                     .map_err(|e| format!("write client init: {}", e))?;
                 self.flush().map_err(|e| format!("flush: {}", e))?;
                 self.read_server_init()
             }
             2 => {
                 // VNC Authentication
+                if missing_password(password) {
+                    return Err(CREDENTIALS_REQUIRED.into());
+                }
                 let pwd = password.unwrap_or("");
                 self.vnc_auth_des(pwd)?;
 
@@ -429,7 +505,7 @@ impl RfbConnection {
                     return Err(format!("authentication failed (result={})", result));
                 }
 
-                self.write_all(&[1])
+                self.write_all(&[u8::from(self.shared)])
                     .map_err(|e| format!("write client init: {}", e))?;
                 self.flush().map_err(|e| format!("flush: {}", e))?;
                 self.read_server_init()
@@ -450,6 +526,52 @@ impl RfbConnection {
             .map_err(|e| format!("write VNC response: {}", e))?;
         self.flush().map_err(|e| format!("flush: {}", e))?;
 
+        Ok(())
+    }
+
+    /// Apple Remote Desktop authentication (security type 30, macOS Screen
+    /// Sharing): the server sends a Diffie-Hellman generator, key length,
+    /// prime and public key; the client answers with the macOS account name
+    /// and password encrypted under MD5(shared secret) and its public key.
+    fn vnc_auth_ard(&mut self, username: &str, password: &str) -> Result<(), String> {
+        use rsa::rand_core::OsRng;
+
+        if username.is_empty() {
+            return Err(
+                "ARD authentication requires the macOS account name: no VNC username was provided"
+                    .into(),
+            );
+        }
+        let mut head = [0u8; 4];
+        self.read_exact(&mut head)
+            .map_err(|e| authentication_read_error("reading the ARD key parameters", e))?;
+        let generator = u16::from_be_bytes([head[0], head[1]]);
+        let key_len = u16::from_be_bytes([head[2], head[3]]) as usize;
+        if !(ARD_MIN_KEY_BYTES..=ARD_MAX_KEY_BYTES).contains(&key_len) {
+            return Err(format!(
+                "ARD authentication: unsupported Diffie-Hellman key length {key_len} bytes"
+            ));
+        }
+        let mut prime = vec![0u8; key_len];
+        self.read_exact(&mut prime)
+            .map_err(|e| authentication_read_error("reading the ARD prime", e))?;
+        let mut server_public = vec![0u8; key_len];
+        self.read_exact(&mut server_public)
+            .map_err(|e| authentication_read_error("reading the ARD server key", e))?;
+
+        let (credentials, client_public) = ard_response(
+            generator,
+            &prime,
+            &server_public,
+            username,
+            password,
+            &mut OsRng,
+        )?;
+        self.write_all(&credentials)
+            .map_err(|e| format!("ARD authentication: write credentials: {e}"))?;
+        self.write_all(&client_public)
+            .map_err(|e| format!("ARD authentication: write public key: {e}"))?;
+        self.flush().map_err(|e| format!("flush: {}", e))?;
         Ok(())
     }
 
@@ -661,11 +783,8 @@ impl RfbConnection {
         self.name = String::from_utf8_lossy(&name_bytes).to_string();
 
         // Allocate framebuffer (RGBA 32-bit) only after applying hard limits.
-        let fb_size = self
-            .limits
-            .framebuffer_bytes(self.width, self.height)
-            .map_err(|e| e.to_string())?;
-        self.framebuffer = vec![0u8; fb_size];
+        let framebuffer = Framebuffer::new(self.width, self.height, &self.limits)?;
+        *self.lock_framebuffer()? = framebuffer;
 
         Ok(ServerInit {
             width: self.width,
@@ -675,57 +794,24 @@ impl RfbConnection {
     }
 
     /// Request pixel format: 32-bit true-colour with depth 24 so ZRLE can use
-    /// the 3-byte CPIXEL form.
+    /// the 3-byte CPIXEL form and rectangles copy straight into RGBA.
     pub fn set_pixel_format_rgba(&mut self) -> Result<(), String> {
-        let mut msg = vec![0u8; 20];
-        msg[0] = 0; // SetPixelFormat message type
-        msg[1] = 0; // padding
-        msg[2] = 0; // padding
-        msg[3] = 0; // padding
-        // Pixel format:
-        msg[4] = 32; // bits-per-pixel
-        msg[5] = 24; // depth: 24 so ZRLE's CPIXEL rule kicks in
-        msg[6] = 0; // big-endian false (little-endian)
-        msg[7] = 1; // true-colour
-        msg[8] = 0; // red-max hi
-        msg[9] = 255; // red-max lo
-        msg[10] = 0; // green-max hi
-        msg[11] = 255; // green-max lo
-        msg[12] = 0; // blue-max hi
-        msg[13] = 255; // blue-max lo
-        msg[14] = 0; // red-shift (R at byte 0 in little-endian)
-        msg[15] = 8; // green-shift (G at byte 1)
-        msg[16] = 16; // blue-shift (B at byte 2)
-        msg[17] = 0; // padding
-        msg[18] = 0; // padding
-        msg[19] = 0; // padding
+        self.set_pixel_format(PixelFormat::RGB888)
+    }
 
-        self.write_all(&msg)
+    /// Request a pixel format before the first update request.
+    pub fn set_pixel_format(&mut self, format: PixelFormat) -> Result<(), String> {
+        self.write_all(&set_pixel_format_message(format))
             .map_err(|e| format!("write set pixel format: {}", e))?;
         self.flush().map_err(|e| format!("flush: {}", e))?;
-
+        self.pixel = PixelConverter::new(format);
+        self.stats.pixel_format = format;
         Ok(())
     }
 
     /// Request encodings in preference order.
     pub fn set_encodings(&mut self, encodings: &[i32]) -> Result<(), String> {
-        let count = u16::try_from(encodings.len())
-            .map_err(|_| "too many VNC encodings requested".to_string())?;
-        let message_len = encodings
-            .len()
-            .checked_mul(4)
-            .and_then(|bytes| bytes.checked_add(4))
-            .ok_or_else(|| "VNC encoding list length overflow".to_string())?;
-        let mut msg = vec![0u8; message_len];
-        msg[0] = 2; // SetEncodings
-        msg[1] = 0;
-        msg[2..4].copy_from_slice(&count.to_be_bytes());
-
-        for (i, enc) in encodings.iter().enumerate() {
-            let off = 4 + i * 4;
-            msg[off..off + 4].copy_from_slice(&enc.to_be_bytes());
-        }
-
+        let msg = set_encodings_message(encodings)?;
         self.write_all(&msg)
             .map_err(|e| format!("write set encodings: {}", e))?;
         self.flush().map_err(|e| format!("flush: {}", e))?;
@@ -756,10 +842,36 @@ impl RfbConnection {
     /// pixels change or while the viewer is hidden. Runtime cancellation closes
     /// the socket explicitly, so remove the handshake timeout before entering
     /// the long-lived read loop.
-    pub fn enter_runtime_mode(&self) -> Result<(), String> {
+    pub fn enter_runtime_mode(&mut self) -> Result<(), String> {
         self.stream
             .set_read_timeout(None)
-            .map_err(|e| format!("clear VNC runtime read timeout failed: {e}"))
+            .map_err(|e| format!("clear VNC runtime read timeout failed: {e}"))?;
+        // Handshake reads stay unbuffered so no byte meant for a sub-protocol
+        // (RA2, TLS bridge) is consumed early. From here on every read goes
+        // through `read_exact`/`RfbStreamReader`, so buffering is safe.
+        if self.secure_io.is_none() {
+            self.read_buffer.enabled = true;
+        }
+        Ok(())
+    }
+
+    /// Counters for the session-information view and performance evidence.
+    pub fn runtime_stats(&self) -> RuntimeStats {
+        RuntimeStats {
+            wire_bytes: self.read_buffer.total,
+            ..self.stats
+        }
+    }
+
+    /// Handle to the authoritative framebuffer for relay-side extraction.
+    pub fn framebuffer(&self) -> SharedFramebuffer {
+        self.framebuffer.clone()
+    }
+
+    fn lock_framebuffer(&self) -> Result<std::sync::MutexGuard<'_, Framebuffer>, String> {
+        self.framebuffer
+            .lock()
+            .map_err(|_| "VNC framebuffer lock poisoned".to_string())
     }
 
     /// Split out an independent writer so input events can be sent while the
@@ -782,6 +894,7 @@ impl RfbConnection {
             secure_output,
             width: self.width,
             height: self.height,
+            pending_pixel_format: self.pending_pixel_format.clone(),
         })
     }
 
@@ -852,6 +965,17 @@ impl RfbConnection {
     }
 
     fn read_framebuffer_update(&mut self) -> Result<ServerMessage, String> {
+        // The writer only switches formats while no update is outstanding, so
+        // this update is the first one encoded in the new format.
+        if let Some(format) = self
+            .pending_pixel_format
+            .lock()
+            .map_err(|_| "VNC pixel format lock poisoned".to_string())?
+            .take()
+        {
+            self.pixel = PixelConverter::new(format);
+            self.stats.pixel_format = format;
+        }
         self.read_exact(&mut [0u8; 1])
             .map_err(|e| format!("read fu padding: {}", e))?;
         let num_rects = self.read_u16()? as usize;
@@ -859,7 +983,13 @@ impl RfbConnection {
             return Err("framebuffer update contains too many rectangles".into());
         }
 
-        let mut decoded: Vec<DecodedRect> = Vec::with_capacity(num_rects);
+        let update_started = std::time::Instant::now();
+        let wire_before = self.read_buffer.total;
+        let mut pixel_rects = 0u16;
+        let mut tight_rects = 0u16;
+        let mut compressed_rects = 0u16;
+        let mut raw_pixels = 0u64;
+        let mut damage: Vec<FbRect> = Vec::with_capacity(num_rects.min(64));
         let mut cursor = None;
         let mut pointer_pos = None;
         for _ in 0..num_rects {
@@ -895,97 +1025,44 @@ impl RfbConnection {
                 }
             }
 
+            let rect = FbRect::new(x, y, w, h);
             match encoding {
-                0 => {
-                    let limits = self.limits;
-                    let rect = self.decode_via_reader(|reader| {
-                        encodings::read_raw_with_limits(reader, x, y, w, h, &limits)
-                    })?;
-                    self.write_to_fb(&rect);
-                    decoded.push(rect);
+                0 | 5 | 16 | ENCODING_TIGHT => {
+                    self.stats.last_encoding = Some(encoding);
+                    pixel_rects = pixel_rects.saturating_add(1);
+                    if encoding == ENCODING_TIGHT {
+                        tight_rects = tight_rects.saturating_add(1);
+                    }
+                    if encoding == 0 {
+                        raw_pixels += u64::from(w) * u64::from(h);
+                    } else {
+                        compressed_rects = compressed_rects.saturating_add(1);
+                    }
+                    self.decode_pixels(encoding, w, h)?;
+                    self.lock_framebuffer()?.blit(rect, &self.scratch)?;
+                    damage.push(rect);
                 }
                 1 => {
-                    // CopyRect resolves against the framebuffer inside the
-                    // decoder, so borrow it explicitly before handing off the
-                    // reader.
-                    let Self {
-                        stream,
-                        secure_io,
-                        framebuffer,
-                        width,
-                        height,
-                        ..
-                    } = self;
-                    let rect = {
-                        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
-                        encodings::read_copyrect(
-                            &mut reader,
-                            x,
-                            y,
-                            w,
-                            h,
-                            framebuffer,
-                            *width,
-                            *height,
-                        )?
-                    };
-                    self.write_to_fb(&rect);
-                    decoded.push(rect);
-                }
-                5 => {
-                    let Self {
-                        stream,
-                        secure_io,
-                        hextile_state,
-                        ..
-                    } = self;
-                    let rects = {
-                        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
-                        encodings::read_hextile(&mut reader, x, y, w, h, hextile_state)?
-                    };
-                    for r in &rects {
-                        self.write_to_fb(r);
-                    }
-                    decoded.extend(rects);
-                }
-                16 => {
-                    let limits = self.limits;
-                    let Self {
-                        stream,
-                        secure_io,
-                        zrle_decoder,
-                        ..
-                    } = self;
-                    let rects = {
-                        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
-                        encodings::read_zrle_with_limits(
-                            &mut reader,
-                            x,
-                            y,
-                            w,
-                            h,
-                            zrle_decoder,
-                            &limits,
-                        )?
-                    };
-                    for r in &rects {
-                        self.write_to_fb(r);
-                    }
-                    decoded.extend(rects);
+                    self.stats.last_encoding.get_or_insert(1);
+                    let (src_x, src_y) =
+                        self.decode_via_reader(|reader| encodings::read_copyrect_source(reader))?;
+                    self.lock_framebuffer()?.copy_rect(src_x, src_y, rect)?;
+                    damage.push(rect);
                 }
                 ENCODING_DESKTOP_SIZE => {
                     // DesktopSize pseudo-encoding: no payload, just a resize.
-                    let size = self
-                        .limits
-                        .framebuffer_bytes(w, h)
-                        .map_err(|e| e.to_string())?;
+                    // Rectangles decoded earlier in this update refer to the
+                    // old geometry; the relay repaints the whole new surface.
+                    self.lock_framebuffer()?.resize(w, h, &self.limits)?;
                     self.width = w;
                     self.height = h;
-                    self.framebuffer = vec![0u8; size];
+                    damage.clear();
+                    damage.push(FbRect::new(0, 0, w, h));
                 }
                 ENCODING_RICH_CURSOR => {
+                    let conv = self.pixel.clone();
                     cursor = Some(self.decode_via_reader(|reader| {
-                        encodings::read_rich_cursor(reader, x, y, w, h)
+                        encodings::read_rich_cursor(reader, x, y, w, h, &conv)
                     })?);
                 }
                 ENCODING_X_CURSOR => {
@@ -1005,11 +1082,65 @@ impl RfbConnection {
             }
         }
 
+        self.stats.updates += 1;
+        self.stats.last_update_pixel_rects = pixel_rects;
+        self.stats.last_update_tight_rects = tight_rects;
+        self.stats.last_update_compressed_rects = compressed_rects;
+        self.stats.last_update_raw_pixels = raw_pixels;
+        self.stats.last_update_wire_bytes = self.read_buffer.total - wire_before;
+        self.stats.last_update_micros = update_started.elapsed().as_micros() as u64;
+        self.stats.last_update_started_at = Some(update_started);
+        self.stats.last_update_finished_at = Some(std::time::Instant::now());
         Ok(ServerMessage::FramebufferUpdate {
-            rects: decoded,
+            rects: damage,
             cursor,
             pointer_pos,
         })
+    }
+
+    /// Decode one pixel rectangle into `self.scratch` (resized to `w*h*4`).
+    fn decode_pixels(&mut self, encoding: i32, w: u16, h: u16) -> Result<(), String> {
+        let bytes = self
+            .limits
+            .rectangle_bytes(w, h)
+            .map_err(|e| e.to_string())?;
+        let limits = self.limits;
+        let Self {
+            stream,
+            secure_io,
+            read_buffer,
+            scratch,
+            hextile_state,
+            zrle_decoder,
+            tight_decoder,
+            pixel,
+            ..
+        } = self;
+        if scratch.capacity() < bytes {
+            // A fresh zeroed allocation maps zero pages lazily instead of
+            // memsetting megabytes the decoder overwrites anyway.
+            *scratch = vec![0u8; bytes];
+        } else {
+            scratch.resize(bytes, 0);
+        }
+        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut(), read_buffer);
+        match encoding {
+            0 => encodings::decode_raw_into(&mut reader, w, h, pixel, scratch),
+            5 => encodings::decode_hextile_into(&mut reader, w, h, hextile_state, pixel, scratch),
+            16 => encodings::decode_zrle_into(
+                &mut reader,
+                w,
+                h,
+                zrle_decoder,
+                &limits,
+                pixel,
+                scratch,
+            ),
+            ENCODING_TIGHT => {
+                tight::decode_tight_into(&mut reader, w, h, tight_decoder, &limits, pixel, scratch)
+            }
+            other => Err(format!("unsupported pixel encoding {other}")),
+        }
     }
 
     /// Run a decoder closure over a temporary `impl Read` view of the stream.
@@ -1019,9 +1150,12 @@ impl RfbConnection {
         f: impl FnOnce(&mut RfbStreamReader<'_>) -> Result<T, String>,
     ) -> Result<T, String> {
         let Self {
-            stream, secure_io, ..
+            stream,
+            secure_io,
+            read_buffer,
+            ..
         } = self;
-        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
+        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut(), read_buffer);
         f(&mut reader)
     }
 
@@ -1030,7 +1164,7 @@ impl RfbConnection {
     fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
         match self.secure_io.as_mut() {
             Some(io) => io.read_exact(&mut self.stream, buf),
-            None => self.stream.read_exact(buf),
+            None => self.read_buffer.read_exact(&mut self.stream, buf),
         }
     }
 
@@ -1072,29 +1206,156 @@ impl RfbConnection {
             .map_err(|e| format!("read i32: {}", e))?;
         Ok(i32::from_be_bytes(buf))
     }
+}
 
-    /// Write a decoded pixel rect into the framebuffer. Used so subsequent
-    /// Hextile/CopyRect rects can reference prior pixel state.
-    fn write_to_fb(&mut self, rect: &DecodedRect) {
-        let DecodedRect::Pixels { x, y, w, h, rgba } = rect;
-        let fb_w = self.width as usize;
-        let src_w = *w as usize;
-        for row in 0..*h as usize {
-            let fb_start = ((*y as usize + row) * fb_w + *x as usize) * 4;
-            let src_start = row * src_w * 4;
-            let len = src_w * 4;
-            if fb_start + len <= self.framebuffer.len() && src_start + len <= rgba.len() {
-                self.framebuffer[fb_start..fb_start + len]
-                    .copy_from_slice(&rgba[src_start..src_start + len]);
-            }
+const RUNTIME_READ_BUFFER_BYTES: usize = 256 * 1024;
+
+/// Runtime counters. `wire_bytes` counts plaintext RFB bytes read after
+/// `enter_runtime_mode` (TLS/RA2 framing overhead excluded).
+#[derive(Debug, Clone, Copy)]
+pub struct RuntimeStats {
+    pub wire_bytes: u64,
+    pub updates: u64,
+    pub last_encoding: Option<i32>,
+    /// Pixel format of the latest decoded update.
+    pub pixel_format: PixelFormat,
+    /// Pixel rectangles (and Tight ones among them) in the latest update.
+    pub last_update_pixel_rects: u16,
+    pub last_update_tight_rects: u16,
+    /// ZRLE / Hextile / Tight rectangles, and pixels sent as Raw, in the
+    /// latest update (DEC-VNC-22: a large Raw-only update means the server
+    /// ignored the first encoding).
+    pub last_update_compressed_rects: u16,
+    pub last_update_raw_pixels: u64,
+    /// Bytes and time from the first rectangle header to the end of the last
+    /// FramebufferUpdate; large updates approximate the line speed.
+    pub last_update_wire_bytes: u64,
+    pub last_update_micros: u64,
+    pub last_update_started_at: Option<std::time::Instant>,
+    pub last_update_finished_at: Option<std::time::Instant>,
+}
+
+impl Default for RuntimeStats {
+    fn default() -> Self {
+        Self {
+            wire_bytes: 0,
+            updates: 0,
+            last_encoding: None,
+            pixel_format: PixelFormat::RGB888,
+            last_update_pixel_rects: 0,
+            last_update_tight_rects: 0,
+            last_update_compressed_rects: 0,
+            last_update_raw_pixels: 0,
+            last_update_wire_bytes: 0,
+            last_update_micros: 0,
+            last_update_started_at: None,
+            last_update_finished_at: None,
+        }
+    }
+}
+
+fn set_encodings_message(encodings: &[i32]) -> Result<Vec<u8>, String> {
+    let count = u16::try_from(encodings.len())
+        .map_err(|_| "too many VNC encodings requested".to_string())?;
+    let message_len = encodings
+        .len()
+        .checked_mul(4)
+        .and_then(|bytes| bytes.checked_add(4))
+        .ok_or_else(|| "VNC encoding list length overflow".to_string())?;
+    let mut msg = vec![0u8; message_len];
+    msg[0] = 2; // SetEncodings
+    msg[2..4].copy_from_slice(&count.to_be_bytes());
+    for (i, enc) in encodings.iter().enumerate() {
+        let off = 4 + i * 4;
+        msg[off..off + 4].copy_from_slice(&enc.to_be_bytes());
+    }
+    Ok(msg)
+}
+
+fn set_pixel_format_message(format: PixelFormat) -> [u8; 20] {
+    let mut msg = [0u8; 20];
+    // Message type 0 and three bytes of padding, then PIXEL_FORMAT.
+    msg[4..20].copy_from_slice(&format.to_wire());
+    msg
+}
+
+pub fn encoding_name(encoding: i32) -> &'static str {
+    match encoding {
+        0 => "Raw",
+        1 => "CopyRect",
+        5 => "Hextile",
+        7 => "Tight",
+        16 => "ZRLE",
+        _ => "Unknown",
+    }
+}
+
+/// Userspace read-ahead for the plaintext RFB stream. Disabled during the
+/// handshake; `enter_runtime_mode` turns it on.
+pub(crate) struct ReadBuffer {
+    data: Box<[u8]>,
+    start: usize,
+    end: usize,
+    enabled: bool,
+    /// Bytes read from the socket while enabled.
+    total: u64,
+}
+
+impl ReadBuffer {
+    fn new(capacity: usize) -> Self {
+        Self {
+            data: vec![0u8; capacity].into_boxed_slice(),
+            start: 0,
+            end: 0,
+            enabled: false,
+            total: 0,
         }
     }
 
-    /// Snapshot of the full framebuffer (RGBA). Currently unused externally;
-    /// kept for future server-side caching / re-attach support.
-    #[allow(dead_code)]
-    pub fn take_full_frame(&self) -> Vec<u8> {
-        self.framebuffer.clone()
+    fn read_exact(&mut self, stream: &mut TcpStream, dst: &mut [u8]) -> std::io::Result<()> {
+        if !self.enabled {
+            return stream.read_exact(dst);
+        }
+        let mut offset = 0;
+        let buffered = self.end - self.start;
+        if buffered > 0 {
+            let n = buffered.min(dst.len());
+            dst[..n].copy_from_slice(&self.data[self.start..self.start + n]);
+            self.start += n;
+            offset = n;
+        }
+        while offset < dst.len() {
+            let remaining = dst.len() - offset;
+            // Large payloads (compressed ZRLE bodies, Raw rectangles) bypass
+            // the buffer and land directly in the destination.
+            if remaining >= self.data.len() {
+                stream.read_exact(&mut dst[offset..])?;
+                self.total += remaining as u64;
+                return Ok(());
+            }
+            self.start = 0;
+            self.end = loop {
+                match stream.read(&mut self.data) {
+                    Ok(0) => {
+                        return Err(Error::new(
+                            ErrorKind::UnexpectedEof,
+                            "VNC server closed the connection",
+                        ));
+                    }
+                    Ok(n) => {
+                        self.total += n as u64;
+                        break n;
+                    }
+                    Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                    Err(error) => return Err(error),
+                }
+            };
+            let n = self.end.min(remaining);
+            dst[offset..offset + n].copy_from_slice(&self.data[..n]);
+            self.start = n;
+            offset += n;
+        }
+        Ok(())
     }
 }
 
@@ -1104,33 +1365,36 @@ impl RfbConnection {
 pub(crate) struct RfbStreamReader<'a> {
     stream: &'a mut TcpStream,
     secure_io: Option<&'a mut RsaAesIo>,
+    read_buffer: &'a mut ReadBuffer,
 }
 
 impl<'a> RfbStreamReader<'a> {
-    fn new(stream: &'a mut TcpStream, secure_io: Option<&'a mut RsaAesIo>) -> Self {
-        Self { stream, secure_io }
+    fn new(
+        stream: &'a mut TcpStream,
+        secure_io: Option<&'a mut RsaAesIo>,
+        read_buffer: &'a mut ReadBuffer,
+    ) -> Self {
+        Self {
+            stream,
+            secure_io,
+            read_buffer,
+        }
     }
 }
 
 impl<'a> Read for RfbStreamReader<'a> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         // Decoders all rely on `read_exact`; this path is just a fallback so
-        // generic `Read` combinators keep working. AES-EAX frames are
-        // message-oriented and only expose read_exact, so we saturate the
-        // requested buffer rather than return a partial read.
-        match self.secure_io.as_mut() {
-            Some(io) => {
-                io.read_exact(self.stream, buf)?;
-                Ok(buf.len())
-            }
-            None => self.stream.read(buf),
-        }
+        // generic `Read` combinators keep working. Saturate the requested
+        // buffer rather than return a partial read.
+        self.read_exact(buf)?;
+        Ok(buf.len())
     }
 
     fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
         match self.secure_io.as_mut() {
             Some(io) => io.read_exact(self.stream, buf),
-            None => self.stream.read_exact(buf),
+            None => self.read_buffer.read_exact(self.stream, buf),
         }
     }
 }
@@ -1139,6 +1403,38 @@ impl RfbWriter {
     pub fn set_framebuffer_size(&mut self, width: u16, height: u16) {
         self.width = width;
         self.height = height;
+    }
+
+    /// Switch the wire pixel format mid-session. Callers send this only
+    /// while no FramebufferUpdateRequest is outstanding, so the reader can
+    /// apply the format to the very next update.
+    pub fn set_pixel_format(&mut self, format: PixelFormat) -> Result<(), String> {
+        *self
+            .pending_pixel_format
+            .lock()
+            .map_err(|_| "VNC pixel format lock poisoned".to_string())? = Some(format);
+        self.write_all(&set_pixel_format_message(format))
+            .map_err(|e| format!("write set pixel format: {}", e))?;
+        self.flush().map_err(|e| format!("flush: {}", e))
+    }
+
+    /// Replace the encoding preference list mid-session.
+    pub fn set_encodings(&mut self, encodings: &[i32]) -> Result<(), String> {
+        self.write_all(&set_encodings_message(encodings)?)
+            .map_err(|e| format!("write set encodings: {}", e))?;
+        self.flush().map_err(|e| format!("flush: {}", e))
+    }
+
+    /// Non-incremental request for one pixel: a liveness probe that every
+    /// server must answer (KeepAlive, VNC-SESS-003).
+    pub fn request_probe(&mut self) -> Result<(), String> {
+        let mut msg = [0u8; 10];
+        msg[0] = 3;
+        msg[6..8].copy_from_slice(&1u16.to_be_bytes());
+        msg[8..10].copy_from_slice(&1u16.to_be_bytes());
+        self.write_all(&msg)
+            .map_err(|e| format!("write keepalive request: {}", e))?;
+        self.flush().map_err(|e| format!("flush: {}", e))
     }
 
     /// Send FramebufferUpdateRequest. incremental=true skips unchanged regions.
@@ -1289,8 +1585,11 @@ impl RsaAesIo {
             }
 
             let n = (buf.len() - offset).min(self.read_buf.len());
-            for dst in &mut buf[offset..offset + n] {
-                *dst = self.read_buf.pop_front().expect("buffer length checked");
+            for (dst, src) in buf[offset..offset + n]
+                .iter_mut()
+                .zip(self.read_buf.drain(..n))
+            {
+                *dst = src;
             }
             offset += n;
         }
@@ -1552,6 +1851,60 @@ fn ra2_public_key_hash(
     }
 }
 
+/// The ARD reply: `{username[64], password[64]}` (NUL-terminated UTF-8, the
+/// rest random) encrypted with AES-128-ECB under MD5 of the fixed-width DH
+/// shared secret, and the client's public key in the server's key width.
+pub(crate) fn ard_response(
+    generator: u16,
+    prime: &[u8],
+    server_public: &[u8],
+    username: &str,
+    password: &str,
+    rng: &mut impl rsa::rand_core::RngCore,
+) -> Result<([u8; 2 * ARD_FIELD_BYTES], Vec<u8>), String> {
+    use aes::cipher::{Array, BlockCipherEncrypt, KeyInit};
+    use md5::Digest;
+    use rsa::BigUint;
+
+    for (field, value) in [("username", username), ("password", password)] {
+        if value.len() >= ARD_FIELD_BYTES || value.as_bytes().contains(&0) {
+            return Err(format!(
+                "ARD authentication: the {field} must be under {ARD_FIELD_BYTES} bytes without NUL characters"
+            ));
+        }
+    }
+    let key_len = prime.len();
+    let p = BigUint::from_bytes_be(prime);
+    let one = BigUint::from(1u32);
+    let two = BigUint::from(2u32);
+    let server_key = BigUint::from_bytes_be(server_public);
+    if generator < 2 || p <= BigUint::from(3u32) || server_key <= one || server_key >= &p - &one {
+        return Err("ARD authentication: invalid Diffie-Hellman parameters from the server".into());
+    }
+    let mut secret = vec![0u8; key_len];
+    rng.fill_bytes(&mut secret);
+    // Private exponent in [1, p - 2].
+    let private = BigUint::from_bytes_be(&secret) % (&p - &two) + &one;
+    let client_public = BigUint::from(generator).modpow(&private, &p);
+    let shared = server_key.modpow(&private, &p);
+    let client_public = left_pad(&client_public.to_bytes_be(), key_len, "ARD public key")?;
+    let shared = left_pad(&shared.to_bytes_be(), key_len, "ARD shared secret")?;
+    let key = md5::Md5::digest(&shared);
+
+    let mut block = [0u8; 2 * ARD_FIELD_BYTES];
+    rng.fill_bytes(&mut block);
+    for (offset, value) in [(0, username), (ARD_FIELD_BYTES, password)] {
+        block[offset..offset + value.len()].copy_from_slice(value.as_bytes());
+        block[offset + value.len()] = 0;
+    }
+    let cipher = aes::Aes128::new_from_slice(&key)
+        .map_err(|e| format!("ARD authentication: AES key: {e}"))?;
+    for chunk in block.chunks_exact_mut(16) {
+        cipher.encrypt_block(Array::from_mut_slice(chunk));
+    }
+    Ok((block, client_public))
+}
+
 fn biguint_to_fixed_bytes(value: &rsa::BigUint, len: usize) -> Result<Vec<u8>, String> {
     let bytes = value.to_bytes_be();
     left_pad(&bytes, len, "RSA integer")
@@ -1622,7 +1975,8 @@ fn increment_le(counter: &mut [u8; 16]) {
 #[derive(Debug)]
 pub enum ServerMessage {
     FramebufferUpdate {
-        rects: Vec<DecodedRect>,
+        /// Damaged framebuffer regions; pixels live in `RfbConnection::framebuffer()`.
+        rects: Vec<FbRect>,
         cursor: Option<DecodedCursor>,
         pointer_pos: Option<DecodedPointerPosition>,
     },
@@ -1798,6 +2152,273 @@ mod tests {
         server.join().unwrap();
     }
 
+    /// RFC 2409 Oakley group 2 (1024-bit MODP), the size macOS uses for ARD.
+    const OAKLEY_GROUP_2: &str = "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74\
+        020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F1437\
+        4FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED\
+        EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF";
+
+    /// Deterministic bytes for reproducible tests.
+    struct CountingRng(u8);
+
+    impl rsa::rand_core::RngCore for CountingRng {
+        fn next_u32(&mut self) -> u32 {
+            let mut bytes = [0u8; 4];
+            self.fill_bytes(&mut bytes);
+            u32::from_le_bytes(bytes)
+        }
+        fn next_u64(&mut self) -> u64 {
+            let mut bytes = [0u8; 8];
+            self.fill_bytes(&mut bytes);
+            u64::from_le_bytes(bytes)
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            for byte in dest {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(17);
+                *byte = self.0;
+            }
+        }
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rsa::rand_core::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+
+    fn hex_bytes(hex: &str) -> Vec<u8> {
+        let hex: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    /// The server half of ARD: decrypt the credentials the client sent.
+    fn ard_server_decrypt(
+        prime: &[u8],
+        server_private: &rsa::BigUint,
+        credentials: &[u8],
+        client_public: &[u8],
+    ) -> (String, String) {
+        use aes::cipher::{Array, BlockCipherDecrypt, KeyInit};
+        use md5::Digest;
+
+        let p = rsa::BigUint::from_bytes_be(prime);
+        let shared = rsa::BigUint::from_bytes_be(client_public).modpow(server_private, &p);
+        let shared = left_pad(&shared.to_bytes_be(), prime.len(), "shared").unwrap();
+        let cipher = aes::Aes128::new_from_slice(&md5::Md5::digest(&shared)).unwrap();
+        let mut plain = credentials.to_vec();
+        for chunk in plain.chunks_exact_mut(16) {
+            cipher.decrypt_block(Array::from_mut_slice(chunk));
+        }
+        let field = |range: std::ops::Range<usize>| {
+            let bytes = &plain[range];
+            let end = bytes.iter().position(|b| *b == 0).unwrap();
+            String::from_utf8(bytes[..end].to_vec()).unwrap()
+        };
+        (field(0..64), field(64..128))
+    }
+
+    #[test]
+    fn ard_response_encrypts_credentials_under_the_dh_secret() {
+        let prime = hex_bytes(OAKLEY_GROUP_2);
+        let p = rsa::BigUint::from_bytes_be(&prime);
+        let server_private = rsa::BigUint::from(0x1234_5678_9abc_def1u64);
+        let server_public = rsa::BigUint::from(2u32).modpow(&server_private, &p);
+        let server_public = left_pad(&server_public.to_bytes_be(), 128, "public").unwrap();
+        let (credentials, client_public) = ard_response(
+            2,
+            &prime,
+            &server_public,
+            "runner",
+            "pässwörd",
+            &mut CountingRng(1),
+        )
+        .unwrap();
+        assert_eq!(client_public.len(), 128);
+        assert_eq!(
+            ard_server_decrypt(&prime, &server_private, &credentials, &client_public),
+            ("runner".to_string(), "pässwörd".to_string())
+        );
+        // Fresh randomness gives a different key pair and ciphertext.
+        let (other, other_public) = ard_response(
+            2,
+            &prime,
+            &server_public,
+            "runner",
+            "pässwörd",
+            &mut CountingRng(2),
+        )
+        .unwrap();
+        assert_ne!(other, credentials);
+        assert_ne!(other_public, client_public);
+    }
+
+    #[test]
+    fn ard_response_rejects_bad_parameters_and_long_credentials() {
+        let prime = hex_bytes(OAKLEY_GROUP_2);
+        let mut rng = CountingRng(3);
+        let one = left_pad(&[1], 128, "one").unwrap();
+        assert!(ard_response(2, &prime, &one, "u", "p", &mut rng).is_err());
+        assert!(ard_response(2, &prime, &prime, "u", "p", &mut rng).is_err());
+        let public = left_pad(&[5], 128, "five").unwrap();
+        assert!(ard_response(1, &prime, &public, "u", "p", &mut rng).is_err());
+        let long = "x".repeat(64);
+        assert!(ard_response(2, &prime, &public, &long, "p", &mut rng).is_err());
+        assert!(ard_response(2, &prime, &public, "u", &long, &mut rng).is_err());
+        assert!(ard_response(2, &prime, &public, "u", "p\0q", &mut rng).is_err());
+        assert!(ard_response(2, &prime, &public, &"x".repeat(63), "p", &mut rng).is_ok());
+    }
+
+    /// macOS-style server: RFB 003.889, offers [30, 2], checks ARD credentials.
+    fn start_ard_fixture(expected: (&'static str, &'static str)) -> (u16, thread::JoinHandle<u8>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            stream.write_all(b"RFB 003.889\n").unwrap();
+            let mut client_banner = [0u8; 12];
+            stream.read_exact(&mut client_banner).unwrap();
+            assert_eq!(&client_banner, b"RFB 003.008\n");
+            stream.write_all(&[2, 30, 2]).unwrap();
+            let mut chosen = [0u8; 1];
+            stream.read_exact(&mut chosen).unwrap();
+            if chosen[0] != 30 {
+                return chosen[0];
+            }
+            let prime = hex_bytes(OAKLEY_GROUP_2);
+            let p = rsa::BigUint::from_bytes_be(&prime);
+            let server_private = rsa::BigUint::from(0xfeed_beef_u64);
+            let server_public = rsa::BigUint::from(2u32).modpow(&server_private, &p);
+            let mut parameters = vec![0, 2, 0, 128];
+            parameters.extend_from_slice(&prime);
+            parameters
+                .extend_from_slice(&left_pad(&server_public.to_bytes_be(), 128, "pub").unwrap());
+            stream.write_all(&parameters).unwrap();
+            let mut credentials = [0u8; 128];
+            stream.read_exact(&mut credentials).unwrap();
+            let mut client_public = [0u8; 128];
+            stream.read_exact(&mut client_public).unwrap();
+            let (user, password) =
+                ard_server_decrypt(&prime, &server_private, &credentials, &client_public);
+            if (user.as_str(), password.as_str()) != expected {
+                let reason = b"Authentication failed";
+                stream.write_all(&1u32.to_be_bytes()).unwrap();
+                stream
+                    .write_all(&(reason.len() as u32).to_be_bytes())
+                    .unwrap();
+                stream.write_all(reason).unwrap();
+                return chosen[0];
+            }
+            stream.write_all(&0u32.to_be_bytes()).unwrap();
+            let mut client_init = [0u8; 1];
+            stream.read_exact(&mut client_init).unwrap();
+            write_server_init(&mut stream, 1440, 900, b"Mac mini");
+            chosen[0]
+        });
+        (port, handle)
+    }
+
+    fn connect_ard(
+        port: u16,
+        username: Option<&str>,
+        password: &str,
+    ) -> Result<ServerInit, String> {
+        let stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let mut connection = RfbConnection::from_stream(
+            stream,
+            Duration::from_secs(5),
+            VncSecurityPolicy::PreferEncryption,
+            DecodeLimits::default(),
+        )?;
+        let init = connection.authenticate(username, Some(password))?;
+        assert_eq!(connection.protocol_version(), "3.8");
+        Ok(init)
+    }
+
+    #[test]
+    fn authenticates_mac_screen_sharing_with_ard_when_a_username_is_given() {
+        let (port, server) = start_ard_fixture(("runner", "Qa1-secret"));
+        let init = connect_ard(port, Some("runner"), "Qa1-secret").unwrap();
+        assert_eq!(
+            (init.width, init.height, init.name.as_str()),
+            (1440, 900, "Mac mini")
+        );
+        assert_eq!(server.join().unwrap(), 30);
+
+        let (port, server) = start_ard_fixture(("runner", "Qa1-secret"));
+        let error = connect_ard(port, Some("runner"), "wrong").unwrap_err();
+        assert!(error.contains("authentication failed"), "{error}");
+        assert_eq!(server.join().unwrap(), 30);
+    }
+
+    #[test]
+    fn mac_server_without_a_username_falls_back_to_vncauth() {
+        let (port, server) = start_ard_fixture(("runner", "Qa1-secret"));
+        // The fixture stops after the choice; the client then fails reading
+        // the VNCAuth challenge, which is all this test needs.
+        let _ = connect_ard(port, None, "Qa1-secret");
+        assert_eq!(server.join().unwrap(), 2);
+    }
+
+    /// A VNCAuth server that reports whether the client answered its
+    /// challenge: `Some(true)` response sent, `Some(false)` the client hung up
+    /// first, `None` it never got as far as the challenge (3.8 selection).
+    fn start_vncauth_probe(minor: u16) -> (u16, thread::JoinHandle<Option<bool>>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream
+                .write_all(format!("RFB 003.{minor:03}\n").as_bytes())
+                .unwrap();
+            let mut client_banner = [0u8; 12];
+            stream.read_exact(&mut client_banner).unwrap();
+            if minor <= 3 {
+                stream.write_all(&2u32.to_be_bytes()).unwrap();
+            } else {
+                stream.write_all(&[1, 2]).unwrap();
+                let mut chosen = [0u8; 1];
+                if stream.read_exact(&mut chosen).is_err() {
+                    return None;
+                }
+            }
+            stream.write_all(&[0x5au8; 16]).unwrap();
+            let mut response = [0u8; 16];
+            Some(stream.read_exact(&mut response).is_ok())
+        });
+        (port, handle)
+    }
+
+    #[test]
+    fn vncauth_without_a_password_asks_instead_of_answering_the_challenge() {
+        for minor in [3, 8] {
+            let (port, server) = start_vncauth_probe(minor);
+            let stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            let mut connection = RfbConnection::from_stream(
+                stream,
+                Duration::from_secs(2),
+                VncSecurityPolicy::PreferEncryption,
+                DecodeLimits::default(),
+            )
+            .unwrap();
+            let error = connection.authenticate(None, None).unwrap_err();
+            assert_eq!(error, CREDENTIALS_REQUIRED, "RFB 3.{minor}");
+            drop(connection);
+            let answered = server.join().unwrap();
+            assert_ne!(answered, Some(true), "RFB 3.{minor}: no challenge response");
+        }
+        assert!(missing_password(Some("")));
+        assert!(!missing_password(Some("secret12")));
+        assert!(needs_password(SEC_TYPE_ARD) && needs_password(SEC_TYPE_RA2_256));
+        assert!(!needs_password(SEC_TYPE_NONE));
+    }
+
     #[test]
     fn authenticates_vncauth_fixture_and_reads_server_init() {
         let (port, server) = start_fixture(8, 2, 1024, 768, b"auth fixture");
@@ -1857,7 +2478,7 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let client = TcpStream::connect(address).unwrap();
         let (_server, _) = listener.accept().unwrap();
-        let connection = RfbConnection::new_stream(
+        let mut connection = RfbConnection::new_stream(
             client,
             Duration::from_secs(2),
             DecodeLimits::default(),
@@ -1871,8 +2492,68 @@ mod tests {
             connection.stream.read_timeout().unwrap(),
             Some(Duration::from_secs(2))
         );
+        assert!(!connection.read_buffer.enabled);
         connection.enter_runtime_mode().unwrap();
         assert_eq!(connection.stream.read_timeout().unwrap(), None);
+        assert!(connection.read_buffer.enabled);
+    }
+
+    #[test]
+    fn buffered_runtime_reads_decode_many_small_hextile_tiles() {
+        // 32x16 Hextile rectangle = two tiles, each "bg specified" (5 bytes):
+        // many tiny reads that the runtime buffer must serve exactly, followed
+        // by a Raw rectangle whose body bypasses the buffer.
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut update = vec![0, 0, 0, 2];
+            for value in [0u16, 0, 32, 16] {
+                update.extend_from_slice(&value.to_be_bytes());
+            }
+            update.extend_from_slice(&5i32.to_be_bytes());
+            update.extend_from_slice(&[0x02, 9, 8, 7, 0]);
+            update.extend_from_slice(&[0x02, 1, 2, 3, 0]);
+            for value in [0u16, 16, 1, 1] {
+                update.extend_from_slice(&value.to_be_bytes());
+            }
+            update.extend_from_slice(&0i32.to_be_bytes());
+            update.extend_from_slice(&[4, 5, 6, 0]);
+            stream.write_all(&update).unwrap();
+        });
+        let stream = TcpStream::connect(address).unwrap();
+        let mut connection = RfbConnection::new_stream(
+            stream,
+            Duration::from_secs(2),
+            DecodeLimits::default(),
+            VncSecurityPolicy::AllowNone,
+            8,
+            None,
+            None,
+        )
+        .unwrap();
+        connection.width = 32;
+        connection.height = 17;
+        connection.framebuffer = Framebuffer::new(32, 17, &DecodeLimits::default())
+            .unwrap()
+            .shared();
+        connection.enter_runtime_mode().unwrap();
+        match connection.read_server_message().unwrap() {
+            ServerMessage::FramebufferUpdate { rects, .. } => {
+                assert_eq!(
+                    rects,
+                    vec![FbRect::new(0, 0, 32, 16), FbRect::new(0, 16, 1, 1)]
+                );
+            }
+            other => panic!("expected framebuffer update, got {other:?}"),
+        }
+        let fb = connection.framebuffer();
+        let fb = fb.lock().unwrap();
+        let relay = fb.relay_frame(FbRect::new(15, 0, 2, 1)).unwrap();
+        assert_eq!(&relay[12..], &[9, 8, 7, 255, 1, 2, 3, 255]);
+        let raw = fb.relay_frame(FbRect::new(0, 16, 1, 1)).unwrap();
+        assert_eq!(&raw[12..], &[4, 5, 6, 255]);
+        server.join().unwrap();
     }
 
     #[test]
@@ -1913,7 +2594,9 @@ mod tests {
         .unwrap();
         connection.width = 800;
         connection.height = 600;
-        connection.framebuffer = vec![0; 800 * 600 * 4];
+        connection.framebuffer = Framebuffer::new(800, 600, &DecodeLimits::default())
+            .unwrap()
+            .shared();
 
         match connection.read_server_message().unwrap() {
             ServerMessage::FramebufferUpdate {
@@ -1973,7 +2656,9 @@ mod tests {
         .unwrap();
         connection.width = 800;
         connection.height = 600;
-        connection.framebuffer = vec![0; 800 * 600 * 4];
+        connection.framebuffer = Framebuffer::new(800, 600, &DecodeLimits::default())
+            .unwrap()
+            .shared();
 
         match connection.read_server_message().unwrap() {
             ServerMessage::FramebufferUpdate {

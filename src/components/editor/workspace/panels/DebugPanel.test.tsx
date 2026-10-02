@@ -37,6 +37,8 @@ function makeSession(overrides: Partial<CodeDebugSession> = {}): CodeDebugSessio
     restart: vi.fn(),
     canRestart: false,
     toggleBreakpoint: vi.fn(),
+    addBreakpoint: vi.fn(),
+    toggleBreakpointEnabled: vi.fn(),
     setBreakpointOptions: vi.fn(),
     setBreakpointMode: vi.fn(),
     removeBreakpoint: vi.fn(),
@@ -59,6 +61,7 @@ function makeSession(overrides: Partial<CodeDebugSession> = {}): CodeDebugSessio
     runToCursor: vi.fn(),
     selectThread: vi.fn(),
     selectFrame: vi.fn(),
+    loadMoreFrames: vi.fn(async () => {}),
     restartFrame: vi.fn(),
     hotReload: vi.fn(),
     evaluate: vi.fn().mockResolvedValue({ value: "", variablesReference: 0, type: null }),
@@ -222,6 +225,7 @@ describe("DebugPanel", () => {
     render(
       <DebugPanel debug={makeSession({ state: stoppedState(), selectThread })} onStart={null} onOpenFrame={vi.fn()} />,
     );
+    fireEvent.click(screen.getByTestId("debug-thread-select"));
     fireEvent.click(screen.getByTestId("debug-thread-2"));
     expect(selectThread).toHaveBeenCalledWith(2);
   });
@@ -246,7 +250,9 @@ describe("DebugPanel", () => {
     const { rerender } = render(
       <DebugPanel debug={makeSession({ state: stoppedState(), restartFrame })} onStart={null} onOpenFrame={vi.fn()} />,
     );
-    expect(screen.queryByTestId("debug-restart-frame-10")).toBeNull();
+    fireEvent.contextMenu(screen.getByTestId("debug-frame-10"));
+    expect(screen.queryByTestId("debug-frame-menu-restart-frame")).toBeNull();
+    fireEvent.keyDown(document.body, { key: "Escape" });
     rerender(
       <DebugPanel
         debug={makeSession({
@@ -258,7 +264,8 @@ describe("DebugPanel", () => {
         onOpenFrame={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByTestId("debug-restart-frame-10"));
+    fireEvent.contextMenu(screen.getByTestId("debug-frame-10"));
+    fireEvent.click(screen.getByTestId("debug-frame-menu-restart-frame"));
     expect(restartFrame).toHaveBeenCalledWith(10);
   });
 
@@ -273,8 +280,21 @@ describe("DebugPanel", () => {
     );
     const input = screen.getByTestId("debug-watch-input");
     fireEvent.change(input, { target: { value: "x + 1" } });
-    fireEvent.keyDown(input, { key: "Enter" });
+    // IDEA: Ctrl+Shift+Enter adds a watch, Enter evaluates.
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true, shiftKey: true });
     expect(addWatchExpression).toHaveBeenCalledWith("x + 1");
+  });
+
+  it("evaluates the field's expression in place with Enter", async () => {
+    const evaluate = vi.fn().mockResolvedValue({ value: "App@7", variablesReference: 0, type: "App" });
+    render(
+      <DebugPanel debug={makeSession({ state: stoppedState(), evaluate })} onStart={null} onOpenFrame={vi.fn()} />,
+    );
+    const input = screen.getByTestId("debug-watch-input");
+    fireEvent.change(input, { target: { value: "this" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(evaluate).toHaveBeenCalledWith("this", "repl");
+    expect(await screen.findByTestId("debug-evaluate-inline-result")).toHaveTextContent("this= {App@7}");
   });
 
   it("offers a rerun button when a previous launch config exists", () => {
@@ -1246,17 +1266,15 @@ describe("DebugPanel", () => {
     expect(variables?.dataset.defaultSize).toBe("55%");
     expect(variables?.dataset.minSize).toBe("15%");
 
-    // The Variables/Watches split is scoped to the workspace instance so two
-    // open workspace tabs do not register the same group id.
-    expect(document.getElementById("ws-1-debug-variables-section")).not.toBeNull();
-    expect(document.getElementById("ws-1-debug-watches-section")).not.toBeNull();
+    // IDEA merges watches into the Variables view: no second split.
+    expect(document.getElementById("ws-1-debug-watches-section")).toBeNull();
   });
 
   it("drops threads and frames once the session is terminated", () => {
     const { rerender } = render(
       <DebugPanel debug={makeSession({ state: stoppedState() })} onStart={null} onOpenFrame={vi.fn()} />,
     );
-    expect(screen.getByTestId("debug-thread-1")).toBeInTheDocument();
+    expect(screen.getByTestId("debug-thread-select")).toHaveTextContent('"main"@1');
     expect(screen.getByTestId("debug-frame-10")).toBeInTheDocument();
 
     // What `terminate()` publishes: no threads, no frames, status terminated.
@@ -1279,7 +1297,7 @@ describe("DebugPanel", () => {
       />,
     );
 
-    expect(screen.queryByTestId("debug-thread-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("debug-thread-select")).not.toHaveTextContent('"main"@1');
     expect(screen.queryByTestId("debug-frame-10")).not.toBeInTheDocument();
     // …and it must not claim the debuggee is still running.
     expect(screen.getByText("Frames are not available")).toBeInTheDocument();

@@ -66,7 +66,7 @@ function looksLikePemKey(value: string): boolean {
   return /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/.test(value);
 }
 
-function isBlockedTarget(host: string): { blocked: boolean; reason?: string } {
+export function isBlockedTarget(host: string): { blocked: boolean; reason?: string } {
   const lower = host.trim().toLowerCase();
   if (!lower) return { blocked: true, reason: "empty host" };
 

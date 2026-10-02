@@ -23,6 +23,7 @@ import {
 } from "../../lib/ipc";
 import { relaunchApp } from "../../lib/updateService";
 import type { BackupManifest, BackupScope } from "../../lib/backup";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export function BackupSettingsPanel() {
   const t = useT();
@@ -67,6 +68,34 @@ export function BackupSettingsPanel() {
     void loadAll();
     void refreshVault();
   }, [loadAll, refreshVault]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: UnlistenFn | undefined;
+    // Tauri events stay within one process. Read shared history and policy
+    // while this panel is open to observe backups made by another instance.
+    const refreshTimer = window.setInterval(() => {
+      if (!disposed) void refreshHistory();
+    }, 15_000);
+    void listen("backup-completed", () => {
+      if (!disposed) void refreshHistory();
+    }).then((stop) => {
+      if (disposed) {
+        stop();
+      } else {
+        unlisten = stop;
+        // Close the gap between the initial load and listener registration.
+        void refreshHistory();
+      }
+    }).catch((error) => {
+      console.error("Failed to listen for backup completion", error);
+    });
+    return () => {
+      disposed = true;
+      window.clearInterval(refreshTimer);
+      unlisten?.();
+    };
+  }, [refreshHistory]);
 
   const effectiveBackupDir = policy?.customBackupDir?.trim() || defaultBackupDir;
   const isCustomDir = Boolean(policy?.customBackupDir?.trim());
@@ -260,7 +289,7 @@ export function BackupSettingsPanel() {
       )}
 
       {actionSuccess && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded text-sm text-emerald-500 flex items-center gap-2">
+        <div data-testid="backup-action-success" className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded text-sm text-emerald-500 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
           <span>{actionSuccess}</span>
         </div>
@@ -393,6 +422,7 @@ export function BackupSettingsPanel() {
           </button>
           <button
             type="button"
+            data-testid="backup-create-now"
             disabled={creating}
             onClick={handleBackupNow}
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-accent text-accent-text rounded hover:opacity-90 disabled:opacity-50 transition-opacity"
@@ -426,6 +456,8 @@ export function BackupSettingsPanel() {
           <div
             role="button"
             tabIndex={0}
+            data-testid="backup-auto-toggle"
+            aria-pressed={policy.autoBackupEnabled}
             className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
               policy.autoBackupEnabled
                 ? "border-[var(--taomni-accent)]/40 bg-[var(--taomni-accent)]/5"
@@ -471,6 +503,7 @@ export function BackupSettingsPanel() {
                   {t("backupSettings.frequencyLabel")}
                 </label>
                 <select
+                  data-testid="backup-frequency"
                   value={policy.frequency}
                   onChange={(e) =>
                     void updatePolicy({
@@ -490,6 +523,7 @@ export function BackupSettingsPanel() {
                   {t("backupSettings.maxCopiesLabel")}
                 </label>
                 <input
+                  data-testid="backup-retained-copies"
                   type="number"
                   min={1}
                   max={30}
@@ -507,7 +541,7 @@ export function BackupSettingsPanel() {
 
           <div className="text-xs text-theme-muted flex items-center justify-between pt-1">
             <span>{t("backupSettings.lastBackupLabel")}:</span>
-            <span className="font-mono">
+            <span data-testid="backup-last-success" className="font-mono">
               {policy.lastBackupAt
                 ? new Date(policy.lastBackupAt).toLocaleString()
                 : t("backupSettings.neverBackedUp")}
@@ -548,6 +582,7 @@ export function BackupSettingsPanel() {
               </h4>
               <button
                 type="button"
+                data-testid="backup-history-refresh"
                 onClick={() => void refreshHistory()}
                 className="p-1 rounded text-theme-muted hover:text-theme-text"
                 title="刷新"
@@ -574,7 +609,7 @@ export function BackupSettingsPanel() {
                   </thead>
                   <tbody className="divide-y divide-theme-border/40">
                     {safeHistory.map((item) => (
-                      <tr key={item.filePath} className="hover:bg-theme-bg/40">
+                      <tr key={item.filePath} data-testid="backup-history-row" data-file-name={item.fileName} className="hover:bg-theme-bg/40">
                         <td className="py-2 px-2 font-mono text-theme-text max-w-xs truncate" title={item.fileName}>
                           {item.fileName}
                         </td>
@@ -600,6 +635,7 @@ export function BackupSettingsPanel() {
                         <td className="py-2 px-2 text-right space-x-2">
                           <button
                             type="button"
+                            data-testid="backup-history-restore"
                             onClick={() => openRestoreModal(item.filePath)}
                             className="text-xs text-accent hover:underline font-medium"
                           >
@@ -699,6 +735,7 @@ export function BackupSettingsPanel() {
                 </div>
 
                 <div
+                  data-testid="backup-restore-files"
                   className="max-h-36 overflow-y-auto space-y-1 rounded border p-2 font-mono text-[11px] text-[var(--taomni-text-muted)]"
                   style={{
                     background: "var(--taomni-panel-bg)",
@@ -814,6 +851,7 @@ export function BackupSettingsPanel() {
             >
               <button
                 type="button"
+                data-testid="backup-restore-cancel"
                 disabled={restoring}
                 onClick={() => setRestoreModalOpen(false)}
                 className="rounded border px-3 py-1.5 text-xs text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"

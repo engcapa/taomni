@@ -1,12 +1,14 @@
+use super::coordination::BackupProcessLock;
 use super::crypto::{encrypt_payload, is_encrypted_bytes};
 use super::manifest::{BackupManifest, file_sha256};
-use super::policy::{load_policy, resolve_backup_dir, save_policy};
+use super::policy::{BackupPolicy, load_policy, resolve_backup_dir, save_policy};
+use super::scheduler::{BackupCoordinator, BackupTrigger, is_backup_due};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, Manager};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
@@ -27,6 +29,60 @@ pub struct BackupCustomOptions {
     pub include_mail: bool,
     #[serde(default)]
     pub include_local_history: bool,
+    #[serde(default)]
+    pub include_mfa: bool,
+}
+
+/// What a backup scope stages. MFA secrets are sealed with a data key held in
+/// the vault, so including `mfa.db` always includes `vault.db` as well.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackupScopeFlags {
+    pub sessions: bool,
+    pub notes: bool,
+    pub vault: bool,
+    pub lanchat: bool,
+    pub configs: bool,
+    pub mail: bool,
+    pub local_history: bool,
+    pub mfa: bool,
+}
+
+pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> BackupScopeFlags {
+    let core = BackupScopeFlags {
+        sessions: true,
+        notes: true,
+        vault: true,
+        lanchat: false,
+        configs: true,
+        mail: false,
+        local_history: false,
+        mfa: true,
+    };
+    let mut flags = match scope {
+        "full" => BackupScopeFlags {
+            lanchat: true,
+            mail: true,
+            ..core
+        },
+        "custom" => match custom {
+            Some(opts) => BackupScopeFlags {
+                sessions: opts.include_sessions,
+                notes: opts.include_notes,
+                vault: opts.include_vault,
+                lanchat: opts.include_lanchat,
+                configs: opts.include_configs,
+                mail: opts.include_mail,
+                local_history: opts.include_local_history,
+                mfa: opts.include_mfa,
+            },
+            None => core,
+        },
+        _ => core,
+    };
+    if flags.mfa {
+        flags.vault = true;
+    }
+    flags
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,14 +136,56 @@ pub fn create_backup(
     target_path: Option<String>,
     password: Option<String>,
 ) -> Result<BackupResult, String> {
+    let coordinator = app.state::<BackupCoordinator>();
+    let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+    let _process_operation = BackupProcessLock::acquire(app)?;
+    create_backup_locked(
+        state,
+        app,
+        scope,
+        custom_options,
+        target_path,
+        password,
+        load_policy(app),
+    )
+}
+
+pub fn create_scheduled_backup(
+    app: &AppHandle,
+    trigger: BackupTrigger,
+) -> Result<Option<BackupResult>, String> {
+    let coordinator = app.state::<BackupCoordinator>();
+    let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+    let _process_operation = BackupProcessLock::acquire(app)?;
+    let policy = load_policy(app);
+    // Recheck inside both locks: any instance may have just completed a backup.
+    if !is_backup_due(&policy, chrono::Utc::now().timestamp_millis(), trigger) {
+        return Ok(None);
+    }
+    let state = app.state::<AppState>();
+    let scope = policy.default_scope.clone();
+    create_backup_locked(&state, app, &scope, None, None, None, policy).map(Some)
+}
+
+fn create_backup_locked(
+    state: &AppState,
+    app: &AppHandle,
+    scope: &str,
+    custom_options: Option<BackupCustomOptions>,
+    target_path: Option<String>,
+    password: Option<String>,
+    policy: BackupPolicy,
+) -> Result<BackupResult, String> {
     let app_data = crate::resolved_app_data_dir(app)?;
 
-    let policy = load_policy(app);
     let resolved_target_dir = resolve_backup_dir(app, &policy);
 
     let now = chrono::Local::now();
     let timestamp_str = now.format("%Y%m%d_%H%M%S").to_string();
-    let default_filename = format!("taomni_backup_{timestamp_str}.taobak");
+    let default_filename = format!(
+        "taomni_backup_{timestamp_str}_{}.taobak",
+        uuid::Uuid::new_v4().simple()
+    );
 
     let out_file_path = match target_path {
         Some(custom) if !custom.trim().is_empty() => PathBuf::from(custom.trim()),
@@ -112,35 +210,10 @@ pub fn create_backup(
     let mut staged_files: Vec<StagedFile> = Vec::new();
 
     // Determine what to include based on scope
-    let (inc_sessions, inc_notes, inc_vault, inc_lanchat, inc_configs, inc_mail, inc_local_history) =
-        match scope {
-            "core" => (true, true, true, false, true, false, false),
-            "full" => (true, true, true, true, true, true, false),
-            "custom" => {
-                let opts = custom_options.unwrap_or(BackupCustomOptions {
-                    include_sessions: true,
-                    include_notes: true,
-                    include_vault: true,
-                    include_lanchat: false,
-                    include_configs: true,
-                    include_mail: false,
-                    include_local_history: false,
-                });
-                (
-                    opts.include_sessions,
-                    opts.include_notes,
-                    opts.include_vault,
-                    opts.include_lanchat,
-                    opts.include_configs,
-                    opts.include_mail,
-                    opts.include_local_history,
-                )
-            }
-            _ => (true, true, true, false, true, false, false),
-        };
+    let flags = resolve_scope_flags(scope, custom_options);
 
     // 1. taomni.db
-    if inc_sessions {
+    if flags.sessions {
         let snap_dest = temp_staging_dir.join("taomni.db");
         let conn = state.db.lock().map_err(|e| e.to_string())?;
         hot_backup_conn(&conn, &snap_dest)?;
@@ -151,7 +224,7 @@ pub fn create_backup(
     }
 
     // 2. notes.db
-    if inc_notes {
+    if flags.notes {
         let snap_dest = temp_staging_dir.join("notes.db");
         let conn = state.notes_db.lock().map_err(|e| e.to_string())?;
         hot_backup_conn(&conn, &snap_dest)?;
@@ -162,7 +235,7 @@ pub fn create_backup(
     }
 
     // 3. vault.db
-    if inc_vault {
+    if flags.vault {
         let snap_dest = temp_staging_dir.join("vault.db");
         state.vault.backup_to(&snap_dest)?;
         staged_files.push(StagedFile {
@@ -171,8 +244,19 @@ pub fn create_backup(
         });
     }
 
+    // 3b. mfa.db (skipped when MFA was never used on this profile)
+    if flags.mfa {
+        let snap_dest = temp_staging_dir.join("mfa.db");
+        if state.mfa.backup_to(&snap_dest)? {
+            staged_files.push(StagedFile {
+                archive_path: "databases/mfa.db".into(),
+                disk_path: snap_dest,
+            });
+        }
+    }
+
     // 4. lanchat.sqlite
-    if inc_lanchat {
+    if flags.lanchat {
         let snap_dest = temp_staging_dir.join("lanchat.sqlite");
         state.lanchat.backup_to(&snap_dest)?;
         staged_files.push(StagedFile {
@@ -182,7 +266,7 @@ pub fn create_backup(
     }
 
     // 5. Config files
-    if inc_configs {
+    if flags.configs {
         if let Some(cfg_base) = dirs::config_dir() {
             let taomni_cfg_dir = cfg_base.join("taomni");
             for cfg_name in &["ai.json", "proxy.json", "mirror.json", "sdk.json"] {
@@ -205,7 +289,7 @@ pub fn create_backup(
     }
 
     // 6. Mail cache databases
-    if inc_mail {
+    if flags.mail {
         let mail_dir = app_data.join("mail-cache");
         if mail_dir.is_dir() {
             if let Ok(entries) = std::fs::read_dir(&mail_dir) {
@@ -225,7 +309,7 @@ pub fn create_backup(
     }
 
     // 7. Local history snapshots
-    if inc_local_history {
+    if flags.local_history {
         let history_db = app_data.join("local-history").join("history.db");
         if history_db.is_file() {
             staged_files.push(StagedFile {
@@ -271,13 +355,15 @@ pub fn create_backup(
 
     // If backup was written into the configured backup directory, perform retention rotation
     if out_file_path.starts_with(&resolved_target_dir) {
-        let _ = rotate_backups(&resolved_target_dir, policy.max_retained_copies);
+        if let Err(error) = rotate_backups(&resolved_target_dir, policy.max_retained_copies) {
+            tracing::warn!(target: "backup", %error, "Backup retention cleanup failed");
+        }
     }
 
     // Update policy last backup time
     let mut updated_policy = policy;
     updated_policy.last_backup_at = Some(manifest.created_at);
-    let _ = save_policy(app, &updated_policy);
+    save_policy(app, &updated_policy)?;
 
     let result = BackupResult {
         file_path: out_file_path.to_string_lossy().into_owned(),
@@ -292,6 +378,9 @@ pub fn create_backup(
         files_count: manifest.files.len(),
     };
 
+    if let Err(error) = app.emit("backup-completed", &result) {
+        tracing::warn!(target: "backup", %error, "Failed to notify backup completion");
+    }
     Ok(result)
 }
 
@@ -443,8 +532,23 @@ pub fn pack_staged_archive(
         let _ = std::fs::create_dir_all(parent);
     }
 
-    std::fs::write(out_file_path, &final_bytes)
+    // Other instances can read history while this archive is being written.
+    // Publish the complete file with a rename in its destination directory.
+    let pending_path = out_file_path.with_file_name(format!(
+        ".backup_output_{}.tmp",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let _cleanup = scopeguard::guard(pending_path.clone(), |path| {
+        let _ = std::fs::remove_file(path);
+    });
+    std::fs::write(&pending_path, &final_bytes)
         .map_err(|e| format!("write backup output file {}: {e}", out_file_path.display()))?;
+    std::fs::rename(&pending_path, out_file_path).map_err(|e| {
+        format!(
+            "publish backup output file {}: {e}",
+            out_file_path.display()
+        )
+    })?;
 
     let file_size = final_bytes.len() as u64;
     Ok((manifest, file_size))

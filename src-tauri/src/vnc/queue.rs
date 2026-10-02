@@ -148,6 +148,26 @@ impl FrameQueueSender {
         Ok(dropped)
     }
 
+    /// Whether a finished frame is still waiting for the WebSocket writer.
+    pub fn has_pending_frame(&self) -> bool {
+        self.0
+            .state
+            .lock()
+            .map(|state| state.latest_frame.is_some())
+            .unwrap_or(false)
+    }
+
+    /// Discard any rectangles that are still being assembled or waiting for
+    /// the WebSocket writer, e.g. after the framebuffer geometry changed.
+    pub fn clear_frames(&self) {
+        if let Ok(mut state) = self.0.state.lock() {
+            state.building.clear();
+            state.building_bytes = 0;
+            state.drop_building = false;
+            state.latest_frame = None;
+        }
+    }
+
     #[cfg(test)]
     pub fn stats(&self) -> (u64, usize) {
         self.0

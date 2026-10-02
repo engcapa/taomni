@@ -79,6 +79,7 @@ steps:
     selector: '[data-testid="context-menu"]'
     state: detached
     timeout_sec: 5
+- click: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-tree-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -95,6 +96,7 @@ steps:
     selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key$="Right021.txt"]'
     state: detached
     timeout_sec: 10
+- click: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-tree-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -166,20 +168,20 @@ verification:
   - id: R4
     requirement: A3：有其他 tab 时 Close Tabs to the Right 与 Close Other Tabs 可用且执行原有关闭路径。
     actions:
-    - 39
-    - 48
+    - 40
+    - 50
     checkpoints:
-    - step: 36
+    - step: 37
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key$=\"Right021.txt\"]", "timeout_sec": 15}}'
-    - step: 40
+    - step: 41
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key$=\"Right021.txt\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 45
+    - step: 47
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key$=\"Other021.txt\"]", "timeout_sec": 15}}'
-    - step: 49
+    - step: 51
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key$=\"Other021.txt\"]", "state": "detached", "timeout_sec": 10}}'
     results:
-    - 40
-    - 49
+    - 41
+    - 51
   visual:
   - check: 对照 IDEA idea-15/16 的分组分隔线与子菜单箭头。
     method: manual

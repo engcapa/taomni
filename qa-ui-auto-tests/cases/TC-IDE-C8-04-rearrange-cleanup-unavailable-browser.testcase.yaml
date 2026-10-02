@@ -39,6 +39,10 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: in-memory virtual local filesystem
+    timeout_sec: 30
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     value: "public class Sample {\n    public void beta() {}\n    public void alpha() {}\n}"
@@ -90,46 +94,46 @@ verification:
   - id: R1
     requirement: Actions触发重排无提供者时显示同步前提错误，整个文档不变
     actions:
-    - 14
-    - 17
-    - 19
+    - 15
+    - 18
     - 20
     - 21
     - 22
+    - 23
     checkpoints:
-    - step: 18
+    - step: 19
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 23
+    - step: 24
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "finish synchronizing
         current editor buffers", "timeout_sec": 20}}'
-    - step: 24
+    - step: 25
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
         "equals": ["public class Sample {", "    public void beta() {}", "    public void alpha() {}", "}"]}}'
     results:
-    - 23
     - 24
+    - 25
   - id: R2
     requirement: Actions触发清理同样报告错误并保持整个文档不变
     actions:
-    - 26
-    - 28
+    - 27
     - 29
     - 30
     - 31
+    - 32
     checkpoints:
-    - step: 27
+    - step: 28
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "finish synchronizing
         current editor buffers", "timeout_sec": 20}}'
-    - step: 33
+    - step: 34
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
         "equals": ["public class Sample {", "    public void beta() {}", "    public void alpha() {}", "}"]}}'
     results:
-    - 32
     - 33
+    - 34
   visual:
   - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
     method: manual

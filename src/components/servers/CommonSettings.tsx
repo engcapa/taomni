@@ -21,6 +21,7 @@ export function CommonSettings({ def, config, onChange }: Props) {
       {def.hasPort && (
         <NumberField
           label={t("servers.fields.port")}
+          testId="server-field-port"
           value={config.port}
           min={0}
           max={65535}
@@ -30,6 +31,7 @@ export function CommonSettings({ def, config, onChange }: Props) {
 
       <TextField
         label={t("servers.fields.bindAddress")}
+        testId="server-field-bind-address"
         value={config.bindAddress}
         placeholder="0.0.0.0"
         onChange={(bindAddress) => onChange({ bindAddress })}
@@ -37,6 +39,7 @@ export function CommonSettings({ def, config, onChange }: Props) {
 
       <CheckboxField
         label={t("servers.fields.autoStop")}
+        testId="server-field-auto-stop"
         checkboxLabel={t("servers.fields.autoStopSeconds")}
         value={config.autoStop}
         onChange={(autoStop) => onChange({ autoStop })}
@@ -47,6 +50,8 @@ export function CommonSettings({ def, config, onChange }: Props) {
           <input
             type="number"
             className="taomni-input"
+            data-testid="server-field-auto-stop-seconds"
+            aria-label={t("servers.fields.autoStopSeconds")}
             style={{ width: 90 }}
             min={1}
             value={Number.isFinite(config.autoStopSeconds) ? config.autoStopSeconds : ""}
@@ -63,6 +68,7 @@ export function CommonSettings({ def, config, onChange }: Props) {
 
       <CheckboxField
         label={t("servers.fields.startOnLaunch")}
+        testId="server-field-start-on-launch"
         checkboxLabel={t("servers.fields.startOnLaunch")}
         value={config.startOnLaunch}
         onChange={(startOnLaunch) => onChange({ startOnLaunch })}

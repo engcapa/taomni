@@ -1,0 +1,213 @@
+id: TC-RDPC-REF-02-xrdp
+title: Taomni RDP client renders and controls a real xrdp reference desktop
+description: 'AC-E07/E08: connect the product client to a disposable reference account, confirm its certificate,
+  assert decoded magenta/cyan pixels and click to flip the target. Exercise full screen, quality evidence, restore
+  and disconnect. Disable NLA in the saved session because xrdp uses TLS/Client Info logon rather than CredSSP. DEC-07 authorizes sudo xrdp provisioning only on the hosted Linux runner.'
+covers:
+- F9.7
+tags:
+- rdp
+- rdp-client
+- reference
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+fixtures:
+- reset_db
+- xrdp_server_required
+- release_build_required
+timeout_sec: 480
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${env.QA_XRDP_PORT}
+- click: '[data-testid="session-specify-username"]'
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${env.QA_XRDP_USER}
+- click: '[data-testid="session-section-rdp"]'
+- set_check:
+    selector: .rdp-options-form fieldset:first-of-type input[type="checkbox"]
+    checked: false
+- fill:
+    selector: .rdp-options-form input[type="number"][min="320"]
+    value: '1280'
+- fill:
+    selector: .rdp-options-form input[type="number"][min="200"]
+    value: '720'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-rdp-xrdp
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-rdp-xrdp"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-rdp-xrdp"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_XRDP_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    timeout_sec: 60
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_text:
+    selector: '[data-testid="rdp-status"]'
+    contains: Connected
+    timeout_sec: 60
+- host_copy_file:
+    from_env_dir: QA_RDP_XRDP_DIR
+    name: flip-state.json
+    to: reference-ready.json
+    timeout_sec: 90
+    expect:
+      ready: true
+- rdp_canvas_assert:
+    artifact: reference-before
+    timeout_sec: 60
+    points:
+    - x: 60
+      y: 100
+      rgb:
+      - 255
+      - 0
+      - 255
+    - x: 160
+      y: 100
+      rgb:
+      - 0
+      - 255
+      - 255
+    - x: 280
+      y: 240
+      rgb:
+      - 0
+      - 0
+      - 0
+- rdp_canvas_click:
+    x: 280
+    y: 240
+- host_copy_file:
+    from_env_dir: QA_RDP_XRDP_DIR
+    name: flip-state.json
+    to: reference-flipped.json
+    expect:
+      flips:
+        min: 1
+- rdp_canvas_assert:
+    artifact: reference-after
+    points:
+    - x: 280
+      y: 240
+      rgb:
+      - 255
+      - 255
+      - 255
+- click: '[data-testid="rdp-view-cycle"]'
+- wait_for:
+    selector: '[data-testid="rdp-connection-bar"][data-visible="true"]'
+    timeout_sec: 15
+- wait_for: '[data-testid="rdp-bar-quality"]'
+- rdp_canvas_assert:
+    artifact: reference-fullscreen
+    points:
+    - x: 280
+      y: 240
+      rgb:
+      - 255
+      - 255
+      - 255
+- assert_json_file:
+    path: reference-fullscreen.json
+    expect:
+      quality_level:
+        min: 0
+        max: 4
+- click: '[data-testid="rdp-bar-restore"]'
+- wait_for:
+    selector: '[data-testid="rdp-connection-bar"]'
+    state: detached
+    timeout_sec: 15
+- click: '[data-testid="rdp-view-cycle"]'
+- hover: '[data-testid="rdp-bar-hotzone"]'
+- wait_for:
+    selector: '[data-testid="rdp-connection-bar"][data-visible="true"]'
+    timeout_sec: 15
+- click: '[data-testid="rdp-bar-disconnect"]'
+- assert_text:
+    selector: '[data-testid="rdp-status"]'
+    contains: Disconnected
+    timeout_sec: 20
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The product client connects to the reference desktop and decodes its known target pixels.
+    actions:
+    - 19
+    - 22
+    - 24
+    checkpoints:
+    - step: 25
+      expectation: Connected status after authentication/certificate confirmation.
+    - step: 26
+      expectation: The reference target reports ready in its own session.
+    - step: 27
+      expectation: Known colors arrived through the product decoder.
+    results:
+    - 25
+    - 26
+    - 27
+  - id: R2
+    requirement: Input reaches the reference session and the changed pixels return to the product client.
+    actions:
+    - 28
+    checkpoints:
+    - step: 29
+      expectation: The session's own state file records a flip.
+    - step: 30
+      expectation: The decoded center pixel changed from black to white.
+    results:
+    - 29
+    - 30
+  - id: R3
+    requirement: Full screen, quality indicator, restore and disconnect work with the reference server.
+    actions:
+    - 31
+    - 36
+    - 38
+    - 39
+    - 41
+    checkpoints:
+    - step: 32
+      expectation: Full screen connection bar is visible.
+    - step: 35
+      expectation: The actual quality value is recorded (0..4).
+    - step: 37
+      expectation: Restore removes the connection bar.
+    - step: 42
+      expectation: Disconnect ends the reference session.
+    results:
+    - 32
+    - 35
+    - 37
+    - 42
+  native:
+  - check: Real xrdp service and desktop on Linux; product client framebuffer and remote input.
+    method: automated
+    reason: Requires the real RDP transport, decoder and hosted desktop; browser stubs cannot establish this.
+  visual:
+  - check: Decoded pixels are checked against known target colors and retained as JSON/screenshots.
+    method: automated
+    reason: Known content provides an independent rendering oracle.

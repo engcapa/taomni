@@ -10,7 +10,9 @@ import platform
 import secrets
 import shutil
 import socket
+import struct
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
@@ -18,6 +20,13 @@ import zipfile
 import yaml
 
 from qa_ui_auto.ci import write_json
+
+# Scriptable RFB server shared with the VNC skill: it logs every client message
+# and takes control commands, so cases can prove what reached "the remote".
+VNC_FIXTURE = Path(".agents/skills/vnc-realvnc-task/scripts/vnc_fixture_server.py")
+VNC_FIXTURE_PACKAGES = ["numpy==2.4.4", "Pillow==12.1.1"]
+# Disposable macOS admin account for the Screen Sharing (ARD) login.
+ARD_USER = "qaard"
 
 
 def command(argv, **kwargs):
@@ -34,8 +43,8 @@ def powershell(script):
                     "$ErrorActionPreference='Stop'; " + script])
 
 
-def secret(name):
-    value = "Qa1_" + secrets.token_hex(16)
+def secret(name, value=None):
+    value = value or "Qa1_" + secrets.token_hex(16)
     os.environ[name] = value
     if os.environ.get("GITHUB_ACTIONS") == "true":
         print(f"::add-mask::{value}", flush=True)
@@ -59,6 +68,110 @@ def sshd_forwarding_policy(private: Path) -> tuple[Path, str]:
     return config, "/config/sshd/sshd_config.d/qa-forwarding.conf:ro"
 
 
+def exact(sock, size):
+    data = b""
+    while len(data) < size:
+        chunk = sock.recv(size - len(data))
+        if not chunk:
+            raise ConnectionError("the RFB server closed the probe connection")
+        data += chunk
+    return data
+
+
+def aes128_ecb(key, data, decrypt=False):
+    """AES-128-ECB through the system LibreSSL/OpenSSL CLI, so the probe needs
+    no extra wheel on the runner's Python."""
+    openssl = "/usr/bin/openssl" if Path("/usr/bin/openssl").is_file() else (shutil.which("openssl") or "openssl")
+    argv = [openssl, "enc", "-aes-128-ecb", "-nopad", "-K", key.hex()] + (["-d"] if decrypt else [])
+    result = subprocess.run(argv, input=data, capture_output=True, timeout=30)
+    if result.returncode or len(result.stdout) != len(data):
+        raise RuntimeError(f"openssl AES-128-ECB failed: {result.stderr.decode(errors='replace')[-500:]}")
+    return result.stdout
+
+
+def end_ard_session(user=None):
+    """Log the ARD account out. A third-party viewer gets its own login
+    session, and an account's first one is a full GUI login (Setup Assistant
+    included) that otherwise keeps competing with the runner's desktop."""
+    subprocess.run(["sudo", "-n", "pkill", "-KILL", "-u", user or ARD_USER], capture_output=True)
+    time.sleep(3)
+
+
+def ard_probe(port, user, password):
+    """Log in to macOS Screen Sharing with ARD (RFB security type 30): DH key
+    agreement, MD5 of the secret as AES-128 key, {user[64], password[64]}."""
+    import hashlib
+
+    # Logging in a fresh account can take a while before ServerInit.
+    with socket.create_connection(("127.0.0.1", port), timeout=10) as sock:
+        sock.settimeout(30)
+        banner = exact(sock, 12)
+        if not banner.startswith(b"RFB 003."):
+            raise RuntimeError(f"not an RFB server: {banner!r}")
+        sock.sendall(b"RFB 003.008\n")
+        offered = list(exact(sock, exact(sock, 1)[0]))
+        if 30 not in offered:
+            raise RuntimeError(f"Screen Sharing does not offer ARD authentication: {offered}")
+        sock.sendall(bytes([30]))
+        generator, key_len = struct.unpack(">HH", exact(sock, 4))
+        prime = int.from_bytes(exact(sock, key_len), "big")
+        server_public = int.from_bytes(exact(sock, key_len), "big")
+        private = secrets.randbelow(prime - 2) + 1
+        public = pow(generator, private, prime).to_bytes(key_len, "big")
+        shared = pow(server_public, private, prime).to_bytes(key_len, "big")
+        block = bytearray(secrets.token_bytes(128))
+        for offset, value in ((0, user), (64, password)):
+            data = value.encode() + b"\0"
+            block[offset:offset + len(data)] = data
+        sock.sendall(aes128_ecb(hashlib.md5(shared).digest(), bytes(block)) + public)
+        if struct.unpack(">I", exact(sock, 4))[0] != 0:
+            raise RuntimeError("Screen Sharing rejected the ARD credentials")
+        sock.sendall(b"\x01")
+        width, height = struct.unpack(">HH", exact(sock, 4))
+        exact(sock, 16)
+        exact(sock, struct.unpack(">I", exact(sock, 4))[0])
+    return banner.decode("latin-1").strip(), offered, width, height
+
+
+def rfb_probe(port, password):
+    """Authenticate to the VNC fixture with VNCAuth and read its ServerInit."""
+    sys.path.insert(0, str(VNC_FIXTURE.parent.resolve()))
+    try:
+        from vnc_des import vnc_auth_response
+    finally:
+        sys.path.pop(0)
+
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+        sock.settimeout(5)
+        if not exact(sock, 12).startswith(b"RFB 003."):
+            raise RuntimeError("VNC fixture did not announce RFB")
+        sock.sendall(b"RFB 003.008\n")
+        offered = exact(sock, exact(sock, 1)[0])
+        if 2 not in offered:
+            raise RuntimeError(f"VNC fixture does not offer VNCAuth: {list(offered)}")
+        sock.sendall(b"\x02")
+        sock.sendall(vnc_auth_response(password, exact(sock, 16)))
+        if struct.unpack(">I", exact(sock, 4))[0] != 0:
+            raise RuntimeError("VNC fixture rejected the probe password")
+        sock.sendall(b"\x01")
+        width, height = struct.unpack(">HH", exact(sock, 4))
+        exact(sock, 16)
+        name = exact(sock, struct.unpack(">I", exact(sock, 4))[0]).decode()
+    return width, height, name
+
+
+def vnc_control(port, *commands):
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+        sock.sendall(("\n".join(commands) + "\n").encode())
+        sock.shutdown(socket.SHUT_WR)
+        sock.settimeout(5)
+        reply = b""
+        # The fixture answers every line, then closes the connection.
+        while chunk := sock.recv(65536):
+            reply += chunk
+    return reply.decode().splitlines()
+
+
 def retry(probe, seconds=120):
     end = time.monotonic() + seconds
     while True:
@@ -73,9 +186,15 @@ def retry(probe, seconds=120):
 def install(capabilities):
     if os.environ.get("GITHUB_ACTIONS") != "true":
         raise RuntimeError("package/account installation is restricted to GitHub hosted jobs")
+    if "vnc" in capabilities:
+        command([sys.executable, "-m", "pip", "install", *VNC_FIXTURE_PACKAGES])
     system = platform.system()
     if system == "Linux":
-        command(["docker", "info", "--format", "{{.ServerVersion}}"])
+        if "xrdp" in capabilities:
+            command(["sudo", "-n", "apt-get", "update"])
+            command(["sudo", "-n", "apt-get", "install", "-y", "xrdp", "xorgxrdp", "openbox"])
+        if set(capabilities) & {"ssh", "mysql"}:
+            command(["docker", "info", "--format", "{{.ServerVersion}}"])
     elif system == "Darwin":
         packages = (["mysql@8.4"] if "mysql" in capabilities else []) + (["openssh"] if "ssh" in capabilities else [])
         if packages:
@@ -112,6 +231,22 @@ class Services:
                 command(argv)
             except Exception as exc:
                 print(f"service cleanup: {type(exc).__name__}", flush=True)
+        self.stack.callback(cleanup)
+
+    def cleanup_action(self, label, action):
+        """Register one teardown action that must never fail the entry.
+
+        Setup failures stay fatal: without the fixture the selected cases
+        cannot run. Teardown runs after every case and its receipt is
+        written, so a locked host key, an already removed account or a
+        stopped service is a logged cleanup note, not an infrastructure
+        error for an otherwise green entry.
+        """
+        def cleanup():
+            try:
+                action()
+            except Exception as exc:
+                print(f"service cleanup ({label}): {type(exc).__name__}: {exc}", flush=True)
         self.stack.callback(cleanup)
 
     def start_process(self, argv, name):
@@ -187,7 +322,7 @@ class Services:
                        "$cred=[PSCredential]::new($env:QA_SERVICE_USER,$pw); "
                        "Start-Process $env:WINDIR\\System32\\cmd.exe -Credential $cred -LoadUserProfile "
                        "-ArgumentList '/c exit 0' -Wait")
-            self.stack.callback(lambda: powershell("Remove-LocalUser -Name $env:QA_SERVICE_USER"))
+            self.cleanup_action("local-ssh-user", lambda: powershell("Remove-LocalUser -Name $env:QA_SERVICE_USER"))
             remote_dir = f"C:/qa-temp-{user}"
             powershell(f"New-Item -ItemType Directory -Force '{remote_dir}' | Out-Null; "
                        f"icacls '{remote_dir}' /grant '{user}:(OI)(CI)F' | Out-Null")
@@ -215,7 +350,10 @@ class Services:
             standard.parent.mkdir(parents=True, exist_ok=True)
             (standard.parent / "logs").mkdir(exist_ok=True)
             previous = standard.read_bytes() if standard.exists() else None
-            self.stack.callback(lambda: standard.write_bytes(previous) if previous is not None else standard.unlink(missing_ok=True))
+            self.cleanup_action(
+                "sshd-config-restore",
+                lambda: standard.write_bytes(previous) if previous is not None else standard.unlink(missing_ok=True),
+            )
             standard.write_text("\n".join(lines + ["SyslogFacility LOCAL0"]) + "\n", encoding="utf-8")
             command(["icacls", str(standard), "/inheritance:r", "/grant:r", "*S-1-5-18:F", "*S-1-5-32-544:F"])
             command(["icacls", str(standard), "/setowner", "*S-1-5-32-544"])
@@ -228,8 +366,8 @@ class Services:
                 log = standard.parent / "logs/sshd.log"
                 if log.is_file():
                     shutil.copy2(log, self.root / "sshd.log")
-            self.stack.callback(collect_windows_logs)
-            self.stack.callback(lambda: powershell("Stop-Service sshd -ErrorAction SilentlyContinue"))
+            self.cleanup_action("sshd-logs", collect_windows_logs)
+            self.cleanup_action("sshd-stop", lambda: powershell("Stop-Service sshd -ErrorAction SilentlyContinue"))
             try:
                 powershell("Start-Service sshd")
             except Exception:
@@ -260,7 +398,7 @@ class Services:
             client.connect("127.0.0.1", port, user, password, timeout=5,
                            banner_timeout=5, auth_timeout=5, allow_agent=False, look_for_keys=False)
         retry(probe)
-        self.stack.callback(client.close)
+        self.cleanup_action("ssh-probe-client", client.close)
         nonce = secrets.token_hex(12)
         _, stdout, stderr = client.exec_command(f"echo {nonce}", timeout=60)
         output = stdout.read().decode(errors="replace")
@@ -381,8 +519,106 @@ class Services:
         self.config.update(database=cfg.copy(), mysql=cfg.copy())
         return {"authentication": True, "dml_roundtrip": True, "port": port}
 
+    def vnc(self):
+        # VNCAuth keys only the first 8 password bytes.
+        password = secret("QA_VNC_PASSWORD", "Qv" + secrets.token_urlsafe(6)[:6])
+        port, control_port = free_port(), free_port()
+        events = self.root / "vnc-events.jsonl"
+        process = self.start_process([sys.executable, VNC_FIXTURE.resolve(), "--port", port,
+                                      "--control-port", control_port, "--log", events,
+                                      "--security", "vncauth", "--password-env", "QA_VNC_PASSWORD",
+                                      "--ext-clipboard", "--clip-formats", "text,html"], "vnc-fixture")
+        def probe():
+            if process.poll() is not None:
+                raise RuntimeError(f"VNC fixture exited ({process.returncode}); see vnc-fixture.log")
+            return rfb_probe(port, password)
+        width, height, name = retry(probe, 60)
+        reply = vnc_control(control_port, "stats")
+        if len(reply) != 1 or not isinstance(json.loads(reply[0]), list):
+            raise RuntimeError("VNC fixture control port did not answer")
+        self.resources.append(f"vnc-fixture:{port}")
+        self.config["vnc"] = {"host": "127.0.0.1", "port": port, "password": "${env.QA_VNC_PASSWORD}",
+                              "control_port": control_port}
+        return {"authentication": True, "server_init": [width, height, name], "port": port,
+                "control_port": control_port}
+
+    def ard(self):
+        """macOS Screen Sharing with an ARD login for a disposable admin account.
+
+        Screen Sharing is new on hosted runners and shares the job with every
+        other macOS case, so a provisioning failure is recorded for the
+        ard_required cases instead of aborting the job."""
+        if platform.system() != "Darwin":
+            raise RuntimeError("macOS Screen Sharing (ARD) needs a macOS runner")
+        try:
+            return self.provision_ard()
+        except Exception as exc:
+            reason = f"{type(exc).__name__}: {exc}"
+            self.ard_diagnostics()
+            self.config["ard"] = {"unavailable": reason}
+            return {"authentication": False, "error": reason}
+
+    def provision_ard(self):
+        # The console account holds a SecureToken: even root cannot set its
+        # password without the old one, so log in as a new admin account.
+        user = ARD_USER
+        password = secret("QA_ARD_PASSWORD", "Qa1-" + secrets.token_hex(8))
+        command(["sudo", "-n", "sysadminctl", "-addUser", user, "-fullName", "Taomni QA ARD",
+                 "-password", password, "-admin"])
+        self.cleanup_command(["sudo", "-n", "sysadminctl", "-deleteUser", user])
+        command(["id", "-u", user])
+        # Best effort: a home folder avoids a broken first session, and an
+        # existing Screen Sharing access list must include the account.
+        subprocess.run(["sudo", "-n", "createhomedir", "-c", "-u", user], capture_output=True)
+        subprocess.run(["sudo", "-n", "dseditgroup", "-o", "edit", "-a", user, "-t", "user",
+                        "com.apple.access_screensharing"], capture_output=True)
+        plist = "/System/Library/LaunchDaemons/com.apple.screensharing.plist"
+        command(["sudo", "-n", "launchctl", "enable", "system/com.apple.screensharing"])
+        # Fails harmlessly when the service is already loaded.
+        subprocess.run(["sudo", "-n", "launchctl", "bootstrap", "system", plist], capture_output=True)
+        self.cleanup_command(["sudo", "-n", "launchctl", "bootout", "system/com.apple.screensharing"])
+        self.ard_session_facts("before the ARD login")
+        banner, offered, width, height = retry(lambda: ard_probe(5900, user, password), 150)
+        self.ard_session_facts("after the ARD login")
+        end_ard_session(user)
+        self.ard_session_facts("after ending the ARD session")
+        self.resources.append("screensharing:5900")
+        # end_session: ard_required logs the account out again after each case.
+        self.config["ard"] = {"host": "127.0.0.1", "port": 5900, "user": user,
+                              "password": "${env.QA_ARD_PASSWORD}", "end_session": True}
+        return {"authentication": True, "banner": banner, "security_types": offered,
+                "server_init": [width, height]}
+
+    def ard_session_facts(self, label):
+        """Who owns the console and which GUI sessions run (no credentials)."""
+        report = [f"## {label} ({time.strftime('%H:%M:%S')})"]
+        for argv in (["stat", "-f", "%Su", "/dev/console"], ["who"],
+                     ["ps", "-axo", "user,pid,%cpu,rss,etime,comm", "-r"]):
+            try:
+                result = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=30)
+                output = "\n".join(result.stdout.splitlines()[:25]) + result.stderr[-500:]
+            except (OSError, subprocess.SubprocessError) as exc:
+                output = f"{type(exc).__name__}: {exc}"
+            report.append(f"$ {' '.join(argv)}\n{output}")
+        with (self.root / "screensharing-sessions.txt").open("a", encoding="utf-8") as log:
+            log.write("\n".join(report) + "\n\n")
+
+    def ard_diagnostics(self):
+        report = []
+        for argv in (["sudo", "-n", "launchctl", "print", "system/com.apple.screensharing"],
+                     ["netstat", "-an", "-p", "tcp"], ["dscl", ".", "-read", f"/Users/{ARD_USER}", "UniqueID"],
+                     ["dscl", ".", "-read", "/Groups/com.apple.access_screensharing"], ["sw_vers"]):
+            try:
+                result = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=60)
+                output = f"{result.stdout[-4000:]}{result.stderr[-1000:]}"
+            except (OSError, subprocess.SubprocessError) as exc:
+                output = f"{type(exc).__name__}: {exc}"
+            report.append(f"$ {' '.join(argv)}\n{output}")
+        (self.root / "screensharing-diagnostics.txt").write_text("\n".join(report), encoding="utf-8")
+
     def __enter__(self):
-        if platform.system() != "Linux" and os.environ.get("GITHUB_ACTIONS") != "true":
+        accounts = self.capabilities & {"ssh", "mysql", "ard"}
+        if accounts and platform.system() != "Linux" and os.environ.get("GITHUB_ACTIONS") != "true":
             raise RuntimeError("native service account setup is restricted to hosted CI")
         self.root.mkdir(parents=True, exist_ok=True)
         self.private = Path(self.stack.enter_context(tempfile.TemporaryDirectory(prefix=self.namespace)))
@@ -393,6 +629,10 @@ class Services:
                 facts["ssh"] = self.ssh()
             if "mysql" in self.capabilities:
                 facts["mysql"] = self.mysql()
+            if "vnc" in self.capabilities:
+                facts["vnc"] = self.vnc()
+            if "ard" in self.capabilities:
+                facts["ard"] = self.ard()
             write_json(self.root / "lease.json", facts)
             return self
         except BaseException:
@@ -412,7 +652,7 @@ def main():
         install(caps)
     else:
         with Services(Path("qa-ui-auto-report/service-probe"), caps, {}):
-            print("SSH/SFTP/MySQL protocol probes passed")
+            print(f"service protocol probes passed: {', '.join(sorted(caps))}")
 
 
 if __name__ == "__main__":

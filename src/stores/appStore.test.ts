@@ -877,7 +877,11 @@ describe("appStore.recentWorkspaces", () => {
 describe("appStore.sidebar", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    useAppStore.setState({ sidebarCollapsed: true });
+    useAppStore.setState({
+      tabs: [tab("welcome", { type: "welcome", closable: false })],
+      activeTabId: "welcome",
+      sidebarCollapsed: true,
+    });
   });
 
   it("persists explicit sidebar collapsed changes", () => {
@@ -894,6 +898,62 @@ describe("appStore.sidebar", () => {
     useAppStore.getState().toggleSidebar();
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
     expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("false");
+  });
+});
+
+describe("appStore.sidebar per tab group (ED-PARITY-027)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useAppStore.setState({
+      tabs: [tab("welcome", { type: "welcome", closable: false }), tab("t1"), tab("cw", { type: "code-workspace" })],
+      activeTabId: "welcome",
+      sidebarCollapsed: false,
+      mergeToolWindowRail: true,
+      sidebarCollapsedByGroup: { "code-workspace": true, terminal: true, other: false },
+    });
+  });
+
+  it("applies a group's state without rewriting the launch state", () => {
+    window.localStorage.setItem("taomni.sidebarCollapsed", "false");
+    useAppStore.setState({ activeTabId: "t1" });
+    useAppStore.getState().applySidebarForActiveTab();
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    // Quitting here must not start the next launch (Welcome) collapsed.
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("false");
+
+    useAppStore.setState({ activeTabId: "welcome" });
+    useAppStore.getState().applySidebarForActiveTab();
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+  });
+
+  it("remembers manual changes per group and keeps only the other group in the legacy key", () => {
+    useAppStore.setState({ activeTabId: "t1", sidebarCollapsed: true });
+    useAppStore.getState().setSidebarCollapsed(false);
+    expect(useAppStore.getState().sidebarCollapsedByGroup).toEqual({ "code-workspace": true, terminal: false, other: false });
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem("taomni.sidebarCollapsedByGroup.v1") ?? "null"))
+      .toEqual({ "code-workspace": true, terminal: false });
+
+    useAppStore.setState({ activeTabId: "cw" });
+    useAppStore.getState().applySidebarForActiveTab();
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    useAppStore.getState().setActiveSideTab("tools");
+    expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(false);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
+
+    useAppStore.setState({ activeTabId: "welcome" });
+    useAppStore.getState().toggleSidebar();
+    expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(true);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
+  });
+
+  it("keeps the single global state when the bar is not merged", () => {
+    useAppStore.setState({ mergeToolWindowRail: false, activeTabId: "t1" });
+    useAppStore.getState().setSidebarCollapsed(true);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
+    expect(window.localStorage.getItem("taomni.sidebarCollapsedByGroup.v1")).toBeNull();
+    useAppStore.getState().applySidebarForActiveTab();
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
   });
 });
 

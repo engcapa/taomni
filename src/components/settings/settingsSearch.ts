@@ -44,7 +44,7 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
   {
     id: "global-ui",
     titleKeys: ["settings.globalUiTitle"],
-    terms: ["ui font", "font family", "font size", "typography", "interface font", "界面字体", "字体", "字号", "排版"],
+    terms: ["ui font", "font family", "font size", "typography", "interface font", "界面字体", "字体", "字号", "排版", "tool window bar", "sidebar rail", "工具窗口条", "侧栏"],
   },
   {
     id: "screenshot",

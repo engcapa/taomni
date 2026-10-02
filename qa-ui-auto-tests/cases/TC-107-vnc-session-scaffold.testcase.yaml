@@ -6,18 +6,18 @@ description: 'Coverage smoke for F9.6. Creates a VNC session bookmark and double
 
   until conn.status === "connected"), so we assert the vnc-panel testid
 
-  is present without requiring a real RFB handshake. The auth prompt
+  is present without requiring a real RFB handshake. No password is
 
-  also fires for the configured host; we dismiss it.
+  stored and none is asked before connecting: the VNC panel asks only when
+
+  the server requires one (DEC-VNC-21), so no pre-connect auth prompt opens.
 
 
-  Because the configured cfg.ssh.host is not necessarily a VNC server, we
+  The host is not a VNC server, so the test only confirms the protocol
 
-  do NOT actually authenticate — the test only confirms the protocol
+  selector + direct open + panel mount path is wired up. Real VNC connection
 
-  selector + auth flow + panel mount path is wired up. Real VNC connection
-
-  testing requires a configured VNC fixture.
+  and in-session authentication are covered by TC-151 with the VNC fixture.
 
   '
 covers:
@@ -54,15 +54,11 @@ steps:
 - open_session:
     name: qa-ui-auto-vnc
     double_click: true
-- wait_for: '[data-testid="auth-prompt"]'
-- fill:
-    selector: '[data-testid="auth-password"]'
-    value: qa-ui-auto-password
-- click: '[data-testid="auth-submit"]'
 - wait_for:
     selector: '[data-testid="vnc-panel"]'
     timeout_sec: 10
 - assert_visible: '[data-testid="vnc-panel"]'
+- assert_not_visible: '[data-testid="auth-prompt"]'
 - wait_for:
     selector: '[data-testid="vnc-canvas"]'
     state: attached
@@ -72,7 +68,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Saved VNC session opens the VNC panel scaffolding：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: A saved VNC session without a stored password opens the VNC panel scaffolding directly, without a pre-connect password prompt.
     actions:
     - 1
     - 3
@@ -83,8 +79,6 @@ verification:
     - 10
     - 11
     - 13
-    - 15
-    - 16
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -95,18 +89,18 @@ verification:
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-vnc\"]"}'
     - step: 14
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-panel\"]", "timeout_sec": 10}}'
-    - step: 18
+      expectation: Opening the session without a stored password mounts the VNC panel directly.
+    - step: 15
       expectation: '{"assert_visible": "[data-testid=\"vnc-panel\"]"}'
-    - step: 19
+    - step: 16
+      expectation: No pre-connect password prompt opens; the panel asks only when the server requires a password.
+    - step: 17
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"]", "state": "attached", "timeout_sec":
         5}}'
     results:
+    - 14
+    - 16
     - 17
-    - 18
-    - 19
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

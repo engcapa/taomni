@@ -8,7 +8,7 @@
 //! generic start request to the matching leaf, and [`set_status`] keeps the
 //! registry + frontend in sync.
 
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -56,10 +56,14 @@ impl LogEmitter {
         }
     }
 
-    /// Emit one timestamped log line to the frontend.
+    /// Emit one timestamped log line to the frontend and keep it in the
+    /// registry's history.
     pub fn line(&self, msg: impl Into<String>) {
         let ts = chrono::Local::now().format("%H:%M:%S");
         let line = format!("[{}] {}", ts, msg.into());
+        if let Some(state) = self.app.try_state::<crate::state::AppState>() {
+            state.servers.record_log(self.server_type, &line);
+        }
         let channel = format!("server://output/{}", self.server_type.as_str());
         let _ = self.app.emit(&channel, line);
     }

@@ -49,7 +49,14 @@ def step_terminal_input(ctx: StepContext, args: Any) -> None:
     if ctx.dry_run:
         return
     attempts = verify["attempts"] if verify else 1
-    for _ in range(attempts):
+    for attempt in range(attempts):
+        if attempt:
+            # A truncated probe may leave an unfinished shell line or start
+            # a program such as `pr` that reads stdin. Restore the prompt
+            # before retrying so the next probe cannot append to that input.
+            locator = ctx.page.locator(selector).first
+            locator.press("Control+c")
+            locator.press("Control+u")
         _dispatch_terminal_input(ctx, selector, text, submit)
         if verify is None:
             return

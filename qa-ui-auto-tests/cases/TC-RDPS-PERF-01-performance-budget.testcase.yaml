@@ -1,0 +1,223 @@
+id: TC-RDPS-PERF-01-performance-budget
+title: RDP server performance - connect time, input-to-frame latency and animation throughput
+description: 'V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Measures the
+
+  Taomni RDP server with rdp-probe over loopback on the runner desktop:
+
+  M1 connect/first-graphics time, M2 input-to-frame latency (40 clicks on a
+
+  host Tk target that inverts colour per click) and M3/M4 distinct animation
+
+  frames per second and bandwidth while a 640x360 host animation runs.
+
+
+  The measurement steps only guard that measurement happened, so every
+
+  report is kept; the last steps then hold the reports to the absolute
+
+  budgets of design §4.7, derived from Windows TermService on the same
+
+  runner and probe (run 36835206663, TC-RDPS-PERF-02): M1 ≤ 500 ms,
+
+  M2 p95 ≤ 65 ms, M3 ≥ 25.6 fps, M4 ≤ 4905 kbps. Budgets may only be
+
+  tightened (DEC-04). The server log is saved as server-log.txt for the
+
+  capture and encoder timings.
+
+
+  Measured on a release QA build (release_build_required) on all three
+
+  platforms; on Windows platform_choice picks Taomni over the running system
+
+  Remote Desktop. TC-RDPS-PERF-02 measures the TermService reference.
+
+
+  The probe declares RDP6.1 bulk compression (mstsc-like). The measurement also requires actual compressed updates
+  and zero independent decompression errors. Absolute M1-M4 budgets remain fixed.
+
+  '
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- performance
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+- release_build_required
+timeout_sec: 600
+steps:
+- open_route: ?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- rdp_probe:
+    scenario: connect
+    artifact: perf-connect
+    args:
+      seconds: 2
+    expect:
+      first_graphics_ms:
+        exists: true
+      framebuffer.painted_share:
+        min: 0.95
+- host_helper:
+    action: start
+    name: target
+    mode: flip
+    geometry: 480x320+40+80
+- rdp_probe:
+    scenario: latency
+    artifact: perf-latency
+    timeout_sec: 330
+    args:
+      x: 280
+      y: 240
+      samples: 40
+      timeout-sec: 300
+    expect:
+      timeouts:
+        max: 4
+      latency_ms.count:
+        min: 36
+- host_helper:
+    action: stop
+    name: target
+- host_helper:
+    action: start
+    name: animation
+    mode: animate
+    geometry: 640x360+40+80
+- rdp_probe:
+    scenario: throughput
+    artifact: perf-throughput
+    args:
+      seconds: 10
+      rect: 40,80,640,360
+      marker: 56,96
+    expect:
+      visible_changes:
+        min: 10
+      marker.frames:
+        min: 100
+      rfx.bulk.compressed_updates:
+        min: 1
+      rfx.bulk.decompression_errors: 0
+- host_helper:
+    action: stop
+    name: animation
+- save_text:
+    selector: '[data-testid="server-log"]'
+    path: server-log.txt
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+- assert_json_file:
+    path: perf-connect.json
+    expect:
+      first_graphics_ms:
+        max: 500
+- assert_json_file:
+    path: perf-latency.json
+    expect:
+      latency_ms.p95:
+        max: 65
+- assert_json_file:
+    path: perf-throughput.json
+    expect:
+      marker.observed_fps:
+        min: 25.6
+      kbps:
+        max: 4905
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Connect time, input-to-frame latency samples and animation throughput are measured on the real
+      server.
+    actions:
+    - 10
+    - 18
+    - 21
+    checkpoints:
+    - step: 17
+      expectation: The connect report includes first_graphics_ms and at least 95% of the framebuffer grid is painted.
+    - step: 19
+      expectation: At least 36 of 40 latency samples were observed.
+    - step: 22
+      expectation: At least 10 visible changes and 100 marker-counted animation frames arrive during 10 s.
+    results:
+    - 19
+    - 22
+  - id: R2
+    requirement: The measurements meet the absolute budgets of design §4.7, derived from Windows TermService on
+      the same runner and probe (run 36835206663).
+    actions:
+    - 17
+    - 19
+    - 22
+    checkpoints:
+    - step: 27
+      expectation: The first graphics update arrives within 500 ms of activation (M1).
+    - step: 28
+      expectation: Input-to-frame latency p95 is at most 65 ms (M2).
+    - step: 29
+      expectation: At least 25.6 distinct animation frames per second are displayed (M3) using at most 4905 kbps
+        (M4).
+    results:
+    - 27
+    - 28
+    - 29
+  native:
+  - check: Real capture, encoder, network loopback and input injection timings on the hosted runner.
+    method: automated
+    reason: Browser stubs have no RDP server; only the packaged app exercises the measured path.
+  visual:
+  - check: Not a visual check.
+    method: not-applicable
+    reason: Metrics come from the probe's decoded framebuffer.

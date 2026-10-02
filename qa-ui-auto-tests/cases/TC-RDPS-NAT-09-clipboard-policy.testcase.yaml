@@ -1,0 +1,206 @@
+id: TC-RDPS-NAT-09-clipboard-policy
+title: RDP server clipboard policy - text only to the client, nothing back, files never offered
+description: |
+  V-05 restricted levels (docs-feature/rdp-server-parity-design.md §4.2,
+  AC-11, DEC-10). Like the Windows "restrict clipboard transfer" policy,
+  each direction has its own level. The server starts with "this computer
+  -> client" set to text only and "client -> this computer" off.
+
+  The host copies HTML: the RDP client must never be offered "HTML Format"
+  (where the host also holds a plain-text alternative, only that is
+  offered). A host text copy still reaches the client. The client then
+  copies its own text: the server must not fetch it, and the host clipboard
+  keeps the host's text. Finally the host copies a folder, which must not
+  be offered either. On Windows platform_choice picks Taomni over the
+  runner's system Remote Desktop.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- clipboard
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+timeout_sec: 300
+steps:
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- select_option:
+    selector: '[data-testid="rdp-field-clipboard-to-client"]'
+    value: text
+- select_option:
+    selector: '[data-testid="rdp-field-clipboard-to-server"]'
+    value: 'off'
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: this computer -> client text, client -> this computer off
+    timeout_sec: 15
+- host_clipboard:
+    action: set
+    kind: html
+    html: <b>宿主 HTML</b> 不应提供
+    text: 宿主 HTML 不应提供
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: html-not-offered
+    expect_exit: 5
+    args:
+      expect: html
+      wait-sec: 5
+    expect:
+      negotiated.cliprdr: true
+      clipboard.remote_copies:
+        excludes: HTML Format
+- host_clipboard:
+    action: set
+    kind: text
+    text: 宿主文本 仅文本 ✓
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: receive-text-only
+    args:
+      expect: text
+    expect:
+      received.text: 宿主文本 仅文本 ✓
+- rdp_probe:
+    scenario: clipboard-send
+    artifact: send-blocked
+    expect_exit: 5
+    args:
+      text: 客户端文本不应到达宿主
+      wait-sec: 5
+    expect:
+      negotiated.cliprdr: true
+      clipboard.requested_formats:
+        equals: []
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: 宿主文本 仅文本 ✓
+- host_make_tree:
+    root: 策略样本
+    files:
+      a.txt: policy sample
+- host_clipboard:
+    action: set
+    kind: files
+    paths:
+    - 策略样本
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: files-not-offered
+    expect_exit: 5
+    args:
+      expect: files
+      wait-sec: 5
+    expect:
+      clipboard.remote_copies:
+        excludes: FileGroupDescriptorW
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The server applies each clipboard direction's level when it starts.
+    actions:
+    - 10
+    - 11
+    - 12
+    checkpoints:
+    - step: 18
+      expectation: The RDP server runs on the case port.
+    - step: 19
+      expectation: The server log reports text only towards the client and off from the client.
+    results:
+    - 19
+  - id: R2
+    requirement: With "this computer -> client" at text only, rich formats are not offered while text still reaches the client.
+    actions:
+    - 20
+    - 22
+    checkpoints:
+    - step: 21
+      expectation: A host HTML copy is never offered as HTML Format (the probe gives up after five seconds).
+    - step: 23
+      expectation: A host text copy reaches the client unchanged.
+    results:
+    - 21
+    - 23
+  - id: R3
+    requirement: With "client -> this computer" off, a client copy is not fetched and the host clipboard is unchanged.
+    actions:
+    - 24
+    checkpoints:
+    - step: 24
+      expectation: The server requests no clipboard data from the client.
+    - step: 25
+      expectation: The host clipboard still holds the host's text.
+    results:
+    - 24
+    - 25
+  - id: R4
+    requirement: Files are not offered when the level excludes them.
+    actions:
+    - 26
+    - 27
+    checkpoints:
+    - step: 28
+      expectation: No server format list names FileGroupDescriptorW.
+    results:
+    - 28
+  native:
+  - check: Real host clipboard (platform tools) and a real CLIPRDR client against the server's per-direction policy.
+    method: automated
+    reason: Browser stubs have no RDP server or host clipboard.
+  visual:
+  - check: Not a visual check.
+    method: not-applicable
+    reason: Clipboard formats and data are asserted.

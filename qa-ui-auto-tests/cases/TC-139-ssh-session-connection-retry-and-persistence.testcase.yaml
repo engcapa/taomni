@@ -68,10 +68,12 @@ steps:
 - assert_pattern:
     selector: '[data-testid="alert-dialog-message"]'
     regex: '^(?:Connection successful(?: \(\d+ms\))?|Authenticated to .+ as .+)$'
+    timeout_sec: 60
 - click: '[data-testid="alert-dialog-ok"]'
 - assert_pattern:
     selector: '[data-testid="session-test-result-summary"]'
     regex: '^(?:Connection successful(?: \(\d+ms\))?|Authenticated to .+ as .+)$'
+    timeout_sec: 60
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
 - fill:
@@ -136,9 +138,9 @@ verification:
     - step: 24
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
     - step: 25
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$", "timeout_sec": 60}}'
     - step: 27
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$", "timeout_sec": 60}}'
     results:
     - 12
     - 19

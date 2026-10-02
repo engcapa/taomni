@@ -220,6 +220,8 @@ export function SettingsPanel() {
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
   const uiFontSize = useAppStore((s) => s.uiFontSize);
+  const mergeToolWindowRail = useAppStore((s) => s.mergeToolWindowRail);
+  const setMergeToolWindowRail = useAppStore((s) => s.setMergeToolWindowRail);
   const welcomeRecentSessionLimit = useAppStore((s) => s.welcomeRecentSessionLimit);
   const setUiFontFamily = useAppStore((s) => s.setUiFontFamily);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
@@ -642,6 +644,19 @@ export function SettingsPanel() {
                     </div>
                   </div>
                 </div>
+                <label className="mt-3 pt-2 border-t border-[var(--taomni-divider)] flex items-start gap-2 text-[12px] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    data-testid="settings-merge-tool-window-rail"
+                    className="mt-0.5"
+                    checked={mergeToolWindowRail}
+                    onChange={(e) => setMergeToolWindowRail(e.target.checked)}
+                  />
+                  <span>
+                    <span className="font-medium">{t("settings.mergeToolWindowRailLabel")}</span>
+                    <span className="block text-[var(--taomni-text-muted)]">{t("settings.mergeToolWindowRailHint")}</span>
+                  </span>
+                </label>
               </section>
             </SettingsAnchor>
             <SettingsAnchor id="screenshot">

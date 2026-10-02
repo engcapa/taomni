@@ -1,10 +1,18 @@
 pub mod clipboard;
 pub mod encodings;
 pub mod error;
+pub mod framebuffer;
+pub mod keyboard_hook;
 pub mod limits;
+pub mod native_pointer;
+#[cfg(test)]
+mod live_bench;
+pub mod pixel;
 pub mod policy;
+pub mod quality;
 pub mod queue;
 pub mod rfb;
+pub mod tight;
 pub mod tls;
 pub mod ws;
 
@@ -14,7 +22,26 @@ use uuid::Uuid;
 
 use crate::state::AppState;
 use crate::vnc::policy::VncClipboardPolicy;
-use crate::vnc::ws::{VncControl, dial_vnc_transport, spawn_vnc_relay};
+use crate::vnc::quality::VncPictureQuality;
+use crate::vnc::ws::{VncControl, VncRelayOptions, dial_vnc_transport, spawn_vnc_relay};
+
+/// In-flight `vnc_connect` calls that the viewer can stop (VNC-SESS-003).
+static CONNECT_ATTEMPTS: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>,
+> = std::sync::LazyLock::new(Default::default);
+const MAX_ATTEMPT_ID_BYTES: usize = 128;
+
+struct AttemptGuard(Option<String>);
+
+impl Drop for AttemptGuard {
+    fn drop(&mut self) {
+        if let Some(id) = self.0.take()
+            && let Ok(mut attempts) = CONNECT_ATTEMPTS.lock()
+        {
+            attempts.remove(&id);
+        }
+    }
+}
 
 const MAX_DETACH_CLAIMS: usize = 64;
 const MAX_DETACH_FIELD_BYTES: usize = 64 * 1024;
@@ -81,6 +108,10 @@ pub struct VncDetachClaim {
     pub security_policy: crate::vnc::policy::VncSecurityPolicy,
     pub view_only: bool,
     pub clipboard_policy: VncClipboardPolicy,
+    /// Viewer options (picture quality, scaling, keys, lifecycle) as the
+    /// frontend's bounded JSON; absent for claims from older builds.
+    #[serde(default)]
+    pub viewer_options_json: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -101,6 +132,13 @@ async fn store_detach_claim(
         claim.password.as_deref(),
         claim.network_settings_json.as_deref(),
     )?;
+    if claim
+        .viewer_options_json
+        .as_deref()
+        .is_some_and(|value| value.len() > MAX_DETACH_FIELD_BYTES)
+    {
+        return Err("VNC viewer options exceed the configured size limit".into());
+    }
 
     let claim_id = Uuid::new_v4().to_string();
     {
@@ -143,6 +181,10 @@ pub async fn vnc_connect(
     security_policy: Option<crate::vnc::policy::VncSecurityPolicy>,
     view_only: Option<bool>,
     clipboard_policy: Option<VncClipboardPolicy>,
+    picture_quality: Option<VncPictureQuality>,
+    shared: Option<bool>,
+    allow_unencrypted: Option<bool>,
+    attempt_id: Option<String>,
 ) -> Result<VncConnectResult, String> {
     validate_connect_inputs(
         &host,
@@ -152,7 +194,24 @@ pub async fn vnc_connect(
         network_settings_json.as_deref(),
     )
     .map_err(structured_error)?;
+    if attempt_id
+        .as_deref()
+        .is_some_and(|id| id.is_empty() || id.len() > MAX_ATTEMPT_ID_BYTES)
+    {
+        return Err(structured_error("invalid VNC connection attempt id".into()));
+    }
     let session_id = Uuid::new_v4().to_string();
+    let attempt = tokio_util::sync::CancellationToken::new();
+    let _attempt_guard = match attempt_id {
+        Some(id) => {
+            CONNECT_ATTEMPTS
+                .lock()
+                .map_err(|_| structured_error("VNC attempt registry poisoned".into()))?
+                .insert(id.clone(), attempt.clone());
+            AttemptGuard(Some(id))
+        }
+        None => AttemptGuard(None),
+    };
 
     let resolved_password = match password.as_deref() {
         Some(p) => state
@@ -175,6 +234,13 @@ pub async fn vnc_connect(
         crate::terminal::resolve_jump_credentials(&state, n).map_err(structured_error)?;
     }
     let policy = security_policy.unwrap_or_default();
+    let options = VncRelayOptions {
+        picture_quality: picture_quality.unwrap_or_default(),
+        shared: shared.unwrap_or(true),
+        // Older callers never asked, so keep their behaviour.
+        allow_unencrypted: allow_unencrypted.unwrap_or(true),
+        ..VncRelayOptions::default()
+    };
     let session = spawn_vnc_relay(
         host,
         port,
@@ -184,6 +250,8 @@ pub async fn vnc_connect(
         policy,
         view_only.unwrap_or(false),
         clipboard_policy.unwrap_or_default(),
+        options,
+        attempt,
     )
     .await
     .map_err(structured_error)?;
@@ -211,6 +279,22 @@ pub async fn vnc_connect(
     });
 
     Ok(result)
+}
+
+/// Stop an in-flight `vnc_connect` (the connecting overlay's Stop button).
+#[tauri::command]
+pub async fn vnc_cancel_connect(attempt_id: String) -> Result<bool, String> {
+    let token = CONNECT_ATTEMPTS
+        .lock()
+        .map_err(|_| "VNC attempt registry poisoned".to_string())?
+        .remove(&attempt_id);
+    Ok(match token {
+        Some(token) => {
+            token.cancel();
+            true
+        }
+        None => false,
+    })
 }
 
 /// Store a one-time, in-memory detach claim. Sensitive fields never cross
@@ -291,6 +375,10 @@ pub async fn vnc_test_connection(
             &host,
             policy,
             crate::vnc::ws::VNC_AUTH_TIMEOUT,
+            true,
+            username
+                .as_deref()
+                .is_some_and(|name| !name.trim().is_empty()),
         )
         .await
         {
@@ -347,6 +435,7 @@ mod tests {
             security_policy: crate::vnc::policy::VncSecurityPolicy::PreferEncryption,
             view_only: false,
             clipboard_policy: VncClipboardPolicy::Bidirectional,
+            viewer_options_json: None,
         }
     }
 

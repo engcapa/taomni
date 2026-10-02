@@ -55,6 +55,7 @@ import { CallOverlay } from "../components/lanchat/CallOverlay";
 import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";
 import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { SocksCapPanel } from "../components/sockscap/SocksCapPanel";
+import { MfaTab } from "../components/mfa/MfaTab";
 import { FileBrowser, type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
@@ -85,7 +86,20 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../lib/vnc";
-import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import {
+  deserializeVncViewerOptions,
+  parseVncViewerOptions,
+  serializeVncViewerOptions,
+  writeVncViewerOptions,
+} from "../lib/vncOptions";
+import type { VncSessionProperties } from "../components/vnc/VncPropertiesDialog";
+import { Bot, Columns2, FolderOpen, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
+import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
+import { useToolWindowStripeStore } from "../components/editor/workspace/toolWindowStripeStore";
+import { useMainRailHostStore } from "../stores/mainRailHostStore";
+import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
 import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { normalizeLocalStartCwd, terminalCwdTitlePrefix } from "../lib/terminalCwd";
@@ -721,6 +735,7 @@ export function MainLayout() {
     tabs,
     activeTabId,
     sidebarCollapsed,
+    mergeToolWindowRail,
     xServerEnabled,
     refreshXServer,
     addTab,
@@ -758,6 +773,12 @@ export function MainLayout() {
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  // ED-PARITY-027 A: every tab group restores its own sidebar state (tool
+  // window tabs start collapsed to the rail).
+  const activeRailGroup = sidebarRailGroup(activeTab?.type);
+  useEffect(() => {
+    useAppStore.getState().applySidebarForActiveTab();
+  }, [activeRailGroup, mergeToolWindowRail]);
   const terminalProfilesBySessionId = useMemo(() => {
     const profiles = new Map<string, TerminalProfile | undefined>();
     for (const session of sessions) {
@@ -921,6 +942,10 @@ export function MainLayout() {
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
+  const mainRailHost = useMainRailHostStore((s) => s.host);
+  const stripeSettings = useToolWindowStripeStore((s) => s.settings);
+  const toggleStripeNames = useToolWindowStripeStore((s) => s.toggleShowNames);
+  const setStripeWidth = useToolWindowStripeStore((s) => s.setWidth);
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
@@ -1293,6 +1318,7 @@ export function MainLayout() {
         security_policy: info.securityPolicy ?? "prefer-encryption",
         view_only: info.viewOnly ?? false,
         clipboard_policy: info.clipboardPolicy ?? "bidirectional",
+        viewer_options_json: info.viewerOptions ? serializeVncViewerOptions(info.viewerOptions) : null,
       }).then((claimId) => {
         // The browser-persisted handoff contains only an opaque one-time id;
         // password/proxy secrets stay in backend memory.
@@ -1496,6 +1522,7 @@ export function MainLayout() {
               securityPolicy: claim.security_policy,
               viewOnly: claim.view_only,
               clipboardPolicy: claim.clipboard_policy as DetachedVncParams["clipboardPolicy"],
+              viewerOptions: deserializeVncViewerOptions(claim.viewer_options_json),
             };
           }
           if (!p?.host) return;
@@ -1515,6 +1542,7 @@ export function MainLayout() {
               securityPolicy: p.securityPolicy,
               viewOnly: p.viewOnly,
               clipboardPolicy: p.clipboardPolicy,
+              viewerOptions: p.viewerOptions,
             },
           });
           setStatusMessage(tr("status.reattached"));
@@ -1842,6 +1870,7 @@ export function MainLayout() {
     const options = parseSessionOptions(session.options_json);
     const rawPolicy = typeof options.vncSecurityPolicy === "string" ? options.vncSecurityPolicy : "prefer-encryption";
     const securityPolicy = rawPolicy === "require-encryption" || rawPolicy === "legacy-compatible" || rawPolicy === "allow-none"
+      || rawPolicy === "prefer-off"
       ? rawPolicy
       : "prefer-encryption";
     const ns = toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json));
@@ -1864,9 +1893,48 @@ export function MainLayout() {
           options.vncClipboardPolicy === "disabled" || options.vncClipboardPolicy === "client-to-server" || options.vncClipboardPolicy === "server-to-client"
             ? options.vncClipboardPolicy
             : "bidirectional",
+        viewerOptions: parseVncViewerOptions(options),
       },
     });
   }, [addTab]);
+
+  // VNC-CONN-001: Properties changed in a VNC session persist to the saved
+  // session (like RealVNC's address-book entry) and to the tab.
+  const persistVncProperties = useCallback(async (tabId: string, sessionId: string, properties: VncSessionProperties) => {
+    useAppStore.getState().updateTabVnc(tabId, {
+      viewOnly: properties.viewOnly,
+      clipboardPolicy: properties.clipboardPolicy,
+      viewerOptions: properties.viewer,
+    });
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (!session) return;
+    const options = writeVncViewerOptions(parseSessionOptions(session.options_json), properties.viewer);
+    options.vncViewOnly = properties.viewOnly;
+    options.vncClipboardPolicy = properties.clipboardPolicy;
+    try {
+      await updateSession({ ...session, options_json: JSON.stringify(options) });
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : String(error));
+    }
+  }, [setStatusMessage, updateSession]);
+
+  // "Remember password" in the in-session authentication form stores the
+  // password in the vault and references it from the session.
+  const rememberVncCredentials = useCallback(async (tabId: string, sessionId: string, password: string) => {
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (!session) return;
+    const ready = await ensureVaultReady(tr(SAVED_PASSWORD_VAULT_REASON_KEY));
+    if (!ready) return;
+    try {
+      const label = `${session.username || "user"}@${session.host || "?"}:${session.port}`;
+      const result = await vaultPut("vnc-password", label, password);
+      const opts = parseSessionOptions(session.options_json);
+      await updateSession({ ...session, options_json: JSON.stringify({ ...opts, passwordRef: result.reference }) });
+      useAppStore.getState().updateTabVnc(tabId, { password: result.reference });
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : String(error));
+    }
+  }, [setStatusMessage, updateSession]);
 
   const openRdpTab = useCallback((session: SessionConfig, password?: string) => {
     const id = `rdp-${session.id}-${Date.now()}`;
@@ -2532,14 +2600,10 @@ export function MainLayout() {
           if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
           openVncTab(session, ref);
         } else {
-          awaitingManualAuthRef.current = true;
-          setPendingAuth({
-            kind: "session",
-            session,
-            resumeRequestId: resume?.requestId,
-            restoreOperationId: resume?.operationId,
-          });
-          return "awaiting-auth";
+          // DEC-VNC-21: connect first; the session's own authentication form
+          // asks only when the server requires a password (RealVNC), so a
+          // None-only server needs no input at all.
+          openVncTab(session);
         }
       } else {
         openVncTab(session, data ?? undefined);
@@ -3182,7 +3246,11 @@ export function MainLayout() {
         || session.session_type === "RDP"
         || session.session_type === "VNC"
       ) {
-        if (session.auth_method === "Password") {
+        if (session.session_type === "VNC" && session.auth_method === "Password") {
+          // DEC-VNC-21: like saved sessions, ask in the session only when the
+          // server requires a password.
+          openVncTab(session);
+        } else if (session.auth_method === "Password") {
           awaitingManualAuthRef.current = true;
           setPendingAuth({ kind: "session", session });
         } else {
@@ -3514,6 +3582,21 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  /** MFA authenticator: one tab per window (docs-feature/mfa-authenticator-design.md). */
+  const openMfaTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "mfa");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: "mfa",
+      type: "mfa",
+      title: t("tabs.mfa"),
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
   /** Unified mail across every saved mail account (TASK-16, DEC-12). */
   const openUnifiedMailTab = useCallback(() => {
     const existing = tabsRef.current.find((tab) => tab.type === "mail-unified");
@@ -3685,6 +3768,9 @@ export function MainLayout() {
       case "mail-unified":
         openUnifiedMailTab();
         break;
+      case "mfa":
+        openMfaTab();
+        break;
       case "help":
         setShowAbout(true);
         break;
@@ -3702,6 +3788,7 @@ export function MainLayout() {
     openPlaceholderTab,
     openSettingsTab,
     openLanChatTab,
+    openMfaTab,
     removeTab,
     requestAppExit,
     setActiveTab,
@@ -3856,6 +3943,56 @@ export function MainLayout() {
   const mailTabs = tabs.filter((t) => t.type === "mail" && t.mail);
   const terminalSplitVisible =
     terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
+  // ED-PARITY-027 B: a terminal's tool windows (attached SFTP, Chat) move from
+  // its floating actions into the collapsed sidebar rail.
+  const terminalRailMerged = mergeToolWindowRail && sidebarCollapsed && !!mainRailHost
+    && activeTab?.type === "terminal" && !terminalSplitVisible;
+  const toggleTerminalSftp = (tab: Tab) => {
+    if (sftpDetachedTabs[tab.id] && tab.ssh) {
+      openDetachedSftp(
+        {
+          sessionId: `attached-${tab.id}`,
+          host: tab.ssh.host,
+          port: tab.ssh.port,
+          username: tab.ssh.username,
+          authMethod: tab.ssh.authMethod,
+          authData: tab.ssh.authData,
+          networkSettingsJson: JSON.stringify(
+            toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
+          ),
+          initialPath: terminalCwds[tab.id],
+          attachedToTerminal: true,
+        },
+        `${tab.title} — SFTP`,
+      );
+    } else {
+      toggleAttachedSidebar(tab.id);
+    }
+  };
+  const terminalRailItems: ToolWindowRailItem[] = [];
+  if (terminalRailMerged && activeTab) {
+    const railTab = activeTab;
+    if (railTab.ssh) {
+      terminalRailItems.push({
+        id: "sftp",
+        label: t("terminal.sftpFloatingButtonLabel"),
+        icon: <FolderOpen />,
+        active: !!attachedSidebars[railTab.id],
+        testId: "attached-sftp-toggle",
+        onSelect: () => toggleTerminalSftp(railTab),
+      });
+    }
+    if (!aiFullyDisabled) {
+      terminalRailItems.push({
+        id: "chat",
+        label: t("terminal.chatFloatingButtonLabel"),
+        icon: <Bot />,
+        active: chatDrawerOpen && activeTabId === railTab.id,
+        testId: "tab-chat-toggle",
+        onSelect: () => void toggleTabChat(railTab.id),
+      });
+    }
+  }
   const effectiveMultiExecSelectedCount = terminalSplitActive
     ? [...multiExecSelectedTabIds].filter((id) => !terminalSplitInputLockedTabIds.has(id)).length
     : multiExecSelectedTabIds.size;
@@ -4043,8 +4180,21 @@ export function MainLayout() {
       {chatDrawerTopPinned && <ChatDrawer />}
 
       <div className="flex-1 flex min-h-0">
+        {terminalRailMerged && mainRailHost && terminalRailItems.length > 0 && createPortal(
+          <ToolWindowRail
+            side="left"
+            embedded
+            top={terminalRailItems}
+            width={effectiveStripeWidth(stripeSettings, "left")}
+            showNames={stripeSettings.showNames}
+            onToggleShowNames={toggleStripeNames}
+            onResize={(width) => setStripeWidth("left", width)}
+            onHide={(id) => terminalRailItems.find((item) => item.id === id)?.onSelect()}
+          />,
+          mainRailHost,
+        )}
         {sidebarCollapsed && (
-          <div data-testid="collapsed-sidebar-rail" className="h-full w-[30px] shrink-0 overflow-visible">
+          <div data-testid="collapsed-sidebar-rail" className="h-full min-w-[30px] shrink-0 overflow-visible">
             <Sidebar
               compact
               onNewSession={handleNewSession}
@@ -4075,11 +4225,15 @@ export function MainLayout() {
             maxSize="40%"
             collapsible
             collapsedSize={0}
-            onResize={(size: PanelSize) => {
+            onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
               const percentage = size.asPercentage;
               if (percentage > 2) {
                 lastSidebarSizeRef.current = percentage;
               }
+              // The first report is the restored layout, which may carry another
+              // tab group's collapsed sidebar (ED-PARITY-027); the store's state
+              // wins and the sync effect resizes the panel to it.
+              if (!prevSize) return;
               setSidebarCollapsed(percentage <= 2);
             }}
           >
@@ -4249,34 +4403,13 @@ export function MainLayout() {
                             detachToggle={!terminalSplitVisible ? {
                               onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
                             } : undefined}
-                            chatToggle={!aiFullyDisabled ? {
+                            chatToggle={!aiFullyDisabled && !(terminalRailMerged && isActive) ? {
                               open: chatDrawerOpen && activeTabId === tab.id,
                               onToggle: () => void toggleTabChat(tab.id),
                             } : undefined}
-                            sftpToggle={!terminalSplitVisible && tab.ssh ? {
+                            sftpToggle={!terminalSplitVisible && tab.ssh && !(terminalRailMerged && isActive) ? {
                               open: sidebarOpen,
-                              onToggle: () => {
-                                if (sftpDetachedTabs[tab.id] && tab.ssh) {
-                                  openDetachedSftp(
-                                    {
-                                      sessionId: `attached-${tab.id}`,
-                                      host: tab.ssh.host,
-                                      port: tab.ssh.port,
-                                      username: tab.ssh.username,
-                                      authMethod: tab.ssh.authMethod,
-                                      authData: tab.ssh.authData,
-                                      networkSettingsJson: JSON.stringify(
-                                        toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
-                                      ),
-                                      initialPath: terminalCwds[tab.id],
-                                      attachedToTerminal: true,
-                                    },
-                                    `${tab.title} — SFTP`,
-                                  );
-                                } else {
-                                  toggleAttachedSidebar(tab.id);
-                                }
-                              }
+                              onToggle: () => toggleTerminalSftp(tab),
                             } : undefined}
                             gitToggle={!tab.ssh && !tab.commandTerminal ? {
                               cwd: terminalCwds[tab.id] ?? null,
@@ -4640,6 +4773,13 @@ export function MainLayout() {
                           securityPolicy={vnc.securityPolicy}
                           viewOnly={vnc.viewOnly}
                           clipboardPolicy={vnc.clipboardPolicy}
+                          viewerOptions={vnc.viewerOptions}
+                          onSessionPropertiesChange={(properties) => {
+                            void persistVncProperties(tab.id, vnc.sessionId, properties);
+                          }}
+                          onCredentialsChange={({ password: typed }) => {
+                            void rememberVncCredentials(tab.id, vnc.sessionId, typed);
+                          }}
                           visible={isActive}
                           onDetach={() => openDetachedVnc(tab.id, vnc, tab.title)}
                         />
@@ -4808,6 +4948,8 @@ export function MainLayout() {
                   />
                 )}
 
+                {activeTab?.type === "mfa" && <MfaTab onStatusMessage={setStatusMessage} />}
+
                 {activeTab?.type === "proxy-test" && activeTab.proxyTest && (
                   <Suspense fallback={null}>
                     <ProxyTestTab info={activeTab.proxyTest} />
@@ -4832,6 +4974,7 @@ export function MainLayout() {
                   activeTab.type !== "nettools" &&
                   activeTab.type !== "sockscap" &&
                   activeTab.type !== "lan-chat" &&
+                  activeTab.type !== "mfa" &&
                   activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}

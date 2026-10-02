@@ -95,6 +95,30 @@ class NativeSessionTransportTest(TestCase):
         ]
         self.assertEqual(click_urls, ["/session/session-1/element/button-1/click", "/session/session-1/element/button-2/click"])
 
+    def test_pointer_click_retries_a_null_element_scroll_error(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(side_effect=["row-1", "row-2"])
+        session.request = Mock(side_effect=[
+            WebDriverError(
+                'HTTP 400: {"value":{"error":"unknown error","message":"JavaScript error: '
+                "TypeError: null is not an object (evaluating 'arguments[0].scrollIntoView')\"}}"
+            ),
+            None,
+            None,
+            None,
+            None,
+        ])
+        with patch("tauri_webdriver.time.sleep") as sleep:
+            session.right_click("#file")
+        self.assertEqual(session.find.call_count, 2)
+        sleep.assert_called_once_with(0.3)
+        actions_call = next(
+            call for call in session.request.call_args_list if call.args[0] == "POST" and call.args[1].endswith("/actions")
+        )
+        actions = actions_call.args[2]["actions"][0]["actions"]
+        self.assertEqual(actions[0]["origin"], {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
+
     def test_pointer_click_gives_up_after_three_stale_references(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
@@ -227,6 +251,8 @@ class NativeSessionFillTest(TestCase):
         execute_results: list[bool] = [contenteditable]
         if contenteditable:
             execute_results.extend(focus_results or [True])
+        else:
+            execute_results.append(False)
         session.execute = Mock(side_effect=execute_results)
         session.press_combo = Mock(return_value="")
         session.type_text = Mock(return_value="")
@@ -284,6 +310,72 @@ class NativeSessionFillTest(TestCase):
             "POST", "/session/session-1/element/element-1/value", {"text": "Taomni"})
         session.press_combo.assert_not_called()
         session.type_text.assert_not_called()
+
+    def test_linux_password_fill_retains_exact_shifted_punctuation(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, True])
+        text = "Qa1_test:@!"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"):
+            result = session.fill('input[type="password"]', text)
+        self.assertEqual(result, 'filled input[type="password"]')
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
+        session.request.assert_has_calls([
+            call("POST", "/session/session-1/element/element-1/click", {}),
+            call("POST", "/session/session-1/element/element-1/value", {"text": text}),
+        ])
+        session.type_text.assert_not_called()
+        self.assertIn('el.value === "Qa1_test:@!"', session.execute.call_args.args[0])
+
+    def test_linux_password_fill_fails_before_submit_without_exposing_secret(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, False, False])
+        text = "Qa1_private:@!"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text, \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 6]):
+            with self.assertRaises(WebDriverError) as error:
+                session.fill('input[type="password"]', text)
+        self.assertIn("password input did not retain the requested value", str(error.exception))
+        self.assertNotIn(text, str(error.exception))
+        self.assertEqual(set_text.call_args_list, [call(text), call("previous")])
+        session.type_text.assert_not_called()
+
+    def test_linux_password_fill_recovers_unshifted_input_with_real_clipboard_paste(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, False, False, True])
+        text = "Qa1_private:@!"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="QA-LEFT-GUTTER"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text, \
+                patch("tauri_webdriver.time.sleep") as sleep:
+            session.fill('input[type="password"]', text)
+        self.assertEqual(set_text.call_args_list, [call(text), call("QA-LEFT-GUTTER")])
+        session.press_combo.assert_has_calls([
+            call("Mod+a"), call("Backspace"),
+            call("Mod+a"), call("Backspace"), call("Control+v"),
+        ])
+        sleep.assert_called_once_with(0.05)
+        session.type_text.assert_not_called()
+
+    def test_linux_password_fill_removes_password_from_clipboard_after_paste_failure(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, False])
+        session.press_combo.side_effect = ["", "", "", "", WebDriverError("paste failed")]
+        text = "Qa1_private:@!"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text:
+            with self.assertRaisesRegex(WebDriverError, "paste failed"):
+                session.fill('input[type="password"]', text)
+        self.assertEqual(set_text.call_args_list, [call(text), call("previous")])
+
+    def test_windows_password_fill_retains_keyboard_input(self) -> None:
+        session = self.session(False)
+        with patch("tauri_webdriver.platform.system", return_value="Windows"):
+            session.fill('input[type="password"]', "Qa1_test:@!")
+        session.type_text.assert_called_once_with("Qa1_test:@!")
+        self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
 
     def test_type_text_paces_contenteditable_key_transactions(self) -> None:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))

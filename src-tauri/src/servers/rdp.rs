@@ -52,11 +52,13 @@ use tokio_util::sync::CancellationToken;
 use super::ServerConfig;
 use super::engine::{LogEmitter, ServerCtx, ServerStarted};
 
+mod audio_input;
 mod auth;
 /// Screen-capture backends (X11 / Wayland). Exposed crate-wide so the LanChat
 /// native A/V stack can reuse the X11 capturer for screen sharing.
 pub(crate) mod capture;
 mod clipboard;
+mod clipboard_formats;
 mod diff;
 mod display;
 #[cfg(target_os = "macos")]
@@ -64,17 +66,25 @@ mod gfx;
 mod input;
 #[cfg(target_os = "macos")]
 pub(crate) use input::{control_permission_granted, request_control_permission};
+#[cfg(test)]
+mod bulk_loopback_tests;
+#[cfg(test)]
+mod loopback_tests;
 mod metrics;
 mod session;
+mod sound;
+pub(crate) mod system_rdp;
 mod tls;
 
 use auth::AuthConfig;
-use clipboard::ClipboardFactory;
+use clipboard::{ClipboardFactory, ClipboardPolicy};
 use display::RdpDisplay;
 use input::RdpInput;
 use metrics::RdpMetrics;
 
 const CONTROL_APPROVAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+/// Cadence of auto-detect RTT probes during a session.
+const AUTODETECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
 #[cfg(target_os = "macos")]
 const EXPERIMENTAL_AVC420_ENV: &str = "TAOMNI_RDP_EXPERIMENTAL_AVC420";
 #[cfg(target_os = "macos")]
@@ -445,8 +455,23 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     let port = if config.port == 0 { 3389 } else { config.port };
     let bind = config.bind_address.clone();
 
+    // The start dialog already moves Taomni off the system port; this also
+    // covers autostart and configs edited elsewhere.
+    let system = tokio::task::spawn_blocking(system_rdp::probe)
+        .await
+        .map_err(|e| format!("system Remote Desktop probe failed: {e}"))?;
+    if let Some(alternative) = system_rdp::alternative_port(&system, port) {
+        return Err(format!(
+            "Windows Remote Desktop already listens on port {port}; choose another port for Taomni's RDP server (for example {alternative})"
+        ));
+    }
+
     let view_only = config.bool_field("viewOnly", false);
     let require_control_approval = config.bool_field("requireControlApproval", true);
+    let audio_playback = config.bool_field("audioPlayback", true);
+    let microphone = config.bool_field("microphone", true);
+    let microphone_device = config.str_field("microphoneDevice", "").trim().to_string();
+    let microphone_device = (!microphone_device.is_empty()).then_some(microphone_device);
     let display_id = config.str_field("displayId", "").trim().to_string();
     let display_id = (!display_id.is_empty()).then_some(display_id);
     let security = SecurityMode::parse(config.str_field("securityMode", "hybrid"))?;
@@ -478,9 +503,19 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     }
     if !view_only && !require_control_approval {
         ctx.log.line(
-            "RDP unattended control is enabled: authenticated clients can control this Mac without a local confirmation prompt.",
+            "RDP unattended control is enabled: authenticated clients can control this computer without a local confirmation prompt.",
         );
     }
+
+    let (clipboard, clipboard_warnings) = ClipboardPolicy::from_settings(
+        config.str_field("clipboardServerToClient", ""),
+        config.str_field("clipboardClientToServer", ""),
+        config.u64_field("clipboardFileMaxMb", ClipboardPolicy::DEFAULT_FILE_MAX_MB),
+    );
+    for warning in clipboard_warnings {
+        ctx.log.line(warning);
+    }
+    ctx.log.line(clipboard.summary());
 
     let identity = tls::identity(&ctx.app).map_err(|e| format!("RDP TLS setup failed: {}", e))?;
     ctx.log
@@ -538,6 +573,10 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
             .rdp_approvals
             .clone(),
         require_control_approval,
+        clipboard,
+        audio_playback,
+        microphone,
+        microphone_device,
     };
     let task = spawn_server(params, ctx.cancel.clone(), ctx.log.clone()).await?;
     Ok(ServerStarted { pid: None, task })
@@ -554,6 +593,13 @@ struct ServerParams {
     app: AppHandle,
     approvals: Arc<ApprovalBroker>,
     require_control_approval: bool,
+    clipboard: ClipboardPolicy,
+    /// Stream this computer's audio output to the client (RDPSND).
+    audio_playback: bool,
+    /// Play client microphones into a host input (AUDIO_INPUT).
+    microphone: bool,
+    /// Output device name the microphone plays into (empty: auto-detect).
+    microphone_device: Option<String>,
 }
 
 /// Drive `RdpServer::run()` and bridge `cancel` → clean shutdown.
@@ -598,8 +644,24 @@ async fn spawn_server(
                     }
                 };
                 server.set_credentials(Some(params.credentials.clone()));
+                // Continuous auto-detect, like Windows Remote Desktop: an RTT
+                // probe every 2 s on clients that negotiated the message
+                // channel, plus periodic Network Characteristics Results.
+                // Idle servers drop the events.
+                server.enable_autodetect();
 
                 let ev_sender = server.event_sender().clone();
+                let probes = ev_sender.clone();
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(AUTODETECT_INTERVAL);
+                    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    loop {
+                        interval.tick().await;
+                        if probes.send(ServerEvent::AutoDetectRttRequest).is_err() {
+                            break;
+                        }
+                    }
+                });
                 let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
                 if ev_sender.send(ServerEvent::GetLocalAddr(addr_tx)).is_err() {
                     let _ = ready_tx.send(Err("RDP listener event channel closed".to_string()));
@@ -694,7 +756,19 @@ fn build_server(
             state: Mutex::new(ControlGateState::default()),
         })
     });
-    let metrics = RdpMetrics::new(log.clone());
+    // Auto-detect RTT (MS-RDPBCGR 2.2.14), written by the server per session
+    // and shown in the periodic latency report.
+    let network_rtt = Arc::new(std::sync::atomic::AtomicU32::new(u32::MAX));
+    let encoder_stats = Arc::new(ironrdp::server::EncoderStats::default());
+    let bulk_enabled = std::env::var("TAOMNI_RDP_BULK_COMPRESSION").as_deref() != Ok("0");
+    log.line(if bulk_enabled {
+        "RDP display encoding: adaptive planar+bulk / RemoteFX (negotiated per connection)"
+    } else {
+        "RDP display encoding: compatibility mode (TAOMNI_RDP_BULK_COMPRESSION=0)"
+    });
+    let metrics = RdpMetrics::new(log.clone())
+        .with_network_rtt(Arc::clone(&network_rtt))
+        .with_encoder_stats(Arc::clone(&encoder_stats));
     #[cfg(target_os = "macos")]
     if !params.view_only && !input::control_permission_granted() {
         anyhow::bail!(
@@ -737,9 +811,32 @@ fn build_server(
         #[cfg(target_os = "macos")]
         input_mapping,
     );
-    let cliprdr: Box<dyn ironrdp::server::CliprdrServerFactory> =
-        Box::new(ClipboardFactory::new(log.clone()));
+    // Both directions off removes the channel itself, as disabling clipboard
+    // redirection does on Windows.
+    let cliprdr: Option<Box<dyn ironrdp::server::CliprdrServerFactory>> =
+        params.clipboard.enabled().then(|| {
+            Box::new(ClipboardFactory::new(log.clone(), params.clipboard))
+                as Box<dyn ironrdp::server::CliprdrServerFactory>
+        });
 
+    let sound: Option<Box<dyn ironrdp::server::SoundServerFactory>> =
+        params.audio_playback.then(|| {
+            Box::new(sound::SoundFactory::new(log.clone()))
+                as Box<dyn ironrdp::server::SoundServerFactory>
+        });
+
+    // Not offered when this computer has nothing to play the microphone
+    // into; the factory logs the reason.
+    let microphone: Option<Box<dyn ironrdp::server::DvcServerFactory>> = params
+        .microphone
+        .then(|| audio_input::MicFactory::new(log.clone(), params.microphone_device.clone()))
+        .flatten()
+        .map(|factory| Box::new(factory) as Box<dyn ironrdp::server::DvcServerFactory>);
+
+    let channel_log = log.clone();
+    let channel_observer: Arc<dyn Fn(&str) + Send + Sync> = Arc::new(move |channel| {
+        channel_log.line(format!("RDP {channel} channel negotiated"));
+    });
     let base = RdpServer::builder().with_addr(params.addr);
     let connection_handler: Box<dyn ConnectionHandler> = Box::new(ConnectionPolicy {
         app: params.app.clone(),
@@ -757,7 +854,13 @@ fn build_server(
                 .with_hybrid(acceptor, identity.pub_key.clone())
                 .with_input_handler(input)
                 .with_display_handler(display)
-                .with_cliprdr_factory(Some(cliprdr));
+                .with_channel_observer(channel_observer)
+                .with_cliprdr_factory(cliprdr)
+                .with_sound_factory(sound)
+                .with_dvc_factory(microphone)
+                .with_bulk_compression(bulk_enabled)
+                .with_encoder_stats_handle(encoder_stats)
+                .with_autodetect_rtt_handle(network_rtt);
             #[cfg(target_os = "macos")]
             let builder = builder.with_honor_client_desktop_size(honor_client_desktop_size);
             #[cfg(target_os = "macos")]

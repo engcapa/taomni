@@ -1,0 +1,116 @@
+id: TC-MFA-011
+title: A saved account is shown as a scannable QR code only after the master password
+description: >-
+  V-28 (AC-18). Browser stub. Show QR code from the row menu first asks for
+  the master password: an empty and a wrong password are refused without
+  rendering anything. The right password (submitted with Enter) renders the
+  otpauth QR. A screenshot of that QR is pasted back into the app's own image
+  import, which decodes the same HOTP account with its current counter and
+  flags it as already added, proving the code is scannable and carries the
+  stored secret and parameters. Reopening asks for the password again and
+  Escape closes it.
+covers: [F-MFA-1, F-MFA-2]
+tags: [mfa, export, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-011}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-011}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA Export}
+- fill: {selector: '[data-testid="mfa-add-account"]', value: export@example.com}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- click: '[data-testid="mfa-add-advanced"]'
+- wait_for: '[data-testid="mfa-add-advanced-panel"]'
+- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Export"] *)', equals: 755 224}
+- click: '[data-testid="mfa-account-hotp-next"]:is([data-issuer="QA Export"] *)'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Export"] *)', equals: 287 082}
+- right_click: '[data-testid="mfa-account-row"][data-issuer="QA Export"]'
+- click: '[data-testid="mfa-menu-qr"]'
+- wait_for: '[data-testid="mfa-qr-dialog"][data-state="locked"]'
+- click: '[data-testid="mfa-qr-reveal"]'
+- assert_text: {selector: '[data-testid="mfa-qr-error"]', contains: Enter the master password}
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: wrong-master-password}
+- click: '[data-testid="mfa-qr-reveal"]'
+- assert_text: {selector: '[data-testid="mfa-qr-error"]', contains: Incorrect master password}
+- assert_count: {selector: '[data-testid="mfa-qr-image"]', equal: 0}
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: qa-mfa-master-011}
+- press: {key: Enter, selector: '[data-testid="mfa-qr-password"]'}
+- wait_for: '[data-testid="mfa-qr-image"]'
+- assert_attribute: {selector: '[data-testid="mfa-qr-dialog"]', name: data-state, equals: shown}
+- seed_clipboard_image: {selector: '[data-testid="mfa-qr-image"]'}
+- click: '[data-testid="mfa-qr-close"]'
+- assert_not_visible: '[data-testid="mfa-qr-dialog"]'
+- click: '[data-testid="mfa-add"]'
+- click: '[data-testid="mfa-add-mode-image"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
+- click: '[data-testid="mfa-image-paste"]'
+- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 20}
+- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Export]}
+- assert_attribute: {selector: '[data-testid="mfa-import-item"]', name: data-duplicate, equals: 'true'}
+- assert_text: {selector: '[data-testid="mfa-import-item"]', contains: counter 1}
+- assert_text: {selector: '[data-testid="mfa-import-item-label"]', contains: export@example.com}
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- right_click: '[data-testid="mfa-account-row"][data-issuer="QA Export"]'
+- click: '[data-testid="mfa-menu-qr"]'
+- wait_for: '[data-testid="mfa-qr-dialog"][data-state="locked"]'
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-qr-dialog"]'
+- screenshot: mfa-011-qr-export.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Show QR code requires the master password; empty and wrong passwords render nothing (AC-18).
+    actions: [11, 13, 14, 15, 16, 18, 19, 21, 23, 24, 26, 28, 29]
+    checkpoints:
+    - {step: 20, expectation: account created}
+    - {step: 22, expectation: counter advanced to 1}
+    - {step: 25, expectation: QR dialog asks for the password}
+    - {step: 27, expectation: empty password refused}
+    - {step: 30, expectation: wrong password refused}
+    - {step: 31, expectation: no QR rendered}
+    results: [30, 31]
+  - id: R2
+    requirement: The right password renders a QR that the app's own scanner decodes into the same account with its current counter (AC-18, AC-05).
+    actions: [32, 33, 36, 37, 39, 40, 42]
+    checkpoints:
+    - {step: 34, expectation: QR rendered}
+    - {step: 35, expectation: dialog in shown state}
+    - {step: 38, expectation: QR dialog closed}
+    - {step: 41, expectation: image pane open}
+    - {step: 43, expectation: pasted QR decoded}
+    - {step: 44, expectation: issuer QA Export}
+    - {step: 45, expectation: same secret and parameters as the stored account}
+    - {step: 46, expectation: current HOTP counter exported}
+    - {step: 47, expectation: account name exported}
+    results: [44, 45, 46, 47]
+  - id: R3
+    requirement: The QR is not kept; reopening asks for the password again and Escape closes the dialogs (AC-18, AC-17).
+    actions: [48, 50, 51, 53]
+    checkpoints:
+    - {step: 49, expectation: import dialog closed}
+    - {step: 52, expectation: password asked again}
+    - {step: 54, expectation: Escape closed the QR dialog}
+    results: [54]
+  visual:
+  - check: QR code is crisp, high-contrast and shown with the warning text.
+    method: manual
+    reason: Scannability by third-party apps on a phone needs a manual check (V-29).
+  native:
+  - check: The Rust export command and master-password check are covered by Rust unit tests and TC-MFA-107.
+    method: external
+    reason: Browser stub evidence is not native.

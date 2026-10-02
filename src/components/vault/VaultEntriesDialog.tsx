@@ -3,7 +3,10 @@ import { useVaultStore } from "../../stores/vaultStore";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useT } from "../../lib/i18n";
 import { confirmAppDialog } from "../../lib/appDialogs";
-import { X, Shield, Search, Trash2 } from "lucide-react";
+import { X, Shield, Search, Trash2, Lock } from "lucide-react";
+
+/** Entry kinds other stores need to decrypt their data (e.g. the MFA data key). */
+const PROTECTED_KINDS = new Set(["mfa_secret"]);
 
 export interface VaultEntriesDialogProps {
   onClose: () => void;
@@ -139,15 +142,27 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
                   <span className="taomni-pill scale-90 select-none shrink-0" style={{ color: "var(--taomni-text-muted)" }}>
                     {e.kind}
                   </span>
-                  <button
-                    type="button"
-                    className="p-1 rounded text-red-600 hover:bg-red-500/10 shrink-0"
-                    onClick={() => handleDelete(e.id, e.label)}
-                    title={t("vaultSettings.deleteEntry")}
-                    data-testid={`vault-entry-delete-${e.id}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {PROTECTED_KINDS.has(e.kind) ? (
+                    // The backend refuses to delete these (VAULT_ENTRY_PROTECTED).
+                    <span
+                      className="p-1 shrink-0"
+                      title={t("vaultSettings.protectedEntry")}
+                      aria-label={t("vaultSettings.protectedEntry")}
+                      data-testid={`vault-entry-protected-${e.id}`}
+                    >
+                      <Lock className="w-3.5 h-3.5" style={{ color: "var(--taomni-text-muted)" }} />
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="p-1 rounded text-red-600 hover:bg-red-500/10 shrink-0"
+                      onClick={() => handleDelete(e.id, e.label)}
+                      title={t("vaultSettings.deleteEntry")}
+                      data-testid={`vault-entry-delete-${e.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

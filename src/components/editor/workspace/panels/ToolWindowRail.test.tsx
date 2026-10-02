@@ -27,6 +27,24 @@ describe("ED-PARITY-010 tool window rail", () => {
     expect(screen.getByTestId("code-workspace-tool-rail-commit").getAttribute("title")).toContain("No Git repository");
   });
 
+  it("renders an embedded stripe for the sidebar rail without its own chrome (ED-PARITY-027)", () => {
+    render(
+      <ToolWindowRail
+        side="left"
+        embedded
+        width={59}
+        showNames
+        top={[{ id: "sftp", label: "SFTP", icon: null, active: false, testId: "attached-sftp-toggle", onSelect: vi.fn() }]}
+      />,
+    );
+    const rail = screen.getByTestId("code-workspace-tool-rail-left");
+    expect(rail).toHaveAttribute("data-embedded", "true");
+    expect(rail.className).toContain("flex-1");
+    expect(rail.className).not.toContain("bg-[var(--taomni-code-gutter-bg)]");
+    expect(rail.style.width).toBe("59px");
+    expect(screen.getByTestId("attached-sftp-toggle")).toHaveTextContent("SFTP");
+  });
+
   function DockWithRail() {
     const [host, setHost] = useState<HTMLDivElement | null>(null);
     const [open, setOpen] = useState(false);

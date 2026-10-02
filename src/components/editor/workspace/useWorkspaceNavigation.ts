@@ -419,11 +419,17 @@ export function useWorkspaceNavigation({
     const detector = createDoubleShiftDetector(() => openSearchEverywhere("all"));
     const handleKeyDown = (event: KeyboardEvent) => detector.handleKeyDown(event);
     const handleKeyUp = (event: KeyboardEvent) => detector.handleKeyUp(event);
+    // Shift is a mouse modifier too (Shift+click breakpoints, selections). A
+    // press in between two Shift taps is not IDEA's double-Shift gesture, so
+    // it cancels the pending tap instead of leaving it armed for 400 ms.
+    const handlePointerDown = () => detector.handlePointerDown();
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("mousedown", handlePointerDown, true);
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("mousedown", handlePointerDown, true);
     };
   }, [openSearchEverywhere, visible]);
 

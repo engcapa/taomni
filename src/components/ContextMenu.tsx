@@ -395,7 +395,9 @@ function MenuRow({
               setOpenByHover(true);
               onOpenSubmenu();
             }
-          } : undefined}
+            // A click without a preceding hover (touch, synthesized clicks on
+            // the macOS WebDriver bridge) still opens a hover submenu.
+          } : (item.disabled ? undefined : openNow)}
           type="button"
         >
           {content}

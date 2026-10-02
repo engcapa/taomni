@@ -50,7 +50,8 @@ steps:
 - wait_for:
     selector: '[data-testid="code-workspace-tree-dir"]'
     timeout_sec: 30
-- click: '[data-testid="code-workspace-view-tree"]'
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-project"]'
 - click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
 - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
 - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"] [data-testid="code-workspace-tree-dir-arrow"]'
@@ -137,29 +138,29 @@ verification:
     - 5
     - 6
     - 7
-    - 12
     - 13
-    - 15
-    - 17
-    - 19
-    - 21
-    - 23
-    - 25
+    - 14
+    - 16
+    - 18
+    - 20
+    - 22
+    - 24
     - 26
-    - 28
+    - 27
     - 29
     - 30
     - 31
-    - 34
-    - 36
-    - 38
-    - 40
+    - 32
+    - 35
+    - 37
+    - 39
     - 41
     - 42
     - 43
-    - 45
+    - 44
     - 46
-    - 52
+    - 47
+    - 53
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -168,57 +169,49 @@ verification:
     - step: 9
       expectation: '{"wait_for": {"selector": "[data-testid=\"project-facts-status-badge\"]", "timeout_sec": 90}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"project-facts-status-badge\"]", "contains": "Ready",
-        "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"project-facts-status-badge\"]", "contains": "Ready", "timeout_sec": 30}}'
     - step: 11
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-dir\"]", "timeout_sec": 30}}'
-    - step: 14
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main\"]"}'
-    - step: 16
+    - step: 17
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java\"]"}'
-    - step: 18
+    - step: 19
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java/com\"]"}'
-    - step: 20
+    - step: 21
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java/com/example\"]"}'
-    - step: 22
+    - step: 23
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java/com/example/single\"]"}'
-    - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/java/com/example/single/App.java\"]",
-        "timeout_sec": 60}}'
-    - step: 27
+    - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/java/com/example/single/App.java\"]", "timeout_sec": 60}}'
+    - step: 28
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
-    - step: 32
-      expectation: '{"wait_for": "[data-testid=\"new-java-class-dialog\"]"}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"new-java-class-package\"]", "contains": "com.example.single"}}'
-    - step: 35
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''select'')[document.querySelectorAll(''select'').length
-        - 1]?.value?.includes(''interface'')", "expect_truthy": true}}'
-    - step: 37
-      expectation: '{"wait_for": {"selector": "[data-testid=\"new-java-class-dialog\"]", "state": "detached"}}'
-    - step: 39
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
-    - step: 44
       expectation: '{"wait_for": "[data-testid=\"new-java-class-dialog\"]"}'
-    - step: 47
-      expectation: '{"assert_file_exists": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java",
-        "timeout_sec": 30}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"new-java-class-package\"]", "contains": "com.example.single"}}'
+    - step: 36
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''select'')[document.querySelectorAll(''select'').length - 1]?.value?.includes(''interface'')", "expect_truthy": true}}'
+    - step: 38
+      expectation: '{"wait_for": {"selector": "[data-testid=\"new-java-class-dialog\"]", "state": "detached"}}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"new-java-class-dialog\"]"}'
     - step: 48
-      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java",
-        "contains": "package com.example.single;", "timeout_sec": 30}}'
+      expectation: '{"assert_file_exists": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java", "timeout_sec": 30}}'
     - step: 49
-      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java",
-        "contains": "public class QaTemplateSmoke", "timeout_sec": 30}}'
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java", "contains": "package com.example.single;", "timeout_sec": 30}}'
     - step: 50
-      expectation: '{"wait_for": {"selector": "[data-testid=\"new-java-class-dialog\"]", "state": "detached", "timeout_sec":
-        30}}'
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java", "contains": "public class QaTemplateSmoke", "timeout_sec": 30}}'
     - step: 51
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains":
-        "public class QaTemplateSmoke", "timeout_sec": 30}}'
-    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"new-java-class-dialog\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 52
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "public class QaTemplateSmoke", "timeout_sec": 30}}'
+    - step: 54
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/java/com/example/single/QaTemplateSmoke.java\"]"}'
     results:
-    - 53
+    - 54
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -6,6 +6,7 @@ import { emit } from "@tauri-apps/api/event";
 import { MainLayout } from "./MainLayout";
 import { useAppStore, recentWorkspaceIdFromParts } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useMainRailHostStore } from "../stores/mainRailHostStore";
 import { commitWelcomeRunSnapshot, exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
 
@@ -21,6 +22,8 @@ const terminalPanelMock = vi.hoisted(() => ({
     onTerminalProfileChange?: (profile: TerminalProfile) => void;
     onUploadLocalPaths?: (request: { paths: string[]; cwd: string | null }) => Promise<void>;
     onCwdChange?: (cwd: string) => void;
+    sftpToggle?: unknown;
+    chatToggle?: unknown;
   }>,
 }));
 
@@ -88,11 +91,22 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/event", () => import("../stubs/tauri-event"));
 
+type MockPanelSize = { asPercentage: number; inPixels: number };
+const panelResizeMock = vi.hoisted(() => ({
+  handlers: new Map<string, (size: MockPanelSize, id: string | undefined, prev: MockPanelSize | undefined) => void>(),
+}));
+
 vi.mock("react-resizable-panels", () => {
   const Group = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={className} data-testid="panel-group">{children}</div>
   );
-  const Panel = forwardRef<unknown, { children: React.ReactNode; panelRef?: React.Ref<unknown> }>(({ children, panelRef }, ref) => {
+  const Panel = forwardRef<unknown, {
+    children: React.ReactNode;
+    panelRef?: React.Ref<unknown>;
+    id?: string;
+    onResize?: (size: MockPanelSize, id: string | undefined, prev: MockPanelSize | undefined) => void;
+  }>(({ children, panelRef, id, onResize }, ref) => {
+    if (id && onResize) panelResizeMock.handlers.set(id, onResize);
     const handle = {
       collapse: vi.fn(),
       resize: vi.fn(),
@@ -226,7 +240,7 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     onUploadLocalPaths?: (request: { paths: string[]; cwd: string | null }) => Promise<void>;
     onCwdChange?: (cwd: string) => void;
   }) => {
-    terminalPanelMock.props.push({ tabId, terminalProfile, onTerminalProfileChange, onUploadLocalPaths, onCwdChange });
+    terminalPanelMock.props.push({ tabId, terminalProfile, onTerminalProfileChange, onUploadLocalPaths, onCwdChange, sftpToggle, chatToggle });
     useEffect(() => {
       terminalLifecycle.mounted();
       onSessionReady?.(`session-${tabId ?? "terminal"}`);
@@ -294,6 +308,28 @@ vi.mock("../components/rdp/RdpPanel", () => ({
   }) => (
     <div
       data-testid="rdp-panel"
+      data-host={host}
+      data-port={port}
+      data-username={username ?? ""}
+      data-password={password ?? ""}
+    />
+  ),
+}));
+
+vi.mock("../components/vnc/VncPanel", () => ({
+  default: ({
+    host,
+    port,
+    username,
+    password,
+  }: {
+    host: string;
+    port: number;
+    username?: string | null;
+    password?: string;
+  }) => (
+    <div
+      data-testid="vnc-panel"
       data-host={host}
       data-port={port}
       data-username={username ?? ""}
@@ -475,6 +511,9 @@ describe("MainLayout attached SFTP sidebar", () => {
       ],
       activeTabId: "ssh-tab",
       sidebarCollapsed: false,
+      // These cases cover the legacy layout; ED-PARITY-027 has its own block.
+      mergeToolWindowRail: false,
+      sidebarCollapsedByGroup: { "code-workspace": true, terminal: true, other: false },
       terminalSplitActive: false,
       terminalSplitLayout: "horizontal",
       terminalSplitInputLockedTabIds: new Set(),
@@ -482,6 +521,7 @@ describe("MainLayout attached SFTP sidebar", () => {
       multiExecSelectedTabIds: new Set(),
       statusMessage: "Ready",
     });
+    useMainRailHostStore.setState({ host: null });
   });
 
   afterEach(() => {
@@ -1562,6 +1602,46 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(rdpPanel).toHaveAttribute("data-username", "alice");
   });
 
+  it("opens saved VNC sessions without a stored password straight into the VNC panel", async () => {
+    render(<MainLayout />);
+
+    const session: SessionConfig = {
+      ...makePasswordSession("vnc-1", "desktop.example.test"),
+      name: "Desktop",
+      session_type: "VNC",
+      port: 5901,
+      username: null,
+    };
+    useSessionStore.setState({ sessions: [session], groups: [] });
+
+    await act(async () => {
+      sidebarMock.props.at(-1)?.onConnectSession?.(session);
+    });
+
+    // DEC-VNC-21: the panel asks only when the server requires a password.
+    const vncPanel = await screen.findByTestId("vnc-panel");
+    expect(screen.queryByTestId("auth-prompt")).not.toBeInTheDocument();
+    expect(vncPanel).toHaveAttribute("data-host", "desktop.example.test");
+    expect(vncPanel).toHaveAttribute("data-port", "5901");
+    expect(vncPanel).toHaveAttribute("data-password", "");
+  });
+
+  it("opens VNC quick-connect URLs straight into the VNC panel", async () => {
+    window.localStorage.setItem("taomni.quickConnectVisible", "true");
+    render(<MainLayout />);
+
+    act(() => {
+      latestQuickConnectProps().onConnectInput?.("vnc://alice@desktop.example.test:5902");
+    });
+
+    const vncPanel = await screen.findByTestId("vnc-panel");
+    expect(screen.queryByTestId("auth-prompt")).not.toBeInTheDocument();
+    expect(vncPanel).toHaveAttribute("data-host", "desktop.example.test");
+    expect(vncPanel).toHaveAttribute("data-port", "5902");
+    expect(vncPanel).toHaveAttribute("data-username", "alice");
+    expect(vncPanel).toHaveAttribute("data-password", "");
+  });
+
   it("opens saved Presto sessions as database tabs with catalog context", async () => {
     const prestoSession: SessionConfig = {
       id: "presto-1",
@@ -1783,6 +1863,105 @@ function setNavigatorPlatform(platform: string): () => void {
     });
   };
 }
+
+describe("MainLayout ED-PARITY-027 single tool window bar", () => {
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    window.localStorage.clear();
+    terminalPanelMock.props = [];
+    sidebarMock.props = [];
+    vi.mocked(listSessions).mockResolvedValue([]);
+    host = document.createElement("div");
+    host.setAttribute("data-testid", "rail-host-under-test");
+    document.body.appendChild(host);
+    useMainRailHostStore.setState({ host });
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        {
+          id: "ssh-tab",
+          type: "terminal",
+          title: "root@example.test",
+          closable: true,
+          ssh: { host: "example.test", port: 22, username: "root", authMethod: "Password", authData: "secret", optionsJson: undefined },
+        },
+      ],
+      activeTabId: "welcome",
+      sidebarCollapsed: false,
+      mergeToolWindowRail: true,
+      sidebarCollapsedByGroup: { "code-workspace": true, terminal: true, other: false },
+      terminalSplitActive: false,
+      multiExecActive: false,
+      multiExecSelectedTabIds: new Set(),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    host.remove();
+    useMainRailHostStore.setState({ host: null });
+  });
+
+  it("collapses the sidebar for a terminal tab and restores it for other tabs", async () => {
+    render(<MainLayout />);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+    act(() => useAppStore.getState().setActiveTab("welcome"));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
+  });
+
+  it("keeps the store's state over a restored collapsed layout and syncs later drags", async () => {
+    render(<MainLayout />);
+    const onResize = panelResizeMock.handlers.get("sidebar");
+    expect(onResize).toBeDefined();
+    // First report = the restored layout of a session that quit in a terminal.
+    act(() => onResize?.({ asPercentage: 0, inPixels: 0 }, "sidebar", undefined));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(false);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
+    // A later report is a drag on the divider: a manual change for Welcome.
+    act(() => onResize?.({ asPercentage: 0, inPixels: 0 }, "sidebar", { asPercentage: 22, inPixels: 220 }));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(true);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
+  });
+
+  it("remembers a manual expand for terminal tabs only", async () => {
+    render(<MainLayout />);
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+    act(() => useAppStore.getState().toggleSidebar());
+    expect(useAppStore.getState().sidebarCollapsedByGroup.terminal).toBe(false);
+    act(() => useAppStore.getState().setActiveTab("welcome"));
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
+    expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(true);
+  });
+
+  it("moves the terminal's SFTP and Chat toggles into the collapsed rail", async () => {
+    render(<MainLayout />);
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    await waitFor(() => expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).not.toBeNull());
+    expect(host.querySelector('[data-testid="tab-chat-toggle"]')).not.toBeNull();
+    const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);
+    expect(active?.sftpToggle).toBeUndefined();
+    expect(active?.chatToggle).toBeUndefined();
+    fireEvent.click(host.querySelector('[data-testid="attached-sftp-toggle"]')!);
+    expect(screen.getByTestId("sftp-sidebar")).toBeInTheDocument();
+    expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps the floating toggles when the bar merge is turned off", async () => {
+    useAppStore.setState({ mergeToolWindowRail: false });
+    render(<MainLayout />);
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).toBeNull();
+    const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);
+    expect(active?.sftpToggle).toBeDefined();
+  });
+});
 
 describe("MainLayout run-snapshot collector (V-06)", () => {
   let originalPlatform: string;

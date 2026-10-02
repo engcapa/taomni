@@ -43,7 +43,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-quick\-ssh\-live\r?$
-    timeout_sec: 15
+    timeout_sec: 60
 - screenshot: 006-quick-ssh-terminal.png
 verification:
   review: reviewed

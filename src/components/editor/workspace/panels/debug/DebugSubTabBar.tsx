@@ -9,6 +9,8 @@ export interface DebugSubTabBarProps {
   badges?: Partial<Record<DebugSubTabId, number | string>>;
   statusText?: string | null;
   trailing?: ReactNode;
+  /** IDEA puts the debug actions on the tab row, right after the tabs. */
+  toolbar?: ReactNode;
   instanceId?: string;
 }
 
@@ -20,7 +22,8 @@ interface SubTabDefinition {
 }
 
 const SUB_TABS: SubTabDefinition[] = [
-  { id: "debugger", label: "Debugger", icon: Bug, testId: "debug-subtab-debugger" },
+  // IDEA new UI names the frames + variables tab "Threads & Variables".
+  { id: "debugger", label: "Threads & Variables", icon: Bug, testId: "debug-subtab-debugger" },
   { id: "console", label: "Console", icon: Terminal, testId: "debug-subtab-console" },
   { id: "breakpoints", label: "Breakpoints", icon: CircleDot, testId: "debug-subtab-breakpoints" },
   { id: "memory", label: "Memory", icon: Cpu, testId: "debug-subtab-memory" },
@@ -32,6 +35,7 @@ export function DebugSubTabBar({
   badges,
   statusText,
   trailing,
+  toolbar,
   instanceId,
 }: DebugSubTabBarProps) {
   const tabButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -63,7 +67,7 @@ export function DebugSubTabBar({
       role="tablist"
       aria-orientation="horizontal"
       data-testid="debug-sub-tab-bar"
-      className="h-6 shrink-0 flex items-center border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-1.5 text-[10px] select-none"
+      className="h-7 shrink-0 flex items-center border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-1.5 text-[10px] select-none"
     >
       <div className="flex items-center gap-0.5" role="presentation">
         {SUB_TABS.map((tab, index) => {
@@ -105,8 +109,9 @@ export function DebugSubTabBar({
           );
         })}
       </div>
+      {toolbar && <div className="ml-2 flex items-center">{toolbar}</div>}
       {statusText && (
-        <span className="ml-2 text-[10px] text-[var(--taomni-text-muted)] truncate">
+        <span data-testid="debug-status-text" className="ml-2 text-[10px] text-[var(--taomni-text-muted)] truncate">
           {statusText}
         </span>
       )}

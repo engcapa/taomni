@@ -1,0 +1,122 @@
+id: TC-RDPS-NAT-07-autodetect
+title: RDP server auto-detect - the server measures round-trip time and sends Network Characteristics Results to the client
+description: |
+  V-10 (docs-feature/rdp-server-parity-design.md §4.5, AC-14). The server
+  enables continuous auto-detection for every connection: an RTT Measure
+  Request every two seconds on the message channel and, every fourth probe
+  once a measurement exists, a Network Characteristics Result carrying the
+  base and average RTT (the same PDU mstsc and the Taomni client turn into a
+  connection-quality indicator).
+
+  rdp-probe autodetect connects over NLA and pumps the session for 14
+  seconds. The ironrdp client answers the RTT requests itself, so the probe
+  records the Network Characteristics Results it receives; at least one
+  must arrive with plausible loopback values. The server's own latency log
+  line must then carry the RTT it measured from the probe's responses.
+  Bandwidth stays unreported (continuous TCP detection has no client byte
+  count); the case does not assert it. On Windows platform_choice picks
+  Taomni over the runner's system Remote Desktop.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- p2
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+timeout_sec: 300
+steps:
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- rdp_probe:
+    scenario: autodetect
+    artifact: autodetect
+    timeout_sec: 120
+    args:
+      seconds: 14
+    expect:
+      autodetect.counts.network_characteristics:
+        min: 1
+      autodetect.network_characteristics.0.base_rtt_ms:
+        min: 0
+        max: 500
+      autodetect.network_characteristics.0.average_rtt_ms:
+        min: 0
+        max: 500
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: network-rtt=
+    timeout_sec: 15
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The server runs continuous auto-detection and reports network characteristics to the connected client.
+    actions:
+    - 17
+    checkpoints:
+    - step: 16
+      expectation: The RDP server is running on the loopback port.
+    - step: 17
+      expectation: Within 14 seconds the client receives at least one Network Characteristics Result whose base and average RTT are between 0 and 500 ms.
+    - step: 18
+      expectation: The server's latency log line includes the RTT it measured from the client's RTT responses.
+    results:
+    - 17
+    - 18
+  native:
+  - check: Real RDP connection over NLA with the server's auto-detect PDUs on the MCS message channel.
+    method: automated
+    reason: Browser stubs have no RDP server.
+  visual:
+  - check: Not a visual check; the probe reads protocol PDUs.
+    method: not-applicable
+    reason: The case asserts protocol behaviour, not rendering.

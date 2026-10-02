@@ -5,7 +5,9 @@ implemented in scripts/tauri_webdriver.py. Verbs that cannot be expressed
 through WebDriver (or that would lie about what was exercised) raise
 StepError instead of silently passing — a native gate must fail loudly.
 
-Native-only verbs:
+Native-only verbs (assert_file_contains / host_write_file also exist in
+browser mode, confined to the report root for runner-host fixtures such as
+the VNC event log; see steps/host_files.py):
 * assert_file_contains  - host-side disk re-read of a saved workspace file
                           (the G0 disk-effect proof; impossible from browser).
 * assert_file_exists    - host-side existence check.
@@ -65,6 +67,22 @@ class NativeStepContext:
         self._clipboard_owner_text: str | None = None
         self._host_clipboard_before: str | None = None
         self._host_clipboard_captured = False
+        # MFA fixtures: xclip serving an image/png CLIPBOARD and the Tk window
+        # showing a QR code for the screen scan, keyed by helper role.
+        self._mfa_helpers: dict[str, subprocess.Popen[str]] = {}
+
+    def stop_mfa_helper(self, role: str) -> bool:
+        proc = self._mfa_helpers.pop(role, None)
+        if proc is None:
+            return False
+        with suppress(OSError, subprocess.TimeoutExpired):
+            proc.kill()
+            proc.wait(timeout=5)
+        for stream in (proc.stdout, proc.stderr):
+            with suppress(Exception):
+                if stream is not None:
+                    stream.close()
+        return True
 
     def restore_host_permissions(self) -> None:
         """Best-effort rollback for report-scoped fault injection.
@@ -79,6 +97,8 @@ class NativeStepContext:
             except OSError:
                 pass
         self._permission_restores.clear()
+        for role in list(self._mfa_helpers):
+            self.stop_mfa_helper(role)
         self._release_clipboard_owner()
         self._restore_host_clipboard()
 
@@ -270,11 +290,8 @@ def _eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "expression" not in args:
         raise StepError("eval_readonly: expected {expression, ...}")
     expr = str(args["expression"])
-    result = ctx.session.execute(f"return ({expr});")
-    if args.get("expect_truthy", True) and not result:
-        raise StepError(f"eval_readonly: expression returned falsy: {result!r}")
-    if "contains" in args and args["contains"] not in str(result):
-        raise StepError(f"eval_readonly: result {result!r} does not contain {args['contains']!r}")
+    from .steps.assertions import assert_readonly_result
+    assert_readonly_result(args, lambda: ctx.session.execute(f"return ({expr});"))
     return f"eval ok"
 
 
@@ -304,6 +321,88 @@ def _hover(ctx: NativeStepContext, args: Any) -> str:
     # Allow React submenu state to mount before the next native step queries it.
     time.sleep(0.35)
     return f"hovered {selector}"
+
+
+def _mouse_path(ctx: NativeStepContext, args: Any) -> str:
+    """Move the pointer through element-relative points (see steps.mouse)."""
+    from .steps.mouse import mouse_path_points
+
+    points = mouse_path_points(args)
+    for point in points:
+        element = ctx.session.find(point["selector"], interactive=False)
+        # W3C element origin: integer offsets from the element's in-view
+        # centre, the same convention as the browser runner. A duration lets
+        # the driver interpolate intermediate moves like `steps` does.
+        ctx.session.request(
+            "POST",
+            ctx.session.endpoint("/actions"),
+            {
+                "actions": [
+                    {
+                        "type": "pointer",
+                        "id": "mouse",
+                        "parameters": {"pointerType": "mouse"},
+                        "actions": [{
+                            "type": "pointerMove",
+                            "duration": 16 * point["steps"],
+                            "x": int(round(point["dx"])),
+                            "y": int(round(point["dy"])),
+                            "origin": {"element-6066-11e4-a52e-4f735466cecf": element},
+                        }],
+                    }
+                ]
+            },
+        )
+        if point["pause_ms"]:
+            time.sleep(point["pause_ms"] / 1000)
+    return f"moved through {len(points)} point(s)"
+
+
+def _terminal_drag_selection(ctx: NativeStepContext, args: Any) -> str:
+    from .steps.mouse import record_terminal_drag, terminal_selection_args, terminal_selection_points
+
+    selector, direction, modifiers = terminal_selection_args(args)
+    element = ctx.session.find(selector + " .xterm", interactive=False)
+    geometry = ctx.session.execute(
+        f"const pane=document.querySelector({json.dumps(selector)});"
+        "const hit=pane?.querySelector('.terminal-search-hit-active');"
+        "const root=pane?.querySelector('.xterm');"
+        "if (!hit || !root) return null;"
+        "const rect=(el)=>{const r=el.getBoundingClientRect();"
+        "return {x:r.left,y:r.top,width:r.width,height:r.height};};"
+        "return {hit:rect(hit),origin:rect(root)};"
+    )
+    box = geometry["hit"] if geometry else None
+    start, end = terminal_selection_points(box, direction)
+    origin_box = geometry["origin"]
+    origin = {"element-6066-11e4-a52e-4f735466cecf": element}
+    # The search overlay ignores pointer events. Use the interactive xterm root
+    # as the origin, retaining CSS offsets on the macOS Retina bridge.
+    def move(point: dict[str, float], duration: int) -> dict[str, Any]:
+        return {"type": "pointerMove", "duration": duration, "origin": origin,
+                "x": round(point["x"] - origin_box["x"] - origin_box["width"] / 2),
+                "y": round(point["y"] - origin_box["y"] - origin_box["height"] / 2)}
+
+    drag = [move(start, 100), {"type": "pointerDown", "button": 0},
+            move(end, 400), {"type": "pause", "duration": 100}, {"type": "pointerUp", "button": 0}]
+    actions = [{"type": "pointer", "id": "terminal-selection-mouse", "parameters": {"pointerType": "mouse"},
+                "actions": [{"type": "pause", "duration": 0} for _ in modifiers] + drag
+                           + [{"type": "pause", "duration": 0} for _ in modifiers]}]
+    if modifiers:
+        actions.insert(0, {"type": "key", "id": "terminal-selection-keys", "actions":
+            [{"type": "keyDown", "value": ctx.session.MODIFIER_MAP[m]} for m in modifiers]
+            + [{"type": "pause", "duration": 0} for _ in drag]
+            + [{"type": "keyUp", "value": ctx.session.MODIFIER_MAP[m]} for m in reversed(modifiers)]})
+    try:
+        ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": actions})
+    finally:
+        with suppress(Exception):
+            ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
+    record_terminal_drag(ctx, {"mode": "native", "platform": platform.system(), "selector": selector,
+                               "direction": direction, "modifiers": modifiers, "box": box,
+                               "origin_box": origin_box, "start": start, "end": end,
+                               "transport": "W3C element-origin pointer actions (macOS: packaged WebView events)"})
+    return f"dragged terminal selection {direction} from the first-column gutter"
 
 
 def _select_option(ctx: NativeStepContext, args: Any) -> str:
@@ -1264,6 +1363,7 @@ def _append_clipboard_observation(ctx: NativeStepContext, entry: dict[str, Any])
 
 VERBS: dict[str, Callable[[NativeStepContext], str]] = {}
 VERBS.update(assert_count=assert_count, assert_menu_items=assert_menu_items)
+VERBS["terminal_drag_selection"] = _terminal_drag_selection
 
 
 def _verb(name: str) -> Callable[[Callable[[NativeStepContext, Any], str]], Callable[[NativeStepContext, Any], str]]:
@@ -1343,7 +1443,12 @@ def _do_type(ctx: NativeStepContext, args: Any) -> str:
 def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
     selector, text, submit, verify = _terminal_input_args(args)
     attempts = verify["attempts"] if verify else 1
-    for _ in range(attempts):
+    for attempt in range(attempts):
+        if attempt:
+            # Recover a truncated shell line or a probe now reading stdin.
+            ctx.session.focus(selector)
+            ctx.session.press_combo("Control+c")
+            ctx.session.press_combo("Control+u")
         _dispatch_terminal_input(ctx, selector, text, submit)
         if verify is None:
             break
@@ -1532,6 +1637,11 @@ def _do_blur(ctx: NativeStepContext, args: Any) -> str:
 @_verb("hover")
 def _do_hover(ctx: NativeStepContext, args: Any) -> str:
     return _hover(ctx, args)
+
+
+@_verb("mouse_path")
+def _do_mouse_path(ctx: NativeStepContext, args: Any) -> str:
+    return _mouse_path(ctx, args)
 
 
 @_verb("select_option")
@@ -2808,6 +2918,126 @@ def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> st
     )
 
 
+# -- MFA authenticator fixtures (docs-feature/mfa-authenticator-design.md) ----
+
+@_verb("assert_totp_code")
+def _do_assert_totp_code(ctx: NativeStepContext, args: Any) -> str:
+    from .mfa_support import assert_totp_code
+
+    return assert_totp_code(lambda expression: ctx.session.execute(f"return ({expression});"), args)
+
+
+def _mfa_helper_line(proc: subprocess.Popen[str], timeout: float) -> str:
+    """First stdout line of a helper, or "" if it exits or stays silent (pipes cannot select() on Windows)."""
+    import threading
+
+    lines: list[str] = []
+    reader = threading.Thread(target=lambda: lines.append(proc.stdout.readline() if proc.stdout else ""), daemon=True)
+    reader.start()
+    reader.join(timeout)
+    return lines[0] if lines else ""
+
+
+# Topmost Tk window showing the fixture image, so a real screen capture of the
+# desktop (with Taomni hidden) contains a QR code. Prints its geometry once mapped.
+_MFA_IMAGE_WINDOW_SOURCE = r'''
+import sys
+import tkinter as tk
+
+path, x, y = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+root = tk.Tk()
+root.title("Taomni QA MFA QR")
+root.configure(background="white")
+image = tk.PhotoImage(file=path)
+tk.Label(root, image=image, background="white", borderwidth=0).pack(padx=24, pady=24)
+root.geometry(f"+{x}+{y}")
+root.attributes("-topmost", True)
+
+def ready():
+    root.update_idletasks()
+    print("WINDOW-READY", root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height(), flush=True)
+
+root.after(300, ready)
+root.mainloop()
+'''
+
+
+@_verb("native_show_image_window")
+def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
+    from .mfa_support import png_fixture
+
+    args = args if isinstance(args, dict) else {"path": args}
+    if args.get("action", "show") == "close":
+        return "image window closed" if ctx.stop_mfa_helper("image-window") else "no image window was open"
+    if platform.system() not in {"Linux", "Windows"} or (platform.system() == "Linux" and not os.environ.get("DISPLAY")):
+        raise StepError("native_show_image_window: requires a Linux X11 display or a Windows desktop")
+    target, data = png_fixture(args.get("path"), "native_show_image_window")
+    ctx.stop_mfa_helper("image-window")
+    proc = subprocess.Popen(
+        [sys.executable, "-c", _MFA_IMAGE_WINDOW_SOURCE, str(target), str(int(args.get("x", 40))), str(int(args.get("y", 40)))],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    ctx._mfa_helpers["image-window"] = proc
+    line = _mfa_helper_line(proc, timeout=20)
+    if not line.startswith("WINDOW-READY"):
+        exited = proc.poll() is not None
+        err = ""
+        if exited and proc.stderr is not None:
+            with suppress(Exception):
+                err = proc.stderr.read().strip()
+        ctx.stop_mfa_helper("image-window")
+        detail = line.strip() or err or (f"exit {proc.returncode}" if exited else "no ready signal within 20s")
+        raise StepError(f"native_show_image_window: window did not appear: {detail}")
+    x, y, width, height = (int(v) for v in line.split()[1:5])
+    observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "pid": proc.pid,
+                   "geometry": {"x": x, "y": y, "width": width, "height": height}, "platform": platform.system()}
+    (ctx.case_dir / "native-image-window.json").write_text(json.dumps(observation, indent=1), encoding="utf-8")
+    return f"image window mapped at {x},{y} {width}x{height}"
+
+
+@_verb("native_clipboard_image")
+def _do_native_clipboard_image(ctx: NativeStepContext, args: Any) -> str:
+    """Make an external xclip process own the X11 CLIPBOARD as image/png.
+
+    The app must then read the image through its own OS clipboard path
+    (arboard); a separate TARGETS read proves the selection really changed.
+    """
+    import shutil
+
+    from .mfa_support import png_fixture
+
+    target, data = png_fixture(args.get("path") if isinstance(args, dict) else args, "native_clipboard_image")
+    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+        raise StepError("native_clipboard_image: requires a Linux X11 display")
+    xclip = shutil.which("xclip")
+    if xclip is None:
+        raise StepError("native_clipboard_image: xclip is not installed")
+    ctx.stop_mfa_helper("clipboard-image")
+    proc = subprocess.Popen(
+        [xclip, "-quiet", "-selection", "clipboard", "-t", "image/png", "-i", str(target)],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True,
+    )
+    ctx._mfa_helpers["clipboard-image"] = proc
+    targets = ""
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            raise StepError(f"native_clipboard_image: xclip exited with {proc.returncode}")
+        with suppress(subprocess.TimeoutExpired):
+            targets = subprocess.run([xclip, "-selection", "clipboard", "-t", "TARGETS", "-o"],
+                                     capture_output=True, text=True, timeout=5, check=False).stdout
+        if "image/png" in targets.split():
+            break
+        time.sleep(0.2)
+    else:
+        raise StepError(f"native_clipboard_image: CLIPBOARD never advertised image/png (targets {targets.split()})")
+    observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
+                   "owner": "xclip", "pid": proc.pid, "targets": targets.split(),
+                   "display": os.environ.get("DISPLAY"), "hostSelectionReplaced": True}
+    (ctx.case_dir / "native-clipboard-image.json").write_text(json.dumps(observation, indent=1), encoding="utf-8")
+    return f"X11 CLIPBOARD owns image/png from {target.name}"
+
+
 def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
     fn = VERBS.get(verb)
     if fn is None:
@@ -2815,3 +3045,8 @@ def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
             f"native runner does not support verb {verb!r}; supported: {sorted(VERBS)}"
         )
     return fn(ctx, args)
+
+
+# RDP server/client verbs live in their own module; importing it registers
+# them in VERBS (it imports `_verb`/`NativeStepContext` defined above).
+from . import rdp_steps  # noqa: E402,F401

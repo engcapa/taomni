@@ -1508,6 +1508,65 @@ describe("TerminalPanel focus behavior", () => {
     expect(screen.queryByTestId("context-menu")).not.toBeInTheDocument();
   });
 
+  it.each(["Enter", "Next", "Prev"])("cancels pending automatic search when navigating with %s", async (action) => {
+    render(<TerminalPanel visible />);
+    await waitFor(() => expect(terminalMocks.focus).toHaveBeenCalled());
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    term.buffer.active.length = 2;
+    term.buffer.active.getLine.mockImplementation(() => ({
+      length: 6,
+      getCell: (column: number) => ({ getChars: () => "marker"[column], getWidth: () => 1 }),
+    }));
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(screen.getByTestId("context-menu-item-find"));
+    const input = await screen.findByPlaceholderText("Find");
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(input, { target: { value: "marker" } });
+      if (action === "Enter") fireEvent.keyDown(input, { key: "Enter" });
+      else fireEvent.click(screen.getByRole("button", { name: action }));
+      expect(term.select).toHaveBeenCalledTimes(1);
+      const status = screen.getByText(/Match \d\/2/).textContent;
+      act(() => vi.advanceTimersByTime(150));
+      expect(term.select).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/Match \d\/2/)).toHaveTextContent(status!);
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(term.select).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps pending automatic search from replacing a manual terminal selection", async () => {
+    render(<TerminalPanel visible />);
+    await waitFor(() => expect(terminalMocks.focus).toHaveBeenCalled());
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    term.buffer.active.length = 1;
+    term.buffer.active.getLine.mockImplementation(() => ({
+      length: 6,
+      getCell: (column: number) => ({ getChars: () => "marker"[column], getWidth: () => 1 }),
+    }));
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(screen.getByTestId("context-menu-item-find"));
+    const input = await screen.findByPlaceholderText("Find");
+    const terminalScreen = screen.getByTestId("terminal-pane").querySelector(".xterm-screen")!;
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(input, { target: { value: "marker" } });
+      fireEvent.mouseDown(terminalScreen, { button: 0 });
+      act(() => vi.advanceTimersByTime(150));
+      expect(term.select).not.toHaveBeenCalled();
+      // Further typing must still run the automatic search.
+      fireEvent.change(input, { target: { value: "mark" } });
+      act(() => vi.advanceTimersByTime(150));
+      expect(term.select).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps a block selection alive when pressing the floating selection toolbar", async () => {
     const onSessionReady = vi.fn();
     render(<TerminalPanel visible onSessionReady={onSessionReady} />);

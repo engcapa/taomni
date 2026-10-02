@@ -4,8 +4,9 @@ import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
 import type { ObjectStorageConfig } from "./objectStorage";
 import type { LaunchPreparation } from "../lib/sockscap";
+import type { VncViewerOptions } from "../lib/vncOptions";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "mail-unified" | "code-workspace";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "mail-unified" | "code-workspace" | "mfa";
 
 /** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
 export type LanPresence = "online" | "away" | "busy" | "offline";
@@ -228,9 +229,11 @@ export interface VncConnectInfo {
   username?: string | null;
   password?: string;
   networkSettingsJson?: string | null;
-  securityPolicy?: "require-encryption" | "prefer-encryption" | "legacy-compatible" | "allow-none";
+  securityPolicy?: "require-encryption" | "prefer-encryption" | "legacy-compatible" | "allow-none" | "prefer-off";
   viewOnly?: boolean;
   clipboardPolicy?: "disabled" | "client-to-server" | "server-to-client" | "bidirectional";
+  /** Per-session viewer options (VNC-CONN-001). */
+  viewerOptions?: VncViewerOptions;
 }
 
 export interface ProxyTestTabInfo {

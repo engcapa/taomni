@@ -1,0 +1,76 @@
+{
+  "audit_id": "LIVE-REALVNC-20260930",
+  "date": "2026-09-30",
+  "baseline_head": "383aa4f2",
+  "host": {
+    "os": "Windows 11",
+    "display": "1920x1080 physical, 125% scaling",
+    "ime": "Chinese IME active"
+  },
+  "reference_client": {
+    "product": "RealVNC Viewer",
+    "version": "7.15.1 (r18)",
+    "artifact": "VNC-Viewer-7.15.1-Windows-64bit.exe",
+    "sha256": "39195c0abe53dc8fc2a57beeb6df9accf72226d46688845bf864c4d639030d84",
+    "authenticode": "Valid, CN=RealVNC Ltd, O=RealVNC Ltd, L=Cambridge, C=GB",
+    "source": "Internet Archive capture of the official downloads.realvnc.com viewer.files URL"
+  },
+  "server": {
+    "address": "<vnc-test-host>:5900 (not recorded)",
+    "rfb_version": "3.7",
+    "security_types": [18, 2],
+    "framebuffer": "1680x1050",
+    "security_result_delay_ms": 25027
+  },
+  "artifacts_local_only": [
+    "qa-ui-auto-report/realvnc-reference/20260930/ (screenshots, OCR, expert-params.txt, bursts-*.jsonl, up-*.log)",
+    "qa-ui-auto-report/vnc-perf/capture-20260930/ (recorded first full-frame updates, contain screen pixels)"
+  ],
+  "measurements": {
+    "realvnc": {
+      "negotiated": {"encoding": "Hextile", "requested": "ZRLE2", "pixel_format": "rgb888", "security": "VncAuth (no encryption)", "line_speed_kbps": 98970},
+      "full_refresh": {"bytes": 6760951, "duration_ms": [565.0, 574.1]},
+      "update_end_to_next_request_ms": {"pairs": 1540, "median": 2.7, "p95": 4.3, "max": 163.2},
+      "minimized_15s": "no updates while minimized; first burst after restore 251489 bytes",
+      "pointer_to_wire_ms": {"moves": 40, "median": 18.04, "p95": 34.33, "max": 71.09}
+    },
+    "taomni_baseline_383aa4f2": {
+      "replay_release_decode_ms_median": {"hextile": 499.45, "zrle": 70.38, "production_zrle": 71.14, "raw": 23.66},
+      "relay_rects_per_full_update": {"hextile": 6930, "zrle": 459, "raw": 1},
+      "live_debug_full_refresh_ms": {"production_zrle": [569.7, 613.1], "hextile": [785.0, 822.1], "raw": [634.0, 654.8]},
+      "full_refresh_wire_kib": {"zrle": 2784.6, "hextile": 6478.5, "raw": 6890.6}
+    },
+    "taomni_after_perf_001": {
+      "replay_release_decode_ms_median": {"hextile": 22.80, "zrle": 55.32, "production_zrle": 54.06, "raw": 28.48},
+      "relay_rects_per_full_update": {"hextile": 1, "zrle": 1, "raw": 1},
+      "live_release_full_refresh_ms": {"production_zrle": [483.9, 484.6], "zrle": [489.8, 508.6], "hextile": [565.4, 573.0], "raw": [614.1, 614.8]}
+    },
+    "taomni_native_qa_release_after_batch": {
+      "build": "native_build.py --release (com.taomni.app.qa, isolated app data), security TLS (anonymous) + VNCAuth, ZRLE",
+      "first_frame_after_auth": {"bytes": [2854279, 2907746], "duration_ms": [238.3, 298.6, 314.0]},
+      "refresh_screen_ms": [219, 270],
+      "update_end_to_next_request_ms": {"median": 3.3, "p95": 4.2},
+      "hidden_tab": "server traffic stops after the 1 s grace; first frame after showing carries the hidden-period changes",
+      "pointer_to_wire_ms_pointerrawupdate": {"runs": 6, "moves_per_run": 40, "median": [19.84, 19.92, 21.03, 21.05, 21.13, 23.31], "p95": [32.82, 33.51, 33.99, 34.42, 34.77, 41.12]},
+      "session_info_line_speed_kbps": [91915, 92432],
+      "proxy_full_frame_line_mbps": [77.8, 96.0],
+      "scaling": {"automatic_fit_px": "1231x769", "one_to_one_exact_pixels_pct": 96.5}
+    },
+    "realvnc_same_window_rerun": {
+      "pointer_to_wire_ms": {"runs": 3, "moves_per_run": 40, "median": [17.29, 18.55, 20.30], "p95": [31.58, 32.42, 40.55]},
+      "full_frame": {"bytes": 6632193, "duration_ms": 540.4}
+    }
+  },
+  "commands": [
+    "python .agents/skills/vnc-realvnc-task/scripts/vnc_burst_proxy.py --target <host>:5900 --listen 5977 --out <bursts.jsonl> --up-log <up.log>",
+    "python .agents/skills/vnc-realvnc-task/scripts/vnc_pointer_latency.py --up-log <up.log> --x 700 --y 500 --moves 40 --label realvnc-7.15.1",
+    "TAOMNI_VNC_LIVE_HOST=<host> TAOMNI_VNC_LIVE_PASSWORD=<secret> TAOMNI_VNC_CAPTURE_DIR=<dir> cargo test --release --lib vnc::live_bench::live -- --ignored --nocapture --test-threads=1",
+    "TAOMNI_VNC_CAPTURE_DIR=<dir> TAOMNI_VNC_ROUNDS=10 cargo test --release --lib vnc::live_bench::replay -- --ignored --nocapture --test-threads=1"
+  ],
+  "unverified": [
+    "RealVNC toolbar in windowed mode",
+    "remote visual feedback latency (server desktop has no safe feedback target)",
+    "macOS and Linux clients",
+    "RealVNC Server, TigerVNC, x11vnc and macOS Screen Sharing servers"
+  ]
+}

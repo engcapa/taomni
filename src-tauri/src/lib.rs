@@ -20,6 +20,7 @@ pub mod llm;
 mod local_history;
 mod lsp;
 mod mail;
+mod mfa;
 mod migrate;
 pub mod models;
 mod module_lock;
@@ -44,6 +45,11 @@ mod tunnel;
 mod update;
 pub mod vault;
 mod vnc;
+/// The VNC special-key hook helper process (`taomni --vnc-special-key-hook <pid>`).
+#[cfg(windows)]
+pub use vnc::keyboard_hook::{
+    HOOK_PROCESS_ARG as VNC_SPECIAL_KEY_HOOK_ARG, run_hook_process as run_vnc_special_key_hook,
+};
 mod voice;
 mod windowing;
 mod workspace;
@@ -176,6 +182,10 @@ pub fn run() {
                 rusqlite::Connection::open(&notes_db_path).expect("failed to open notes database");
             notes::init_db(&notes_conn).expect("failed to init notes database");
 
+            // The MFA authenticator keeps its own mfa.db, opened lazily on first
+            // use so a damaged file cannot block startup (see mfa/store.rs).
+            let mfa_store = Arc::new(mfa::store::MfaStore::new(app_data.join("mfa.db")));
+
             let vault_path = vault::default_vault_path(app.handle());
             let v = vault::Vault::open(&vault_path).expect("failed to open vault");
             let vault_arc = Arc::new(v);
@@ -194,6 +204,7 @@ pub fn run() {
             app.manage(AppState::new(
                 conn,
                 notes_conn,
+                mfa_store,
                 mail_db_dir,
                 vault_arc,
                 ai_ctx,
@@ -207,6 +218,8 @@ pub fn run() {
             let local_history = local_history::init_local_history(app.handle())
                 .expect("failed to init local history store");
             app.manage(local_history);
+
+            backup::scheduler::start(app.handle());
 
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -788,8 +801,12 @@ pub fn run() {
             servers::stop_local_server,
             servers::get_server_status,
             servers::list_server_statuses,
+            servers::list_server_logs,
+            servers::clear_server_log,
             servers::probe_rdp_capture,
             servers::resolve_rdp_connection_request,
+            servers::probe_system_rdp,
+            servers::open_system_rdp_settings,
             servers::save_server_config,
             servers::load_server_configs,
             vnc::vnc_connect,
@@ -797,6 +814,9 @@ pub fn run() {
             vnc::vnc_test_connection,
             vnc::vnc_create_detach_claim,
             vnc::vnc_consume_detach_claim,
+            vnc::vnc_cancel_connect,
+            vnc::keyboard_hook::vnc_set_special_key_capture,
+            vnc::keyboard_hook::vnc_special_key_capture_status,
             rdp::rdp_connect,
             rdp::rdp_disconnect,
             rdp::rdp_test_connection,
@@ -1121,6 +1141,20 @@ pub fn run() {
             notes::commands::notes_set_prefs,
             notes::commands::notes_list_alerts,
             notes::commands::notes_ack_alert,
+            mfa::commands::mfa_list,
+            mfa::commands::mfa_codes,
+            mfa::commands::mfa_inspect,
+            mfa::commands::mfa_add,
+            mfa::commands::mfa_update,
+            mfa::commands::mfa_delete,
+            mfa::commands::mfa_reorder,
+            mfa::commands::mfa_hotp_next,
+            mfa::commands::mfa_mark_used,
+            mfa::commands::mfa_set_prefs,
+            mfa::commands::mfa_reset_store,
+            mfa::commands::mfa_export_uri,
+            mfa::commands::mfa_read_clipboard_image,
+            mfa::commands::mfa_capture_screens,
             backup::backup_create,
             backup::backup_inspect,
             backup::backup_stage_restore,
@@ -1134,6 +1168,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { code, ref api, .. } = event {
+                backup::scheduler::handle_exit_request(app_handle, code, api);
+            }
             // On app exit, cleanly stop the elevated SocksCap helper (and its
             // WinDivert driver) so no elevated process/driver leaks. The
             // helper's parent-death watchdog covers crash/kill paths.

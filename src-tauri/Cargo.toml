@@ -10,6 +10,13 @@ rust-version = "1.94"
 # `cargo tauri dev` cannot pick between taomni and acp-fake-agent.
 default-run = "taomni"
 
+# Make the patched protocol crates' unit tests runnable with this application's
+# patch table, while ordinary Cargo commands continue to target Taomni only.
+[workspace]
+members = ["vendor/ironrdp-acceptor", "vendor/ironrdp-bulk", "vendor/ironrdp-server"]
+default-members = ["."]
+resolver = "2"
+
 [lib]
 name = "taomni_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -18,6 +25,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "acp-fake-agent"
 path = "tests/support/acp_fake_agent.rs"
 test = false
+bench = false
+
+# QA-only RDP probe client (qa-ui-auto oracle + performance meter for the local
+# RDP server; see docs-feature/rdp-server-parity-design.md). Never bundled.
+[[bin]]
+name = "rdp-probe"
+path = "src/bin/rdp-probe/main.rs"
 bench = false
 
 # Elevated SocksCap helper (Windows UAC + WinDivert probe). Built alongside
@@ -104,6 +118,9 @@ libc = "0.2"
 font-kit = "0.14"
 dirs = "6"
 flate2 = "1"
+# Persistent-stream inflate for VNC ZRLE/Tight (VNC-PERF-003). flate2 resolves to
+# stock C zlib in this dependency graph; zlib-rs inflates the same streams faster.
+zlib-rs = { version = "0.6", default-features = false, features = ["std"] }
 # Read source files returned as jar:/kls: definition URIs without extracting
 # archives to the workspace. Keep formats narrow: SDK/source JARs use deflate.
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
@@ -112,8 +129,6 @@ tokio-tungstenite = "0.29"
 imap = "2.4.1"
 # BODYSTRUCTURE / section types; same version `imap` already uses.
 imap-proto = "=0.10.2"
-# POP3 APOP digest (already in the lockfile).
-md-5 = "=0.10.6"
 lettre = "0.11.22"
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 native-tls = "0.2"
@@ -124,7 +139,12 @@ tokio-native-tls = "0.3"
 # SDK. Building the vendored source requires a complete Perl distribution.
 openssl = { version = "0.10.81", features = ["vendored"] }
 tokio-openssl = "0.6.5"
-ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor"] }
+# `qoi`/`qoiz` must stay enabled together with `session`: the server's default
+# features turn them on in ironrdp-pdu, so `client_codecs_capabilities`
+# advertises QOI/QOIZ, and an IronRDP-based server (Taomni's own included)
+# then sends surface bits the client could not decode — a black desktop.
+ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor", "qoi", "qoiz"] }
+ironrdp-bulk = "=0.1.1"
 ironrdp-tokio = { version = "0.10.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-native-certs = "0.8"
@@ -151,6 +171,9 @@ generic-array = "1"
 rsa = "0.9"
 sha2 = "0.11"
 sha1 = "0.11"
+# VNC Apple Remote Desktop authentication (MD5 of the DH secret is the AES key)
+# and POP3 APOP digest.
+md-5 = "0.11"
 rand = "0.10"
 pbkdf2 = "0.13"
 hex = "0.4"
@@ -220,6 +243,9 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 # Screenshot tool recording: GIF encoder and MP4 (ISO BMFF) muxer.
 gif = "0.13"
 mp4 = "0.14"
+# Tight JPEG rectangles in the VNC client (VNC-PERF-004); already in the tree via image/tiff.
+zune-jpeg = "0.5"
+zune-core = "0.5"
 tauri-plugin-dialog = "2.7.3"
 # Screenshot hotkey. Pinned to 2.3.2: 2.4.0 requires tauri ^2.12 and would
 # force a workspace-wide tauri 2.11 -> 2.12 upgrade.
@@ -233,6 +259,8 @@ scopeguard = "1.2"
 # PipeWire 0.3.48 ABI buildable while retaining newer-header support.
 libspa = { path = "vendor/libspa" }
 ironrdp-connector = { path = "vendor/ironrdp-connector" }
+ironrdp-acceptor = { path = "vendor/ironrdp-acceptor" }
+ironrdp-bulk = { path = "vendor/ironrdp-bulk" }
 # Keep latency-sensitive RDP display updates out of Nagle's small-packet delay.
 ironrdp-server = { path = "vendor/ironrdp-server" }
 picky = { path = "vendor/picky" }
@@ -243,7 +271,11 @@ tauri-utils = { path = "vendor/tauri-utils" }
 winscard = { path = "vendor/winscard" }
 
 [features]
-default = ["hbase-kerberos"]
+default = ["hbase-kerberos", "rdp-server-audio"]
+# RDP server sound: WASAPI loopback / virtual-microphone playback through cpal
+# (macOS loopback uses ScreenCaptureKit; Linux uses PipeWire directly). Also
+# lets the QA-only rdp-probe play and record host audio devices.
+rdp-server-audio = ["dep:cpal"]
 voice-capture = ["dep:cpal"]
 screen-capture = ["dep:xcap"]
 # LanChat native A/V transport (Linux / no-WebRTC stack). Pulls in cpal (mic
@@ -281,6 +313,13 @@ windows = { version = "0.62", features = [
   "Win32_Graphics_Gdi",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
+  # RDP server: built-in Remote Desktop detection (TermService state and
+  # administrator/UAC elevation type) and clipboard change sequence numbers.
+  "Win32_System_Services",
+  "Win32_Security",
+  "Win32_System_Threading",
+  "Win32_UI_Shell",
+  "Win32_System_DataExchange",
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -296,6 +335,8 @@ dispatch2 = "0.3.1"
 objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSError"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSPasteboard"] }
 objc2-core-media = { version = "0.3.2", features = ["CMSampleBuffer", "objc2-core-video"] }
+# AudioBufferList/ASBD for the RDPSND ScreenCaptureKit system-audio loopback.
+objc2-core-audio-types = { version = "0.3.2", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
 objc2-core-video = { version = "0.3.2", features = ["CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
 objc2-core-foundation = "0.3.2"
 objc2-screen-capture-kit = { version = "0.3.2", default-features = false, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-graphics", "objc2-core-media"] }
@@ -331,7 +372,9 @@ x11rb = { version = "0.13", features = ["shm", "damage", "randr"] }
 # permissions in one session is required on GNOME/KDE and avoids accidentally
 # capturing or controlling only XWayland surfaces.
 ashpd = { version = "0.12", default-features = false, features = ["tokio"] }
-pipewire = "0.9"
+# `v0_3_49` exposes pw_buffer.requested, which the RDP microphone source uses
+# to produce exactly one graph quantum per cycle (headers are >= 1.0 in CI).
+pipewire = { version = "0.9", features = ["v0_3_49"] }
 # The SOCKS/process capture test harness still enumerates X11 windows through
 # xcap. RDP screen sharing does not use this crate on Linux; its Wayland path
 # is the portal/PipeWire backend above.
@@ -348,6 +391,8 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 
 [dev-dependencies]
 tempfile = "3"
+# JPEG encoder for Tight decoder tests only.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # Shrink debug artifacts for this heavy Tauri crate. Default `debug = 2` (full
 # DWARF) balloons `target/` via rlibs, the main binary, incremental caches, and

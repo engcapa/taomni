@@ -176,6 +176,123 @@ describe("useCodeDebugSession", () => {
     expect(breakpointCalls()[2].lines).toEqual([7]);
   });
 
+  it("removes a Remove-once-hit breakpoint after its first hit", async () => {
+    dapSendRequest.mockImplementation((_id: string, command: string) => {
+      if (command === "threads") return Promise.resolve({ threads: [{ id: 1, name: "main" }] });
+      if (command === "stackTrace") {
+        return Promise.resolve({
+          stackFrames: [{ id: 10, name: "App.main(String[])", line: 12, source: { path: "/repo/App.java" } }],
+          totalFrames: 1,
+        });
+      }
+      return Promise.resolve({ breakpoints: [] });
+    });
+    const { result } = renderHook(() => useCodeDebugSession("ws-1"));
+    const emit = await startSession(result.current.startDebug);
+    act(() => result.current.addBreakpoint("/repo/App.java", 12, { temporary: true }));
+    await waitFor(() => expect(breakpointCalls().at(-1)?.lines).toEqual([12]));
+    act(() => emit({ sessionId: "sess-1", event: "stopped", message: { body: { reason: "breakpoint", threadId: 1 } } }));
+    await waitFor(() => expect(result.current.breakpoints["/repo/App.java"]).toBeUndefined());
+    expect(breakpointCalls().at(-1)?.lines).toEqual([]);
+    // The stop itself stays visible: a temporary breakpoint still suspends.
+    expect(result.current.state?.status).toBe("stopped");
+  });
+
+  it("runs a non-suspending stack-trace breakpoint and resumes without showing a stop", async () => {
+    dapSendRequest.mockImplementation((_id: string, command: string) => {
+      if (command === "stackTrace") {
+        return Promise.resolve({
+          stackFrames: [
+            { id: 10, name: "com.acme.App.run()", line: 20, source: { path: "/repo/App.java" } },
+            { id: 11, name: "com.acme.App.main(String[])", line: 5, source: { path: "/repo/App.java" } },
+          ],
+        });
+      }
+      return Promise.resolve({ breakpoints: [] });
+    });
+    const { result } = renderHook(() => useCodeDebugSession("ws-1"));
+    const emit = await startSession(result.current.startDebug);
+    act(() => result.current.addBreakpoint("/repo/App.java", 20, { suspend: false, logStack: true }));
+    // The adapter still suspends: only the client can print a stack trace.
+    await waitFor(() => expect(breakpointCalls().at(-1)?.lines).toEqual([20]));
+    const request = dapSendRequest.mock.calls.filter((call) => call[1] === "setBreakpoints").at(-1)?.[2] as {
+      breakpoints: Array<{ logMessage?: string }>;
+    };
+    expect(request.breakpoints[0].logMessage).toBeUndefined();
+    act(() => emit({ sessionId: "sess-1", event: "stopped", message: { body: { reason: "breakpoint", threadId: 3 } } }));
+    await waitFor(() => expect(dapSendRequest.mock.calls.some((call) => call[1] === "continue")).toBe(true));
+    expect(dapSendRequest.mock.calls.find((call) => call[1] === "continue")?.[2]).toEqual({ threadId: 3 });
+    await waitFor(() => expect(result.current.state?.output.map((line) => line.text).join("")).toContain(
+      "Breakpoint reached\n\tat com.acme.App.run(App.java:20)\n\tat com.acme.App.main(App.java:5)\n",
+    ));
+    expect(result.current.state?.status).not.toBe("stopped");
+  });
+
+  it("arms a dependent breakpoint only after its master is hit, then disables it again", async () => {
+    let topLine = 5;
+    dapSendRequest.mockImplementation((_id: string, command: string) => {
+      if (command === "threads") return Promise.resolve({ threads: [{ id: 1, name: "main" }] });
+      if (command === "stackTrace") {
+        return Promise.resolve({
+          stackFrames: [{ id: 10, name: "App.main(String[])", line: topLine, source: { path: "/repo/App.java" } }],
+        });
+      }
+      return Promise.resolve({ breakpoints: [] });
+    });
+    const { result } = renderHook(() => useCodeDebugSession("ws-1"));
+    const emit = await startSession(result.current.startDebug);
+    act(() => result.current.addBreakpoint("/repo/App.java", 5));
+    act(() => result.current.addBreakpoint("/repo/App.java", 9, { dependsOn: { path: "/repo/App.java", line: 5 } }));
+    await waitFor(() => expect(breakpointCalls().at(-1)?.lines).toEqual([5]));
+    act(() => emit({ sessionId: "sess-1", event: "stopped", message: { body: { reason: "breakpoint", threadId: 1 } } }));
+    await waitFor(() => expect(breakpointCalls().at(-1)?.lines).toEqual([5, 9]));
+    act(() => emit({ sessionId: "sess-1", event: "continued", message: { body: { threadId: 1 } } }));
+    topLine = 9;
+    act(() => emit({ sessionId: "sess-1", event: "stopped", message: { body: { reason: "breakpoint", threadId: 1 } } }));
+    // "After hit: Disable again" (the default) waits for the master once more.
+    await waitFor(() => expect(breakpointCalls().at(-1)?.lines).toEqual([5]));
+  });
+
+  it("toggles a breakpoint's enabled state without removing it", async () => {
+    const { result } = renderHook(() => useCodeDebugSession("ws-1"));
+    await startSession(result.current.startDebug);
+    act(() => result.current.addBreakpoint("/repo/App.java", 4));
+    act(() => result.current.toggleBreakpointEnabled("/repo/App.java", 4));
+    await waitFor(() => expect(breakpointCalls().at(-1)?.lines).toEqual([]));
+    expect(result.current.breakpoints["/repo/App.java"]).toEqual([{ line: 4, enabled: false }]);
+    act(() => result.current.toggleBreakpointEnabled("/repo/App.java", 4));
+    await waitFor(() => expect(breakpointCalls().at(-1)?.lines).toEqual([4]));
+  });
+
+  it("loads further stack pages on demand", async () => {
+    dapSendRequest.mockImplementation((_id: string, command: string, args?: { startFrame?: number }) => {
+      if (command === "threads") return Promise.resolve({ threads: [{ id: 1, name: "main" }] });
+      if (command === "stackTrace") {
+        const start = args?.startFrame ?? 0;
+        const count = start === 0 ? 40 : 5;
+        return Promise.resolve({
+          stackFrames: Array.from({ length: count }, (_, index) => ({
+            id: 100 + start + index,
+            name: `App.f${start + index}()`,
+            line: 1,
+            source: { path: "/repo/App.java" },
+          })),
+          totalFrames: 45,
+        });
+      }
+      return Promise.resolve({ breakpoints: [] });
+    });
+    const { result } = renderHook(() => useCodeDebugSession("ws-1"));
+    const emit = await startSession(result.current.startDebug);
+    act(() => emit({ sessionId: "sess-1", event: "stopped", message: { body: { reason: "pause", threadId: 1 } } }));
+    await waitFor(() => expect(result.current.state?.frames).toHaveLength(40));
+    expect(result.current.state?.framesTotal).toBe(45);
+    await act(async () => { await result.current.loadMoreFrames(); });
+    expect(result.current.state?.frames).toHaveLength(45);
+    expect(dapSendRequest.mock.calls.filter((call) => call[1] === "stackTrace").at(-1)?.[2])
+      .toEqual({ threadId: 1, startFrame: 40, levels: 40 });
+  });
+
   it("persists and sends a source breakpoint mode only to the active adapter", async () => {
     const { result } = renderHook(() => useCodeDebugSession("ws-1"));
     const emit = await startSession(result.current.startDebug, {
@@ -1732,6 +1849,28 @@ describe("useCodeDebugSession", () => {
 
     act(() => result.current.clearConsole());
     expect(result.current.state?.output).toEqual([]);
+  });
+
+  it("keeps the debuggee's last output that arrives after exited/terminated, before the exit line", async () => {
+    const { result } = renderHook(() => useCodeDebugSession("ws-1"));
+    const emit = await startSession(result.current.startDebug);
+    act(() => emit({ sessionId: "sess-1", event: "initialized", message: {} }));
+    dapTerminate.mockClear();
+    act(() => emit({ sessionId: "sess-1", event: "exited", message: { body: { exitCode: 0 } } }));
+    act(() => emit({ sessionId: "sess-1", event: "terminated", message: {} }));
+    // java-debug's stream reader delivers the final println after the exit events.
+    act(() => emit({
+      sessionId: "sess-1",
+      event: "output",
+      message: { body: { category: "stdout", output: "debug-value=42\n" } },
+    }));
+    expect(dapTerminate).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.state?.status).toBe("terminated"));
+    const texts = result.current.state!.output.map((line) => line.text);
+    const value = texts.indexOf("debug-value=42\n");
+    expect(value).toBeGreaterThan(-1);
+    expect(value).toBeLessThan(texts.findIndex((text) => text.includes("Process finished with exit code 0")));
+    expect(dapTerminate).toHaveBeenCalledWith("sess-1");
   });
 
   it("starts parallel compound children and broadcasts breakpoints to every live session", async () => {

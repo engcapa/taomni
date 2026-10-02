@@ -27,9 +27,9 @@ import {
   type DocumentTransaction,
   type WorkspaceDocumentTransactionOwner,
 } from "./workspaceDocumentTransactionOwner";
+import { hoverDocTooltip } from "./hoverDocTooltip";
 import {
   EditorView,
-  closeHoverTooltip,
   crosshairCursor,
   drawSelection,
   highlightActiveLine,
@@ -161,7 +161,18 @@ import {
   updateGitEditorChrome,
   type GitLineChange,
 } from "./gitEditorChrome";
-import { createDebugEditorChrome, type DebugBreakpointMarker } from "./debugEditorChrome";
+import {
+  createDebugEditorChrome,
+  type DebugBreakpointMarker,
+  type DebugGutterAnchor,
+} from "./debugEditorChrome";
+
+/** Breakpoint gutter actions beyond toggle/edit (IDEA mouse model). */
+export interface BreakpointGutterActions {
+  toggleEnabled?: (line: number) => void;
+  add?: (line: number, kind: "temporary" | "logging", anchor?: DebugGutterAnchor) => void;
+  openMenu?: (line: number, anchor: DebugGutterAnchor) => void;
+}
 import { createCoverageEditorChrome } from "./coverageEditorChrome";
 import {
   editorAppearanceExtension,
@@ -552,7 +563,9 @@ interface CodeMirrorHostProps {
   /** Toggle a breakpoint at a 1-based line (breakpoint gutter click). */
   onToggleBreakpoint?: (line: number) => void;
   /** Edit a breakpoint's condition/logpoint at a 1-based line (gutter right-click). */
-  onEditBreakpoint?: (line: number) => void;
+  onEditBreakpoint?: (line: number, anchor?: DebugGutterAnchor) => void;
+  /** IDEA gutter extras: middle-click enable, Alt/Shift+click kinds, empty-line menu. */
+  breakpointGutterActions?: BreakpointGutterActions;
   /** Editor-area right-click (symbol / buffer menu). */
   onContextMenu?: (info: EditorContextMenuRequest) => void;
   onCommandPortChange?: (registration: EditorCommandPortRegistration) => void;
@@ -2039,34 +2052,39 @@ function lspHoverExtension(
   hoverTime: number,
 ): Extension {
   if (!enabled) return [];
-  const extension = hoverTooltip((view, pos): Promise<Tooltip | null> => {
-    const position = lspPositionFromOffset(view.state.doc, pos);
-    return hoverRef.current(position).then((content) => {
-      if (!content) return null;
-      const title = extractIdentifierAtPos(view.state.doc, pos);
-      const displayContent = content.title ? content : { ...content, title };
-      return {
-        pos,
-        above: true,
-        create() {
-          const dom = createHoverDocDom({
-            content: displayContent,
-            onPin: onPinHoverDocRef.current,
-            onClose: () => view.dispatch({ effects: closeHoverTooltip(extension) }),
-            activeResizeSessionRef,
-          });
-          return {
-            dom,
-            destroy: () => cancelActiveHoverResize(activeResizeSessionRef),
-          };
-        },
-      };
-    });
-  }, {
-    hideOnChange: true,
+  // IDEA keeps the hover popup while the pointer moves towards it or rests in
+  // it (hoverDocTooltip); CodeMirror's hoverTooltip closed it on the first
+  // pointer move off the hovered character.
+  return hoverDocTooltip({
     hoverTime,
+    isBusy: () => !!activeResizeSessionRef.current,
+    source: (view, pos) => {
+      const position = lspPositionFromOffset(view.state.doc, pos);
+      return hoverRef.current(position).then((content) => {
+        if (!content) return null;
+        const title = extractIdentifierAtPos(view.state.doc, pos);
+        const displayContent = content.title ? content : { ...content, title };
+        return {
+          create: (close) => {
+            // Same structure as before: the .cm-tooltip-hover wrapper stays
+            // transparent and the container draws the popup chrome.
+            const wrapper = document.createElement("div");
+            wrapper.className = "cm-tooltip-hover";
+            wrapper.appendChild(createHoverDocDom({
+              content: displayContent,
+              onPin: onPinHoverDocRef.current,
+              onClose: close,
+              activeResizeSessionRef,
+            }));
+            return {
+              dom: wrapper,
+              destroy: () => cancelActiveHoverResize(activeResizeSessionRef),
+            };
+          },
+        };
+      });
+    },
   });
-  return extension;
 }
 
 function foldHoverProvenanceTooltip(resolvePath: () => string | null | undefined): Extension {
@@ -2346,6 +2364,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onRunGutterClick,
   onToggleBreakpoint,
   onEditBreakpoint,
+  breakpointGutterActions,
   onContextMenu,
   onCommandPortChange,
   completionTriggers,
@@ -2822,6 +2841,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   } | null>(null);
   const onToggleBreakpointRef = useRef(onToggleBreakpoint);
   const onEditBreakpointRef = useRef(onEditBreakpoint);
+  const breakpointGutterActionsRef = useRef(breakpointGutterActions);
   const onPinHoverDocRef = useRef(onPinHoverDoc);
   onPinHoverDocRef.current = onPinHoverDoc;
   // Debug actions go through refs so a new session (or a step landing) does not
@@ -2921,6 +2941,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onRunGutterClickRef.current = onRunGutterClick;
   onToggleBreakpointRef.current = onToggleBreakpoint;
   onEditBreakpointRef.current = onEditBreakpoint;
+  breakpointGutterActionsRef.current = breakpointGutterActions;
   debugStepRef.current = debugStep;
   debugRunToCursorRef.current = debugRunToCursor;
   debugStopRef.current = debugStop;
@@ -2945,7 +2966,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     inlineValues,
     actions: {
       toggleBreakpoint: (line) => onToggleBreakpointRef.current?.(line),
-      editBreakpoint: (line) => onEditBreakpointRef.current?.(line),
+      editBreakpoint: (line, anchor) => onEditBreakpointRef.current?.(line, anchor),
+      toggleBreakpointEnabled: (line) => breakpointGutterActionsRef.current?.toggleEnabled?.(line),
+      addBreakpoint: (line, kind, anchor) => {
+        const add = breakpointGutterActionsRef.current?.add;
+        if (add) add(line, kind, anchor);
+        else onToggleBreakpointRef.current?.(line);
+      },
+      openGutterMenu: (line, anchor) => {
+        const open = breakpointGutterActionsRef.current?.openMenu;
+        if (open) open(line, anchor);
+        else onEditBreakpointRef.current?.(line, anchor);
+      },
       step: (action) => {
         const step = debugStepRef.current;
         if (!step) return false;

@@ -1,0 +1,20 @@
+# Offline encoder comparison for docs-feature/rdp-server-parity/encoder-adaptive-design.md.
+# Standalone (not part of the src-tauri workspace). Run from this directory:
+#   cargo run --release
+[package]
+name = "rdp-encoder-experiment"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+# Same versions as src-tauri/Cargo.lock (ironrdp 0.17 stack).
+ironrdp-graphics = "=0.9.0"
+ironrdp-pdu = "=0.9.0"
+ironrdp-bulk = "=0.1.1"
+zstd-safe = "7.2"
+
+[profile.release]
+debug = false
