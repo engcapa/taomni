@@ -60,6 +60,15 @@ Git tag / GitHub Release
 - `TC-UPDATE-MACOS-002`：真实 HTTP 流分别暂停于 20% / 60%，取消并重试后释放旧流，要求新进度不回退、旧流不安装，再释放新流安装成功。
 - 原生用例仅在隔离 QA app / run-owned Disposable.app 上执行，使用生产 updater/公钥，不修改 /Applications 或当前 QA 二进制；不证明生产重启、Intel 真机、Rosetta 执行或 Gatekeeper/notarization。
 
+### 本次执行证据（2026-10-02）
+
+- 测试提交：`ded2dbdc966c29f22f3612c0b074ceea80f6b0eb`（`worktree-macos-upgrade`）。
+- 指定工作流：[QA UI Auto Platforms / 36999439566](https://github.com/engcapa/taomni/actions/runs/36999439566)，`macos-15` ARM64 / WKWebView / isolated native debug build；选择 `TC-UPDATE-MACOS-001,TC-UPDATE-MACOS-002`。
+- 原始 CI 汇总：2 selected / 2 passed，0 failed / skipped / capability gaps / infrastructure errors；`ci-summary.json` 的 head 与上述提交一致。真实 AppKit About 菜单激活后，通过生产 About 按钮/版本入口和升级对话框执行。
+- 本地仅 unit：32 项 updater service/store/dialog，54 项 shell/titlebar，11 项 Node manifest，17 项 QA planner/execute/dev-contract + 4 项 fixture 合同。未启动本地 browser/native app 或进行本地构建。
+- 历史失败保留：36994890350 的原生构建成功，但用例误用了 macOS 不显示的网页菜单入口（2 failed）；36998224030 因新 QA 菜单探针双重引用 `&&str` 编译失败，已修；36998549487 修正后 2 passed，最终代码另以 36999439566 重验。
+- 下载证据目录：`qa-ui-auto-report/macos-upgrade/<run-id>/`（不提交）。不把 workflow 绿替代实际 case pass；线上 v0.4.29 清单仍须独立授权后修改。
+
 ## CI 签名要求
 
 仓库 secrets 必须配置：
