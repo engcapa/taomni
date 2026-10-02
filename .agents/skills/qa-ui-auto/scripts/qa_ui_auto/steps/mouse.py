@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import platform
 from typing import Any
 
@@ -137,7 +138,13 @@ def step_drag_to(ctx: StepContext, args: Any) -> None:
         dst = ctx.page.locator(args["to"]).first  # type: ignore[attr-defined]
         if ctx.dry_run:
             return
-        src.drag_to(dst, force=True)
+        kwargs: dict = {"force": True}
+        # Preserve explicit element offsets for screenshot canvas/handle drags.
+        if args.get("from_position"):
+            kwargs["source_position"] = args["from_position"]
+        if args.get("to_position"):
+            kwargs["target_position"] = args["to_position"]
+        src.drag_to(dst, **kwargs)
         return
     if ctx.dry_run:
         return
@@ -208,3 +215,33 @@ def step_terminal_drag_selection(ctx: StepContext, args: Any) -> None:
             page.keyboard.up(modifier)
     record_terminal_drag(ctx, {"mode": "browser", "selector": selector, "direction": direction,
                                "modifiers": modifiers, "box": box, "start": start, "end": end})
+
+
+@verb("drag_path")
+def step_drag_path(ctx: StepContext, args: Any) -> None:
+    """Trace element-relative points with real browser pointer input, always releasing."""
+    if not isinstance(args, dict) or set(args) != {"selector", "points"}:
+        raise StepError("drag_path requires selector and points")
+    points = args["points"]
+    if not isinstance(points, list) or not 2 <= len(points) <= 256:
+        raise StepError("drag_path requires 2..256 points")
+    for p in points:
+        if (not isinstance(p, dict) or set(p) != {"x", "y"}
+                or any(isinstance(p[k], bool) or not isinstance(p[k], (int, float))
+                       or not math.isfinite(p[k]) for k in ("x", "y"))):
+            raise StepError("drag_path requires finite x/y coordinates")
+    if ctx.dry_run:
+        return
+    box = ctx.page.locator(args["selector"]).first.bounding_box()
+    if not box:
+        raise StepError("drag_path element has no visible bounding box")
+    if any(not 0 <= p["x"] <= box["width"] or not 0 <= p["y"] <= box["height"] for p in points):
+        raise StepError("drag_path point is outside the selected element")
+    mouse = ctx.page.mouse
+    mouse.move(box["x"] + points[0]["x"], box["y"] + points[0]["y"])
+    mouse.down()
+    try:
+        for p in points[1:]:
+            mouse.move(box["x"] + p["x"], box["y"] + p["y"], steps=8)
+    finally:
+        mouse.up()

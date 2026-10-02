@@ -95,6 +95,30 @@ class NativeSessionTransportTest(TestCase):
         ]
         self.assertEqual(click_urls, ["/session/session-1/element/button-1/click", "/session/session-1/element/button-2/click"])
 
+    def test_pointer_click_retries_a_null_element_scroll_error(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(side_effect=["row-1", "row-2"])
+        session.request = Mock(side_effect=[
+            WebDriverError(
+                'HTTP 400: {"value":{"error":"unknown error","message":"JavaScript error: '
+                "TypeError: null is not an object (evaluating 'arguments[0].scrollIntoView')\"}}"
+            ),
+            None,
+            None,
+            None,
+            None,
+        ])
+        with patch("tauri_webdriver.time.sleep") as sleep:
+            session.right_click("#file")
+        self.assertEqual(session.find.call_count, 2)
+        sleep.assert_called_once_with(0.3)
+        actions_call = next(
+            call for call in session.request.call_args_list if call.args[0] == "POST" and call.args[1].endswith("/actions")
+        )
+        actions = actions_call.args[2]["actions"][0]["actions"]
+        self.assertEqual(actions[0]["origin"], {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
+
     def test_pointer_click_gives_up_after_three_stale_references(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"

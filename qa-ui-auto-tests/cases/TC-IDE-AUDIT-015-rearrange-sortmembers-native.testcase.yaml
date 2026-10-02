@@ -62,6 +62,9 @@ steps:
 - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
 - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
 - type: Rearrange Code
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"] [data-index="0"]'
+    timeout_sec: 30
 - press: Enter
 - wait_for:
     selector: '[data-testid="confirm-dialog"]'
@@ -110,6 +113,9 @@ steps:
 - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
 - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
 - type: Rearrange Code
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"] [data-index="0"]'
+    timeout_sec: 30
 - press: Enter
 - wait_for:
     selector: '[data-testid="confirm-dialog"]'
@@ -159,19 +165,19 @@ verification:
     - 15
     - 16
     - 17
-    - 18
-    - 21
-    - 23
-    - 27
-    - 31
-    - 33
+    - 19
+    - 22
+    - 24
+    - 28
+    - 32
     - 34
     - 35
     - 36
-    - 39
-    - 42
-    - 43
-    - 46
+    - 38
+    - 41
+    - 44
+    - 45
+    - 48
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -188,54 +194,54 @@ verification:
     - step: 14
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
     - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
+    - step: 21
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog\"]", "contains": "Rearrange preview",
         "timeout_sec": 10}}'
-    - step: 22
+    - step: 23
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "SortMembers.java
         from disk", "timeout_sec": 30}}'
-    - step: 24
+    - step: 25
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "changed since
         the frozen preimage", "timeout_sec": 60}}'
-    - step: 25
+    - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "void zebra",
         "timeout_sec": 10}}'
-    - step: 26
+    - step: 27
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "224c54e2637efff8c89c5d0fc2901fd0254fdb3a8d88b35b45e6a336955a1e02", "timeout_sec": 30}}'
-    - step: 28
+    - step: 29
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "SortMembers.java
         from disk", "timeout_sec": 30}}'
-    - step: 29
+    - step: 30
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b", "timeout_sec": 30}}'
-    - step: 32
+    - step: 33
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 37
+    - step: 39
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
-    - step: 38
+    - step: 40
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog\"]", "contains": "Rearrange preview",
         "timeout_sec": 10}}'
-    - step: 40
+    - step: 42
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Rearranged
         SortMembers.java", "timeout_sec": 60}}'
-    - step: 41
+    - step: 43
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"]", "regex": "(?s)private
         int laterField.*void apple", "timeout_sec": 10}}'
-    - step: 44
+    - step: 46
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Undid Rearrange
         Code", "timeout_sec": 10}}'
-    - step: 45
+    - step: 47
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"]", "regex": "(?s)void
         zebra.*private int laterField", "timeout_sec": 10}}'
-    - step: 47
+    - step: 49
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b", "timeout_sec": 30}}'
     results:
-    - 47
+    - 49
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

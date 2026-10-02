@@ -1605,6 +1605,12 @@ def _do_eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     return _eval_readonly(ctx, args)
 
 
+@_verb("native_screenshot_scenario")
+def _do_screenshot_scenario(ctx: NativeStepContext, args: Any) -> str:
+    from .screenshot_scenarios import run_scenario
+    return run_scenario(ctx, args)
+
+
 @_verb("blur")
 def _do_blur(ctx: NativeStepContext, args: Any) -> str:
     """Remove focus from a control the way leaving the field does.

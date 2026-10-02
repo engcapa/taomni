@@ -67,7 +67,7 @@ from qa_ui_auto.testcase import discover, step_verb_and_args  # noqa: E402
 
 INTERACTIVE_VERBS = {
     "middle_click",
-    "click", "dblclick", "right_click", "hover", "drag_to", "native_click",
+    "click", "dblclick", "right_click", "hover", "drag_to", "drag_path", "native_click",
     "native_pointer_drag",
     "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "upload_file",
     "set_check", "send_text_via_label", "open_session", "click_menu",
@@ -77,7 +77,7 @@ DISPLAY_VERBS = {
     "assert_text_equals", "assert_items",
     "wait_for", "assert_visible", "assert_not_visible", "assert_text",
     "assert_pattern", "assert_count", "assert_attribute", "assert_disabled",
-    "assert_enabled", "screenshot", "assert_menu_items",
+    "assert_enabled", "screenshot", "assert_menu_items", "screenshot_reference", "assert_screenshot_mask",
 }
 SELECTOR_KEYS = {"selector", "from", "to", "path"}   # path is for screenshot fname; filtered below
 

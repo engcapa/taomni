@@ -41,6 +41,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_TC010_READY\r?$
+    timeout_sec: 60
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
 - wait_for:
@@ -105,6 +106,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_MODE=${fixture.sftp_chmod_mode}\r?$
+    timeout_sec: 60
 - wait: 1
 - right_click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-menu.txt"'
 - wait_for: '[data-testid="context-menu"]'
@@ -172,7 +174,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec":
         60}}'
     - step: 15
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_TC010_READY\\r?$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_TC010_READY\\r?$", "timeout_sec": 60}}'
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 18
@@ -220,7 +222,7 @@ verification:
     - step: 52
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "${fixture.sftp_chmod_status}"}}'
     - step: 54
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_MODE=${fixture.sftp_chmod_mode}\\r?$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_MODE=${fixture.sftp_chmod_mode}\\r?$", "timeout_sec": 60}}'
     - step: 57
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 59

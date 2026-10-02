@@ -1,0 +1,33 @@
+id: TC-SHOT-N11
+title: Native freehand Copy and Pin retain original RGBA and actual OS dragging moves the topmost pin
+description: Fixed concave vertices are sent through real system mouse input; public renderer actions export real OS-captured content. Expected mask is derived independently from original canvas pixels, never from the exported contour.
+covers: [F27.1]
+tags: [screenshot, native, freehand, pin, rgba, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: freehand}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: OS mouse input draws a real auto-closed concave selection and public Pin and Copy export original interior RGB with exact interior/exterior alpha on all supported desktop WebViews.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: 'Both outputs match independently retained original crop and fixed mask dimensions, every RGB tile and exact nonboundary alpha; only a 2px edge band is excluded. Pin PNG and OS clipboard RGBA are checked separately; closed contour, freehand mode and disabled rectangle-only operations must all pass. Original/full/crop/expected/actual/difference PNGs and metrics are retained.'}
+    results: [3]
+  - id: R2
+    requirement: Public Pin opens an independent native always-on-top window, survives overlay/session cleanup, moves by the requested displacement under actual OS dragging, then closes and removes its retained copy without hiding the main window.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: 'Actual native outer position changes by 80x64 logical pixels (scaled physically, within 6 physical pixels) after OS mouse down/move/up, native topmost is true (Linux requires the successful X11 window-manager ABOVE atom rather than GTK cached state), source session is cleaned while the pin copy survives, and Escape closes/removes the independent copy.'}
+    - {step: 4, expectation: Main application is restored after both public output operations.}
+    results: [3, 4]
+  visual:
+  - {check: Original content and alpha, method: automated, reason: Native screen pixels and clipboard/Pin outputs are compared with actual original canvas PNGs across all pixels and spatial tiles rather than checking nonblank content or dimensions alone.}
+  native:
+  - {check: Physical gesture and window displacement, method: automated, reason: 'Real Enigo/SetCursorPos OS input draws and drags; before/after native positions and topmost state are recorded. DOM automation selects toolbar actions and dispatches Escape, so the close check proves renderer/native lifecycle, not a physical Escape-key test.'}

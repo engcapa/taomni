@@ -1,0 +1,120 @@
+id: TC-BACKUP-001
+title: Daily backup runs while the native app stays open and refreshes Settings
+description: >-
+  A disabled daily policy is seeded in an isolated profile. Enabling automatic
+  backup in Settings creates a real core archive on the next background check.
+  A second check without an elapsed day must not create a duplicate. Moving
+  lastBackupAt two days into the past simulates an elapsed day without restarting the
+  app: the real timer creates another archive and updates the open history.
+  Manual backup still works with rolling retention, and disabling the policy
+  prevents further backups even with an expired timestamp. Browser stubs
+  cannot establish native timer, SQLite snapshot or filesystem behavior.
+  The linked native subprocess probe separately verifies two real instances
+  contending for the same due interval, foreign history refresh and manual queuing.
+covers: [F-BACKUP-1, F-MFA-3]
+tags: [backup, settings, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, backup_policy]
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-auto-toggle"]'
+- assert_attribute: {selector: '[data-testid="backup-auto-toggle"]', name: aria-pressed, equals: 'false'}
+- assert_count: {selector: '[data-testid="backup-history-row"]', equal: 0}
+- click: '[data-testid="backup-auto-toggle"]'
+- wait_for: '[data-testid="backup-frequency"]'
+- select_option: {selector: '[data-testid="backup-frequency"]', value: weekly}
+- assert_file_contains: {path: '${fixture.backup_policy_path}', contains: '"frequency": "weekly"'}
+- select_option: {selector: '[data-testid="backup-frequency"]', value: daily}
+- assert_file_contains: {path: '${fixture.backup_policy_path}', contains: '"frequency": "daily"'}
+- fill: {selector: '[data-testid="backup-retained-copies"]', value: '2'}
+- wait_for: {selector: '[data-testid="backup-history-row"]', timeout_sec: 90}
+- assert_count: {selector: '[data-testid="backup-history-row"]', equal: 1}
+- assert_pattern: {selector: '[data-testid="backup-last-success"]', regex: '\d'}
+- click: '[data-testid="backup-history-restore"]'
+- wait_for: {selector: '[data-testid="backup-restore-files"]', timeout_sec: 30}
+- assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/taomni.db}
+- assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/notes.db}
+- assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/vault.db}
+- click: '[data-testid="backup-restore-cancel"]'
+# Deliberately observe a whole later scheduler pass; a readiness wait cannot
+# prove that no duplicate snapshot was created while the policy was not due.
+- wait: 65
+- assert_count: {selector: '[data-testid="backup-history-row"]', equal: 1}
+- host_write_file:
+    path: ${fixture.backup_policy_path}
+    text: ${fixture.backup_expired_daily_policy}
+- wait_for: {selector: '[data-testid="backup-history-row"]:nth-of-type(2)', timeout_sec: 90}
+- assert_count: {selector: '[data-testid="backup-history-row"]', equal: 2}
+- click: '[data-testid="backup-create-now"]'
+- wait_for: {selector: '[data-testid="backup-action-success"]', timeout_sec: 60}
+- assert_count: {selector: '[data-testid="backup-history-row"]', equal: 2}
+- click: '[data-testid="backup-history-refresh"]'
+- assert_count: {selector: '[data-testid="backup-history-row"]', equal: 2}
+- click: '[data-testid="backup-auto-toggle"]'
+- assert_file_contains: {path: '${fixture.backup_policy_path}', contains: '"autoBackupEnabled": false'}
+- host_write_file:
+    path: ${fixture.backup_policy_path}
+    text: ${fixture.backup_disabled_expired_policy}
+- wait: 65
+- click: '[data-testid="backup-history-refresh"]'
+- assert_count: {selector: '[data-testid="backup-history-row"]', equal: 2}
+- screenshot: backup-daily-background.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Enabling the saved daily policy creates a native archive without Backup Now or restart, and updates history and last success time.
+    actions: [3, 5, 9, 11, 13, 15]
+    checkpoints:
+    - {step: 8, expectation: Disabled initial policy has no backup history}
+    - {step: 12, expectation: Weekly policy was saved on disk}
+    - {step: 14, expectation: Daily policy was saved on disk}
+    - {step: 17, expectation: One automatic archive appears}
+    - {step: 18, expectation: Last successful backup time is displayed}
+    results: [12, 14, 17, 18]
+  - id: R2
+    requirement: The automatic core archive can be read back and contains consistent snapshots of the session, notes and vault databases.
+    actions: [19]
+    checkpoints:
+    - {step: 20, expectation: Real archive inspection completed}
+    - {step: 21, expectation: Session database snapshot is included}
+    - {step: 22, expectation: Notes database snapshot is included}
+    - {step: 23, expectation: Vault database snapshot is included}
+    results: [21, 22, 23]
+  - id: R3
+    requirement: A later pass before the next day creates no duplicate; an expired daily timestamp is detected while the same app stays open.
+    actions: [27]
+    checkpoints:
+    - {step: 26, expectation: One snapshot remains after a later timer pass}
+    - {step: 28, expectation: Second automatic snapshot appears without manual refresh}
+    - {step: 29, expectation: Both automatic snapshots are displayed}
+    results: [26, 29]
+  - id: R4
+    requirement: Manual Backup Now still creates an archive and retention keeps two copies; disabling automatic backup prevents further expired backups.
+    actions: [30, 33, 35, 37, 39]
+    checkpoints:
+    - {step: 31, expectation: Manual backup succeeds}
+    - {step: 32, expectation: Rolling retention keeps two snapshots after manual backup}
+    - {step: 34, expectation: Explicit refresh still shows two snapshots}
+    - {step: 36, expectation: Automatic backup disable was persisted}
+    - {step: 40, expectation: No new snapshot was generated by the disabled expired policy}
+    results: [32, 34, 36, 40]
+  visual:
+  - check: Backup history and the last successful backup time remain readable after automatic and manual backups.
+    method: manual
+    reason: Review the retained screenshot.
+  native:
+  - check: Daily and weekly interval boundaries, clock rollback, and on-exit policy selection are covered by Rust scheduler tests.
+    method: external
+    reason: Advancing the operating system clock or waiting seven days is unsuitable for the UI case.
+  - check: Cross-process lock exclusion and automatic lock release after a killed owner are covered by Rust subprocess tests.
+    method: external
+    reason: The lock owner is a disposable subprocess; no production profile is used.
+  - check: Two real instances create one archive per shared due interval, the open Settings panel observes a foreign backup without a local event, and manual backup waits for the same OS lock.
+    method: external
+    reason: Run scripts/backup_multi_probe.py under the QA skill against the matching isolated native build. Its deterministic contention uses a Linux OS lock and /proc observations; Windows and macOS need equivalent native host evidence.

@@ -1,8 +1,10 @@
+mod coordination;
 pub mod crypto;
 pub mod engine;
 pub mod manifest;
 pub mod policy;
 pub mod restore;
+pub mod scheduler;
 
 #[cfg(test)]
 mod tests;
@@ -36,10 +38,14 @@ pub async fn backup_create(
 /// Inspect a backup archive and return its manifest.
 #[tauri::command]
 pub async fn backup_inspect(
+    app: AppHandle,
     path: String,
     password: Option<String>,
 ) -> Result<BackupManifest, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let coordinator = app.state::<scheduler::BackupCoordinator>();
+        let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+        let _process_operation = coordination::BackupProcessLock::acquire(&app)?;
         let p = PathBuf::from(path);
         restore::inspect_archive(&p, password.as_deref())
     })
@@ -56,6 +62,9 @@ pub async fn backup_stage_restore(
     vault_password: Option<String>,
 ) -> Result<StageRestoreResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let coordinator = app.state::<scheduler::BackupCoordinator>();
+        let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+        let _process_operation = coordination::BackupProcessLock::acquire(&app)?;
         let state = app.state::<AppState>();
         state
             .vault
@@ -75,8 +84,18 @@ pub async fn backup_get_policy(app: AppHandle) -> Result<BackupPolicy, String> {
 
 /// Update and save the backup policy.
 #[tauri::command]
-pub async fn backup_set_policy(app: AppHandle, policy: BackupPolicy) -> Result<(), String> {
-    policy::save_policy(&app, &policy)
+pub async fn backup_set_policy(app: AppHandle, mut policy: BackupPolicy) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let coordinator = app.state::<scheduler::BackupCoordinator>();
+        let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+        let _process_operation = coordination::BackupProcessLock::acquire(&app)?;
+        // Settings may still hold the timestamp from before a background backup.
+        // Only a successful backup is allowed to update this backend-owned value.
+        policy.last_backup_at = policy::load_policy(&app).last_backup_at;
+        policy::save_policy(&app, &policy)
+    })
+    .await
+    .map_err(|e| format!("save backup policy task join error: {e}"))?
 }
 
 /// List all backup entries in the effective backup directory.
@@ -90,9 +109,16 @@ pub async fn backup_list_history(app: AppHandle) -> Result<Vec<BackupEntryInfo>,
 /// Delete a specific backup item from the effective backup directory.
 #[tauri::command]
 pub async fn backup_delete_item(app: AppHandle, file_name: String) -> Result<(), String> {
-    let pol = policy::load_policy(&app);
-    let dir = policy::resolve_backup_dir(&app, &pol);
-    engine::delete_backup_item(&dir, &file_name)
+    tauri::async_runtime::spawn_blocking(move || {
+        let coordinator = app.state::<scheduler::BackupCoordinator>();
+        let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+        let _process_operation = coordination::BackupProcessLock::acquire(&app)?;
+        let pol = policy::load_policy(&app);
+        let dir = policy::resolve_backup_dir(&app, &pol);
+        engine::delete_backup_item(&dir, &file_name)
+    })
+    .await
+    .map_err(|e| format!("delete backup task join error: {e}"))?
 }
 
 /// Get the system default backup directory path as string.

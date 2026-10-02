@@ -109,7 +109,8 @@ steps:
     name: aria-selected
     equals: 'true'
 - eval_readonly:
-    expression: document.activeElement?.getAttribute('data-path') === 'src/main/example.txt'
+    expression: document.activeElement?.getAttribute('data-path') ?? document.activeElement?.tagName ?? 'none'
+    contains: src/main/example.txt
 - assert_file_sha256:
     path: ${fixture.project_tree_root}/src/main/example.txt
     equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
@@ -191,7 +192,7 @@ verification:
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/example.txt\"]",
         "name": "aria-selected", "equals": "true"}}'
     - step: 45
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-path'') === ''src/main/example.txt''"}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-path'') ?? document.activeElement?.tagName ?? ''none''", "contains": "src/main/example.txt"}}'
     - step: 46
       expectation: '{"assert_file_sha256": {"path": "${fixture.project_tree_root}/src/main/example.txt", "equals":
         "bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a"}}'

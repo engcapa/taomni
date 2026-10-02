@@ -131,7 +131,17 @@ pub fn save_policy(app: &AppHandle, policy: &BackupPolicy) -> Result<(), String>
     let file_path = app_data.join(POLICY_FILE_NAME);
     let json = serde_json::to_string_pretty(policy)
         .map_err(|e| format!("serialize backup policy: {e}"))?;
-    std::fs::write(&file_path, json).map_err(|e| format!("save backup policy: {e}"))?;
+    // Readers must never see an empty/partial policy and fall back to defaults
+    // while Settings or a background backup is updating the file.
+    let temp_path = app_data.join(format!(
+        ".backup_policy_{}.tmp",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let _cleanup = scopeguard::guard(temp_path.clone(), |path| {
+        let _ = std::fs::remove_file(path);
+    });
+    std::fs::write(&temp_path, json).map_err(|e| format!("save backup policy: {e}"))?;
+    std::fs::rename(&temp_path, &file_path).map_err(|e| format!("replace backup policy: {e}"))?;
     Ok(())
 }
 

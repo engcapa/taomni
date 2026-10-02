@@ -1,0 +1,82 @@
+id: TC-SHOT-003
+title: Scroll capture dispatches crop geometry and resets selection and annotations
+description: The browser scroll stub returns the same 400x300 image and three frames; this case checks renderer refresh, not tall-image stitching or OS scrolling.
+covers: [F27.1]
+tags: [screenshot, scroll-capture, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- drag_to:
+    from: '[data-testid="screenshot-select-layer"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 100, y: 100}
+    to_position: {x: 500, y: 400}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- click: '[data-testid="screenshot-tool-rect"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 160, y: 160}
+    to_position: {x: 300, y: 260}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- click: '[data-testid="screenshot-scroll-capture"]'
+# Busy is transient with the fast stub; wait for the completed phase instead.
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- assert_not_visible: '[data-testid="screenshot-selection"]'
+- assert_not_visible: '[data-testid="screenshot-toolbar"]'
+- assert_not_visible: '[data-testid="screenshot-scroll-busy"]'
+- assert_visible: '[data-testid="screenshot-hint"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '0'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-toast"]'
+    equals: Scroll capture stitched 3 frames
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_scroll_capture" && JSON.stringify(window.__taomniStubScreenshotCalls.at(-2).args) === '{"displayId":"0,0","x":40,"y":40,"width":160,"height":120}'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_update" && window.__taomniStubScreenshotCalls.at(-1).args.width === 400 && window.__taomniStubScreenshotCalls.at(-1).args.height === 300
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_disabled: '[data-testid="screenshot-undo"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Scroll capture sends the selected physical region, applies the returned artifact, and clears the previous selection and annotation history.
+    actions: [1, 2, 4, 6, 7, 9]
+    checkpoints:
+    - {step: 8, expectation: A real annotation existed before refresh.}
+    - {step: 10, expectation: Completion returns to select phase.}
+    - {step: 11, expectation: The old region is removed.}
+    - {step: 12, expectation: The old toolbar is removed.}
+    - {step: 13, expectation: The busy state has ended.}
+    - {step: 14, expectation: Region-selection instructions return.}
+    - {step: 15, expectation: No annotation survives the new capture.}
+    - {step: 16, expectation: The UI reports the stub's three-frame result.}
+    - {step: 17, expectation: Request geometry is exactly the selected 160x120 crop at 40x40.}
+    - {step: 18, expectation: 'Overlay update uses the actual 400x300 stub result, without claiming a tall image.'}
+    results: [10, 11, 12, 13, 14, 15, 16, 17, 18]
+  - id: R2
+    requirement: Reselecting after scroll refresh starts with empty undo and redo stacks and remains cancelable.
+    actions: [19, 23]
+    checkpoints:
+    - {step: 21, expectation: Undo was cleared with the previous shapes.}
+    - {step: 22, expectation: Redo was cleared as well.}
+    - {step: 24, expectation: Cancel returns to the main camera.}
+    results: [21, 22, 24]
+  visual:
+  - check: Completed refresh removes stale crop and annotation state.
+    method: automated
+    reason: Phase, size, history and visibility assertions establish renderer refresh only.
+  native:
+  - check: Actual scroll injection, overlap detection and tall-image row order.
+    method: external
+    reason: The synthetic browser result does not stitch or scroll; native SHOT-N scroll cases own these checks.

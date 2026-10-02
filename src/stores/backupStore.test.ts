@@ -64,7 +64,12 @@ describe("useBackupStore", () => {
   it("updates policy via updatePolicy", async () => {
     useBackupStore.setState({ policy: fakePolicy });
 
-    invokeMock.mockResolvedValue(undefined);
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "backup_get_policy") {
+        return Promise.resolve({ ...fakePolicy, customBackupDir: "D:\\MyBackups", autoBackupEnabled: true });
+      }
+      return Promise.resolve();
+    });
 
     await useBackupStore.getState().updatePolicy({
       customBackupDir: "D:\\MyBackups",
@@ -112,6 +117,60 @@ describe("useBackupStore", () => {
     expect(result).toEqual(fakeResult);
     expect(useBackupStore.getState().lastResult).toEqual(fakeResult);
     expect(useBackupStore.getState().creating).toBe(false);
+  });
+
+  it("refreshes both history and the last successful background backup time", async () => {
+    useBackupStore.setState({ policy: fakePolicy, history: [] });
+    const policy = { ...fakePolicy, autoBackupEnabled: true, lastBackupAt: 1788501000000 };
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "backup_get_policy") return Promise.resolve(policy);
+      if (cmd === "backup_list_history") return Promise.resolve(fakeHistory);
+      return Promise.reject(new Error(`unhandled cmd: ${cmd}`));
+    });
+
+    await useBackupStore.getState().refreshHistory();
+
+    expect(useBackupStore.getState().history).toEqual(fakeHistory);
+    expect(useBackupStore.getState().policy?.lastBackupAt).toBe(policy.lastBackupAt);
+  });
+
+  it("keeps a completed background backup when an older initial history load finishes later", async () => {
+    let resolveInitialHistory!: (history: BackupEntryInfo[]) => void;
+    const initialHistory = new Promise<BackupEntryInfo[]>((resolve) => { resolveInitialHistory = resolve; });
+    let historyReads = 0;
+    const policy = { ...fakePolicy, lastBackupAt: 1788501000000 };
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "backup_get_default_dir") return Promise.resolve(fakeDefaultDir);
+      if (cmd === "backup_list_history") {
+        historyReads += 1;
+        return historyReads === 1 ? initialHistory : Promise.resolve(fakeHistory);
+      }
+      if (cmd === "backup_get_policy") return Promise.resolve(historyReads <= 1 ? fakePolicy : policy);
+      return Promise.reject(new Error(`unhandled cmd: ${cmd}`));
+    });
+
+    const initialLoad = useBackupStore.getState().loadAll();
+    await useBackupStore.getState().refreshHistory();
+    resolveInitialHistory([]);
+    await initialLoad;
+
+    expect(useBackupStore.getState().history).toEqual(fakeHistory);
+    expect(useBackupStore.getState().policy?.lastBackupAt).toBe(policy.lastBackupAt);
+    expect(useBackupStore.getState().defaultBackupDir).toBe(fakeDefaultDir);
+    expect(useBackupStore.getState().loading).toBe(false);
+  });
+
+  it("keeps a newer backend backup timestamp when changing a stale policy", async () => {
+    useBackupStore.setState({ policy: fakePolicy });
+    const policy = { ...fakePolicy, frequency: "daily" as const, lastBackupAt: 1788501000000 };
+    invokeMock.mockImplementation((cmd: string) => {
+      if (cmd === "backup_get_policy") return Promise.resolve(policy);
+      return Promise.resolve();
+    });
+
+    await useBackupStore.getState().updatePolicy({ frequency: "daily" });
+
+    expect(useBackupStore.getState().policy).toEqual(policy);
   });
 
   it("deletes a backup file via deleteBackup", async () => {
