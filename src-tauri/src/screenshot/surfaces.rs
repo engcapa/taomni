@@ -141,6 +141,31 @@ pub fn close_borders(app: &AppHandle) {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn request_gtk_border_size(window: &tauri::Window, width: f64, height: f64) -> Result<(), String> {
+    let border = window.clone();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            use webkit2gtk::glib::prelude::ObjectExt;
+            let result = border.gtk_window().map(|gtk| {
+                let width = width.round().max(1.0) as i32;
+                let height = height.round().max(1.0) as i32;
+                // GTK's empty-window natural size is 200x200. A widget size
+                // request disables that fallback; geometry hints alone are
+                // raised to the natural size for a non-resizable window.
+                gtk.set_property("width-request", width);
+                gtk.set_property("height-request", height);
+                gtk.set_property("default-width", width);
+                gtk.set_property("default-height", height);
+            });
+            let _ = tx.send(result.map_err(|e| e.to_string()));
+        })
+        .map_err(|e| e.to_string())?;
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("configure GTK capture range: {e}"))?
+}
+
 pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Result<(), String> {
     close_borders(app);
     let result = (|| {
@@ -188,6 +213,8 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
             window
                 .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
                 .map_err(|e| e.to_string())?;
+            #[cfg(target_os = "linux")]
+            request_gtk_border_size(&window, width, height)?;
             // GTK creates its GDK surface on show. Applying an input shape
             // before that makes Tao unwrap a missing native window.
             window.show().map_err(|e| e.to_string())?;
