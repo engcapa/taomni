@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -39,6 +40,17 @@ def photo_noise(width: int, height: int, frame: int) -> bytes:
         seed ^= (seed << 5) & 0xFFFFFFFF
         result[index] = seed & 0x1F
     return bytes(result)
+
+
+def animation_delay_ms(started: float, now: float) -> int:
+    """Wait for the next 60 Hz deadline without adding drawing time to it.
+
+    A slow draw skips elapsed deadlines; it must not queue catch-up draws that
+    starve Tk's event loop. Markers still count actual draws, never deadlines.
+    """
+    period = 1.0 / 60.0
+    next_tick = math.floor((now - started) / period + 1e-9) + 1
+    return max(1, math.ceil((started + next_tick * period - now) * 1000))
 
 
 def main() -> int:
@@ -109,6 +121,8 @@ def main() -> int:
         state["marker"] = {"x": 16, "y": 16, "levels": 16}
         animation_started = time.monotonic()
         last_written = [animation_started]
+        last_frames = [0]
+        state["animation_samples"] = []
 
         def step() -> None:
             state["frames"] += 1
@@ -127,15 +141,25 @@ def main() -> int:
                 x0, _, _, _ = canvas.coords(bar)
                 if x0 > width:
                     canvas.move(bar, -(width + bar_w * 2), 0)
+            # Include the real Tk redraw in the scheduling cost. Otherwise a
+            # macOS draw plus a fresh 16 ms timer can cap the source at 25 Hz,
+            # even when the RDP capture and encoder can deliver faster.
+            root.update_idletasks()
             now = time.monotonic()
             if now - last_written[0] >= 1.0:
+                state["animation_samples"].append({
+                    "elapsed_s": now - animation_started,
+                    "frames": state["frames"],
+                    "source_fps": (state["frames"] - last_frames[0]) / (now - last_written[0]),
+                })
                 last_written[0] = now
+                last_frames[0] = state["frames"]
                 state["animation_elapsed_s"] = now - animation_started
                 state["animation_source_fps"] = state["frames"] / state["animation_elapsed_s"]
                 write_state(args.state, state)
-            root.after(16, step)
+            root.after(animation_delay_ms(animation_started, time.monotonic()), step)
 
-        root.after(16, step)
+        root.after(animation_delay_ms(animation_started, time.monotonic()), step)
     else:
         canvas.bind("<Button-1>", flip)
         root.bind("<Key>", flip)

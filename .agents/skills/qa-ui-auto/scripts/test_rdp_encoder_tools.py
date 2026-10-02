@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 from qa_ui_auto import rdp_steps as steps
 from qa_ui_auto.fixtures import xrdp_server_required as xrdp
 from qa_ui_auto.fixtures import rdp_baseline_required as baseline
-from qa_ui_auto.rdp_helpers.rdp_target import photo_noise
+from qa_ui_auto.rdp_helpers.rdp_target import animation_delay_ms, photo_noise
 from qa_ui_auto.rdp_helpers import mstsc
 from qa_ui_auto.steps import StepError
 
@@ -198,6 +198,15 @@ class EncoderToolsTest(unittest.TestCase):
         self.assertNotEqual(photo_noise(20, 12, 0), photo_noise(20, 12, 1))
         self.assertEqual(len(photo_noise(20, 12, 0)), 240)
         self.assertLessEqual(max(photo_noise(20, 12, 0)), 31)
+
+    def test_animation_clock_includes_draw_cost_and_skips_elapsed_deadlines(self):
+        # Drawing for 8 ms leaves only 9 ms until the first 60 Hz deadline;
+        # adding a full 16 ms here would reduce the real source frame rate.
+        self.assertEqual(animation_delay_ms(100.0, 100.008), 9)
+        # A long draw cannot enqueue all the missed ticks or busy-spin: the
+        # next draw waits for the upcoming deadline, and counts only itself.
+        self.assertEqual(animation_delay_ms(100.0, 100.052), 15)
+        self.assertEqual(animation_delay_ms(100.0, 100.1), 17)
 
 
 class TermServiceFixtureTest(unittest.TestCase):
