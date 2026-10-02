@@ -67,4 +67,15 @@
 - 对 macOS 动画 helper 增加进程局部的
   `NSActivityUserInitiatedAllowingIdleSystemSleep` 和每秒 draw p95/max，验证
   后台调度是否是干扰源；像素序列、60 Hz 调度、测量时长和 0.95/1.05 门槛保持原值。
-  该探针及照片用例的原生复测待回填，不把推测写成已证实根因。
+- macOS 补测 [37037305754](https://github.com/engcapa/taomni/actions/runs/37037305754)，
+  提交 `8e576e93`：selection 中的 `TC-RDPS-PERF-01` 和 `TC-RDPS-PERF-03` 均通过，
+  为 2 passed / 0 failed / 0 skipped；selection、源码/runner/case/build identity 及
+  33 个 receipt artifact 的哈希均已核对。PERF-01 的连接耗时为 54 ms、输入延迟
+  p95 为 55.910 ms、实际画面为 35.453 fps、717.549 kbps，预算通过。PERF-03 的
+  baseline/adaptive 实际画面为 25.9989/26.3887 fps，`fps_ratio=1.014994`，
+  `kbps_ratio=0.990345`，满足 0.95/1.05 门槛。
+- 该轮照片窗口仍只协商 RemoteFX，没有 planar；新的 helper 活动声明和 draw telemetry
+  显示 adaptive 源平均 38.610 fps，draw p95 最大 14.900 ms、draw 最大 27.130 ms，
+  baseline 源平均 37.015 fps，draw p95 最大 19.144 ms、draw 最大 36.864 ms。两组源
+  在约 5 秒后都降到约 23–31 fps，因此保留“宿主源节奏会下降”的诊断结论；本轮通过
+  说明没有观察到编码器导致的照片帧率退化，但不把宿主调度根因写成已完全证明。

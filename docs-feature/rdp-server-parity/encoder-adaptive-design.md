@@ -255,7 +255,7 @@ EncoderIter::next(rect)
 ### TASK-E2 内容自适应选择
 
 - 职责与文件范围：`vendor/ironrdp-server/src/encoder/mod.rs`（`AdaptiveHandler`）、`src-tauri/src/servers/rdp.rs`、`src-tauri/src/servers/rdp/metrics.rs`
-- 输入与必读：§4.1、§4.2、DEC-02/03；`encoder/bitmap.rs`（基线有宽度限制，新 bulk 路径按字节写 scan width）；`encoder/rfx.rs`
+- 输入与必读：§4.1、§4.2、DEC-02/03；`encoder/bitmap.rs`（基线有宽度限制，新 bulk 路径按客户端能力省略压缩头，带头时 scan width 写像素宽度）；`encoder/rfx.rs`
 - 依赖：TASK-E1
 - 实施内容：
   1. `UpdateEncoder::new` 中，当协商出 RemoteFX、且连接有批量压缩器时，构建 `BitmapUpdater::Adaptive(AdaptiveHandler { bitmap: BitmapHandler, rfx: RemoteFxHandler })`；其他情况保持原有选择，不改动。
@@ -533,6 +533,8 @@ EncoderIter::next(rect)
 - 第十七轮 [37002307561](https://github.com/engcapa/taomni/actions/runs/37002307561)，源码 `c1644d60`：三端 browser 各 5/0/0，Linux native 12/0/0，macOS 10/1/0，Windows 14/1/0。Linux UI 154 ms / 44.065 ms p95 / 53.953 实际 fps / 165.685 kbps，照片帧率/带宽比 1.015235/1.016501；macOS UI 66 ms / 67.754 ms / 31.238 fps / 470.946 kbps，唯一失败为 M2，照片比 0.987933/1.000474；Windows UI 48 ms / 50.834 ms / 33.819 fps / 460.237 kbps，照片比 1.008976/1.000078。三端照片与 bulk 解压均通过，但不能关闭整批验收。Windows mstsc owned PID 9436 在截图前退出 `3221226356`（`0xC0000374`，堆损坏），Application Error 为空，没有 dump。参考服务器均通过：xrdp 图案、点击 flips=1、全屏连接栏、quality_level=0；TermService 也通过。完整三端原始 receipt 哈希与源码/runner/case/build 身份已核验。
 - 第十八轮 Windows 三卡定位 [37005242439](https://github.com/engcapa/taomni/actions/runs/37005242439)，同源码 `c1644d60`：NAT-03、PERF-01 通过，UI 37 ms / 46.486 ms p95 / 32.427 实际 fps / 441.670 kbps；NAT-08 owned compositor crop 两种颜色仍为 0。原始 receipt 哈希与身份已核验。压缩头修正没有解除真实 mstsc 显示/堆损坏问题。
 - 第十九轮准备：为 owned mstsc PID 增加 ProcDump first-chance AV/退出捕获与 CDB 堆栈；仅 hosted runner 临时启用完整 PageHeap，恢复原 GlobalFlag/PageHeapFlags/VerifierFlags/VerifierDlls/StackTraceDatabaseSizeInMB 值及类型。36 个 mocked 工具/清理 unit 通过。macOS 的串行 ScreenCaptureKit 回调队列显式使用 UserInteractive QoS；Frame::captured_at 在回调内产生，原帧龄指标不包含此前的 native 等待，因此另保留探针 sample_events 与目标 flip_samples 的同机时间戳，以区分输入投递、绘制提交和接收。预算及照片比值门槛保持原值，实际效果待 CI。
+- 第十九轮等待期间的独立解码诊断（本地 unit，源码 `ba884490`）：直接调用当前 vendor BulkEncoder/BitmapEncoder 生成 fixture，并用 gh 读取的 FreeRDP 原始 `mppc_decompress`、`xcrush_decompress` 和 `planar_decompress_plane_rle_only` C 函数独立解码。1,600 个 MPPC-8K/64K、XCRUSH 数据包覆盖连续历史、大小交替、多分片和 resize reset；144 张 planar 位图 / 416 个矩形覆盖宽 1/2/3/4/47/253/255/640/1024、高 1/32/131/360、父 stride、raw/RLE 四类图案。全部原始字节或 RGB 像素一致，日志 `qa-ui-auto-report/_local/freerdp-independent-unit2.log`。不启动桌面会话；这些 fixture 未复现协议字节错误，不能替代 V-E13 的真实 mstsc 互通证据。本地 probe release unit 15 passed / 0 failed / 0 ignored。
+- 第二十轮 macOS 补测 [37037305754](https://github.com/engcapa/taomni/actions/runs/37037305754)，提交 `8e576e93`：原生选定的 PERF-01/03 为 2/0/0（passed/failed/skipped），完整 receipt 与 identity 校验通过。PERF-01 实际画面 35.453 fps、输入延迟 p95 55.910 ms、717.549 kbps；PERF-03 的照片 `fps_ratio=1.014994`、`kbps_ratio=0.990345`。照片窗口只协商 RemoteFX；helper 的 activity 声明和 draw p95/max 遥测已随报告保留，源动画两组在约 5 秒后仍下降到约 23–31 fps，但 adaptive 没有相对 baseline 的帧率退化。
 
 ## 9. 验收追踪与交付条件
 
