@@ -1,12 +1,14 @@
+use super::coordination::BackupProcessLock;
 use super::crypto::{encrypt_payload, is_encrypted_bytes};
 use super::manifest::{BackupManifest, file_sha256};
-use super::policy::{load_policy, resolve_backup_dir, save_policy};
+use super::policy::{BackupPolicy, load_policy, resolve_backup_dir, save_policy};
+use super::scheduler::{BackupCoordinator, BackupTrigger, is_backup_due};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, Manager};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
@@ -134,14 +136,56 @@ pub fn create_backup(
     target_path: Option<String>,
     password: Option<String>,
 ) -> Result<BackupResult, String> {
+    let coordinator = app.state::<BackupCoordinator>();
+    let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+    let _process_operation = BackupProcessLock::acquire(app)?;
+    create_backup_locked(
+        state,
+        app,
+        scope,
+        custom_options,
+        target_path,
+        password,
+        load_policy(app),
+    )
+}
+
+pub fn create_scheduled_backup(
+    app: &AppHandle,
+    trigger: BackupTrigger,
+) -> Result<Option<BackupResult>, String> {
+    let coordinator = app.state::<BackupCoordinator>();
+    let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+    let _process_operation = BackupProcessLock::acquire(app)?;
+    let policy = load_policy(app);
+    // Recheck inside both locks: any instance may have just completed a backup.
+    if !is_backup_due(&policy, chrono::Utc::now().timestamp_millis(), trigger) {
+        return Ok(None);
+    }
+    let state = app.state::<AppState>();
+    let scope = policy.default_scope.clone();
+    create_backup_locked(&state, app, &scope, None, None, None, policy).map(Some)
+}
+
+fn create_backup_locked(
+    state: &AppState,
+    app: &AppHandle,
+    scope: &str,
+    custom_options: Option<BackupCustomOptions>,
+    target_path: Option<String>,
+    password: Option<String>,
+    policy: BackupPolicy,
+) -> Result<BackupResult, String> {
     let app_data = crate::resolved_app_data_dir(app)?;
 
-    let policy = load_policy(app);
     let resolved_target_dir = resolve_backup_dir(app, &policy);
 
     let now = chrono::Local::now();
     let timestamp_str = now.format("%Y%m%d_%H%M%S").to_string();
-    let default_filename = format!("taomni_backup_{timestamp_str}.taobak");
+    let default_filename = format!(
+        "taomni_backup_{timestamp_str}_{}.taobak",
+        uuid::Uuid::new_v4().simple()
+    );
 
     let out_file_path = match target_path {
         Some(custom) if !custom.trim().is_empty() => PathBuf::from(custom.trim()),
@@ -311,13 +355,15 @@ pub fn create_backup(
 
     // If backup was written into the configured backup directory, perform retention rotation
     if out_file_path.starts_with(&resolved_target_dir) {
-        let _ = rotate_backups(&resolved_target_dir, policy.max_retained_copies);
+        if let Err(error) = rotate_backups(&resolved_target_dir, policy.max_retained_copies) {
+            tracing::warn!(target: "backup", %error, "Backup retention cleanup failed");
+        }
     }
 
     // Update policy last backup time
     let mut updated_policy = policy;
     updated_policy.last_backup_at = Some(manifest.created_at);
-    let _ = save_policy(app, &updated_policy);
+    save_policy(app, &updated_policy)?;
 
     let result = BackupResult {
         file_path: out_file_path.to_string_lossy().into_owned(),
@@ -332,6 +378,9 @@ pub fn create_backup(
         files_count: manifest.files.len(),
     };
 
+    if let Err(error) = app.emit("backup-completed", &result) {
+        tracing::warn!(target: "backup", %error, "Failed to notify backup completion");
+    }
     Ok(result)
 }
 
@@ -483,8 +532,23 @@ pub fn pack_staged_archive(
         let _ = std::fs::create_dir_all(parent);
     }
 
-    std::fs::write(out_file_path, &final_bytes)
+    // Other instances can read history while this archive is being written.
+    // Publish the complete file with a rename in its destination directory.
+    let pending_path = out_file_path.with_file_name(format!(
+        ".backup_output_{}.tmp",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let _cleanup = scopeguard::guard(pending_path.clone(), |path| {
+        let _ = std::fs::remove_file(path);
+    });
+    std::fs::write(&pending_path, &final_bytes)
         .map_err(|e| format!("write backup output file {}: {e}", out_file_path.display()))?;
+    std::fs::rename(&pending_path, out_file_path).map_err(|e| {
+        format!(
+            "publish backup output file {}: {e}",
+            out_file_path.display()
+        )
+    })?;
 
     let file_size = final_bytes.len() as u64;
     Ok((manifest, file_size))

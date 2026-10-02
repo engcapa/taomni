@@ -216,6 +216,8 @@ pub fn run() {
                 .expect("failed to init local history store");
             app.manage(local_history);
 
+            backup::scheduler::start(app.handle());
+
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -1129,6 +1131,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { code, ref api, .. } = event {
+                backup::scheduler::handle_exit_request(app_handle, code, api);
+            }
             // On app exit, cleanly stop the elevated SocksCap helper (and its
             // WinDivert driver) so no elevated process/driver leaks. The
             // helper's parent-death watchdog covers crash/kill paths.

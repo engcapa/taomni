@@ -1838,6 +1838,14 @@
 - `[data-testid="sql-completion-accept-enter"]` — interactive — F11.1.sql-completion-accept-enter
 - `[data-testid="sql-completion-reset"]` — interactive — F11.1.sql-completion-reset
 
+## settings/backup (F-BACKUP-1)
+
+- `[data-testid="backup-auto-toggle"]` — interactive — F-BACKUP-1.auto-toggle
+- `[data-testid="backup-frequency"]` — interactive — F-BACKUP-1.frequency
+- `[data-testid="backup-retained-copies"]` — interactive — F-BACKUP-1.retained-copies
+- `[data-testid="backup-last-success"]` — display — F-BACKUP-1.last-success
+- `[data-testid="backup-history-refresh"]` — interactive — F-BACKUP-1.history-refresh
+
 ## settings/backup (F-MFA-3)
 
 - `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup
