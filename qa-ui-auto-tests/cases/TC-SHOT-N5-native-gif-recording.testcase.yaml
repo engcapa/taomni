@@ -1,6 +1,6 @@
 id: TC-SHOT-N5
-title: Native animated fixture records a decodable GIF at wall-clock speed
-description: Regression for region capture throughput; the twelve-frame minimum is retained after crop-before-conversion optimization and startup-frame reuse.
+title: Native GIF frames match actual original screen states and timing
+description: Every decoded frame must match the retained original canvas state for its complementary frame id and random per-run nonce. Changing frame hashes or multiple frames alone cannot pass.
 covers: [F27.1]
 tags: [screenshot, recording, native, p1]
 modes: [native]
@@ -15,12 +15,12 @@ verification:
   review: reviewed
   requirements:
   - id: gif-capture
-    requirement: Real persistent capture yields a decodable GIF with sufficient changing frames, correct size and duration.
+    requirement: Real persistent screen capture records the original moving scene with correct region pixels, state order and playback timing, rejecting black, wrong-region, stale or unrelated multi-frame GIFs.
     actions: [1]
     checkpoints:
-    - {step: 3, expectation: "Decode at least twelve frames/four distinct frames, duration 75-140 percent of three seconds, region dimensions and actual GIF retained."}
+    - {step: 3, expectation: "Every decoded GIF frame has this run's nonce and source frame id and matches its actual retained original pixels across all 24x24 tiles (mean error <=8; no tile >20; <=2 percent materially different pixels). Source states remain ordered, timestamp drift <=250ms, no frame gap/end stall >700ms and coverage >=70 percent duration. Existing twelve-frame/four-state and three-second duration checks also pass. Originals, GIF, timeline, per-frame comparisons and original/actual/difference contact sheet are retained."}
     results: [3]
   visual:
-  - {check: Motion fidelity, method: external, reason: Play retained GIF and compare to the native moving fixture; automated decoder asserts timing and frame variation.}
+  - {check: Original scene fidelity, method: automated, reason: "Compare each decoded frame to a PNG saved during the actual fixture draw; unique nonce prevents old clips passing. Negative unit tests reject changing unrelated GIF frames. Retained paired images support visual review."}
   native:
   - {check: GIF pipeline, method: automated, reason: "Real native window and screen capture into built-in GIF encoder, not generated pixels or file-header-only proof."}

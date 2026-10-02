@@ -15,6 +15,7 @@
 pub mod capture;
 pub mod ocr;
 pub mod qa;
+mod qa_oracle;
 pub mod record;
 pub mod scroll;
 pub mod shortcut;

@@ -15,13 +15,13 @@ verification:
   review: reviewed
   requirements:
   - id: repeated-scroll
-    requirement: Two consecutive real wheel/stitch sessions independently retain row order/heights without stale fixture state.
+    requirement: Two independent OS wheel/stitch sessions each capture the complete original page, matching all spatial pixel tiles and row structure without stale content or cropped-away omissions.
     actions: [1]
     checkpoints:
-    - {step: 3, expectation: First native long screenshot passes row oracle and is retained.}
-    - {step: 4, expectation: "Fresh fixture capture again grows with consecutive correctly sized rows; no duplicate/synthetic fallback pass."}
+    - {step: 3, expectation: "First full native long screenshot matches the retained original source crop across every spatial tile; source/expected/output/difference PNGs are saved."}
+    - {step: 4, expectation: "Fresh fixture full capture independently passes pixel content and row-order/height checks; duplications, gaps, text/shape losses and stretched/reordered pages remain failures."}
     results: [3, 4]
   visual:
-  - {check: Stitch quality, method: external, reason: Inspect retained stitched PNGs alongside row oracle.}
+  - {check: Stitch content fidelity, method: automated, reason: Compare complete original renderer page versus full native stitch; retain paired PNGs and amplified differences.}
   native:
   - {check: Repeated wheel and capture, method: automated, reason: Both scenarios use actual native source and OS input.}

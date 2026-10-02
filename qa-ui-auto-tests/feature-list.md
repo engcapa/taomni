@@ -9256,6 +9256,9 @@ files:
   - src-tauri/src/screenshot/scroll.rs
   - src-tauri/src/screenshot/record.rs
   - src-tauri/src/screenshot/ocr.rs
+  - src-tauri/src/screenshot/qa.rs
+  - src-tauri/src/screenshot/qa_oracle.rs
+  - src/components/screenshot/ScreenshotQaFixture.tsx
 controls:
   - id: system-screenshot
     selector: '[data-testid="system-screenshot"]'
@@ -9542,8 +9545,8 @@ controls:
 - 区域选择与全屏选择默认处于 select 模式，显式点击矩形等工具后才开始绘制；选区可通过八方向 handles 与 move 区域调整，recrop 保留标注，选区外重新选择和滚动截图完成则清空旧标注。12 个工具包含矩形、椭圆、箭头、直线、画笔、荧光笔、文字、气泡、马赛克、模糊、编号和橡皮；实际拖拽创建形状，文字 Enter/blur 提交、Escape 取消，擦除是可撤销的变更，redo 仅在 undo 后可用。
 - 输出支持复制、PNG 保存（取消保留选区）、贴图；OCR 显示/复制识别结果，auto-redact 将返回框作为一次可撤销标注，水印支持文字/透明度/颜色的 apply/clear。滚动截图刷新 overlay；GIF/MP4 录制入口配独立状态条、停止预览、保存/完成和 GIF 首帧复制（剪贴板不承载动画）。
 - Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回同一 400×300 图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
-- Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界；每次交付分别记录实际执行的平台与结果，browser 或静态检查不外推为 native 通过。
-- `status: done` 表示功能代码已实装，不表示本次验收已通过。本次 browser 用例维护仅做静态检查，所有新增/更新流程尚未运行；Windows/macOS/Linux native 与托管执行证据须由对应独立报告补齐。
+- Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界。N2/N9 捕获完整长页并将产物逐像素/24×24 区块与真实 renderer canvas 保留的原画比对，覆盖文字、图案、分隔线及缺失/重复/错位/拉伸，不只检查高度或单列颜色。N5–N8 对 GIF/MP4 每一解码帧核对原画 frame id、每轮随机 nonce、区域像素及有序时间线，黑帧/错区域/静态或无关多帧均不得通过；保存原始 PNG、产物、逐帧指标/时间线和原图/实际/差异接触图。
+- `status: done` 表示功能代码已实装，不表示本次加强验收已通过。旧标准三端 browser 各21/21（run36953666030），三端 native 各10/10（run36956493957）已核验回执与构建身份，但不能外推为2026-10-02新增的完整原画内容比对通过；加强后的内容校验仍须对应新SHA hosted证据。
 
 ### 27.2 截图快捷键设置与能力状态
 

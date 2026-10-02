@@ -728,7 +728,7 @@ pub struct ClipInfo {
     pub height: u32,
     pub frames: u32,
     pub duration_ms: u64,
-    /// Distinct decoded frames (by pixel hash) — proves motion.
+    /// Distinct decoded pixel hashes; a structural check, not source-content proof.
     pub distinct_frames: u32,
 }
 
@@ -741,17 +741,27 @@ fn pixel_hash(data: &[u8]) -> u64 {
 
 /// Decode a recorded GIF/MP4 and summarize it.
 pub fn inspect_clip(path: &Path) -> anyhow::Result<ClipInfo> {
+    inspect_clip_frames(path, &mut |_, _| Ok(()))
+}
+
+pub(crate) fn inspect_clip_frames(
+    path: &Path,
+    observe: &mut dyn FnMut(&RgbaImage, u64) -> anyhow::Result<()>,
+) -> anyhow::Result<ClipInfo> {
     let is_mp4 = path
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("mp4"));
     if is_mp4 {
-        inspect_mp4(path)
+        inspect_mp4(path, observe)
     } else {
-        inspect_gif(path)
+        inspect_gif(path, observe)
     }
 }
 
-fn inspect_gif(path: &Path) -> anyhow::Result<ClipInfo> {
+fn inspect_gif(
+    path: &Path,
+    observe: &mut dyn FnMut(&RgbaImage, u64) -> anyhow::Result<()>,
+) -> anyhow::Result<ClipInfo> {
     let file = std::fs::File::open(path).context("open gif")?;
     let mut options = gif::DecodeOptions::new();
     options.set_color_output(gif::ColorOutput::RGBA);
@@ -761,6 +771,16 @@ fn inspect_gif(path: &Path) -> anyhow::Result<ClipInfo> {
     let mut delay_cs = 0u64;
     let mut hashes = std::collections::HashSet::new();
     while let Some(frame) = decoder.read_next_frame().context("read gif frame")? {
+        if frame.left != 0
+            || frame.top != 0
+            || u32::from(frame.width) != width
+            || u32::from(frame.height) != height
+        {
+            anyhow::bail!("recorded GIF frame does not cover its canvas");
+        }
+        let image = RgbaImage::from_raw(width, height, frame.buffer.to_vec())
+            .context("GIF decoded pixel dimensions")?;
+        observe(&image, delay_cs * 10)?;
         frames += 1;
         delay_cs += frame.delay as u64;
         hashes.insert(pixel_hash(&frame.buffer));
@@ -775,7 +795,10 @@ fn inspect_gif(path: &Path) -> anyhow::Result<ClipInfo> {
     })
 }
 
-fn inspect_mp4(path: &Path) -> anyhow::Result<ClipInfo> {
+fn inspect_mp4(
+    path: &Path,
+    observe: &mut dyn FnMut(&RgbaImage, u64) -> anyhow::Result<()>,
+) -> anyhow::Result<ClipInfo> {
     let file = std::fs::File::open(path).context("open mp4")?;
     let size = file.metadata().context("stat mp4")?.len();
     let mut reader =
@@ -822,24 +845,40 @@ fn inspect_mp4(path: &Path) -> anyhow::Result<ClipInfo> {
             let len =
                 u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
             i += 4;
-            let end = (i + len).min(bytes.len());
+            let end = i
+                .checked_add(len)
+                .filter(|end| *end <= bytes.len())
+                .context("truncated AVCC sample")?;
             annex_b.extend_from_slice(&start_code);
             annex_b.extend_from_slice(&bytes[i..end]);
             i = end;
         }
-        if let Ok(Some(yuv)) = decoder.decode(&annex_b) {
+        if i != bytes.len() || annex_b.is_empty() {
+            anyhow::bail!("H264 sample {sample_id} has incomplete AVCC data");
+        }
+        if let Some(yuv) = decoder
+            .decode(&annex_b)
+            .map_err(|e| anyhow::anyhow!("decode H264 sample {sample_id}: {e}"))?
+        {
             use openh264::formats::YUVSource;
             let (w, h) = yuv.dimensions();
             let mut rgb = vec![0u8; w * h * 3];
             yuv.write_rgb8(&mut rgb);
+            let mut rgba = Vec::with_capacity(w * h * 4);
+            for pixel in rgb.chunks_exact(3) {
+                rgba.extend_from_slice(&[pixel[0], pixel[1], pixel[2], 255]);
+            }
+            let image =
+                RgbaImage::from_raw(w as u32, h as u32, rgba).context("H264 decoded pixels")?;
+            observe(&image, sample.start_time)?;
             // Coarse hash: H.264 noise must not make static frames "distinct".
             let coarse: Vec<u8> = rgb.iter().step_by(97).map(|v| v >> 4).collect();
             hashes.insert(pixel_hash(&coarse));
             decoded += 1;
         }
     }
-    if decoded == 0 {
-        anyhow::bail!("no mp4 sample decoded");
+    if decoded != count {
+        anyhow::bail!("only {decoded}/{count} MP4 samples decoded");
     }
     Ok(ClipInfo {
         format: "mp4",
@@ -986,6 +1025,43 @@ mod tests {
         );
         assert_eq!(info.distinct_frames, 4);
         std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn changing_gif_or_mp4_frames_do_not_prove_they_recorded_the_original() {
+        for format in [RecordFormat::Gif, RecordFormat::Mp4] {
+            let original: Vec<_> = (0..12).map(|i| frame(160, 96, i)).collect();
+            let unrelated: Vec<_> = original
+                .iter()
+                .enumerate()
+                .map(|(i, image)| {
+                    let swapped = RgbaImage::from_fn(160, 96, |x, y| {
+                        let p = image.get_pixel(x, y);
+                        image::Rgba([p[2], p[1], p[0], 255])
+                    });
+                    (swapped, i as u64 * 100)
+                })
+                .collect();
+            let path = encode(format, &unrelated, 1500);
+            let mut matched = 0;
+            let mut decoded = 0usize;
+            let clip = inspect_clip_frames(&path, &mut |image, _| {
+                if super::super::qa_oracle::compare(image, &original[decoded], true).passed {
+                    matched += 1;
+                }
+                decoded += 1;
+                Ok(())
+            })
+            .unwrap();
+            assert_eq!(clip.frames, 12);
+            assert!(clip.distinct_frames >= 4);
+            assert_eq!(
+                matched, 0,
+                "changing {:?} pixels must still match the source",
+                format
+            );
+            std::fs::remove_file(path).ok();
+        }
     }
 
     #[test]

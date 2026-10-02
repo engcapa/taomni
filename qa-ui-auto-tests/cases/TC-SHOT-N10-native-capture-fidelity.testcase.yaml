@@ -18,9 +18,9 @@ verification:
     requirement: Region capture includes known content from a real native fixture with correct crop dimensions, row colors/order and physical heights.
     actions: [1]
     checkpoints:
-    - {step: 3, expectation: "Fixture row IDs begin at zero and remain consecutive, at least seven rows and correct 44 CSS px physical row heights; actual region PNG retained."}
+    - {step: 3, expectation: "Captured region matches the actual original canvas crop across every spatial pixel tile, including text/shapes/checker patterns; fixed lossless thresholds and row order/physical heights all pass. Original crop, captured PNG and amplified difference are retained."}
     results: [3]
   visual:
-  - {check: Capture fidelity, method: external, reason: Inspect retained fixture region PNG; automated color/row oracle proves content rather than merely nonblank desktop.}
+  - {check: Original pixel fidelity, method: automated, reason: Compare the complete captured region to original rendered canvas pixels; retain expected/actual/difference PNGs rather than relying on nonblank or single-column evidence.}
   native:
   - {check: Native pixels, method: automated, reason: "Product region command reads actual OS screen and decodes fixture pixels, without injected or synthetic capture output."}
