@@ -45,16 +45,29 @@ pub struct EncoderStats {
 }
 
 const PLANAR_BULK_GIVE_UP_RATIO: f64 = 0.25;
+const PLANAR_ESTIMATE_SAMPLE_SIZE: usize = 4096;
 
 /// Estimate with a throwaway MPPC-64K history. Never touch the connection's
 /// compressor until the selected payload is actually fragmented and sent.
 fn estimate_bulk_size(data: &[u8]) -> Result<usize> {
-    // Bound the estimate's CPU cost on photo content. The first fragment
-    // provides a conservative ratio without any previous-frame history.
-    let sample = &data[..data.len().min(MAX_FASTPATH_UPDATE_SIZE)];
-    if sample.is_empty() {
+    if data.is_empty() {
         return Ok(0);
     }
+    // Bound the photo cost while covering the whole encoded rectangle. A
+    // prefix alone can be entirely desktop padding around a noisy photo.
+    // Four separated 1 KiB strips retain runs and sample all colour planes.
+    let mut strips = [0u8; PLANAR_ESTIMATE_SAMPLE_SIZE];
+    let sample = if data.len() <= strips.len() {
+        data
+    } else {
+        let strip_size = strips.len() / 4;
+        for index in 0..4 {
+            let start = index * (data.len() - strip_size) / 3;
+            strips[index * strip_size..(index + 1) * strip_size]
+                .copy_from_slice(&data[start..start + strip_size]);
+        }
+        &strips
+    };
     let encoded = BulkCompressor::estimate_mppc64k_size(sample)?;
     Ok((encoded * data.len()).div_ceil(sample.len()))
 }
@@ -712,8 +725,7 @@ impl BitmapUpdateHandler for BitmapHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
         // Crops may retain a much wider parent stride. Reserve for pixels
         // actually encoded rather than clearing the entire parent-sized tail.
-        let pixels = usize::from(bitmap.width.get()) * usize::from(bitmap.height.get());
-        let mut buffer = vec![0; pixels * 8];
+        let mut buffer = vec![0; self.bitmap.output_size_hint(bitmap)];
         let len = loop {
             match self.bitmap.encode(bitmap, buffer.as_mut_slice()) {
                 Err(err) => match err {
@@ -758,7 +770,11 @@ impl RemoteFxHandler {
 
 impl BitmapUpdateHandler for RemoteFxHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
-        let mut buffer = vec![0; bitmap.data.len()];
+        // A crop retains the parent framebuffer's stride and tail. RemoteFX
+        // reads only this rectangle, so clearing that whole tail per dirty
+        // rectangle needlessly touches megabytes on each photo frame.
+        let pixels = usize::from(bitmap.width.get()) * usize::from(bitmap.height.get());
+        let mut buffer = vec![0; pixels * 4 + 4096];
         let len = loop {
             match self
                 .remotefx
@@ -1081,6 +1097,44 @@ mod bulk_tests {
                 .unwrap();
             assert_eq!(encoded.code, UpdateCode::Bitmap, "width={width}");
         }
+    }
+
+    #[test]
+    fn photo_after_a_plain_planar_prefix_uses_remotefx() {
+        let (width, height) = (704u16, 384u16);
+        let mut pixels = vec![48; usize::from(width) * usize::from(height) * 4];
+        let mut seed = 0x9e3779b9u32;
+        for y in 0..256usize {
+            for x in 32..672usize {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                let offset = (y * usize::from(width) + x) * 4;
+                pixels[offset..offset + 4].copy_from_slice(&[
+                    seed as u8,
+                    (seed >> 8) as u8,
+                    (seed >> 16) as u8,
+                    255,
+                ]);
+            }
+        }
+        let bitmap = BitmapUpdate {
+            x: 0,
+            y: 0,
+            width: NonZeroU16::new(width).unwrap(),
+            height: NonZeroU16::new(height).unwrap(),
+            format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+            data: pixels.into(),
+            stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+        };
+        let mut handler = AdaptiveHandler {
+            bitmap: BitmapHandler::for_bulk_compression(),
+            rfx: RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height }),
+        };
+        assert_eq!(
+            handler.handle(&bitmap).unwrap().code,
+            UpdateCode::SurfaceCommands
+        );
     }
 
     #[test]

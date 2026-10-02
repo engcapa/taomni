@@ -35,6 +35,17 @@ impl BitmapEncoder {
         }
     }
 
+    pub(crate) fn output_size_hint(&self, bitmap: &BitmapUpdate) -> usize {
+        let pixels = usize::from(bitmap.width.get()) * usize::from(bitmap.height.get());
+        if self.byte_scan_width {
+            // Raw RGB planes need 3 B/pixel; RLE's literal overhead fits in
+            // 4 B/pixel. Allow bitmap/planar headers even for one-row chunks.
+            pixels * 4 + usize::from(bitmap.height.get()) * 32
+        } else {
+            pixels * 8
+        }
+    }
+
     pub(crate) fn encode(
         &mut self,
         bitmap: &BitmapUpdate,
@@ -88,7 +99,16 @@ impl BitmapEncoder {
                 usize::from(height),
             );
 
-            let len = {
+            let len = if !rle {
+                encode_raw_chunk(
+                    bitmap.format,
+                    chunk,
+                    stride,
+                    usize::from(row_len),
+                    usize::from(height),
+                    &mut self.buffer,
+                )?
+            } else {
                 let pixels = chunk
                     .chunks(stride)
                     .map(|row| &row[..usize::from(row_len)])
@@ -101,7 +121,6 @@ impl BitmapEncoder {
                     pixels,
                     self.buffer.as_mut_slice(),
                     rle,
-                    usize::from(bitmap.width.get()) * usize::from(height),
                 )?
             };
 
@@ -142,46 +161,10 @@ impl BitmapEncoder {
         src: P,
         dst: &mut [u8],
         rle: bool,
-        pixel_count: usize,
     ) -> Result<usize, BitmapEncodeError>
     where
         P: Iterator<Item = &'a [u8]> + Clone,
     {
-        if !rle {
-            let mut cursor = WriteCursor::new(dst);
-            BitmapStreamHeader {
-                enable_rle_compression: false,
-                use_alpha: false,
-                color_plane_definition: ColorPlaneDefinition::Argb,
-            }
-            .encode(&mut cursor)
-            .map_err(BitmapEncodeError::Encode)?;
-            let (red_index, green_index, blue_index) = match format {
-                PixelFormat::ARgb32 | PixelFormat::XRgb32 => (1, 2, 3),
-                PixelFormat::RgbA32 | PixelFormat::RgbX32 => (0, 1, 2),
-                PixelFormat::ABgr32 | PixelFormat::XBgr32 => (3, 2, 1),
-                PixelFormat::BgrA32 | PixelFormat::BgrX32 => (2, 1, 0),
-            };
-            let needed = pixel_count * 3 + 1;
-            if cursor.len() < needed {
-                return Err(BitmapEncodeError::Encode(not_enough_bytes_err!(
-                    "BitmapStreamData",
-                    cursor.len(),
-                    needed
-                )));
-            }
-            let planes = &mut cursor.remaining_mut()[..pixel_count * 3];
-            let (red, green_blue) = planes.split_at_mut(pixel_count);
-            let (green, blue) = green_blue.split_at_mut(pixel_count);
-            for (((red, green), blue), pixel) in red.iter_mut().zip(green).zip(blue).zip(src) {
-                *red = pixel[red_index];
-                *green = pixel[green_index];
-                *blue = pixel[blue_index];
-            }
-            cursor.advance(pixel_count * 3);
-            cursor.write_u8(0);
-            return Ok(cursor.pos());
-        }
         let written = match format {
             PixelFormat::ARgb32 | PixelFormat::XRgb32 => {
                 encoder.encode_pixels_stream::<_, ARgbChannels>(src, dst, rle)?
@@ -198,6 +181,81 @@ impl BitmapEncoder {
         };
 
         Ok(written)
+    }
+}
+
+fn encode_raw_chunk(
+    format: PixelFormat,
+    src: &[u8],
+    stride: usize,
+    row_len: usize,
+    height: usize,
+    dst: &mut [u8],
+) -> Result<usize, BitmapEncodeError> {
+    let mut cursor = WriteCursor::new(dst);
+    BitmapStreamHeader {
+        enable_rle_compression: false,
+        use_alpha: false,
+        color_plane_definition: ColorPlaneDefinition::Argb,
+    }
+    .encode(&mut cursor)
+    .map_err(BitmapEncodeError::Encode)?;
+    let pixels = row_len / 4 * height;
+    let needed = pixels * 3 + 1;
+    if cursor.len() < needed {
+        return Err(BitmapEncodeError::Encode(not_enough_bytes_err!(
+            "BitmapStreamData",
+            cursor.len(),
+            needed
+        )));
+    }
+    let (red, gb) = cursor.remaining_mut()[..pixels * 3].split_at_mut(pixels);
+    let (green, blue) = gb.split_at_mut(pixels);
+    match format {
+        PixelFormat::ARgb32 | PixelFormat::XRgb32 => {
+            raw_planes::<1, 2, 3>(src, stride, row_len, height, red, green, blue)
+        }
+        PixelFormat::RgbA32 | PixelFormat::RgbX32 => {
+            raw_planes::<0, 1, 2>(src, stride, row_len, height, red, green, blue)
+        }
+        PixelFormat::ABgr32 | PixelFormat::XBgr32 => {
+            raw_planes::<3, 2, 1>(src, stride, row_len, height, red, green, blue)
+        }
+        PixelFormat::BgrA32 | PixelFormat::BgrX32 => {
+            raw_planes::<2, 1, 0>(src, stride, row_len, height, red, green, blue)
+        }
+    }
+    cursor.advance(pixels * 3);
+    cursor.write_u8(0);
+    Ok(cursor.pos())
+}
+
+fn raw_planes<const R: usize, const G: usize, const B: usize>(
+    src: &[u8],
+    stride: usize,
+    row_len: usize,
+    height: usize,
+    red: &mut [u8],
+    green: &mut [u8],
+    blue: &mut [u8],
+) {
+    let width = row_len / 4;
+    for (y, ((red, green), blue)) in red
+        .chunks_exact_mut(width)
+        .zip(green.chunks_exact_mut(width))
+        .zip(blue.chunks_exact_mut(width))
+        .enumerate()
+    {
+        let start = (height - y - 1) * stride;
+        let row = &src[start..start + row_len];
+        for (((red, green), blue), pixel) in
+            red.iter_mut().zip(green).zip(blue).zip(row.chunks_exact(4))
+        {
+            // A fixed pixel layout lets LLVM vectorize the three plane stores.
+            *red = pixel[R];
+            *green = pixel[G];
+            *blue = pixel[B];
+        }
     }
 }
 

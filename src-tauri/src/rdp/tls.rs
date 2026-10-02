@@ -16,7 +16,7 @@ use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{DigitallySignedStruct, RootCertStore, SignatureScheme};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use x509_cert::der::Decode;
+use x509_cert::der::{Decode, Encode};
 
 pub type TlsStream<S> = tokio_rustls::client::TlsStream<S>;
 
@@ -214,6 +214,7 @@ impl PinnedServerVerifier {
         &self,
         cert: &CertificateDer<'_>,
         system_error: rustls::Error,
+        now: UnixTime,
     ) -> Result<ServerCertVerified, rustls::Error> {
         let observed = certificate_fingerprint(cert);
         let Some(expected) = self.pin.as_deref() else {
@@ -232,7 +233,7 @@ impl PinnedServerVerifier {
         let parsed = x509_cert::Certificate::from_der(cert.as_ref()).map_err(|e| {
             rustls::Error::General(format!("pinned RDP certificate could not be parsed: {e}"))
         })?;
-        let now = std::time::SystemTime::now();
+        let now = std::time::UNIX_EPOCH + std::time::Duration::from_secs(now.as_secs());
         if now < parsed.tbs_certificate.validity.not_before.to_system_time() {
             return Err(rustls::Error::InvalidCertificate(
                 rustls::CertificateError::NotValidYet,
@@ -250,9 +251,55 @@ impl PinnedServerVerifier {
             | rustls::Error::InvalidCertificate(
                 rustls::CertificateError::NotValidForNameContext { .. },
             ) => Ok(ServerCertVerified::assertion()),
+            rustls::Error::InvalidCertificate(rustls::CertificateError::BadSignature)
+                if valid_self_signature(&parsed) =>
+            {
+                // A system anchor with the same issuer name but another key
+                // can produce BadSignature for a valid self-signed RDP leaf.
+                // Exact pinning plus its independently verified signature
+                // establishes trust without using that conflicting anchor.
+                Ok(ServerCertVerified::assertion())
+            }
             other => Err(other),
         }
     }
+}
+
+fn valid_self_signature(cert: &x509_cert::Certificate) -> bool {
+    if cert.tbs_certificate.issuer != cert.tbs_certificate.subject
+        || cert.signature_algorithm != cert.tbs_certificate.signature
+    {
+        return false;
+    }
+    let spki = &cert.tbs_certificate.subject_public_key_info;
+    let (Some(key), Some(signature)) = (
+        spki.subject_public_key.as_bytes(),
+        cert.signature.as_bytes(),
+    ) else {
+        return false;
+    };
+    let (Ok(key_algorithm), Ok(signature_algorithm), Ok(message)) = (
+        spki.algorithm.to_der(),
+        cert.signature_algorithm.to_der(),
+        cert.tbs_certificate.to_der(),
+    ) else {
+        return false;
+    };
+    let (Ok(key_algorithm), Ok(signature_algorithm)) = (
+        x509_cert::der::asn1::AnyRef::from_der(&key_algorithm),
+        x509_cert::der::asn1::AnyRef::from_der(&signature_algorithm),
+    ) else {
+        return false;
+    };
+    rustls::crypto::ring::default_provider()
+        .signature_verification_algorithms
+        .all
+        .iter()
+        .any(|algorithm| {
+            algorithm.public_key_alg_id().as_ref() == key_algorithm.value()
+                && algorithm.signature_alg_id().as_ref() == signature_algorithm.value()
+                && algorithm.verify_signature(key, &message, signature).is_ok()
+        })
 }
 
 impl ServerCertVerifier for PinnedServerVerifier {
@@ -272,7 +319,7 @@ impl ServerCertVerifier for PinnedServerVerifier {
             now,
         ) {
             Ok(verified) => Ok(verified),
-            Err(error) => self.verify_pin(end_entity, error),
+            Err(error) => self.verify_pin(end_entity, error, now),
         }
     }
 
@@ -395,10 +442,81 @@ mod tests {
             pinned
                 .verify_pin(
                     &cert,
-                    rustls::Error::InvalidCertificate(rustls::CertificateError::Revoked)
+                    rustls::Error::InvalidCertificate(rustls::CertificateError::Revoked),
+                    now,
                 )
                 .is_err()
         );
+    }
+
+    #[test]
+    fn pinned_termservice_certificate_survives_a_conflicting_system_anchor() {
+        use rustls::client::danger::ServerCertVerifier as _;
+        use x509_cert::der::Decode as _;
+
+        super::install_crypto_provider();
+        // Public certificate from hosted run 36962712369. A stale system
+        // anchor with the same issuer name can make WebPKI report BadSignature
+        // instead of UnknownIssuer for this valid, self-signed certificate.
+        let cert = CertificateDer::from(include_bytes!("testdata/termservice-public.der").to_vec());
+        let parsed = x509_cert::Certificate::from_der(cert.as_ref()).unwrap();
+        let public_key = parsed
+            .tbs_certificate
+            .subject_public_key_info
+            .subject_public_key
+            .as_bytes()
+            .unwrap();
+        let mut stale = cert.as_ref().to_vec();
+        let key_offset = stale
+            .windows(public_key.len())
+            .position(|bytes| bytes == public_key)
+            .unwrap();
+        stale[key_offset + public_key.len() - 8] ^= 2;
+        let mut roots = rustls::RootCertStore::empty();
+        roots.add(CertificateDer::from(stale)).unwrap();
+        let webpki = rustls::client::WebPkiServerVerifier::builder(Arc::new(roots))
+            .build()
+            .unwrap();
+        let server_name = rustls::pki_types::ServerName::try_from("127.0.0.1").unwrap();
+        // Keep the public fixture usable after its real-world expiry.
+        let now = rustls::pki_types::UnixTime::since_unix_epoch(std::time::Duration::from_secs(
+            1_790_928_000,
+        ));
+        assert!(matches!(
+            webpki.verify_server_cert(&cert, &[], &server_name, &[], now),
+            Err(rustls::Error::InvalidCertificate(
+                rustls::CertificateError::BadSignature
+            ))
+        ));
+        let mut pinned = super::PinnedServerVerifier {
+            webpki,
+            pin: Some(certificate_fingerprint(&cert)),
+            host: "127.0.0.1".to_string(),
+            port: 3389,
+        };
+        pinned
+            .verify_server_cert(&cert, &[], &server_name, &[], now)
+            .unwrap();
+        pinned.pin = None;
+        assert!(
+            pinned
+                .verify_server_cert(&cert, &[], &server_name, &[], now)
+                .unwrap_err()
+                .to_string()
+                .contains("RDP_CERTIFICATE_UNTRUSTED")
+        );
+
+        // Even an exact pin cannot accept a genuinely damaged signature.
+        let mut damaged = cert.as_ref().to_vec();
+        *damaged.last_mut().unwrap() ^= 1;
+        let damaged = CertificateDer::from(damaged);
+        pinned.pin = Some(certificate_fingerprint(&damaged));
+        assert!(matches!(
+            pinned.verify_server_cert(&damaged, &[], &server_name, &[], now),
+            Err(rustls::Error::InvalidCertificate(
+                rustls::CertificateError::BadSignature
+            ))
+        ));
     }
 
     #[tokio::test]

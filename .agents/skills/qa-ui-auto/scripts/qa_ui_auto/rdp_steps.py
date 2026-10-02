@@ -33,6 +33,7 @@ from .deadline import budget_time as time
 from .native_steps import NativeStepContext, _verb
 from .steps import StepError
 from . import host_clipboard
+from .rdp_helpers.mstsc import launch as launch_mstsc
 
 HELPERS = Path(__file__).resolve().parent / "rdp_helpers"
 
@@ -238,20 +239,47 @@ using System;
 using System.Runtime.InteropServices;
 public class QaMstscCapture {
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
+  public delegate bool EnumProc(IntPtr handle, IntPtr parameter);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc callback, IntPtr parameter);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr handle, out uint processId);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr handle, out Rect rect);
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr handle, IntPtr hdc, uint flags);
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  public static IntPtr FindVisibleWindow(uint pid) {
+    IntPtr best = IntPtr.Zero; long largest = 0;
+    EnumWindows((handle, parameter) => {
+      uint owner; Rect rect;
+      GetWindowThreadProcessId(handle, out owner);
+      if (owner == pid && IsWindowVisible(handle) && GetWindowRect(handle, out rect)) {
+        long area = (long)(rect.Right - rect.Left) * (rect.Bottom - rect.Top);
+        if (area > largest) { largest = area; best = handle; }
+      }
+      return true;
+    }, IntPtr.Zero);
+    return best;
+  }
 }
 '@
 [void][QaMstscCapture]::SetProcessDPIAware()
 $p = Get-Process -Id ([int]$env:QA_MSTSC_PID) -ErrorAction Stop
+$window = [QaMstscCapture]::FindVisibleWindow([uint32]$p.Id)
 $r = New-Object QaMstscCapture+Rect
-if ($p.MainWindowHandle -eq 0 -or -not [QaMstscCapture]::GetWindowRect($p.MainWindowHandle,[ref]$r)) { throw 'mstsc window unavailable' }
+if ($window -eq [IntPtr]::Zero -or -not [QaMstscCapture]::GetWindowRect($window,[ref]$r)) { throw 'mstsc visible window unavailable' }
 $w=$r.Right-$r.Left; $h=$r.Bottom-$r.Top
 if ($w -lt 200 -or $h -lt 200) { throw 'mstsc window is too small' }
 $bmp=New-Object System.Drawing.Bitmap $w,$h
 $g=[System.Drawing.Graphics]::FromImage($bmp)
-$g.CopyFromScreen($r.Left,$r.Top,0,0,$bmp.Size)
+$hdc=$g.GetHdc()
+try {
+  # Capture the client window itself. The known host target is topmost, and
+  # copying the same screen rectangle would incorrectly count its pixels as
+  # proof of mstsc decoding the remote desktop.
+  if (-not [QaMstscCapture]::PrintWindow($window,$hdc,2)) { throw 'mstsc PrintWindow failed' }
+} finally { $g.ReleaseHdc($hdc) }
 $bmp.Save($env:QA_MSTSC_CAPTURE,[System.Drawing.Imaging.ImageFormat]::Png)
+[pscustomobject]@{capture_kind='owned-client-window'; actor='PrintWindow'; pid=$p.Id; hwnd=$window.ToInt64(); width=$w; height=$h} |
+  ConvertTo-Json | Set-Content -Encoding UTF8 ($env:QA_MSTSC_CAPTURE + '.metadata.json')
 $g.Dispose(); $bmp.Dispose()
 '''
     result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
@@ -308,12 +336,18 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
     process = None
 
     def cleanup() -> None:
+        nonlocal process
         if process is not None:
             try:
                 diagnostics = subprocess.run(
                     ["powershell", "-NoProfile", "-NonInteractive", "-Command",
                      "Get-Process mstsc -ErrorAction SilentlyContinue | "
-                     "Select-Object Id,SessionId,MainWindowHandle,MainWindowTitle,Path | ConvertTo-Json"],
+                     "Select-Object Id,SessionId,MainWindowHandle,MainWindowTitle,Path,CPU,StartTime,Responding | ConvertTo-Json; "
+                     "Get-CimInstance Win32_Process -Filter \"Name='mstsc.exe'\" | "
+                     "Select-Object ProcessId,ParentProcessId,SessionId,CommandLine | ConvertTo-Json; "
+                     "Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-TerminalServices-ClientActiveXCore/Operational'; "
+                     "StartTime=(Get-Date).AddMinutes(-3)} -ErrorAction SilentlyContinue | "
+                     "Select-Object TimeCreated,Id,Message | ConvertTo-Json"],
                     capture_output=True, text=True, timeout=30)
                 (ctx.case_dir / "mstsc-process-state.txt").write_text(
                     f"owned_pid={process.pid} exit={process.poll()}\n{diagnostics.stdout}\n{diagnostics.stderr}",
@@ -325,7 +359,11 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
                     _capture_mstsc(ctx, process, {"snapshot": "mstsc-last-window.png"})
                 except Exception:
                     pass  # Capture is diagnostic; owned process/credential cleanup must finish.
-            _stop_process(process)
+            try:
+                _stop_process(process)
+            finally:
+                process.close()
+                process = None
         subprocess.run(["cmdkey", f"/delete:{target}"], capture_output=True, timeout=30)
 
     _register_cleanup(ctx, cleanup)
@@ -333,6 +371,7 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
     options = [f"full address:s:127.0.0.1:{port}", f"username:s:{user}",
                "authentication level:i:0", "prompt for credentials:i:0", "promptcredentialonce:i:0",
                "enablecredsspsupport:i:1", "negotiate security layer:i:1", "screen mode id:i:1",
+               "gatewayusagemethod:i:0", "disableconnectionsharing:i:1",
                "winposstr:s:0,1,10,10,1014,750", "smart sizing:i:1", "compression:i:1",
                f"desktopwidth:i:{int(args.get('width') or 1024)}", f"desktopheight:i:{int(args.get('height') or 768)}",
                "session bpp:i:32", "audiomode:i:0", "redirectclipboard:i:1", "autoreconnection enabled:i:0"]
@@ -340,15 +379,7 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
         # Avoid Windows text mode expanding CRLF to CRCRLF. mstsc also needs
         # the complete path when invoked outside the RDP file's directory.
         rdp.write_text("\r\n".join(options) + "\r\n", encoding="utf-16", newline="")
-        startup_factory = getattr(subprocess, "STARTUPINFO", None)
-        startup = startup_factory() if startup_factory is not None else None
-        if startup is not None:
-            # A detached CI runner may inherit SW_HIDE. This case explicitly
-            # tests mstsc's visible native window, including failure dialogs.
-            startup.dwFlags |= getattr(subprocess, "STARTF_USESHOWWINDOW", 1)
-            startup.wShowWindow = 1  # SW_SHOWNORMAL
-        process = subprocess.Popen(["mstsc.exe", str(rdp.resolve()), f"/v:127.0.0.1:{port}"],
-                                   startupinfo=startup)
+        process = launch_mstsc(rdp, port)
     except BaseException:
         cleanup()
         raise
@@ -739,7 +770,7 @@ def _do_rdp_canvas_click(ctx: NativeStepContext, args: Any) -> str:
 
 @_verb("rdp_canvas_assert")
 def _do_rdp_canvas_assert(ctx: NativeStepContext, args: Any) -> str:
-    """Read decoded pixels at desktop coordinates and preserve quality evidence."""
+    """Read decoded pixels and preserve the client view and quality evidence."""
     if not isinstance(args, dict) or not isinstance(args.get("points"), list) or not args["points"]:
         raise StepError("rdp_canvas_assert: expected {points: [{x,y,rgb,tolerance?}], artifact?, timeout_sec?}")
     selector = str(args.get("selector") or '[data-testid="rdp-canvas"]')
@@ -765,7 +796,10 @@ def _do_rdp_canvas_assert(ctx: NativeStepContext, args: Any) -> str:
         return ok, result
 
     _poll(observe, float(args.get("timeout_sec") or 30), f"decoded client pixels in {artifact.name}")
-    return f"decoded client pixel assertions passed; evidence {artifact.name}"
+    # Capture the actual WebView after the decoder's independent pixel oracle
+    # succeeds, including the connection bar in the full-screen observation.
+    ctx.session.screenshot(artifact.with_suffix(".png"))
+    return f"decoded client pixel assertions passed; evidence {artifact.name}, {artifact.with_suffix('.png').name}"
 
 @_verb("save_text")
 def _do_save_text(ctx: NativeStepContext, args: Any) -> str:

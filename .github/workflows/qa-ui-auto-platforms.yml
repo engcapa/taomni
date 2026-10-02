@@ -249,6 +249,7 @@ jobs:
             if [[ "$RUNNER_OS" == "macOS" ]]; then bash scripts/bundle-krb5-macos.sh stage; fi
             cd src-tauri
             cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server --lib
+            cargo test --locked --release -p ironrdp-server --lib profile_photo_encoder_costs -- --ignored --nocapture
             cargo test --locked --release --lib servers::rdp::
             cargo test --locked --release --lib rdp::session::tests
             cargo test --locked --release --lib rdp::ws::tests

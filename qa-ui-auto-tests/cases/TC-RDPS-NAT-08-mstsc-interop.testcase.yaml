@@ -148,7 +148,7 @@ verification:
     - step: 24
       expectation: At least one planar rectangle is sent.
     - step: 25
-      expectation: The mstsc window contains both known remote target colors.
+      expectation: PrintWindow captures the owned mstsc client window and finds both known remote target colors.
     results:
     - 20
     - 21

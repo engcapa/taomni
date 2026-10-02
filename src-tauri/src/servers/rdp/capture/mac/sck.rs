@@ -34,9 +34,10 @@ use crate::servers::engine::LogEmitter;
 /// ScreenCaptureKit's native queue must remain shallow: values above this add
 /// whole display frames of latency before the delegate is even called.
 const NATIVE_QUEUE_DEPTH: isize = 3;
-/// 30 Hz is the best latency/CPU tradeoff for the current bitmap RDP encoder.
-/// The latest-frame mailbox still lets interactive updates arrive immediately.
-const FRAME_RATE: i32 = 30;
+/// GUI sources may themselves draw at ~30 Hz. Sampling at the same rate with
+/// an independent phase loses changes; a 60 Hz capture budget also reduces
+/// the input-to-frame wait. The shallow slot still coalesces work.
+const FRAME_RATE: i32 = 60;
 const CONTENT_TIMEOUT: Duration = Duration::from_secs(5);
 const STOP_TIMEOUT: Duration = Duration::from_millis(750);
 /// How long one poll waits for new desktop content before reporting an idle

@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 from qa_ui_auto import rdp_steps as steps
 from qa_ui_auto.fixtures import xrdp_server_required as xrdp
 from qa_ui_auto.rdp_helpers.rdp_target import photo_noise
+from qa_ui_auto.rdp_helpers import mstsc
 from qa_ui_auto.steps import StepError
 
 
@@ -48,7 +49,7 @@ class EncoderToolsTest(unittest.TestCase):
         with patch.object(steps.platform, "system", return_value="Windows"), \
              patch.dict(os.environ, {"QA_RDP_USER": "fixture-user", "QA_RDP_PASSWORD": "dummy-password"}), \
              patch.object(steps.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as run, \
-             patch.object(steps.subprocess, "Popen", side_effect=OSError("launch failed")):
+             patch.object(steps, "launch_mstsc", side_effect=OSError("launch failed")):
             with self.assertRaisesRegex(OSError, "launch failed"):
                 steps._do_host_mstsc(self.ctx, {"action": "start"})
         self.assertEqual(run.call_args_list[-1].args[0], ["cmdkey", "/delete:TERMSRV/127.0.0.1"])
@@ -59,7 +60,7 @@ class EncoderToolsTest(unittest.TestCase):
         with patch.object(steps.platform, "system", return_value="Windows"), \
              patch.dict(os.environ, {"QA_RDP_USER": "fixture-user", "QA_RDP_PASSWORD": "dummy-password"}), \
              patch.object(steps.subprocess, "run", return_value=SimpleNamespace(returncode=0)), \
-             patch.object(steps.subprocess, "Popen", return_value=process), \
+             patch.object(steps, "launch_mstsc", return_value=process), \
              patch.object(steps, "_stop_process") as stop:
             steps._do_host_mstsc(self.ctx, {"action": "start"})
             steps._do_host_mstsc(self.ctx, {"action": "stop"})
@@ -69,25 +70,44 @@ class EncoderToolsTest(unittest.TestCase):
     def test_mstsc_file_uses_absolute_path_and_single_crlf_lines(self):
         process = Mock(pid=12345)
         process.poll.return_value = None
-        startup = SimpleNamespace(dwFlags=0, wShowWindow=0)
         with patch.object(steps.platform, "system", return_value="Windows"), \
              patch.dict(os.environ, {"QA_RDP_USER": "fixture-user", "QA_RDP_PASSWORD": "dummy-password"}), \
              patch.object(steps.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")), \
-             patch.object(steps.subprocess, "STARTUPINFO", return_value=startup, create=True), \
-             patch.object(steps.subprocess, "Popen", return_value=process) as launch, \
+             patch.object(steps, "launch_mstsc", return_value=process) as launch, \
              patch.object(steps, "_stop_process"), \
              patch.object(steps, "_capture_mstsc", side_effect=RuntimeError("capture failed")) as capture:
             steps._do_host_mstsc(self.ctx, {"action": "start"})
-            launch.assert_called_once_with(["mstsc.exe", str((self.case / "mstsc.rdp").resolve()),
-                                            "/v:127.0.0.1:3389"], startupinfo=startup)
-            self.assertEqual(startup.wShowWindow, 1)
-            self.assertNotEqual(startup.dwFlags, 0)
+            launch.assert_called_once_with(self.case / "mstsc.rdp", 3389)
             raw = (self.case / "mstsc.rdp").read_bytes().decode("utf-16")
             self.assertIn("\r\nusername:s:fixture-user\r\n", raw)
             self.assertNotIn("\r\r\n", raw)
             steps._do_host_mstsc(self.ctx, {"action": "stop"})
             capture.assert_called_once()
             self.assertIsNone(self.ctx._mstsc_process)
+
+    def test_mstsc_native_launch_sets_the_desktop_and_owns_its_handles(self):
+        import ctypes
+        api = Mock()
+        def create(application, command, proc, thread, inherit, flags, env, directory, startup, info):
+            self.assertEqual(startup._obj.lpDesktop, r"winsta0\default")
+            self.assertEqual(startup._obj.wShowWindow, 1)
+            self.assertEqual(startup._obj.cb, ctypes.sizeof(mstsc.StartupInfo))
+            self.assertFalse(inherit)
+            self.assertIn(str((self.case / "mstsc.rdp").resolve()), command.value)
+            self.assertIn("/v:127.0.0.1:45678", command.value)
+            info._obj.hProcess, info._obj.hThread, info._obj.dwProcessId = 42, 43, 44
+            return True
+        api.CreateProcessW.side_effect = create
+        api.GetExitCodeProcess.side_effect = lambda handle, code: setattr(code._obj, "value", 0) or True
+        api.WaitForSingleObject.return_value = 0
+        with patch.dict(os.environ, {"SystemRoot": r"C:\Windows"}), \
+             patch.object(mstsc.ctypes, "WinDLL", return_value=api, create=True):
+            process = mstsc.launch(self.case / "mstsc.rdp", 45678)
+            self.assertEqual(process.pid, 44)
+            self.assertEqual(process.wait(timeout=1), 0)
+            process.close()
+            process.close()
+        self.assertEqual([call.args[0] for call in api.CloseHandle.call_args_list], [43, 42])
 
     def test_canvas_waits_for_the_decoded_pixels_and_records_quality(self):
         self.ctx.session.execute.side_effect = [None,
@@ -97,6 +117,13 @@ class EncoderToolsTest(unittest.TestCase):
             steps._do_rdp_canvas_assert(self.ctx, {"points": [{"x": 60, "y": 100, "rgb": [255, 0, 255]}]})
         self.assertEqual(self.ctx.session.execute.call_count, 3)
         self.assertEqual(json.loads((self.case / "client-pixels.json").read_text())["quality_level"], 3)
+        self.ctx.session.screenshot.assert_called_once_with(self.case / "client-pixels.png")
+
+    def test_canvas_capture_failure_is_not_reported_as_complete_evidence(self):
+        self.ctx.session.execute.return_value = {"pixels": [[255, 0, 255, 255]], "quality_level": 0}
+        self.ctx.session.screenshot.side_effect = RuntimeError("WebView capture failed")
+        with self.assertRaisesRegex(RuntimeError, "WebView capture failed"):
+            steps._do_rdp_canvas_assert(self.ctx, {"points": [{"x": 60, "y": 100, "rgb": [255, 0, 255]}]})
 
     def test_photo_target_noise_is_deterministic_and_changes_each_frame(self):
         self.assertEqual(photo_noise(20, 12, 0), photo_noise(20, 12, 0))

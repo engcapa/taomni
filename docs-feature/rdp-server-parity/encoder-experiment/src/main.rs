@@ -417,7 +417,17 @@ fn strategies(fragment: usize, historical: bool) -> Vec<(&'static str, bool, Enc
                 .map(|r| {
                     let px = crop(c, r);
                     let planar = planar_candidate(&px, r.w, r.h);
-                    let sample = &planar[..planar.len().min(FRAGMENT)];
+                    let mut strips = [0u8; 4096];
+                    let sample = if planar.len() <= strips.len() {
+                        planar.as_slice()
+                    } else {
+                        for index in 0..4 {
+                            let start = index * (planar.len() - 1024) / 3;
+                            strips[index * 1024..(index + 1) * 1024]
+                                .copy_from_slice(&planar[start..start + 1024]);
+                        }
+                        &strips
+                    };
                     let encoded = estimate_mppc(sample);
                     let estimate = (encoded * planar.len()).div_ceil(sample.len());
                     if estimate as f64 <= planar.len() as f64 * 0.25 {

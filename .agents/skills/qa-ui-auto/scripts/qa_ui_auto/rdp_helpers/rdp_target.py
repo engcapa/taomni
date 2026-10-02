@@ -107,7 +107,8 @@ def main() -> int:
         # level steps to get delivered animation frames per second.
         marker = canvas.create_rectangle(0, 0, 32, 32, fill="#080808", width=0)
         state["marker"] = {"x": 16, "y": 16, "levels": 16}
-        last_written = [time.monotonic()]
+        animation_started = time.monotonic()
+        last_written = [animation_started]
 
         def step() -> None:
             state["frames"] += 1
@@ -129,6 +130,8 @@ def main() -> int:
             now = time.monotonic()
             if now - last_written[0] >= 1.0:
                 last_written[0] = now
+                state["animation_elapsed_s"] = now - animation_started
+                state["animation_source_fps"] = state["frames"] / state["animation_elapsed_s"]
                 write_state(args.state, state)
             root.after(16, step)
 
