@@ -16,9 +16,9 @@ description: >-
   and discards its eventual bytes. OS launch/restart is intentionally not exercised.
 steps:
   - open: app
-  - wait_for: '[data-testid="app-main-menu"]'
-  - click: '[data-testid="app-main-menu"]'
-  - click: '[data-testid="context-menu-item-help"]'
+  - wait_for: '[data-testid="welcome-panel"]'
+  - native_about: null
+  - wait_for: '[data-testid="about-dialog"]'
   - click: '[data-testid="about-check-update"]'
   - wait_for: '[data-testid="update-download"]:not(:disabled)'
   - click: '[data-testid="update-download"]'
@@ -26,8 +26,8 @@ steps:
   - click: '[data-testid="update-cancel-download"]'
   - wait_for: {selector: '[data-testid="update-dialog"]', state: detached}
   - assert_updater_unchanged: null
-  - click: '[data-testid="app-main-menu"]'
-  - click: '[data-testid="context-menu-item-help"]'
+  - native_about: null
+  - wait_for: '[data-testid="about-dialog"]'
   - click: '[data-testid="about-check-update"]'
   - wait_for: '[data-testid="update-download"]:not(:disabled)'
   - click: '[data-testid="update-download"]'
@@ -45,14 +45,14 @@ verification:
   requirements:
     - id: V-UPD-CANCEL-01
       requirement: Explicit Cancel detaches the in-progress download and leaves the app unchanged.
-      actions: [3, 4, 5, 7, 9]
+      actions: [3, 5, 7, 9]
       checkpoints:
         - {step: 10, expectation: 'Cancellation closes the update dialog, instead of hiding a still-active store operation.'}
         - {step: 11, expectation: Host SHA256 of the disposable app remains unchanged.}
       results: [10, 11]
     - id: V-UPD-CANCEL-02
       requirement: Cancel, recheck and retry isolate the second transfer from old native progress and completion.
-      actions: [12, 13, 14, 16, 19]
+      actions: [12, 14, 16, 19]
       checkpoints:
         - {step: 18, expectation: Retry progress is held at 60% in the real WKWebView.}
         - {step: 20, expectation: 'While old bytes finish, all raw samples remain downloading at 60%; no regression or old ready state.'}

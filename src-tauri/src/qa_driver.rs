@@ -789,6 +789,88 @@ async fn desktop_screenshot(Path(session_id): Path<String>) -> Response {
     }
 }
 
+/// Activate the installed AppKit About item, including its real menu event and
+/// frontend callback. No renderer state or app command is synthesized.
+async fn native_about<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    if !session_is_valid(&session_id)
+        || !cfg!(debug_assertions)
+        || state.app.config().identifier != crate::QA_APP_ID
+    {
+        return error("native About activation requires the isolated QA session");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let app = state.app.clone();
+        let (tx, rx) = oneshot::channel();
+        if let Err(err) = state.app.run_on_main_thread(move || {
+            let result = (|| -> Result<(), String> {
+                use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
+                use objc2_foundation::NSString;
+                use tauri::menu::MenuItemKind;
+                let menu = app.menu().ok_or("application menu is not installed yet")?;
+                let Some(MenuItemKind::Submenu(submenu)) = menu.get(&"app") else {
+                    return Err("application submenu is not installed yet".into());
+                };
+                let Some(MenuItemKind::MenuItem(item)) = submenu.get(&"about") else {
+                    return Err("About item is not installed yet".into());
+                };
+                if !item.is_enabled().map_err(|e| e.to_string())? {
+                    return Err("About item is disabled".into());
+                }
+                let title = item.text().map_err(|e| e.to_string())?;
+                // SAFETY: AppKit access occurs on the main thread. Objects
+                // remain retained by the installed menu for the traversal.
+                unsafe fn activate(menu: &AnyObject, title: &str) -> bool {
+                    unsafe {
+                        let count: isize = msg_send![menu, numberOfItems];
+                        for index in 0..count {
+                            let item: Retained<AnyObject> = msg_send![menu, itemAtIndex: index];
+                            let text: Retained<NSString> = msg_send![&*item, title];
+                            if text.to_string() == title {
+                                let enabled: bool = msg_send![&*item, isEnabled];
+                                if !enabled {
+                                    return false;
+                                }
+                                let _: () = msg_send![menu, performActionForItemAtIndex: index];
+                                return true;
+                            }
+                            let child: Option<Retained<AnyObject>> = msg_send![&*item, submenu];
+                            if let Some(child) = child {
+                                if activate(&child, title) {
+                                    return true;
+                                }
+                            }
+                        }
+                        false
+                    }
+                }
+                unsafe {
+                    let application: Retained<AnyObject> =
+                        msg_send![class!(NSApplication), sharedApplication];
+                    let menu: Option<Retained<AnyObject>> = msg_send![&*application, mainMenu];
+                    if !menu.is_some_and(|menu| activate(&menu, &title)) {
+                        return Err("installed AppKit About item was not found".into());
+                    }
+                }
+                Ok(())
+            })();
+            let _ = tx.send(result);
+        }) {
+            return error(err.to_string());
+        }
+        return match tokio::time::timeout(Duration::from_secs(10), rx).await {
+            Ok(Ok(Ok(()))) => ok(json!({"activated": "about", "transport": "AppKit NSMenu"})),
+            Ok(Ok(Err(message))) => error(message),
+            _ => error("native About activation timed out"),
+        };
+    }
+    #[cfg(not(target_os = "macos"))]
+    error("native About activation requires macOS")
+}
+
 /// Start the opt-in bridge and return immediately so Tauri can finish setup.
 pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: String, port: u16) {
     if BRIDGE_STARTED.swap(true, Ordering::AcqRel) {
@@ -842,6 +924,10 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             .route(
                 "/session/{session_id}/execute/sync",
                 post(execute_sync::<R>),
+            )
+            .route(
+                "/session/{session_id}/qa/native-about",
+                post(native_about::<R>),
             )
             .route("/session/{session_id}/refresh", post(refresh::<R>))
             .route("/session/{session_id}/url", get(current_url::<R>))

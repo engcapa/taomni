@@ -16,6 +16,19 @@ def active(ctx):
     return fixture
 
 
+def native_about(ctx, args):
+    deadline = time.time() + 10
+    last = None
+    while time.time() < deadline:
+        try:
+            result = ctx.session.request("POST", ctx.session.endpoint("/qa/native-about"), {})
+            return json.dumps(result)
+        except Exception as error:
+            last = error
+            time.sleep(0.2)
+    raise StepError(f"Installed native About menu could not be activated: {last}")
+
+
 def fixture_mode(ctx, args):
     fixture = active(ctx)
     fixture.set_mode(args)
@@ -86,6 +99,7 @@ def assert_progress(ctx, args):
 
 
 VERBS.update({
+    "native_about": native_about,
     "updater_fixture_mode": fixture_mode,
     "updater_release": release,
     "assert_updater_installed": assert_installed,

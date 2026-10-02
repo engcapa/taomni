@@ -302,6 +302,7 @@
       "maxProperties": 1,
       "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
       "properties": {
+        "native_about": { "type": "null" },
         "updater_fixture_mode": { "enum": ["correct", "broken", "slow"] },
         "updater_release": { "enum": [1, 2] },
         "assert_updater_installed": { "enum": ["aarch64", "x86_64"] },

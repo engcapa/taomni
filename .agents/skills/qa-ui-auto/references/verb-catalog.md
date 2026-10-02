@@ -133,6 +133,7 @@ loopback HTTP to the real updater. Only the disposable report-owned app is repla
 
 | Verb | Arguments | Behavior |
 |---|---|---|
+| `native_about` | `null` | macOS QA bridge activates the installed AppKit NSMenu About item; requires enabled real menu and runs its native event/frontend callback. Does not synthesize app state or a command. |
 | `updater_fixture_mode` | `broken \| correct \| slow` | Switches the fixture manifest, not application state. `broken` pairs ARM signature with Intel URL; `correct` retains generated per-arch URLs; `slow` holds first/second streams at 20%/60%. |
 | `updater_release` | `1 \| 2` | Releases one held real HTTP download; does not synthesize IPC progress. |
 | `assert_updater_installed` | `aarch64 \| x86_64` | Independently reads installed executable SHA256, `lipo` architecture and Info.plist version against the authentic archive; retains installed-*.json. |
