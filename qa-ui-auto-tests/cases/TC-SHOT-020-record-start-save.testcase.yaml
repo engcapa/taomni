@@ -72,7 +72,7 @@ verification:
     requirement: The public GIF menu entry sends exact physical crop and format arguments, routes to the initialized recorder, and displays the actual stub preview after stop.
     actions: [1, 2, 4, 6, 8, 13]
     checkpoints:
-    - {step: 7, expectation: Before starting, the menu explains the recording range, stop button and whole-display stop shortcut.}
+    - {step: 7, expectation: 'Before starting, the menu explains the recording range, stop button and whole-display stop shortcut.'}
     - {step: 9, expectation: The recorder is initialized after start.}
     - {step: 10, expectation: The source overlay is unmounted.}
     - {step: 11, expectation: Running timer is present.}
