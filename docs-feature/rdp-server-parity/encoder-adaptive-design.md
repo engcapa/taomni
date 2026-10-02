@@ -492,6 +492,9 @@ EncoderIter::next(rect)
 - UI 源调度定位：macOS capture/forward 约 56 fps，而探针 marker 只前进约 25 fps；宿主 Tk 动画在绘制后再等待固定 16 ms，累计绘制与事件循环耗时。目标现在显式完成 Tk redraw，按单调时钟的 60 Hz deadline 调度；超过 deadline 时跳过时钟 tick，marker 只计真实绘制，不推算丢帧。新增逐秒 `animation_samples`，保留实际源速率供分析。24 个全 mocked 工具 unit 通过；M1~M4 和照片比值门槛未改，修正后的三端实测仍须后续 CI。
 - mstsc 单卡 [36982670416](https://github.com/engcapa/taomni/actions/runs/36982670416) 的 debug QA 原始报告为 0/1/0，receipt、选单和 debug 构建身份均核验。NLA 与 cliprdr/rdpsnd/drdynvc 已通过，`encode=planar:9/rfx:1 bulk=48%`；唯一失败在 PrintWindow 图案校验（magenta=0/cyan=127）。截图是已连接的桌面与条纹动画，连接前创建的图案被本机回环 mstsc 窗口遮挡；用例改为在通道握手后创建并抬起目标。仍只从 owned mstsc 窗口检查两种已知颜色，不能用整个宿主桌面代替客户端画面。
 
+- 第九轮 [36984196978](https://github.com/engcapa/taomni/actions/runs/36984196978)，源码 `6c873255`：三端 browser 各 5/0/0；native 为 Linux 12/0/0、macOS 10/1/0、Windows 13/2/0。UI 四项分别为 Linux 138 ms / 40.321 ms p95 / 54.393 实际 fps / 171.184 kbps，macOS 74 ms / 63.259 ms / 24.170 fps / 387.504 kbps，Windows 29 ms / 42.864 ms / 33.809 fps / 504.603 kbps。三端照片帧率比为 0.993598 / 0.970170 / 0.998166，带宽比为 0.985822 / 0.966403 / 0.992410，均通过；bulk 解压错误为 0。Linux xrdp、Windows TermService 与 macOS J-02 通过。macOS 唯一失败仍为 M3；Windows mstsc 已完成 NLA 与通道协商，但连接后进程退出 `0xC0000005`，原因尚未确定；PERF-02 的真实画面为“已登录用户过多 / 选择要断开的用户”，并非测量动画。全部选单、源码/runner/case/build 身份与 receipt 原始文件哈希已核验，两个 Windows 失败保留。
+- TermService 会话限制修复：仅 hosted Windows runner 临时设置并恢复 `fSingleSessionPerUser` 的值和类型；PERF-02 在吞吐账号登录前显式释放本 fixture 创建的延迟测量账号，并轮询确认 slot 消失。新 verb `host_rdp_logoff` 拒绝工作站、继承账号和 runneradmin，失败不写成功证据。部分 PowerShell setup 失败也先登记已创建账号，teardown 只处理本 fixture 拥有的会话；清理失败保留原始 setup 错误并另写 stderr。31 个全 mocked 工具/清理 unit 通过。实际参考性能与所有互通断言须由后续 CI 重测，预算和照片比值门槛均未调整。
+
 ## 9. 验收追踪与交付条件
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 | 当前缺口 |

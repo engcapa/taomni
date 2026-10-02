@@ -233,6 +233,23 @@ def _do_host_copy_file(ctx: NativeStepContext, args: Any) -> str:
     raise StepError(f"host_copy_file: {last_error}")
 
 
+@_verb("host_rdp_logoff")
+def _do_host_rdp_logoff(ctx: NativeStepContext, args: Any) -> str:
+    if not isinstance(args, dict) or args.get("user_env") not in {
+        "QA_RDP_BASELINE_USER1", "QA_RDP_BASELINE_USER2"
+    }:
+        raise StepError("host_rdp_logoff: expected an owned reference user environment name")
+    from .fixtures import rdp_baseline_required
+    try:
+        sessions = rdp_baseline_required.logoff_owned_session(os.environ.get(args["user_env"], ""))
+    except (RuntimeError, subprocess.SubprocessError) as error:
+        raise StepError(f"host_rdp_logoff: {error}") from error
+    path = ctx.case_dir / "reference-logoff.json"
+    path.write_text(json.dumps({"user_env": args["user_env"], "sessions": sessions,
+                                "released": True}), encoding="utf-8")
+    return f"released {len(sessions)} owned reference session(s)"
+
+
 def _capture_mstsc(ctx: NativeStepContext, process: subprocess.Popen, args: dict) -> str:
     path = _within_report(ctx, str(args.get("snapshot") or "mstsc-window.png"))
     script = r'''

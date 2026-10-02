@@ -1,4 +1,5 @@
 """Encoder QA tool boundaries, readiness and failure cleanup (all OS calls mocked)."""
+import io
 import json
 import os
 from pathlib import Path
@@ -210,6 +211,103 @@ class EncoderToolsTest(unittest.TestCase):
 
 
 class TermServiceFixtureTest(unittest.TestCase):
+    def test_partial_host_setup_registers_accounts_before_reporting_failure(self):
+        from qa_ui_auto.fixtures import FixtureSkip
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(baseline.platform, "system", return_value="Windows"), \
+             patch.object(baseline, "WORK_DIR", Path(directory)), \
+             patch.object(baseline, "_CREATED", []) as created, \
+             patch.object(baseline, "_ANIMATION", []) as animation, \
+             patch.object(baseline.shutil, "copy2"), \
+             patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}), \
+             patch.object(baseline.subprocess, "run", side_effect=[
+                 subprocess.CompletedProcess([], 0, "", ""),
+                 subprocess.CompletedProcess([], 1, "created:qa-rdp-base1\nanimation:unset\n", "host setup failed")]):
+            with self.assertRaisesRegex(FixtureSkip, "host setup failed"):
+                baseline._setup(SimpleNamespace())
+            self.assertEqual(created, ["qa-rdp-base1"])
+            self.assertEqual(animation, ["unset"])
+
+    def test_setup_retains_original_error_when_cleanup_also_fails(self):
+        context = MagicMock()
+        with patch.object(baseline.platform, "system", return_value="Windows"), \
+             patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), \
+             patch.dict(sys.modules, {"winreg": MagicMock()}), \
+             patch.object(mstsc, "_registry_value", return_value=context), \
+             patch.object(baseline, "_setup", side_effect=RuntimeError("setup failed")), \
+             patch.object(baseline, "_teardown", side_effect=RuntimeError("cleanup failed")), \
+             patch.object(sys, "stderr", new_callable=io.StringIO) as evidence:
+            with self.assertRaisesRegex(RuntimeError, "^setup failed$"):
+                baseline.setup(SimpleNamespace())
+            self.assertIn("TermService setup cleanup failed: cleanup failed", evidence.getvalue())
+            context.__exit__.assert_called_once()
+            self.assertIsNone(baseline._SESSION_POLICY)
+
+    def test_session_ids_match_only_the_owned_user_with_active_or_disconnected_rows(self):
+        rows = (" USERNAME SESSIONNAME ID STATE IDLE TIME LOGON TIME\n"
+                ">runneradmin console 1 Active none 10/2/2026 9:00 AM\n"
+                " qa-rdp-base1 rdp-tcp#4 3 Active none 10/2/2026 9:00 AM\n"
+                " QA-RDP-BASE1 7 Disc 2 10/2/2026 9:00 AM\n"
+                " qa-rdp-base2 8 Disc 1 10/2/2026 9:00 AM\n")
+        self.assertEqual(baseline.session_ids(rows, "qa-rdp-base1"), [3, 7])
+
+    def test_logoff_rejects_workstations_inherited_accounts_and_unowned_users(self):
+        for hosted, owned, user in [("false", True, "qa-rdp-base1"),
+                                    ("true", False, "qa-rdp-base1"),
+                                    ("true", True, "runneradmin")]:
+            with self.subTest(hosted=hosted, owned=owned, user=user), \
+                 patch.object(baseline.platform, "system", return_value="Windows"), \
+                 patch.dict(os.environ, {"GITHUB_ACTIONS": hosted}), \
+                 patch.object(baseline, "_CREATED", ["qa-rdp-base1"] if owned else []), \
+                 patch.object(baseline.subprocess, "run") as run:
+                with self.assertRaisesRegex(RuntimeError, "owned hosted reference account"):
+                    baseline.logoff_owned_session(user)
+                run.assert_not_called()
+
+    def test_logoff_waits_for_only_the_owned_session_slot_to_be_released(self):
+        rows = ">runneradmin console 1 Active none\nqa-rdp-base1 3 Disc none\n"
+        with patch.object(baseline.platform, "system", return_value="Windows"), \
+             patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), \
+             patch.object(baseline, "_CREATED", ["qa-rdp-base1"]), \
+             patch.object(baseline.subprocess, "run", side_effect=[
+                 SimpleNamespace(stdout=rows), SimpleNamespace(stdout=""),
+                 SimpleNamespace(stdout=rows), SimpleNamespace(stdout=">runneradmin console 1 Active none\n")]) as run, \
+             patch("time.sleep") as sleep:
+            self.assertEqual(baseline.logoff_owned_session("qa-rdp-base1"), [3])
+        self.assertEqual([call.args[0] for call in run.call_args_list], [
+            ["quser"], ["logoff", "3"], ["quser"], ["quser"]])
+        sleep.assert_called_once_with(0.25)
+
+    def test_session_reuse_policy_is_restored_after_partial_setup_and_cleanup_failure(self):
+        context = MagicMock()
+        registry = MagicMock()
+        with patch.object(baseline.platform, "system", return_value="Windows"), \
+             patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), \
+             patch.dict(sys.modules, {"winreg": registry}), \
+             patch.object(mstsc, "_registry_value", return_value=context), \
+             patch.object(baseline, "_setup", side_effect=RuntimeError("setup failed")), \
+             patch.object(baseline, "_teardown") as cleanup:
+            with self.assertRaisesRegex(RuntimeError, "setup failed"):
+                baseline.setup(SimpleNamespace())
+            cleanup.assert_called_once()
+            context.__exit__.assert_called_once()
+            self.assertIsNone(baseline._SESSION_POLICY)
+        context = MagicMock()
+        with patch.object(baseline, "_SESSION_POLICY", context), \
+             patch.object(baseline, "_teardown", side_effect=RuntimeError("cleanup failed")):
+            with self.assertRaisesRegex(RuntimeError, "cleanup failed"):
+                baseline.teardown(SimpleNamespace())
+            context.close.assert_called_once()
+            self.assertIsNone(baseline._SESSION_POLICY)
+
+    def test_logoff_verb_does_not_write_success_evidence_after_a_failed_release(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(baseline, "logoff_owned_session", side_effect=RuntimeError("logoff failed")):
+            ctx = SimpleNamespace(case_dir=Path(directory))
+            with self.assertRaisesRegex(StepError, "logoff failed"):
+                steps._do_host_rdp_logoff(ctx, {"user_env": "QA_RDP_BASELINE_USER1"})
+            self.assertFalse((ctx.case_dir / "reference-logoff.json").exists())
+
     def test_startup_evidence_is_redacted_and_unavailable_evidence_does_not_block_cleanup(self):
         for unavailable in (False, True):
             with self.subTest(unavailable=unavailable), tempfile.TemporaryDirectory() as directory:
