@@ -1154,10 +1154,40 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     let bar = wait_window(&app, super::surfaces::SCROLL_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| e.to_string())?;
-    run_js(&bar, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-scroll-stop\"]');i++) await new Promise(r=>setTimeout(r,100)); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    run_js(
+        &bar,
+        r#"
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      for (let i = 0; i < 100; i++) {
+        if (document.querySelector('[data-testid="screenshot-scroll-stop"]')) return true;
+        await sleep(100);
+      }
+      throw new Error('scroll Finish control missing');
+    "#,
+        Duration::from_secs(15),
+    )
+    .await
+    .map_err(|e| format!("scroll controls readiness: {e}"))?;
     let geometry = capture_surfaces(&app, &display, region, super::surfaces::SCROLL_LABEL)
         .map_err(|e| e.to_string())?;
-    run_js(&bar, "for(let i=0;i<100;i++){ const status=await window.__TAURI_INTERNALS__.invoke('screenshot_scroll_status'); if(status?.frames>=2) break; await new Promise(r=>setTimeout(r,100)); } document.querySelector('[data-testid=\"screenshot-scroll-stop\"]').click(); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    let progress = run_js(
+        &bar,
+        r#"
+      for (let i = 0; i < 100; i++) {
+        const status = await window.__TAURI_INTERNALS__.invoke('screenshot_scroll_status');
+        if (status?.frames >= 2) return status;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      throw new Error('scroll did not capture a second frame');
+    "#,
+        Duration::from_secs(15),
+    )
+    .await
+    .map_err(|e| format!("scroll progress: {e}"))?;
+    // Finish closes this window. Read the result from the surviving overlay,
+    // rather than polling an async script slot in the window being destroyed.
+    bar.eval("document.querySelector('[data-testid=\"screenshot-scroll-stop\"]').click()")
+        .map_err(|e| format!("click scroll Finish: {e}"))?;
     let completed = run_js(&overlay, "for(let i=0;i<150 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase!=='select';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase==='select';", Duration::from_secs(20)).await.map_err(|e| e.to_string())?;
     let result = super::screenshot_overlay_init().await?;
     let output = image::open(&result.path)
@@ -1189,7 +1219,21 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     let bar = wait_window(&app, super::surfaces::SCROLL_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| e.to_string())?;
-    run_js(&bar, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]');i++) await new Promise(r=>setTimeout(r,100)); document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]').click(); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    run_js(
+        &bar,
+        r#"
+      for (let i = 0; i < 100; i++) {
+        if (document.querySelector('[data-testid="screenshot-scroll-cancel"]')) return true;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      throw new Error('scroll Cancel control missing');
+    "#,
+        Duration::from_secs(15),
+    )
+    .await
+    .map_err(|e| format!("scroll cancel readiness: {e}"))?;
+    bar.eval("document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]').click()")
+        .map_err(|e| format!("click scroll Cancel: {e}"))?;
     let cancelled = run_js(&overlay, "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase!=='annotate';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase==='annotate' && document.querySelector('[data-testid=\"screenshot-annotation-canvas\"]')?.dataset.shapes==='1' && !!document.querySelector('[data-testid=\"screenshot-selection\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
     let cleanup = app.windows().keys().all(|name| {
         !name.starts_with(super::surfaces::BORDER_PREFIX) && name != super::surfaces::SCROLL_LABEL
@@ -1209,7 +1253,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             && cleanup
             && artifact.is_some(),
         json!({"currentWindowVisible":current_visible,"currentWindowSelected":selected,"currentRegion":current_region,
-            "defaultHidesWindows":default_hidden,"scrollCompleted":completed,"geometry":geometry,"comparison":comparison,
+            "defaultHidesWindows":default_hidden,"scrollCompleted":completed,"scrollProgress":progress,"geometry":geometry,"comparison":comparison,
             "scrollCancelledPreservesAnnotations":cancelled,"controlsCleaned":cleanup,"artifact":artifact,
             "originalArtifact":original_artifact,"differenceArtifact":difference,"windowArtifact":window_artifact}),
     ))
@@ -1421,6 +1465,9 @@ async fn mouse_path(points: Vec<(i32, i32)>) -> anyhow::Result<()> {
                     move_to(&mut input, (x, y))?;
                     std::thread::sleep(Duration::from_millis(18));
                 }
+                // Mousemoves can coalesce under WebView load. Hold each fixed
+                // waypoint so the OS gesture includes the prescribed corners.
+                std::thread::sleep(Duration::from_millis(120));
             }
             Ok(())
         })();
@@ -1579,7 +1626,7 @@ pub async fn screenshot_qa_freehand(app: AppHandle) -> Result<String, String> {
           const q = id => document.querySelector('[data-testid="' + id + '"]');
           for (let i = 0; i < 50 && !q('screenshot-toolbar'); i++) await sleep(100);
           const path = q('screenshot-freehand-contour')?.getAttribute('d') || '';
-          return {closed: path.endsWith(' Z'), scrollDisabled:q('screenshot-scroll-capture')?.disabled,
+          return {closed: path.endsWith(' Z'), contour:path, scrollDisabled:q('screenshot-scroll-capture')?.disabled,
             recordDisabled:q('screenshot-record')?.disabled, mode:q('screenshot-overlay')?.dataset.selectionMode};
         "#, Duration::from_secs(10)).await.map_err(|e| format!("{e:#}"))?;
         overlay

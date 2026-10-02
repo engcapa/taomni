@@ -20,14 +20,14 @@ verification:
   review: reviewed
   requirements:
   - id: controls
-    requirement: Production current-window entry preserves main visibility; default capture hides it; scroll Finish keeps
+    requirement: Production current-window entry preserves main visibility; default capture hides it; scroll progress reports at least two frames; Finish keeps
       original page pixels and Cancel preserves the crop and annotations; native control and boundary rectangles never intersect
       captured pixels.
     actions:
     - 1
     checkpoints:
     - step: 3
-      expectation: 'native_screenshot_scenario: {''scenario'': ''controls''}'
+      expectation: 'Current-window entry preselects its physical bounds while main stays visible; default entry hides main. After at least two captured frames, click Finish and observe the surviving overlay return to selection with a longer image matching the original page pixels. Click Cancel in a second run and observe the original crop and one annotation preserved. Visible native controls and range borders lie outside the crop; all temporary controls and borders close after either operation.'
     - step: 4
       expectation: 'assert_visible: [data-testid="system-screenshot"]'
     results:
