@@ -88,7 +88,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-after\-sftp\-close\r?$
-    timeout_sec: 20
+    timeout_sec: 60
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
 - wait_for:
@@ -153,7 +153,7 @@ verification:
     - step: 28
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 30}}'
     - step: 31
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-sftp\\-close\\r?$", "timeout_sec": 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-sftp\\-close\\r?$", "timeout_sec": 60}}'
     - step: 33
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 34

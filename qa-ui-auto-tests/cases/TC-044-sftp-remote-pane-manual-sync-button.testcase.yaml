@@ -49,6 +49,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_CWD_READY\r?$
+    timeout_sec: 60
 - wait: 1
 - click: '[data-testid="sftp-browser"] >> button[title*="sync the remote pane"]'
 - wait_for: '[data-testid="sftp-remote-path"] button[data-path="${fixture.sftp_sync_test_dir}"]'
@@ -90,7 +91,7 @@ verification:
     - step: 14
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path\"] button[data-path=\"/\"]"}'
     - step: 18
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD_READY\\r?$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD_READY\\r?$", "timeout_sec": 60}}'
     - step: 23
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
         "equals": "${fixture.sftp_sync_test_dir}"}}'

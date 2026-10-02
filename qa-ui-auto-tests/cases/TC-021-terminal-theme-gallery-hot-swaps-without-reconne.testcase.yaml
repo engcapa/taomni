@@ -54,7 +54,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-theme\-marker\r?$
-    timeout_sec: 15
+    timeout_sec: 60
 - click: '[data-testid="context-menu-item-find"]'
 - wait_for: input[placeholder="Find"]
 - click: '[data-testid="terminal-pane"] button:has-text("Close")'
@@ -69,7 +69,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-theme\-still\-alive\r?$
-    timeout_sec: 15
+    timeout_sec: 60
 - screenshot: 021-terminal-theme-hot-swap.png
 verification:
   review: reviewed

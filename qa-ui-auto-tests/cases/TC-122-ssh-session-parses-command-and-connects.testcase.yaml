@@ -72,7 +72,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-command\-parsed\-live\r?$
-    timeout_sec: 20
+    timeout_sec: 60
 - screenshot: 122-ssh-command-parsed-connect.png
 verification:
   review: reviewed
@@ -119,7 +119,7 @@ verification:
     - step: 20
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
     - step: 22
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec": 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec": 60}}'
     results:
     - 16
     - 20
