@@ -78,7 +78,7 @@ steps:
     timeout_sec: 30
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: printf 'qa-ssh-after-sftp-close\n'
+    text: echo qa-ssh-after-sftp-close
     submit: true
     verify:
       selector: '[data-testid="terminal-pane"]'
