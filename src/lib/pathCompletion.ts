@@ -24,6 +24,11 @@ export function isWindowsPath(value: string): boolean {
 export function resolvePathInput(value: string, currentPath: string, homePath?: string | null, windows = false): string {
   const cleaned = cleanPathInput(value);
   if (!cleaned) return currentPath;
+  // Windows OpenSSH exposes drive roots as /C:/, while copied OS paths use
+  // C:/ or C:\. Keep those absolute when resolving in that remote namespace.
+  if (!windows && (/^\/[a-z]:(?:\/|$)/i.test(currentPath) || /^\/[a-z]:(?:\/|$)/i.test(homePath ?? "")) && /^[a-z]:[\\/]/i.test(cleaned)) {
+    return `/${cleaned.replace(/\\/g, "/")}`;
+  }
   if (cleaned === "~" || cleaned.startsWith("~/") || (windows && cleaned.startsWith("~\\"))) {
     return homePath ? `${homePath.replace(/[\\/]$/, "")}${cleaned.slice(1) || (windows ? "\\" : "/")}` : cleaned;
   }

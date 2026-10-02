@@ -84,4 +84,20 @@ describe("FilePanel path provider wiring", () => {
     fireEvent.keyDown(input, { key: "Escape" });
     expect(useObjectStorageStore.getState().sessions.sid).toBe(before);
   });
+
+  it("keeps copied Windows drive addresses absolute in an OpenSSH remote pane", async () => {
+    const session = useSftpStore.getState().sessions.sid;
+    useSftpStore.setState({ sessions: { sid: { ...session, homeDir: "/C:/Users/qa", remote: pane("/C:/Users/qa") } } });
+    vi.mocked(sftpListRemote).mockResolvedValue([{ ...directory, path: "/C:/work/Documents" }]);
+    render(<FilePanel sessionId="sid" side="remote" onItemDoubleClick={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("sftp-remote-path-edit"));
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "C:\\work\\Doc" } });
+    await load();
+    expect(sftpListRemote).toHaveBeenCalledWith("sid", "/C:/work/");
+    expect(screen.getByRole("option")).toHaveTextContent("/C:/work/Documents/");
+    fireEvent.change(input, { target: { value: "C:/work" } });
+    await act(async () => fireEvent.keyDown(input, { key: "Enter" }));
+    expect(useSftpStore.getState().sessions.sid.remote.path).toBe("/C:/work");
+  });
 });

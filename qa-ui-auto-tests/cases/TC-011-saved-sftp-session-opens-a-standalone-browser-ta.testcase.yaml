@@ -65,7 +65,7 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: ${cfg.sftp.remote_test_dir}
+    equals: ${fixture.sftp_sync_test_dir}
 - screenshot: 011-standalone-sftp-session.png
 verification:
   review: reviewed
@@ -117,7 +117,7 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
     - step: 32
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
-        "${cfg.sftp.remote_test_dir}"}}'
+        "${fixture.sftp_sync_test_dir}"}}'
     results:
     - 32
   visual:

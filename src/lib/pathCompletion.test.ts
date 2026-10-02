@@ -34,6 +34,9 @@ describe("path completion queries", () => {
 
   it("keeps a Windows-hosted SFTP path in the remote POSIX namespace", () => {
     expect(pathCompletionQuery("/C:/Users/te", "/C:/work", null, false)).toEqual({ directory: "/C:/Users/", prefix: "te", separator: "/", windows: false });
+    expect(pathCompletionQuery("C:/Users/te", "/C:/work", null, false)).toEqual({ directory: "/C:/Users/", prefix: "te", separator: "/", windows: false });
+    expect(pathCompletionQuery("C:\\Users\\te", "/C:/work", null, false)).toEqual({ directory: "/C:/Users/", prefix: "te", separator: "/", windows: false });
+    expect(pathCompletionQuery("C:/Users/te", "/", "/C:/Users/qa", false)).toEqual({ directory: "/C:/Users/", prefix: "te", separator: "/", windows: false });
   });
 
   it("resolves relative navigation against the pane and preserves filesystem dot/symlink semantics", () => {

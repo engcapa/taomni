@@ -2458,6 +2458,7 @@ controls:
 - chmod 对话框：Owner / Group / Other 三组权限位 + Apply
 - 地址栏：SFTP、本地 File 会话及对象存储的共享地址栏输入时自动下拉目录候选；Tab 补全唯一候选或公共前缀，↑↓ 选择，回车导航，鼠标选择保留输入焦点以继续补全。仅提供目录（含目录符号链接），支持空格、Unicode、相对路径、主目录缩写及本地 Windows 驱动器/UNC 路径；隐藏目录可用 `.` 前缀显式发现。异步查询不修改当前面板或历史，忽略失效请求，查询失败后可继续手动导航。
 - 补全覆盖：`TC-PATH-LOCAL-01` 与 `TC-PATH-SFTP-01` 均含 browser/native；原生验证实际本地文件系统与 SSH/SFTP 边界，browser 的本地 VFS 不作为原生证据。对象存储 provider 接线由 `FilePanelPathCompletion.test.tsx` 覆盖，在线对象存储服务未纳入此次托管场景。
+- Windows OpenSSH：远程地址栏将复制的 `C:/…` 或 `C:\…` 绝对地址转换为服务端 `/C:/…` 命名空间，目录提示与导航均使用同一路径解析；远程地址断言与 shell 初始化分别使用 fixture 的 SFTP 路径与 shell 路径。
 - 跨面板拖拽（REMOTE↔LOCAL）：`customDnD` 指针驱动层 + `application/x-taomni-files` MIME，支持多选与文件夹
 - OS 文件拖入远程面板 → 直接上传到当前远程目录
   - Linux/macOS：通过 Tauri `onDragDropEvent` 拿到绝对路径，前端 `sftpStat(side="local") → controller.upload`

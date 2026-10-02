@@ -39,7 +39,7 @@ steps:
     timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
-    text: mkdir -p '${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b' && printf '\nQA_PATH_READY\n'
+    text: mkdir -p '${fixture.sftp_shell_test_dir}/qa-path-TC028/a/b' && printf '\nQA_PATH_READY\n'
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
@@ -56,7 +56,7 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b
+    equals: ${fixture.sftp_sync_test_dir}/qa-path-TC028/a/b
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-up"]'
@@ -64,7 +64,7 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028/a
+    equals: ${fixture.sftp_sync_test_dir}/qa-path-TC028/a
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-up"]'
@@ -72,7 +72,7 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028
+    equals: ${fixture.sftp_sync_test_dir}/qa-path-TC028
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-back"]'
@@ -80,7 +80,7 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028/a
+    equals: ${fixture.sftp_sync_test_dir}/qa-path-TC028/a
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-forward"]'
@@ -88,7 +88,7 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028
+    equals: ${fixture.sftp_sync_test_dir}/qa-path-TC028
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-path"] button[data-path$="${cfg.sftp.remote_test_dir}"]'
@@ -172,27 +172,27 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path\"] button[data-path=\"/\"]"}'
     - step: 23
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
-        "${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b"}}'
+        "${fixture.sftp_sync_test_dir}/qa-path-TC028/a/b"}}'
     - step: 25
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 28
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
-        "${cfg.sftp.remote_test_dir}/qa-path-TC028/a"}}'
+        "${fixture.sftp_sync_test_dir}/qa-path-TC028/a"}}'
     - step: 30
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 33
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
-        "${cfg.sftp.remote_test_dir}/qa-path-TC028"}}'
+        "${fixture.sftp_sync_test_dir}/qa-path-TC028"}}'
     - step: 35
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 38
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
-        "${cfg.sftp.remote_test_dir}/qa-path-TC028/a"}}'
+        "${fixture.sftp_sync_test_dir}/qa-path-TC028/a"}}'
     - step: 40
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 43
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
-        "${cfg.sftp.remote_test_dir}/qa-path-TC028"}}'
+        "${fixture.sftp_sync_test_dir}/qa-path-TC028"}}'
     - step: 45
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 48
