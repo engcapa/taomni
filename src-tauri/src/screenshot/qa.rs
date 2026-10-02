@@ -1220,9 +1220,25 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
     let actual = (after.x - before.x, after.y - before.y);
     let moved = (actual.0 - delta.0).abs() <= 6 && (actual.1 - delta.1).abs() <= 6;
     let topmost = window.is_always_on_top()?;
+    #[cfg(target_os = "linux")]
+    let native_state = tokio::task::spawn_blocking(|| {
+        std::process::Command::new("xprop")
+            .args(["-name", "Pinned Screenshot", "_NET_WM_STATE"])
+            .output()
+            .map(|o| {
+                json!({"success":o.status.success(),"stdout":String::from_utf8_lossy(&o.stdout),
+                "stderr":String::from_utf8_lossy(&o.stderr)})
+            })
+            .unwrap_or_else(|e| json!({"error":e.to_string()}))
+    })
+    .await
+    .context("native pin state probe")?;
+    #[cfg(not(target_os = "linux"))]
+    let native_state = Value::Null;
     Ok(
         json!({"passed":moved && topmost,"before":[before.x,before.y],"after":[after.x,after.y],
-        "expectedDelta":delta,"actualDelta":actual,"alwaysOnTop":topmost,"input":"OS mouse down/move/up"}),
+        "expectedDelta":delta,"actualDelta":actual,"alwaysOnTop":topmost,"nativeState":native_state,
+        "input":"OS mouse down/move/up"}),
     )
 }
 

@@ -61,7 +61,9 @@ steps:
 - drag_to:
     from: '[data-testid="screenshot-handle-se"]'
     to: '[data-testid="screenshot-select-layer"]'
-    from_position: {x: 4, y: 4}
+    # Playwright offsets are padding-box relative: 3 + 1px border is the
+    # 8px handle's actual center, so the gesture starts on the exact vertex.
+    from_position: {x: 3, y: 3}
     to_position: {x: 725, y: 575}
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - assert_attribute:
