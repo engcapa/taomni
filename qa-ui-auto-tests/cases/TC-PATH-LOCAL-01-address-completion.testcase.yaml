@@ -35,9 +35,7 @@ steps:
     value: ${fixture.path_completion_root}
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-path-completion-local"]'
-- open_session:
-    name: qa-path-completion-local
-    double_click: true
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-path-completion-local"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"]'
 - assert_text:
     selector: '[data-testid="sftp-local-list"]'
