@@ -1,6 +1,6 @@
 id: TC-SHOT-N11
 title: Native freehand Copy and Pin retain original RGBA and actual OS dragging moves the topmost pin
-description: Fixed concave vertices are sent through real system mouse input with a dwell at each corner so the WebView can consume the prescribed gesture; public renderer actions export real OS-captured content. Expected mask is derived independently from original canvas pixels, never from the exported contour.
+description: Before each still capture the real system cursor is parked outside the fixture crop to keep the scene equal to the original canvas. Fixed concave vertices are sent through real system mouse input with a dwell at each corner so the WebView can consume the prescribed gesture; public renderer actions export real OS-captured content. Expected mask is derived independently from original canvas pixels, never from the exported contour.
 covers: [F27.1]
 tags: [screenshot, native, freehand, pin, rgba, p1]
 modes: [native]

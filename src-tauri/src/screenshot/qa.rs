@@ -1436,26 +1436,40 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
 
 /// Send real desktop mouse input; physical coordinates are never injected into
 /// the DOM. Also used to verify the pin renderer's native startDragging path.
+fn move_os_pointer(input: &mut enigo::Enigo, (x, y): (i32, i32)) -> anyhow::Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = input;
+        unsafe { windows::Win32::UI::WindowsAndMessaging::SetCursorPos(x, y) }
+            .context("move pointer")?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        use enigo::Mouse;
+        input
+            .move_mouse(x, y, enigo::Coordinate::Abs)
+            .map_err(|e| anyhow::anyhow!("move pointer: {e}"))?;
+    }
+    Ok(())
+}
+
+async fn park_pointer(point: (i32, i32)) -> anyhow::Result<()> {
+    tokio::task::spawn_blocking(move || {
+        let mut input = enigo::Enigo::new(&enigo::Settings::default())
+            .map_err(|e| anyhow::anyhow!("input synthesis unavailable: {e}"))?;
+        move_os_pointer(&mut input, point)
+    })
+    .await
+    .context("park desktop pointer")?
+}
+
 async fn mouse_path(points: Vec<(i32, i32)>) -> anyhow::Result<()> {
     tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
         use enigo::{Button, Direction, Enigo, Mouse, Settings};
         let mut input = Enigo::new(&Settings::default())
             .map_err(|e| anyhow::anyhow!("input synthesis unavailable: {e}"))?;
         let first = *points.first().context("empty mouse path")?;
-        let move_to = |input: &mut Enigo, (x, y): (i32, i32)| -> anyhow::Result<()> {
-            #[cfg(target_os = "windows")]
-            {
-                let _ = input;
-                unsafe { windows::Win32::UI::WindowsAndMessaging::SetCursorPos(x, y) }
-                    .context("move pointer")?;
-            }
-            #[cfg(not(target_os = "windows"))]
-            input
-                .move_mouse(x, y, enigo::Coordinate::Abs)
-                .map_err(|e| anyhow::anyhow!("move pointer: {e}"))?;
-            Ok(())
-        };
-        move_to(&mut input, first)?;
+        move_os_pointer(&mut input, first)?;
         std::thread::sleep(Duration::from_millis(150));
         let result = (|| -> anyhow::Result<()> {
             input
@@ -1466,7 +1480,7 @@ async fn mouse_path(points: Vec<(i32, i32)>) -> anyhow::Result<()> {
                 for step in 1..=16 {
                     let x = pair[0].0 + (pair[1].0 - pair[0].0) * step / 16;
                     let y = pair[0].1 + (pair[1].1 - pair[0].1) * step / 16;
-                    move_to(&mut input, (x, y))?;
+                    move_os_pointer(&mut input, (x, y))?;
                     std::thread::sleep(Duration::from_millis(18));
                 }
                 // Mousemoves can coalesce under WebView load. Hold each fixed
@@ -1594,8 +1608,15 @@ pub async fn screenshot_qa_freehand(app: AppHandle) -> Result<String, String> {
     let cropped_original = capture::crop(&original, offset, offset, width, height);
     let expected = qa_oracle::masked_original(&cropped_original, &polygon);
     let mut results = Vec::new();
+    let parked_cursor = (display.x + 16, display.y + 16);
     for action in ["pin", "copy"] {
         fixture.set_focus().map_err(|e| e.to_string())?;
+        // The still capture can include the system cursor on macOS. Keep the
+        // source scene equal to the original canvas; the preceding pin drag
+        // otherwise leaves that cursor inside the second capture's polygon.
+        park_pointer(input_point(parked_cursor, scale))
+            .await
+            .map_err(|e| format!("{e:#}"))?;
         tokio::time::sleep(Duration::from_millis(350)).await;
         let origin = fixture.inner_position().map_err(|e| e.to_string())?;
         super::open_overlay(&app, Some(display.id.clone())).await?;
@@ -1709,7 +1730,7 @@ pub async fn screenshot_qa_freehand(app: AppHandle) -> Result<String, String> {
     }
     let passed = results.iter().all(|r| r["passed"] == json!(true));
     let details = json!({"passed":passed,"scale":scale,"results":results,
-        "boundaryTolerancePixels":2,"input":"OS mouse down/move/up"});
+        "boundaryTolerancePixels":2,"initialCursor":parked_cursor,"input":"OS mouse down/move/up"});
     let metrics =
         keep_json(&details, "freehand-rgba-comparison.json").map_err(|e| format!("{e:#}"))?;
     Ok(report(
