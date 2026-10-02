@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Taomni · UI 布局与易用性设计演示</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #090d12; --bg: #10161e; --surface: #151d27; --raised: #1b2531;
+      --hover: #222f3d; --line: #293441; --text: #e4eaf1; --muted: #9baaba;
+      --dim: #75889a; --accent: #79d6bf; --accent-bg: #18362f; --blue: #9ebdff;
+      --orange: #edbd80; --red: #f4a0a0; --shadow: 0 24px 90px #0007;
+      --mono: "Cascadia Code", Consolas, "SFMono-Regular", monospace;
+      font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      font-size: 13px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--text); background: var(--page); }
+    body.light {
+      color-scheme: light;
+      --page: #e9edf1; --bg: #ffffff; --surface: #f4f6f8; --raised: #ffffff;
+      --hover: #e7edf2; --line: #d3dce3; --text: #243445; --muted: #53677a;
+      --dim: #60768b; --accent: #197862; --accent-bg: #dfefe9; --blue: #325db2;
+      --orange: #91601d; --red: #b23b3b; --shadow: 0 24px 90px #24344526;
+    }
+    button, input, select, textarea { font: inherit; }
+    button, select { cursor: pointer; }
+    button { color: inherit; border: 0; background: transparent; }
+    button:disabled { cursor: default; opacity: .5; }
+    button:hover:not(:disabled) { background: var(--hover); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    input, textarea, select { color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+    input, textarea { padding: 9px 11px; }
+    input::placeholder, textarea::placeholder { color: var(--dim); }
+    select { padding: 6px 8px; }
+    svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .muted { color: var(--muted); } .accent { color: var(--accent); } .blue { color: var(--blue); }
+    .orange { color: var(--orange); } .red { color: var(--red); } .mono { font-family: var(--mono); }
+    .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .spacer { flex: 1; min-width: 0; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 32px; padding: 0 11px; border-radius: 6px; white-space: nowrap; }
+    .btn.primary { color: var(--accent); background: var(--accent-bg); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+    .icon-btn { display: inline-flex; align-items: center; justify-content: center; height: 30px; width: 30px; border-radius: 5px; flex-shrink: 0; }
+    .badge { min-width: 19px; height: 19px; padding: 0 5px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; background: var(--hover); color: var(--muted); }
+    .badge.new { color: var(--accent); background: var(--accent-bg); }
+    kbd { font-family: inherit; font-size: 10px; padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--dim); white-space: nowrap; }
+    .demo-header { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; min-height: 64px; padding: 14px 24px; }
+    .demo-brand { font-size: 15px; font-weight: 650; letter-spacing: .2px; }
+    .demo-brand span { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 10px; }
+    .scenes { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; }
+    .scenes button { padding: 6px 10px; border-radius: 5px; font-size: 12px; }
+    .scenes button.active { background: var(--hover); color: var(--accent); }
+    .demo-options { margin-left: auto; display: flex; gap: 7px; align-items: center; font-size: 12px; }
+    .stage { margin: 0 20px; overflow-x: auto; padding: 0 1px 8px; }
+    .app { display: flex; flex-direction: column; position: relative; margin: 0 auto; width: 100%; min-width: 760px; height: max(590px, calc(100vh - 138px)); max-height: 1120px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); background: var(--bg); --dock-width: 232px; }
+    .titlebar { display: flex; align-items: center; height: 44px; flex-shrink: 0; padding: 0 10px; gap: 8px; background: var(--surface); border-bottom: 1px solid var(--line); }
+    .brand-button { font-size: 14px; font-weight: 650; gap: 9px; padding: 0 9px; height: 32px; display: flex; align-items: center; border-radius: 6px; }
+    .brand-mark { display: grid; place-items: center; height: 22px; width: 22px; border-radius: 6px; background: var(--accent); color: var(--bg); font-size: 14px; font-weight: 800; }
+    .search-trigger { flex: 0 1 360px; margin: 0 auto; justify-content: flex-start; color: var(--muted); border: 1px solid var(--line); height: 29px; min-width: 130px; background: var(--bg); font-size: 12px; }
+    .search-trigger kbd { margin-left: auto; }
+    .title-actions { display: flex; align-items: center; gap: 4px; }
+    .title-actions .btn { font-size: 12px; height: 30px; padding: 0 9px; }
+    .window-controls { display: flex; gap: 1px; border-left: 1px solid var(--line); margin-left: 5px; padding-left: 6px; }
+    .window-controls span { display: grid; place-items: center; height: 32px; width: 30px; color: var(--muted); }
+    .traffic { display: flex; gap: 7px; width: 65px; flex-shrink: 0; padding: 0 5px; }
+    .traffic i { width: 11px; height: 11px; border-radius: 50%; background: #fc625c; }
+    .traffic i:nth-child(2) { background: #fdbd40; } .traffic i:nth-child(3) { background: #34c749; }
+    .app-body { display: flex; flex: 1; min-height: 0; position: relative; }
+    .rail { display: flex; flex-direction: column; align-items: center; width: 56px; flex-shrink: 0; padding: 8px 4px; gap: 5px; background: var(--surface); border-right: 1px solid var(--line); z-index: 5; }
+    .rail-btn { position: relative; width: 47px; min-height: 48px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font-size: 10px; color: var(--muted); }
+    .rail-btn svg { height: 19px; width: 19px; }
+    .rail-btn.active { color: var(--accent); background: var(--accent-bg); }
+    .rail-btn.active::before { content: ""; position: absolute; left: -4px; height: 22px; width: 2px; background: var(--accent); border-radius: 3px; }
+    .rail-line { width: 26px; height: 1px; background: var(--line); margin: 8px 0; }
+    .dock { width: var(--dock-width); flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; position: relative; }
+    .dock.overlay { position: absolute; top: 0; bottom: 0; left: 56px; box-shadow: 18px 0 50px #0005; z-index: 16; }
+    .dock-header { height: 44px; display: flex; align-items: center; padding: 0 12px; gap: 7px; border-bottom: 1px solid var(--line); font-weight: 600; flex-shrink: 0; }
+    .dock-context { padding: 11px 12px 9px; border-bottom: 1px solid var(--line); font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+    .dock-context strong { display: block; color: var(--text); font-weight: 500; margin-bottom: 4px; }
+    .dock-scroll { flex: 1; overflow: auto; padding: 8px; }
+    .dock-search { width: 100%; margin: 2px 0 13px; font-size: 11px; }
+    .section-label { font-size: 10px; color: var(--dim); letter-spacing: .6px; padding: 12px 6px 8px; }
+    .tree-row { display: flex; align-items: center; gap: 7px; min-height: 32px; width: 100%; padding: 0 7px; text-align: left; border-radius: 4px; font-size: 12px; white-space: nowrap; }
+    .tree-row svg { width: 14px; height: 14px; color: var(--dim); }
+    .tree-row.selected { background: var(--hover); color: var(--text); }
+    .tree-row .badge { margin-left: auto; }
+    .indent { padding-left: 23px; } .indent2 { padding-left: 39px; }
+    .dock-foot { padding: 10px 12px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
+    .resize-handle { position: absolute; width: 6px; top: 0; bottom: 0; right: -3px; cursor: col-resize; z-index: 17; touch-action: none; }
+    .resize-handle:hover, .resize-handle:focus-visible { background: var(--accent); }
+    .main { display: flex; flex: 1; min-width: 0; flex-direction: column; overflow: hidden; }
+    .tabs-line { display: flex; align-items: stretch; height: 38px; flex-shrink: 0; background: var(--surface); border-bottom: 1px solid var(--line); }
+    .tabs-scroll { display: flex; flex: 1; overflow: auto hidden; min-width: 0; scrollbar-width: none; }
+    .tabs-scroll::-webkit-scrollbar { display: none; }
+    .tab { display: flex; align-items: center; flex-shrink: 0; min-width: 125px; max-width: 185px; border-right: 1px solid var(--line); position: relative; color: var(--muted); }
+    .tab.active { background: var(--bg); color: var(--text); }
+    .tab.active::after { position: absolute; content: ""; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
+    .tab.in-pane::before { content: ""; height: 5px; width: 5px; border-radius: 50%; background: var(--blue); position: absolute; left: 6px; top: 5px; }
+    .tab-target { display: flex; align-items: center; gap: 7px; padding: 0 10px; height: 37px; min-width: 0; flex: 1; text-align: left; font-size: 12px; }
+    .tab-target span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 118px; }
+    .tab-target svg { width: 14px; height: 14px; }
+    .tab-close { margin: 0 3px 0 0; width: 22px; height: 24px; }
+    .tab-close svg { width: 12px; height: 12px; }
+    .tab-count { border-left: 1px solid var(--line); padding: 0 10px; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    .panes { display: grid; flex: 1; min-height: 0; min-width: 0; gap: 5px; background: var(--line); }
+    .panes.lr { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .panes.tb { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+    .pane { display: flex; flex-direction: column; background: var(--bg); min-height: 0; min-width: 0; overflow: hidden; position: relative; }
+    .pane.focused { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+    .pane-bar { height: 40px; flex-shrink: 0; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 7px; padding: 0 13px; font-size: 11px; color: var(--muted); }
+    .pane-bar strong { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .type-label { font-size: 9px; border: 1px solid var(--line); border-radius: 3px; padding: 2px 4px; color: var(--dim); }
+    .pane-bar .btn { height: 27px; padding: 0 6px; font-size: 11px; }
+    .content { flex: 1; min-height: 0; overflow: auto; }
+    .inner-tabs { display: flex; height: 36px; gap: 0; border-bottom: 1px solid var(--line); overflow: hidden; flex-shrink: 0; }
+    .inner-tab { padding: 0 15px; color: var(--muted); font-size: 11px; display: flex; align-items: center; gap: 7px; white-space: nowrap; border-right: 1px solid var(--line); }
+    .inner-tab.active { color: var(--text); border-bottom: 1px solid var(--accent); background: var(--surface); }
+    .code-layout { display: flex; flex-direction: column; height: 100%; }
+    .breadcrumb { font-size: 11px; color: var(--dim); padding: 12px 20px 9px; }
+    .code { padding: 5px 15px 35px 0; font-family: var(--mono); font-size: 12px; line-height: 23px; overflow-x: auto; flex: 1; min-height: 0; }
+    .code-line { display: flex; white-space: pre; min-width: max-content; padding-right: 20px; }
+    .ln { text-align: right; width: 51px; padding-right: 19px; color: var(--dim); flex-shrink: 0; user-select: none; }
+    .syn-key { color: var(--blue); } .syn-string { color: var(--accent); } .syn-comment { color: var(--dim); } .syn-type { color: var(--orange); }
+    .code-line.highlight { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .bottom-tool { height: 148px; min-height: 100px; flex-shrink: 0; border-top: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; }
+    .bottom-tabs { display: flex; align-items: center; height: 34px; border-bottom: 1px solid var(--line); padding: 0 8px; gap: 8px; font-size: 11px; }
+    .bottom-tabs button { padding: 6px 7px; border-radius: 4px; } .bottom-tabs .chosen { color: var(--accent); }
+    .tool-output { padding: 12px 18px; font-family: var(--mono); font-size: 11px; line-height: 23px; overflow: auto; }
+    .terminal { padding: 18px 22px; font-family: var(--mono); font-size: 12px; line-height: 25px; white-space: pre; overflow: auto; height: 100%; }
+    .prompt { color: var(--accent); } .cursor { display: inline-block; width: 7px; height: 14px; background: var(--accent); vertical-align: middle; }
+    .metric-row { display: flex; gap: 10px; font-family: inherit; margin: 17px 0 20px; white-space: normal; }
+    .metric { min-width: 80px; flex: 1; padding: 11px 14px; border: 1px solid var(--line); border-radius: 6px; }
+    .metric b { display: block; font-size: 20px; font-weight: 500; color: var(--text); } .metric small { color: var(--dim); font-size: 10px; }
+    .query { padding: 18px 20px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; line-height: 23px; white-space: pre-wrap; }
+    .query-tools { padding: 10px 14px; display: flex; align-items: center; gap: 9px; font-size: 11px; border-bottom: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; }
+    th { color: var(--muted); font-weight: 500; background: var(--surface); }
+    th, td { padding: 10px 15px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    .table-wrap { overflow: auto; }
+    .mail-layout { display: flex; min-height: 100%; }
+    .mail-list { width: 230px; min-width: 180px; flex-shrink: 0; border-right: 1px solid var(--line); background: var(--surface); }
+    .mail-list-head { padding: 16px; color: var(--muted); font-size: 11px; }
+    .mail-item { padding: 15px; width: 100%; text-align: left; border-bottom: 1px solid var(--line); }
+    .mail-item.active { background: var(--hover); border-left: 2px solid var(--accent); }
+    .mail-sender { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .mail-sender time { margin-left: auto; font-size: 10px; } .mail-item b { display: block; font-size: 12px; font-weight: 550; margin: 8px 0; }
+    .mail-item p { font-size: 11px; margin: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mail-message { flex: 1; min-width: 0; padding: 28px 30px; line-height: 1.85; }
+    .mail-message h2 { font-size: 21px; font-weight: 550; margin: 0 0 18px; }
+    .avatar { height: 31px; width: 31px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-bg); color: var(--accent); font-size: 11px; flex-shrink: 0; }
+    .mail-message .message-body { margin-top: 28px; font-size: 13px; }
+    .callout { padding: 13px 16px; border-left: 2px solid var(--accent); background: var(--surface); margin: 20px 0; }
+    .attachment { padding: 11px 13px; border: 1px solid var(--line); border-radius: 6px; margin-top: 20px; display: inline-flex; align-items: center; gap: 8px; font-size: 11px; }
+    .remote { height: 100%; min-height: 270px; background: linear-gradient(125deg,#243d62,#182c47 48%,#244e58); position: relative; display: flex; align-items: center; justify-content: center; padding: 25px; color: #d8e5ee; }
+    .remote-window { width: min(450px, 85%); background: #182532eb; border: 1px solid #546478; border-radius: 7px; overflow: hidden; box-shadow: 0 15px 40px #0005; }
+    .remote-window .remote-head { padding: 12px 16px; background: #293948; font-size: 11px; }
+    .remote-window pre { padding: 20px; line-height: 25px; font-family: var(--mono); font-size: 11px; }
+    .remote-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 32px; background: #122335aa; padding: 8px 16px; font-size: 10px; }
+    .diff { font-family: var(--mono); font-size: 12px; line-height: 25px; padding: 22px; white-space: pre; }
+    .diff .added { background: var(--accent-bg); color: var(--accent); } .diff .removed { background: color-mix(in srgb,var(--red) 9%,transparent); color: var(--red); }
+    .home { padding: 36px clamp(24px, 6vw, 80px); overflow: auto; flex: 1; }
+    .eyebrow { font-size: 10px; letter-spacing: 1.8px; color: var(--accent); text-transform: uppercase; }
+    .home h1 { font-size: 30px; font-weight: 550; letter-spacing: -.6px; margin: 13px 0 8px; }
+    .home-intro { color: var(--muted); margin: 0 0 25px; font-size: 12px; }
+    .home-quick { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-top: 25px; }
+    .quick-card { text-align: left; border: 1px solid var(--line); border-radius: 8px; padding: 17px; min-height: 108px; background: var(--surface); }
+    .quick-card svg { color: var(--accent); width: 21px; height: 21px; margin-bottom: 12px; } .quick-card strong { display: block; font-size: 12px; font-weight: 550; }
+    .quick-card span { display: block; margin-top: 6px; font-size: 10px; color: var(--dim); }
+    .home-section { margin-top: 28px; } .home-section .row h3 { font-size: 13px; font-weight: 550; }
+    .recents { border-top: 1px solid var(--line); margin-top: 8px; }
+    .recent-row { width: 100%; padding: 12px 5px; display: flex; align-items: center; gap: 13px; text-align: left; border-bottom: 1px solid var(--line); }
+    .recent-row svg { color: var(--muted); } .recent-row strong { font-size: 12px; font-weight: 500; } .recent-row small { display: block; margin-top: 5px; color: var(--dim); font-size: 11px; }
+    .recent-row time { margin-left: auto; color: var(--dim); font-size: 10px; }
+    .restore-card { border: 1px solid var(--line); border-radius: 7px; padding: 15px 18px; display: flex; align-items: center; gap: 15px; margin-top: 26px; background: var(--surface); }
+    .restore-card strong { font-size: 12px; font-weight: 500; } .restore-card small { display: block; margin-top: 6px; color: var(--dim); font-size: 11px; }
+    .tao { width: 324px; flex-shrink: 0; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: var(--surface); min-height: 0; }
+    .tao.peek { position: absolute; right: 12px; top: 10px; bottom: 12px; width: 340px; max-width: calc(100% - 80px); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow); z-index: 20; overflow: hidden; }
+    .tao-title { display: flex; align-items: center; gap: 7px; padding: 0 13px; height: 44px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+    .tao-title strong { font-weight: 600; } .tao-title .btn { font-size: 10px; padding: 0 6px; height: 26px; }
+    .tao-tabs { display: flex; padding: 8px 10px 0; border-bottom: 1px solid var(--line); flex-shrink: 0; gap: 4px; }
+    .tao-tabs button { padding: 9px 11px; font-size: 11px; border-bottom: 2px solid transparent; }
+    .tao-tabs button.active { border-bottom-color: var(--accent); color: var(--accent); }
+    .tao-body { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
+    .context-chip { display: flex; align-items: center; gap: 7px; font-size: 10px; padding: 9px; border-radius: 5px; border: 1px solid var(--line); margin-bottom: 22px; color: var(--muted); }
+    .context-chip svg { width: 13px; height: 13px; color: var(--accent); }
+    .chat-label { font-size: 10px; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 7px; }
+    .chat-label svg { width: 15px; height: 15px; }
+    .chat-bubble { padding: 13px; background: var(--raised); border: 1px solid var(--line); border-radius: 7px; line-height: 1.85; font-size: 12px; margin-bottom: 19px; overflow-wrap: anywhere; }
+    .chat-bubble.user { background: var(--accent-bg); }
+    .chat-compose { margin: 0 13px 13px; border: 1px solid var(--line); border-radius: 7px; padding: 9px; background: var(--bg); flex-shrink: 0; }
+    .chat-compose textarea { width: 100%; resize: vertical; min-height: 55px; max-height: 110px; border: 0; padding: 5px; font-size: 12px; }
+    .chat-compose .row { font-size: 10px; color: var(--dim); margin-top: 8px; } .chat-compose .btn { height: 25px; font-size: 10px; }
+    .note { padding: 15px; border-radius: 7px; background: var(--raised); border: 1px solid var(--line); margin-bottom: 12px; }
+    .note h4 { font-weight: 550; font-size: 12px; margin: 0 0 12px; } .note p { font-size: 11px; color: var(--muted); line-height: 1.9; margin: 0; }
+    .note textarea { width: 100%; font-size: 11px; line-height: 1.9; resize: vertical; height: 104px; }
+    .notification { padding: 15px 0; border-bottom: 1px solid var(--line); }
+    .notification strong { font-size: 12px; font-weight: 500; } .notification p { margin: 8px 0; font-size: 11px; color: var(--muted); line-height: 1.7; }
+    .notification small { color: var(--dim); font-size: 10px; } .notification .btn { height: 26px; padding: 0 8px; font-size: 10px; margin-top: 10px; }
+    .statusbar { display: flex; align-items: center; flex-shrink: 0; height: 24px; padding: 0 12px; gap: 13px; font-size: 10px; border-top: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+    .statusbar .dot { display: inline-block; width: 5px; height: 5px; background: var(--accent); border-radius: 50%; margin-right: 5px; }
+    .demo-foot { display: flex; align-items: center; gap: 18px; padding: 11px 25px 14px; font-size: 11px; color: var(--dim); }
+    .demo-foot .key-note { margin-left: auto; }
+    dialog { padding: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 11px; box-shadow: var(--shadow); max-height: 86vh; }
+    dialog::backdrop { background: #060c15b5; backdrop-filter: blur(5px); }
+    .dialog-head { padding: 21px 25px 17px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); }
+    .dialog-head h2 { font-size: 19px; font-weight: 550; margin: 0; } .dialog-head p { font-size: 11px; color: var(--muted); margin: 7px 0 0; }
+    .overview { width: min(1220px, calc(100vw - 64px)); }
+    .overview-toolbar { display: flex; align-items: center; padding: 15px 25px; gap: 13px; flex-wrap: wrap; }
+    .search-field { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding-left: 10px; background: var(--surface); flex: 1; min-width: 180px; }
+    .search-field svg { color: var(--muted); width: 15px; height: 15px; } .search-field input { border: 0; background: transparent; flex: 1; width: 100%; min-width: 0; }
+    .chips { display: flex; gap: 4px; }
+    .chip { font-size: 11px; border-radius: 5px; padding: 7px 10px; white-space: nowrap; } .chip.active { background: var(--accent-bg); color: var(--accent); }
+    .overview-content { padding: 0 25px 22px; overflow: auto; max-height: calc(86vh - 186px); }
+    .group-heading { display: flex; align-items: center; gap: 8px; margin: 20px 0 11px; font-size: 12px; color: var(--muted); }
+    .group-heading:first-child { margin-top: 0; } .group-heading span { height: 1px; flex: 1; background: var(--line); margin-left: 6px; }
+    .preview-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 13px; }
+    .preview-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; text-align: left; background: var(--surface); padding: 0; width: 100%; }
+    .preview-card.current { border-color: var(--accent); }
+    .preview-title { padding: 12px 13px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .preview-title .badge { margin-left: auto; } .preview-title svg { color: var(--muted); width: 15px; height: 15px; }
+    .preview { height: 145px; overflow: hidden; padding: 13px 15px; background: var(--bg); font-family: var(--mono); font-size: 10px; line-height: 21px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); pointer-events: none; }
+    .preview.email-preview { font-family: inherit; } .preview.remote-preview { background: linear-gradient(125deg,#243d62,#182c47,#244e58); color: #dde7f0; }
+    .preview table { font-size: 9px; } .preview td, .preview th { padding: 4px 6px; } .preview strong { font-size: 12px; font-weight: 550; }
+    .preview-foot { padding: 9px 13px; display: flex; gap: 7px; align-items: center; color: var(--dim); font-size: 10px; }
+    .dialog-foot { padding: 12px 25px; border-top: 1px solid var(--line); display: flex; gap: 15px; color: var(--dim); font-size: 10px; align-items: center; }
+    .command-dialog { width: min(590px,calc(100vw - 50px)); } .command-input { border: 0; width: 100%; padding: 20px 24px; border-bottom: 1px solid var(--line); font-size: 14px; }
+    .command-results { max-height: 440px; overflow: auto; padding: 8px; }
+    .command-row { display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px; text-align: left; border-radius: 5px; font-size: 12px; }
+    .command-row svg { color: var(--muted); } .command-row small { margin-left: auto; color: var(--dim); font-size: 10px; }
+    .command-row.selected { background: var(--hover); } .empty { padding: 35px; text-align: center; font-size: 12px; color: var(--muted); }
+    .chooser { width: min(560px,calc(100vw - 50px)); }
+    .chooser .command-results { padding: 10px 15px; max-height: 390px; }
+    .help { width: min(630px,calc(100vw - 50px)); }
+    .help-body { padding: 20px 25px; line-height: 1.95; font-size: 12px; max-height: 60vh; overflow: auto; }
+    .help-body p { margin: 0 0 13px; } .help-body li { margin-bottom: 7px; } .help-body ul { padding-left: 20px; }
+    .popover { position: fixed; z-index: 45; min-width: 218px; max-width: 290px; border: 1px solid var(--line); border-radius: 7px; box-shadow: var(--shadow); background: var(--raised); padding: 5px; }
+    .popover button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 9px 10px; font-size: 12px; border-radius: 4px; }
+    .popover button small { margin-left: auto; font-size: 10px; color: var(--dim); } .popover .menu-label { color: var(--dim); font-size: 10px; padding: 9px 10px 5px; }
+    .popover .divider { height: 1px; background: var(--line); margin: 5px 3px; }
+    .toast { position: fixed; left: 50%; bottom: 45px; transform: translateX(-50%); z-index: 60; background: var(--raised); color: var(--text); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 7px; padding: 12px 18px; font-size: 12px; max-width: calc(100vw - 40px); }
+    .app.compact .search-trigger { flex: 0 1 130px; }
+    .app.compact .search-trigger .search-copy, .app.compact .search-trigger kbd { display: none; }
+    .app.compact .title-actions .btn { padding: 0 7px; }
+    .app.short .bottom-tool { height: 115px; }
+    .panes.tb .mail-list { width: 200px; }
+    @media (max-width: 1120px) { .demo-brand span { display: none; } .demo-header { gap: 8px; padding: 12px 18px; } .demo-foot .key-note { display: none; } }
+    @media (max-width: 960px) { .preview-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .chips { flex-wrap: wrap; } .overview-toolbar { gap: 9px; } .home-quick { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 620px) { .preview-grid { grid-template-columns: 1fr; } .demo-options { margin-left: 0; flex-wrap: wrap; } .stage { margin: 0 8px; } .demo-foot { padding: 10px; } }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <header class="demo-header">
+    <div class="demo-brand">Taomni <span>整体布局 · 设计演示 v1</span></div>
+    <nav class="scenes" aria-label="演示场景">
+      <button data-scene="dev" class="active">开发</button>
+      <button data-scene="ops">运维双栏</button>
+      <button data-scene="mail">邮件</button>
+      <button data-scene="overview">多 Tab 总览</button>
+      <button data-scene="home">首页</button>
+    </nav>
+    <div class="demo-options">
+      <select id="viewport" aria-label="模拟窗口宽度">
+        <option value="auto">跟随窗口</option><option value="1440">1440 px</option><option value="1200">1200 px</option><option value="960">960 px</option>
+      </select>
+      <select id="platform" aria-label="模拟桌面平台"><option value="windows">Windows</option><option value="macos">macOS</option><option value="linux">Linux</option></select>
+      <button class="btn" id="theme">浅色</button>
+      <button class="btn" id="reset">重置</button>
+      <button class="icon-btn" id="help-button" aria-label="演示说明" title="演示说明">?</button>
+    </div>
+  </header>
+  <div class="stage"><section id="app" class="app" aria-label="Taomni 桌面布局原型"></section></div>
+  <footer class="demo-foot">
+    <span>离线交互原型 · 示例内容 · 窗口控制仅示意</span>
+    <span id="layout-readout"></span>
+    <span class="key-note">试试：总览 → 切换内容，视图 → 左右并排，Tao → 固定 / 浮层</span>
+  </footer>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <div id="popover" class="popover" hidden></div>
+  <dialog id="overview" class="overview" aria-labelledby="overview-title">
+    <div class="dialog-head">
+      <div><h2 id="overview-title">所有打开的内容 <span id="overview-count" class="muted"></span></h2><p>看见内容，再切换。工作组可以同时包含终端、代码、数据库与邮件。</p></div>
+      <span class="spacer"></span><button class="icon-btn" data-close-dialog aria-label="关闭总览"><span data-icon="x"></span></button>
+    </div>
+    <div class="overview-toolbar">
+      <label class="search-field"><span data-icon="search"></span><input id="overview-search" type="search" aria-label="搜索打开的内容" placeholder="搜索标题、主机或项目…" autofocus></label>
+      <div id="overview-filters" class="chips" role="group" aria-label="按类型筛选"></div>
+      <select id="overview-group" aria-label="总览分组"><option value="group">按工作组</option><option value="type">按类型</option><option value="recent">最近使用</option></select>
+    </div>
+    <div id="overview-content" class="overview-content"></div>
+    <div class="dialog-foot"><span>预览均为模拟内容；产品中的敏感会话可关闭内容预览。</span><span class="spacer"></span><span>方向键移动 · Enter 切换 · Esc 返回</span></div>
+  </dialog>
+  <dialog id="command" class="command-dialog" aria-label="全局查找">
+    <input id="command-input" class="command-input" placeholder="查找打开的内容或操作…" aria-label="搜索内容或操作" autofocus>
+    <div id="command-results" class="command-results"></div>
+    <div class="dialog-foot">↑ ↓ 选择 · Enter 打开 · Esc 返回</div>
+  </dialog>
+  <dialog id="chooser" class="chooser" aria-labelledby="chooser-title">
+    <div class="dialog-head"><div><h2 id="chooser-title">选择并排的内容</h2><p id="chooser-subtitle">把已有内容移到另一栏，不新建连接。</p></div><span class="spacer"></span><button class="icon-btn" data-close-dialog aria-label="关闭选择"><span data-icon="x"></span></button></div>
+    <div id="chooser-results" class="command-results"></div>
+  </dialog>
+  <dialog id="confirm" class="help" aria-labelledby="confirm-title">
+    <div class="dialog-head"><h2 id="confirm-title">关闭示例工作区？</h2></div>
+    <div class="help-body"><p>这个示例工作区带有“未保存”标记。关闭内容与隐藏面板使用不同的交互。</p><p class="muted">真实产品沿用现有保存 / 放弃 / 取消流程。本原型仅演示取消和关闭，不操作任何文件。</p></div>
+    <div class="dialog-foot"><button class="btn" data-close-dialog>取消</button><span class="spacer"></span><button id="confirm-close" class="btn primary">关闭示例内容</button></div>
+  </dialog>
+  <dialog id="help" class="help" aria-labelledby="help-title">
+    <div class="dialog-head"><h2 id="help-title">如何体验这个设计</h2><span class="spacer"></span><button class="icon-btn" data-close-dialog aria-label="关闭说明"><span data-icon="x"></span></button></div>
+    <div class="help-body">
+      <p>本页独立运行，无需网络、安装依赖或启动 Taomni。上方一排用于切换演示场景和窗口尺寸，下方窗口是建议的产品布局。</p>
+      <ul>
+        <li><strong>多 Tab：</strong>点“总览”，查看大卡片、搜索、类型筛选与工作组；点卡片回到对应内容。</li>
+        <li><strong>混合分屏：</strong>点“视图 → 左右并排 / 上下并排”，选择另一种内容。点面板标题切换焦点，左侧工具和 Tao 上下文跟随焦点。</li>
+        <li><strong>面板：</strong>左侧“会话 / 文件 / Git”复用同一位置；拖动面板右边缘调整宽度。打开 Tao，可切换聊天 / 便签 / 通知，选择固定或浮层。</li>
+        <li><strong>首页：</strong>固定“首页”按钮始终可见；从首页“返回工作”恢复分屏和原有上下文。</li>
+        <li><strong>标题栏：</strong>“新建”“视图”“总览”“Tao”都有名称；点“Taomni”查看低频应用操作。桌面窗口控制仅示意。</li>
+        <li><strong>键盘：</strong>Ctrl / ⌘ + Shift + H 打开总览，Ctrl / ⌘ + Shift + K 打开全局查找；Alt + Home 回首页；F10 切换专注。</li>
+      </ul>
+      <p>Tab 可点击、关闭与拖动排序，邮件列表可切换，聊天可提交模拟消息，便签可在本次页面内编辑。刷新或“重置”恢复示例数据。</p>
+      <p class="muted">布局与交互演示不等于产品实现。连接、AI、文件操作、真实保存、原生窗口、截图采集和广播输入均未接入；完整规则见旁边的设计文档。</p>
+    </div>
+  </dialog>
+  <script>
+    "use strict";
+    const paths = {
+      home: '<path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+      server: '<rect x="4" y="3" width="16" height="7" rx="2"/><rect x="4" y="14" width="16" height="7" rx="2"/><path d="M7 6h.01M7 17h.01M11 6h6M11 17h6"/>',
+      folder: '<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+      file: '<path d="M14 2H5v20h14V7zM14 2v5h5M8 12h8M8 16h6"/>',
+      git: '<circle cx="6" cy="5" r="3"/><circle cx="6" cy="19" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 8v8M18 9c0 6-12 2-12 7"/>',
+      terminal: '<path d="m4 6 5 6-5 6M12 18h8"/>',
+      code: '<path d="m8 5-6 7 6 7M16 5l6 7-6 7M14 3l-4 18"/>',
+      database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
+      mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/>',
+      monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v4M7 21h10"/>',
+      box: '<path d="m12 2 9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10M7 4.8l9 5"/>',
+      search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+      grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+      view: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 3v18M8 8h13"/>',
+      lr: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/>',
+      tb: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18"/>',
+      plus: '<path d="M12 4v16M4 12h16"/>',
+      x: '<path d="m6 6 12 12M6 18 18 6"/>',
+      down: '<path d="m6 9 6 6 6-6"/>',
+      right: '<path d="m9 6 6 6-6 6"/>',
+      spark: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5zM20 2v4M18 4h4"/>',
+      pin: '<path d="m8 3 8 0-1 6 4 4v2H5v-2l4-4zM12 15v7"/>',
+      float: '<rect x="3" y="3" width="18" height="18" rx="2"/><rect x="10" y="9" width="9" height="10" rx="1"/>',
+      focus: '<path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/>',
+      bell: '<path d="M18 8a6 6 0 0 0-12 0c0 8-3 9-3 9h18s-3-1-3-9M9 21h6"/>',
+      note: '<path d="M3 3h18v12l-6 6H3zM15 21v-6h6M7 8h10M7 12h7"/>',
+      settings: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="5"/>',
+      play: '<path d="m8 4 12 8-12 8z"/>',
+      arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
+      check: '<path d="m4 12 5 5L20 6"/>',
+      more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+      minus: '<path d="M5 12h14"/>',
+      restore: '<path d="M3 10a9 9 0 1 1 2 8M3 4v6h6M12 7v5l3 2"/>'
+    };
+    const icon = (name) => '<svg aria-hidden="true" viewBox="0 0 24 24">' + (paths[name] || paths.file) + '</svg>';
+    const esc = (value) => String(value).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
+    const tabsSeed = [
+      {id:"code", title:"taomni", type:"code", label:"Code Workspace", icon:"code", target:"~/projects/taomni", group:"发布准备", status:"3 个更改", dirty:true},
+      {id:"ssh", title:"prod-api-01", type:"terminal", label:"SSH", icon:"terminal", target:"deploy@10.0.8.21", group:"发布准备", status:"已连接"},
+      {id:"db", title:"production", type:"data", label:"PostgreSQL", icon:"database", target:"db.internal · app", group:"发布准备", status:"已连接"},
+      {id:"git", title:"taomni · Git", type:"git", label:"Git", icon:"git", target:"~/projects/taomni", group:"发布准备", status:"3 个更改"},
+      {id:"ssh2", title:"staging-api", type:"terminal", label:"SSH", icon:"terminal", target:"deploy@10.0.8.32", group:"验证环境", status:"已连接"},
+      {id:"local", title:"PowerShell", type:"terminal", label:"本地终端", icon:"terminal", target:"~/projects", group:"验证环境", status:"空闲"},
+      {id:"sftp", title:"staging · SFTP", type:"files", label:"SFTP", icon:"folder", target:"10.0.8.32 · /srv/app", group:"验证环境", status:"传输 1 / 2"},
+      {id:"vnc", title:"QA Desktop", type:"remote", label:"VNC", icon:"monitor", target:"10.0.8.40:5900", group:"验证环境", status:"已连接"},
+      {id:"mail", title:"工作邮箱", type:"mail", label:"Mail", icon:"mail", target:"work@example.com", group:"沟通", status:"2 封未读"},
+      {id:"storage", title:"assets · S3", type:"storage", label:"对象存储", icon:"box", target:"s3://release-assets", group:"沟通", status:"就绪"}
+    ];
+    const files = [
+      ["folder","src",0,""], ["folder","components",1,""], ["folder","tabbar",2,""],
+      ["code","TabBar.tsx",2,"M"], ["folder","layouts",1,""], ["code","MainLayout.tsx",2,"M"],
+      ["folder","stores",1,""], ["code","appStore.ts",2,"M"], ["file","package.json",0,""],
+      ["folder","src-tauri",0,""], ["folder","docs-feature",0,""]
+    ];
+    const mailSeed = [
+      {from:"Lin · 产品",time:"10:42",subject:"布局设计评审 · 周五下午",preview:"请带上多 Tab 和混合分屏的演示。",body:"本周五下午我们一起看一下新的布局方案。希望重点体验：多 Tab 时如何快速找到内容、文件和 Git 面板是否容易发现，以及窗口变窄后的工作空间。",next:"请在评审前准备终端 + 数据库的并排场景。",attachment:"layout-review.pdf · 248 KB"},
+      {from:"CI Bot",time:"10:18",subject:"Release candidate · build passed",preview:"Windows / macOS / Linux 构建已完成。",body:"Release candidate 的示例构建报告已生成。三个平台的构建状态汇总如下。",next:"Windows、macOS、Linux：示例状态为通过。",attachment:"build-report.txt · 12 KB"},
+      {from:"Team",time:"09:30",subject:"本周发布检查清单",preview:"请确认服务状态、数据库变更和版本说明。",body:"请查看本周发布检查清单，并把需要进一步讨论的问题整理到便签里。",next:"验证环境 → 发布环境 → 回滚检查。",attachment:"release-checklist.md · 4 KB"}
+    ];
+    const typeNames = {code:"代码",terminal:"终端",data:"数据",git:"Git",files:"文件",remote:"远程桌面",mail:"邮件",storage:"对象存储"};
+    const app = document.getElementById("app");
+    const popover = document.getElementById("popover");
+    let s, overviewType = "all", chooserAction = "lr", confirmTabId = null, commandIndex = 0, commandItems = [], lastFocus = null, toastTimer, draggedTabId = null;
+    function initialState() {
+      return {tabs:tabsSeed.map((t,i) => ({...t, used:100-i})),active:"code",panes:["code"],axis:"lr",home:false,returnDock:null,dock:"files",dockWidth:232,docks:{code:"files",ssh:"files",db:"objects",mail:"mail"},tao:false,taoMode:"peek",taoTab:"chat",overlayPriority:"dock",contextLocked:false,lockedContext:null,bottom:true,bottomTab:"terminal",focus:false,mailIndex:0,note:"检查 SSH 服务状态\n核对数据库迁移\n确认发布说明与回滚步骤",messages:[],scene:"dev",lastUsed:101};
+    }
+    s = initialState();
+    const tabById = (id) => s.tabs.find(t => t.id === id);
+    const current = () => tabById(s.active);
+    const byTypeDock = (t) => !t ? null : t.type === "code" || t.type === "terminal" || t.type === "files" ? "files" : t.type === "data" ? "objects" : t.type === "mail" ? "mail" : t.type === "git" ? "git" : null;
+    function supportedTools(t) {
+      if (!t) return [];
+      if (t.type === "code") return [["files","folder","项目"],["git","git","Git"],["bottom","terminal","终端"]];
+      if (t.type === "terminal") return [["files","folder","文件"],...(t.id === "local" ? [["git","git","Git"]] : [])];
+      if (t.type === "data") return [["objects","database","对象"]];
+      if (t.type === "mail") return [["mail","mail","文件夹"]];
+      if (t.type === "git") return [["git","git","更改"]];
+      return [];
+    }
+    function btn(action, name, imageName, extra) {
+      return '<button class="btn ' + (extra || "") + '" data-action="' + action + '">' + (imageName ? icon(imageName) : "") + name + '</button>';
+    }
+    function iconBtn(action, label, imageName) {
+      return '<button class="icon-btn" data-action="' + action + '" aria-label="' + label + '" title="' + label + '">' + icon(imageName) + '</button>';
+    }
+    function railBtn(action, name, imageName, active) {
+      return '<button class="rail-btn' + (active ? " active" : "") + '" data-action="' + action + '" aria-label="' + name + '" title="' + name + '" aria-pressed="' + !!active + '">' + icon(imageName) + '<span>' + name + '</span></button>';
+    }
+    function showToast(msg) {
+      const el = document.getElementById("toast"); el.textContent = msg; el.hidden = false;
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3400);
+    }
+    function closePopover() { popover.hidden = true; popover.innerHTML = ""; }
+    function openDialog(id) {
+      closePopover(); lastFocus = document.activeElement;
+      const el = document.getElementById(id);
+      if (!el.open) el.showModal();
+      const input = el.querySelector("input"); if (input) input.focus();
+    }
+    function closeDialog(el) { el.close(); if (lastFocus && lastFocus.isConnected) lastFocus.focus(); }
+    function focusPane(id) {
+      if (!tabById(id)) return;
+      s.active = id; s.home = false; tabById(id).used = ++s.lastUsed;
+      s.dock = Object.prototype.hasOwnProperty.call(s.docks,id) ? s.docks[id] : byTypeDock(current());
+    }
+    function activate(id) {
+      if (!tabById(id)) return;
+      if (s.home) { s.home = false; }
+      if (!s.panes.includes(id)) {
+        const old = s.panes.indexOf(s.active);
+        s.panes[Math.max(0,old)] = id;
+      }
+      focusPane(id); render(); scrollActive();
+    }
+    function scrollActive() { const el = app.querySelector('.tab[data-id="' + s.active + '"]'); if (el && !s.home) el.scrollIntoView({block:"nearest",inline:"nearest"}); }
+    function goHome() {
+      if (!s.home) s.returnDock = s.dock;
+      s.home = true; render();
+    }
+    function returnWork() {
+      s.home = false; s.dock = s.returnDock;
+      render(); scrollActive();
+    }
+    function setDock(name) {
+      if (s.focus) s.focus = false;
+      s.dock = s.dock === name ? null : name;
+      s.docks[s.active] = s.dock; s.overlayPriority = "dock"; render();
+    }
+    function actualLayout() {
+      const width = app.clientWidth, height = app.clientHeight;
+      let dockVisible = !!s.dock && !s.focus && (!s.home || s.dock === "sessions");
+      const dockOverlay = width < 1080;
+      let taoVisible = s.tao && !s.focus;
+      if (dockVisible && dockOverlay && taoVisible) {
+        if (s.overlayPriority === "tao") dockVisible = false;
+        else taoVisible = false;
+      }
+      const mainMin = s.panes.length > 1 && !s.home ? 760 : current()?.type === "mail" ? 640 : 520;
+      const left = dockVisible && !dockOverlay ? s.dockWidth : 0;
+      const taoInline = taoVisible && s.taoMode === "pin" && width - 56 - left - 324 >= mainMin;
+      const available = width - 56 - left - (taoInline ? 324 : 0);
+      return {width,height,dockVisible,dockOverlay,taoVisible,taoInline,axis:s.axis === "lr" && available < 760 ? "tb" : s.axis};
+    }
+    function render() {
+      const t = current(), l = actualLayout(), platform = document.getElementById("platform").value;
+      app.classList.toggle("compact",l.width < 1080); app.classList.toggle("short",l.height < 670);
+      app.style.setProperty("--dock-width",s.dockWidth + "px");
+      const traffic = platform === "macos" ? '<div class="traffic" aria-label="原生窗口控制示意"><i></i><i></i><i></i></div>' : "";
+      const win = platform !== "macos" ? '<div class="window-controls" role="img" aria-label="最小化、最大化、关闭窗口示意"><span>' + icon("minus") + '</span><span>' + icon("view") + '</span><span>' + icon("x") + '</span></div>' : "";
+      let html = '<header class="titlebar">' + traffic + '<button class="brand-button" data-action="app-menu" aria-label="Taomni 应用菜单"><span class="brand-mark">T</span>Taomni</button>';
+      html += '<button class="btn search-trigger" data-action="command" title="全局查找 · Ctrl / ⌘ + Shift + K">' + icon("search") + '<span class="search-copy">查找内容或操作</span><kbd>' + (platform === "macos" ? "⌘ ⇧ K" : "Ctrl ⇧ K") + '</kbd></button>';
+      html += '<div class="title-actions">' + btn("overview",'总览 <span class="badge">' + s.tabs.length + '</span>',"grid") + (s.focus ? btn("focus","退出专注","focus") : btn("view","视图","view")) + btn("new","新建","plus") + '<button class="btn' + (l.taoVisible ? " primary" : "") + '" data-action="tao" aria-expanded="' + l.taoVisible + '">' + icon("spark") + 'Tao <span class="badge new">3</span></button></div>' + win + '</header>';
+      html += '<div class="app-body"><nav class="rail" aria-label="导航与当前内容工具">' + railBtn("home","首页","home",s.home) + railBtn("dock:sessions","会话","server",s.dock === "sessions" && l.dockVisible) + '<div class="rail-line"></div>';
+      if (!s.home) for (const [id,imageName,name] of supportedTools(t)) html += railBtn(id === "bottom" ? "bottom" : "dock:" + id,name,imageName,id === "bottom" ? s.bottom && !s.focus : s.dock === id && l.dockVisible);
+      html += '<span class="spacer"></span>' + railBtn("more-tools","工具","more",false) + railBtn("settings","设置","settings",false) + '</nav>';
+      if (l.dockVisible) html += renderDock(t,l);
+      html += '<main class="main"><div class="tabs-line"><div class="tabs-scroll" role="tablist" aria-label="打开的工作内容">';
+      for (const tab of s.tabs) {
+        const selected = !s.home && tab.id === s.active;
+        html += '<div class="tab' + (selected ? " active" : "") + (!s.home && s.panes.includes(tab.id) ? " in-pane" : "") + '" data-id="' + tab.id + '" draggable="true"><button class="tab-target" role="tab" aria-selected="' + selected + '" data-tab="' + tab.id + '" title="' + esc(tab.label + " · " + tab.target) + '">' + icon(tab.icon) + '<span>' + esc(tab.title) + '</span>' + (tab.dirty ? '<span class="orange" aria-label="有未保存内容">●</span>' : "") + '</button><button class="icon-btn tab-close" data-close-tab="' + tab.id + '" aria-label="关闭 ' + esc(tab.title) + '">' + icon("x") + '</button></div>';
+      }
+      html += '</div><button class="tab-count" data-action="overview" title="查看所有打开的内容">' + icon("grid") + s.tabs.length + '</button></div>';
+      if (s.home || !t) html += renderHome();
+      else html += '<div class="panes ' + (s.panes.length > 1 ? l.axis : "") + '" data-layout="' + (s.panes.length > 1 ? l.axis : "single") + '">' + s.panes.map(id => renderPane(tabById(id))).join("") + '</div>';
+      html += '</main>';
+      if (l.taoVisible) html += renderTao(l);
+      html += '</div><footer class="statusbar"><span><i class="dot"></i>' + (s.home ? "首页 · 工作内容保持打开" : esc(t?.label + " · " + t?.status)) + '</span>';
+      if (!s.home && t?.type === "code") html += '<span>' + icon("git") + ' main</span><span>UTF-8</span>';
+      html += '<span class="spacer"></span>' + (s.focus ? '<span class="accent">专注模式</span>' : s.panes.length > 1 && !s.home ? '<span>两栏 · 工具跟随当前焦点</span>' : '<span>单页</span>') + '<span>' + s.tabs.length + ' 个内容打开</span></footer>';
+      app.innerHTML = html;
+      document.querySelectorAll("[data-scene]").forEach(b => b.classList.toggle("active",b.dataset.scene === s.scene));
+      document.getElementById("layout-readout").textContent = Math.round(l.width) + " × " + Math.round(l.height) + " · " + (l.dockVisible ? l.dockOverlay ? "左侧临时面板" : "左侧停靠面板" : "左侧收起") + " · " + (l.taoVisible ? l.taoInline ? "Tao 固定" : "Tao 浮层" : "Tao 收起");
+      initResize();
+      scrollActive();
+    }
+    function renderDock(t,l) {
+      const dockNames = {sessions:"会话",files:t?.type === "code" ? "项目文件" : "文件",git:"Git · 更改",objects:"数据库对象",mail:"邮件文件夹"};
+      let h = '<aside class="dock' + (l.dockOverlay ? " overlay" : "") + '" aria-label="' + dockNames[s.dock] + '"><div class="dock-header"><span>' + dockNames[s.dock] + '</span><span class="spacer"></span>' + iconBtn("dock-close","收起面板","x") + '</div>';
+      const context = s.dock === "sessions" ? "全部会话 · 按保存目录组织" : t?.target || "";
+      h += '<div class="dock-context"><strong>' + (s.dock === "sessions" ? "资源导航" : esc(t?.title || "")) + '</strong>' + esc(context) + '</div><div class="dock-scroll">';
+      if (s.dock === "sessions") {
+        h += '<label><input class="dock-search" id="session-search" aria-label="搜索会话" placeholder="搜索会话…" /></label><div id="session-list">' + renderSessions("") + '</div>';
+      } else if (s.dock === "files" && t?.type === "code") {
+        h += '<div class="section-label">TAOMNI</div>' + files.map((f,i) => '<button class="tree-row' + (f[2] ? f[2] === 2 ? " indent2" : " indent" : "") + (i === 3 ? " selected" : "") + '" data-action="file:' + i + '">' + icon(f[0]) + esc(f[1]) + (f[3] ? '<span class="spacer"></span><span class="orange">' + f[3] + '</span>' : "") + '</button>').join("");
+      } else if (s.dock === "files") {
+        h += '<div class="section-label">' + (t?.id === "local" ? "~/PROJECTS" : "/SRV/APP") + '</div>';
+        h += [["folder","current"],["folder","releases"],["folder","shared"],["file",".env"],["file","docker-compose.yml"],["file","README.md"]].map(f => '<button class="tree-row" data-action="file-open">' + icon(f[0]) + f[1] + '</button>').join("");
+      } else if (s.dock === "git") {
+        h += '<div class="section-label">MAIN · 3 个更改</div>' + ["TabBar.tsx","MainLayout.tsx","appStore.ts"].map(f => '<button class="tree-row" data-action="git-diff">' + icon("file") + f + '<span class="spacer"></span><span class="orange">M</span></button>').join("") + '<div class="section-label">仓库</div><div class="tree-row">' + icon("git") + 'main <span class="muted">↑ 1</span></div>';
+      } else if (s.dock === "objects") {
+        h += '<div class="section-label">APP / PUBLIC</div>' + ["tables","deployments","users","audit_logs","views","functions"].map((f,i) => '<button class="tree-row' + (i > 0 && i < 4 ? " indent" : "") + (i === 1 ? " selected" : "") + '" data-action="db-object">' + icon(i === 0 || i > 3 ? "folder" : "database") + f + '</button>').join("");
+      } else if (s.dock === "mail") {
+        h += '<div class="section-label">WORK@EXAMPLE.COM</div>' + [["收件箱","2"],["已发送",""],["草稿","1"],["归档",""],["垃圾邮件",""]].map((f,i) => '<button class="tree-row' + (i === 0 ? " selected" : "") + '" data-action="mail-folder:' + i + '">' + icon("mail") + f[0] + (f[1] ? '<span class="badge">' + f[1] + '</span>' : "") + '</button>').join("");
+      }
+      h += '</div><div class="dock-foot">' + (s.dock === "sessions" ? "导航到会话不会关闭当前内容" : s.dock === "files" && t?.type !== "code" ? '附属文件浏览 · ' + btn("open-sftp","独立打开","arrow") : s.dock === "git" ? btn("open-git","完整 Git 页面","arrow") : "工具跟随当前面板的焦点") + '</div><div class="resize-handle" role="separator" aria-label="调整左侧面板宽度" aria-orientation="vertical" aria-valuenow="' + s.dockWidth + '" aria-valuemin="190" aria-valuemax="360" tabindex="0"></div></aside>';
+      return h;
+    }
+    function renderSessions(query) {
+      const found = s.tabs.filter(t => (t.title + " " + t.target).toLowerCase().includes(query.toLowerCase()));
+      if (!found.length) return '<div class="empty">没有匹配的会话</div>';
+      let h = "";
+      for (const group of [...new Set(found.map(t => t.group))]) h += '<div class="section-label">' + group + '</div>' + found.filter(t => t.group === group).map(t => '<button class="tree-row" data-tab="' + t.id + '">' + icon(t.icon) + esc(t.title) + '</button>').join("");
+      return h;
+    }
+    function renderPane(t) {
+      if (!t) return "";
+      const isActive = s.active === t.id;
+      let h = '<section class="pane' + (isActive ? " focused" : "") + '" data-pane="' + t.id + '" aria-label="' + esc(t.title) + '"><div class="pane-bar" data-focus-pane="' + t.id + '">' + icon(t.icon) + '<span class="type-label">' + t.label + '</span><strong>' + esc(t.target) + '</strong><span class="spacer"></span>';
+      if (s.panes.length > 1) h += '<button class="btn" data-focus-pane="' + t.id + '" aria-label="聚焦 ' + t.title + '">' + (isActive ? '<span class="accent">当前</span>' : "聚焦") + '</button>' + iconBtn("merge","合为单页，保留所有打开的内容","view");
+      else h += iconBtn("pane-menu","当前内容操作","more");
+      h += '</div><div class="content">' + contentFor(t) + '</div></section>';
+      return h;
+    }
+    function contentFor(t) {
+      if (t.type === "code") return renderCode();
+      if (t.type === "terminal") {
+        if (t.id === "local" || t.label === "本地终端") return '<div class="terminal"><span class="muted">PowerShell 7.5 · local</span>\n\n<span class="prompt">PS ~/projects/taomni&gt;</span> git status --short\n<span class="orange"> M src/components/tabbar/TabBar.tsx\n M src/layouts/MainLayout.tsx\n M src/stores/appStore.ts</span>\n\n<span class="prompt">PS ~/projects/taomni&gt;</span> pnpm dev\n\n  <span class="accent">VITE</span>  ready\n  Local:   <span class="blue">http://localhost:5000/</span>\n\n<span class="prompt">PS ~/projects/taomni&gt;</span> <span class="cursor"></span></div>';
+        return '<div class="terminal"><span class="muted">Ubuntu 24.04 LTS · ' + esc(t.target) + '</span>\n\n<span class="prompt">deploy@' + esc(t.title) + ':~$</span> systemctl status api\n<span class="accent">● api.service — Taomni API</span>\n  Loaded: loaded (/etc/systemd/system/api.service)\n  Active: <span class="accent">active (running)</span>\n  Main PID: 4821 (api-server)\n<div class="metric-row"><div class="metric"><b>2.4%</b><small>CPU</small></div><div class="metric"><b>184 MB</b><small>MEMORY</small></div><div class="metric"><b>99.9%</b><small>UPTIME</small></div></div><span class="prompt">deploy@' + esc(t.title) + ':~$</span> tail -f /srv/app/logs/api.log\n<span class="muted">10:42:18</span> <span class="accent">INFO</span> health check passed\n<span class="muted">10:42:20</span> <span class="accent">INFO</span> GET /api/projects 200 12ms\n<span class="muted">10:42:24</span> <span class="accent">INFO</span> database pool: 8/20 active\n<span class="muted">10:42:25</span> <span class="accent">INFO</span> workers ready\n\n<span class="prompt">deploy@' + esc(t.title) + ':~$</span> <span class="cursor"></span></div>';
+      }
+      if (t.type === "data") return '<div class="query"><span class="syn-key">SELECT</span> id, version, environment, status\n<span class="syn-key">FROM</span> deployments\n<span class="syn-key">WHERE</span> environment = <span class="syn-string">\'production\'</span>\n<span class="syn-key">ORDER BY</span> created_at <span class="syn-key">DESC LIMIT</span> 5;</div><div class="query-tools">' + btn("query","运行","play","primary") + '<span class="muted">结果 · 5 行 · 18 ms（示例）</span></div>' + dataTable() + '<div class="tool-output muted">只读查询 · app.public.deployments</div>';
+      if (t.type === "mail") return renderMail();
+      if (t.type === "remote") return '<div class="remote"><div class="remote-window"><div class="remote-head">QA Desktop · Terminal</div><pre>qa@desktop:~$ ./smoke-check\n\n<span style="color:#91d8bb">✓</span> Connection established\n<span style="color:#91d8bb">✓</span> Display 1920 × 1080\n<span style="color:#91d8bb">✓</span> Workspace ready\n\nqa@desktop:~$ ▌</pre></div><div class="remote-bar">Applications &nbsp; Terminal<span style="float:right">10:42</span></div></div>';
+      if (t.type === "git") return '<div class="query-tools">' + icon("git") + '<strong>main</strong><span class="muted">3 个更改</span><span class="spacer"></span>' + btn("git-log","提交历史","restore") + '</div><div class="breadcrumb">src/layouts/MainLayout.tsx · 工作区差异</div><div class="diff"><span class="muted">@@ layout / title actions @@</span>\n\n<span class="removed">− &lt;TabMore /&gt;</span>\n<span class="added">+ &lt;TabsOverviewButton count={tabs.length} /&gt;</span>\n<span class="added">+ &lt;LayoutMenu /&gt;</span>\n\n  &lt;main className="work-area"&gt;\n<span class="added">+   &lt;FocusedContent /&gt;</span>\n  &lt;/main&gt;\n\n<span class="muted">差异为设计示例，不代表实际产品改动。</span></div>';
+      if (t.type === "files") return '<div class="query-tools">' + icon("folder") + '<span>/srv/app</span><span class="spacer"></span>' + btn("transfer","传输列表","arrow") + '</div>' + fileTable() + '<div class="tool-output"><span class="accent">传输中</span> release.tar.gz &nbsp; 72% &nbsp; 8.2 MB/s <br><span class="muted">切换 Tab 或隐藏面板后，传输继续（产品目标）。</span></div>';
+      return '<div class="query-tools">' + icon("box") + '<strong>release-assets</strong><span class="spacer"></span>' + btn("storage","对象列表","folder") + '</div>' + fileTable();
+    }
+    function renderCode() {
+      const lines = [
+        '<span class="syn-key">import</span> { useMemo } <span class="syn-key">from</span> <span class="syn-string">"react"</span>;',
+        '<span class="syn-key">import</span> { useAppStore } <span class="syn-key">from</span> <span class="syn-string">"../../stores/appStore"</span>;',
+        '',
+        '<span class="syn-comment">// One place to find your work.</span>',
+        '<span class="syn-key">export function</span> <span class="syn-type">TabsOverview</span>() {',
+        '  <span class="syn-key">const</span> tabs = useAppStore((state) =&gt; state.tabs);',
+        '  <span class="syn-key">const</span> activeId = useAppStore((state) =&gt; state.activeTabId);',
+        '',
+        '  <span class="syn-key">const</span> groups = useMemo(() =&gt; {',
+        '    <span class="syn-key">return</span> groupByContext(tabs);',
+        '  }, [tabs]);',
+        '',
+        '  <span class="syn-key">return</span> (',
+        '    &lt;<span class="syn-type">OverviewSurface</span> title=<span class="syn-string">"所有打开的内容"</span>&gt;',
+        '      {groups.map((group) =&gt; (',
+        '        &lt;<span class="syn-type">ContentPreviewGroup</span>',
+        '          key={group.id}',
+        '          items={group.tabs}',
+        '          activeId={activeId}',
+        '        /&gt;',
+        '      ))}',
+        '    &lt;/<span class="syn-type">OverviewSurface</span>&gt;',
+        '  );',
+        '}'
+      ];
+      let h = '<div class="code-layout"><div class="inner-tabs"><div class="inner-tab active">' + icon("code") + 'TabBar.tsx <span class="orange">●</span></div><div class="inner-tab">MainLayout.tsx</div><div class="inner-tab">appStore.ts</div></div><div class="breadcrumb">src &nbsp; / &nbsp; components &nbsp; / &nbsp; tabbar &nbsp; / &nbsp; TabBar.tsx</div><div class="code">';
+      h += lines.map((line,i) => '<div class="code-line' + (i === 13 ? " highlight" : "") + '"><span class="ln">' + (i+1) + '</span><span>' + (line || " ") + '</span></div>').join("") + '</div>';
+      if (s.bottom && !s.focus) {
+        h += '<div class="bottom-tool"><div class="bottom-tabs">' + ["terminal","problems","run"].map((id,i) => '<button class="' + (s.bottomTab === id ? "chosen" : "") + '" data-action="bottom-tab:' + id + '">' + ["终端","问题","运行"][i] + '</button>').join("") + '<span class="spacer"></span>' + iconBtn("bottom","收起底部工具","x") + '</div><div class="tool-output">';
+        h += s.bottomTab === "terminal" ? '<span class="prompt">~/projects/taomni $</span> pnpm dev<br><span class="accent">VITE</span> ready &nbsp; <span class="muted">Local:</span> <span class="blue">http://localhost:5000/</span><br><span class="prompt">~/projects/taomni $</span> <span class="cursor"></span>' : s.bottomTab === "problems" ? '<span class="accent">✓</span> 当前文件没有问题（示例）' : '<span class="accent">✓</span> 开发服务器已启动（示例）<br><span class="muted">输出保留在当前工作区，不占用全局 Tab。</span>';
+        h += '</div></div>';
+      }
+      return h + '</div>';
+    }
+    function dataTable() {
+      return '<div class="table-wrap"><table><thead><tr><th>#</th><th>id</th><th>version</th><th>environment</th><th>status</th></tr></thead><tbody>' + [29,28,27,26,25].map((n,i) => '<tr><td class="muted">' + (i+1) + '</td><td>' + (4800+n) + '</td><td>0.4.' + n + '</td><td>production</td><td class="' + (i ? "muted" : "accent") + '">' + (i ? "archived" : "active") + '</td></tr>').join("") + '</tbody></table></div>';
+    }
+    function fileTable() {
+      return '<div class="table-wrap"><table><thead><tr><th>名称</th><th>大小</th><th>修改时间</th><th>权限 / 状态</th></tr></thead><tbody>' + [["current","—","10:12","drwxr-xr-x"],["releases","—","09:54","drwxr-xr-x"],["release.tar.gz","48.2 MB","10:42","传输中"],["docker-compose.yml","2.1 KB","昨天","-rw-r--r--"],["README.md","4.6 KB","昨天","-rw-r--r--"]].map(f => '<tr><td>' + icon(f[1] === "—" ? "folder" : "file") + ' ' + f[0] + '</td><td class="muted">' + f[1] + '</td><td class="muted">' + f[2] + '</td><td class="muted">' + f[3] + '</td></tr>').join("") + '</tbody></table></div>';
+    }
+    function renderMail() {
+      const m = mailSeed[s.mailIndex];
+      let h = '<div class="mail-layout"><div class="mail-list"><div class="mail-list-head">收件箱 <span class="badge new">2</span></div>';
+      h += mailSeed.map((mail,i) => '<button class="mail-item' + (i === s.mailIndex ? " active" : "") + '" data-mail="' + i + '"><div class="mail-sender">' + esc(mail.from) + '<time>' + mail.time + '</time></div><b>' + esc(mail.subject) + '</b><p>' + esc(mail.preview) + '</p></button>').join("");
+      return h + '</div><article class="mail-message"><h2>' + esc(m.subject) + '</h2><div class="row"><span class="avatar">' + esc(m.from[0]) + '</span><div><strong>' + esc(m.from) + '</strong><div class="muted" style="font-size:10px">收件人：我 · 今天 ' + m.time + '</div></div></div><div class="message-body"><p>Hi，</p><p>' + esc(m.body) + '</p><div class="callout">' + esc(m.next) + '</div><p>谢谢，<br>' + esc(m.from) + '</p></div><div class="attachment">' + icon("file") + esc(m.attachment) + '</div><div class="row" style="margin-top:28px">' + btn("reply","回复","arrow","primary") + btn("mail-to-note","记录到便签","note") + '</div></article></div>';
+    }
+    function renderHome() {
+      const recents = s.tabs.slice().sort((a,b) => b.used-a.used).slice(0,4);
+      let h = '<section class="home" aria-label="首页"><div class="eyebrow">YOUR WORK, WITHIN REACH</div><div class="row"><h1>从这里，继续工作。</h1><span class="spacer"></span>';
+      if (s.tabs.length) h += btn("return-work","返回工作","arrow");
+      h += '</div><p class="home-intro">最近的会话、项目和文件。首页始终在左上角。</p>';
+      let quick = '<div class="home-quick">';
+      for (const [imageName,title,meta,action] of [["terminal","终端与会话","本地 / SSH","new"],["code","打开项目","Code Workspace","goto:code"],["database","连接数据库","查询与数据浏览","goto:db"],["mail","打开邮箱","邮件与附件","goto:mail"]]) quick += '<button class="quick-card" data-action="' + action + '">' + icon(imageName) + '<strong>' + title + '</strong><span>' + meta + '</span></button>';
+      quick += '</div>';
+      h += '<div class="home-section"><div class="row"><h3>最近使用</h3><span class="spacer"></span>' + btn("overview","查看所有打开的内容","grid") + '</div><div class="recents">';
+      h += recents.map(t => '<button class="recent-row" data-tab="' + t.id + '">' + icon(t.icon) + '<div><strong>' + esc(t.title) + '</strong><small>' + esc(t.label + " · " + t.target) + '</small></div><time>' + (s.panes.includes(t.id) ? "已打开" : "本次工作") + '</time>' + icon("right") + '</button>').join("");
+      return h + '</div></div>' + quick + '<div class="restore-card">' + icon("restore") + '<div><strong>上次工作 · 发布准备</strong><small>示例记录：终端、项目与数据库。恢复前可选择要打开的内容。</small></div><span class="spacer"></span>' + btn("restore","选择恢复","arrow") + '</div></section>';
+    }
+    function renderTao(l) {
+      const bound = s.contextLocked ? tabById(s.lockedContext) : s.home ? null : current();
+      let h = '<aside class="tao' + (l.taoInline ? "" : " peek") + '" aria-label="Tao 助手"><header class="tao-title">' + icon("spark") + '<strong>Tao</strong><span class="spacer"></span>';
+      h += '<button class="btn" data-action="tao-mode" aria-pressed="' + (s.taoMode === "pin") + '" title="' + (s.taoMode === "pin" ? "取消固定，改为浮层" : "固定在右侧；空间不足时暂用浮层") + '">' + icon(s.taoMode === "pin" ? "float" : "pin") + (s.taoMode === "pin" ? "取消固定" : "固定") + '</button>' + iconBtn("tao","收起 Tao","x") + '</header>';
+      if (s.taoMode === "pin" && !l.taoInline) h += '<div class="dock-context">固定偏好已保留 · 空间不足，暂用浮层</div>';
+      h += '<nav class="tao-tabs" aria-label="Tao 功能">' + [["chat","聊天"],["notes","便签"],["notifications","通知"]].map(([id,name]) => '<button class="' + (s.taoTab === id ? "active" : "") + '" data-action="tao-tab:' + id + '" aria-pressed="' + (s.taoTab === id) + '">' + name + (id === "notifications" ? ' <span class="badge new">3</span>' : "") + '</button>').join("") + '</nav><div class="tao-body">';
+      if (s.taoTab === "chat") {
+        h += '<div class="context-chip">' + icon(s.contextLocked ? "pin" : "code") + '<span>' + (s.contextLocked ? "已锁定：" : "上下文：") + esc(bound?.title || "通用聊天") + '</span><span class="spacer"></span><button class="icon-btn" data-action="lock-context" aria-label="' + (s.contextLocked ? "恢复跟随焦点" : "锁定当前上下文") + '" title="' + (s.contextLocked ? "恢复跟随焦点" : "锁定当前上下文") + '">' + icon("pin") + '</button></div><div class="chat-label">' + icon("spark") + 'Tao</div><div class="chat-bubble">当前是 <strong>' + esc(bound?.label || "通用聊天") + '</strong> 上下文。<br><br>你可以在这里讨论当前工作，把待办记录到便签，或查看通知。切换左侧文件 / Git 面板时，聊天会保留。<br><br><span class="muted">需要专心工作时，收起 Tao 即可。</span></div>';
+        h += s.messages.filter(m => m.context === (bound?.id || "global")).map(m => '<div class="chat-label">你</div><div class="chat-bubble user">' + esc(m.text) + '</div><div class="chat-label">' + icon("spark") + 'Tao · 演示</div><div class="chat-bubble">已收到这条示例消息。真实 AI 请求未接入。</div>').join("");
+      } else if (s.taoTab === "notes") {
+        h += '<div class="row" style="margin-bottom:15px"><span class="muted" style="font-size:11px">我的便签 · 本次页面内编辑</span><span class="spacer"></span></div><div class="note"><h4>发布前检查</h4><textarea id="note-input" aria-label="编辑发布前检查便签">' + esc(s.note) + '</textarea></div><div class="note"><h4>布局评审</h4><p>看看总览里的内容预览是否够用。<br>验证终端 + 数据库并排操作。</p></div>';
+      } else {
+        h += '<div class="notification"><strong>' + icon("mail") + ' 新邮件 · 布局设计评审</strong><p>Lin 发来一封邮件，点击回到完整邮件页面。</p><small>工作邮箱 · 10:42</small><br>' + btn("goto:mail","打开邮件","arrow") + '</div><div class="notification"><strong>' + icon("spark") + ' AI 工作已完成</strong><p>示例：发布检查已整理。</p><small>taomni · 10:38</small><br>' + btn("tao-tab:chat","查看聊天","arrow") + '</div><div class="notification"><strong>' + icon("note") + ' 便签提醒</strong><p>下午 15:00 · 布局设计评审</p><small>便签 · 今天</small><br>' + btn("tao-tab:notes","查看便签","arrow") + '</div>';
+      }
+      h += '</div>';
+      if (s.taoTab === "chat") h += '<form class="chat-compose" id="chat-form"><textarea id="chat-input" aria-label="发送示例聊天消息" placeholder="讨论当前工作…"></textarea><div class="row"><span>示例消息 · 不调用 AI</span><span class="spacer"></span><button type="submit" class="btn primary">发送 ' + icon("arrow") + '</button></div></form>';
+      return h + '</aside>';
+    }
+    function renderOverview() {
+      const query = document.getElementById("overview-search").value.toLowerCase();
+      const order = document.getElementById("overview-group").value;
+      const found = s.tabs.filter(t => (overviewType === "all" || t.type === overviewType || overviewType === "other" && ["git","files","remote","storage"].includes(t.type)) && (t.title + " " + t.target + " " + t.label + " " + t.group).toLowerCase().includes(query));
+      document.getElementById("overview-count").textContent = "(" + s.tabs.length + ")";
+      document.getElementById("overview-filters").innerHTML = [["all","全部"],["code","代码"],["terminal","终端"],["data","数据"],["mail","邮件"],["other","其他"]].map(([id,name]) => '<button class="chip' + (overviewType === id ? " active" : "") + '" data-filter="' + id + '" aria-pressed="' + (overviewType === id) + '">' + name + '</button>').join("");
+      if (order === "recent") found.sort((a,b) => b.used-a.used);
+      const groupOf = (t) => order === "recent" ? "最近使用" : order === "type" ? typeNames[t.type] : t.group;
+      const groups = [...new Set(found.map(groupOf))];
+      let h = "";
+      for (const group of groups) h += '<div class="group-heading">' + esc(group) + ' <span></span> ' + found.filter(t => groupOf(t) === group).length + '</div><div class="preview-grid">' + found.filter(t => groupOf(t) === group).map(t => '<button class="preview-card' + (t.id === s.active && !s.home ? " current" : "") + '" data-overview-tab="' + t.id + '" aria-label="切换到 ' + esc(t.title) + '"><div class="preview-title">' + icon(t.icon) + esc(t.title) + (s.panes.includes(t.id) && !s.home ? '<span class="badge new">' + (t.id === s.active ? "当前" : "另一栏") + '</span>' : "") + '</div><div class="preview' + (t.type === "mail" ? " email-preview" : t.type === "remote" ? " remote-preview" : "") + '">' + previewFor(t) + '</div><div class="preview-foot"><span>' + esc(t.label) + '</span><span class="spacer"></span><span>' + esc(t.status) + '</span></div></button>').join("") + '</div>';
+      document.getElementById("overview-content").innerHTML = h || '<div class="empty">没有匹配的内容。清空搜索或切换“全部”。</div>';
+    }
+    function previewFor(t) {
+      if (t.type === "code") return '<span class="muted">TabBar.tsx · src/components/tabbar</span><br><span class="syn-key">export function</span> TabsOverview() {<br>&nbsp; <span class="syn-key">const</span> tabs = useAppStore(...);<br>&nbsp; <span class="syn-key">return</span> (<br>&nbsp; &nbsp; &lt;OverviewSurface&gt;<br>&nbsp; &nbsp; &nbsp; &lt;ContentPreviewGroup /&gt;<br>&nbsp; &nbsp; &lt;/OverviewSurface&gt;';
+      if (t.type === "terminal") return '<span class="muted">' + esc(t.target) + '</span><br><span class="prompt">$</span> ' + (t.id === "local" ? 'pnpm dev<br><br><span class="accent">VITE</span> ready<br>Local: http://localhost:5000/' : 'systemctl status api<br><span class="accent">● active (running)</span><br><br><span class="muted">10:42:20</span> INFO GET /api/projects 200<br><span class="muted">10:42:24</span> INFO workers ready');
+      if (t.type === "data") return '<span class="syn-key">SELECT</span> * <span class="syn-key">FROM</span> deployments;<br><br>' + dataTable();
+      if (t.type === "mail") return '<span class="muted">Lin · 10:42</span><br><strong>布局设计评审 · 周五下午</strong><br><br>重点体验多 Tab、混合分屏与文件面板。<br>请在评审前准备并排操作的演示。';
+      if (t.type === "remote") return '<span class="muted" style="color:#bdd0e0">QA DESKTOP</span><br><br>qa@desktop:~$ ./smoke-check<br>✓ Connection established<br>✓ Workspace ready<br>qa@desktop:~$ ▌';
+      if (t.type === "git") return '<span class="muted">MainLayout.tsx · main</span><br><span class="red">− &lt;TabMore /&gt;</span><br><span class="accent">+ &lt;TabsOverviewButton /&gt;<br>+ &lt;LayoutMenu /&gt;</span><br><br>3 files changed';
+      return '<span class="muted">' + esc(t.target) + '</span><br><br>▸ current<br>▸ releases<br>  release.tar.gz &nbsp; 48.2 MB<br>  docker-compose.yml';
+    }
+    function overview() { overviewType = "all"; document.getElementById("overview-search").value = ""; renderOverview(); openDialog("overview"); }
+    function showMenu(kind,anchor) {
+      closePopover();
+      const item = (action,name,imageName,hint) => '<button data-action="' + action + '">' + (imageName ? icon(imageName) : "") + name + (hint ? '<small>' + hint + '</small>' : "") + '</button>';
+      let h = "";
+      if (kind === "view") h = '<div class="menu-label">内容布局</div>' + item("single","单页","view",s.panes.length === 1 ? "✓" : "") + item("split:lr","左右并排","lr") + item("split:tb","上下并排","tb") + '<div class="divider"></div><div class="menu-label">工作空间</div>' + item("focus",s.focus ? "退出专注" : "专注模式","focus","F10") + item("dock:sessions","会话导航","server") + item("layout-reset","恢复当前内容的默认布局","restore");
+      if (kind === "new") h = item("new-terminal","新建本地终端","terminal") + item("connect","连接已有会话","server") + item("goto:code","打开项目","code") + item("goto:db","连接数据库","database") + item("goto:mail","打开邮箱","mail");
+      if (kind === "app-menu") h = item("home","首页","home","Alt Home") + item("settings","设置","settings") + item("theme","切换主题","view") + '<div class="divider"></div>' + item("import","导入 / 导出会话","server") + item("tools","网络工具 / 代理 / MFA","more") + item("help","演示说明","note");
+      if (kind === "pane-menu") h = item("split:lr","与其他内容并排","lr") + item("close-current","关闭当前内容","x") + item("detach","在独立窗口打开","float") + item("capture","截图 / 录制","monitor");
+      if (kind === "more-tools") h = item("tools","网络工具 / 代理 / MFA","more") + item("goto:storage","对象存储","box") + item("lan-chat","局域网聊天","mail");
+      popover.innerHTML = h; popover.hidden = false;
+      const r = anchor.getBoundingClientRect(); const p = popover.getBoundingClientRect();
+      popover.style.left = Math.max(8,Math.min(r.left,window.innerWidth-p.width-10)) + "px";
+      popover.style.top = Math.max(8,Math.min(r.bottom+6,window.innerHeight-p.height-10)) + "px";
+      popover.querySelector("button")?.focus();
+    }
+    function openChooser(axis) {
+      if (s.home) returnWork();
+      chooserAction = axis;
+      document.getElementById("chooser-title").textContent = axis === "restore" ? "选择恢复的示例内容" : "选择" + (axis === "lr" ? "左右" : "上下") + "并排的内容";
+      document.getElementById("chooser-subtitle").textContent = axis === "restore" ? "本原型只切回已打开的示例，不重新建立连接。" : "移动已有内容到另一栏，不新建连接。";
+      document.getElementById("chooser-results").innerHTML = s.tabs.filter(t => axis === "restore" || t.id !== s.active).map(t => '<button class="command-row" data-choose-tab="' + t.id + '">' + icon(t.icon) + esc(t.title) + '<small>' + t.label + '</small></button>').join("") || '<div class="empty">先打开另一个内容，再进行并排。</div>';
+      openDialog("chooser");
+    }
+    function chooseTab(id) {
+      closeDialog(document.getElementById("chooser"));
+      if (chooserAction === "restore") { activate(id); return; }
+      s.axis = chooserAction; s.panes = [s.active,id]; s.home = false; s.focus = false;
+      render(); showToast("已并排。点击面板标题切换焦点；所有连接保持各自的内容实例。");
+    }
+    function closeTab(id,confirmed) {
+      const t = tabById(id); if (!t) return;
+      if (t.dirty && !confirmed) { confirmTabId = id; openDialog("confirm"); return; }
+      const wasHome = s.home;
+      s.tabs = s.tabs.filter(t => t.id !== id); s.panes = s.panes.filter(x => x !== id);
+      if (!s.panes.length && s.tabs.length) s.panes = [s.tabs.slice().sort((a,b) => b.used-a.used)[0].id];
+      if (!s.tabs.length) { s.active = null; s.home = true; s.dock = null; }
+      else if (s.active === id) focusPane(s.panes[0]);
+      if (wasHome) s.home = true;
+      if (s.contextLocked && s.lockedContext === id) { s.contextLocked = false; s.lockedContext = null; showToast("原上下文已关闭，Tao 恢复跟随焦点。"); }
+      render(); if (document.getElementById("overview").open) renderOverview();
+    }
+    function commandSearch() {
+      const query = document.getElementById("command-input").value.toLowerCase();
+      const commands = [["home","首页","home"],["overview","所有打开的内容 · 总览","grid"],["split:lr","左右并排","lr"],["split:tb","上下并排","tb"],["tao","打开 / 收起 Tao","spark"],["dock:sessions","会话导航","server"],["focus","专注模式","focus"],["new-terminal","新建本地终端","terminal"]];
+      commandItems = [...s.tabs.filter(t => (t.title+" "+t.target).toLowerCase().includes(query)).map(t => ({action:"goto:"+t.id,title:t.title,icon:t.icon,hint:t.label})), ...commands.filter(c => c[1].includes(query)).map(c => ({action:c[0],title:c[1],icon:c[2],hint:"操作"}))];
+      commandIndex = 0; renderCommands();
+    }
+    function renderCommands() {
+      document.getElementById("command-results").innerHTML = commandItems.map((c,i) => '<button class="command-row' + (i === commandIndex ? " selected" : "") + '" data-command-index="' + i + '">' + icon(c.icon) + esc(c.title) + '<small>' + c.hint + '</small></button>').join("") || '<div class="empty">没有匹配的内容或操作</div>';
+    }
+    function command() { document.getElementById("command-input").value = ""; commandSearch(); openDialog("command"); }
+    function scene(name) {
+      s.scene = name; s.focus = false; s.home = false; s.tao = false;
+      if (name === "overview") { render(); overview(); return; }
+      if (name === "home") { goHome(); return; }
+      const active = name === "dev" ? "code" : name === "ops" ? "ssh" : "mail";
+      if (!tabById(active)) s.tabs.push({...tabsSeed.find(t => t.id === active),used:++s.lastUsed});
+      if (name === "ops" && !tabById("db")) s.tabs.push({...tabsSeed.find(t => t.id === "db"),used:++s.lastUsed});
+      s.panes = name === "ops" ? ["ssh","db"] : [active]; s.axis = "lr"; focusPane(active); s.dock = byTypeDock(current()); s.docks[active] = s.dock; s.bottom = true;
+      render(); scrollActive();
+    }
+    function handle(action,anchor) {
+      if (["view","new","app-menu","pane-menu","more-tools"].includes(action)) { showMenu(action,anchor); return; }
+      closePopover();
+      if (action.startsWith("goto:")) {
+        const id = action.slice(5);
+        if (!tabById(id)) { const seed = tabsSeed.find(t => t.id === id); if (seed) s.tabs.push({...seed,used:++s.lastUsed}); }
+        activate(id); return;
+      }
+      if (action.startsWith("dock:")) { setDock(action.slice(5)); return; }
+      if (action.startsWith("split:")) { openChooser(action.slice(6)); return; }
+      if (action.startsWith("tao-tab:")) { s.taoTab = action.slice(8); s.tao = true; render(); return; }
+      if (action.startsWith("bottom-tab:")) { s.bottomTab = action.slice(11); render(); return; }
+      if (action.startsWith("file:")) { showToast("文件树内容用于布局示例，编辑器展示固定示例文件。"); return; }
+      if (action.startsWith("mail-folder:")) { showToast("演示展示收件箱；其他邮件文件夹保留在同一导航区域。"); return; }
+      switch (action) {
+        case "overview": overview(); break;
+        case "command": command(); break;
+        case "home": goHome(); break;
+        case "return-work": returnWork(); break;
+        case "dock-close": s.docks[s.active] = null; s.dock = null; render(); break;
+        case "tao": { const visible = actualLayout().taoVisible; s.focus = false; s.tao = !visible; s.overlayPriority = "tao"; render(); break; }
+        case "tao-mode": s.taoMode = s.taoMode === "pin" ? "peek" : "pin"; render(); break;
+        case "lock-context": s.contextLocked = !s.contextLocked; s.lockedContext = s.contextLocked ? s.active : null; render(); break;
+        case "bottom": s.bottom = !s.bottom; s.focus = false; render(); break;
+        case "merge": case "single": s.panes = [s.active]; s.home = false; render(); break;
+        case "focus": s.focus = !s.focus; render(); break;
+        case "layout-reset": s.focus = false; s.panes = [s.active]; s.axis = "lr"; s.dock = byTypeDock(current()); s.docks[s.active] = s.dock; s.dockWidth = 232; s.tao = false; s.bottom = true; render(); showToast("已恢复当前内容的默认布局。"); break;
+        case "new-terminal": {
+          const id = "local-" + (++s.lastUsed);
+          s.tabs.push({id,title:"本地终端 " + s.tabs.filter(t => t.type === "terminal").length,type:"terminal",label:"本地终端",icon:"terminal",target:"~/projects",group:"验证环境",status:"示例",used:s.lastUsed}); activate(id); showToast("新增了一个示例 Tab，没有启动真实终端。"); break;
+        }
+        case "connect": setDock("sessions"); break;
+        case "open-sftp": {
+          const owner = current(); if (!owner) break;
+          const id = "files-" + owner.id;
+          if (!tabById(id)) s.tabs.push({id,title:owner.title + " · 文件",type:"files",label:owner.label === "SSH" ? "SFTP" : "文件浏览",icon:"folder",target:owner.target + (owner.label === "SSH" ? " · /srv/app" : ""),group:owner.group,status:"示例",used:++s.lastUsed,ownerId:owner.id});
+          activate(id); break;
+        }
+        case "open-git": case "git-diff": handle("goto:git",anchor); break;
+        case "close-current": closeTab(s.active,false); break;
+        case "mail-to-note": s.note += "\n" + mailSeed[s.mailIndex].subject; s.tao = true; s.taoTab = "notes"; s.overlayPriority = "tao"; render(); break;
+        case "restore": openChooser("restore"); break;
+        case "theme": document.getElementById("theme").click(); break;
+        case "help": openDialog("help"); break;
+        default: showToast("这是布局示例：该操作的真实业务流程沿用产品能力，本页未接入。");
+      }
+    }
+    function initResize() {
+      const handle = app.querySelector(".resize-handle"); if (!handle) return;
+      handle.addEventListener("pointerdown",e => {
+        e.preventDefault(); handle.setPointerCapture(e.pointerId);
+        const startX = e.clientX, startWidth = s.dockWidth;
+        const move = ev => { s.dockWidth = Math.round(Math.max(190,Math.min(360,startWidth+ev.clientX-startX))); app.style.setProperty("--dock-width",s.dockWidth+"px"); handle.setAttribute("aria-valuenow",s.dockWidth); };
+        const up = () => { handle.removeEventListener("pointermove",move); handle.removeEventListener("pointerup",up); handle.removeEventListener("pointercancel",up); render(); };
+        handle.addEventListener("pointermove",move); handle.addEventListener("pointerup",up); handle.addEventListener("pointercancel",up);
+      });
+      handle.addEventListener("keydown",e => { if (["ArrowLeft","ArrowRight"].includes(e.key)) { e.preventDefault(); s.dockWidth = Math.max(190,Math.min(360,s.dockWidth+(e.key === "ArrowRight" ? 8 : -8))); render(); app.querySelector(".resize-handle")?.focus(); } });
+    }
+    document.addEventListener("click",e => {
+      const close = e.target.closest("[data-close-dialog]"); if (close) { closeDialog(close.closest("dialog")); return; }
+      const overTab = e.target.closest("[data-overview-tab]"); if (overTab) { closeDialog(document.getElementById("overview")); activate(overTab.dataset.overviewTab); return; }
+      const filter = e.target.closest("[data-filter]"); if (filter) { overviewType = filter.dataset.filter; renderOverview(); document.querySelector('[data-filter="'+overviewType+'"]')?.focus(); return; }
+      const choose = e.target.closest("[data-choose-tab]"); if (choose) { chooseTab(choose.dataset.chooseTab); return; }
+      const cr = e.target.closest("[data-command-index]"); if (cr) { const c = commandItems[Number(cr.dataset.commandIndex)]; closeDialog(document.getElementById("command")); handle(c.action,app.querySelector(".search-trigger")); return; }
+      const closeTabButton = e.target.closest("[data-close-tab]"); if (closeTabButton) { closeTab(closeTabButton.dataset.closeTab,false); return; }
+      const tab = e.target.closest("[data-tab]"); if (tab) { activate(tab.dataset.tab); return; }
+      const mail = e.target.closest("[data-mail]"); if (mail) { s.mailIndex = Number(mail.dataset.mail); render(); return; }
+      const action = e.target.closest("[data-action]"); if (action) { handle(action.dataset.action,action); return; }
+      const fp = e.target.closest("[data-focus-pane]"); if (fp && s.panes.length > 1) { focusPane(fp.dataset.focusPane); render(); return; }
+      const sceneButton = e.target.closest("[data-scene]"); if (sceneButton) { scene(sceneButton.dataset.scene); return; }
+      if (!e.target.closest("#popover")) closePopover();
+    });
+    document.addEventListener("input",e => {
+      if (e.target.id === "overview-search") renderOverview();
+      if (e.target.id === "command-input") commandSearch();
+      if (e.target.id === "session-search") document.getElementById("session-list").innerHTML = renderSessions(e.target.value);
+      if (e.target.id === "note-input") s.note = e.target.value;
+    });
+    document.addEventListener("submit",e => {
+      if (e.target.id !== "chat-form") return;
+      e.preventDefault(); const input = document.getElementById("chat-input"), value = input.value.trim(); if (!value) { input.focus(); return; }
+      s.messages.push({text:value,context:s.contextLocked ? s.lockedContext : s.home ? "global" : s.active}); render(); document.getElementById("chat-input")?.focus(); app.querySelector(".tao-body")?.scrollTo({top:99999});
+    });
+    document.getElementById("overview-group").addEventListener("change",renderOverview);
+    document.getElementById("confirm-close").addEventListener("click",() => { closeDialog(document.getElementById("confirm")); closeTab(confirmTabId,true); });
+    document.getElementById("viewport").addEventListener("change",e => { app.style.width = e.target.value === "auto" ? "100%" : e.target.value+"px"; render(); });
+    document.getElementById("platform").addEventListener("change",render);
+    document.getElementById("theme").addEventListener("click",() => { document.body.classList.toggle("light"); document.getElementById("theme").textContent = document.body.classList.contains("light") ? "深色" : "浅色"; });
+    document.getElementById("reset").addEventListener("click",() => { s = initialState(); closePopover(); document.querySelectorAll("dialog[open]").forEach(d => d.close()); render(); scrollActive(); });
+    document.getElementById("help-button").addEventListener("click",() => openDialog("help"));
+    document.querySelectorAll("[data-icon]").forEach(el => { el.innerHTML = icon(el.dataset.icon); });
+    document.querySelectorAll("dialog").forEach(d => {
+      d.addEventListener("click",e => { if (e.target !== d) return; const r=d.getBoundingClientRect(); if (e.clientX<r.left || e.clientX>r.right || e.clientY<r.top || e.clientY>r.bottom) closeDialog(d); });
+      d.addEventListener("cancel",e => { e.preventDefault(); closeDialog(d); });
+    });
+    document.addEventListener("keydown",e => {
+      const modal = document.querySelector("dialog[open]");
+      if (modal) {
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeDialog(modal); return; }
+        if (modal.id === "command" && ["ArrowDown","ArrowUp","Enter"].includes(e.key)) {
+          e.preventDefault();
+          if (!commandItems.length) return;
+          if (e.key === "Enter") { const c=commandItems[commandIndex]; closeDialog(modal); handle(c.action,app.querySelector(".search-trigger")); }
+          else { commandIndex=(commandIndex+(e.key==="ArrowDown" ? 1 : -1)+commandItems.length)%commandItems.length; renderCommands(); document.querySelector('[data-command-index="'+commandIndex+'"]')?.scrollIntoView({block:"nearest"}); }
+        }
+        if (modal.id === "overview" && ["ArrowDown","ArrowUp","ArrowLeft","ArrowRight"].includes(e.key) && !(e.target.tagName === "INPUT" && ["ArrowLeft","ArrowRight","ArrowUp"].includes(e.key)) && e.target.tagName !== "SELECT") {
+          const cards=[...modal.querySelectorAll(".preview-card")]; if (!cards.length) return;
+          const idx=cards.indexOf(document.activeElement), cols=window.innerWidth<=620 ? 1 : window.innerWidth<=960 ? 2 : 3;
+          const delta=e.key==="ArrowRight" ? 1 : e.key==="ArrowLeft" ? -1 : e.key==="ArrowDown" ? cols : -cols;
+          e.preventDefault(); cards[idx<0 ? 0 : Math.max(0,Math.min(cards.length-1,idx+delta))].focus();
+        }
+        return;
+      }
+      if (!popover.hidden) {
+        if (e.key==="Escape") { e.preventDefault(); closePopover(); app.querySelector('[data-action="view"]')?.focus(); return; }
+        if (["ArrowDown","ArrowUp"].includes(e.key)) { e.preventDefault(); const items=[...popover.querySelectorAll("button")], idx=items.indexOf(document.activeElement); items[(idx+(e.key==="ArrowDown" ? 1 : -1)+items.length)%items.length]?.focus(); return; }
+      }
+      const typing = ["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName) || e.target.isContentEditable;
+      const primary = e.ctrlKey || e.metaKey;
+      if (primary && e.shiftKey && e.key.toLowerCase()==="h") { e.preventDefault(); overview(); return; }
+      if (primary && e.shiftKey && e.key.toLowerCase()==="k") { e.preventDefault(); command(); return; }
+      if (typing) return;
+      if (e.altKey && e.key==="Home") { e.preventDefault(); goHome(); }
+      if (e.key==="F10") { e.preventDefault(); s.focus=!s.focus; render(); }
+      if (e.key==="Escape") {
+        if (actualLayout().taoVisible && !actualLayout().taoInline) { s.tao=false; render(); }
+        else if (s.focus) { s.focus=false; render(); }
+        else if (actualLayout().dockVisible && actualLayout().dockOverlay) { s.dock=null; render(); }
+      }
+    });
+    app.addEventListener("dragstart",e => { const tab=e.target.closest(".tab"); if (!tab) return; draggedTabId=tab.dataset.id; e.dataTransfer.setData("text/plain",draggedTabId); e.dataTransfer.effectAllowed="move"; });
+    app.addEventListener("dragover",e => { if (e.target.closest(".tab")) { e.preventDefault(); e.dataTransfer.dropEffect="move"; } });
+    app.addEventListener("drop",e => {
+      const target=e.target.closest(".tab"); if (!target || !draggedTabId) return;
+      e.preventDefault(); const a=s.tabs.findIndex(t=>t.id===draggedTabId), b=s.tabs.findIndex(t=>t.id===target.dataset.id);
+      if (a>=0 && b>=0 && a!==b) { const [moved]=s.tabs.splice(a,1); s.tabs.splice(b,0,moved); render(); }
+      draggedTabId=null;
+    });
+    let resizeTimer;
+    new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer=setTimeout(render,80); }).observe(app);
+    render();
+    window.taomniDemo = {getState:() => ({...s}),reset:() => {s=initialState();render();},scene,activate};
+  </script>
+</body>
+</html>
