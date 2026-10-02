@@ -95,6 +95,17 @@
 
 - `[data-testid="ptt-button"]` — interactive [optional] — F-AI-2.3.ptt-button
 
+## application/update (F-Update-1)
+
+- `[data-testid="update-dialog"]` — display — F-Update-1.update-dialog
+- `[data-testid="update-arch-darwin-aarch64"]` — interactive — F-Update-1.update-arch-arm64
+- `[data-testid="update-arch-darwin-x86_64"]` — interactive — F-Update-1.update-arch-intel
+- `[data-testid="update-download"]` — interactive — F-Update-1.update-download
+- `[data-testid="update-cancel-download"]` — interactive — F-Update-1.update-cancel-download
+- `[data-testid="update-progress"]` — display — F-Update-1.update-progress
+- `[data-testid="update-error"]` — display — F-Update-1.update-error
+- `[data-testid="update-restart"]` — interactive [optional] — F-Update-1.update-restart
+
 ## capture (F4.13)
 
 - `[data-testid="capture-toolbar"]` — display — F4.13.toolbar-root
@@ -1315,6 +1326,8 @@
 
 ## main/menubar (F1.8)
 
+- `[data-testid="about-check-update"]` — interactive — F1.8.about-check-update
+- `[data-testid="about-version"]` — interactive — F1.8.about-version
 - `[data-testid="app-main-menu"]` — interactive — F1.8.app-main-menu
 - `[data-testid="about-dialog"]` — display [optional] — F1.8.about-dialog
 - `[data-testid="context-menu-item-view"]` — interactive [optional] — F1.8.context-menu-item-view

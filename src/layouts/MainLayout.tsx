@@ -970,7 +970,7 @@ export function MainLayout() {
       // Don't disturb the user mid-flow: skip while the window is open or a
       // check/download/staged-install is in progress.
       if (st.dialogOpen) return;
-      if (st.status === "checking" || st.status === "downloading" || st.status === "ready") return;
+      if (["checking", "downloading", "installing", "authorizing", "ready"].includes(st.status)) return;
       void st.check();
     };
     const initial = window.setTimeout(runCheck, 4000);

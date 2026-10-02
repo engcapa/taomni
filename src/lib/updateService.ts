@@ -36,6 +36,32 @@ export interface DownloadProgress {
 // One resolved Update per target key (e.g. "darwin-x86_64"). check() resolves
 // to a single platform entry, so we keep them apart and reuse at install time.
 const updateCache = new Map<string, Update>();
+const downloadedCache = new Map<string, Update>();
+const checkGenerations = new Map<string, number>();
+
+export interface DownloadOptions {
+  signal?: AbortSignal;
+  onInstalling?: () => void;
+}
+
+function throwIfCancelled(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException("Update download cancelled", "AbortError");
+}
+
+export async function discardDownloadedUpdate(target?: string): Promise<void> {
+  const key = target ?? "";
+  const update = downloadedCache.get(key);
+  downloadedCache.delete(key);
+  if (update) await closeUpdate(update);
+}
+
+async function closeUpdate(update: Update): Promise<void> {
+  try {
+    await update.close();
+  } catch {
+    // Resource cleanup is best-effort; never replace the operation's outcome.
+  }
+}
 const SOCKSCAP_UPDATE_SUDO_REQUIRED = "SOCKSCAP_UPDATE_SUDO_REQUIRED:";
 
 function errorText(error: unknown): string {
@@ -94,6 +120,21 @@ function checkOptions(target?: string, proxy?: string): { target?: string; proxy
 }
 
 
+async function pluginCheck(target?: string): Promise<Update | null> {
+  if (__TAOMNI_QA_UPDATER__) {
+    const result = await invoke<{
+      configured: boolean;
+      update: ConstructorParameters<typeof import("@tauri-apps/plugin-updater").Update>[0] | null;
+    }>("qa_updater_check", { target });
+    if (result.configured) {
+      const { Update } = await import("@tauri-apps/plugin-updater");
+      return result.update ? new Update(result.update) : null;
+    }
+  }
+  const { check } = await import("@tauri-apps/plugin-updater");
+  return check(checkOptions(target, await appProxyUrl()));
+}
+
 export async function getUpdaterPlatform(): Promise<UpdaterPlatform> {
   if (!isTauriRuntime()) {
     const os = devOsToken();
@@ -110,18 +151,20 @@ export async function getUpdaterPlatform(): Promise<UpdaterPlatform> {
  */
 export async function checkForUpdate(target?: string): Promise<AvailableUpdate | null> {
   if (!isTauriRuntime()) return null;
-  const { check } = await import("@tauri-apps/plugin-updater");
-  const proxy = await appProxyUrl();
-  const update = await check(checkOptions(target, proxy));
-
   const key = target ?? "";
+  const generation = (checkGenerations.get(key) ?? 0) + 1;
+  checkGenerations.set(key, generation);
+  const update = await pluginCheck(target);
+  if (checkGenerations.get(key) !== generation) {
+    if (update) await closeUpdate(update);
+    return null;
+  }
+
   const prev = updateCache.get(key);
-  if (prev && prev !== update) {
-    try {
-      await prev.close();
-    } catch {
-      // Closing a stale handle is best-effort.
-    }
+  if (prev && prev !== update) await closeUpdate(prev);
+  if (checkGenerations.get(key) !== generation) {
+    if (update) await closeUpdate(update);
+    return null;
   }
 
   if (!update) {
@@ -158,10 +201,21 @@ export async function installDownloadedUpdate(
   target: string | undefined,
   sudoPassword?: string,
 ): Promise<void> {
-  const update = updateCache.get(target ?? "");
+  const key = target ?? "";
+  const update = downloadedCache.get(key);
   if (!update) throw new Error("The downloaded update is no longer available. Download it again.");
-  await prepareSocksCapForUpgrade(sudoPassword);
-  await update.install();
+  try {
+    await prepareSocksCapForUpgrade(sudoPassword);
+    await update.install();
+  } catch (error) {
+    if (!isSocksCapUpgradeAuthorizationRequired(error) && !isSudoAuthenticationError(error)) {
+      downloadedCache.delete(key);
+      await closeUpdate(update);
+    }
+    throw error;
+  }
+  downloadedCache.delete(key);
+  await closeUpdate(update);
 }
 
 /**
@@ -177,47 +231,65 @@ export async function installDownloadedUpdate(
 export async function downloadAndInstall(
   target: string | undefined,
   onProgress: (p: DownloadProgress) => void,
+  options: DownloadOptions = {},
 ): Promise<void> {
   if (!isTauriRuntime()) throw new Error("Updates are only available in the desktop app.");
-
+  const { signal, onInstalling } = options;
+  throwIfCancelled(signal);
   const key = target ?? "";
   let update = updateCache.get(key);
+  // Transfer ownership out of the check cache. A retry/check must not close or
+  // reuse a handle whose old download is still delivering IPC progress events.
+  updateCache.delete(key);
   if (!update) {
-    const { check } = await import("@tauri-apps/plugin-updater");
-    const proxy = await appProxyUrl();
-    update = (await check(checkOptions(target, proxy))) ?? undefined;
+    throwIfCancelled(signal);
+    update = (await pluginCheck(target)) ?? undefined;
     if (!update) throw new Error("No update is available for the selected package.");
-    updateCache.set(key, update);
   }
-
   let total: number | null = null;
   let downloaded = 0;
-  await update.download((event) => {
-    switch (event.event) {
-      case "Started":
-        total = event.data.contentLength ?? null;
-        downloaded = 0;
-        onProgress({ downloaded, total, percent: total ? 0 : null });
-        break;
-      case "Progress":
-        downloaded += event.data.chunkLength;
-        onProgress({
-          downloaded,
-          total,
-          percent: total ? Math.min(100, Math.round((downloaded / total) * 100)) : null,
-        });
-        break;
-      case "Finished":
-        onProgress({ downloaded, total, percent: 100 });
-        break;
-    }
-  });
-
-  // Download done → progress pinned at 100% (UI reads this as "installing").
-  // Stop SocksCap before installation can replace files or a later relaunch can
-  // terminate the process with machine-wide capture state still installed.
-  onProgress({ downloaded, total, percent: 100 });
-  await installDownloadedUpdate(target);
+  let downloadedHandle = false;
+  try {
+    throwIfCancelled(signal);
+    const previous = downloadedCache.get(key);
+    downloadedCache.delete(key);
+    if (previous && previous !== update) await closeUpdate(previous);
+    throwIfCancelled(signal);
+    await update.download((event) => {
+      if (signal?.aborted) return;
+      switch (event.event) {
+        case "Started":
+          total = event.data.contentLength ?? null;
+          downloaded = 0;
+          onProgress({ downloaded, total, percent: total ? 0 : null });
+          break;
+        case "Progress":
+          downloaded += event.data.chunkLength;
+          onProgress({
+            downloaded,
+            total,
+            percent: total ? Math.min(100, Math.round((downloaded / total) * 100)) : null,
+          });
+          break;
+        case "Finished":
+          onProgress({ downloaded, total, percent: 100 });
+          break;
+      }
+    });
+    // Tauri's download IPC has no transport-abort API. Cancellation detaches
+    // progress immediately; its eventual bytes are discarded, never installed.
+    throwIfCancelled(signal);
+    onProgress({ downloaded, total, percent: 100 });
+    throwIfCancelled(signal);
+    downloadedCache.set(key, update);
+    downloadedHandle = true;
+    onInstalling?.();
+    await installDownloadedUpdate(target);
+  } finally {
+    // Once bytes are downloaded, installDownloadedUpdate owns cleanup (or
+    // retains them for sudo authorization). Failed/cancelled transfers own it here.
+    if (!downloadedHandle) await closeUpdate(update);
+  }
 }
 
 /** Restart into the freshly installed version (confirmation gate #2). */

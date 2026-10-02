@@ -1,0 +1,78 @@
+id: TC-UPDATE-MACOS-002
+title: Cancel then check and retry keeps progress isolated from the old native download
+covers: [F-Update-1, F1.8]
+tags: [p0, update, macos, cancellation]
+modes: [native]
+native_platforms: [macOS]
+fixtures: [reset_db, macos_updater]
+timeout_sec: 240
+description: >-
+  The loopback server holds authentic signed ARM downloads at 20% and 60%, without mocking
+  updater IPC or progress. Start via About, cancel at 20%, check again and start the retry.
+  Release the old transfer while the retry is paused at 60%: old progress and completion
+  must not regress the new bar, replace its state with ready, or install the old bytes.
+  Release the retry and verify real signed ARM installation in the report-owned app.
+  The updater plugin has no transport-abort API: cancellation detaches the old callbacks
+  and discards its eventual bytes. OS launch/restart is intentionally not exercised.
+steps:
+  - open: app
+  - wait_for: '[data-testid="app-main-menu"]'
+  - click: '[data-testid="app-main-menu"]'
+  - click: '[data-testid="context-menu-item-help"]'
+  - click: '[data-testid="about-check-update"]'
+  - wait_for: '[data-testid="update-download"]:not(:disabled)'
+  - click: '[data-testid="update-download"]'
+  - wait_for: {selector: '[data-testid="update-progress"][aria-valuenow="20"]', timeout_sec: 30}
+  - click: '[data-testid="update-cancel-download"]'
+  - wait_for: {selector: '[data-testid="update-dialog"]', state: detached}
+  - assert_updater_unchanged: null
+  - click: '[data-testid="app-main-menu"]'
+  - click: '[data-testid="context-menu-item-help"]'
+  - click: '[data-testid="about-check-update"]'
+  - wait_for: '[data-testid="update-download"]:not(:disabled)'
+  - click: '[data-testid="update-download"]'
+  - wait_for: {selector: '[data-testid="update-progress"][aria-valuenow="60"]', timeout_sec: 30}
+  - assert_updater_progress: {min: 60, max: 60, seconds: 1}
+  - updater_release: 1
+  - assert_updater_progress: {min: 60, max: 60, seconds: 5, old_transfer_done: true}
+  - assert_updater_unchanged: null
+  - updater_release: 2
+  - wait_for: {selector: '[data-testid="update-restart"]', timeout_sec: 60}
+  - assert_updater_installed: aarch64
+  - screenshot: cancel-retry-progress.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-UPD-CANCEL-01
+      requirement: Explicit Cancel detaches the in-progress download and leaves the app unchanged.
+      actions: [3, 4, 5, 7, 9]
+      checkpoints:
+        - {step: 10, expectation: 'Cancellation closes the update dialog, instead of hiding a still-active store operation.'}
+        - {step: 11, expectation: Host SHA256 of the disposable app remains unchanged.}
+      results: [10, 11]
+    - id: V-UPD-CANCEL-02
+      requirement: Cancel, recheck and retry isolate the second transfer from old native progress and completion.
+      actions: [12, 13, 14, 16, 19]
+      checkpoints:
+        - {step: 18, expectation: Retry progress is held at 60% in the real WKWebView.}
+        - {step: 20, expectation: 'While old bytes finish, all raw samples remain downloading at 60%; no regression or old ready state.'}
+        - {step: 21, expectation: The cancelled transfer never installs its bytes.}
+      results: [20, 21]
+    - id: V-UPD-CANCEL-03
+      requirement: The uncancelled retry still verifies and installs normally, then requires user-confirmed restart.
+      actions: [22]
+      checkpoints:
+        - {step: 23, expectation: The retry completes at the restart confirmation gate.}
+        - {step: 24, expectation: 'Installed real Mach-O bytes, lipo arm64 and version match the pinned release archive.'}
+      results: [23, 24]
+  visual:
+    - check: Download bar exposes the current transfer's monotonically increasing percent.
+      method: automated
+      reason: aria-valuenow samples are retained in retry-progress*.json; no subjective speedup or pixel-parity claim.
+  native:
+    - check: Cancelled real Tauri download completion cannot install or rewrite retry progress.
+      method: automated
+      reason: Native IPC delivers the old stream's actual late chunks, and independent host bytes prove cancellation has no install effect.
+    - check: Transport cancellation and OS relaunch.
+      method: not-applicable
+      reason: Plugin transport cancellation is unavailable; this contract explicitly discards bytes rather than claiming the TCP transfer stops. Relaunch is outside this case.

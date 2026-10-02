@@ -268,6 +268,7 @@ jobs:
           releaseName: Taomni v${{ steps.version.outputs.version }}
           releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
           generateReleaseNotes: true
+          includeUpdaterJson: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           args: ${{ matrix.args }}
 
@@ -485,6 +486,7 @@ jobs:
           releaseName: Taomni v${{ steps.version.outputs.version }}
           releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
           generateReleaseNotes: true
+          includeUpdaterJson: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           args: --target aarch64-apple-darwin
 
@@ -562,6 +564,7 @@ jobs:
           releaseName: Taomni v${{ steps.version.outputs.version }}
           releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
           generateReleaseNotes: true
+          includeUpdaterJson: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           args: --target x86_64-apple-darwin
 
@@ -633,6 +636,12 @@ jobs:
     runs-on: ubuntu-22.04
     if: github.event_name == 'release' || github.ref_type == 'tag' || inputs.tag != ''
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Updater manifest unit contracts
+        run: node --test scripts/compose-updater-manifest.test.mjs
       - name: Resolve release tag
         id: meta
         shell: bash
@@ -661,75 +670,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${TAG#v}"
-          BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
-          NOTES="$(gh release view "$TAG" --json body --jq '.body // ""' 2>/dev/null || true)"
-          PUB_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          platforms='{}'
+          export RELEASE_NOTES="$(gh release view "$TAG" --json body --jq '.body // ""')"
+          node scripts/compose-updater-manifest.mjs artifacts updater-assets
 
-          arch_of() { case "$(echo "$1" | tr 'A-Z' 'a-z')" in *aarch64*|*arm64*) echo aarch64;; *) echo x86_64;; esac; }
+          # Validate and stage all platforms before uploading anything. macOS
+          # bundles have arch-qualified names and retain their signed bytes.
+          while IFS= read -r asset; do
+            gh release upload "$TAG" "$asset" --clobber
+          done < <(find updater-assets -maxdepth 1 -type f ! -name latest.json | sort)
 
-          record_entry() {
-            local key="$1" sig="$2" asset="$3"
-            local sig_content; sig_content="$(cat "$sig" | tr -d '\r')"
-            platforms="$(jq -n --argjson p "$platforms" --arg k "$key" \
-              --arg url "${BASE_URL}/${asset}" --arg sig "$sig_content" \
-              '$p + {($k): {signature:$sig, url:$url}}')"
-          }
-
-          while IFS= read -r sig; do
-            bundle="${sig%.sig}"
-            [ -f "$bundle" ] || { echo "::warning::missing bundle $bundle for $sig"; continue; }
-            asset="$(basename "$bundle")"
-            a="$(arch_of "$sig")"
-
-            # Upload bundle under its original filename with --clobber (avoids creating duplicate assets)
-            gh release upload "$TAG" "$bundle" --clobber
-
-            case "$asset" in
-              *.app.tar.gz)
-                record_entry "darwin-${a}" "$sig" "$asset"
-                record_entry "darwin-${a}-app" "$sig" "$asset"
-                ;;
-              *.AppImage|*.AppImage.tar.gz)
-                record_entry "linux-${a}-appimage" "$sig" "$asset"
-                record_entry "linux-${a}" "$sig" "$asset"
-                ;;
-              *.deb)
-                record_entry "linux-${a}-deb" "$sig" "$asset"
-                ;;
-              *.rpm)
-                record_entry "linux-${a}-rpm" "$sig" "$asset"
-                ;;
-              *-setup.exe|*-setup.nsis.zip)
-                record_entry "windows-${a}-nsis" "$sig" "$asset"
-                record_entry "windows-${a}" "$sig" "$asset"
-                ;;
-              *.msi|*.msi.zip)
-                record_entry "windows-${a}-msi" "$sig" "$asset"
-                # Fallback to MSI only if NSIS did not provide windows-${a}
-                if ! echo "$platforms" | jq -e --arg k "windows-${a}" 'has($k)' >/dev/null; then
-                  record_entry "windows-${a}" "$sig" "$asset"
-                fi
-                ;;
-              *)
-                echo "::notice::ignoring unsupported signature artifact: $asset"
-                ;;
-            esac
-          done < <(find artifacts -type f -name '*.sig' | sort)
-
-          [ -n "$NOTES" ] || NOTES="Desktop bundles for Taomni ${TAG}."
-
-          jq -n --arg v "$VERSION" --arg n "$NOTES" --arg d "$PUB_DATE" --argjson p "$platforms" \
-            '{version:$v, notes:$n, pub_date:$d, platforms:$p}' > latest.json
-
-          echo "Composed latest.json:"; cat latest.json
-          count="$(jq '.platforms | length' latest.json)"
-          echo "Platform entries: $count"
-
-          # Safety checks: ensure all supported OS families exist in latest.json
-          echo "$platforms" | jq -e 'has("darwin-aarch64") and has("darwin-x86_64")' >/dev/null || { echo "::error::missing macOS platforms in latest.json"; exit 1; }
-          echo "$platforms" | jq -e 'has("windows-x86_64") or has("windows-x86_64-nsis")' >/dev/null || { echo "::error::missing Windows platforms in latest.json"; exit 1; }
-          echo "$platforms" | jq -e 'has("linux-x86_64") or has("linux-x86_64-appimage")' >/dev/null || { echo "::error::missing Linux platforms in latest.json"; exit 1; }
-
-          gh release upload "$TAG" latest.json --clobber
+          # Publish the complete manifest only after every referenced asset exists.
+          gh release upload "$TAG" updater-assets/latest.json --clobber

@@ -480,6 +480,12 @@ files:
   - src/components/ContextMenu.tsx
   - src/components/AboutDialog.tsx
 controls:
+  - id: about-check-update
+    selector: '[data-testid="about-check-update"]'
+    kind: interactive
+  - id: about-version
+    selector: '[data-testid="about-version"]'
+    kind: interactive
   - id: app-main-menu
     selector: '[data-testid="app-main-menu"]'
     kind: interactive     # opens the unified app menu (ControlBar)
@@ -3392,6 +3398,55 @@ controls:
 ---
 
 ## 13. 自动化测试基线
+
+### 自动更新与发布资产完整性
+
+<!-- feature
+id: F-Update-1
+status: done
+area: application/update
+components: [UpdateDialog, AboutDialog]
+files:
+  - src/components/UpdateDialog.tsx
+  - src/lib/updateService.ts
+  - src/stores/updateStore.ts
+  - src-tauri/src/update.rs
+  - src-tauri/src/update/qa.rs
+  - scripts/compose-updater-manifest.mjs
+  - .github/workflows/release.yml
+controls:
+  - id: update-dialog
+    selector: '[data-testid="update-dialog"]'
+    kind: display
+  - id: update-arch-arm64
+    selector: '[data-testid="update-arch-darwin-aarch64"]'
+    kind: interactive
+  - id: update-arch-intel
+    selector: '[data-testid="update-arch-darwin-x86_64"]'
+    kind: interactive
+  - id: update-download
+    selector: '[data-testid="update-download"]'
+    kind: interactive
+  - id: update-cancel-download
+    selector: '[data-testid="update-cancel-download"]'
+    kind: interactive
+  - id: update-progress
+    selector: '[data-testid="update-progress"]'
+    kind: display
+  - id: update-error
+    selector: '[data-testid="update-error"]'
+    kind: display
+  - id: update-restart
+    selector: '[data-testid="update-restart"]'
+    kind: interactive
+    optional: true # restarting into production is excluded from isolated updater installation cases
+-->
+
+- macOS 两种架构的已签名包按版本/架构独立命名；完整清单最后发布，不能以同名资产覆盖另一个架构。
+- About 检查/版本入口、原生架构推荐和选择、真实签名拒绝、隔离安装由 TC-UPDATE-MACOS-001 保护。
+- 下载取消后不再安装或回写进度，重新检查/下载使用独立句柄；安装阶段不可取消，由 TC-UPDATE-MACOS-002 与 focused unit tests 保护。
+- native 用例使用固定真实签名的 v0.4.29 包和生产公钥，安装目标仅为报告内一次性 app；不证明生产 app 重启、公证或 Rosetta 执行。
+
 
 ### 13.1 单元测试（Vitest）✅
 - 测试文件 17 个，覆盖：

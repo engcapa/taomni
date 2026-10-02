@@ -31,6 +31,8 @@ Git tag / GitHub Release
 4. 下载完成前显示字节/百分比进度。
 5. 安装前调用 `sockscap_prepare_for_update`，释放驱动、helper 和系统捕获状态。
 6. 安装完成后再次征得用户确认，再重启到新版本。
+7. 下载阶段的「取消」立即使当前任务失效并关闭窗口；旧任务的进度、完成和失败不得回写新任务，也不得继续安装。插件没有传输级取消 API，因此旧 HTTP 下载可能短暂继续，其最终字节被丢弃。
+8. 正在下载、安装、授权或等待重启时，重新检查不会替换当前任务；安装阶段不提供取消按钮。
 
 检查结果按 target 缓存，下载与安装复用同一个 `Update` 对象。不得绕过 updater 的签名校验，也不得自行执行未验证的安装包。
 
@@ -41,6 +43,22 @@ Git tag / GitHub Release
 - endpoint 指向 GitHub 最新 Release 的 `latest.json`。
 - `latest.json` 必须是包含所有已发布平台的单一清单；不能让并行构建产物互相覆盖。
 - 清单中的 URL、signature、target key 和版本必须与 Release assets 一致。
+- `scripts/compose-updater-manifest.mjs` 从有明确平台/架构归属的 workflow artifacts 生成清单。macOS 最终资产名为 `Taomni_<version>_aarch64.app.tar.gz` / `Taomni_<version>_x86_64.app.tar.gz`，签名同步命名；只复制/重命名，不能改变已签名字节。
+- 所有平台完成完整性校验并上传所引用的包/签名后，最后发布完整 `latest.json`；平台构建禁止各自发布局部清单。重复目标、冲突文件名、缺包/签名或缺平台会阻止发布。
+
+### 2026-10-02 macOS ARM 升级失败根因
+
+线上 `v0.4.29` 的两个架构条目（含 `-app` 别名）指向同一个 `Taomni.app.tar.gz`，签名却分别来自 ARM / Intel。finalize 以本地同名包 `--clobber` 上传，后上传的 Intel 字节覆盖了 ARM：公共包与 `Taomni_x64.app.tar.gz` 的 SHA256 均为 `c536d3580dc1e1852e834cb781414e3c9e1f3a1d7de7da3c06ee2e4427c2149d`，真实 ARM 包为 `5d3081a8cb576e0599054076527175b7374495b25bc091d9c63c4e3793fd9b57`。选择 M 芯片下载到了 Intel 字节，ARM 签名按安全契约拒绝安装。这不是芯片检测或 Rosetta 限制。
+
+代码修复不会自动修复已有 Release。若获授权修复线上 `v0.4.29`，先保存原 `latest.json`，逐个核验独立架构包和 `.sig`，仅将 `darwin-aarch64` / `darwin-aarch64-app` 的 URL 改为现有 `Taomni_aarch64.app.tar.gz`，`darwin-x86_64` / `darwin-x86_64-app` 改为 `Taomni_x64.app.tar.gz`；保持签名、版本及其他平台条目不变，验证后再覆盖上传清单。无需重签名、更换公钥或让用户改选 x86_64。
+
+### 回归验证范围
+
+- `scripts/compose-updater-manifest.test.mjs`：同名双架构、原始签名字节不变、平台别名、Linux 格式、NSIS/MSI 优先级与失败前置门禁。
+- updater service/store/dialog unit tests：取消→检查→重试，旧回调/完成/错误隔离，下载句柄不被重新检查关闭，安装/授权门禁与 SocksCap 清理保留。
+- `TC-UPDATE-MACOS-001`：固定真实签名包 + 同一个清单生成器，原生 UI→check/download/验签/install；旧错配拒绝，正确 ARM/Intel 均安装成功。
+- `TC-UPDATE-MACOS-002`：真实 HTTP 流分别暂停于 20% / 60%，取消并重试后释放旧流，要求新进度不回退、旧流不安装，再释放新流安装成功。
+- 原生用例仅在隔离 QA app / run-owned Disposable.app 上执行，使用生产 updater/公钥，不修改 /Applications 或当前 QA 二进制；不证明生产重启、Intel 真机、Rosetta 执行或 Gatekeeper/notarization。
 
 ## CI 签名要求
 

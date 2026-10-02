@@ -553,6 +553,11 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     "message": f"{type(e).__name__}: {e}",
                     "artifacts": {},
                 }
+            # The updater fixture owns an HTTP server and controlled downloads;
+            # stop them after the app session even when a step or setup failed.
+            if "macos_updater" in c.fixtures:
+                with suppress(Exception):
+                    get_fixture("macos_updater").teardown(ctx_ns)
             if r["status"] == "failed":
                 r["failure"]["artifacts"] = failure_artifacts
             with suppress(Exception):

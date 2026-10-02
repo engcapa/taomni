@@ -88,6 +88,7 @@
           "parity009_ssr",
           "parity007_extract",
           "mail_server",
+          "macos_updater",
           "rdp_server_required",
           "system_rdp_running",
           "release_build_required",
@@ -301,6 +302,21 @@
       "maxProperties": 1,
       "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
       "properties": {
+        "updater_fixture_mode": { "enum": ["correct", "broken", "slow"] },
+        "updater_release": { "enum": [1, 2] },
+        "assert_updater_installed": { "enum": ["aarch64", "x86_64"] },
+        "assert_updater_unchanged": { "type": "null" },
+        "assert_updater_progress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "max": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "seconds": { "type": "number", "minimum": 0.1, "maximum": 30 },
+            "old_transfer_done": { "type": "boolean" }
+          }
+        },
         "open": {
           "$ref": "#/$defs/url_or_app"
         },
