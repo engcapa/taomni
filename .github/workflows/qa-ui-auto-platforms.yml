@@ -235,6 +235,11 @@ jobs:
         env:
           QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
         run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
+      - name: Windows mstsc startup diagnostic
+        if: runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        run: >-
+          python -m qa_ui_auto.rdp_helpers.mstsc
+          --preflight 'qa-ui-auto-report/${{ matrix.id }}/mstsc-startup'
       - name: RDP unit contracts on the native platform
         if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
         env:

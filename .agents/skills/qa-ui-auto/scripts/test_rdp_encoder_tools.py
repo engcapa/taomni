@@ -102,12 +102,39 @@ class EncoderToolsTest(unittest.TestCase):
         api.WaitForSingleObject.return_value = 0
         with patch.dict(os.environ, {"SystemRoot": r"C:\Windows"}), \
              patch.object(mstsc.ctypes, "WinDLL", return_value=api, create=True):
-            process = mstsc.launch(self.case / "mstsc.rdp", 45678)
+            process = mstsc.launch_create(self.case / "mstsc.rdp", 45678)
             self.assertEqual(process.pid, 44)
             self.assertEqual(process.wait(timeout=1), 0)
             process.close()
             process.close()
         self.assertEqual([call.args[0] for call in api.CloseHandle.call_args_list], [43, 42])
+
+    def test_mstsc_shell_launch_retains_only_its_process_and_reports_failure(self):
+        import ctypes
+        kernel, shell, ole = Mock(), Mock(), Mock()
+        kernel.GetProcessId.return_value = 123
+        ole.CoInitializeEx.return_value = 0
+        def execute(info):
+            self.assertEqual(info._obj.cbSize, ctypes.sizeof(mstsc.ShellExecuteInfo))
+            self.assertEqual(info._obj.fMask, 0x140)
+            self.assertEqual(info._obj.nShow, 1)
+            self.assertEqual(info._obj.lpVerb, "open")
+            self.assertIn(str((self.case / "mstsc.rdp").resolve()), info._obj.lpParameters)
+            self.assertIn("/v:127.0.0.1:45678", info._obj.lpParameters)
+            info._obj.hProcess = 42
+            return True
+        shell.ShellExecuteExW.side_effect = execute
+        with patch.dict(os.environ, {"SystemRoot": r"C:\Windows"}), \
+             patch.object(mstsc, "_kernel", return_value=kernel), \
+             patch.object(mstsc.ctypes, "WinDLL", side_effect=lambda name, **kwargs: ole if name == "ole32" else shell, create=True):
+            process = mstsc.launch(self.case / "mstsc.rdp", 45678)
+            self.assertEqual(process.pid, 123)
+            process.close()
+            kernel.CloseHandle.assert_called_once_with(42)
+            shell.ShellExecuteExW.side_effect = lambda info: True
+            with self.assertRaisesRegex(OSError, "owned process"):
+                mstsc.launch(self.case / "mstsc.rdp", 45678)
+            self.assertEqual(ole.CoUninitialize.call_count, 2)
 
     def test_canvas_waits_for_the_decoded_pixels_and_records_quality(self):
         self.ctx.session.execute.side_effect = [None,

@@ -34,6 +34,7 @@ from .native_steps import NativeStepContext, _verb
 from .steps import StepError
 from . import host_clipboard
 from .rdp_helpers.mstsc import launch as launch_mstsc
+from .rdp_helpers.mstsc import diagnose as diagnose_mstsc
 
 HELPERS = Path(__file__).resolve().parent / "rdp_helpers"
 
@@ -339,6 +340,7 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
         nonlocal process
         if process is not None:
             try:
+                diagnose_mstsc(process, ctx.case_dir)
                 diagnostics = subprocess.run(
                     ["powershell", "-NoProfile", "-NonInteractive", "-Command",
                      "Get-Process mstsc -ErrorAction SilentlyContinue | "
@@ -372,6 +374,8 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
                "authentication level:i:0", "prompt for credentials:i:0", "promptcredentialonce:i:0",
                "enablecredsspsupport:i:1", "negotiate security layer:i:1", "screen mode id:i:1",
                "gatewayusagemethod:i:0", "disableconnectionsharing:i:1",
+               "redirectprinters:i:0", "redirectsmartcards:i:0", "redirectwebauthn:i:0",
+               "redirectcomports:i:0", "redirectposdevices:i:0", "drivestoredirect:s:", "devicestoredirect:s:",
                "winposstr:s:0,1,10,10,1014,750", "smart sizing:i:1", "compression:i:1",
                f"desktopwidth:i:{int(args.get('width') or 1024)}", f"desktopheight:i:{int(args.get('height') or 768)}",
                "session bpp:i:32", "audiomode:i:0", "redirectclipboard:i:1", "autoreconnection enabled:i:0"]
