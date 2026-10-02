@@ -440,9 +440,10 @@ EncoderIter::next(rect)
 
 ### 8.2 GitHub CI 循环记录
 
-- 第一轮运行 [36949925667](https://github.com/engcapa/taomni/actions/runs/36949925667)，源码 `7c88ebf6`：三平台 browser 均为 4 passed / 0 failed / 0 skipped，已读取 summary、receipt 与 ci-outcome。Linux native 的 acceptor/bulk/server unit 为 1/135/17 passed；根库测试链接失败，错误为 `unable to find library -lgbm`，未开始 native cases。补齐 workflow 的 `libgbm-dev`，并将 RDP unit 输出保存为产物中的 `rdp-unit.log`。Windows/macOS native 仍在运行，待真实报告后回填。
+- 第一轮运行 [36949925667](https://github.com/engcapa/taomni/actions/runs/36949925667)，源码 `7c88ebf6`：三平台 browser 均为 4 passed / 0 failed / 0 skipped，已读取 summary、receipt 与 ci-outcome。Linux native 的 acceptor/bulk/server unit 为 1/135/17 passed；根库测试链接失败，错误为 `unable to find library -lgbm`，未开始 native cases。补齐 workflow 的 `libgbm-dev`，并将 RDP unit 输出保存为产物中的 `rdp-unit.log`。macOS 同样通过 vendor 的 153 tests，根库 RDP unit 94 passed / 1 failed：`reconnect_creates_a_fresh_bulk_history` 在服务端尚未结束上一连接时立即重连，被单连接接入策略拒绝。测试改为等待 `ConnectionHandler::on_disconnected` 的事件后重连，保留对新压缩历史的断言。Windows native 待真实报告后回填。
 - CI 等待期间审查发现两个参考服务器 case 残留对未创建的 `qa-rdp-loopback` 会话的等待，已移除并校正验收编号；xrdp 用例明确关闭 NLA，使用其支持的 TLS/Client Info 自动登录。探针补处理独立 `AT_FRONT` 控制包，回归验证后续 MPPC back-reference 使用已回绕的历史；探针 unit 15 passed（`encoder-probe-history.log`）。
 - 后续全量回归增加上游 V-15 的真实 ID `TC-auto-F-Servers-1-servers-dialog`，与原来的 20 个 RDP case 一起选择。
+- 第二轮 [36951702144](https://github.com/engcapa/taomni/actions/runs/36951702144)，源码 `d5dc6aa9`：QA 工具 unit 通过；Linux-only 选单包含 4 个仅 Windows 可执行的显式 ID，plan 如实拒绝，未执行 cases。后续按三平台联合选单运行全部 21 个 ID。
 
 ## 9. 验收追踪与交付条件
 

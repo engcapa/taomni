@@ -19,8 +19,8 @@ use ironrdp::pdu::rdp::capability_sets::client_codecs_capabilities;
 use ironrdp::pdu::rdp::client_info::CompressionType;
 use ironrdp::pdu::rdp::headers::CompressionFlags;
 use ironrdp::server::{
-    BitmapUpdate, DesktopSize, DisplayUpdate, EncoderStats, PixelFormat, RdpServer,
-    RdpServerDisplay, RdpServerDisplayUpdates, ServerEvent,
+    BitmapUpdate, ConnectionHandler, DesktopSize, DisplayUpdate, EncoderStats, PixelFormat,
+    PostConnectionAction, RdpServer, RdpServerDisplay, RdpServerDisplayUpdates, ServerEvent,
 };
 use ironrdp::session::image::DecodedImage;
 use ironrdp::session::{ActiveStage, ActiveStageBuilder, ActiveStageOutput};
@@ -49,11 +49,25 @@ impl RdpServerDisplayUpdates for ControlledUpdates {
     }
 }
 
+struct ConnectionClosed(tokio::sync::mpsc::UnboundedSender<()>);
+impl ConnectionHandler for ConnectionClosed {
+    fn on_disconnected(
+        &mut self,
+        _peer: SocketAddr,
+        _duration: Duration,
+        _error: Option<&anyhow::Error>,
+    ) -> PostConnectionAction {
+        let _ = self.0.send(());
+        PostConnectionAction::Continue
+    }
+}
+
 struct TestServer {
     _dir: tempfile::TempDir,
     addr: SocketAddr,
     shutdown: Option<tokio::sync::oneshot::Sender<()>>,
     updates: tokio::sync::mpsc::UnboundedSender<DisplayUpdate>,
+    disconnected: tokio::sync::mpsc::UnboundedReceiver<()>,
     size: Arc<Mutex<DesktopSize>>,
     stats: Arc<EncoderStats>,
     thread: Option<std::thread::JoinHandle<()>>,
@@ -69,6 +83,7 @@ impl TestServer {
         let size = Arc::new(Mutex::new(DesktopSize { width, height }));
         let stats = Arc::new(EncoderStats::default());
         let (updates, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (disconnected_tx, disconnected) = tokio::sync::mpsc::unbounded_channel();
         let display = ControlledDisplay {
             size: size.clone(),
             receiver: Arc::new(tokio::sync::Mutex::new(receiver)),
@@ -82,7 +97,8 @@ impl TestServer {
                     .with_addr(SocketAddr::from(([127, 0, 0, 1], 0)))
                     .with_tls(identity.make_acceptor().unwrap()).with_no_input()
                     .with_display_handler(display).with_bulk_compression(enabled)
-                    .with_encoder_stats_handle(thread_stats).build();
+                    .with_encoder_stats_handle(thread_stats)
+                    .with_connection_handler(Some(Box::new(ConnectionClosed(disconnected_tx)))).build();
                 let events = server.event_sender().clone();
                 let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
                 events.send(ServerEvent::GetLocalAddr(addr_tx)).unwrap();
@@ -104,6 +120,7 @@ impl TestServer {
             addr,
             shutdown: Some(shutdown),
             updates,
+            disconnected,
             size,
             stats,
             thread: Some(thread),
@@ -493,7 +510,7 @@ async fn proprietary_codec_with_compression_keeps_its_existing_wire_format() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reconnect_creates_a_fresh_bulk_history() {
-    let server = TestServer::new(256, 128, true);
+    let mut server = TestServer::new(256, 128, true);
     for round in 0..2 {
         let mut client = TestClient::connect(server.addr, Some(CompressionType::Rdp61), false)
             .await
@@ -505,5 +522,12 @@ async fn reconnect_creates_a_fresh_bulk_history() {
             client.wire.flushed > 0,
             "connection {round} must flush the peer"
         );
+        drop(client);
+        // The server rejects concurrent clients. Wait until its previous
+        // connection has completed before testing a new connection's history.
+        tokio::time::timeout(Duration::from_secs(8), server.disconnected.recv())
+            .await
+            .unwrap()
+            .expect("server reports the previous connection has ended");
     }
 }
