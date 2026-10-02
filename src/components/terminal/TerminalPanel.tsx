@@ -576,6 +576,7 @@ export function TerminalPanel({
   const [searchOpen, setSearchOpen] = useState(false);
   const [eventLogOpen, setEventLogOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const searchTimerRef = useRef<number | null>(null);
   const [searchStatus, setSearchStatus] = useState("");
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
@@ -1596,7 +1597,15 @@ export function TerminalPanel({
     setSearchStatus("");
   }, []);
 
+  const cancelPendingSearch = useCallback(() => {
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+  }, []);
+
   const closeSearch = useCallback(() => {
+    cancelPendingSearch();
     setSearchOpen(false);
     setSearchStatus("");
     setSearchMatches([]);
@@ -1605,9 +1614,10 @@ export function TerminalPanel({
     termRef.current?.clearSelection();
     clearTerminalBlockSelection();
     focusTerminal();
-  }, [clearTerminalBlockSelection, focusTerminal]);
+  }, [cancelPendingSearch, clearTerminalBlockSelection, focusTerminal]);
 
   const runSearch = useCallback((direction: "next" | "previous" = "next") => {
+    cancelPendingSearch();
     const terminal = termRef.current;
     const term = (searchInputRef.current?.value ?? searchValue).trim();
     if (!terminal || !term) {
@@ -1635,7 +1645,7 @@ export function TerminalPanel({
       setActiveSearchIndex(-1);
       setSearchStatus("No matches");
     }
-  }, [clearTerminalBlockSelection, searchValue]);
+  }, [cancelPendingSearch, clearTerminalBlockSelection, searchValue]);
 
   const renameTerminal = useCallback(async () => {
     if (!tabId) return;
@@ -2330,6 +2340,7 @@ export function TerminalPanel({
       if (!(target instanceof Node) || !containerRef.current?.contains(target)) {
         return;
       }
+      cancelPendingSearch();
       if (isTerminalBlockSelectionMouseEvent(event)) {
         startTerminalBlockSelection(event);
         return;
@@ -2340,7 +2351,7 @@ export function TerminalPanel({
       suppressNativePasteUntilRef.current = Date.now() + 500;
       middleClickSelectionRef.current = getActiveTerminalSelectionText();
     }
-  }, [clearTerminalBlockSelection, getActiveTerminalSelectionText, startTerminalBlockSelection]);
+  }, [cancelPendingSearch, clearTerminalBlockSelection, getActiveTerminalSelectionText, startTerminalBlockSelection]);
 
   const handleTerminalMouseUpCapture = useCallback((event: ReactMouseEvent) => {
     if (!isMac || event.button !== 1) return;
@@ -3715,9 +3726,9 @@ export function TerminalPanel({
       return;
     }
 
-    const timer = window.setTimeout(() => runSearch("next"), 120);
-    return () => window.clearTimeout(timer);
-  }, [runSearch, searchOpen, searchValue]);
+    searchTimerRef.current = window.setTimeout(() => runSearch("next"), 120);
+    return cancelPendingSearch;
+  }, [cancelPendingSearch, runSearch, searchOpen, searchValue]);
 
   const searchHighlights = useMemo(
     () => getVisibleSearchHighlights(

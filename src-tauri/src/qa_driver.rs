@@ -327,21 +327,8 @@ async fn element_click<R: Runtime>(
     // events. Pointer-only surfaces (the VNC and RDP canvases) ignore mouse
     // events, and a cancelled pointerdown suppresses the compatibility
     // mousedown/mouseup like a real driver.
-    script.push_str(concat!(
-        "if (!el) throw new Error('stale element'); ",
-        "const r = el.getBoundingClientRect(); ",
-        "const at = {bubbles:true,cancelable:true,composed:true,view:window,button:0,",
-        "clientX:r.left + r.width / 2,clientY:r.top + r.height / 2}; ",
-        "const pointer = {...at,pointerId:1,pointerType:'mouse',isPrimary:true}; ",
-        "const compat = el.dispatchEvent(new PointerEvent('pointerdown',{...pointer,buttons:1})); ",
-        "el.focus?.(); ",
-        "if (compat) el.dispatchEvent(new MouseEvent('mousedown',{...at,buttons:1})); ",
-        "el.dispatchEvent(new PointerEvent('pointerup',{...pointer,buttons:0})); ",
-        "if (compat) el.dispatchEvent(new MouseEvent('mouseup',{...at,buttons:0})); ",
-        "if (typeof el.click === 'function') el.click(); ",
-        "else el.dispatchEvent(new MouseEvent('click',{...at,buttons:0})); ",
-        "return true;",
-    ));
+    script.push_str(include_str!("qa_driver_pointer.js"));
+    script.push_str("return dispatchQaElementClick(el);");
     match eval_js(&state, script).await {
         Ok(value) => ok(value),
         Err(message) => error(message),

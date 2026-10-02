@@ -2064,6 +2064,7 @@
 - `input[placeholder="Find"]` — interactive [optional] — F4.1.find-input
 - `span:has-text("Match")` — display [optional] — F4.1.find-match-info
 - `role=button[name="Close"]` — interactive [optional] — F4.1.find-close
+  ↳ `xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']` — alias
 
 ## terminal/right-menu (F4.2)
 

@@ -18,6 +18,8 @@ const dispatch = new Function(
   `${pointerScript}\nreturn dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtPoint);`,
 ) as Dispatch;
 
+const elementClick = new Function("el", `${pointerScript}\nreturn dispatchQaElementClick(el);`) as (el: HTMLElement) => boolean;
+
 function fixture(sources: Source[]) {
   const root = document.createElement("div");
   const cell = document.createElement("span");
@@ -56,6 +58,33 @@ describe("macOS QA WebView pointer actions", () => {
       ["mousemove", 4, 0, 0], ["mousedown", 4, 1, 1], ["mousemove", 128, 1, 0], ["mouseup", 128, 0, 1],
     ]);
     expect(events.some((event) => event.type === "click")).toBe(false);
+  });
+
+  it("clears an existing xterm selection with a single element click before dragging", () => {
+    const { root, events, run } = fixture([{ type: "pointer", actions: drag }]);
+    let selected = true;
+    // xterm recognises only detail 1/2/3; detail 0 leaves the old selection in place.
+    root.addEventListener("mousedown", (event) => {
+      if (event.detail === 1) selected = false;
+    });
+    expect(elementClick(root)).toBe(true);
+    expect(selected).toBe(false);
+    expect(events.filter((event) => ["mousedown", "mouseup"].includes(event.type))
+      .map((event) => [event.type, event.buttons, event.detail])).toEqual([
+      ["mousedown", 1, 1], ["mouseup", 0, 1],
+    ]);
+    run();
+    expect(events.filter((event) => event.type === "click")).toHaveLength(1);
+  });
+
+  it("retains element focus and suppresses mouse events for pointer-only surfaces", () => {
+    const { root, events } = fixture([]);
+    root.tabIndex = 0;
+    root.addEventListener("pointerdown", (event) => event.preventDefault());
+    elementClick(root);
+    expect(document.activeElement).toBe(root);
+    expect(events.some((event) => event.type === "mousedown" || event.type === "mouseup")).toBe(false);
+    expect(events.filter((event) => event.type === "click")).toHaveLength(1);
   });
 
   it("holds Control and Shift throughout a block drag and releases them after it", () => {

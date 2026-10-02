@@ -85,7 +85,11 @@ steps:
 - wait_for:
     selector: '[data-testid="multiexec-bar"]'
     timeout_sec: 5
-- click: '[data-testid="multiexec-bar"] >> text="All"'
+- click: '[data-testid="multiexec-bar"] button[title="Clear selection"]'
+- assert_text:
+    selector: '[data-testid="multiexec-bar"]'
+    contains: 0 / 2
+- click: '[data-testid="multiexec-bar"] button[title="Select all terminals"]'
 - assert_text:
     selector: '[data-testid="multiexec-bar"]'
     contains: 1 / 2
@@ -106,6 +110,7 @@ verification:
     - 32
     - 34
     - 36
+    - 38
     checkpoints:
     - step: 7
       expectation: '{assert_count: {equal: 2, selector: ''[data-testid="tab-item"][data-tab-type="terminal"]''}}'
@@ -142,6 +147,8 @@ verification:
     - step: 33
       expectation: '{assert_visible: ''[data-testid="terminal-input-locked"]''}'
     - step: 37
+      expectation: '{assert_text: {contains: 0 / 2, selector: ''[data-testid="multiexec-bar"]''}}'
+    - step: 39
       expectation: '{assert_text: {contains: 1 / 2, selector: ''[data-testid="multiexec-bar"]''}}'
     results:
     - 7
@@ -162,6 +169,7 @@ verification:
     - 31
     - 33
     - 37
+    - 39
   visual:
   - check: Inspect first-column gutters and screen clipping in the split screenshot.
     method: manual

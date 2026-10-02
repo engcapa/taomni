@@ -794,6 +794,8 @@ controls:
     selector: 'role=button[name="Close"]'
     kind: interactive
     optional: true
+    aliases:
+      - "xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']"
 -->
 
 - Copy / Copy All / Paste / Paste with Shift+Insert

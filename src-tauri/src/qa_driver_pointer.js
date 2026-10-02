@@ -1,4 +1,22 @@
 // Embedded by the opt-in macOS QA bridge. It dispatches WebView events, not OS input.
+function dispatchQaElementClick(el) {
+  if (!el) throw new Error("stale element");
+  const r = el.getBoundingClientRect();
+  const at = {
+    bubbles: true, cancelable: true, composed: true, button: 0, detail: 1,
+    clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+  };
+  const pointer = { ...at, pointerId: 1, pointerType: "mouse", isPrimary: true };
+  const compat = el.dispatchEvent(new PointerEvent("pointerdown", { ...pointer, buttons: 1 }));
+  el.focus?.();
+  if (compat) el.dispatchEvent(new MouseEvent("mousedown", { ...at, buttons: 1 }));
+  el.dispatchEvent(new PointerEvent("pointerup", { ...pointer, buttons: 0 }));
+  if (compat) el.dispatchEvent(new MouseEvent("mouseup", { ...at, buttons: 0 }));
+  if (typeof el.click === "function") el.click();
+  else el.dispatchEvent(new MouseEvent("click", { ...at, buttons: 0 }));
+  return true;
+}
+
 function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtPoint) {
   const states = sources.map(() => ({ x: 0, y: 0, buttons: 0, down: null, dragged: false, clicks: 0, suppressMouse: false }));
   const ticks = Math.max(0, ...sources.map((source) => (source.actions || []).length));

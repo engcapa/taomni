@@ -35,6 +35,11 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo QA-LEFT-""GUTTER
     submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: (?m)^QA-LEFT-GUTTER\r?$
+      timeout_sec: 10
+      attempts: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: (?m)^QA-LEFT-GUTTER\r?$
@@ -186,7 +191,7 @@ steps:
 - screenshot:
     path: terminal-gutter-local.png
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-- click: role=button[name="Close"]
+- click: "xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']"
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-view"]'
 - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
@@ -213,6 +218,11 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo QA-LEFT-""GUTTER
     submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: (?m)^QA-LEFT-GUTTER\r?$
+      timeout_sec: 10
+      attempts: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: (?m)^QA-LEFT-GUTTER\r?$

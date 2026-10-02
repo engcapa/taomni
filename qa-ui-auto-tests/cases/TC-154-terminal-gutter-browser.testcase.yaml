@@ -39,6 +39,11 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo QA-LEFT-""GUTTER
     submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: (?m)^QA-LEFT-GUTTER\r?$
+      timeout_sec: 10
+      attempts: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: (?m)^QA-LEFT-GUTTER\r?$
