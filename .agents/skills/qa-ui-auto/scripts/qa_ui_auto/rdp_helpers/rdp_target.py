@@ -15,6 +15,7 @@ Modes:
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
 import math
 import os
@@ -53,6 +54,48 @@ def animation_delay_ms(started: float, now: float) -> int:
     return max(1, math.ceil((started + next_tick * period - now) * 1000))
 
 
+@contextmanager
+def _measurement_activity(enabled: bool):
+    """Keep the visible macOS target's timers eligible while a probe runs.
+
+    A Tk helper is a separate background process. App Nap / background QoS
+    can make its draw rate drift during a paired throughput measurement. The
+    assertion belongs to this process only and is released on exit; it does
+    not change machine sleep policy or the RDP encoder's scheduling.
+    """
+    if not enabled or sys.platform != "darwin":
+        yield "default"
+        return
+    import ctypes as ct
+
+    ct.CDLL("/System/Library/Frameworks/Foundation.framework/Foundation")
+    objc = ct.CDLL("/usr/lib/libobjc.A.dylib")
+    objc.objc_getClass.argtypes = [ct.c_char_p]
+    objc.objc_getClass.restype = ct.c_void_p
+    objc.sel_registerName.argtypes = [ct.c_char_p]
+    objc.sel_registerName.restype = ct.c_void_p
+    send = ct.CFUNCTYPE(ct.c_void_p, ct.c_void_p, ct.c_void_p)(("objc_msgSend", objc))
+    send_string = ct.CFUNCTYPE(ct.c_void_p, ct.c_void_p, ct.c_void_p, ct.c_char_p)(("objc_msgSend", objc))
+    begin = ct.CFUNCTYPE(ct.c_void_p, ct.c_void_p, ct.c_void_p, ct.c_uint64, ct.c_void_p)(("objc_msgSend", objc))
+    end = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_void_p)(("objc_msgSend", objc))
+    selector = objc.sel_registerName
+    process = send(objc.objc_getClass(b"NSProcessInfo"), selector(b"processInfo"))
+    reason = send_string(objc.objc_getClass(b"NSString"), selector(b"stringWithUTF8String:"),
+                         b"Taomni QA RDP animation measurement")
+    # NSActivityUserInitiatedAllowingIdleSystemSleep: keep App Nap from
+    # throttling the measurement, without preventing system idle sleep.
+    token = begin(process, selector(b"beginActivityWithOptions:reason:"),
+                  0x00FFFFFF & ~(1 << 20), reason)
+    if not token:
+        raise RuntimeError("could not acquire the macOS RDP measurement activity")
+    send(token, selector(b"retain"))
+    try:
+        yield "NSActivityUserInitiatedAllowingIdleSystemSleep"
+    finally:
+        end(process, selector(b"endActivity:"), token)
+        send(token, selector(b"release"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--geometry", default="480x320+40+80", help="WxH+X+Y in desktop pixels")
@@ -61,7 +104,11 @@ def main() -> int:
     parser.add_argument("--pattern", action="store_true", help="Known magenta/cyan markers for mstsc screenshot verification")
     parser.add_argument("--lifetime-sec", type=float, default=900.0)
     args = parser.parse_args()
+    with _measurement_activity(args.mode in {"animate", "photo"}) as activity:
+        return _run_target(args, activity)
 
+
+def _run_target(args: argparse.Namespace, activity: str) -> int:
     if sys.platform == "win32":
         # Desktop coordinates must be physical pixels, matching RDP capture.
         try:
@@ -88,6 +135,7 @@ def main() -> int:
         "frames": 0,
         "last_event_unix_ms": None,
         "ready": False,
+        "process_activity": activity,
         "flip_samples": [],
     }
 
@@ -132,8 +180,10 @@ def main() -> int:
         last_written = [animation_started]
         last_frames = [0]
         state["animation_samples"] = []
+        draw_times = []
 
         def step() -> None:
+            draw_started = time.monotonic()
             state["frames"] += 1
             if photo_image is not None:
                 frame = state["frames"]
@@ -155,12 +205,17 @@ def main() -> int:
             # even when the RDP capture and encoder can deliver faster.
             root.update_idletasks()
             now = time.monotonic()
+            draw_times.append((now - draw_started) * 1000)
             if now - last_written[0] >= 1.0:
+                sorted_draw_times = sorted(draw_times)
                 state["animation_samples"].append({
                     "elapsed_s": now - animation_started,
                     "frames": state["frames"],
                     "source_fps": (state["frames"] - last_frames[0]) / (now - last_written[0]),
+                    "draw_ms_p95": sorted_draw_times[math.ceil(len(sorted_draw_times) * 0.95) - 1],
+                    "draw_ms_max": sorted_draw_times[-1],
                 })
+                draw_times.clear()
                 last_written[0] = now
                 last_frames[0] = state["frames"]
                 state["animation_elapsed_s"] = now - animation_started

@@ -46,5 +46,25 @@
 - 关闭预算和半启动会话的回归均先失败后通过。Windows 原生进程探针验证：
   owned 子进程独占的测试文件可以在清理后删除，无关进程仍存活。
 - workflow 同款 Python 工具检查：123 tests，121 passed / 2 平台条件 skip。
-- 修正后的三平台实际 native、mstsc 和性能结果待回填；旧 macOS/Linux 通过记录
-  不作为本次源码的验证结果。
+- Windows 根库 RDP unit：250 passed / 7 live-service ignored；rdp-probe unit：
+  15 passed。CPU profiler 单独运行通过；只作为编码诊断，不替代 native 性能。
+- `audit --gate`、本次变更的 development contract 和三平台精选 CI plan 通过。
+  NAT-08 dry-run 用占位 fixture 环境通过（无执行 receipt，不计入 native 通过）。
+- 修正提交 `552c2dea` 的 CI [37030390326](https://github.com/engcapa/taomni/actions/runs/37030390326)：
+  Linux 三项 native 全部通过；已核验源码、runner、case、QA build 身份及 55 个
+  receipt 原始文件哈希。UI M2 p95 45.108 ms，实际画面 49.948 fps，224.101 kbps；
+  照片帧率比 0.969315、带宽比 0.982469，满足原门槛。
+  Windows 四项 native 全部通过，已核验 71 个 receipt 文件哈希；mstsc 的独立窗口
+  截图可见 magenta/cyan 和动画条纹，音频/clipboard/drdynvc 完成握手，正常断开，
+  后续 PERF setup/reset_db 均成功。UI M2 p95 49.441 ms、33.390 fps、784.105 kbps；
+  照片帧率比 1.020810、带宽比 1.030226。
+- 同轮 macOS 为 2 passed / 1 failed，56 个原始文件哈希已核验：UI p95 52.940 ms、
+  37.481 fps、752.569 kbps 达标；照片帧率比 0.938727 未达 0.95，保留失败。
+  此窗口内全部为 RemoteFX，无 planar；宿主动画源 baseline/adaptive 分别
+  36.761/35.363 fps，且在两组后半段都由约 50 fps 降至约 20–25 fps。
+  前两轮也存在同样源节奏下降，单次编码 profiler 的 baseline/adaptive 耗时
+  则前后反向波动，尚不能把失败归因于产品编码器。
+- 对 macOS 动画 helper 增加进程局部的
+  `NSActivityUserInitiatedAllowingIdleSystemSleep` 和每秒 draw p95/max，验证
+  后台调度是否是干扰源；像素序列、60 Hz 调度、测量时长和 0.95/1.05 门槛保持原值。
+  该探针及照片用例的原生复测待回填，不把推测写成已证实根因。
