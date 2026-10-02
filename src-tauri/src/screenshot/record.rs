@@ -175,6 +175,33 @@ fn sessions() -> &'static Mutex<HashMap<String, Session>> {
     SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// The screenshot hotkey also finishes a running clip when controls are hidden.
+pub fn request_stop(id: &str) -> anyhow::Result<()> {
+    let sessions = sessions().lock().unwrap();
+    let session = sessions
+        .get(id)
+        .ok_or_else(|| anyhow::anyhow!("unknown recording id"))?;
+    session.stop.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+pub fn recording_status(id: &str) -> (bool, bool) {
+    sessions()
+        .lock()
+        .unwrap()
+        .get(id)
+        .map(|session| {
+            (
+                session
+                    .capture
+                    .as_ref()
+                    .is_none_or(|thread| thread.is_finished()),
+                session.stop.load(Ordering::SeqCst),
+            )
+        })
+        .unwrap_or((true, false))
+}
+
 /// Start a recording of `region` (display-relative physical pixels, `None`
 /// = whole display). Returns the recording id once the capture backend is
 /// ready, so backend failures surface to the caller.
@@ -213,16 +240,15 @@ pub fn start_recording(
             .name("screenshot-record-capture".into())
             .spawn(move || {
                 let result = capture_loop(&app, display, region, format, fps, &stop, tx, ready_tx);
-                if !stop.load(Ordering::SeqCst) {
-                    // Ended without a stop request: time limit or failure.
-                    let _ = app.emit(
-                        RECORDING_ENDED_EVENT,
-                        serde_json::json!({
-                            "recordingId": id,
-                            "error": result.as_ref().err().map(|e| format!("{e:#}")),
-                        }),
-                    );
-                }
+                super::recording_ended(&app, &id);
+                let _ = app.emit(
+                    RECORDING_ENDED_EVENT,
+                    serde_json::json!({
+                        "recordingId": id,
+                        "error": result.as_ref().err().map(|e| format!("{e:#}")),
+                        "stoppedByUser": stop.load(Ordering::SeqCst),
+                    }),
+                );
                 result
             })
     };

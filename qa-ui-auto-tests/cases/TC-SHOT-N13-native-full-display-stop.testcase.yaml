@@ -1,0 +1,47 @@
+id: TC-SHOT-N13
+title: Native whole-display recorder stays outside captured pixels and stops through the screenshot route
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: full-recorder
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: full-recorder
+    requirement: Whole-display recording keeps controls outside captured pixels or hides them; the production screenshot hotkey
+      route stops it before showing the preview; a real GIF decodes and cleanup restores main.
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: 'native_screenshot_scenario: {''scenario'': ''full-recorder''}'
+    - step: 4
+      expectation: 'assert_visible: [data-testid="system-screenshot"]'
+    results:
+    - 3
+    - 4
+  visual:
+  - check: Observable capture UI and operation results
+    method: automated
+    reason: Assertions check the stated visible states and geometry; retained screenshots allow review.
+  native:
+  - check: Native capture and window lifecycle
+    method: automated
+    reason: Actual desktop capture, native visibility and geometry, production stop routing, GIF decode and lifecycle. OS
+      global chord delivery is covered by the separate hotkey scenario.
+native_platforms:
+- Linux
+- Windows
+- macOS

@@ -106,19 +106,6 @@
 - `[data-testid="update-error"]` — display — F-Update-1.update-error
 - `[data-testid="update-restart"]` — interactive [optional] — F-Update-1.update-restart
 
-## capture (F4.13)
-
-- `[data-testid="capture-toolbar"]` — display — F4.13.toolbar-root
-- `[data-testid="capture-menu"]` — interactive — F4.13.capture-menu
-- `[data-testid="capture-menu-dropdown"]` — display [optional] — F4.13.capture-menu-dropdown
-- `[data-testid="capture-save-visible"]` — interactive [optional] — F4.13.save-visible
-- `[data-testid="capture-copy-clipboard"]` — interactive [optional] — F4.13.copy-clipboard
-- `[data-testid="capture-save-full"]` — interactive [optional] — F4.13.save-full
-- `[data-testid="capture-toggle-scroll"]` — interactive [optional] — F4.13.toggle-scroll
-- `[data-testid="capture-toggle-gif"]` — interactive [optional] — F4.13.toggle-gif
-- `[data-testid="capture-stop-scroll"]` — interactive [optional] — F4.13.stop-scroll-pill
-- `[data-testid="capture-stop-gif"]` — interactive [optional] — F4.13.stop-gif-pill
-
 ## code-workspace/appearance-and-actions (F25.3)
 
 - `[data-testid="workspace-editor-appearance-settings-dialog"]` — display [optional] — F25.3.appearance-dialog
@@ -1662,6 +1649,27 @@
 - `[data-testid="screenshot-record-mp4"]` — interactive — F27.1.screenshot-record-mp4
 - `[data-testid="screenshot-text-input"]` — interactive — F27.1.screenshot-text-input
 - `[data-testid="screenshot-toast"]` — display — F27.1.screenshot-toast
+- `[data-testid="system-screenshot-current-window"]` — interactive — F27.1.system-screenshot-current-window
+- `[data-testid="system-screenshot-default-hint"]` — display — F27.1.system-screenshot-default-hint
+- `[data-testid="screenshot-tool-move"]` — interactive — F27.1.screenshot-tool-move
+- `[data-testid="screenshot-annotation-selection"]` — display — F27.1.screenshot-annotation-selection
+- `[data-testid="screenshot-annotation-delete"]` — interactive — F27.1.screenshot-annotation-delete
+- `[data-testid="screenshot-scroll-confirm"]` — display — F27.1.screenshot-scroll-confirm
+- `[data-testid="screenshot-scroll-instructions"]` — display — F27.1.screenshot-scroll-instructions
+- `[data-testid="screenshot-scroll-start"]` — interactive — F27.1.screenshot-scroll-start
+- `[data-testid="screenshot-scroll-confirm-cancel"]` — interactive — F27.1.screenshot-scroll-confirm-cancel
+- `[data-testid="screenshot-scroll-controller"]` — display — F27.1.screenshot-scroll-controller
+- `[data-testid="screenshot-scroll-progress"]` — display — F27.1.screenshot-scroll-progress
+- `[data-testid="screenshot-scroll-stop"]` — interactive — F27.1.screenshot-scroll-stop
+- `[data-testid="screenshot-scroll-cancel"]` — interactive — F27.1.screenshot-scroll-cancel
+- `[data-testid="screenshot-scroll-error"]` — display [optional] — F27.1.screenshot-scroll-error
+- `[data-testid="screenshot-record-hint"]` — display — F27.1.screenshot-record-hint
+- `[data-testid="screenshot-recorder-range-hint"]` — display — F27.1.screenshot-recorder-range-hint
+- `[data-testid="screenshot-recording-boundary"]` — display [optional] — F27.1.screenshot-recording-boundary
+- `[data-testid="screenshot-annotation-resize-nw"]` — interactive — F27.1.screenshot-annotation-resize-nw
+- `[data-testid="screenshot-annotation-resize-ne"]` — interactive — F27.1.screenshot-annotation-resize-ne
+- `[data-testid="screenshot-annotation-resize-sw"]` — interactive — F27.1.screenshot-annotation-resize-sw
+- `[data-testid="screenshot-annotation-resize-se"]` — interactive — F27.1.screenshot-annotation-resize-se
 
 ## screenshot/settings (F27.2)
 

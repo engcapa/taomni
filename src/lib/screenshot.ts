@@ -55,6 +55,8 @@ export interface OverlayInit {
   width: number;
   height: number;
   scaleFactor: number;
+  /** Visible part of the invoking window, in display-relative physical pixels. */
+  windowRegion?: PhysicalRect | null;
 }
 
 export interface RecordingStarted {
@@ -81,6 +83,17 @@ export type RecordFormat = "gif" | "mp4";
 
 /** Event the backend emits when a recording stops on its own. */
 export const RECORDING_ENDED_EVENT = "screenshot://recording-ended";
+export const SCROLL_PROGRESS_EVENT = "screenshot://scroll-progress";
+
+export interface ScrollStatus { frames: number; }
+
+export async function scrollStatus(): Promise<ScrollStatus | null> {
+  return invoke<ScrollStatus | null>("screenshot_scroll_status");
+}
+
+export async function stopScrollCapture(cancel = false): Promise<void> {
+  return invoke<void>("screenshot_stop_scroll_capture", { cancel });
+}
 
 export async function listDisplays(): Promise<ScreenshotDisplay[]> {
   return invoke<ScreenshotDisplay[]>("screenshot_list_displays");
@@ -127,9 +140,10 @@ export async function probeScreenshot(): Promise<ScreenshotProbe> {
 }
 
 /** Hide app windows, capture the display, open the fullscreen overlay. */
-export async function openScreenshotOverlay(displayId?: string): Promise<void> {
+export async function openScreenshotOverlay(displayId?: string, includeCurrentWindow = false): Promise<void> {
   return invoke<void>("screenshot_open_overlay", {
     displayId: displayId ?? null,
+    includeCurrentWindow,
   });
 }
 
@@ -212,6 +226,17 @@ export async function currentRecording(): Promise<string | null> {
   return invoke<string | null>("screenshot_current_recording");
 }
 
+export interface RecordingStatus {
+  recordingId: string;
+  finished: boolean;
+  stoppedByUser: boolean;
+  region: PhysicalRect | null;
+}
+
+export async function recordingStatus(): Promise<RecordingStatus | null> {
+  return invoke<RecordingStatus | null>("screenshot_recording_status");
+}
+
 export async function shortcutStatus(): Promise<ShortcutStatus> {
   return invoke<ShortcutStatus>("screenshot_shortcut_status");
 }
@@ -261,6 +286,14 @@ export function isScreenshotOverlayWindow(): boolean {
 /** True when running inside the recorder bar window. */
 export function isScreenshotRecorderWindow(): boolean {
   return currentLabel() === "screenshot-recorder";
+}
+
+export function isScreenshotScrollWindow(): boolean {
+  return currentLabel() === "screenshot-scroll";
+}
+
+export function isScreenshotBoundaryWindow(): boolean {
+  return currentLabel()?.startsWith("screenshot-boundary-") ?? false;
 }
 
 /** True when running inside a pinned-screenshot window. */

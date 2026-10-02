@@ -66,6 +66,75 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it("preselects the current window without hiding it in a new full-display selection", async () => {
+    api.fetchOverlayInit.mockResolvedValueOnce({ path: "window.png", displayId: "0,0", width: 2048, height: 1152, scaleFactor: 2,
+      windowRegion: { x: 200, y: 150, width: 800, height: 600 } });
+    render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-toolbar");
+    expect(screen.getByTestId("screenshot-selection")).toHaveStyle({ left: "100px", top: "100px", width: "400px", height: "400px" });
+    expect(screen.getByTestId("screenshot-size-hint")).toHaveTextContent("800 × 600");
+  });
+
+  it("selects, moves, resizes, restyles and deletes a mark with independent undo steps", async () => {
+    await open();
+    drag("screenshot-select-layer", [100, 100], [500, 450]);
+    fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
+    drag("screenshot-annotation-layer", [130, 130], [230, 210]);
+    fireEvent.click(screen.getByTestId("screenshot-tool-move"));
+    drag("screenshot-annotation-layer", [150, 150], [220, 230]);
+    expect(shapes()).toBe("1");
+    expect(screen.getByTestId("screenshot-annotation-selection")).toHaveStyle({ left: "200px", top: "210px", width: "100px", height: "80px" });
+    fireEvent.click(screen.getByTestId("screenshot-undo"));
+    expect(screen.getByTestId("screenshot-annotation-selection")).toHaveStyle({ left: "130px", top: "130px" });
+    fireEvent.click(screen.getByTestId("screenshot-redo"));
+    drag("screenshot-annotation-resize-se", [300, 290], [350, 330]);
+    expect(screen.getByTestId("screenshot-annotation-selection")).toHaveStyle({ width: "150px", height: "120px" });
+    fireEvent.click(screen.getByTestId("screenshot-color-green"));
+    fireEvent.click(screen.getByTestId("screenshot-line-width-8"));
+    const ctx = (screen.getByTestId("screenshot-annotation-canvas") as HTMLCanvasElement).getContext("2d")!;
+    expect(ctx.strokeStyle).toBe("#52c41a");
+    expect(ctx.lineWidth).toBe(8);
+    fireEvent.keyDown(window, { key: "Delete" });
+    expect(shapes()).toBe("0");
+    expect(screen.queryByTestId("screenshot-annotation-selection")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("screenshot-undo"));
+    expect(shapes()).toBe("1");
+  });
+
+  it("edits selected text in place and Escape preserves the original text", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
+    fireEvent.click(screen.getByTestId("screenshot-tool-text"));
+    fireEvent.click(screen.getByTestId("screenshot-annotation-layer"), { clientX: 100, clientY: 100 });
+    fireEvent.change(screen.getByTestId("screenshot-text-input"), { target: { value: "first" } });
+    fireEvent.keyDown(screen.getByTestId("screenshot-text-input"), { key: "Enter" });
+    fireEvent.click(screen.getByTestId("screenshot-tool-move"));
+    fireEvent.doubleClick(screen.getByTestId("screenshot-annotation-layer"), { clientX: 110, clientY: 110 });
+    expect(screen.getByTestId("screenshot-text-input")).toHaveValue("first");
+    fireEvent.change(screen.getByTestId("screenshot-text-input"), { target: { value: "edited" } });
+    fireEvent.keyDown(screen.getByTestId("screenshot-text-input"), { key: "Enter" });
+    expect(shapes()).toBe("1");
+    fireEvent.doubleClick(screen.getByTestId("screenshot-annotation-layer"), { clientX: 110, clientY: 110 });
+    expect(screen.getByTestId("screenshot-text-input")).toHaveValue("edited");
+    fireEvent.keyDown(screen.getByTestId("screenshot-text-input"), { key: "Escape" });
+    expect(shapes()).toBe("1");
+  });
+
+  it("explains scroll capture before starting and keeps the original image when cancelled", async () => {
+    await open();
+    drag("screenshot-select-layer", [100, 100], [500, 450]);
+    fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    expect(screen.getByTestId("screenshot-scroll-instructions")).toBeInTheDocument();
+    expect(api.scrollCapture).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("screenshot-scroll-confirm-cancel"));
+    expect(screen.queryByTestId("screenshot-scroll-confirm")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    api.scrollCapture.mockRejectedValueOnce(new Error("scroll capture cancelled"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
+    await waitFor(() => expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "annotate"));
+    expect(screen.getByTestId("screenshot-selection")).toHaveStyle({ left: "100px", top: "100px" });
+    expect(api.updateOverlayImage).not.toHaveBeenCalled();
+  });
   it("selects reverse drags, activates a tool explicitly and copies an integral per-axis crop", async () => {
     await open();
     drag("screenshot-select-layer", [300, 300], [100, 100]);

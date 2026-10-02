@@ -13,6 +13,7 @@ import type { ScreenshotPoint } from "../../lib/screenshot";
 
 export type AnnotationTool =
   | "select"
+  | "move"
   | "rect"
   | "ellipse"
   | "arrow"
@@ -105,6 +106,8 @@ export interface AnnotationCanvasHandle {
   /** Programmatically add shapes (e.g. auto-redact boxes) as one undo step. */
   addShapes: (shapes: Shape[]) => void;
   shapeCount: () => number;
+  deleteSelected: () => boolean;
+  updateSelectedStyle: (style: { color?: string; lineWidth?: number }) => void;
 }
 
 interface AnnotationCanvasProps {
@@ -123,6 +126,7 @@ interface AnnotationCanvasProps {
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   /** Fired when the user presses a draw tool outside the selection. */
   onRequestReselect?: (at: Point) => void;
+  onSelectionChange?: (shape: Shape | null) => void;
 }
 
 const TEXT_FONT_SIZE = 18;
@@ -380,7 +384,9 @@ export function shapeHitTest(shape: Shape, p: Point, radius: number): boolean {
     }
     case "pen":
     case "highlighter":
-      return shape.pts.some((pt) => Math.hypot(pt.x - p.x, pt.y - p.y) <= radius + shape.lineWidth);
+      return shape.pts.some((pt, i) => i === 0
+        ? dist(pt, p) <= radius + shape.lineWidth
+        : shapeHitTest({ ...shape, kind: "line", x1: shape.pts[i - 1].x, y1: shape.pts[i - 1].y, x2: pt.x, y2: pt.y }, p, radius + shape.lineWidth));
     case "text": {
       const w = shape.text.length * shape.fontSize * 0.6;
       return (
@@ -392,6 +398,43 @@ export function shapeHitTest(shape: Shape, p: Point, radius: number): boolean {
     }
     case "number":
       return Math.hypot(shape.x - p.x, shape.y - p.y) <= radius + 14;
+  }
+}
+
+export function shapeBounds(shape: Shape): CssRect {
+  switch (shape.kind) {
+    case "rect": case "ellipse": case "mosaic": case "blur": return normRect(shape);
+    case "balloon": {
+      const r = normRect(shape);
+      return rectFromDrag({ x: Math.min(r.x, shape.tx), y: Math.min(r.y, shape.ty) },
+        { x: Math.max(r.x + r.w, shape.tx), y: Math.max(r.y + r.h, shape.ty) });
+    }
+    case "line": case "arrow": return rectFromDrag({ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 });
+    case "pen": case "highlighter": {
+      const xs = shape.pts.map((p) => p.x), ys = shape.pts.map((p) => p.y);
+      return rectFromDrag({ x: Math.min(...xs), y: Math.min(...ys) }, { x: Math.max(...xs), y: Math.max(...ys) });
+    }
+    case "text": return { x: shape.x, y: shape.y, w: Math.max(shape.fontSize, shape.text.length * shape.fontSize * 0.6), h: shape.fontSize * 1.2 };
+    case "number": {
+      const r = Math.max(14, shape.lineWidth * 4);
+      return { x: shape.x - r, y: shape.y - r, w: r * 2, h: r * 2 };
+    }
+  }
+}
+
+/** Transform all geometry together, keeping the stored snapshot immutable. */
+export function transformShape(shape: Shape, from: CssRect, to: CssRect): Shape {
+  const sx = from.w ? to.w / from.w : 1, sy = from.h ? to.h / from.h : 1;
+  const x = (v: number) => to.x + (v - from.x) * sx;
+  const y = (v: number) => to.y + (v - from.y) * sy;
+  switch (shape.kind) {
+    case "rect": case "ellipse": case "mosaic": case "blur":
+      return { ...shape, x: x(shape.x), y: y(shape.y), w: shape.w * sx, h: shape.h * sy };
+    case "balloon": return { ...shape, x: x(shape.x), y: y(shape.y), w: shape.w * sx, h: shape.h * sy, tx: x(shape.tx), ty: y(shape.ty) };
+    case "line": case "arrow": return { ...shape, x1: x(shape.x1), y1: y(shape.y1), x2: x(shape.x2), y2: y(shape.y2) };
+    case "pen": case "highlighter": return { ...shape, pts: shape.pts.map((p) => ({ x: x(p.x), y: y(p.y) })) };
+    case "text": return { ...shape, x: x(shape.x), y: y(shape.y), fontSize: Math.max(8, shape.fontSize * sy) };
+    case "number": return { ...shape, x: x(shape.x), y: y(shape.y), lineWidth: Math.max(1, shape.lineWidth * Math.min(sx, sy)) };
   }
 }
 
@@ -431,6 +474,10 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     const [eraserTrail, setEraserTrail] = useState<Point[] | null>(null);
     const [textAt, setTextAt] = useState<Point | null>(null);
     const [textValue, setTextValue] = useState("");
+    const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [editedShape, setEditedShape] = useState<Shape | null>(null);
+    const editingTextRef = useRef<TextShape | null>(null);
+    const movingRef = useRef<{ shape: Shape; start: Point; bounds: CssRect; corner?: "nw" | "ne" | "sw" | "se" } | null>(null);
     const idRef = useRef(1);
     const drawingRef = useRef<{ start: Point; pts: Point[] } | null>(null);
     /** Set when a mousedown already placed a number marker for this click. */
@@ -445,6 +492,22 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       (next: Shape[]) => apply(commit(historyRef.current, next)),
       [apply],
     );
+
+    const selected = history.shapes.find((s) => s.id === selectedId) ?? null;
+    useLayoutEffect(() => {
+      props.onSelectionChange?.(tool === "move" ? selected : null);
+    }, [selected, tool, props.onSelectionChange]);
+
+    const deleteSelected = useCallback(() => {
+      if (selectedId === null || !historyRef.current.shapes.some((s) => s.id === selectedId)) return false;
+      mutate(historyRef.current.shapes.filter((s) => s.id !== selectedId));
+      setSelectedId(null);
+      return true;
+    }, [mutate, selectedId]);
+    const updateSelectedStyle = useCallback((style: { color?: string; lineWidth?: number }) => {
+      if (selectedId === null) return;
+      mutate(historyRef.current.shapes.map((s) => s.id === selectedId ? { ...s, ...style } : s));
+    }, [mutate, selectedId]);
 
     // Toolbar availability is part of the same visible history update;
     // a passive effect exposes stale enabled/disabled state for one paint.
@@ -476,6 +539,10 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       setDraft(null);
       setTextAt(null);
       setTextValue("");
+      setSelectedId(null);
+      setEditedShape(null);
+      movingRef.current = null;
+      editingTextRef.current = null;
     }, [apply]);
 
     const exportDataUrl = useCallback((base: HTMLImageElement, sx: number, sy: number): string => {
@@ -492,8 +559,8 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
 
     useImperativeHandle(
       ref,
-      () => ({ undo, redo, clear, exportDataUrl, addShapes, shapeCount: () => historyRef.current.shapes.length }),
-      [undo, redo, clear, exportDataUrl, addShapes],
+      () => ({ undo, redo, clear, exportDataUrl, addShapes, deleteSelected, updateSelectedStyle, shapeCount: () => historyRef.current.shapes.length }),
+      [undo, redo, clear, exportDataUrl, addShapes, deleteSelected, updateSelectedStyle],
     );
 
     // Live redraw (HiDPI-aware; CSS-px coordinate space).
@@ -523,7 +590,8 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       }
       const sampleScaleX = baseImage ? baseImage.naturalWidth / Math.max(1, imageWidth) : 1;
       const sampleScaleY = baseImage ? baseImage.naturalHeight / Math.max(1, imageHeight) : 1;
-      const all = draft ? [...history.shapes, draft] : history.shapes;
+      const stored = editedShape ? history.shapes.map((s) => s.id === editedShape.id ? editedShape : s) : history.shapes;
+      const all = draft ? [...stored, draft] : stored;
       for (const shape of all) paintShape(ctx, shape, baseImage, sampleScaleX, sampleScaleY);
       if (selection) ctx.restore();
       if (eraserTrail && eraserTrail.length > 0) {
@@ -536,7 +604,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         paintPolyline(ctx, eraserTrail);
         ctx.restore();
       }
-    }, [history, draft, eraserTrail, selection, selectionContour, baseImage, imageWidth, imageHeight, lineWidth]);
+    }, [history, draft, editedShape, eraserTrail, selection, selectionContour, baseImage, imageWidth, imageHeight, lineWidth]);
 
     const localPos = (e: { clientX: number; clientY: number }): Point => {
       const r = wrapRef.current?.getBoundingClientRect();
@@ -588,6 +656,12 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         onRequestReselect?.(p);
         return;
       }
+      if (tool === "move") {
+        const hit = [...historyRef.current.shapes].reverse().find((s) => shapeHitTest(s, p, Math.max(5, s.lineWidth)));
+        setSelectedId(hit?.id ?? null);
+        if (hit) movingRef.current = { shape: hit, start: p, bounds: shapeBounds(hit) };
+        return;
+      }
       // Text opens its input on click (a drag's mouseup would blur it).
       if (tool === "text") return;
       if (tool === "number") {
@@ -605,6 +679,24 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     };
 
     const handleMouseMove = (e: ReactMouseEvent) => {
+      const move = movingRef.current;
+      if (move) {
+        const p = clampToSelection(localPos(e));
+        let bounds: CssRect;
+        if (move.corner) {
+          const opposite = { x: move.corner.endsWith("w") ? move.bounds.x + move.bounds.w : move.bounds.x,
+            y: move.corner.startsWith("n") ? move.bounds.y + move.bounds.h : move.bounds.y };
+          bounds = rectFromDrag(opposite, p);
+          if (bounds.w < 4 || bounds.h < 4) return;
+        } else {
+          const clip = selection ?? { x: 0, y: 0, w: imageWidth, h: imageHeight };
+          bounds = { ...move.bounds,
+            x: Math.max(clip.x, Math.min(move.bounds.x + p.x - move.start.x, clip.x + clip.w - move.bounds.w)),
+            y: Math.max(clip.y, Math.min(move.bounds.y + p.y - move.start.y, clip.y + clip.h - move.bounds.h)) };
+        }
+        setEditedShape(transformShape(move.shape, move.bounds, bounds));
+        return;
+      }
       const d = drawingRef.current;
       if (!d || tool === "select" || tool === "text") return;
       const p = clampToSelection(localPos(e));
@@ -621,6 +713,14 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     };
 
     const finishDrawing = (e: { clientX: number; clientY: number }) => {
+      if (movingRef.current) {
+        if (editedShape && JSON.stringify(editedShape) !== JSON.stringify(movingRef.current.shape)) {
+          mutate(historyRef.current.shapes.map((s) => s.id === editedShape.id ? editedShape : s));
+        }
+        movingRef.current = null;
+        setEditedShape(null);
+        return;
+      }
       const d = drawingRef.current;
       drawingRef.current = null;
       setDraft(null);
@@ -660,15 +760,18 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     // still finishes the shape.
     useEffect(() => {
       const onUp = (e: MouseEvent) => {
-        if (drawingRef.current) finishDrawing(e);
+        if (drawingRef.current || movingRef.current) finishDrawing(e);
       };
       window.addEventListener("mouseup", onUp);
-      return () => window.removeEventListener("mouseup", onUp);
+      const onMove = (e: MouseEvent) => { if (movingRef.current && !wrapRef.current?.contains(e.target as Node)) handleMouseMove(e as unknown as ReactMouseEvent); };
+      window.addEventListener("mousemove", onMove);
+      return () => { window.removeEventListener("mouseup", onUp); window.removeEventListener("mousemove", onMove); };
     });
 
     const commitText = () => {
       if (textAt && textValue.trim()) {
-        addShape({
+        const original = editingTextRef.current;
+        const next: TextShape = {
           id: -1,
           color,
           lineWidth,
@@ -676,9 +779,12 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           x: textAt.x,
           y: textAt.y,
           text: textValue.trim(),
-          fontSize: TEXT_FONT_SIZE,
-        });
+          fontSize: original?.fontSize ?? TEXT_FONT_SIZE,
+        };
+        if (original) mutate(historyRef.current.shapes.map((s) => s.id === original.id ? { ...next, id: original.id, color: original.color, lineWidth: original.lineWidth } : s));
+        else addShape(next);
       }
+      editingTextRef.current = null;
       setTextAt(null);
       setTextValue("");
     };
@@ -709,6 +815,15 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onClick={handleClick}
+        onDoubleClick={(e) => {
+          if (tool !== "move") return;
+          const p = localPos(e);
+          const hit = [...historyRef.current.shapes].reverse().find((s) => shapeHitTest(s, p, 5));
+          if (hit?.kind !== "text") return;
+          editingTextRef.current = hit;
+          setTextAt({ x: hit.x, y: hit.y });
+          setTextValue(hit.text);
+        }}
         style={{
           position: "absolute",
           left: 0,
@@ -719,7 +834,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           // events; below the selection handles and the toolbar.
           zIndex: 30,
           pointerEvents: interactive ? "auto" : "none",
-          cursor: interactive ? (tool === "text" ? "text" : "crosshair") : "default",
+          cursor: tool === "move" ? "default" : interactive ? (tool === "text" ? "text" : "crosshair") : "default",
         }}
       >
         <canvas
@@ -728,6 +843,15 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           data-shapes={history.shapes.length}
           style={{ display: "block", width: imageWidth, height: imageHeight }}
         />
+        {tool === "move" && selected && (() => {
+          const bounds = shapeBounds(editedShape ?? selected);
+          return <div data-testid="screenshot-annotation-selection" data-kind={selected.kind}
+            style={{ position: "absolute", left: bounds.x, top: bounds.y, width: Math.max(1, bounds.w), height: Math.max(1, bounds.h), border: "1px dashed #1677ff", pointerEvents: "none" }}>
+            {(["nw", "ne", "sw", "se"] as const).map((corner) => <div key={corner} data-testid={`screenshot-annotation-resize-${corner}`}
+              onMouseDown={(e) => { e.stopPropagation(); movingRef.current = { shape: selected, start: localPos(e), bounds: shapeBounds(selected), corner }; }}
+              style={{ position: "absolute", width: 8, height: 8, background: "#fff", border: "1px solid #1677ff", pointerEvents: "auto", cursor: `${corner}-resize`, left: corner.endsWith("w") ? -4 : "calc(100% - 4px)", top: corner.startsWith("n") ? -4 : "calc(100% - 4px)" }} />)}
+          </div>;
+        })()}
         {textAt && (
           <input
             autoFocus
@@ -740,6 +864,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
               e.stopPropagation();
               if (e.key === "Enter") commitText();
               else if (e.key === "Escape") {
+                editingTextRef.current = null;
                 setTextAt(null);
                 setTextValue("");
               }

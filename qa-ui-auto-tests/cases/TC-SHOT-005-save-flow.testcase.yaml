@@ -47,10 +47,14 @@ steps:
 - press:
     key: Mod+s
     selector: '[data-testid="screenshot-save"]'
-- wait_for: '[data-testid="text-input-dialog"]'
+- wait_for: '[data-testid="text-input-dialog"] [data-testid="text-input-dialog-input"]:focus'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
     value: qa-ui-auto-shot.png
+- assert_attribute:
+    selector: '[data-testid="text-input-dialog-input"]'
+    name: value
+    equals: qa-ui-auto-shot.png
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="system-screenshot"]'
 - assert_not_visible: '[data-testid="screenshot-overlay"]'
@@ -76,15 +80,16 @@ verification:
     results: [13, 14, 15, 16, 17]
   - id: R2
     requirement: Ctrl+S or Cmd+S reopens save, sends the selected PNG artifact and exact chosen destination once, and closes capture.
-    actions: [18, 20, 21]
+    actions: [18, 20, 22]
     checkpoints:
-    - {step: 19, expectation: Keyboard save opens the in-app path dialog.}
-    - {step: 22, expectation: The main window returns after confirmation.}
-    - {step: 23, expectation: The overlay is unmounted.}
-    - {step: 24, expectation: The canvas export decodes to the chosen 160x120 crop.}
-    - {step: 25, expectation: Save receives that exported path and the exact requested filename.}
-    - {step: 26, expectation: Exactly one save-image request was followed by close.}
-    results: [19, 22, 23, 24, 25, 26]
+    - {step: 19, expectation: Keyboard save opens the in-app path dialog and the app focuses its initialized input before typing.}
+    - {step: 21, expectation: The initialized input retains the exact requested filename before confirmation.}
+    - {step: 23, expectation: The main window returns after confirmation.}
+    - {step: 24, expectation: The overlay is unmounted.}
+    - {step: 25, expectation: The canvas export decodes to the chosen 160x120 crop.}
+    - {step: 26, expectation: Save receives that exported path and the exact requested filename.}
+    - {step: 27, expectation: Exactly one save-image request was followed by close.}
+    results: [19, 21, 23, 24, 25, 26, 27]
   visual:
   - check: Save cancel and confirmation produce the expected dialog and capture states.
     method: automated

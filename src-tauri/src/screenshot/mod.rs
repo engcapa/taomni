@@ -1,7 +1,6 @@
 //! Feishu-style system screenshot & screen recording tool.
 //!
-//! Unlike the per-tab xterm-render capture (`src/lib/capture`), this module
-//! captures the real OS screen on any display: fullscreen, region, scrolling
+//! Captures the real OS screen on any display: fullscreen, region, scrolling
 //! (auto-scroll + stitch), and video recording to GIF / MP4. Windows, macOS
 //! and Linux are all supported.
 //!
@@ -19,12 +18,13 @@ mod qa_oracle;
 pub mod record;
 pub mod scroll;
 pub mod shortcut;
+pub mod surfaces;
 
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -54,6 +54,16 @@ pub struct OverlayInit {
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
+    pub window_region: Option<PhysicalRegion>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhysicalRegion {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -101,6 +111,9 @@ struct ToolState {
     recording: Option<String>,
     /// Remains true while the stopped clip is being previewed.
     recorder_open: bool,
+    include_current_window: bool,
+    recording_region: Option<PhysicalRegion>,
+    scroll: Option<Arc<scroll::ScrollControl>>,
     pins: HashMap<String, PinInit>,
 }
 
@@ -249,21 +262,126 @@ pub async fn screenshot_scroll_capture(
     width: u32,
     height: u32,
 ) -> Result<ScrollCaptureResult, String> {
+    let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
+    let region = capture::clamp_region(display.width, display.height, (x, y, width, height));
+    let rect = surfaces::region_rect(&display, region);
+    let position = capture_control_position(&app, &display, rect)?;
+    let control = Arc::new(scroll::ScrollControl::default());
+    {
+        let mut state = tool_state();
+        if state.scroll.is_some() || state.recorder_open {
+            return Err("a capture is already running".into());
+        }
+        state.scroll = Some(control.clone());
+    }
+    let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     let overlay = app.get_webview_window(OVERLAY_LABEL);
     if let Some(window) = &overlay {
         let _ = window.hide();
     }
+    let surfaces = surfaces::open_borders(&app, &display, rect)
+        .and_then(|()| open_scroll_bar(&app, &display, position, control.clone()));
+    if let Err(error) = surfaces {
+        tool_state().scroll = None;
+        surfaces::close_borders(&app);
+        if let Some(window) = app.get_webview_window(surfaces::SCROLL_LABEL) {
+            let _ = window.close();
+        }
+        if let Some(window) = &overlay {
+            let _ = window.show();
+        }
+        return Err(error);
+    }
     let worker = app.clone();
+    let worker_control = control.clone();
     let result = blocking("scroll capture", move || {
-        let display = capture::resolve_display(&worker, display_id.as_deref())?;
-        scroll::scroll_capture(&worker, &display, (x, y, width, height))
+        scroll::scroll_capture_controlled(&worker, &display, region, 40, &worker_control)
     })
     .await;
+    if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
+        return Err("scroll capture cancelled".into());
+    }
+    tool_state().scroll = None;
+    surfaces::close_borders(&app);
+    if let Some(window) = app.get_webview_window(surfaces::SCROLL_LABEL) {
+        let _ = window.close();
+    }
     if let Some(window) = overlay {
         let _ = window.show();
         let _ = window.set_focus();
     }
     result
+}
+
+#[tauri::command]
+pub async fn screenshot_scroll_status() -> Result<Option<serde_json::Value>, String> {
+    Ok(tool_state()
+        .scroll
+        .as_ref()
+        .map(|control| serde_json::json!({ "frames": control.frames.load(Ordering::SeqCst) })))
+}
+
+#[tauri::command]
+pub async fn screenshot_stop_scroll_capture(cancel: bool) -> Result<(), String> {
+    if let Some(control) = &tool_state().scroll {
+        control.request_stop(cancel);
+    }
+    Ok(())
+}
+
+fn capture_control_position(
+    app: &AppHandle,
+    display: &DisplayInfo,
+    region: surfaces::Rect,
+) -> Result<Option<surfaces::Rect>, String> {
+    let mut displays = capture::list_displays(app).map_err(internal_error)?;
+    displays.sort_by_key(|d| d.id != display.id);
+    let position = surfaces::control_position(&displays, region);
+    if position.is_none() && !shortcut::current_status().registered {
+        return Err("No room for controls outside the capture. Select a smaller region or enable the system screenshot hotkey before capturing the whole display.".into());
+    }
+    Ok(position)
+}
+
+fn open_scroll_bar(
+    app: &AppHandle,
+    display: &DisplayInfo,
+    position: Option<surfaces::Rect>,
+    control: Arc<scroll::ScrollControl>,
+) -> Result<(), String> {
+    let window = window_builder(
+        app,
+        surfaces::SCROLL_LABEL,
+        WebviewUrl::App("index.html#screenshot-scroll".into()),
+    )
+    .title("Scroll capture")
+    .inner_size(surfaces::CONTROL_WIDTH, surfaces::CONTROL_HEIGHT)
+    .visible(false)
+    .decorations(false)
+    .resizable(false)
+    .shadow(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .content_protected(true)
+    .focused(false)
+    .build()
+    .map_err(|e| e.to_string())?;
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            control.request_stop(true);
+        }
+    });
+    if let Some(rect) = position {
+        window
+            .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
+            .map_err(|e| e.to_string())?;
+        window
+            .set_position(PhysicalPosition::new(rect.x, rect.y))
+            .map_err(|e| e.to_string())?;
+        window.show().map_err(|e| e.to_string())?;
+    }
+    let _ = display;
+    Ok(())
 }
 
 /// Copy a screenshot artifact to the OS clipboard as an image. Uses the
@@ -400,6 +518,8 @@ fn hide_app_windows(app: &AppHandle) -> bool {
     for (label, window) in app.webview_windows() {
         if label == OVERLAY_LABEL
             || label == RECORDER_LABEL
+            || label == surfaces::SCROLL_LABEL
+            || label.starts_with(surfaces::BORDER_PREFIX)
             || label.starts_with(PIN_LABEL_PREFIX)
             || label == qa::QA_WINDOW_LABEL
         {
@@ -446,6 +566,31 @@ fn cover_display(window: &WebviewWindow, display: &DisplayInfo) {
 /// overlay is opening/open just focus the existing one; while a recording
 /// runs they focus the recorder bar.
 pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result<(), String> {
+    open_overlay_with_window(app, display_id, None).await
+}
+
+async fn open_overlay_with_window(
+    app: &AppHandle,
+    display_id: Option<String>,
+    current_window: Option<WebviewWindow>,
+) -> Result<(), String> {
+    if STARTING_RECORDING.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+    let recording = {
+        let state = tool_state();
+        if let Some(control) = &state.scroll {
+            control.request_stop(false);
+            return Ok(());
+        }
+        state.recording.clone()
+    };
+    if let Some(id) = recording {
+        // Finish before showing any controls: full-display capture has no
+        // safe location for a visible bar, even when content protection is unavailable.
+        record::request_stop(&id).map_err(internal_error)?;
+        return Ok(());
+    }
     if let Some(label) = {
         let state = tool_state();
         if state.recording.is_some() || state.recorder_open {
@@ -465,7 +610,7 @@ pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result
     if OPENING.swap(true, Ordering::SeqCst) {
         return Ok(());
     }
-    let result = open_overlay_inner(app, display_id).await;
+    let result = open_overlay_inner(app, display_id, current_window).await;
     OPENING.store(false, Ordering::SeqCst);
     if result.is_err() {
         // Never leave the user with no visible window.
@@ -479,7 +624,11 @@ pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result
     result
 }
 
-async fn open_overlay_inner(app: &AppHandle, display_id: Option<String>) -> Result<(), String> {
+async fn open_overlay_inner(
+    app: &AppHandle,
+    display_id: Option<String>,
+    current_window: Option<WebviewWindow>,
+) -> Result<(), String> {
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     let display = {
         let app = app.clone();
@@ -489,7 +638,32 @@ async fn open_overlay_inner(app: &AppHandle, display_id: Option<String>) -> Resu
         })
         .await?
     };
-    if hide_app_windows(app) {
+    let window_region = if let Some(window) = &current_window {
+        let pos = window.outer_position().map_err(|e| e.to_string())?;
+        let size = window.outer_size().map_err(|e| e.to_string())?;
+        let left = (pos.x - display.x).max(0) as u32;
+        let top = (pos.y - display.y).max(0) as u32;
+        let right = (pos.x as i64 + size.width as i64 - display.x as i64)
+            .clamp(0, display.width as i64) as u32;
+        let bottom = (pos.y as i64 + size.height as i64 - display.y as i64)
+            .clamp(0, display.height as i64) as u32;
+        if right <= left || bottom <= top {
+            return Err("current window is outside the selected display".into());
+        }
+        Some(PhysicalRegion {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+        })
+    } else {
+        None
+    };
+    tool_state().include_current_window = current_window.is_some();
+    if current_window.is_none() && hide_app_windows(app) {
+        tokio::time::sleep(HIDE_SETTLE).await;
+    } else if current_window.is_some() {
+        // Let the invoking options menu disappear before freezing the window.
         tokio::time::sleep(HIDE_SETTLE).await;
     }
     let (path, width, height) = {
@@ -511,6 +685,7 @@ async fn open_overlay_inner(app: &AppHandle, display_id: Option<String>) -> Resu
         width,
         height,
         scale_factor: display.scale_factor,
+        window_region,
     });
 
     let url = WebviewUrl::App("index.html#screenshot-overlay".into());
@@ -537,9 +712,16 @@ async fn open_overlay_inner(app: &AppHandle, display_id: Option<String>) -> Resu
 #[tauri::command]
 pub async fn screenshot_open_overlay(
     app: AppHandle,
+    window: WebviewWindow,
     display_id: Option<String>,
+    include_current_window: Option<bool>,
 ) -> Result<(), String> {
-    open_overlay(&app, display_id).await
+    open_overlay_with_window(
+        &app,
+        display_id,
+        include_current_window.unwrap_or(false).then_some(window),
+    )
+    .await
 }
 
 /// The pending overlay payload, set by [`open_overlay`].
@@ -603,12 +785,18 @@ pub(crate) fn close_session(app: &AppHandle) {
         let mut state = tool_state();
         state.overlay = None;
         state.recorder_open = false;
+        state.recording_region = None;
+        state.include_current_window = false;
+        if let Some(control) = state.scroll.take() {
+            control.request_stop(true);
+        }
         state.recording.take()
     };
     if let Some(id) = recording {
         let _ = record::cancel_recording(&id);
     }
-    for label in [OVERLAY_LABEL, RECORDER_LABEL] {
+    surfaces::close_borders(app);
+    for label in [OVERLAY_LABEL, RECORDER_LABEL, surfaces::SCROLL_LABEL] {
         if let Some(window) = app.get_webview_window(label) {
             let _ = window.close();
         }
@@ -792,13 +980,34 @@ pub async fn screenshot_start_recording(
     }
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     let had_overlay = tool_state().overlay.is_some();
-    hide_app_windows(&app);
+    let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
+    let bounded = capture::clamp_region(
+        display.width,
+        display.height,
+        region.unwrap_or((0, 0, display.width, display.height)),
+    );
+    capture_control_position(&app, &display, surfaces::region_rect(&display, bounded))?;
+    if !tool_state().include_current_window {
+        hide_app_windows(&app);
+    }
     if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
         let _ = window.hide();
     }
+    if let Err(error) = open_recorder_bar(&app, &display, bounded) {
+        surfaces::close_borders(&app);
+        if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
+            let _ = window.close();
+        }
+        if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
+            let _ = window.show();
+        }
+        if !had_overlay {
+            restore_app_windows(&app);
+        }
+        return Err(error);
+    }
     let worker = app.clone();
     let started = blocking("start recording", move || {
-        let display = capture::resolve_display(&worker, display_id.as_deref())?;
         std::thread::sleep(HIDE_SETTLE);
         let id = record::start_recording(&worker, display.clone(), region, format, fps)?;
         Ok((id, display))
@@ -807,6 +1016,10 @@ pub async fn screenshot_start_recording(
     let (recording_id, display) = match started {
         Ok(started) => started,
         Err(e) => {
+            surfaces::close_borders(&app);
+            if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
+                let _ = window.close();
+            }
             if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
                 let _ = window.show();
                 let _ = window.set_focus();
@@ -827,21 +1040,35 @@ pub async fn screenshot_start_recording(
         state.recording = Some(recording_id.clone());
         state.recorder_open = true;
         state.overlay = None;
+        let r = capture::clamp_region(
+            display.width,
+            display.height,
+            region.unwrap_or((0, 0, display.width, display.height)),
+        );
+        state.recording_region = Some(PhysicalRegion {
+            x: r.0,
+            y: r.1,
+            width: r.2,
+            height: r.3,
+        });
     }
     if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
         let _ = window.close();
     }
-    if let Err(e) = open_recorder_bar(&app, &display) {
-        let _ = record::cancel_recording(&recording_id);
-        tool_state().recording = None;
-        close_session(&app);
-        return Err(e);
+    if capture_control_position(&app, &display, surfaces::region_rect(&display, bounded))?.is_some()
+    {
+        if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
+            let _ = window.show();
+        }
     }
     Ok(RecordingStarted { recording_id })
 }
 
 #[tauri::command]
-pub async fn screenshot_stop_recording(recording_id: String) -> Result<RecordingFile, String> {
+pub async fn screenshot_stop_recording(
+    app: AppHandle,
+    recording_id: String,
+) -> Result<RecordingFile, String> {
     if tool_state().recording.as_deref() != Some(&recording_id) {
         return Err("unknown recording id".into());
     }
@@ -856,6 +1083,7 @@ pub async fn screenshot_stop_recording(recording_id: String) -> Result<Recording
             state.recording = None;
         }
     }
+    surfaces::close_borders(&app);
     let info = info?;
     Ok(RecordingFile {
         path: info.path.to_string_lossy().into_owned(),
@@ -867,11 +1095,15 @@ pub async fn screenshot_stop_recording(recording_id: String) -> Result<Recording
 }
 
 #[tauri::command]
-pub async fn screenshot_cancel_recording(recording_id: String) -> Result<(), String> {
+pub async fn screenshot_cancel_recording(
+    app: AppHandle,
+    recording_id: String,
+) -> Result<(), String> {
     if tool_state().recording.as_deref() != Some(&recording_id) {
         return Err("unknown recording id".into());
     }
     let current_id = recording_id.clone();
+    surfaces::close_borders(&app);
     let result = blocking("cancel recording", move || {
         record::cancel_recording(&recording_id)
     })
@@ -888,16 +1120,52 @@ pub async fn screenshot_cancel_recording(recording_id: String) -> Result<(), Str
 /// The recorder bar window reads this to learn which recording it controls.
 #[tauri::command]
 pub async fn screenshot_current_recording() -> Result<Option<String>, String> {
+    while STARTING_RECORDING.load(Ordering::SeqCst) && tool_state().recording.is_none() {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
     Ok(tool_state().recording.clone())
 }
 
-fn open_recorder_bar(app: &AppHandle, display: &DisplayInfo) -> Result<(), String> {
+#[tauri::command]
+pub async fn screenshot_recording_status() -> Result<Option<serde_json::Value>, String> {
+    let (id, region) = {
+        let state = tool_state();
+        (state.recording.clone(), state.recording_region.clone())
+    };
+    Ok(id.map(|id| {
+        let (finished, stopped_by_user) = record::recording_status(&id);
+        serde_json::json!({ "recordingId": id, "finished": finished, "stoppedByUser": stopped_by_user, "region": region })
+    }))
+}
+
+pub(crate) fn recording_ended(app: &AppHandle, id: &str) {
+    if tool_state().recording.as_deref() != Some(id) {
+        return;
+    }
+    surfaces::close_borders(app);
+    if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+fn open_recorder_bar(
+    app: &AppHandle,
+    display: &DisplayInfo,
+    region: (u32, u32, u32, u32),
+) -> Result<(), String> {
     if let Some(existing) = app.get_webview_window(RECORDER_LABEL) {
         let _ = existing.close();
     }
     let url = WebviewUrl::App("index.html#screenshot-recorder".into());
     // Compact while recording; the bar grows itself for the preview.
-    let (lw, lh) = (300.0, 56.0);
+    let (lw, lh) = (surfaces::CONTROL_WIDTH, surfaces::CONTROL_HEIGHT);
+    let rect = surfaces::region_rect(
+        display,
+        capture::clamp_region(display.width, display.height, region),
+    );
+    let position = capture_control_position(app, display, rect)?;
+    surfaces::open_borders(app, display, rect)?;
     let window = window_builder(app, RECORDER_LABEL, url)
         .title("Recording")
         .inner_size(lw, lh)
@@ -914,14 +1182,19 @@ fn open_recorder_bar(app: &AppHandle, display: &DisplayInfo) -> Result<(), Strin
     watch_session_window(&window);
     // Bottom-center of the recorded display.
     let s = display.scale_factor.max(0.5);
-    let (pw, ph) = ((lw * s) as i32, (lh * s) as i32);
+    let (pw, ph) = position
+        .map(|r| (r.w, r.h))
+        .unwrap_or(((lw * s) as i32, (lh * s) as i32));
     let x = display.x + (display.width as i32 - pw) / 2;
     // Leave room above for the grown preview (240 logical px).
     let y = display.y + display.height as i32 - ph - (240.0 * s) as i32;
-    let _ = window.set_position(PhysicalPosition::new(x, y));
+    let (x, y) = position.map(|r| (r.x, r.y)).unwrap_or((x, y));
     window
-        .show()
-        .map_err(|e| format!("show recorder bar: {e}"))?;
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|e| format!("position recording controls: {e}"))?;
+    window
+        .set_size(PhysicalSize::new(pw as u32, ph as u32))
+        .map_err(|e| format!("size recording controls: {e}"))?;
     Ok(())
 }
 
@@ -983,6 +1256,7 @@ mod tests {
                 width: 1,
                 height: 1,
                 scale_factor: 1.0,
+                window_region: None,
             });
             state.hidden = vec!["main".into()];
         }

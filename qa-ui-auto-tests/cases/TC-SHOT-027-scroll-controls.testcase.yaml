@@ -1,0 +1,85 @@
+id: TC-SHOT-027
+title: Scroll progress controls distinguish Finish from Cancel
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-scroll
+- wait_for: '[data-testid="screenshot-scroll-progress"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-scroll-progress"]'
+    equals: Scroll capture · 3 frames
+- click: '[data-testid="screenshot-scroll-stop"]'
+- wait_for: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).args.cancel
+      === false
+- open: ${cfg.app.base_url}#screenshot-scroll
+- wait_for: '[data-testid="screenshot-scroll-controller"]'
+- click: '[data-testid="screenshot-scroll-cancel"]'
+- wait_for: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).args.cancel
+      === true
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: finish
+    requirement: Finish shows progress and requests stopping while retaining the captured content.
+    actions:
+    - 1
+    - 4
+    checkpoints:
+    - step: 3
+      expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-scroll-progress"]'', ''equals'': ''Scroll
+        capture · 3 frames''}'
+    - step: 5
+      expectation: 'wait_for: [data-testid="screenshot-overlay"]'
+    - step: 6
+      expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture"
+        && window.__taomniStubScreenshotCalls.at(-1).args.cancel === false''}'
+    results:
+    - 3
+    - 5
+    - 6
+  - id: cancel
+    requirement: Cancel explicitly requests discarding the scroll capture.
+    actions:
+    - 7
+    - 9
+    checkpoints:
+    - step: 10
+      expectation: 'wait_for: [data-testid="screenshot-overlay"]'
+    - step: 11
+      expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture"
+        && window.__taomniStubScreenshotCalls.at(-1).args.cancel === true''}'
+    results:
+    - 10
+    - 11
+  - id: close
+    requirement: The returned overlay remains closeable.
+    actions:
+    - 12
+    checkpoints:
+    - step: 13
+      expectation: 'wait_for: [data-testid="system-screenshot"]'
+    results:
+    - 13
+  visual:
+  - check: Observable capture UI and operation results
+    method: automated
+    reason: Assertions check the stated visible states and geometry; retained screenshots allow review.
+  native:
+  - check: Native capture and window lifecycle
+    method: external
+    reason: Browser verifies renderer interaction and stub dispatch; native window, clipboard and media assertions are covered
+      by SHOT-N cases.

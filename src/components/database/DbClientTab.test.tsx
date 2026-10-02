@@ -230,11 +230,6 @@ vi.mock("../ContextMenu", () => ({
   useContextMenu: () => ({ show: contextMenuShow, render: null, showAt: vi.fn(), refreshItems: vi.fn(), close: vi.fn(), isOpen: false }),
 }));
 
-vi.mock("../../lib/capture", () => ({
-  captureElementPng: vi.fn(async () => new Uint8Array()),
-  renderElementToCanvas: vi.fn(async () => null),
-  safeFilePart: (value: string) => value,
-}));
 
 /**
  * The schema tree appears on the commit that connects; the mocked editor

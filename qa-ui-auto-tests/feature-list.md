@@ -1120,62 +1120,22 @@ controls:
 - 候选合并三类来源并去重：命令历史（host 维度）、用户自定义命令、平台预置命令（Windows / Unix 各一套，覆盖 nav / git / network / process / system / files / env）
 - 选中后注入到当前终端
 
-### 4.13 终端截图 / 滚动截屏 / GIF 录制 ✅
+### 4.13 会话截图入口已统一到系统截图 ✅
 
 <!-- feature
 id: F4.13
 status: done
-area: capture
-components: [CaptureToolbar, FloatingToolbar]
+area: screenshot/screen-record
+components: [ControlBar, OpenTabsMenu]
 files:
-  - src/components/capture/CaptureToolbar.tsx
-  - src/lib/capture/
-controls:
-  - id: toolbar-root
-    selector: '[data-testid="capture-toolbar"]'
-    kind: display
-  - id: capture-menu
-    selector: '[data-testid="capture-menu"]'
-    kind: interactive
-  - id: capture-menu-dropdown
-    selector: '[data-testid="capture-menu-dropdown"]'
-    kind: display
-    optional: true       # only renders while the capture menu is open
-  - id: save-visible
-    selector: '[data-testid="capture-save-visible"]'
-    kind: interactive
-    optional: true       # only renders when menu is open
-  - id: copy-clipboard
-    selector: '[data-testid="capture-copy-clipboard"]'
-    kind: interactive
-    optional: true
-  - id: save-full
-    selector: '[data-testid="capture-save-full"]'
-    kind: interactive
-    optional: true       # menu open AND host provides getFull
-  - id: toggle-scroll
-    selector: '[data-testid="capture-toggle-scroll"]'
-    kind: interactive
-    optional: true       # menu open AND host provides getScrollFrame
-  - id: toggle-gif
-    selector: '[data-testid="capture-toggle-gif"]'
-    kind: interactive
-    optional: true       # menu open AND host provides getGifFrame
-  - id: stop-scroll-pill   # active-capture pill, only while scroll-capturing
-    selector: '[data-testid="capture-stop-scroll"]'
-    kind: interactive
-    optional: true
-  - id: stop-gif-pill      # active-capture pill, only while recording
-    selector: '[data-testid="capture-stop-gif"]'
-    kind: interactive
-    optional: true
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/tabbar/OpenTabsMenu.tsx
+controls: []
 -->
 
-- 终端面板内嵌 `CaptureToolbar`（通过 `FloatingToolbar` 浮窗承载，可拖拽 / 折叠 / 位置持久化）
-- **可见区域 PNG**：截取当前可见 viewport，可保存到磁盘或写入剪贴板（`ClipboardItem`）
-- **滚动截屏**：滚动捕获整段 scrollback 拼接为单张长图（`startScrollCapture`）
-- **GIF 录制**：基于 `gifenc` 的实时录制，工具条显示计时与 Stop；保存为 .gif
-- 文件名前缀按上下文（terminal / vnc）自动生成时间戳后缀
+- 移除终端、数据库、RDP、VNC 的旧会话截图菜单、录制指示器与源注册。
+- 使用标题栏统一的系统截图入口；需要截图 Taomni 内容时选择“截取当前窗口”（F27.1）。
+- TC-104 验证终端和 tab 菜单没有旧入口，统一入口可打开并取消返回终端。
 
 ---
 
@@ -2980,12 +2940,9 @@ controls:
 - 位置 / 折叠状态按 `storageKey` 持久化到 `localStorage`
 - 终端、VNC、SFTP 等多个面板共用
 
-### 10.2 `CaptureToolbar` ✅
-- 三类操作：可见区域 PNG、滚动 / 全帧 PNG、GIF 录制
-- 输出路由：保存到磁盘（`saveBlobToFile` 走原生保存对话框）/ 复制到剪贴板（`ClipboardItem`）
-- `startScrollCapture`：滚动区域逐帧拼接为长图（终端 scrollback / VNC 画面）
-- `createGifRecorder`：基于 `gifenc` 的 GIF 实时编码，工具条显示录制时长 + Stop
-- 文件名前缀按上下文 + 时间戳生成（`safeFilePart` / `timestampFilePart`）
+### 10.2 系统截图与录屏 ✅
+- 统一能力与用例归属 F27.1；旧会话 CaptureToolbar、store 与截图/GIF 引擎已删除。
+- 保留明确的结束按钮、进度、计时与预览导出体验；窗口和控制条均在录制像素范围外。
 
 ### 10.3 文件 IO 流式 IPC ✅
 - Tauri 命令对：`read_stream_open / read_stream_read / read_stream_close` 与 `write_stream_open / write_stream_append / write_stream_close / write_stream_abort`
@@ -10263,12 +10220,17 @@ controls:
 id: F27.1
 status: done
 area: screenshot/screen-record
-components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, RecorderBar, ControlBar, screenshot.ts, screenshot (tauri)]
+components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, RecorderBar, ScrollCaptureBar, ScreenshotMenuButton, ControlBar, screenshot.ts, screenshot (tauri)]
 files:
   - src/components/screenshot/ScreenshotOverlay.tsx
   - src/components/screenshot/AnnotationCanvas.tsx
   - src/components/screenshot/PinnedImage.tsx
   - src/components/screenshot/RecorderBar.tsx
+  - src/components/screenshot/ScrollCaptureBar.tsx
+  - src/components/screenshot/ScreenshotMenuButton.tsx
+  - src-tauri/src/screenshot/surfaces.rs
+  - src/lib/screenshotShortcut.ts
+  - src/App.tsx
   - src/lib/screenshot.ts
   - src/lib/screenshotSelection.ts
   - src/components/tabbar/ControlBar.tsx
@@ -10569,15 +10531,83 @@ controls:
   - id: screenshot-toast
     selector: '[data-testid="screenshot-toast"]'
     kind: display
+  - id: system-screenshot-current-window
+    selector: '[data-testid="system-screenshot-current-window"]'
+    kind: interactive
+  - id: system-screenshot-default-hint
+    selector: '[data-testid="system-screenshot-default-hint"]'
+    kind: display
+  - id: screenshot-tool-move
+    selector: '[data-testid="screenshot-tool-move"]'
+    kind: interactive
+  - id: screenshot-annotation-selection
+    selector: '[data-testid="screenshot-annotation-selection"]'
+    kind: display
+  - id: screenshot-annotation-delete
+    selector: '[data-testid="screenshot-annotation-delete"]'
+    kind: interactive
+  - id: screenshot-scroll-confirm
+    selector: '[data-testid="screenshot-scroll-confirm"]'
+    kind: display
+  - id: screenshot-scroll-instructions
+    selector: '[data-testid="screenshot-scroll-instructions"]'
+    kind: display
+  - id: screenshot-scroll-start
+    selector: '[data-testid="screenshot-scroll-start"]'
+    kind: interactive
+  - id: screenshot-scroll-confirm-cancel
+    selector: '[data-testid="screenshot-scroll-confirm-cancel"]'
+    kind: interactive
+  - id: screenshot-scroll-controller
+    selector: '[data-testid="screenshot-scroll-controller"]'
+    kind: display
+  - id: screenshot-scroll-progress
+    selector: '[data-testid="screenshot-scroll-progress"]'
+    kind: display
+  - id: screenshot-scroll-stop
+    selector: '[data-testid="screenshot-scroll-stop"]'
+    kind: interactive
+  - id: screenshot-scroll-cancel
+    selector: '[data-testid="screenshot-scroll-cancel"]'
+    kind: interactive
+  - id: screenshot-scroll-error
+    selector: '[data-testid="screenshot-scroll-error"]'
+    kind: display
+    optional: true
+  - id: screenshot-record-hint
+    selector: '[data-testid="screenshot-record-hint"]'
+    kind: display
+  - id: screenshot-recorder-range-hint
+    selector: '[data-testid="screenshot-recorder-range-hint"]'
+    kind: display
+  - id: screenshot-recording-boundary
+    selector: '[data-testid="screenshot-recording-boundary"]'
+    kind: display
+    optional: true
+  - id: screenshot-annotation-resize-nw
+    selector: '[data-testid="screenshot-annotation-resize-nw"]'
+    kind: interactive
+  - id: screenshot-annotation-resize-ne
+    selector: '[data-testid="screenshot-annotation-resize-ne"]'
+    kind: interactive
+  - id: screenshot-annotation-resize-sw
+    selector: '[data-testid="screenshot-annotation-resize-sw"]'
+    kind: interactive
+  - id: screenshot-annotation-resize-se
+    selector: '[data-testid="screenshot-annotation-resize-se"]'
+    kind: interactive
 -->
 
-- 系统截图工具：ControlBar 全局相机按钮（不依附 tab）与当前配置快捷键打开截图 overlay；默认 Windows/Linux `Ctrl+Alt+A`，macOS `Ctrl+Super+A`（Control+Command+A）。延迟菜单支持 3/5/10 秒，倒计时中点击相机取消。
+- 系统截图工具：主窗口及独立终端/数据库/RDP/VNC 窗口共用相机入口，默认隐藏应用窗口；菜单“截取当前窗口”保留调用窗口并预选其物理边界。当前配置快捷键打开截图 overlay；默认 Windows/Linux `Ctrl+Alt+A`，macOS `Ctrl+Super+A`（Control+Command+A）。菜单支持 3/5/10 秒延迟，倒计时中点击相机取消。原有 session 图像截图/录制入口及实现已移除，终端文本日志录制继续保留。
 - 区域选择与全屏选择默认处于 select 模式，显式点击矩形等工具后才开始绘制；选区可通过八方向 handles 与 move 区域调整，recrop 保留标注，选区外重新选择和滚动截图完成则清空旧标注。12 个工具包含矩形、椭圆、箭头、直线、画笔、荧光笔、文字、气泡、马赛克、模糊、编号和橡皮；实际拖拽创建形状，文字 Enter/blur 提交、Escape 取消，擦除是可撤销的变更，redo 仅在 undo 后可用。
+- “选择/移动标注”按最上层命中选择已有形状，支持拖动、四角缩放、颜色/线宽修改、Delete/Backspace 或按钮删除，以及双击修改文字；操作参与撤销/重做。标注选中边框仅显示在编辑器中，不进入导出画面。
 - 自由手绘选区：hint/toolbar 可在矩形与自由选区间切换，松手自动闭合，凹形/交叉轮廓按 even-odd 规则命中和导出；退化直线/微小轮廓不进入标注。八方向 handles 与 move 按包围盒变换轮廓并保留标注历史；轮廓外（包括包围盒内空白）按下重新选择。切回矩形保留包围盒/标注，重新进入自由选区清空旧形状。画笔仍是独立标注工具。
 - 输出支持复制、PNG 保存（取消保留选区）、贴图；自由选区在自然尺寸 PNG 中保留内部原画/标注并将外部变为透明，最终遮罩在水印之后应用。Pin 保留原有无边框/置顶/原生拖动和三种关闭入口，以棋盘背景显示透明 PNG，不扩展为跨重启图库。OCR 显示/复制识别结果，auto-redact 将返回框作为一次可撤销标注，水印支持文字/透明度/颜色的 apply/clear。滚动截图刷新 overlay；GIF/MP4 录制入口配独立状态条、停止预览、保存/完成和 GIF 首帧复制（剪贴板不承载动画）；自由选区禁用滚动/录制并提示切换矩形。
+- 滚动截图开始前说明自动滚动与结束方式，进行中显示帧数、“完成”和“取消”；完成保留已捕获长图，取消保留原始选区和标注。滚动及录制期间使用选区外的原生红色边框和控制窗口，避免依赖平台的内容保护来排除控制画面；全屏等没有安全控制位置时隐藏控制窗口，截图快捷键结束采集后再显示预览。没有安全位置且快捷键未注册时拒绝启动并提示调整范围或启用快捷键。
 - Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回同一 400×300 图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
 - Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界。N2/N9 捕获完整长页并将产物逐像素/24×24 区块与真实 renderer canvas 保留的原画比对，覆盖文字、图案、分隔线及缺失/重复/错位/拉伸，不只检查高度或单列颜色。N5–N8 对 GIF/MP4 每一解码帧核对原画 frame id、每轮随机 nonce、区域像素及有序时间线，黑帧/错区域/静态或无关多帧均不得通过；保存原始 PNG、产物、逐帧指标/时间线和原图/实际/差异接触图。
 - 新增 Browser `TC-SHOT-022` 验证自由轮廓/退化拒绝/移动缩放/历史/切换/轮廓外命中，`TC-SHOT-023` 将两种轮廓 Pin 的实际 PNG 与导出前保留原图做独立 RGB/alpha 比对。Native `TC-SHOT-N11` 使用真实 OS 鼠标绘制凹形选区，分别核对 Pin 文件与 OS 剪贴板 RGBA；实际拖动 Pin 后读取窗口位置差/置顶状态，并检查独立副本存活/销毁。run36991920385（SHA63c275da）三端新增与保留流程已通过：各 browser23/23、native11/11，零失败零跳过；三端 Pin 实际位移均80×64，原画 RGB 完全一致且非边缘 alpha 无差异。Linux 置顶读取真实 X11 ABOVE atom，保留 GTK/Tao 缓存 false 作为诊断，不用缓存或 builder 声明代替实际 WM 状态。
+- 本轮回归用例 `TC-SHOT-024`–`027` 覆盖标注编辑、当前窗口选项及滚动控制，`TC-104` 检查旧 session 图像入口移除；`TC-SHOT-N12` 核对真实窗口可见性、选区预选、滚动完成/取消和原生边框位置，`TC-SHOT-N13` 核对全屏录制停止与控制排除。N2/N9 的真实像素场景使用 CSS 隐藏鼠标指针，使桌面画面与保留的 canvas 原画一致；仍使用真实 OS 滚轮，逐像素阈值与比较区域不变。三平台执行证据以对应提交的 CI 产物为准。
 - `status: done` 表示功能代码已实装。完整原画内容比对标准下，run36973502375（SHA fb0f02c5）三端 native 各10/10、零失败零跳过；回执、构建身份、用例摘要与产物哈希均已核验，Pillow/PyAV 独立解码确认每一 GIF/MP4 帧匹配本轮原画且长图逐像素一致。该历史结果不证明新增自由选区或物理 Pin 拖动。最终扩展 run36991920385 已另行验证全部六组回执/源码/构建/配置/用例身份和产物哈希，独立解码12个 GIF/MP4 的283帧全部匹配原画/nonce/时间线，完整长图逐像素一致；27个便捷产物保留在 `qa-ui-auto-report/hosted-36991920385/outputs/{linux,windows,macos}/`，完整证据与两个独立校验 JSON 同根。旧标准 run36956493957 结果不作为该证据。混合 DPI/多显示器与 Wayland 仍未验证。
 
 ### 27.2 截图快捷键设置与能力状态

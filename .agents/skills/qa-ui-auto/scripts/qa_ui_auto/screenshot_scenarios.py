@@ -21,6 +21,8 @@ SCENARIOS = {
     "pin": "screenshot_qa_pin",
     "freehand": "screenshot_qa_freehand",
     "hotkey": "screenshot_qa_hotkey",
+    "controls": "screenshot_qa_controls",
+    "full-recorder": "screenshot_qa_full_recorder",
 }
 
 

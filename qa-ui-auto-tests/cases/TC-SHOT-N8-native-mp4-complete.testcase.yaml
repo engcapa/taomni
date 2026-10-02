@@ -1,25 +1,49 @@
 id: TC-SHOT-N8
 title: Native MP4 recorder preview decodes and actually plays
-covers: [F27.1]
-tags: [screenshot, recording, native, p1]
-modes: [native]
-native_platforms: [Linux, Windows, macOS]
-fixtures: [reset_db]
+covers:
+- F27.1
+tags:
+- screenshot
+- recording
+- native
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+fixtures:
+- reset_db
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
-- native_screenshot_scenario: {scenario: recorder, format: mp4}
+- native_screenshot_scenario:
+    scenario: recorder
+    format: mp4
 - assert_visible: '[data-testid="system-screenshot"]'
 verification:
   review: reviewed
   requirements:
   - id: mp4-recorder
-    requirement: Recorder stop loads a real MP4 in the platform WebView and playback advances, then Done restores main/removes temp clip.
-    actions: [1]
+    requirement: Recorder stop loads a real MP4 in the platform WebView and playback advances, then Done restores main/removes
+      temp clip. Recording borders are visible outside the selected pixels and the control bar does not intersect the recording;
+      decoded original scene comparisons reject captured tool chrome.
+    actions:
+    - 1
     checkpoints:
-    - {step: 3, expectation: "Every decoded video frame matches its actual original scene PNG/id/random nonce and ordered timeline; only gaps unexplained by real original visibility holds may count as a stall, in addition to timer advance and real WebView metadata/pixels/playback advancement. Dimensions agree, reentry retains preview and Done restores main/removes temp. MP4, source frame PNGs, per-frame metrics/timeline and difference contact sheet are retained."}
-    results: [3]
+    - step: 3
+      expectation: Every decoded video frame matches its actual original scene PNG/id/random nonce and ordered timeline; only
+        gaps unexplained by real original visibility holds may count as a stall, in addition to timer advance and real WebView
+        metadata/pixels/playback advancement. Dimensions agree, reentry retains preview and Done restores main/removes temp.
+        MP4, source frame PNGs, per-frame metrics/timeline and difference contact sheet are retained.
+    results:
+    - 3
   visual:
-  - {check: Preview quality, method: external, reason: Play retained recorder-preview MP4; automated currentTime/pixels establish platform codec playback.}
+  - check: Preview quality
+    method: external
+    reason: Play retained recorder-preview MP4; automated currentTime/pixels establish platform codec playback.
   native:
-  - {check: WebView MP4 support, method: automated, reason: Real WebView2/WebKitGTK/WKWebView video element must decode and play; VIDEO tag presence alone cannot pass.}
+  - check: WebView MP4 support
+    method: automated
+    reason: Real WebView2/WebKitGTK/WKWebView video element must decode and play; VIDEO tag presence alone cannot pass.

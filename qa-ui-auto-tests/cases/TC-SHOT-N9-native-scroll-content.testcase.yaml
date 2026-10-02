@@ -24,4 +24,4 @@ verification:
   visual:
   - {check: Stitch content fidelity, method: automated, reason: Compare complete original renderer page versus full native stitch; retain paired PNGs and amplified differences.}
   native:
-  - {check: Repeated wheel and capture, method: automated, reason: Both scenarios use actual native source and OS input.}
+  - {check: Repeated wheel and capture, method: automated, reason: "Both scenarios use actual native source and OS input. The fixture uses CSS cursor:none to match the cursor-free retained canvas original, without masking output pixels or changing the comparison thresholds."}

@@ -50,13 +50,13 @@ mod vnc;
 pub use vnc::keyboard_hook::{
     HOOK_PROCESS_ARG as VNC_SPECIAL_KEY_HOOK_ARG, run_hook_process as run_vnc_special_key_hook,
 };
+mod structural_search;
 mod voice;
 mod windowing;
 mod workspace;
 mod workspace_execution;
 mod workspace_fs;
 mod workspace_search;
-mod structural_search;
 pub mod workspace_tooling;
 mod wsl;
 
@@ -1075,6 +1075,8 @@ pub fn run() {
             screenshot::screenshot_capture_full,
             screenshot::screenshot_capture_region,
             screenshot::screenshot_scroll_capture,
+            screenshot::screenshot_scroll_status,
+            screenshot::screenshot_stop_scroll_capture,
             screenshot::screenshot_copy_image,
             screenshot::screenshot_save_image,
             screenshot::screenshot_save_data_url,
@@ -1093,6 +1095,7 @@ pub fn run() {
             screenshot::screenshot_stop_recording,
             screenshot::screenshot_cancel_recording,
             screenshot::screenshot_current_recording,
+            screenshot::screenshot_recording_status,
             screenshot::shortcut::screenshot_shortcut_status,
             screenshot::shortcut::screenshot_shortcut_set,
             screenshot::qa::screenshot_qa_capture,
@@ -1102,6 +1105,8 @@ pub fn run() {
             screenshot::qa::screenshot_qa_record,
             screenshot::qa::screenshot_qa_overlay_copy,
             screenshot::qa::screenshot_qa_recorder,
+            screenshot::qa::screenshot_qa_controls,
+            screenshot::qa::screenshot_qa_full_recorder,
             screenshot::qa::screenshot_qa_pin,
             screenshot::qa::screenshot_qa_freehand,
             screenshot::qa::screenshot_qa_hotkey,

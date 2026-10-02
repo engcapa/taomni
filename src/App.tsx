@@ -15,11 +15,14 @@ import {
   isScreenshotPinWindow,
   isScreenshotQaFixtureWindow,
   isScreenshotRecorderWindow,
+  isScreenshotScrollWindow,
+  isScreenshotBoundaryWindow,
 } from "./lib/screenshot";
 import { useScreenshotAppShortcut } from "./lib/screenshotShortcut";
 import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
 import { PinnedImage } from "./components/screenshot/PinnedImage";
 import { RecorderBar } from "./components/screenshot/RecorderBar";
+import { ScrollCaptureBar } from "./components/screenshot/ScrollCaptureBar";
 import { ScreenshotQaFixture } from "./components/screenshot/ScreenshotQaFixture";
 import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
@@ -178,6 +181,10 @@ function App() {
   // `index.html#screenshot-overlay` renders the overlay in-page with stubbed
   // capture backends.
   const overlayHash = routeHash;
+  if (isScreenshotBoundaryWindow() || overlayHash.startsWith("#screenshot-boundary")) {
+    return <div data-testid="screenshot-recording-boundary" style={{ position: "fixed", inset: 0, background: "#ff4d4f", pointerEvents: "none" }} />;
+  }
+  if (isScreenshotScrollWindow() || overlayHash.startsWith("#screenshot-scroll")) return <ScrollCaptureBar />;
   if (
     isScreenshotOverlayWindow() ||
     overlayHash.startsWith("#screenshot-overlay")

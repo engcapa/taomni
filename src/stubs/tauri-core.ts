@@ -1658,6 +1658,7 @@ async function readStubWorkspaceEncodedFile(
 const STUB_SCREENSHOT_DATA_URL: string = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAHYElEQVR42u3UsQ3DIBRAQSZJ7do1QzAEQ3gSaoZgCMZJnSodcvlFE8m5pzfDpbfC5XT6/jyOva9UvR6pOXjCELCABSxgAQtYwAIWsIAFLGABS8ACFrCABSxgAQtYwAIWsIAFLAELWMACFrCABSxgAQtYwAIWsAQsYAELWMACFqeABSxgAQtYwBKwgAUsYAELWAYWsIAFLGABC1gGFrCABSxgAcvAAhawgAUsYBlYwAIWsIAFLAMLWMACFrCABSxgAQtYwAIWsAwsYAELWMACFrCABSxgAQtYwDKwgAUsYAELWMACFrCABSxgAQtYAhawgAUsYAELWMACFrCABSxgCVjAAhawgAUsYAELWMACFrCAJWABC1jAAhawgAUsYAELWMACloAFLGABC1jAMrCABSxgAQtYAhawgAUsYAHLGAIWsIAFLGABy8ACFrCABSxgGVjAAhawgAUsAwtYwAIWsIBlYAELWMACFrCABSxgAQtYwAKWgQUsYAELWMACFrCABSxgAQtYBhawgAUsYAELWMACFrCABSxgAUvAAhawgAUsYAELWMACFrCABSwBC1jAAhawgAUsYAELWMACFrAELGABC1jAAhawgAUsYAELWMASsIAFLGABC1gGFrCABSxgAUvAAhawgAUsYAGLRMACFrCABSxgGVjA+h1YikcoYAELWMACFrAMLGABC1jAApaBBSxgAQtYwDKwgAUsYAELWMACFrCABSxgAcvAAhawgAUsYAELWMACFrCABSwDC1jAAhawgAUsYAELWMACFrAMLGABC1jAAhawgAUsYAELWMACloAFLGABC1jAAhawgAUsYAELWAIWsIAFLGABC1jAAhawgAUsYAlYwAIWsIAFLEgBaxescjp4LtX398EqzetRpoMDC1jAAhawgAUsYAELWMACFrCAZWABC1jAAhawgAUsYAELWMACloEFLGABC1jAAhawgAUsYAELWAYWsIAFLGABi1PAAhawgAUsYBlYwAIWsIAFLAMLWMACFrCABSxIAQtYwAIWsIBlYAELWMACFrAMLGABC1jAApaBBSxgAQtYwAIWsIAFLGABC1gGFrCABSxgAQtYwAIWsIAFLGAZWMACFrCABSxgAQtYwAIWsIAFLAwBC1jAAhawgAUsYAELWMACFrAMLGABC1jAAhawgAUsYAELWMAysIAFLGABC1jAAhawgAUsYAHLwAIWsIAFLGBxCljAAhawgAUsAwtYwAIWsIBlYAELWMACFrCAZWABC1jAAhawDCxgAQtYwAKWgQUsYAELWMAysIAFLGABC1jAAhawgAUsYAHLwAIWsIAFLGABC1jAAhawgAUsAwtYwAIWsIAFLGABC1jAAhawgEUiYAELWMACFrCABSxgAQtYwAKWgQUsYAELWMACFrCABSxgAQtYBhawgAUsYAELWMACFrCABSxgGVjAAhawgAUsAwtYwAIWsIBlYAELWMACFrCMIWABC1jAAhawDCxgAQtYwAKWgQUsYAELWMAysIAFLGABC1gGFrCABSxgAQtYwAIWsIAFLGAZWMACFrCABSxgAQtYwAIWsIBlYAELWMACFrCABSxgAQtYwAIWsEgELGABC1jAAhawgAUsYAELWMAysIAFLGABC1jAAhawgAUsYAHLwAIWsIAFLGABC1jAAhawgAUsAwtYwAIWsIBlYAELWMAC1qPB6tXBc2++vw9Wn16P/nFwYAELWMACFrCABSxgAQtYwAIWsAwsYAELWMACFrCABSxgAQtYwDKwgAUsYAELWMACFrCABSxgAcvAAhawgAUsYHEKWMACFrCABSwDC1jAAhawgGVgAQtYwAIWsIAFKWABC1jAAhawDCxgAQtYwAKWgQUsYAELWMAysIAFLGABC1jAAhawgAUsYAHLwAIWsIAFLGABC1jAAhawgPUHYL0UC1jAAhawgAUsYAELWMACFrCABSwDC1jAAhawgAUsYAELWMACFrAMLGABC1jAAhawgAUsYAELWMAysIAFLGABC1icAhawgAUsYAHLwAIWsIAFLGAZWMACFrCABSxgQQpYwAIWsIAFLAELWMACFrCAZWABC1jAAhawBCxgAQtYwAIWsIAFLGABC1jAErCABSxgAQtYwAIWsIAFLGABS8ACFrCABSxgAQtYwAIWsIAFLGBhCFjAAhawgAUsYAELWMACFrCAZWABC1jAAhawgAUsYAELWMACloEFLGABC1jAAhawgAUsYAELWAYWsIAFLGABi1PAAhawgAUsYBlYwAIWsIAFLAMLWMACFrCABSwDC1jAAhawgCVgAQtYwAIWsAwsYAELWMACloAFLGABC1jAAhawgAUsYAELWAIWsIAFLGABC1jAAhawgAUsYAlYwAIWsIAFLGABC1jAAhawgAUsEgELWMACFrCABSxgAQtYwAIWsAwsYAELWMACFrCABSxgAQtYwDKwgAUsYAELWMACFrCABSxgAcvAAhawgAUsYBlYwAIWsIAFLAMLWMACFrCAZWABC1jAAtYD+wK40T0UTMEo5gAAAABJRU5ErkJggg==";
 /** Browser-preview screenshot artifacts: stub path -> data URL. */
 const stubScreenshotFiles = new Map<string, string>();
+let stubScreenshotIncludeWindow = false;
 function stubScreenshotCall(cmd: string, args: unknown): void {
   try {
     const w = window as unknown as Record<string, unknown>;
@@ -5065,6 +5066,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "screenshot_overlay_init": {
       return ({
+        windowRegion: stubScreenshotIncludeWindow ? { x: 40, y: 30, width: 320, height: 240 } : null,
         path: STUB_SCREENSHOT_DATA_URL,
         displayId: "0,0",
         width: 400,
@@ -5073,6 +5075,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as unknown) as T;
     }
     case "screenshot_open_overlay": {
+      stubScreenshotIncludeWindow = Boolean(args?.includeCurrentWindow);
       stubScreenshotCall(cmd, args);
       location.hash = "screenshot-overlay";
       return (undefined as unknown) as T;
@@ -5094,6 +5097,18 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         width: Number(a.width ?? 400),
         height: Number(a.height ?? 300),
       } as unknown) as T;
+    }
+    case "screenshot_scroll_status": {
+      return ({ frames: 3 } as unknown) as T;
+    }
+    case "screenshot_stop_scroll_capture": {
+      stubScreenshotCall(cmd, args);
+      location.hash = "screenshot-overlay";
+      return undefined as T;
+    }
+    case "screenshot_recording_status": {
+      return ({ recordingId: "stub-rec-1", finished: false, stoppedByUser: false,
+        region: { x: 40, y: 30, width: 320, height: 240 } } as unknown) as T;
     }
     case "screenshot_scroll_capture": {
       stubScreenshotCall(cmd, args);

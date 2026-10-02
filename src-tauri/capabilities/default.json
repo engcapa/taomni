@@ -12,6 +12,8 @@
     "notes-*",
     "screenshot-overlay",
     "screenshot-recorder",
+    "screenshot-scroll",
+    "screenshot-boundary-*",
     "screenshot-pin-*",
     "screenshot-qa-fixture"
   ],

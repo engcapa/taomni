@@ -7,6 +7,7 @@ type RecordingEnded = { recordingId: string; error: string | null };
 type EndListener = (event: { payload: RecordingEnded }) => void;
 
 const mocks = vi.hoisted(() => ({
+  recordingStatus: vi.fn(),
   currentRecording: vi.fn<() => Promise<string | null>>(),
   stopRecording: vi.fn<(id: string) => Promise<RecordingFile>>(),
   cancelRecording: vi.fn<(id: string) => Promise<void>>(),
@@ -29,6 +30,7 @@ vi.mock("../../lib/i18n", () => ({ useT: () => mocks.translate }));
 vi.mock("../../lib/screenshot", () => ({
   RECORDING_ENDED_EVENT: "screenshot://recording-ended",
   currentRecording: mocks.currentRecording,
+  recordingStatus: mocks.recordingStatus,
   stopRecording: mocks.stopRecording,
   cancelRecording: mocks.cancelRecording,
   loadScreenshotUrl: mocks.loadScreenshotUrl,
@@ -88,6 +90,7 @@ function emitEnded(recordingId = "recording-1", error: string | null = null) {
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.currentRecording.mockResolvedValue("recording-1");
+  mocks.recordingStatus.mockResolvedValue(null);
   mocks.stopRecording.mockResolvedValue(gif);
   mocks.cancelRecording.mockResolvedValue(undefined);
   mocks.closeOverlay.mockResolvedValue(undefined);
@@ -216,7 +219,7 @@ describe("RecorderBar Stop and Cancel", () => {
     fireEvent.click(screen.getByTestId("screenshot-recorder-stop"));
     expect(await screen.findByTestId("screenshot-recorder-error")).toHaveTextContent("encoder failed");
     expect(screen.getByTestId("screenshot-recorder-error")).toHaveTextContent("screenshot.recordFailed");
-    expect(mocks.setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 300, height: 140 }));
+    expect(mocks.setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 360, height: 140 }));
     expect(screen.getByTestId("screenshot-recorder-stop")).toBeDisabled();
     expect(screen.queryByText("screenshot.recordFinishing")).not.toBeInTheDocument();
     expect(screen.getByTestId("screenshot-recorder-cancel")).toBeEnabled();
@@ -318,6 +321,14 @@ describe("RecorderBar preview actions", () => {
 });
 
 describe("RecorderBar backend auto-end listener", () => {
+  it("recovers a stop request delivered before the hidden bar subscribed", async () => {
+    mocks.recordingStatus.mockResolvedValue({ recordingId: "recording-1", finished: true, stoppedByUser: true,
+      region: { x: 100, y: 100, width: 640, height: 480 } });
+    render(<RecorderBar />);
+    await screen.findByTestId("screenshot-recorder-preview");
+    expect(mocks.stopRecording).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId("screenshot-recorder-notice")).not.toBeInTheDocument();
+  });
   it.each([null, "capture source failed"])("shows %j notice while finishing and finalizes only the matching recording", async (error) => {
     const stop = deferred<RecordingFile>();
     mocks.stopRecording.mockReturnValue(stop.promise);
@@ -328,7 +339,7 @@ describe("RecorderBar backend auto-end listener", () => {
     emitEnded("recording-1", error);
     expect(screen.getByTestId("screenshot-recorder-notice")).toHaveTextContent(error ?? "screenshot.recordLimitReached");
     expect(screen.getByText("screenshot.recordFinishing")).toBeInTheDocument();
-    expect(mocks.setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 300, height: 140 }));
+    expect(mocks.setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 360, height: 140 }));
     emitEnded("recording-1", "duplicate event");
     expect(mocks.stopRecording).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("screenshot-recorder-notice")).not.toHaveTextContent("duplicate event");

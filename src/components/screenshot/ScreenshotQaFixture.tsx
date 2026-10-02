@@ -143,7 +143,9 @@ function PixelFixture({ animated }: { animated: boolean }) {
     };
   }, [animated]);
   return (
-    <div ref={rootRef} data-testid="screenshot-qa-fixture-ready" style={{ position: "fixed", inset: 0, paddingRight: animated ? 0 : 8, overflowY: animated ? "hidden" : "scroll", background: "#ffffff", scrollBehavior: "auto" }}>
+    // Keep the native scene consistent with the retained canvas original while
+    // real OS wheel input moves the pointer through the fixture.
+    <div ref={rootRef} data-testid="screenshot-qa-fixture-ready" style={{ position: "fixed", inset: 0, paddingRight: animated ? 0 : 8, overflowY: animated ? "hidden" : "scroll", background: "#ffffff", scrollBehavior: "auto", cursor: "none" }}>
       <canvas ref={canvasRef} style={{ display: "block" }} />
     </div>
   );

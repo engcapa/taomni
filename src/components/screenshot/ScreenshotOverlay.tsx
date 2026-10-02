@@ -15,6 +15,7 @@ import {
   ListOrdered,
   Maximize,
   MessageCircle,
+  MousePointer2,
   Minus,
   Pencil,
   Pin,
@@ -26,6 +27,7 @@ import {
   Square,
   Stamp,
   Type,
+  Trash2,
   Undo2,
   Video,
   X,
@@ -55,6 +57,7 @@ import {
   type ScreenshotPoint,
 } from "../../lib/screenshot";
 import { contourBounds, contourPath, maskContour, pointInContour, transformContour, validContour } from "../../lib/screenshotSelection";
+import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
 import {
   AnnotationCanvas,
   type AnnotationCanvasHandle,
@@ -78,6 +81,7 @@ const COLORS: { value: string; testid: string; titleKey: string }[] = [
 ];
 
 const TOOLS: { tool: AnnotationTool; testid: string; titleKey: string; Icon: LucideIcon }[] = [
+  { tool: "move", testid: "screenshot-tool-move", titleKey: "screenshot.toolMove", Icon: MousePointer2 },
   { tool: "rect", testid: "screenshot-tool-rect", titleKey: "screenshot.toolRect", Icon: Square },
   { tool: "ellipse", testid: "screenshot-tool-ellipse", titleKey: "screenshot.toolEllipse", Icon: Circle },
   { tool: "arrow", testid: "screenshot-tool-arrow", titleKey: "screenshot.toolArrow", Icon: ArrowUpRight },
@@ -313,6 +317,7 @@ const HANDLE_CURSORS: Record<Handle, string> = {
 
 export function ScreenshotOverlay() {
   const t = useT();
+  const stopShortcut = screenshotShortcutLabel(useScreenshotShortcutStore((s) => s.status));
   const [init, setInit] = useState<OverlayInit | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
@@ -326,6 +331,12 @@ export function ScreenshotOverlay() {
   const [lineWidth, setLineWidth] = useState(4);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [annotationSelected, setAnnotationSelected] = useState(false);
+  const [scrollConfirm, setScrollConfirm] = useState(false);
+  const onAnnotationSelection = useCallback((shape: Shape | null) => {
+    setAnnotationSelected(!!shape);
+    if (shape) { setColor(shape.color); setLineWidth(shape.lineWidth); }
+  }, []);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
@@ -401,7 +412,12 @@ export function ScreenshotOverlay() {
       setInit(data);
       setImg(loaded.img);
       setImgUrl(loaded.url);
-      setPhase("select");
+      if (data.windowRegion) {
+        const s = data.windowRegion;
+        setSel({ x: s.x * window.innerWidth / data.width, y: s.y * window.innerHeight / data.height,
+          w: s.width * window.innerWidth / data.width, h: s.height * window.innerHeight / data.height });
+        setPhase("annotate");
+      } else setPhase("select");
     })().catch((e: unknown) => {
       if (!cancelled) setLoadError(formatUnknownError(e));
     });
@@ -724,6 +740,7 @@ export function ScreenshotOverlay() {
       if (!init || !img || !sel || contour) return;
       setPhase("busy");
       setRecordOpen(false);
+      setScrollConfirm(false);
       try {
         // The backend hides this window while it scrolls, then shows it.
         const res = await scrollCapture(init.displayId || undefined, toPhysical(sel));
@@ -739,7 +756,7 @@ export function ScreenshotOverlay() {
         setPhase("select");
         showToast(t("screenshot.scrollDone", { count: res.frames }));
       } catch (e) {
-        showToast(t("screenshot.scrollFailed", { error: formatUnknownError(e) }));
+        if (!String(e).includes("scroll capture cancelled")) showToast(t("screenshot.scrollFailed", { error: formatUnknownError(e) }));
         setPhase("annotate");
       }
     });
@@ -764,12 +781,13 @@ export function ScreenshotOverlay() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
+      const target = e.target instanceof Element ? e.target : null;
       const typing = !!target?.closest("input, textarea, select, [contenteditable='true']");
       const mod = e.ctrlKey || e.metaKey;
       if (e.key === "Escape") {
         e.preventDefault();
-        if (recordOpen) setRecordOpen(false);
+        if (scrollConfirm) setScrollConfirm(false);
+        else if (recordOpen) setRecordOpen(false);
         else if (watermarkOpen) setWatermarkOpen(false);
         else if (ocrOpen) setOcrOpen(false);
         else if (pickerMode) exitPickerMode();
@@ -779,6 +797,10 @@ export function ScreenshotOverlay() {
         return;
       }
       if (typing || phase !== "annotate") return;
+      if ((e.key === "Delete" || e.key === "Backspace") && tool === "move") {
+        if (canvasRef.current?.deleteSelected()) e.preventDefault();
+        return;
+      }
       if (mod && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) canvasRef.current?.redo();
@@ -974,6 +996,7 @@ export function ScreenshotOverlay() {
             setCanUndo(u);
             setCanRedo(r);
           }}
+          onSelectionChange={onAnnotationSelection}
           onRequestReselect={(p) => {
             resetSelection();
             startRegionDrag(p.x, p.y);
@@ -1052,7 +1075,7 @@ export function ScreenshotOverlay() {
                 title={t(c.titleKey)}
                 aria-label={t(c.titleKey)}
                 aria-pressed={color === c.value}
-                onClick={() => setColor(c.value)}
+                onClick={() => { setColor(c.value); if (tool === "move") canvasRef.current?.updateSelectedStyle({ color: c.value }); }}
                 className="w-5 h-5 mx-0.5 rounded-full shrink-0"
                 style={{
                   background: c.value,
@@ -1069,7 +1092,7 @@ export function ScreenshotOverlay() {
                 title={`${w}px`}
                 aria-label={`${w}px`}
                 aria-pressed={lineWidth === w}
-                onClick={() => setLineWidth(w)}
+                onClick={() => { setLineWidth(w); if (tool === "move") canvasRef.current?.updateSelectedStyle({ lineWidth: w }); }}
                 className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
                 style={{ background: lineWidth === w ? "var(--taomni-hover)" : "transparent", color: "var(--taomni-text)" }}
               >
@@ -1083,8 +1106,11 @@ export function ScreenshotOverlay() {
             <ToolButton testid="screenshot-redo" title={t("screenshot.redo")} disabled={!canRedo} onClick={() => canvasRef.current?.redo()}>
               <Redo2 size={16} />
             </ToolButton>
+            <ToolButton testid="screenshot-annotation-delete" title={t("screenshot.deleteAnnotation")} disabled={!annotationSelected} onClick={() => { canvasRef.current?.deleteSelected(); }}>
+              <Trash2 size={16} />
+            </ToolButton>
             <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour} onClick={() => void handleScrollCapture()}>
+            <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour} onClick={() => { setRecordOpen(false); setScrollConfirm(true); }}>
               <ScrollText size={16} />
             </ToolButton>
             <ToolButton
@@ -1218,6 +1244,7 @@ export function ScreenshotOverlay() {
                   className="absolute bottom-full mb-2 right-0 rounded-lg py-1 shadow-2xl text-[12px] whitespace-nowrap"
                   style={{ zIndex: 10, ...panelStyle }}
                 >
+                  <p data-testid="screenshot-record-hint" className="px-4 py-2 max-w-72 whitespace-normal text-[var(--taomni-text-muted)]">{t("screenshot.recordHint", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
                   <button
                     type="button"
                     data-testid="screenshot-record-gif"
@@ -1260,6 +1287,17 @@ export function ScreenshotOverlay() {
       )}
 
       {/* Busy state (scroll capture / recording start). */}
+      {scrollConfirm && <div data-testid="screenshot-scroll-confirm" role="dialog" aria-label={t("screenshot.scrollCapture")}
+        className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 80, background: "rgba(0,0,0,0.25)" }}>
+        <div className="rounded-xl shadow-2xl p-5 w-96 text-[13px]" style={panelStyle}>
+          <p className="font-medium mb-2">{t("screenshot.scrollCapture")}</p>
+          <p data-testid="screenshot-scroll-instructions" className="mb-4">{t("screenshot.scrollInstructions", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
+          <div className="flex justify-end gap-2">
+            <button data-testid="screenshot-scroll-confirm-cancel" type="button" className="px-3 py-2 rounded-lg" onClick={() => setScrollConfirm(false)}>{t("screenshot.cancel")}</button>
+            <button data-testid="screenshot-scroll-start" type="button" className="px-3 py-2 rounded-lg" style={{ background: "var(--taomni-accent)", color: "#fff" }} onClick={() => void handleScrollCapture()}>{t("screenshot.scrollStart")}</button>
+          </div>
+        </div>
+      </div>}
       {phase === "busy" && (
         <div
           data-testid="screenshot-scroll-busy"

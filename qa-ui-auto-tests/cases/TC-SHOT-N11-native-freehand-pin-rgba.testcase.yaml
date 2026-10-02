@@ -1,6 +1,6 @@
 id: TC-SHOT-N11
 title: Native freehand Copy and Pin retain original RGBA and actual OS dragging moves the topmost pin
-description: Fixed concave vertices are sent through real system mouse input; public renderer actions export real OS-captured content. Expected mask is derived independently from original canvas pixels, never from the exported contour.
+description: Before each still capture the real system cursor is parked outside the fixture crop to keep the scene equal to the original canvas. Fixed concave vertices are sent through real system mouse input with a dwell at each corner so the WebView can consume the prescribed gesture; public renderer actions export real OS-captured content. Expected mask is derived independently from original canvas pixels, never from the exported contour.
 covers: [F27.1]
 tags: [screenshot, native, freehand, pin, rgba, p1]
 modes: [native]
@@ -18,7 +18,7 @@ verification:
     requirement: OS mouse input draws a real auto-closed concave selection and public Pin and Copy export original interior RGB with exact interior/exterior alpha on all supported desktop WebViews.
     actions: [1]
     checkpoints:
-    - {step: 3, expectation: 'Both outputs match independently retained original crop and fixed mask dimensions, every RGB tile and exact nonboundary alpha; only a 2px edge band is excluded. Pin PNG and OS clipboard RGBA are checked separately; closed contour, freehand mode and disabled rectangle-only operations must all pass. Original/full/crop/expected/actual/difference PNGs and metrics are retained.'}
+    - {step: 3, expectation: 'Both outputs match independently retained original crop and fixed mask dimensions, every RGB tile and exact nonboundary alpha; only a 2px edge band is excluded. Pin PNG and OS clipboard RGBA are checked separately; closed contour, freehand mode and disabled rectangle-only operations must all pass. Original/full/crop/expected/actual/difference PNGs and metrics including the observed contour are retained.'}
     results: [3]
   - id: R2
     requirement: Public Pin opens an independent native always-on-top window, survives overlay/session cleanup, moves by the requested displacement under actual OS dragging, then closes and removes its retained copy without hiding the main window.
