@@ -59,7 +59,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -76,7 +76,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: reverse
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -93,7 +93,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
     modifiers:
     - Control
@@ -129,7 +129,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -162,7 +162,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: reverse
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -186,7 +186,7 @@ steps:
 - screenshot:
     path: terminal-gutter-local.png
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-- click: '[data-testid="terminal-pane"][data-terminal-active="true"] button:has-text("Close")'
+- click: role=button[name="Close"]
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-view"]'
 - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
@@ -237,7 +237,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -254,7 +254,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: reverse
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -271,7 +271,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
     modifiers:
     - Control
@@ -436,4 +436,4 @@ verification:
   native:
   - check: Verify first-column selection and copied bytes in the packaged WebView on each selected OS.
     method: automated
-    reason: Native uses the real local/SSH terminal, W3C pointer input and independent OS clipboard reads; browser mode proves the shared renderer and browser clipboard only.
+    reason: Native uses the real local/SSH terminal, W3C pointer input and independent OS clipboard reads; browser mode proves the shared renderer and browser clipboard only. macOS uses the packaged WKWebView event bridge, not OS-global mouse injection.

@@ -96,8 +96,11 @@ class MouseStepsTest(TestCase):
 
     def native_terminal_context(self, directory: str) -> SimpleNamespace:
         session = Mock()
-        session.find.return_value = "highlight-element"
-        session.execute.return_value = {"x": 108, "y": 40, "width": 120, "height": 18}
+        session.find.return_value = "xterm-element"
+        session.execute.return_value = {
+            "hit": {"x": 108, "y": 40, "width": 120, "height": 18},
+            "origin": {"x": 100, "y": 40, "width": 300, "height": 200},
+        }
         session.endpoint.return_value = "/session/qa/actions"
         session.MODIFIER_MAP = {"Control": "\ue009", "Shift": "\ue008"}
         return SimpleNamespace(session=session, case_dir=Path(directory))
@@ -115,8 +118,9 @@ class MouseStepsTest(TestCase):
         self.assertEqual(keys["actions"][:2], [{"type": "keyDown", "value": "\ue009"},
                                                {"type": "keyDown", "value": "\ue008"}])
         moves = [a for a in pointer["actions"] if a["type"] == "pointerMove"]
-        self.assertEqual([(m["x"], m["y"]) for m in moves], [(58, 0), (-64, 0)])
-        self.assertTrue(all(m["origin"] == {"element-6066-11e4-a52e-4f735466cecf": "highlight-element"} for m in moves))
+        self.assertEqual([(m["x"], m["y"]) for m in moves], [(-24, -91), (-146, -91)])
+        self.assertTrue(all(m["origin"] == {"element-6066-11e4-a52e-4f735466cecf": "xterm-element"} for m in moves))
+        ctx.session.find.assert_called_once_with("#hit .xterm", interactive=False)
         self.assertEqual(ctx.session.request.call_args_list[-1], call("DELETE", "/session/qa/actions"))
 
     def test_native_terminal_drag_releases_inputs_when_driver_fails(self):

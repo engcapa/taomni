@@ -598,33 +598,14 @@ async fn actions_script<R: Runtime>(
           if (origin === 'pointer') return [lastX + ox, lastY + oy];
           return [ox, oy];
         }};
-        for (const source of __qaActions) {{
-          if (source.type === 'key') {{
-            for (const action of source.actions || []) if (action.type === 'keyDown' || action.type === 'keyUp') __qaEmitKey(action.type, action.value);
-          }} else if (source.type === 'pointer') {{
-            let x=0, y=0, clickCount=0;
-            for (const action of source.actions || []) {{
-              if (action.type === 'pointerMove') {{
-                [x, y] = __qaOrigin(action.origin, Number(action.x)||0, Number(action.y)||0);
-                lastX = x; lastY = y;
-                const target=__qaPoint(x,y);
-                target.dispatchEvent(new PointerEvent('pointermove',{{bubbles:true,clientX:x,clientY:y,buttons:0}}));
-                // WKWebView's in-process bridge does not synthesize the
-                // compatibility mouse events that a platform pointer move
-                // normally produces. React's onMouseEnter/onMouseMove menu
-                // handlers depend on mouseover/mousemove, so dispatch those
-                // events alongside pointermove for hover interactions.
-                const mouseInit={{bubbles:true,cancelable:true,clientX:x,clientY:y,buttons:0}};
-                target.dispatchEvent(new MouseEvent('mouseover',mouseInit));
-                target.dispatchEvent(new MouseEvent('mousemove',mouseInit));
-              }}
-              else if (action.type === 'pointerDown') {{ const target=__qaPoint(x,y); target.dispatchEvent(new PointerEvent('pointerdown',{{bubbles:true,button:action.button||0,buttons:1,clientX:x,clientY:y}})); }}
-              else if (action.type === 'pointerUp') {{ const target=__qaPoint(x,y); const button = action.button||0; target.dispatchEvent(new PointerEvent('pointerup',{{bubbles:true,button,buttons:0,clientX:x,clientY:y}})); if (button === 2) {{ target.dispatchEvent(new MouseEvent('contextmenu',{{bubbles:true,cancelable:true,button:2,clientX:x,clientY:y}})); }} else {{ target.dispatchEvent(new MouseEvent('click',{{bubbles:true,button,clientX:x,clientY:y}})); clickCount++; if (clickCount === 2) target.dispatchEvent(new MouseEvent('dblclick',{{bubbles:true,button:0,clientX:x,clientY:y}})); }} }}
-            }}
-          }}
-        }}
+        {pointer_script}
+        dispatchQaActions(__qaActions, __qaEmitKey, __qaModifiers, (origin, ox, oy) => {{
+          [lastX, lastY] = __qaOrigin(origin, ox, oy);
+          return [lastX, lastY];
+        }}, __qaPoint);
         return true;"#,
-        helper = lookup_helper()
+        helper = lookup_helper(),
+        pointer_script = include_str!("qa_driver_pointer.js")
     ))
 }
 

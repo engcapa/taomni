@@ -24,9 +24,10 @@ steps:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 20
 - click: '[data-testid="new-local-terminal"]'
-- wait_for:
-    selector: '[data-testid="tab-item"] >> nth=2'
-    timeout_sec: 5
+- wait_for: '[data-testid="tab-item"][data-tab-type="terminal"][data-active="true"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    equal: 2
 - click: '[data-testid="tab-split-view"]'
 - wait_for:
     selector: '[data-testid="terminal-split-toolbar"]'
@@ -85,7 +86,9 @@ steps:
     selector: '[data-testid="multiexec-bar"]'
     timeout_sec: 5
 - click: '[data-testid="multiexec-bar"] >> text="All"'
-- assert_visible: '[data-testid="multiexec-bar"] >> text="1 / 2"'
+- assert_text:
+    selector: '[data-testid="multiexec-bar"]'
+    contains: 1 / 2
 - screenshot: 110-terminal-split-smoke.png
 verification:
   review: reviewed
@@ -96,71 +99,74 @@ verification:
     - 1
     - 3
     - 5
-    - 7
-    - 14
-    - 20
-    - 26
-    - 31
-    - 33
-    - 35
+    - 8
+    - 15
+    - 21
+    - 27
+    - 32
+    - 34
+    - 36
     checkpoints:
-    - step: 9
+    - step: 7
+      expectation: '{assert_count: {equal: 2, selector: ''[data-testid="tab-item"][data-tab-type="terminal"]''}}'
+    - step: 10
       expectation: '{assert_visible: ''[data-testid="terminal-split-panes"]''}'
-    - step: 11
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
     - step: 12
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
     - step: 13
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+    - step: 14
       expectation: '{assert_visible: ''[data-testid="terminal-split-resize-handle"]''}'
-    - step: 15
+    - step: 16
       expectation: '{assert_attribute: {equals: vertical, name: data-layout, selector: ''[data-testid="terminal-split-panes"]''}}'
-    - step: 17
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
     - step: 18
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
     - step: 19
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+    - step: 20
       expectation: '{assert_visible: ''[data-testid="terminal-split-resize-handle"]''}'
-    - step: 21
+    - step: 22
       expectation: '{assert_attribute: {equals: grid, name: data-layout, selector: ''[data-testid="terminal-split-panes"]''}}'
-    - step: 23
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
     - step: 24
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
-    - step: 25
-      expectation: '{assert_visible: ''[data-testid="terminal-split-grid-column-resize-handle"]''}'
-    - step: 27
-      expectation: '{assert_attribute: {equals: horizontal, name: data-layout, selector: ''[data-testid="terminal-split-panes"]''}}'
-    - step: 29
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
-    - step: 30
+    - step: 25
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
-    - step: 32
+    - step: 26
+      expectation: '{assert_visible: ''[data-testid="terminal-split-grid-column-resize-handle"]''}'
+    - step: 28
+      expectation: '{assert_attribute: {equals: horizontal, name: data-layout, selector: ''[data-testid="terminal-split-panes"]''}}'
+    - step: 30
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
+    - step: 31
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+    - step: 33
       expectation: '{assert_visible: ''[data-testid="terminal-input-locked"]''}'
-    - step: 36
-      expectation: '{assert_visible: ''[data-testid="multiexec-bar"] >> text="1 / 2"''}'
+    - step: 37
+      expectation: '{assert_text: {contains: 1 / 2, selector: ''[data-testid="multiexec-bar"]''}}'
     results:
-    - 9
-    - 11
+    - 7
+    - 10
     - 12
     - 13
-    - 15
-    - 17
+    - 14
+    - 16
     - 18
     - 19
-    - 21
-    - 23
+    - 20
+    - 22
     - 24
     - 25
-    - 27
-    - 29
+    - 26
+    - 28
     - 30
-    - 32
-    - 36
+    - 31
+    - 33
+    - 37
   visual:
-  - check: Inspect first-column spacing, selected text and highlight alignment in normal and fullscreen screenshots.
+  - check: Inspect first-column gutters and screen clipping in the split screenshot.
     method: manual
-    reason: DOM geometry and clipboard assertions are automated; screenshots still need separate visual review.
+    reason: DOM geometry checks cover each layout; screenshots require visual review.
   native:
-  - check: Verify first-column selection and copied bytes in the packaged WebView on each selected OS.
+  - check: Verify split layouts and terminal gutters in the packaged WebView on each selected OS.
     method: automated
     reason: Browser verifies the shared split renderer; native repeats the layout checks with actual local terminals. Selection and OS clipboard correctness are independently covered by TC-155.

@@ -365,19 +365,26 @@ def _terminal_drag_selection(ctx: NativeStepContext, args: Any) -> str:
     from .steps.mouse import record_terminal_drag, terminal_selection_args, terminal_selection_points
 
     selector, direction, modifiers = terminal_selection_args(args)
-    element = ctx.session.find(selector, interactive=False)
-    box = ctx.session.execute(
-        f"const el=document.querySelector({json.dumps(selector)});"
-        "if (!el) return null; const r=el.getBoundingClientRect();"
-        "return {x:r.left,y:r.top,width:r.width,height:r.height};"
+    element = ctx.session.find(selector + " .xterm", interactive=False)
+    geometry = ctx.session.execute(
+        f"const pane=document.querySelector({json.dumps(selector)});"
+        "const hit=pane?.querySelector('.terminal-search-hit-active');"
+        "const root=pane?.querySelector('.xterm');"
+        "if (!hit || !root) return null;"
+        "const rect=(el)=>{const r=el.getBoundingClientRect();"
+        "return {x:r.left,y:r.top,width:r.width,height:r.height};};"
+        "return {hit:rect(hit),origin:rect(root)};"
     )
+    box = geometry["hit"] if geometry else None
     start, end = terminal_selection_points(box, direction)
+    origin_box = geometry["origin"]
     origin = {"element-6066-11e4-a52e-4f735466cecf": element}
-    # Element origins keep CSS offsets consistent with the macOS Retina bridge.
+    # The search overlay ignores pointer events. Use the interactive xterm root
+    # as the origin, retaining CSS offsets on the macOS Retina bridge.
     def move(point: dict[str, float], duration: int) -> dict[str, Any]:
         return {"type": "pointerMove", "duration": duration, "origin": origin,
-                "x": round(point["x"] - box["x"] - box["width"] / 2),
-                "y": round(point["y"] - box["y"] - box["height"] / 2)}
+                "x": round(point["x"] - origin_box["x"] - origin_box["width"] / 2),
+                "y": round(point["y"] - origin_box["y"] - origin_box["height"] / 2)}
 
     drag = [move(start, 100), {"type": "pointerDown", "button": 0},
             move(end, 400), {"type": "pause", "duration": 100}, {"type": "pointerUp", "button": 0}]
@@ -396,7 +403,8 @@ def _terminal_drag_selection(ctx: NativeStepContext, args: Any) -> str:
             ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
     record_terminal_drag(ctx, {"mode": "native", "platform": platform.system(), "selector": selector,
                                "direction": direction, "modifiers": modifiers, "box": box,
-                               "start": start, "end": end, "transport": "W3C element-origin pointer actions"})
+                               "origin_box": origin_box, "start": start, "end": end,
+                               "transport": "W3C element-origin pointer actions (macOS: packaged WebView events)"})
     return f"dragged terminal selection {direction} from the first-column gutter"
 
 

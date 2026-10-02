@@ -60,7 +60,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -73,7 +73,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: reverse
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -86,7 +86,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
     modifiers:
     - Control
@@ -118,7 +118,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -147,7 +147,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: reverse
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -186,7 +186,7 @@ steps:
     selector: button[title="Copy (Ctrl+C)"]
     state: hidden
 - terminal_drag_selection:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     direction: forward
 - wait_for: button[title="Copy (Ctrl+C)"]
 - click: button[title="Copy (Ctrl+C)"]
@@ -335,4 +335,4 @@ verification:
   native:
   - check: Packaged WebView and OS clipboard behavior require TC-155 in native mode.
     method: external
-    reason: Native uses the real local/SSH terminal, W3C pointer input and independent OS clipboard reads; browser mode proves the shared renderer and browser clipboard only.
+    reason: Native uses the real local/SSH terminal, W3C pointer input and independent OS clipboard reads; browser mode proves the shared renderer and browser clipboard only. macOS uses the packaged WKWebView event bridge, not OS-global mouse injection.

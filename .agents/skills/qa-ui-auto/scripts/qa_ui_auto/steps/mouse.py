@@ -191,7 +191,7 @@ def step_terminal_drag_selection(ctx: StepContext, args: Any) -> None:
     selector, direction, modifiers = terminal_selection_args(args)
     if ctx.dry_run:
         return
-    box = ctx.page.locator(selector).first.bounding_box()
+    box = ctx.page.locator(selector + " .terminal-search-hit-active").first.bounding_box()
     start, end = terminal_selection_points(box, direction)
     page = ctx.page
     held: list[str] = []
