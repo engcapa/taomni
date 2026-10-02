@@ -93,17 +93,15 @@ import {
   subscribeSqlExecutionPreferences,
 } from "../../lib/sqlExecutionPreferences";
 import { useAppStore } from "../../stores/appStore";
+import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
-import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
 import { useChatStore } from "../../stores/chatStore";
-import { CaptureMenuButton } from "../capture/CaptureMenuButton";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import {
   FT_BUTTON_STYLE,
   FT_BUTTON_ACTIVE_OVERRIDE,
   FT_ICON_BUTTON_STYLE,
 } from "../floating-toolbar/floatingToolbarStyles";
-import { captureElementPng, renderElementToCanvas, safeFilePart } from "../../lib/capture";
 import { useT } from "../../lib/i18n";
 import {
   AI_ANSWER_LANGUAGES,
@@ -1552,33 +1550,6 @@ export default function DbClientTab({
     });
   }, [appendEchoSqlFromOutside, flushWorkspace, info.engine, insertQueryFromOutside, queryRegistryTitle, tabId]);
 
-  const captureDbFrame = useCallback(async () => {
-    if (!rootRef.current) return null;
-    return await renderElementToCanvas(rootRef.current);
-  }, []);
-
-  // Publish this DB view as the active capture source while visible, so the
-  // screenshot actions (tab-strip `⋯` menu / detached capture button) target it.
-  useEffect(() => {
-    if (!visible) return;
-    const source: CaptureSource = {
-      filenamePrefix: safeFilePart(`db-${info.engine}-${info.host}`),
-      getVisible: async () => {
-        if (!rootRef.current) throw new Error("Database view not ready");
-        return await captureElementPng(rootRef.current);
-      },
-      getFull: async () => {
-        if (!rootRef.current) throw new Error("Database view not ready");
-        return await captureElementPng(rootRef.current);
-      },
-      getScrollFrame: captureDbFrame,
-      getGifFrame: captureDbFrame,
-      onStatus: setStatusMessage,
-    };
-    useCaptureStore.getState().setSource(source);
-    return () => useCaptureStore.getState().clearSource(source);
-  }, [visible, info.engine, info.host, captureDbFrame, setStatusMessage]);
-
   const cancelQuery = useCallback((panelId?: string) => {
     for (const panel of panelsRef.current) {
       if ((!panelId || panel.id === panelId) && panel.sheets.some((sheet) => sheet.running)) {
@@ -2712,7 +2683,7 @@ export default function DbClientTab({
         )}
         {detachedWindowControls && (
           <>
-            <CaptureMenuButton />
+            <ScreenshotMenuButton />
             <button
               type="button"
               data-testid="detached-reattach"

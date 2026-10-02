@@ -53,6 +53,7 @@ import {
   writeFiles as writeClipboardFiles,
   writeText as writeClipboardText,
 } from "../../lib/clipboard";
+import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
 import {
   FT_BUTTON_STYLE,
@@ -60,9 +61,6 @@ import {
   FT_ICON_BUTTON_STYLE,
   FT_SEPARATOR_STYLE,
 } from "../floating-toolbar/floatingToolbarStyles";
-import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
-import { CaptureMenuButton } from "../capture/CaptureMenuButton";
-import { captureCanvasPng } from "../../lib/capture";
 import { useAppStore } from "../../stores/appStore";
 import { confirmAppDialog } from "../../lib/appDialogs";
 
@@ -839,29 +837,6 @@ export default function RdpPanel({
       ? { icon: <Minimize2 size={14} />, label: t("rdp.restore"), hint: " (F11)" }
       : { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" };
 
-  // Publish this RDP canvas as the active capture source while connected and
-  // visible (screenshot actions live in the tab-strip `⋯` menu / detached
-  // capture button).
-  useEffect(() => {
-    if (!visible || status !== "connected") return;
-    const source: CaptureSource = {
-      filenamePrefix: `rdp-${host}`,
-      getVisible: async () => {
-        if (!canvasRef.current) throw new Error(t("rdp.notReady"));
-        return await captureCanvasPng(canvasRef.current);
-      },
-      getFull: async () => {
-        if (!canvasRef.current) throw new Error(t("rdp.notReady"));
-        return await captureCanvasPng(canvasRef.current);
-      },
-      getScrollFrame: () => canvasRef.current ?? null,
-      getGifFrame: () => canvasRef.current ?? null,
-      onStatus: (msg) => useAppStore.getState().setStatusMessage(msg),
-    };
-    useCaptureStore.getState().setSource(source);
-    return () => useCaptureStore.getState().clearSource(source);
-  }, [visible, status, host, t]);
-
   return (
     <div
       ref={containerRef}
@@ -977,8 +952,8 @@ export default function RdpPanel({
         </button>
         {detachedWindowControls && (
           <>
+            <ScreenshotMenuButton />
             <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-            <CaptureMenuButton />
             <button
               type="button"
               data-testid="detached-reattach"

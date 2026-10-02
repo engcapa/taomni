@@ -1026,6 +1026,250 @@ fn read_clipboard_image(app: &AppHandle) -> anyhow::Result<RgbaImage> {
     .context("clipboard image size mismatch")
 }
 
+fn capture_surfaces(
+    app: &AppHandle,
+    display: &DisplayInfo,
+    region: (u32, u32, u32, u32),
+    label: &str,
+) -> anyhow::Result<Value> {
+    let crop = super::surfaces::region_rect(display, region);
+    let bar = app
+        .get_webview_window(label)
+        .context("capture controls missing")?;
+    let pos = bar.outer_position()?;
+    let size = bar.outer_size()?;
+    let control = super::surfaces::Rect {
+        x: pos.x,
+        y: pos.y,
+        w: size.width as i32,
+        h: size.height as i32,
+    };
+    let bar_visible = bar.is_visible()?;
+    let mut border_count = 0;
+    let mut borders_outside = true;
+    for (name, window) in app.windows() {
+        if !name.starts_with(super::surfaces::BORDER_PREFIX) {
+            continue;
+        }
+        let pos = window.outer_position()?;
+        let size = window.outer_size()?;
+        let rect = super::surfaces::Rect {
+            x: pos.x,
+            y: pos.y,
+            w: size.width as i32,
+            h: size.height as i32,
+        };
+        borders_outside &= !crop.intersects(rect) && window.is_visible()?;
+        border_count += 1;
+    }
+    Ok(
+        json!({"barVisible":bar_visible,"controlsOutside":!bar_visible || !crop.intersects(control),
+        "bordersOutside":borders_outside,"borderCount":border_count,"region":[crop.x,crop.y,crop.w,crop.h],
+        "control":[control.x,control.y,control.w,control.h]}),
+    )
+}
+
+async fn begin_scroll_ui(
+    app: &AppHandle,
+    display: &DisplayInfo,
+    region: (u32, u32, u32, u32),
+    annotate: bool,
+) -> Result<WebviewWindow, String> {
+    super::open_overlay(app, Some(display.id.clone())).await?;
+    let overlay = wait_window(app, super::OVERLAY_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
+    let script = format!(
+        r#"
+      const q = (id) => document.querySelector('[data-testid="' + id + '"]');
+      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+      for (let i = 0; i < 100 && q('screenshot-overlay')?.dataset.phase !== 'select'; i++) await sleep(100);
+      const img = q('screenshot-base-image');
+      if (!img?.naturalWidth) throw new Error('capture background unavailable');
+      const sx = window.innerWidth / img.naturalWidth, sy = window.innerHeight / img.naturalHeight;
+      const x = {x} * sx, y = {y} * sy, w = {w} * sx, h = {h} * sy;
+      const fire = (el, type, x, y) => el.dispatchEvent(new MouseEvent(type, {{bubbles:true,button:0,clientX:x,clientY:y}}));
+      fire(q('screenshot-select-layer'), 'mousedown', x, y); await sleep(50);
+      fire(window, 'mousemove', x + w, y + h); await sleep(50);
+      fire(window, 'mouseup', x + w, y + h); await sleep(100);
+      if ({annotate}) {{
+        q('screenshot-tool-rect').click(); await sleep(100);
+        fire(q('screenshot-annotation-layer'), 'mousedown', x + 20, y + 20); await sleep(50);
+        fire(q('screenshot-annotation-layer'), 'mousemove', x + 80, y + 80); await sleep(50);
+        fire(window, 'mouseup', x + 80, y + 80); await sleep(100);
+        if (q('screenshot-annotation-canvas').dataset.shapes !== '1') throw new Error('annotation missing');
+      }}
+      q('screenshot-scroll-capture').click(); await sleep(100);
+      if (!q('screenshot-scroll-instructions')?.textContent) throw new Error('scroll instructions missing');
+      q('screenshot-scroll-start').click(); return true;
+    "#,
+        x = region.0,
+        y = region.1,
+        w = region.2,
+        h = region.3,
+        annotate = annotate
+    );
+    run_js(&overlay, &script, Duration::from_secs(20))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(overlay)
+}
+
+/// Real entry/window lifecycle plus stop/cancel of the production scroll UI.
+#[tauri::command]
+pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
+    ensure_qa(&app)?;
+    let _cleanup = ScenarioCleanup(app.clone());
+    super::close_session(&app);
+    let main = app
+        .get_webview_window("main")
+        .ok_or("main window unavailable")?;
+    run_js(&main, "document.querySelector('[data-testid=\"system-screenshot-delay-toggle\"]').click(); await new Promise(r => setTimeout(r,100)); document.querySelector('[data-testid=\"system-screenshot-current-window\"]').click(); return true;", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
+    let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
+    let selected = run_js(&overlay, "for (let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase !== 'annotate';i++) await new Promise(r=>setTimeout(r,100)); return !!document.querySelector('[data-testid=\"screenshot-selection\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    let current_visible = main_visible(&app);
+    let current_region = super::screenshot_overlay_init().await?.window_region;
+    let window_artifact = keep_artifact(
+        std::path::Path::new(&super::screenshot_overlay_init().await?.path),
+        "current-window.png",
+    );
+    super::close_session(&app);
+    wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(5)).await;
+    super::open_overlay(&app, None).await?;
+    let default_hidden = !main_visible(&app)
+        && super::screenshot_overlay_init()
+            .await?
+            .window_region
+            .is_none();
+    super::close_session(&app);
+    wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(5)).await;
+
+    let (fixture, display, region) = open_fixture(&app, "scroll")
+        .await
+        .map_err(|e| e.to_string())?;
+    let source = read_source(&fixture).await.map_err(|e| e.to_string())?;
+    let overlay = begin_scroll_ui(&app, &display, region, false).await?;
+    let bar = wait_window(&app, super::surfaces::SCROLL_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
+    run_js(&bar, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-scroll-stop\"]');i++) await new Promise(r=>setTimeout(r,100)); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    let geometry = capture_surfaces(&app, &display, region, super::surfaces::SCROLL_LABEL)
+        .map_err(|e| e.to_string())?;
+    run_js(&bar, "for(let i=0;i<100;i++){ const status=await window.__TAURI_INTERNALS__.invoke('screenshot_scroll_status'); if(status?.frames>=2) break; await new Promise(r=>setTimeout(r,100)); } document.querySelector('[data-testid=\"screenshot-scroll-stop\"]').click(); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    let completed = run_js(&overlay, "for(let i=0;i<150 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase!=='select';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase==='select';", Duration::from_secs(20)).await.map_err(|e| e.to_string())?;
+    let result = super::screenshot_overlay_init().await?;
+    let output = image::open(&result.path)
+        .map_err(|e| e.to_string())?
+        .to_rgba8();
+    let original = source_png(
+        source
+            .data_url
+            .as_deref()
+            .ok_or("original page unavailable")?,
+    )
+    .map_err(|e| e.to_string())?;
+    let full_expected = source_crop(&source, &original).map_err(|e| e.to_string())?;
+    let expected = capture::crop(&full_expected, 0, 0, full_expected.width(), output.height());
+    let comparison = qa_oracle::compare(&output, &expected, false);
+    let artifact = keep_artifact(std::path::Path::new(&result.path), "scroll-stopped.png");
+    let original_artifact = keep_image(&original, "scroll-stop-original.png");
+    let difference = keep_image(
+        &qa_oracle::difference(&output, &expected),
+        "scroll-stop-difference.png",
+    );
+    super::close_session(&app);
+    wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(5)).await;
+
+    let (_fixture, display, region) = open_fixture(&app, "scroll")
+        .await
+        .map_err(|e| e.to_string())?;
+    let overlay = begin_scroll_ui(&app, &display, region, true).await?;
+    let bar = wait_window(&app, super::surfaces::SCROLL_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
+    run_js(&bar, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]');i++) await new Promise(r=>setTimeout(r,100)); document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]').click(); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    let cancelled = run_js(&overlay, "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase!=='annotate';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase==='annotate' && document.querySelector('[data-testid=\"screenshot-annotation-canvas\"]')?.dataset.shapes==='1' && !!document.querySelector('[data-testid=\"screenshot-selection\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    let cleanup = app.windows().keys().all(|name| {
+        !name.starts_with(super::surfaces::BORDER_PREFIX) && name != super::surfaces::SCROLL_LABEL
+    });
+    Ok(report(
+        current_visible
+            && selected == json!(true)
+            && current_region.is_some()
+            && default_hidden
+            && completed == json!(true)
+            && output.height() > region.3
+            && comparison.passed
+            && geometry["controlsOutside"] == json!(true)
+            && geometry["bordersOutside"] == json!(true)
+            && geometry["borderCount"].as_u64().unwrap_or(0) >= 2
+            && cancelled == json!(true)
+            && cleanup
+            && artifact.is_some(),
+        json!({"currentWindowVisible":current_visible,"currentWindowSelected":selected,"currentRegion":current_region,
+            "defaultHidesWindows":default_hidden,"scrollCompleted":completed,"geometry":geometry,"comparison":comparison,
+            "scrollCancelledPreservesAnnotations":cancelled,"controlsCleaned":cleanup,"artifact":artifact,
+            "originalArtifact":original_artifact,"differenceArtifact":difference,"windowArtifact":window_artifact}),
+    ))
+}
+
+/// Whole-display recording must remain stoppable with no overlapping controls.
+#[tauri::command]
+pub async fn screenshot_qa_full_recorder(app: AppHandle) -> Result<String, String> {
+    ensure_qa(&app)?;
+    let _cleanup = ScenarioCleanup(app.clone());
+    super::close_session(&app);
+    let display = capture::resolve_display(&app, None).map_err(|e| e.to_string())?;
+    let started = super::screenshot_start_recording(
+        app.clone(),
+        Some(display.id.clone()),
+        None,
+        None,
+        None,
+        None,
+        "gif".into(),
+        Some(5),
+    )
+    .await?;
+    let output =
+        super::record::output_path(&started.recording_id).ok_or("recording output not tracked")?;
+    let bar = wait_window(&app, super::RECORDER_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
+    let geometry = capture_surfaces(
+        &app,
+        &display,
+        (0, 0, display.width, display.height),
+        super::RECORDER_LABEL,
+    )
+    .map_err(|e| e.to_string())?;
+    tokio::time::sleep(Duration::from_millis(1100)).await;
+    // Exercise the same route used by the registered global screenshot chord;
+    // the separate hotkey scenario owns OS key-delivery evidence.
+    super::open_overlay(&app, None).await?;
+    let preview = run_js(&bar, "for(let i=0;i<150;i++){const p=document.querySelector('[data-testid=\"screenshot-recorder-preview\"]'); if(p?.complete && p.naturalWidth>0) return true; const error=document.querySelector('[data-testid=\"screenshot-recorder-error\"]'); if(error) throw new Error(error.textContent); await new Promise(r=>setTimeout(r,100));} return false;", Duration::from_secs(20)).await.map_err(|e| e.to_string())?;
+    let clip = super::record::inspect_clip(&output).map_err(|e| e.to_string())?;
+    let artifact = keep_artifact(&output, "whole-display-recording.gif");
+    let bar_visible_after_stop = bar.is_visible().unwrap_or(false);
+    bar.eval("document.querySelector('[data-testid=\"screenshot-recorder-done\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let closed = wait_closed(&app, super::RECORDER_LABEL, Duration::from_secs(10)).await;
+    Ok(report(
+        geometry["controlsOutside"] == json!(true)
+            && preview == json!(true)
+            && bar_visible_after_stop
+            && clip.frames >= 1
+            && clip.duration_ms >= 800
+            && closed
+            && main_visible(&app)
+            && !output.exists()
+            && artifact.is_some(),
+        json!({"geometry":geometry,"preview":preview,"clip":clip,"controlsVisibleAfterStop":bar_visible_after_stop,"closed":closed,"artifact":artifact}),
+    ))
+}
+
 /// Recorder bar flow: start a real recording, stop it from the bar, check
 /// the preview loads (asset protocol), then finish and confirm the session
 /// ends with the main window restored.
@@ -1054,6 +1298,8 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let bar = wait_window(&app, super::RECORDER_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| format!("{e:#}"))?;
+    let geometry = capture_surfaces(&app, &display, region, super::RECORDER_LABEL)
+        .map_err(|e| e.to_string())?;
     let script = r#"
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       const q = (s) => document.querySelector(s);
@@ -1118,6 +1364,9 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
         && info["naturalHeight"].as_u64() == Some(clip.height as u64)
         && (format != "mp4" || info["playbackMoved"] == json!(true));
     let ok = main_hidden
+        && geometry["controlsOutside"] == json!(true)
+        && geometry["bordersOutside"] == json!(true)
+        && geometry["borderCount"].as_u64().unwrap_or(0) >= 2
         && closed
         && restored
         && timer_moved
@@ -1133,7 +1382,7 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     Ok(report(
         ok,
         json!({ "page":info,"clip":clip,"barClosed":closed,"mainHidden":main_hidden,"mainRestored":restored,
-        "gifCopied":copied,"previewRetained":preview_retained,"tempRemoved":output_removed,"format":format,"originalComparison":content,"artifact":artifact }),
+        "gifCopied":copied,"previewRetained":preview_retained,"tempRemoved":output_removed,"format":format,"originalComparison":content,"artifact":artifact,"captureGeometry":geometry }),
     ))
 }
 

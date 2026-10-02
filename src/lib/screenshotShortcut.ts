@@ -14,6 +14,8 @@ import {
   isScreenshotOverlayWindow,
   isScreenshotPinWindow,
   isScreenshotRecorderWindow,
+  isScreenshotScrollWindow,
+  isScreenshotBoundaryWindow,
   openScreenshotOverlay,
   setShortcut,
   shortcutStatus,
@@ -92,7 +94,7 @@ export function useScreenshotAppShortcut(): void {
 
   useEffect(() => {
     if (!status.enabled || (isTauriRuntime() && status.registered)) return;
-    if (isScreenshotOverlayWindow() || isScreenshotRecorderWindow() || isScreenshotPinWindow()) return;
+    if (isScreenshotOverlayWindow() || isScreenshotRecorderWindow() || isScreenshotPinWindow() || isScreenshotScrollWindow() || isScreenshotBoundaryWindow()) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat) return;
       if (!eventMatchesAccelerator(event, status.accelerator)) return;

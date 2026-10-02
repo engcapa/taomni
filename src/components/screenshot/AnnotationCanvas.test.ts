@@ -7,6 +7,8 @@ import {
   paintShape,
   redoHistory,
   shapeHitTest,
+  shapeBounds,
+  transformShape,
   undoHistory,
   type AnnotationCanvasHandle,
   type History,
@@ -15,6 +17,27 @@ import {
 } from "./AnnotationCanvas";
 
 const rect = (id: number, x: number): Shape => ({ id, kind: "rect", color: "#f00", lineWidth: 2, x, y: 0, w: 10, h: 10 });
+
+describe("annotation manipulation", () => {
+  it("selects the middle of a sparse pen segment", () => {
+    expect(shapeHitTest({ id: 1, kind: "pen", color: "red", lineWidth: 4, pts: [{ x: 10, y: 20 }, { x: 110, y: 20 }] }, { x: 60, y: 20 }, 5)).toBe(true);
+  });
+
+  it("moves and scales strokes without mutating their undo snapshot", () => {
+    const pen: Shape = { id: 1, kind: "pen", color: "red", lineWidth: 4, pts: [{ x: 10, y: 20 }, { x: 110, y: 120 }] };
+    const moved = transformShape(pen, shapeBounds(pen), { x: 30, y: 40, w: 200, h: 150 });
+    expect(moved).toMatchObject({ pts: [{ x: 30, y: 40 }, { x: 230, y: 190 }] });
+    expect(pen.pts[0]).toEqual({ x: 10, y: 20 });
+  });
+
+  it("moves the balloon tail with its body and preserves line direction", () => {
+    const arrow: Shape = { id: 1, kind: "arrow", color: "red", lineWidth: 4, x1: 100, y1: 100, x2: 20, y2: 40 };
+    const moved = transformShape(arrow, shapeBounds(arrow), { x: 120, y: 140, w: 80, h: 60 });
+    expect(moved).toMatchObject({ x1: 200, y1: 200, x2: 120, y2: 140 });
+    const balloon: Shape = { id: 2, kind: "balloon", color: "red", lineWidth: 4, x: 50, y: 50, w: 40, h: 40, tx: 10, ty: 10 };
+    expect(transformShape(balloon, shapeBounds(balloon), { x: 20, y: 30, w: 80, h: 80 })).toMatchObject({ x: 60, y: 70, tx: 20, ty: 30 });
+  });
+});
 
 describe("annotation history", () => {
   const empty: History = { shapes: [], undo: [], redo: [] };

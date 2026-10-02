@@ -7,6 +7,10 @@ const windowMocks = vi.hoisted(() => ({
   startDragging: vi.fn(async () => undefined),
   toggleMaximize: vi.fn(async () => undefined),
 }));
+const captureMocks = vi.hoisted(() => ({ open: vi.fn(async () => undefined) }));
+vi.mock("../../lib/screenshot", async (original) => ({
+  ...await original<typeof import("../../lib/screenshot")>(), openScreenshotOverlay: captureMocks.open,
+}));
 const tabBarMocks = vi.hoisted(() => ({ props: [] as Array<{ detailsRevealExternal?: boolean }> }));
 const openTabsMocks = vi.hoisted(() => ({ props: [] as Array<{ onDetachActiveTab?: () => void }> }));
 
@@ -38,10 +42,6 @@ vi.mock("../window/WindowControls", () => ({
 
 vi.mock("../window/TitleBarTrayControls", () => ({
   TitleBarTrayControls: () => <div data-testid="titlebar-tray" />,
-}));
-
-vi.mock("../capture/CaptureIndicators", () => ({
-  CaptureIndicators: () => <div data-testid="capture-indicators" />,
 }));
 
 vi.mock("../menubar/useSessionImportExport", () => ({
@@ -97,6 +97,20 @@ function renderControlBar(
 }
 
 describe("ControlBar settings button", () => {
+  it("hides windows by default and offers an explicit current-window capture", () => {
+    renderControlBar(vi.fn());
+    fireEvent.click(screen.getByTestId("system-screenshot"));
+    expect(captureMocks.open).toHaveBeenCalledWith(undefined, false);
+  });
+
+  it("closes capture options and includes the current window when requested", () => {
+    renderControlBar(vi.fn());
+    fireEvent.click(screen.getByTestId("system-screenshot-delay-toggle"));
+    fireEvent.click(screen.getByTestId("system-screenshot-current-window"));
+    expect(captureMocks.open).toHaveBeenCalledWith(undefined, true);
+    expect(screen.queryByTestId("system-screenshot-delay-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("capture-indicators")).not.toBeInTheDocument();
+  });
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();

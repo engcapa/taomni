@@ -121,7 +121,7 @@ describe("useScreenshotAppShortcut", () => {
     const event = new KeyboardEvent("keydown", { ...chord, bubbles: true, cancelable: true });
     fireEvent(document.body, event);
     expect(event.defaultPrevented).toBe(true);
-    expect(openCalls()).toEqual([["screenshot_open_overlay", { displayId: null }]]);
+    expect(openCalls()).toEqual([["screenshot_open_overlay", { displayId: null, includeCurrentWindow: false }]]);
   });
 
   it("does not double-open when native global registration already handles the chord", async () => {
@@ -141,7 +141,7 @@ describe("useScreenshotAppShortcut", () => {
     expect(openCalls()).toHaveLength(0);
   });
 
-  it.each(["screenshot-overlay", "screenshot-recorder", "screenshot-pin-7"])("does not handle keys inside %s", async (label) => {
+  it.each(["screenshot-overlay", "screenshot-recorder", "screenshot-pin-7", "screenshot-scroll", "screenshot-boundary-0"])("does not handle keys inside %s", async (label) => {
     mocks.native = true;
     mocks.windowLabel = label;
     await mountShortcut();

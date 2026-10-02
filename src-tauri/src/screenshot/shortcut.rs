@@ -183,7 +183,7 @@ pub fn init(app: &AppHandle) {
     }
 }
 
-fn current_status() -> ShortcutStatus {
+pub(super) fn current_status() -> ShortcutStatus {
     CURRENT
         .lock()
         .unwrap_or_else(|p| p.into_inner())

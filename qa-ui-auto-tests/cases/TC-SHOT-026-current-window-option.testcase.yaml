@@ -1,0 +1,98 @@
+id: TC-SHOT-026
+title: Current window capture is optional and default capture still hides windows
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- set_viewport:
+    width: 1000
+    height: 750
+- wait_for: '[data-testid="system-screenshot"]'
+- click: '[data-testid="system-screenshot-delay-toggle"]'
+- assert_text:
+    selector: '[data-testid="system-screenshot-default-hint"]'
+    contains: Default capture hides Taomni
+- click: '[data-testid="system-screenshot-current-window"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: 320 × 240
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true
+- screenshot: current-window-selected.png
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- click: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- assert_not_visible: '[data-testid="screenshot-selection"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === false
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: current
+    requirement: The current-window option preselects the visible window and requests its inclusion.
+    actions:
+    - 4
+    - 6
+    checkpoints:
+    - step: 5
+      expectation: 'assert_text: {''selector'': ''[data-testid="system-screenshot-default-hint"]'', ''contains'': ''Default
+        capture hides Taomni''}'
+    - step: 7
+      expectation: 'wait_for: [data-testid="screenshot-toolbar"]'
+    - step: 8
+      expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-size-hint"]'', ''equals'': ''320 × 240''}'
+    - step: 9
+      expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow
+        === true''}'
+    results:
+    - 5
+    - 7
+    - 8
+    - 9
+  - id: default
+    requirement: A following ordinary capture uses default hiding and starts with no preselected window.
+    actions:
+    - 11
+    - 13
+    checkpoints:
+    - step: 14
+      expectation: 'wait_for: [data-testid="screenshot-overlay"][data-phase="select"]'
+    - step: 15
+      expectation: 'assert_not_visible: [data-testid="screenshot-selection"]'
+    - step: 16
+      expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow
+        === false''}'
+    results:
+    - 14
+    - 15
+    - 16
+  - id: close
+    requirement: Escape closes the default capture.
+    actions:
+    - 17
+    checkpoints:
+    - step: 18
+      expectation: 'wait_for: [data-testid="system-screenshot"]'
+    results:
+    - 18
+  visual:
+  - check: Observable capture UI and operation results
+    method: automated
+    reason: Assertions check the stated visible states and geometry; retained screenshots allow review.
+  native:
+  - check: Native capture and window lifecycle
+    method: external
+    reason: Browser verifies renderer interaction and stub dispatch; native window, clipboard and media assertions are covered
+      by SHOT-N cases.

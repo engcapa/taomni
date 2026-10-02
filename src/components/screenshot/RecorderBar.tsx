@@ -10,6 +10,7 @@ import {
   closeScreenshotOverlay,
   copyImageToClipboard,
   currentRecording,
+  recordingStatus,
   loadScreenshotUrl,
   revokeScreenshotUrl,
   saveImageToFile,
@@ -48,6 +49,7 @@ export function RecorderBar() {
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [range, setRange] = useState<string | null>(null);
   const stopRef = useRef(false);
   const mountedRef = useRef(false);
   const closingRef = useRef(false);
@@ -94,8 +96,7 @@ export function RecorderBar() {
 
   useEffect(() => {
     if (preview || !isActive() || !(initFailed || stopping || notice || error)) return;
-    // The native bar starts at 300×56; extra status rows would be clipped.
-    void getCurrentWindow().setSize(new LogicalSize(300, 140)).catch(() => undefined);
+    void getCurrentWindow().setSize(new LogicalSize(360, 140)).catch(() => undefined);
   }, [preview, initFailed, stopping, notice, error, isActive]);
 
   const closeAll = useCallback(async () => {
@@ -172,14 +173,23 @@ export function RecorderBar() {
     if (!recordingId) return;
     let unlisten: (() => void) | undefined;
     let disposed = false;
-    void listen<{ recordingId: string; error: string | null }>(RECORDING_ENDED_EVENT, (event) => {
+    void listen<{ recordingId: string; error: string | null; stoppedByUser?: boolean }>(RECORDING_ENDED_EVENT, (event) => {
       if (disposed || !isActive() || stopRef.current || event.payload.recordingId !== recordingId) return;
       if (event.payload.error) setNotice(event.payload.error);
-      else setNotice(t("screenshot.recordLimitReached"));
+      else if (!event.payload.stoppedByUser) setNotice(t("screenshot.recordLimitReached"));
       void handleStop();
-    }).then((fn) => {
+    }).then(async (fn) => {
       if (disposed) fn();
-      else unlisten = fn;
+      else {
+        unlisten = fn;
+        const status = await recordingStatus();
+        if (disposed || !isActive() || status?.recordingId !== recordingId) return;
+        if (status.region) setRange(`${status.region.width} × ${status.region.height}`);
+        if (status.finished && !stopRef.current) {
+          if (!status.stoppedByUser) setNotice(t("screenshot.recordLimitReached"));
+          void handleStop();
+        }
+      }
     }).catch(() => undefined);
     return () => {
       disposed = true;
@@ -326,12 +336,13 @@ export function RecorderBar() {
         </>
       ) : (
         <>
-          <div className="flex items-center gap-2" data-tauri-drag-region>
+          <p data-testid="screenshot-recorder-range-hint" className="text-[11px] text-[var(--taomni-text-muted)]">{range ? `${range} · ` : ""}{t("screenshot.recordingRangeHint")}</p>
+          <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ background: "#ff4d4f" }} />
-            <span data-testid="screenshot-recorder-timer" className="tabular-nums font-medium" data-tauri-drag-region>
+            <span data-testid="screenshot-recorder-timer" className="tabular-nums font-medium">
               {formatElapsed(elapsed)}
             </span>
-            <span className="flex-1" data-tauri-drag-region />
+            <span className="flex-1" />
             <button
               type="button"
               data-testid="screenshot-recorder-stop"
@@ -339,10 +350,11 @@ export function RecorderBar() {
               aria-label={t("screenshot.stop")}
               onClick={() => void handleStop()}
               disabled={stopping || stopRef.current || !recordingId}
-              className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40"
+              className="h-8 px-2 gap-1 rounded-lg flex items-center justify-center disabled:opacity-40"
               style={{ background: "#ff4d4f", color: "#ffffff" }}
             >
               <Square size={14} />
+              {t("screenshot.stopRecording")}
             </button>
             <button
               type="button"

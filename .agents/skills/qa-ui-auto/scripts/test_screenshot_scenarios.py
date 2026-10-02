@@ -49,7 +49,7 @@ class ScreenshotScenariosTest(TestCase):
                 self.assertTrue(any(json.loads(path.read_text())["transportError"] == str(error) for path in files))
 
     def test_new_scenarios_only_invoke_their_fixed_commands(self):
-        for scenario, command in (("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand")):
+        for scenario, command in (("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand"), ("controls", "screenshot_qa_controls"), ("full-recorder", "screenshot_qa_full_recorder")):
             self.ctx.session.execute.side_effect = [True, {"done": True, "value": 'OK {"pixels":100}'}, True]
             run_scenario(self.ctx, {"scenario": scenario})
             self.assertIn(command, self.ctx.session.execute.call_args_list[-3].args[0])

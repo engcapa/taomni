@@ -12,12 +12,13 @@
 //! The overlay window hides itself before this runs (it would otherwise be
 //! captured and swallow the wheel events), then reopens on the result.
 
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
 use anyhow::Context;
 use image::RgbaImage;
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 use super::capture::{DisplayInfo, FrameSource, crop, save_png};
 
@@ -48,6 +49,40 @@ pub struct ScrollCaptureResult {
     pub frames: u32,
 }
 
+#[derive(Default)]
+pub struct ScrollControl {
+    pub stop: AtomicBool,
+    pub cancel: AtomicBool,
+    pub frames: AtomicU32,
+}
+
+impl ScrollControl {
+    pub fn request_stop(&self, cancel: bool) {
+        if cancel {
+            self.cancel.store(true, Ordering::SeqCst);
+        }
+        self.stop.store(true, Ordering::SeqCst);
+    }
+
+    fn settle(&self, duration: Duration) {
+        let until = std::time::Instant::now() + duration;
+        while !self.stop.load(Ordering::SeqCst) && std::time::Instant::now() < until {
+            std::thread::sleep(
+                Duration::from_millis(20)
+                    .min(until.saturating_duration_since(std::time::Instant::now())),
+            );
+        }
+    }
+
+    fn progress(&self, app: &AppHandle, frames: u32) {
+        self.frames.store(frames, Ordering::SeqCst);
+        let _ = app.emit(
+            "screenshot://scroll-progress",
+            serde_json::json!({ "frames": frames }),
+        );
+    }
+}
+
 /// Run a scrolling capture over `width`x`height` at display-relative
 /// physical `(x, y)`. Blocking; call from `spawn_blocking`.
 pub fn scroll_capture(
@@ -65,13 +100,26 @@ pub fn scroll_capture_with(
     region: (u32, u32, u32, u32),
     max_frames: u32,
 ) -> anyhow::Result<ScrollCaptureResult> {
+    scroll_capture_controlled(app, display, region, max_frames, &ScrollControl::default())
+}
+
+pub fn scroll_capture_controlled(
+    app: &AppHandle,
+    display: &DisplayInfo,
+    region: (u32, u32, u32, u32),
+    max_frames: u32,
+    control: &ScrollControl,
+) -> anyhow::Result<ScrollCaptureResult> {
     let (x, y, width, height) = region;
     if width < 8 || height < (MIN_OVERLAP as u32) * 3 {
         anyhow::bail!("scroll capture region is too small ({width}x{height})");
     }
     let mut wheel = Wheel::new()?;
     wheel.move_to(display, x + width / 2, y + height / 2)?;
-    std::thread::sleep(INITIAL_SETTLE);
+    control.settle(INITIAL_SETTLE);
+    if control.cancel.load(Ordering::SeqCst) {
+        anyhow::bail!("scroll capture cancelled");
+    }
 
     let mut source = FrameSource::one_shot(app, display.clone());
     let mut grab = || -> anyhow::Result<RgbaImage> {
@@ -81,17 +129,27 @@ pub fn scroll_capture_with(
 
     let first = grab()?;
     let mut stitcher = Stitcher::new(first);
+    control.progress(app, stitcher.frames);
     // Notches per step: large regions scroll faster; a step that jumps past
     // the region is undone and retried with a single notch.
     let mut notches: i32 = if height >= 600 { 3 } else { 1 };
     let mut still = 0u32;
 
-    while stitcher.frames < max_frames.min(MAX_FRAMES) && stitcher.height() < MAX_STITCHED_HEIGHT {
+    while !control.stop.load(Ordering::SeqCst)
+        && stitcher.frames < max_frames.min(MAX_FRAMES)
+        && stitcher.height() < MAX_STITCHED_HEIGHT
+    {
         wheel.scroll(notches)?;
-        std::thread::sleep(SETTLE_DELAY);
+        control.settle(SETTLE_DELAY);
+        if control.stop.load(Ordering::SeqCst) {
+            break;
+        }
         let frame = grab()?;
         match stitcher.push(frame) {
-            Step::Appended => still = 0,
+            Step::Appended => {
+                still = 0;
+                control.progress(app, stitcher.frames);
+            }
             Step::Unchanged => {
                 still += 1;
                 if still >= STILL_LIMIT {
@@ -102,7 +160,10 @@ pub fn scroll_capture_with(
                 if notches > 1 {
                     // Jumped further than the region: go back and slow down.
                     wheel.scroll(-notches)?;
-                    std::thread::sleep(SETTLE_DELAY);
+                    control.settle(SETTLE_DELAY);
+                    if control.stop.load(Ordering::SeqCst) {
+                        break;
+                    }
                     notches = 1;
                     let back = grab()?;
                     stitcher.rebase(back);
@@ -111,6 +172,10 @@ pub fn scroll_capture_with(
                 }
             }
         }
+    }
+
+    if control.cancel.load(Ordering::SeqCst) {
+        anyhow::bail!("scroll capture cancelled");
     }
 
     let stitched = stitcher.finish();

@@ -1,0 +1,227 @@
+id: TC-SHOT-024
+title: Select move resize restyle delete and undo annotations
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport:
+    width: 1000
+    height: 750
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- drag_to:
+    from: '[data-testid="screenshot-select-layer"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position:
+      x: 100
+      y: 100
+    to_position:
+      x: 800
+      y: 500
+- click: '[data-testid="screenshot-tool-rect"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 140
+      y: 160
+    to_position:
+      x: 240
+      y: 240
+- click: '[data-testid="screenshot-tool-move"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 180
+      y: 200
+    to_position:
+      x: 200
+      y: 230
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-selection"]'
+    name: style
+    matches: 'left: 160px; top: 190px; width: 100px; height: 80px;'
+- click: '[data-testid="screenshot-undo"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-selection"]'
+    name: style
+    matches: 'left: 140px; top: 160px;'
+- click: '[data-testid="screenshot-redo"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-selection"]'
+    name: style
+    matches: 'left: 160px; top: 190px; width: 100px; height: 80px;'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-resize-se"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 4
+      y: 4
+    to_position:
+      x: 320
+      y: 310
+- drag_to:
+    from: '[data-testid="screenshot-annotation-resize-nw"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 4
+      y: 4
+    to_position:
+      x: 140
+      y: 170
+- drag_to:
+    from: '[data-testid="screenshot-annotation-resize-ne"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 4
+      y: 4
+    to_position:
+      x: 340
+      y: 150
+- drag_to:
+    from: '[data-testid="screenshot-annotation-resize-sw"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 4
+      y: 4
+    to_position:
+      x: 120
+      y: 330
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-selection"]'
+    name: style
+    matches: 'left: 120px; top: 150px; width: 220px; height: 180px;'
+- click: '[data-testid="screenshot-color-green"]'
+- click: '[data-testid="screenshot-line-width-8"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-green"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="screenshot-line-width-8"]'
+    name: aria-pressed
+    equals: 'true'
+- screenshot: annotation-selected-and-resized.png
+- click: '[data-testid="screenshot-annotation-delete"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '0'
+- click: '[data-testid="screenshot-undo"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '1'
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position:
+      x: 200
+      y: 210
+- press: Delete
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '0'
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: move
+    requirement: Moving a mark changes its geometry without moving the screenshot crop; undo and redo restore the mark.
+    actions:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 10
+    - 12
+    checkpoints:
+    - step: 9
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-annotation-selection"]'', ''name'': ''style'',
+        ''matches'': ''left: 160px; top: 190px; width: 100px; height: 80px;''}'
+    - step: 11
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-annotation-selection"]'', ''name'': ''style'',
+        ''matches'': ''left: 140px; top: 160px;''}'
+    - step: 13
+      expectation: Redo restores the moved rectangle before resizing.
+    results:
+    - 9
+    - 11
+    - 13
+  - id: resize
+    requirement: All four resize handles manipulate the selected mark.
+    actions:
+    - 14
+    - 15
+    - 16
+    - 17
+    checkpoints:
+    - step: 18
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-annotation-selection"]'', ''name'': ''style'',
+        ''matches'': ''left: 120px; top: 150px; width: 220px; height: 180px;''}'
+    results:
+    - 18
+  - id: style
+    requirement: Color and stroke controls edit the selected existing mark.
+    actions:
+    - 19
+    - 20
+    checkpoints:
+    - step: 21
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-green"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''true''}'
+    - step: 22
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-line-width-8"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''true''}'
+    results:
+    - 21
+    - 22
+  - id: delete
+    requirement: Toolbar and keyboard deletion each remove the selected mark; undo restores it.
+    actions:
+    - 24
+    - 26
+    - 28
+    - 29
+    checkpoints:
+    - step: 25
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
+        ''equals'': ''0''}'
+    - step: 27
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
+        ''equals'': ''1''}'
+    - step: 30
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
+        ''equals'': ''0''}'
+    results:
+    - 25
+    - 27
+    - 30
+  - id: close
+    requirement: Cancel restores the main capture entry.
+    actions:
+    - 31
+    checkpoints:
+    - step: 32
+      expectation: 'wait_for: [data-testid="system-screenshot"]'
+    results:
+    - 32
+  visual:
+  - check: Observable capture UI and operation results
+    method: automated
+    reason: Assertions check the stated visible states and geometry; retained screenshots allow review.
+  native:
+  - check: Native capture and window lifecycle
+    method: external
+    reason: Browser verifies renderer interaction and stub dispatch; native window, clipboard and media assertions are covered
+      by SHOT-N cases.
