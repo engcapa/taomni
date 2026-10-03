@@ -1389,7 +1389,13 @@ def _do_screenshot(ctx: NativeStepContext, args: Any) -> str:
 
 @_verb("click")
 def _do_click(ctx: NativeStepContext, args: Any) -> str:
-    selector, _ = _selector_args(args)
+    from .steps.mouse import _resolve_click
+
+    selector, options = _resolve_click(args)
+    if set(options) - {"modifiers"}:
+        raise StepError("native click supports selector and modifiers; position/force are browser-only")
+    if options.get("modifiers"):
+        return ctx.session.pointer_button_click(selector, 0, options["modifiers"])
     return ctx.session.click(selector)
 
 
@@ -1642,6 +1648,29 @@ def _do_hover(ctx: NativeStepContext, args: Any) -> str:
 @_verb("mouse_path")
 def _do_mouse_path(ctx: NativeStepContext, args: Any) -> str:
     return _mouse_path(ctx, args)
+
+
+@_verb("mouse_button")
+def _do_mouse_button(ctx: NativeStepContext, args: Any) -> str:
+    from .steps.mouse import mouse_button_action
+
+    action = mouse_button_action(args)
+    if platform.system() == "Darwin":
+        raise StepError("mouse_button: the macOS bridge does not retain pointer state across action requests")
+    try:
+        ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": [{
+            "type": "pointer", "id": "mouse", "parameters": {"pointerType": "mouse"},
+            "actions": [{"type": "pointerDown" if action == "down" else "pointerUp", "button": 0}],
+        }]})
+    except Exception:
+        with suppress(Exception):
+            ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
+        raise
+    finally:
+        if action == "up":
+            with suppress(Exception):
+                ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
+    return f"left mouse button {action}"
 
 
 @_verb("select_option")

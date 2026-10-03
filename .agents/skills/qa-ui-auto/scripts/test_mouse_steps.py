@@ -4,11 +4,13 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, call
+from unittest.mock import patch
 
 from qa_ui_auto.steps import StepContext, StepError
 from qa_ui_auto.steps.mouse import (
     drag_offset, mouse_path_points, step_drag_to, step_mouse_path,
     step_terminal_drag_selection, terminal_selection_args, terminal_selection_points,
+    mouse_button_action, step_mouse_button,
 )
 
 
@@ -70,6 +72,56 @@ class MouseStepsTest(TestCase):
         page.wait_for_timeout.assert_called_once_with(50)
         with self.assertRaisesRegex(StepError, "selector"):
             mouse_path_points({"points": [{"dx": 1}]})
+
+    def test_mouse_button_holds_and_releases_browser_input(self):
+        ctx, page, _ = self.context()
+        step_mouse_button(ctx, "down")
+        step_mouse_button(ctx, "up")
+        self.assertEqual(page.mouse.mock_calls, [call.down(), call.up()])
+        with self.assertRaisesRegex(StepError, "down or up"):
+            mouse_button_action("click")
+
+    def test_native_mouse_button_preserves_the_mouse_path_source_until_release(self):
+        from qa_ui_auto.native_steps import _do_mouse_button
+
+        session = Mock()
+        session.endpoint.return_value = "/session/qa/actions"
+        ctx = SimpleNamespace(session=session)
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Windows"):
+            _do_mouse_button(ctx, "down")
+            self.assertEqual(session.request.call_count, 1)
+            pointer = session.request.call_args.args[2]["actions"][0]
+            self.assertEqual(pointer["id"], "mouse")
+            self.assertEqual(pointer["actions"], [{"type": "pointerDown", "button": 0}])
+            _do_mouse_button(ctx, "up")
+        self.assertEqual(session.request.call_args, call("DELETE", "/session/qa/actions"))
+
+    def test_native_mouse_button_releases_on_failure_and_rejects_the_stateless_bridge(self):
+        from qa_ui_auto.native_steps import _do_mouse_button
+
+        session = Mock()
+        session.endpoint.return_value = "/session/qa/actions"
+        session.request.side_effect = [RuntimeError("driver failure"), None]
+        ctx = SimpleNamespace(session=session)
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"):
+            with self.assertRaisesRegex(RuntimeError, "driver failure"):
+                _do_mouse_button(ctx, "down")
+        self.assertEqual(session.request.call_args, call("DELETE", "/session/qa/actions"))
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Darwin"):
+            with self.assertRaisesRegex(StepError, "does not retain"):
+                _do_mouse_button(ctx, "down")
+
+    def test_native_click_passes_modifiers_and_rejects_unsupported_options(self):
+        from qa_ui_auto.native_steps import _do_click
+
+        session = Mock()
+        ctx = SimpleNamespace(session=session)
+        with patch("qa_ui_auto.steps.mouse.platform.system", return_value="Windows"):
+            _do_click(ctx, {"selector": "#row", "modifiers": ["Mod", "Shift"]})
+        session.pointer_button_click.assert_called_once_with("#row", 0, ["Control", "Shift"])
+        session.click.assert_not_called()
+        with self.assertRaisesRegex(StepError, "browser-only"):
+            _do_click(ctx, {"selector": "#row", "force": True})
 
     def test_terminal_drag_starts_in_the_gutter_and_reverses_the_same_endpoints(self):
         box = {"x": 108, "y": 40, "width": 120, "height": 18}

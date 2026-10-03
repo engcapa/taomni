@@ -3435,6 +3435,7 @@ const dict = {
     contextDuplicate: "Duplicate",
     contextDuplicateCount: "Duplicate selected sessions ({count})",
     contextMoveToFolder: "Move to folder",
+    dragSelectedCount: "Move {count} sessions",
     contextSetTerminalTheme: "Set terminal appearance...",
     contextDelete: "Delete",
     contextDeleteCount: "Delete selected sessions ({count})",

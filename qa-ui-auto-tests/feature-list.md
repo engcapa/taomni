@@ -1404,6 +1404,9 @@ controls:
   - id: session-tree-item       # individual row; pair with [data-session-name=...] / [data-session-type=...]
     selector: '[data-testid="session-tree-item"]'
     kind: interactive
+  - id: session-tree-folder
+    selector: '[data-testid="session-tree-folder"]'
+    kind: interactive
   - id: session-search
     selector: '[data-testid="session-search"]'
     kind: interactive
@@ -4213,6 +4216,9 @@ controls:
 -->
 
 - 在 SessionTree 中按住 Ctrl / Meta 单击会话条目可累加选中
+- Shift 单击按可见树顺序选择连续范围；重复 Shift 单击保留起点，Ctrl / Meta + Shift 累加范围
+- 拖动已选中条目会批量移动整个选区，浮动提示显示会话数量；Escape 取消，树内拖拽不选择文字
+- 多选后右键 Move to folder 仍可批量移动，重新加载后保留全部会话归属
 - 选中状态通过 `data-selected` / `aria-selected` 属性暴露
 - 右键菜单首项变成 `Connect selected sessions (N)`，一次性把所有选中会话作为新 tab 打开
 - 右键菜单提供 `Set terminal theme...` 预览 flyout，可批量写入所选非 Mail 保存会话的 `terminalProfile.theme`

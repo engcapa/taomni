@@ -1,0 +1,363 @@
+id: TC-SESSION-TREE-02
+title: Session tree drag count, text selection, Escape, batch and single move
+description: Runs real held-pointer gestures in the browser and Windows/Linux packaged WebViews. Inspects the active
+  ghost, its count, destination highlight and empty text selection before release; verifies cancellation and reload persistence.
+  macOS native held gestures are explicitly outside the bridge capability.
+covers:
+- F6.2
+- F-Sidebar-1
+- F6.3
+- F-FolderName-1
+tags:
+- sessions
+- multi-select
+- drag
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+native_platforms:
+- Linux
+- Windows
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-selection-a
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-selection-b
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-b"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-selection-c
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+- right_click: '[data-testid="session-tree-folder"][data-folder-path=""]'
+- click: '[data-testid="context-menu-item-new-folder"]'
+- wait_for: '[data-testid="folder-name-dialog"]'
+- fill:
+    selector: '[data-testid="folder-name-dialog-input"]'
+    value: qa-selection-target
+- click: '[data-testid="folder-name-dialog-confirm"]'
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    modifiers:
+    - Mod
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+    - qa-selection-c
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+      dx: -20
+      dy: 0
+      steps: 8
+- mouse_button: down
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+      dx: -8
+      dy: 0
+      steps: 8
+- assert_text_equals:
+    selector: '[data-custom-drag-ghost="true"]'
+    equals: Move 2 sessions
+- eval_readonly:
+    expression: window.getSelection()?.toString().length === 0
+    expect_truthy: true
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+      dx: 0
+      dy: 0
+      steps: 8
+- assert_attribute:
+    selector: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+    name: data-drag-over
+    equals: 'true'
+- screenshot: session-batch-drag-preview.png
+- press: Escape
+- mouse_button: up
+- assert_not_visible: '[data-custom-drag-ghost="true"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"], [data-testid="session-tree-item"][data-session-name="qa-selection-b"],
+      [data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    attribute: data-group-path
+    equals:
+    - ''
+    - ''
+    - ''
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+    - qa-selection-c
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+      dx: 0
+      dy: 0
+      steps: 8
+- mouse_button: down
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+      dx: 0
+      dy: 0
+      steps: 8
+- assert_text_equals:
+    selector: '[data-custom-drag-ghost="true"]'
+    equals: Move 2 sessions
+- mouse_button: up
+- assert_not_visible: '[data-custom-drag-ghost="true"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"], [data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    attribute: data-group-path
+    equals:
+    - qa-selection-target
+    - qa-selection-target
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-b"]'
+    attribute: data-group-path
+    equals:
+    - ''
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+    - qa-selection-c
+- eval_readonly:
+    expression: window.getSelection()?.toString().length === 0
+    expect_truthy: true
+- reload: null
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"], [data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    attribute: data-group-path
+    equals:
+    - qa-selection-target
+    - qa-selection-target
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-b"]'
+    attribute: data-group-path
+    equals:
+    - ''
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-b"]'
+      dx: 0
+      dy: 0
+      steps: 8
+- mouse_button: down
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+      dx: 0
+      dy: 0
+      steps: 8
+- assert_text_equals:
+    selector: '[data-custom-drag-ghost="true"]'
+    equals: qa-selection-b
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-b
+- mouse_button: up
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"], [data-testid="session-tree-item"][data-session-name="qa-selection-b"],
+      [data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    attribute: data-group-path
+    equals:
+    - qa-selection-target
+    - qa-selection-target
+    - qa-selection-target
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+      dx: 0
+      dy: 0
+      steps: 8
+- mouse_button: down
+- mouse_path:
+    points:
+    - selector: '[data-testid="session-new"]'
+      dx: 0
+      dy: 0
+      steps: 8
+- mouse_button: up
+- assert_not_visible: '[data-testid="session-editor"]'
+- assert_not_visible: '[data-custom-drag-ghost="true"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"], [data-testid="session-tree-item"][data-session-name="qa-selection-b"],
+      [data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    attribute: data-group-path
+    equals:
+    - qa-selection-target
+    - qa-selection-target
+    - qa-selection-target
+- screenshot: session-drag-moved.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A selected row drags the whole two-session selection with a visible count and destination highlight;
+      tree text is never selected and Escape cancels without moving sessions.
+    actions:
+    - 33
+    - 34
+    - 36
+    - 37
+    - 38
+    - 41
+    - 44
+    - 45
+    checkpoints:
+    - step: 35
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n    selector:\
+        \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 39
+      expectation: '{assert_text_equals: {equals: Move 2 sessions, selector: ''[data-custom-drag-ghost="true"]''}}'
+    - step: 40
+      expectation: "{eval_readonly: {expect_truthy: true, expression: 'window.getSelection()?.toString().length\n   \
+        \   === 0'}}"
+    - step: 42
+      expectation: '{assert_attribute: {equals: ''true'', name: data-drag-over, selector: ''[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]''}}'
+    - step: 46
+      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
+    - step: 47
+      expectation: "{assert_items: {attribute: data-group-path, equals: ['', '', ''], selector: '[data-testid=\"session-tree-item\"\
+        ][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"\
+        ], [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-c\"]'}}"
+    - step: 48
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n    selector:\
+        \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    results:
+    - 35
+    - 39
+    - 40
+    - 42
+    - 46
+    - 47
+    - 48
+  - id: R2
+    requirement: Dropping a selected session onto the folder moves exactly the two selected sessions, clears the ghost
+      and highlight, preserves selection and persists both group paths after reload.
+    actions:
+    - 49
+    - 50
+    - 51
+    - 53
+    - 59
+    - 61
+    checkpoints:
+    - step: 52
+      expectation: '{assert_text_equals: {equals: Move 2 sessions, selector: ''[data-custom-drag-ghost="true"]''}}'
+    - step: 54
+      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
+    - step: 55
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target],\n\
+        \    selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"\
+        session-tree-item\"][data-session-name=\"qa-selection-c\"]'}}"
+    - step: 56
+      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-b"]''}}'
+    - step: 57
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n    selector:\
+        \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 58
+      expectation: "{eval_readonly: {expect_truthy: true, expression: 'window.getSelection()?.toString().length\n   \
+        \   === 0'}}"
+    - step: 62
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target],\n\
+        \    selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"\
+        session-tree-item\"][data-session-name=\"qa-selection-c\"]'}}"
+    - step: 63
+      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-b"]''}}'
+    results:
+    - 52
+    - 54
+    - 55
+    - 56
+    - 57
+    - 58
+    - 62
+    - 63
+  - id: R3
+    requirement: Dragging an unselected row selects and moves only that row; releasing over a non-folder performs no
+      move or button activation and clears drag tracking.
+    actions:
+    - 64
+    - 65
+    - 66
+    - 69
+    - 71
+    - 72
+    - 73
+    - 74
+    checkpoints:
+    - step: 67
+      expectation: '{assert_text_equals: {equals: qa-selection-b, selector: ''[data-custom-drag-ghost="true"]''}}'
+    - step: 68
+      expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-b], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
+    - step: 70
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
+        \      qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"\
+        ],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
+        ][data-session-name=\"qa-selection-c\"]'}}"
+    - step: 75
+      expectation: '{assert_not_visible: ''[data-testid="session-editor"]''}'
+    - step: 76
+      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
+    - step: 77
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
+        \      qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"\
+        ],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
+        ][data-session-name=\"qa-selection-c\"]'}}"
+    results:
+    - 67
+    - 68
+    - 70
+    - 75
+    - 76
+    - 77
+  visual:
+  - check: Selected rows and the drag count remain legible; drop destination is highlighted.
+    method: manual
+    reason: Inspect the retained screenshots; functional assertions alone do not establish visual clarity.
+  native:
+  - check: Real Windows WebView2/Linux WebKitGTK held pointer drag, text-selection suppression, Escape and persistent
+      batch move.
+    method: automated
+    reason: Native uses the isolated QA app and real IPC/database. Browser uses stubs. macOS uses packaged WebView event
+      input for selection; held-pointer drag is not supported by its stateless bridge.

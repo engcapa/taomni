@@ -114,7 +114,6 @@ export function startCustomDrag(opts: StartOpts): void {
       document.body.appendChild(drag.ghost);
       positionGhost(drag, clientX, clientY);
     }
-    suppressNextClick();
     opts.onActivate?.();
     return true;
   };
@@ -135,6 +134,8 @@ export function startCustomDrag(opts: StartOpts): void {
   const finish = (clientX: number, clientY: number, dropped: boolean) => {
     if (!active || active !== drag) return;
     if (drag.activated) {
+      // The compatibility click follows pointerup, potentially long after activation.
+      suppressNextClick();
       const target = pointerTarget(clientX, clientY, drag.ghost);
       emit({
         phase: dropped ? "drop" : "cancel",

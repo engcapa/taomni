@@ -1733,6 +1733,7 @@
 - `[data-testid="side-tab-sessions"]` — interactive — F6.2.side-tab-sessions
 - `[data-testid="session-tree"]` — display — F6.2.session-tree
 - `[data-testid="session-tree-item"]` — interactive — F6.2.session-tree-item
+- `[data-testid="session-tree-folder"]` — interactive — F6.2.session-tree-folder
 - `[data-testid="session-search"]` — interactive — F6.2.session-search
 - `[data-testid="session-new"]` — interactive — F6.2.session-new
 - `[data-testid="session-edit"]` — interactive — F6.2.session-edit
