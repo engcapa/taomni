@@ -1087,6 +1087,11 @@ pub async fn screenshot_stop_recording(
         }
     }
     surfaces::close_borders(&app);
+    // The recorder preview remains open after Stop, but the application
+    // windows hidden for the capture session must become available again.
+    // Without this, the process stays alive while its main window is hidden,
+    // so macOS app switching has no visible Taomni window to activate.
+    restore_app_windows(&app);
     let info = info?;
     Ok(RecordingFile {
         path: info.path.to_string_lossy().into_owned(),
