@@ -1656,6 +1656,13 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let (fixture, display, region) = open_fixture(&app, "anim")
         .await
         .map_err(|e| format!("{e:#}"))?;
+    // Keep the OS cursor outside the recorded region. CoreGraphics includes the
+    // cursor in display snapshots on macOS, which would otherwise add a false
+    // pixel mismatch to the frame oracle.
+    park_pointer(input_point((display.x + 16, display.y + 16), display.scale_factor))
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+    tokio::time::sleep(Duration::from_millis(350)).await;
     let started = super::screenshot_start_recording(
         app.clone(),
         Some(display.id.clone()),
