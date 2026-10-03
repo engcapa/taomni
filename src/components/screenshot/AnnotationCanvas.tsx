@@ -72,6 +72,7 @@ export interface TextShape extends ShapeBase {
   y: number;
   text: string;
   fontSize: number;
+  fontFamily?: string;
 }
 
 export interface NumberShape extends ShapeBase {
@@ -107,7 +108,7 @@ export interface AnnotationCanvasHandle {
   addShapes: (shapes: Shape[]) => void;
   shapeCount: () => number;
   deleteSelected: () => boolean;
-  updateSelectedStyle: (style: { color?: string; lineWidth?: number }) => void;
+  updateSelectedStyle: (style: { color?: string; lineWidth?: number; fontFamily?: string; fontSize?: number }) => void;
 }
 
 interface AnnotationCanvasProps {
@@ -117,6 +118,9 @@ interface AnnotationCanvasProps {
   tool: AnnotationTool;
   color: string;
   lineWidth: number;
+  fontFamily?: string;
+  fontSize?: number;
+  textHint?: string;
   /** Loaded background image; sampled by mosaic and blur. */
   baseImage: HTMLImageElement | null;
   /** CSS-pixel rect annotations are clipped to; null = whole image. */
@@ -130,7 +134,18 @@ interface AnnotationCanvasProps {
 }
 
 const TEXT_FONT_SIZE = 18;
-const FONT_STACK = 'Inter, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
+export const FONT_STACK = 'Inter, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
+
+const TEXT_LINE_HEIGHT = 1.2;
+
+/** Measure each explicit line with the same font used for live and exported text. */
+function textBounds(shape: TextShape): CssRect {
+  const lines = shape.text.split("\n");
+  const ctx = document.createElement("canvas").getContext("2d");
+  if (ctx) ctx.font = `600 ${shape.fontSize}px ${shape.fontFamily ?? FONT_STACK}`;
+  const widths = lines.map((line) => ctx?.measureText(line)?.width ?? line.length * shape.fontSize);
+  return { x: shape.x, y: shape.y, w: Math.max(shape.fontSize, ...widths), h: lines.length * shape.fontSize * TEXT_LINE_HEIGHT };
+}
 
 function inRect(p: Point, r: CssRect): boolean {
   return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
@@ -300,13 +315,16 @@ export function paintShape(
       paintPolyline(ctx, shape.pts);
       break;
     case "text":
-      ctx.font = `600 ${shape.fontSize}px ${FONT_STACK}`;
+      ctx.font = `600 ${shape.fontSize}px ${shape.fontFamily ?? FONT_STACK}`;
       ctx.textBaseline = "top";
       // Thin dark outline keeps light colors readable on light content.
       ctx.lineWidth = Math.max(2, shape.fontSize / 8);
       ctx.strokeStyle = "rgba(0, 0, 0, 0.55)";
-      ctx.strokeText(shape.text, shape.x, shape.y);
-      ctx.fillText(shape.text, shape.x, shape.y);
+      shape.text.split("\n").forEach((line, index) => {
+        const y = shape.y + index * shape.fontSize * TEXT_LINE_HEIGHT;
+        ctx.strokeText(line, shape.x, y);
+        ctx.fillText(line, shape.x, y);
+      });
       break;
     case "mosaic":
       if (base) paintMosaic(ctx, base, shape, sampleScaleX, sampleScaleY);
@@ -388,13 +406,9 @@ export function shapeHitTest(shape: Shape, p: Point, radius: number): boolean {
         ? dist(pt, p) <= radius + shape.lineWidth
         : shapeHitTest({ ...shape, kind: "line", x1: shape.pts[i - 1].x, y1: shape.pts[i - 1].y, x2: pt.x, y2: pt.y }, p, radius + shape.lineWidth));
     case "text": {
-      const w = shape.text.length * shape.fontSize * 0.6;
-      return (
-        p.x >= shape.x - radius &&
-        p.x <= shape.x + w + radius &&
-        p.y >= shape.y - radius &&
-        p.y <= shape.y + shape.fontSize + radius
-      );
+      const r = textBounds(shape);
+      return p.x >= r.x - radius && p.x <= r.x + r.w + radius
+        && p.y >= r.y - radius && p.y <= r.y + r.h + radius;
     }
     case "number":
       return Math.hypot(shape.x - p.x, shape.y - p.y) <= radius + 14;
@@ -414,7 +428,7 @@ export function shapeBounds(shape: Shape): CssRect {
       const xs = shape.pts.map((p) => p.x), ys = shape.pts.map((p) => p.y);
       return rectFromDrag({ x: Math.min(...xs), y: Math.min(...ys) }, { x: Math.max(...xs), y: Math.max(...ys) });
     }
-    case "text": return { x: shape.x, y: shape.y, w: Math.max(shape.fontSize, shape.text.length * shape.fontSize * 0.6), h: shape.fontSize * 1.2 };
+    case "text": return textBounds(shape);
     case "number": {
       const r = Math.max(14, shape.lineWidth * 4);
       return { x: shape.x - r, y: shape.y - r, w: r * 2, h: r * 2 };
@@ -463,7 +477,7 @@ const EMPTY_HISTORY: History = { shapes: [], undo: [], redo: [] };
 
 export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCanvasProps>(
   function AnnotationCanvas(props, ref) {
-    const { imageWidth, imageHeight, tool, color, lineWidth, baseImage, selection, selectionContour, onHistoryChange, onRequestReselect } =
+    const { imageWidth, imageHeight, tool, color, lineWidth, fontFamily = FONT_STACK, fontSize = TEXT_FONT_SIZE, textHint, baseImage, selection, selectionContour, onHistoryChange, onRequestReselect } =
       props;
 
     const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -476,6 +490,8 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     const [textValue, setTextValue] = useState("");
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [editedShape, setEditedShape] = useState<Shape | null>(null);
+    const textInputRef = useRef<HTMLTextAreaElement | null>(null);
+    const textOpenRef = useRef(false);
     const editingTextRef = useRef<TextShape | null>(null);
     const movingRef = useRef<{ shape: Shape; start: Point; bounds: CssRect; corner?: "nw" | "ne" | "sw" | "se" } | null>(null);
     const idRef = useRef(1);
@@ -504,7 +520,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       setSelectedId(null);
       return true;
     }, [mutate, selectedId]);
-    const updateSelectedStyle = useCallback((style: { color?: string; lineWidth?: number }) => {
+    const updateSelectedStyle = useCallback((style: { color?: string; lineWidth?: number; fontFamily?: string; fontSize?: number }) => {
       if (selectedId === null) return;
       mutate(historyRef.current.shapes.map((s) => s.id === selectedId ? { ...s, ...style } : s));
     }, [mutate, selectedId]);
@@ -543,6 +559,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       setEditedShape(null);
       movingRef.current = null;
       editingTextRef.current = null;
+      textOpenRef.current = false;
     }, [apply]);
 
     const exportDataUrl = useCallback((base: HTMLImageElement, sx: number, sy: number): string => {
@@ -592,7 +609,10 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       const sampleScaleY = baseImage ? baseImage.naturalHeight / Math.max(1, imageHeight) : 1;
       const stored = editedShape ? history.shapes.map((s) => s.id === editedShape.id ? editedShape : s) : history.shapes;
       const all = draft ? [...stored, draft] : stored;
-      for (const shape of all) paintShape(ctx, shape, baseImage, sampleScaleX, sampleScaleY);
+      for (const shape of all) {
+        if (textAt && shape.id === editingTextRef.current?.id) continue;
+        paintShape(ctx, shape, baseImage, sampleScaleX, sampleScaleY);
+      }
       if (selection) ctx.restore();
       if (eraserTrail && eraserTrail.length > 0) {
         ctx.save();
@@ -604,7 +624,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         paintPolyline(ctx, eraserTrail);
         ctx.restore();
       }
-    }, [history, draft, editedShape, eraserTrail, selection, selectionContour, baseImage, imageWidth, imageHeight, lineWidth]);
+    }, [history, draft, editedShape, textAt, eraserTrail, selection, selectionContour, baseImage, imageWidth, imageHeight, lineWidth]);
 
     const localPos = (e: { clientX: number; clientY: number }): Point => {
       const r = wrapRef.current?.getBoundingClientRect();
@@ -769,6 +789,8 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     });
 
     const commitText = () => {
+      if (!textOpenRef.current) return;
+      textOpenRef.current = false;
       if (textAt && textValue.trim()) {
         const original = editingTextRef.current;
         const next: TextShape = {
@@ -778,8 +800,9 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           kind: "text",
           x: textAt.x,
           y: textAt.y,
-          text: textValue.trim(),
-          fontSize: original?.fontSize ?? TEXT_FONT_SIZE,
+          text: textValue,
+          fontSize: original?.fontSize ?? fontSize,
+          fontFamily: original?.fontFamily ?? fontFamily,
         };
         if (original) mutate(historyRef.current.shapes.map((s) => s.id === original.id ? { ...next, id: original.id, color: original.color, lineWidth: original.lineWidth } : s));
         else addShape(next);
@@ -789,11 +812,22 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       setTextValue("");
     };
 
+    // WebKit need not blur a textarea when a non-focusable canvas is clicked.
+    useEffect(() => {
+      if (!textAt) return;
+      const onDown = (event: MouseEvent) => {
+        if (!textInputRef.current?.contains(event.target as Node)) commitText();
+      };
+      window.addEventListener("mousedown", onDown, true);
+      return () => window.removeEventListener("mousedown", onDown, true);
+    });
+
     const handleClick = (e: ReactMouseEvent) => {
       if (tool !== "text" && tool !== "number") return;
       const p = localPos(e);
       if (outsideSelection(p)) return;
       if (tool === "text") {
+        textOpenRef.current = true;
         setTextAt(p);
         setTextValue("");
         return;
@@ -820,6 +854,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           const p = localPos(e);
           const hit = [...historyRef.current.shapes].reverse().find((s) => shapeHitTest(s, p, 5));
           if (hit?.kind !== "text") return;
+          textOpenRef.current = true;
           editingTextRef.current = hit;
           setTextAt({ x: hit.x, y: hit.y });
           setTextValue(hit.text);
@@ -853,8 +888,13 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           </div>;
         })()}
         {textAt && (
-          <input
+          <textarea
+            ref={textInputRef}
             autoFocus
+            aria-label={textHint}
+            title={textHint}
+            rows={Math.max(1, textValue.split("\n").length)}
+            wrap="off"
             data-testid="screenshot-text-input"
             value={textValue}
             onChange={(e) => setTextValue(e.target.value)}
@@ -862,8 +902,13 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               e.stopPropagation();
-              if (e.key === "Enter") commitText();
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                commitText();
+              }
               else if (e.key === "Escape") {
+                textOpenRef.current = false;
                 editingTextRef.current = null;
                 setTextAt(null);
                 setTextValue("");
@@ -875,15 +920,19 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
               // Padding offsets so the typed text sits where it will render.
               left: textAt.x - 4,
               top: textAt.y - 2,
-              minWidth: 120,
+              width: Math.max(120, Math.min(imageWidth - textAt.x, textBounds({ id: -1, kind: "text", x: 0, y: 0, text: textValue + "  ", color, lineWidth,
+                fontSize: editingTextRef.current?.fontSize ?? fontSize, fontFamily: editingTextRef.current?.fontFamily ?? fontFamily }).w + 12)),
+              maxWidth: Math.max(40, imageWidth - textAt.x),
+              maxHeight: Math.max(40, imageHeight - textAt.y),
+              resize: "none",
               background: "rgba(0, 0, 0, 0.3)",
               border: `1px dashed ${color}`,
               outline: "none",
               color,
-              fontSize: TEXT_FONT_SIZE,
+              fontSize: editingTextRef.current?.fontSize ?? fontSize,
               fontWeight: 600,
-              lineHeight: 1,
-              fontFamily: FONT_STACK,
+              lineHeight: TEXT_LINE_HEIGHT,
+              fontFamily: editingTextRef.current?.fontFamily ?? fontFamily,
               padding: "2px 4px",
               zIndex: 5,
             }}

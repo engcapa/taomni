@@ -59,7 +59,7 @@ steps:
     selector: '[data-testid="screenshot-text-input"]'
     value: qa-shot
 - press:
-    key: Enter
+    key: Control+Enter
     selector: '[data-testid="screenshot-text-input"]'
 - assert_not_visible: '[data-testid="screenshot-text-input"]'
 - wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="6"]'

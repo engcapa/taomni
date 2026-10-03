@@ -1,7 +1,7 @@
 id: TC-SHOT-003
-title: Scroll capture dispatches crop geometry and resets selection and annotations
-description: The browser scroll stub returns the same 400x300 image and three frames; this case checks renderer refresh, not
-  tall-image stitching or OS scrolling.
+title: Scroll result preserves aspect ratio, supports original size and starts annotation without reselecting
+description: Tall 400x1800 browser fixture checks preview geometry and export dimensions; native N12 owns actual stitching
+  and OS scrolling.
 covers:
 - F27.1
 tags:
@@ -48,36 +48,101 @@ steps:
 - assert_not_visible: '[data-testid="screenshot-scroll-confirm"]'
 - click: '[data-testid="screenshot-scroll-capture"]'
 - click: '[data-testid="screenshot-scroll-start"]'
-- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="preview"]'
 - assert_not_visible: '[data-testid="screenshot-selection"]'
 - assert_not_visible: '[data-testid="screenshot-toolbar"]'
 - assert_not_visible: '[data-testid="screenshot-scroll-busy"]'
-- assert_visible: '[data-testid="screenshot-hint"]'
+- assert_visible: '[data-testid="screenshot-scroll-result"]'
 - assert_attribute:
     selector: '[data-testid="screenshot-annotation-canvas"]'
     name: data-shapes
     equals: '0'
-- assert_text_equals:
-    selector: '[data-testid="screenshot-toast"]'
-    equals: Scroll capture stitched 3 frames
+- assert_text:
+    selector: '[data-testid="screenshot-scroll-result-meta"]'
+    contains: 400 × 1800
 - eval_readonly:
     expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_scroll_capture" && JSON.stringify(window.__taomniStubScreenshotCalls.at(-2).args)
       === '{"displayId":"0,0","x":40,"y":40,"width":160,"height":120}'
 - eval_readonly:
     expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_update" && window.__taomniStubScreenshotCalls.at(-1).args.width
-      === 400 && window.__taomniStubScreenshotCalls.at(-1).args.height === 300
-- click: '[data-testid="screenshot-fullscreen"]'
+      === 400 && window.__taomniStubScreenshotCalls.at(-1).args.height === 1800
+- eval_readonly:
+    expression: Math.abs(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().width
+      / document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().height
+      - 400 / 1800) < 0.001
+- click: '[data-testid="screenshot-scroll-actual"]'
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().width
+      === 400
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().height
+      === 1800
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-viewport\"]").scrollHeight
+      > document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-viewport\"]").clientHeight
+- click: '[data-testid="screenshot-scroll-fit"]'
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().height
+      <= document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-viewport\"]").clientHeight
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().width
+      <= 400
+- screenshot: scroll-result-fit.png
+- click: '[data-testid="screenshot-scroll-result-edit"]'
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - assert_disabled: '[data-testid="screenshot-undo"]'
 - assert_disabled: '[data-testid="screenshot-redo"]'
-- click: '[data-testid="screenshot-cancel"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-base-image\"]").getBoundingClientRect().width
+      / document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-base-image\"]").getBoundingClientRect().height
+      - 400 / 1800) < 0.001
+- click: '[data-testid="screenshot-copy"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-3).cmd === "screenshot_save_data_url" && window.__taomniStubScreenshotCalls.at(-3).args.width
+      === 400 && window.__taomniStubScreenshotCalls.at(-3).args.height === 1800
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-hint"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- click: '[data-testid="screenshot-scroll-capture"]'
+- click: '[data-testid="screenshot-scroll-start"]'
+- wait_for: '[data-testid="screenshot-scroll-result"]'
+- click: '[data-testid="screenshot-scroll-result-save"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: long-capture.png
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_save_image" && window.__taomniStubScreenshotCalls.at(-2).args.dest
+      === "long-capture.png"
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-hint"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- click: '[data-testid="screenshot-scroll-capture"]'
+- click: '[data-testid="screenshot-scroll-start"]'
+- wait_for: '[data-testid="screenshot-scroll-result"]'
+- click: '[data-testid="screenshot-scroll-result-pin"]'
+- wait_for: '[data-testid="screenshot-pin-image"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_pin_to_screen"')
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-hint"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- click: '[data-testid="screenshot-scroll-capture"]'
+- click: '[data-testid="screenshot-scroll-start"]'
+- wait_for: '[data-testid="screenshot-scroll-result"]'
+- click: '[data-testid="screenshot-scroll-result-close"]'
 - wait_for: '[data-testid="system-screenshot"]'
 verification:
   review: reviewed
   requirements:
-  - id: R1
-    requirement: Scroll capture sends the selected physical region, applies the returned artifact, and clears the previous
-      selection and annotation history.
+  - id: capture
+    requirement: Selected physical region dispatches correctly; confirmation can be cancelled before start; prior marks are
+      cleared.
     actions:
     - 1
     - 2
@@ -85,77 +150,132 @@ verification:
     - 6
     - 7
     - 9
+    - 12
+    - 14
     - 15
     checkpoints:
     - step: 8
-      expectation: A real annotation existed before refresh.
+      expectation: Original mark exists
+    - step: 11
+      expectation: Instructions visible
+    - step: 13
+      expectation: Cancel closes instructions
     - step: 16
-      expectation: Completion returns to select phase.
+      expectation: Result preview opens
     - step: 17
-      expectation: The old region is removed.
+      expectation: No selection frame
     - step: 18
-      expectation: The old toolbar is removed.
+      expectation: No toolbar
     - step: 19
-      expectation: The busy state has ended.
+      expectation: No busy state
     - step: 20
-      expectation: Region-selection instructions return.
+      expectation: Result is visible
     - step: 21
-      expectation: No annotation survives the new capture.
-    - step: 22
-      expectation: The UI reports the stub's three-frame result.
+      expectation: Old marks cleared
     - step: 23
-      expectation: Request geometry is exactly the selected 160x120 crop at 40x40.
+      expectation: Crop IPC is exact
     - step: 24
-      expectation: Overlay update uses the actual 400x300 stub result, without claiming a tall image.
+      expectation: Tall result metadata is stored
     results:
+    - 8
+    - 11
+    - 13
     - 16
     - 17
     - 18
     - 19
     - 20
     - 21
-    - 22
     - 23
     - 24
-  - id: R2
-    requirement: Reselecting after scroll refresh starts with empty undo and redo stacks and remains cancelable.
+  - id: preview
+    requirement: Fit and original-size views preserve proportions and stay readable.
     actions:
-    - 25
-    - 29
+    - 26
+    - 30
     checkpoints:
+    - step: 22
+      expectation: Native dimensions shown
+    - step: 25
+      expectation: Uniform aspect ratio
     - step: 27
-      expectation: Undo was cleared with the previous shapes.
+      expectation: 100% image with scrollable viewport
     - step: 28
-      expectation: Redo was cleared as well.
-    - step: 30
-      expectation: Cancel returns to the main camera.
+      expectation: 100% image with scrollable viewport
+    - step: 29
+      expectation: 100% image with scrollable viewport
+    - step: 31
+      expectation: Fit stays inside viewport without upscaling
+    - step: 32
+      expectation: Fit stays inside viewport without upscaling
     results:
+    - 22
+    - 25
     - 27
     - 28
-    - 30
-  - id: R3
-    requirement: Opening scroll capture explains the automatic scrolling and how to finish or cancel.
+    - 29
+    - 31
+    - 32
+  - id: output
+    requirement: Continue annotation directly and copy full natural dimensions.
     actions:
-    - 9
+    - 34
+    - 39
     checkpoints:
-    - step: 11
-      expectation: Visible instructions explain automatic scrolling and stop controls.
+    - step: 35
+      expectation: Toolbar opens
+    - step: 36
+      expectation: Undo cleared
+    - step: 37
+      expectation: Redo cleared
+    - step: 38
+      expectation: Annotation image keeps aspect ratio
+    - step: 40
+      expectation: Copy closes tool
+    - step: 41
+      expectation: Export remains 400x1800
     results:
-    - 11
-  - id: R4
-    requirement: Cancelling before start closes the confirmation and keeps the original selection and annotation.
+    - 35
+    - 36
+    - 37
+    - 38
+    - 40
+    - 41
+  - id: preview-actions
+    requirement: Preview Save uses the chosen filename; Pin opens the captured image; Close exits directly.
     actions:
-    - 12
+    - 42
+    - 48
+    - 50
+    - 51
+    - 54
+    - 60
+    - 63
+    - 65
+    - 71
     checkpoints:
-    - step: 13
-      expectation: The confirmation is closed without starting a capture.
+    - step: 53
+      expectation: Save dispatched to long-capture.png
+    - step: 61
+      expectation: Pinned image appears
+    - step: 62
+      expectation: Pin IPC dispatched
+    - step: 64
+      expectation: Pin closes
+    - step: 72
+      expectation: Result closes without another selection
     results:
-    - 13
+    - 53
+    - 61
+    - 62
+    - 64
+    - 72
   visual:
-  - check: Completed refresh removes stale crop and annotation state.
+  - check: Text, menu and result layout
     method: automated
-    reason: Phase, size, history and visibility assertions establish renderer refresh only.
+    reason: Geometry, font style, visible states and retained screenshots establish the described renderer layout.
   native:
-  - check: Actual scroll injection, overlap detection and tall-image row order.
+  - check: Packaged WebView, OS capture and clipboard
     method: external
-    reason: The synthetic browser result does not stitch or scroll; native SHOT-N scroll cases own these checks.
+    reason: Native SHOT-N3 and N12 exercise real capture/clipboard and three packaged WebViews. Browser stubs do not establish
+      OS behavior.

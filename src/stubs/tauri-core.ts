@@ -5112,10 +5112,22 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "screenshot_scroll_capture": {
       stubScreenshotCall(cmd, args);
+      const canvas = document.createElement("canvas");
+      canvas.width = 400;
+      canvas.height = 1800;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#f5f5f5";
+      ctx.fillRect(0, 0, 400, 1800);
+      ctx.font = "20px sans-serif";
+      for (let y = 40; y < 1800; y += 60) {
+        ctx.fillStyle = "#222";
+        ctx.fillText(`Scroll preview row ${y / 60}`, 20, y);
+        ctx.strokeRect(10, y - 30, 380, 45);
+      }
       return ({
-        path: STUB_SCREENSHOT_DATA_URL,
+        path: canvas.toDataURL("image/png"),
         width: 400,
-        height: 300,
+        height: 1800,
         frames: 3,
       } as unknown) as T;
     }

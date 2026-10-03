@@ -33,6 +33,8 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { listSystemFonts } from "../../lib/ipc";
+import { ScrollCaptureResult } from "./ScrollCaptureResult";
 import { useT } from "../../lib/i18n";
 import { formatUnknownError } from "../../lib/appDialogs";
 import {
@@ -60,13 +62,14 @@ import { contourBounds, contourPath, maskContour, pointInContour, transformConto
 import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
 import {
   AnnotationCanvas,
+  FONT_STACK,
   type AnnotationCanvasHandle,
   type AnnotationTool,
   type CssRect,
   type Shape,
 } from "./AnnotationCanvas";
 
-type Phase = "loading" | "select" | "annotate" | "busy";
+type Phase = "loading" | "select" | "annotate" | "busy" | "preview";
 
 /** Selections smaller than this (CSS px) are treated as a click. */
 const MIN_SEL = 6;
@@ -329,12 +332,19 @@ export function ScreenshotOverlay() {
   const [tool, setTool] = useState<AnnotationTool>("select");
   const [color, setColor] = useState(COLORS[0].value);
   const [lineWidth, setLineWidth] = useState(4);
+  const [fontFamily, setFontFamily] = useState(FONT_STACK);
+  const [fontSize, setFontSize] = useState(18);
+  const [systemFonts, setSystemFonts] = useState<string[]>([]);
+  const [textSelected, setTextSelected] = useState(false);
+  const [scrollResult, setScrollResult] = useState<{ frames: number; w: number; h: number } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [annotationSelected, setAnnotationSelected] = useState(false);
   const [scrollConfirm, setScrollConfirm] = useState(false);
   const onAnnotationSelection = useCallback((shape: Shape | null) => {
     setAnnotationSelected(!!shape);
+    setTextSelected(shape?.kind === "text");
+    if (shape?.kind === "text") { setFontFamily(shape.fontFamily ?? FONT_STACK); setFontSize(shape.fontSize); }
     if (shape) { setColor(shape.color); setLineWidth(shape.lineWidth); }
   }, []);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
@@ -355,6 +365,9 @@ export function ScreenshotOverlay() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(null);
   const canvasRef = useRef<AnnotationCanvasHandle | null>(null);
+  const recordMenuRef = useRef<HTMLDivElement | null>(null);
+  const recordButtonRef = useRef<HTMLDivElement | null>(null);
+  const [recordPos, setRecordPos] = useState({ left: 8, top: 8 });
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   /** Region-select / move / resize drag in progress. */
   const dragRef = useRef<{
@@ -367,9 +380,18 @@ export function ScreenshotOverlay() {
   const toastTimer = useRef<number | null>(null);
   const busyRef = useRef(false);
 
+  useEffect(() => {
+    if (tool !== "text" && !textSelected) return;
+    let disposed = false;
+    void listSystemFonts().then((fonts) => { if (!disposed) setSystemFonts(fonts); }).catch(() => undefined);
+    return () => { disposed = true; };
+  }, [tool, textSelected]);
+
+  const imageSize = scrollResult ?? viewport;
+
   /** CSS px -> physical px, per axis (backend image is physical pixels). */
-  const sx = img ? img.naturalWidth / Math.max(1, viewport.w) : 1;
-  const sy = img ? img.naturalHeight / Math.max(1, viewport.h) : 1;
+  const sx = img ? img.naturalWidth / Math.max(1, imageSize.w) : 1;
+  const sy = img ? img.naturalHeight / Math.max(1, imageSize.h) : 1;
   const bounds = img ? { width: img.naturalWidth, height: img.naturalHeight } : undefined;
   const toPhysical = (r: CssRect) => toPhysicalRect(r, sx, sy, bounds);
 
@@ -487,12 +509,12 @@ export function ScreenshotOverlay() {
   // ---------------------------------------------------------------------
 
   const fullscreenSelect = useCallback(() => {
-    setSel({ x: 0, y: 0, w: viewport.w, h: viewport.h });
+    setSel({ x: 0, y: 0, w: imageSize.w, h: imageSize.h });
     setContour(null);
     setSelectionMode("rectangle");
     setTool("select");
     setPhase("annotate");
-  }, [viewport.w, viewport.h]);
+  }, [imageSize.w, imageSize.h]);
 
   /** Drop the selection and annotations; back to region selection. */
   const resetSelection = useCallback(() => {
@@ -750,11 +772,13 @@ export function ScreenshotOverlay() {
         setInit({ ...init, path: res.path, width: res.width, height: res.height });
         setImg(loaded.img);
         setImgUrl(loaded.url);
-        setSel(null);
+        const scale = Math.min(1, (viewport.w - 32) / loaded.img.naturalWidth, (viewport.h - 160) / loaded.img.naturalHeight);
+        const size = { w: loaded.img.naturalWidth * scale, h: loaded.img.naturalHeight * scale };
+        setScrollResult({ frames: res.frames, ...size });
+        setSel({ x: 0, y: 0, ...size });
         setContour(null);
-        setTool("select");
-        setPhase("select");
-        showToast(t("screenshot.scrollDone", { count: res.frames }));
+        setTool("move");
+        setPhase("preview");
       } catch (e) {
         if (!String(e).includes("scroll capture cancelled")) showToast(t("screenshot.scrollFailed", { error: formatUnknownError(e) }));
         setPhase("annotate");
@@ -792,11 +816,12 @@ export function ScreenshotOverlay() {
         else if (ocrOpen) setOcrOpen(false);
         else if (pickerMode) exitPickerMode();
         else if (phase === "annotate" && tool !== "select" && canvasRef.current?.shapeCount() === 0) setTool("select");
+        else if (scrollResult) close();
         else if (phase === "annotate") resetSelection();
         else close();
         return;
       }
-      if (typing || phase !== "annotate") return;
+      if (typing || (phase !== "annotate" && phase !== "preview")) return;
       if ((e.key === "Delete" || e.key === "Backspace") && tool === "move") {
         if (canvasRef.current?.deleteSelected()) e.preventDefault();
         return;
@@ -838,12 +863,34 @@ export function ScreenshotOverlay() {
     const h = el?.offsetHeight ?? 44;
     const gap = 8;
     let top: number;
-    if (sel.y + sel.h + gap + h <= viewport.h - 4) top = sel.y + sel.h + gap;
+    if (scrollResult) top = viewport.h - h - 12;
+    else if (sel.y + sel.h + gap + h <= viewport.h - 4) top = sel.y + sel.h + gap;
     else if (sel.y - gap - h >= 4) top = sel.y - gap - h;
     else top = Math.max(4, sel.y + sel.h - h - gap);
+    top = Math.min(Math.max(4, top), Math.max(4, viewport.h - h - 4));
     const left = Math.min(Math.max(4, sel.x + sel.w - w), Math.max(4, viewport.w - w - 4));
     setToolbarPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }));
-  }, [sel, phase, dragging, viewport.w, viewport.h, ocrOpen]);
+  }, [sel, phase, dragging, viewport.w, viewport.h, ocrOpen, tool, textSelected, scrollResult]);
+
+  useLayoutEffect(() => {
+    if (!recordOpen) return;
+    const button = recordButtonRef.current?.getBoundingClientRect();
+    const menu = recordMenuRef.current;
+    if (!button || !menu) return;
+    const left = Math.max(8, Math.min(button.right - menu.offsetWidth, viewport.w - menu.offsetWidth - 8));
+    const above = button.top - menu.offsetHeight - 8;
+    const top = above >= 8 ? above : Math.max(8, Math.min(button.bottom + 8, viewport.h - menu.offsetHeight - 8));
+    setRecordPos({ left, top });
+  }, [recordOpen, toolbarPos, viewport]);
+
+  useEffect(() => {
+    if (!recordOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (!recordButtonRef.current?.contains(event.target as Node)) setRecordOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [recordOpen]);
 
   if (loadError) {
     return (
@@ -905,7 +952,7 @@ export function ScreenshotOverlay() {
           alt=""
           draggable={false}
           className="fixed inset-0 z-0"
-          style={{ width: "100%", height: "100%" }}
+          style={{ width: imageSize.w, height: imageSize.h }}
         />
       )}
 
@@ -922,7 +969,7 @@ export function ScreenshotOverlay() {
           <path data-testid="screenshot-freehand-contour" d={contourPath(contour)} fill="none" stroke="#1677ff" strokeWidth={1} />
         </svg>
       )}
-      {sel && (
+      {sel && phase !== "preview" && (
         <div
           data-testid="screenshot-selection"
           className="fixed z-[35] pointer-events-none"
@@ -984,11 +1031,14 @@ export function ScreenshotOverlay() {
       {img && (
         <AnnotationCanvas
           ref={canvasRef}
-          imageWidth={viewport.w}
-          imageHeight={viewport.h}
+          imageWidth={imageSize.w}
+          imageHeight={imageSize.h}
           tool={phase === "annotate" && !pickerMode ? tool : "select"}
           color={color}
           lineWidth={lineWidth}
+          fontFamily={fontFamily}
+          fontSize={fontSize}
+          textHint={t("screenshot.textHint")}
           baseImage={img}
           selection={sel}
           selectionContour={contour}
@@ -1044,13 +1094,29 @@ export function ScreenshotOverlay() {
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
+          {(tool === "text" || textSelected) && <div data-testid="screenshot-text-style" className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 mb-1 text-[12px]" style={panelStyle}>
+            <label className="flex items-center gap-2">{t("screenshot.fontFamily")}
+              <select data-testid="screenshot-font-family" aria-label={t("screenshot.fontFamily")} className="taomni-input h-7 max-w-44" value={fontFamily}
+                onChange={(e) => { setFontFamily(e.target.value); if (textSelected) canvasRef.current?.updateSelectedStyle({ fontFamily: e.target.value }); }}>
+                <option value={FONT_STACK}>{t("screenshot.fontDefault")}</option>
+                <option value="serif">{t("screenshot.fontSerif")}</option>
+                <option value="monospace">{t("screenshot.fontMono")}</option>
+                {systemFonts.map((font) => <option key={font} value={`${JSON.stringify(font)}, sans-serif`}>{font}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2">{t("screenshot.fontSize")}
+              <input data-testid="screenshot-font-size" aria-label={t("screenshot.fontSize")} type="number" min={8} max={144} step={1} value={fontSize}
+                className="taomni-input h-7 w-16 px-2" onChange={(e) => { const value = e.target.valueAsNumber; if (Number.isFinite(value) && value >= 8 && value <= 144) { setFontSize(value); if (textSelected) canvasRef.current?.updateSelectedStyle({ fontSize: value }); } }} />
+            </label>
+            <span data-testid="screenshot-text-hint" className="text-[var(--taomni-text-muted)]">{t("screenshot.textHint")}</span>
+          </div>}
           <div className="flex flex-wrap items-center gap-0.5 rounded-xl px-1.5 py-1 shadow-2xl" style={panelStyle}>
-            <ToolButton testid="screenshot-selection-rectangle" title={t("screenshot.selectionRectangle")} active={selectionMode === "rectangle"} onClick={() => changeSelectionMode("rectangle")}>
+            {!scrollResult && <ToolButton testid="screenshot-selection-rectangle" title={t("screenshot.selectionRectangle")} active={selectionMode === "rectangle"} onClick={() => changeSelectionMode("rectangle")}>
               <Square size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-selection-freehand" title={t("screenshot.selectionFreehand")} active={selectionMode === "freehand"} onClick={() => changeSelectionMode("freehand")}>
+            </ToolButton>}
+            {!scrollResult && <ToolButton testid="screenshot-selection-freehand" title={t("screenshot.selectionFreehand")} active={selectionMode === "freehand"} onClick={() => changeSelectionMode("freehand")}>
               <Lasso size={16} />
-            </ToolButton>
+            </ToolButton>}
             <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
             {TOOLS.map(({ tool: name, testid, titleKey, Icon }) => (
               <ToolButton
@@ -1110,7 +1176,7 @@ export function ScreenshotOverlay() {
               <Trash2 size={16} />
             </ToolButton>
             <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour} onClick={() => { setRecordOpen(false); setScrollConfirm(true); }}>
+            <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour || !!scrollResult} onClick={() => { setRecordOpen(false); setScrollConfirm(true); }}>
               <ScrollText size={16} />
             </ToolButton>
             <ToolButton
@@ -1222,11 +1288,11 @@ export function ScreenshotOverlay() {
                 </div>
               )}
             </div>
-            <div className="relative">
+            <div ref={recordButtonRef} className="relative">
               <ToolButton
                 testid="screenshot-record"
                 title={t(contour ? "screenshot.rectangleRequired" : "screenshot.record")}
-                disabled={!!contour}
+                disabled={!!contour || !!scrollResult}
                 active={recordOpen}
                 onClick={() => {
                   setWatermarkOpen(false);
@@ -1240,11 +1306,12 @@ export function ScreenshotOverlay() {
               </ToolButton>
               {recordOpen && (
                 <div
+                  ref={recordMenuRef}
                   data-testid="screenshot-record-menu"
-                  className="absolute bottom-full mb-2 right-0 rounded-lg py-1 shadow-2xl text-[12px] whitespace-nowrap"
-                  style={{ zIndex: 10, ...panelStyle }}
+                  className="fixed rounded-xl p-2 shadow-2xl text-[13px] overflow-y-auto"
+                  style={{ zIndex: 65, width: Math.min(320, viewport.w - 16), maxHeight: viewport.h - 16, ...recordPos, ...panelStyle }}
                 >
-                  <p data-testid="screenshot-record-hint" className="px-4 py-2 max-w-72 whitespace-normal text-[var(--taomni-text-muted)]">{t("screenshot.recordHint", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
+                  <p data-testid="screenshot-record-hint" className="px-2 py-2 leading-relaxed whitespace-normal break-words text-[var(--taomni-text-muted)]">{t("screenshot.recordHint", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
                   <button
                     type="button"
                     data-testid="screenshot-record-gif"
@@ -1285,6 +1352,10 @@ export function ScreenshotOverlay() {
           </div>
         </div>
       )}
+
+      {phase === "preview" && scrollResult && img && imgUrl && <ScrollCaptureResult url={imgUrl} width={img.naturalWidth} height={img.naturalHeight}
+        frames={scrollResult.frames} onEdit={() => setPhase("annotate")} onCopy={() => void handleCopy()} onSave={() => void handleSave()}
+        onPin={() => void handlePin()} onClose={close} />}
 
       {/* Busy state (scroll capture / recording start). */}
       {scrollConfirm && <div data-testid="screenshot-scroll-confirm" role="dialog" aria-label={t("screenshot.scrollCapture")}
