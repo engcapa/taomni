@@ -7,10 +7,23 @@ from unittest.mock import Mock, patch
 
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.behavior_contract import is_check
+from qa_ui_auto.testcase import load_case
+from qa_ui_auto.verification import native_support
 from qa_ui_auto.window_drag import run_window_drag, validate_movement
 
 
 class WindowDragTest(TestCase):
+    def test_main_rail_cases_validate_and_declare_native_platform_boundaries(self):
+        cases = [load_case(path) for path in Path("qa-ui-auto-tests/cases").glob("TC-MAIN-RAIL-*.yaml")]
+        self.assertEqual(len(cases), 3)
+        for case in cases:
+            if "native" in case.modes:
+                self.assertIsNone(native_support(case, "Linux"))
+                if case.id == "TC-MAIN-RAIL-01":
+                    self.assertIsNone(native_support(case, "macOS"))
+                else:
+                    self.assertIsNotNone(native_support(case, "macOS"))
+
     def test_only_movement_with_an_independent_postcondition_is_a_contract_check(self):
         self.assertTrue(is_check({"native_window_drag": {"dx": 24, "dy": 18}}))
         self.assertFalse(is_check({"native_window_drag": {"dx": 0, "dy": 0}}))

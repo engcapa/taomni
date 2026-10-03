@@ -269,7 +269,7 @@ export function ToolWindowRailButton({
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu ? (event) => onContextMenu(event, item) : undefined}
     >
-      <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center [&>svg]:h-4 [&>svg]:w-4">{item.icon}</span>
+      <span aria-hidden="true" className="flex h-[20px] w-[20px] items-center justify-center [&>svg]:h-[16px] [&>svg]:w-[16px]">{item.icon}</span>
       {showNames && (
         <span className="w-full truncate px-0.5 text-center text-[10px] leading-3">{item.label}</span>
       )}
@@ -282,7 +282,7 @@ export function ToolWindowRailButton({
   );
 }
 
-export const toolWindowRailButtonClass = "relative flex min-h-8 w-full shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0 py-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--taomni-accent)] disabled:opacity-40 data-[active=true]:bg-[var(--taomni-accent)] data-[active=true]:text-white";
+export const toolWindowRailButtonClass = "relative flex min-h-[32px] w-full shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0 py-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--taomni-accent)] disabled:opacity-40 data-[active=true]:bg-[var(--taomni-accent)] data-[active=true]:text-white";
 
 /**
  * IDEA "More tool windows" (…) at the end of the left stripe: every tool
@@ -334,7 +334,7 @@ export function MoreToolWindowsButton({
         className={toolWindowRailButtonClass}
         onClick={() => setOpen((value) => !value)}
       >
-        <MoreHorizontal className="h-4 w-4" />
+        <MoreHorizontal className="h-[16px] w-[16px]" />
       </button>
       {open && rect && createPortal(
         <div

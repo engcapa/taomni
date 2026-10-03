@@ -1654,6 +1654,13 @@ def _do_assert_attribute(ctx: NativeStepContext, args: Any) -> str:
     return _assert_attribute(ctx, args)
 
 
+@_verb("assert_element_geometry")
+def _do_assert_element_geometry(ctx: NativeStepContext, args: Any) -> str:
+    from .element_geometry import run_geometry
+
+    return run_geometry(args, lambda expression: ctx.session.execute(f"return ({expression});"), ctx.case_dir)
+
+
 @_verb("assert_localstorage")
 def _do_assert_localstorage(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "key" not in args:

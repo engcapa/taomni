@@ -1,7 +1,7 @@
 id: TC-MAIN-RAIL-02
 title: Left rail keeps upright Chinese names and a full-height grip at narrow widths in both themes
 description: Browser layout acceptance at 1280 and 800 CSS pixels with theme, locale, collapse and names changes; screenshots require visual review.
-covers: [F1.2, F1.3, F6.2, F-Sockscap-1, F25.5]
+covers: [F1.2, F1.3, F6.2, F-Sockscap-1, F25.5, F-I18n-1]
 tags: [main, sidebar, p1]
 modes: [browser]
 fixtures: [reset_db]
@@ -11,11 +11,13 @@ steps:
   - wait_for: '[data-testid="welcome-panel"]'
   - set_viewport: {width: 1280, height: 820}
   - seed_storage: {key: taomni.sidebarCollapsed, value: 'false'}
-  - seed_storage: {key: taomni.locale.v1, value: zh-CN}
-  - seed_storage: {key: taomni.appTheme.v1, value: light}
   - seed_storage: {key: taomni.codeWorkspace.toolWindowStripes.v1, value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'}
   - reload_window: null
   - wait_for: '[data-testid="session-tree"]'
+  - click: '[data-testid="language-switcher"]'
+  - click: '[data-testid="language-option-zh-CN"]'
+  - click: '[data-testid="theme-cycle"]'
+  - assert_localstorage: {key: taomni.appTheme.v1, equals: light}
   - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: 会话}
   - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: 工具}
   - eval_readonly:
@@ -48,9 +50,13 @@ steps:
   - screenshot: main-rail-narrow-dark-names.png
   - click: '[data-testid="sidebar-tool-code-workspace"]'
   - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-  - eval_readonly:
-      expression: Math.abs(document.querySelector('button[data-tool-window-id]').getBoundingClientRect().width - document.querySelector('nav[data-embedded] button').getBoundingClientRect().width) < 1 && document.querySelector('nav[data-embedded] button').getBoundingClientRect().height >= 32
-      expect_truthy: true
+  - assert_element_geometry:
+      selector: '[data-testid="collapsed-sidebar-rail"] button[data-tool-window-id]'
+      min_count: 3
+      min_width: 32
+      min_height: 32
+      same_width: true
+      icon_size: 16
   - click: '[data-testid="code-workspace-bottom-tab-problems"]'
   - assert_visible: '[data-testid="code-workspace-tool-window-problems"]'
   - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
@@ -63,85 +69,90 @@ verification:
     actions:
     - 1
     - 3
+    - 6
     - 8
-    - 14
+    - 9
+    - 10
     - 16
-    - 19
-    - 22
+    - 18
+    - 21
     - 24
+    - 26
+    - 29
+    - 32
+    - 33
+    - 36
+    - 39
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 11
+      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "equals": "light"}}'
+    - step: 12
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
+        "equals": "会话"}}'
+    - step: 13
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
+        "equals": "工具"}}'
+    - step: 14
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''button[data-tool-window-id]'')).writingMode
+        === ''horizontal-tb''", "expect_truthy": true}}'
+    - step: 17
+      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "equals": "dark"}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
+        - innerHeight) < 1", "expect_truthy": true}}'
+    - step: 20
+      expectation: '{"eval_readonly": {"expression": "document.documentElement.scrollWidth <= innerWidth", "expect_truthy":
+        true}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
+    - step: 25
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sidebar-rail-menu-show-names\"]", "contains": "显示工具窗口名称"}}'
+    - step: 27
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]",
+        "equals": ""}}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-tool-code-workspace\"]"}'
+    - step: 34
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
+        "equals": "工具"}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 38
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] button[data-tool-window-id]",
+        "min_count": 3, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
+    - step: 40
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-problems\"]"}'
+    - step: 41
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
+    results:
+    - 2
+    - 7
+    - 11
+    - 12
+    - 13
+    - 14
+    - 17
+    - 19
+    - 20
+    - 22
+    - 23
+    - 25
     - 27
     - 30
     - 31
     - 34
     - 37
-    checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 10
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
-        "equals": "会话"}}'
-    - step: 11
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
-        "equals": "工具"}}'
-    - step: 12
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''button[data-tool-window-id]'')).writingMode
-        === ''horizontal-tb''", "expect_truthy": true}}'
-    - step: 15
-      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "equals": "dark"}}'
-    - step: 17
-      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
-        - innerHeight) < 1", "expect_truthy": true}}'
-    - step: 18
-      expectation: '{"eval_readonly": {"expression": "document.documentElement.scrollWidth <= innerWidth", "expect_truthy":
-        true}}'
-    - step: 20
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
-    - step: 23
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sidebar-rail-menu-show-names\"]", "contains": "显示工具窗口名称"}}'
-    - step: 25
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]",
-        "equals": ""}}'
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
-    - step: 29
-      expectation: '{"assert_visible": "[data-testid=\"sidebar-tool-code-workspace\"]"}'
-    - step: 32
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
-        "equals": "工具"}}'
-    - step: 35
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 36
-      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''button[data-tool-window-id]'').getBoundingClientRect().width
-        - document.querySelector(''nav[data-embedded] button'').getBoundingClientRect().width) < 1 && document.querySelector(''nav[data-embedded]
-        button'').getBoundingClientRect().height >= 32", "expect_truthy": true}}'
-    - step: 38
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-problems\"]"}'
-    - step: 39
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
-    results:
-    - 2
-    - 9
-    - 10
-    - 11
-    - 12
-    - 15
-    - 17
-    - 18
-    - 20
-    - 21
-    - 23
-    - 25
-    - 28
-    - 29
-    - 32
-    - 35
-    - 36
     - 38
-    - 39
+    - 40
+    - 41
   visual:
   - check: 检查对应截图的图标、名称、选中态、全高拖拽带以及点击区域无缩小、遮挡或截断。
     method: manual

@@ -161,6 +161,15 @@ def step_assert_count(ctx: StepContext, args: Any) -> None:
         raise StepError(f"{selector}: expected ≤{args['max']}, got {count}")
 
 
+@verb("assert_element_geometry")
+def step_assert_element_geometry(ctx: StepContext, args: Any) -> None:
+    if ctx.dry_run:
+        return
+    from ..element_geometry import run_geometry
+
+    run_geometry(args, lambda expression: ctx.page.evaluate(f"() => ({expression})"), ctx.case_dir)
+
+
 @verb("assert_url")
 def step_assert_url(ctx: StepContext, args: Any) -> None:
     expected = str(args)
