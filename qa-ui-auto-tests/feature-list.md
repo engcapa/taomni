@@ -10282,6 +10282,7 @@ files:
   - src/components/screenshot/PinnedImage.tsx
   - src/components/screenshot/RecorderBar.tsx
   - src/components/screenshot/ScrollCaptureBar.tsx
+  - src/components/screenshot/ScrollCaptureResult.tsx
   - src/components/screenshot/ScreenshotMenuButton.tsx
   - src-tauri/src/screenshot/surfaces.rs
   - src/lib/screenshotShortcut.ts
@@ -10298,6 +10299,51 @@ files:
   - src-tauri/src/screenshot/qa_oracle.rs
   - src/components/screenshot/ScreenshotQaFixture.tsx
 controls:
+  - id: screenshot-text-style
+    selector: '[data-testid="screenshot-text-style"]'
+    kind: display
+  - id: screenshot-font-family
+    selector: '[data-testid="screenshot-font-family"]'
+    kind: interactive
+  - id: screenshot-font-size
+    selector: '[data-testid="screenshot-font-size"]'
+    kind: interactive
+  - id: screenshot-text-hint
+    selector: '[data-testid="screenshot-text-hint"]'
+    kind: display
+  - id: screenshot-scroll-result
+    selector: '[data-testid="screenshot-scroll-result"]'
+    kind: display
+  - id: screenshot-scroll-result-meta
+    selector: '[data-testid="screenshot-scroll-result-meta"]'
+    kind: display
+  - id: screenshot-scroll-result-viewport
+    selector: '[data-testid="screenshot-scroll-result-viewport"]'
+    kind: display
+  - id: screenshot-scroll-result-image
+    selector: '[data-testid="screenshot-scroll-result-image"]'
+    kind: display
+  - id: screenshot-scroll-fit
+    selector: '[data-testid="screenshot-scroll-fit"]'
+    kind: interactive
+  - id: screenshot-scroll-actual
+    selector: '[data-testid="screenshot-scroll-actual"]'
+    kind: interactive
+  - id: screenshot-scroll-result-close
+    selector: '[data-testid="screenshot-scroll-result-close"]'
+    kind: interactive
+  - id: screenshot-scroll-result-edit
+    selector: '[data-testid="screenshot-scroll-result-edit"]'
+    kind: interactive
+  - id: screenshot-scroll-result-pin
+    selector: '[data-testid="screenshot-scroll-result-pin"]'
+    kind: interactive
+  - id: screenshot-scroll-result-save
+    selector: '[data-testid="screenshot-scroll-result-save"]'
+    kind: interactive
+  - id: screenshot-scroll-result-copy
+    selector: '[data-testid="screenshot-scroll-result-copy"]'
+    kind: interactive
   - id: system-screenshot
     selector: '[data-testid="system-screenshot"]'
     kind: interactive

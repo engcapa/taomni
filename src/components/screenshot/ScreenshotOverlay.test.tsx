@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("../../lib/ipc", () => ({ listSystemFonts: async () => ["Arial", "Noto Sans"] }));
 import { ScreenshotOverlay } from "./ScreenshotOverlay";
 
 const api = vi.hoisted(() => ({
@@ -107,17 +108,68 @@ describe("ScreenshotOverlay", () => {
     fireEvent.click(screen.getByTestId("screenshot-tool-text"));
     fireEvent.click(screen.getByTestId("screenshot-annotation-layer"), { clientX: 100, clientY: 100 });
     fireEvent.change(screen.getByTestId("screenshot-text-input"), { target: { value: "first" } });
-    fireEvent.keyDown(screen.getByTestId("screenshot-text-input"), { key: "Enter" });
+    fireEvent.keyDown(screen.getByTestId("screenshot-text-input"), { key: "Enter", ctrlKey: true });
     fireEvent.click(screen.getByTestId("screenshot-tool-move"));
     fireEvent.doubleClick(screen.getByTestId("screenshot-annotation-layer"), { clientX: 110, clientY: 110 });
     expect(screen.getByTestId("screenshot-text-input")).toHaveValue("first");
     fireEvent.change(screen.getByTestId("screenshot-text-input"), { target: { value: "edited" } });
-    fireEvent.keyDown(screen.getByTestId("screenshot-text-input"), { key: "Enter" });
+    fireEvent.keyDown(screen.getByTestId("screenshot-text-input"), { key: "Enter", ctrlKey: true });
     expect(shapes()).toBe("1");
     fireEvent.doubleClick(screen.getByTestId("screenshot-annotation-layer"), { clientX: 110, clientY: 110 });
     expect(screen.getByTestId("screenshot-text-input")).toHaveValue("edited");
     fireEvent.keyDown(screen.getByTestId("screenshot-text-input"), { key: "Escape" });
     expect(shapes()).toBe("1");
+  });
+
+  it("keeps Enter and IME input open, commits multiline font settings and restores them on undo", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
+    fireEvent.click(screen.getByTestId("screenshot-tool-text"));
+    fireEvent.change(screen.getByTestId("screenshot-font-family"), { target: { value: "monospace" } });
+    fireEvent.change(screen.getByTestId("screenshot-font-size"), { target: { value: "32" } });
+    fireEvent.click(screen.getByTestId("screenshot-annotation-layer"), { clientX: 100, clientY: 100 });
+    const input = screen.getByTestId("screenshot-text-input");
+    expect(input.tagName).toBe("TEXTAREA");
+    expect(input).toHaveStyle({ fontFamily: "monospace", fontSize: "32px" });
+    fireEvent.change(input, { target: { value: "first\n第二行" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(shapes()).toBe("0");
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true, isComposing: true });
+    expect(shapes()).toBe("0");
+    fireEvent.blur(input);
+    expect(shapes()).toBe("1");
+    const ctx = (screen.getByTestId("screenshot-annotation-canvas") as HTMLCanvasElement).getContext("2d")!;
+    expect(ctx.fillText).toHaveBeenCalledWith("first", 100, 100);
+    expect(ctx.fillText).toHaveBeenCalledWith("第二行", 100, 138.4);
+    fireEvent.click(screen.getByTestId("screenshot-tool-move"));
+    fireEvent.mouseDown(screen.getByTestId("screenshot-annotation-layer"), { button: 0, clientX: 110, clientY: 145 });
+    fireEvent.mouseUp(window, { clientX: 110, clientY: 145 });
+    expect(screen.getByTestId("screenshot-annotation-selection")).toHaveStyle({ height: "76.8px" });
+    fireEvent.change(screen.getByTestId("screenshot-font-size"), { target: { value: "24" } });
+    fireEvent.click(screen.getByTestId("screenshot-undo"));
+    expect(screen.getByTestId("screenshot-font-size")).toHaveValue(32);
+    fireEvent.doubleClick(screen.getByTestId("screenshot-annotation-layer"), { clientX: 110, clientY: 145 });
+    expect(screen.getByTestId("screenshot-text-input")).toHaveValue("first\n第二行");
+    expect(api.copyImageToClipboard).not.toHaveBeenCalled();
+  });
+
+  it("previews tall scroll results without selecting again, and copies full native dimensions", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
+    api.scrollCapture.mockResolvedValueOnce({ path: "tall.png", width: 400, height: 2400, frames: 6 });
+    api.loadScreenshotUrl.mockResolvedValueOnce("data:image/png;base64,400x2400");
+    api.updateOverlayImage.mockResolvedValueOnce(undefined);
+    fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
+    await screen.findByTestId("screenshot-scroll-result");
+    expect(screen.queryByTestId("screenshot-hint")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("screenshot-toolbar")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("screenshot-scroll-actual"));
+    expect(screen.getByTestId("screenshot-scroll-result-image")).toHaveStyle({ width: "400px", height: "2400px" });
+    fireEvent.click(screen.getByTestId("screenshot-scroll-fit"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-result-copy"));
+    await waitFor(() => expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce());
+    expect(api.saveDataUrl).toHaveBeenCalledWith("data:image/png;base64,400x2400");
   });
 
   it("explains scroll capture before starting and keeps the original image when cancelled", async () => {
@@ -242,7 +294,7 @@ describe("ScreenshotOverlay", () => {
     fireEvent.click(screen.getByTestId("screenshot-annotation-layer"), { clientX: 100, clientY: 100 });
     const text = screen.getByTestId("screenshot-text-input");
     fireEvent.change(text, { target: { value: "hello" } });
-    fireEvent.keyDown(text, { key: "Enter" });
+    fireEvent.keyDown(text, { key: "Enter", ctrlKey: true });
     expect(shapes()).toBe("1");
     expect(api.copyImageToClipboard).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("screenshot-tool-number"));

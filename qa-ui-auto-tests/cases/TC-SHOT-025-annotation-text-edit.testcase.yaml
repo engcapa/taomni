@@ -23,7 +23,7 @@ steps:
 - fill:
     selector: '[data-testid="screenshot-text-input"]'
     value: original
-- press: Enter
+- press: Control+Enter
 - click: '[data-testid="screenshot-tool-move"]'
 - dblclick:
     selector: '[data-testid="screenshot-annotation-layer"]'
@@ -37,7 +37,7 @@ steps:
 - fill:
     selector: '[data-testid="screenshot-text-input"]'
     value: edited
-- press: Enter
+- press: Control+Enter
 - assert_attribute:
     selector: '[data-testid="screenshot-annotation-canvas"]'
     name: data-shapes
@@ -71,7 +71,7 @@ verification:
   review: reviewed
   requirements:
   - id: edit
-    requirement: Double-click opens existing text and Enter edits it in place.
+    requirement: Double-click opens existing text and Ctrl+Enter edits it in place.
     actions:
     - 3
     - 4

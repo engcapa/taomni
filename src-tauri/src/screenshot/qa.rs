@@ -925,12 +925,36 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
       fire(ann, 'mousemove', 220, 200);
       fire(ann, 'mouseup', 300, 250);
       await sleep(200);
+      q('[data-testid="screenshot-record"]').click(); await sleep(150);
+      const menu = q('[data-testid="screenshot-record-menu"]').getBoundingClientRect();
+      const hint = q('[data-testid="screenshot-record-hint"]').getBoundingClientRect();
+      if (menu.width < 280 || hint.height > 180 || menu.left < 0 || menu.top < 0 || menu.right > innerWidth || menu.bottom > innerHeight)
+        throw new Error('record menu cramped or outside viewport: ' + JSON.stringify({menu:menu.toJSON(), hint:hint.toJSON()}));
+      window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true})); await sleep(100);
+      q('[data-testid="screenshot-tool-text"]').click(); await sleep(100);
+      const font = q('[data-testid="screenshot-font-family"]');
+      font.value = 'monospace'; font.dispatchEvent(new Event('change',{bubbles:true}));
+      const size = q('[data-testid="screenshot-font-size"]');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(size,'24');
+      size.dispatchEvent(new Event('input',{bubbles:true}));
+      q('[data-testid="screenshot-color-green"]').click(); await sleep(100);
+      fire(ann, 'click', 170, 170); await sleep(100);
+      const text = q('[data-testid="screenshot-text-input"]');
+      if (text.tagName !== 'TEXTAREA' || getComputedStyle(text).fontSize !== '24px' || !getComputedStyle(text).fontFamily.includes('monospace'))
+        throw new Error('text font controls did not apply');
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(text,'Alpha\nBeta');
+      text.dispatchEvent(new Event('input',{bubbles:true})); await sleep(100);
+      text.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); await sleep(100);
+      if (!q('[data-testid="screenshot-text-input"]')) throw new Error('Enter prematurely committed text');
+      text.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',ctrlKey:true,bubbles:true})); await sleep(100);
+      if (q('[data-testid="screenshot-text-input"]')) throw new Error('Ctrl+Enter did not commit text');
       const info = {
+        textFont: 'monospace', textSize: 24, textLines: 2, recordMenuWidth: menu.width,
         naturalWidth: img().naturalWidth, naturalHeight: img().naturalHeight,
         innerWidth: window.innerWidth, innerHeight: window.innerHeight,
         undoEnabled: !q('[data-testid="screenshot-undo"]').disabled,
       };
-      if (q('[data-testid="screenshot-annotation-canvas"]').getAttribute('data-shapes') !== '1') throw new Error('rectangle not committed');
+      if (q('[data-testid="screenshot-annotation-canvas"]').getAttribute('data-shapes') !== '2') throw new Error('rectangle and multiline text not committed');
       return info;
     "#;
     let info = run_js(&overlay, script, Duration::from_secs(25)).await;
@@ -955,7 +979,7 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
     let expected = ((300.0 * sx).round() as i64, (200.0 * sy).round() as i64);
 
     let clipboard = read_clipboard_image(&app);
-    let (clip_w, clip_h, red, artifact) = match &clipboard {
+    let (clip_w, clip_h, red, green_lines, artifact) = match &clipboard {
         Ok(image) => {
             // The top edge of the rectangle is at (50,50) in the crop,
             // not just anywhere a red desktop pixel happened to be.
@@ -970,14 +994,25 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
                     p[0] > 200 && p[1] < 130 && p[2] < 130
                 })
                 .count();
+            let green_lines: Vec<usize> = [70.0, 98.8].iter().map(|top| {
+                let y0 = (top * sy).floor() as u32;
+                let y1 = ((top + 24.0) * sy).ceil() as u32;
+                ((y0)..y1.min(image.height())).flat_map(|y| {
+                    ((70.0 * sx) as u32..(150.0 * sx) as u32).map(move |x| (x, y))
+                }).filter(|&(x, y)| {
+                    let p = image.get_pixel(x.min(image.width() - 1), y);
+                    p[1] > 150 && p[0] < 140 && p[2] < 100
+                }).count()
+            }).collect();
             (
                 image.width() as i64,
                 image.height() as i64,
                 red,
+                green_lines,
                 keep_image(image, "overlay-copy.png"),
             )
         }
-        Err(_) => (0, 0, 0, None),
+        Err(_) => (0, 0, 0, vec![0, 0], None),
     };
     super::close_session(&app);
     let ok = hidden_main
@@ -986,6 +1021,7 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
         && (clip_w - expected.0).abs() <= 2
         && (clip_h - expected.1).abs() <= 2
         && red >= 50
+        && green_lines.iter().all(|count| *count >= 10)
         && info["undoEnabled"] == Value::Bool(true)
         && artifact.is_some();
     Ok(report(
@@ -999,6 +1035,7 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
             "clipboard": [clip_w, clip_h],
             "clipboardError": clipboard.as_ref().err().map(|e| format!("{e:#}")),
             "redPixels": red,
+            "greenPixelsPerTextLine": green_lines,
             "artifact": artifact,
         }),
     ))
@@ -1253,7 +1290,30 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     // rather than polling an async script slot in the window being destroyed.
     bar.eval("document.querySelector('[data-testid=\"screenshot-scroll-stop\"]').click()")
         .map_err(|e| format!("click scroll Finish: {e}"))?;
-    let completed = run_js(&overlay, "for(let i=0;i<150 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase!=='select';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase==='select';", Duration::from_secs(20)).await.map_err(|e| e.to_string())?;
+    let completed = run_js(&overlay, r#"
+      const q = id => document.querySelector('[data-testid="'+id+'"]');
+      const sleep = ms => new Promise(r=>setTimeout(r,ms));
+      for(let i=0;i<150 && q('screenshot-overlay')?.dataset.phase!=='preview';i++) await sleep(100);
+      if (q('screenshot-overlay')?.dataset.phase !== 'preview') throw new Error('scroll result preview missing');
+      const image = q('screenshot-scroll-result-image');
+      for(let i=0;i<50 && !image?.complete;i++) await sleep(100);
+      const r = image.getBoundingClientRect();
+      const container = q('screenshot-scroll-result-viewport').getBoundingClientRect();
+      if (Math.abs(r.width / r.height - image.naturalWidth / image.naturalHeight) > 0.005
+        || r.width > image.naturalWidth + 1 || r.height > container.height || r.left < 0 || r.right > innerWidth)
+        throw new Error('scroll preview stretched or clipped');
+      if (q('screenshot-hint') || q('screenshot-toolbar')) throw new Error('unexpected selection instructions');
+      q('screenshot-scroll-actual').click(); await sleep(100);
+      const actual = image.getBoundingClientRect();
+      if (Math.abs(actual.width-image.naturalWidth)>1 || Math.abs(actual.height-image.naturalHeight)>1)
+        throw new Error('original size is not 100%');
+      q('screenshot-scroll-fit').click(); await sleep(100);
+      q('screenshot-scroll-result-edit').click(); await sleep(100);
+      if (!q('screenshot-toolbar') || q('screenshot-overlay')?.dataset.phase !== 'annotate') throw new Error('annotation unavailable');
+      const base = q('screenshot-base-image').getBoundingClientRect();
+      if (Math.abs(base.width/base.height-image.naturalWidth/image.naturalHeight)>0.005) throw new Error('annotation image distorted');
+      return true;
+    "#, Duration::from_secs(25)).await.map_err(|e| e.to_string())?;
     let result = super::screenshot_overlay_init().await?;
     let output = image::open(&result.path)
         .map_err(|e| e.to_string())?

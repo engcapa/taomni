@@ -1552,6 +1552,21 @@
 
 ## screenshot/screen-record (F27.1)
 
+- `[data-testid="screenshot-text-style"]` — display — F27.1.screenshot-text-style
+- `[data-testid="screenshot-font-family"]` — interactive — F27.1.screenshot-font-family
+- `[data-testid="screenshot-font-size"]` — interactive — F27.1.screenshot-font-size
+- `[data-testid="screenshot-text-hint"]` — display — F27.1.screenshot-text-hint
+- `[data-testid="screenshot-scroll-result"]` — display — F27.1.screenshot-scroll-result
+- `[data-testid="screenshot-scroll-result-meta"]` — display — F27.1.screenshot-scroll-result-meta
+- `[data-testid="screenshot-scroll-result-viewport"]` — display — F27.1.screenshot-scroll-result-viewport
+- `[data-testid="screenshot-scroll-result-image"]` — display — F27.1.screenshot-scroll-result-image
+- `[data-testid="screenshot-scroll-fit"]` — interactive — F27.1.screenshot-scroll-fit
+- `[data-testid="screenshot-scroll-actual"]` — interactive — F27.1.screenshot-scroll-actual
+- `[data-testid="screenshot-scroll-result-close"]` — interactive — F27.1.screenshot-scroll-result-close
+- `[data-testid="screenshot-scroll-result-edit"]` — interactive — F27.1.screenshot-scroll-result-edit
+- `[data-testid="screenshot-scroll-result-pin"]` — interactive — F27.1.screenshot-scroll-result-pin
+- `[data-testid="screenshot-scroll-result-save"]` — interactive — F27.1.screenshot-scroll-result-save
+- `[data-testid="screenshot-scroll-result-copy"]` — interactive — F27.1.screenshot-scroll-result-copy
 - `[data-testid="system-screenshot"]` — interactive — F27.1.system-screenshot
 - `[data-testid="system-screenshot-delay-toggle"]` — interactive — F27.1.system-screenshot-delay-toggle
 - `[data-testid="system-screenshot-delay-menu"]` — display — F27.1.system-screenshot-delay-menu
