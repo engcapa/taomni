@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taomni UI 布局与易用性重构交互原型 Demo</title>
+  <style>
+    :root {
+      --bg: #1e1f22;
+      --chrome-bg: #191a1c;
+      --chrome-border: #303238;
+      --panel-bg: #232428;
+      --card-bg: #2b2d32;
+      --card-hover: #32353c;
+      --accent: #6aa6f8;
+      --accent-soft: rgba(106, 166, 248, 0.15);
+      --accent-green: #4ade80;
+      --accent-purple: #c084fc;
+      --accent-amber: #fbbf24;
+      --accent-orange: #fb923c;
+      --accent-cyan: #22d3ee;
+      --text: #e6eaf0;
+      --text-muted: #9ca3ad;
+      --divider: #303238;
+      --hover: rgba(255, 255, 255, 0.07);
+      --selected: #293b55;
+      --tab-active: #1e1f22;
+      --tab-inactive: #23252a;
+      --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+      --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      font-family: var(--font-ui);
+      background-color: #121315;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* Top presentation banner */
+    .demo-notice-bar {
+      background: linear-gradient(90deg, #1e3a8a, #4338ca);
+      color: #fff;
+      padding: 6px 16px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+    }
+    .demo-notice-bar span {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .demo-notice-bar .badge {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 11px;
+    }
+    .demo-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .demo-btn {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: background 0.15s;
+    }
+    .demo-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Main App Container */
+    .app-window {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      border: 1px solid var(--chrome-border);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 1. Window Title Bar */
+    .titlebar {
+      height: 38px;
+      background: var(--chrome-bg);
+      border-bottom: 1px solid var(--chrome-border);
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 8px;
+      z-index: 100;
+    }
+
+    /* Traffic Lights */
+    .traffic-lights {
+      display: flex;
+      gap: 6px;
+      padding: 0 4px;
+    }
+    .traffic-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .traffic-close { background: #ff5f56; }
+    .traffic-min { background: #ffbd2e; }
+    .traffic-max { background: #27c93f; }
+
+    /* Brand / Menu */
+    .brand-block {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      color: #fff;
+    }
+    .brand-block:hover {
+      background: var(--hover);
+    }
+    .brand-logo {
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    /* Titlebar Center: Tabs Strip */
+    .tabbar-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      height: 100%;
+      min-width: 0;
+      gap: 4px;
+    }
+
+    /* Fixed Welcome / Home Button */
+    .home-tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      height: 28px;
+      background: var(--tab-inactive);
+      border: 1px solid var(--chrome-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .home-tab-btn:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+    .home-tab-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .tab-strip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      height: 100%;
+      flex: 1;
+      scrollbar-width: none;
+    }
+    .tab-strip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .session-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      height: 28px;
+      background: var(--tab-inactive);
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 12px;
+      white-space: nowrap;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .session-tab:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+    .session-tab.active {
+      background: var(--bg);
+      border-color: var(--chrome-border);
+      color: var(--text);
+      font-weight: 500;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    /* Session Type Badges / Dots */
+    .type-badge {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .type-terminal { background: #38bdf8; box-shadow: 0 0 6px rgba(56, 189, 248, 0.4); }
+    .type-db { background: #4ade80; box-shadow: 0 0 6px rgba(74, 222, 128, 0.4); }
+    .type-code { background: #c084fc; box-shadow: 0 0 6px rgba(192, 132, 252, 0.4); }
+    .type-remote { background: #fb923c; box-shadow: 0 0 6px rgba(251, 146, 60, 0.4); }
+    .type-mail { background: #fbbf24; box-shadow: 0 0 6px rgba(251, 191, 36, 0.4); }
+
+    .tab-close {
+      width: 14px;
+      height: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      margin-left: 2px;
+      opacity: 0.6;
+    }
+    .tab-close:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .new-tab-btn {
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .new-tab-btn:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    /* Titlebar Right: Action Clusters */
+    .titlebar-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .action-group {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--chrome-border);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .icon-btn {
+      width: 26px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      cursor: pointer;
+      color: var(--text-muted);
+      position: relative;
+      background: transparent;
+      border: none;
+      font-size: 13px;
+    }
+    .icon-btn:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+    .icon-btn.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .overview-trigger {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      height: 24px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      border: none;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .overview-trigger:hover {
+      background: var(--hover);
+      color: var(--accent);
+    }
+    .overview-trigger kbd {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .tao-badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 6px;
+      height: 6px;
+      background: #f43f5e;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #f43f5e;
+    }
+
+    /* 2. Workspace Body: Left Rail + Left Panel + Main Stage + Right Tao */
+    .workspace-body {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* Left Activity Rail */
+    .activity-rail {
+      width: 46px;
+      background: var(--chrome-bg);
+      border-right: 1px solid var(--chrome-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+      gap: 6px;
+      z-index: 50;
+    }
+    .rail-btn {
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-muted);
+      position: relative;
+      transition: all 0.15s;
+    }
+    .rail-btn:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+    .rail-btn.active {
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .rail-btn.active::before {
+      content: "";
+      position: absolute;
+      left: -6px;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 0 3px 3px 0;
+    }
+    .rail-spacer {
+      flex: 1;
+    }
+
+    /* Left Collapsible Panel Drawer */
+    .side-drawer {
+      width: 260px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--chrome-border);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      z-index: 40;
+    }
+    .side-drawer.collapsed {
+      width: 0;
+      border-right: none;
+    }
+    .drawer-header {
+      height: 36px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--chrome-border);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .drawer-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .tree-node {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .tree-node:hover {
+      background: var(--hover);
+    }
+    .tree-node.selected {
+      background: var(--selected);
+      color: #fff;
+    }
+    .tree-badge {
+      margin-left: auto;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+    }
+
+    /* Main Stage */
+    .main-stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      min-width: 0;
+      position: relative;
+    }
+
+    /* Context Sub-Bar (Active Tab Contextual Controls) */
+    .context-bar {
+      height: 30px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--chrome-border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .context-bar .session-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .status-dot-green {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--accent-green);
+    }
+    .context-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+    }
+    .context-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .context-chip:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+
+    /* Viewport Contents */
+    .viewport {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .viewport.active {
+      display: flex;
+    }
+
+    /* 1. Welcome Viewport */
+    .welcome-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      max-width: 1040px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .welcome-hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--chrome-border);
+      padding-bottom: 20px;
+    }
+    .welcome-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .welcome-subtitle {
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-size: 13px;
+    }
+    .quick-search-box {
+      width: 320px;
+      background: var(--card-bg);
+      border: 1px solid var(--chrome-border);
+      border-radius: var(--radius-md);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+    }
+    .quick-search-box input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 13px;
+      width: 100%;
+    }
+
+    .welcome-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .session-card {
+      background: var(--card-bg);
+      border: 1px solid var(--chrome-border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .session-card:hover {
+      border-color: var(--accent);
+      background: var(--card-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    }
+    .card-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .card-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: #fff;
+    }
+    .card-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 8px;
+    }
+
+    /* 2. Terminal Viewport */
+    .terminal-view {
+      flex: 1;
+      background: #141517;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e6eaf0;
+      overflow-y: auto;
+    }
+    .term-prompt { color: var(--accent-green); }
+    .term-path { color: var(--accent); }
+    .term-cmd { color: #fff; font-weight: 500; }
+    .term-output { color: #9ca3ad; }
+
+    /* 3. Database Viewport */
+    .db-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .sql-editor-mock {
+      height: 120px;
+      background: #18191c;
+      border-bottom: 1px solid var(--chrome-border);
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .sql-keyword { color: #f43f5e; font-weight: 600; }
+    .sql-string { color: var(--accent-green); }
+    .db-results-table {
+      flex: 1;
+      overflow: auto;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .db-results-table th {
+      background: #202125;
+      text-align: left;
+      padding: 8px 12px;
+      border: 1px solid var(--chrome-border);
+      color: var(--text-muted);
+    }
+    .db-results-table td {
+      padding: 6px 12px;
+      border: 1px solid var(--chrome-border);
+    }
+
+    /* Right Tao Copilot Panel */
+    .tao-drawer {
+      width: 320px;
+      background: var(--panel-bg);
+      border-left: 1px solid var(--chrome-border);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      z-index: 45;
+    }
+    .tao-drawer.collapsed {
+      width: 0;
+      border-left: none;
+    }
+    .tao-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--chrome-border);
+      background: var(--chrome-bg);
+    }
+    .tao-tab-btn {
+      flex: 1;
+      padding: 9px 0;
+      text-align: center;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+    .tao-tab-btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+      background: var(--panel-bg);
+    }
+    .tao-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 12px;
+      gap: 12px;
+    }
+    .chat-bubble {
+      background: var(--card-bg);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .chat-bubble.assistant {
+      border-left: 3px solid var(--accent);
+    }
+    .chat-bubble.user {
+      background: var(--selected);
+      align-self: flex-end;
+    }
+    .chat-input-box {
+      margin-top: auto;
+      background: var(--card-bg);
+      border: 1px solid var(--chrome-border);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .chat-input-box textarea {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-family: inherit;
+      resize: none;
+      font-size: 12px;
+    }
+    .chat-input-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* 3. VISUAL TAB OVERVIEW MODAL (The Great Gallery Grid Switcher) */
+    .tab-overview-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 11, 14, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 500;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 40px;
+      overflow-y: auto;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .tab-overview-overlay.open {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .overview-header {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .overview-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .overview-title {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+    }
+    .overview-title span {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .overview-close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .overview-close-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .overview-search-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-md);
+      padding: 10px 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+    .overview-search-bar input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .overview-filter-pills {
+      display: flex;
+      gap: 8px;
+    }
+    .filter-pill {
+      padding: 4px 12px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--chrome-border);
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-pill:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+    .filter-pill.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Cards Grid */
+    .overview-grid {
+      width: 100%;
+      max-width: 1100px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .preview-card {
+      background: var(--card-bg);
+      border: 1px solid var(--chrome-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+    .preview-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--accent);
+    }
+    .preview-card.is-active-tab {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent), 0 12px 30px rgba(0,0,0,0.4);
+    }
+
+    .preview-card-header {
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid var(--chrome-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .preview-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .card-actions-hover {
+      display: flex;
+      gap: 4px;
+      opacity: 0.6;
+    }
+    .preview-card:hover .card-actions-hover {
+      opacity: 1;
+    }
+    .card-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      font-size: 11px;
+    }
+    .card-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Card Content Preview */
+    .preview-card-body {
+      height: 160px;
+      background: #141518;
+      padding: 10px 12px;
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.45;
+      position: relative;
+    }
+    .preview-card-body::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 40px;
+      background: linear-gradient(transparent, #141518);
+    }
+
+    .preview-card-footer {
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Status Bar */
+    .app-statusbar {
+      height: 24px;
+      background: var(--chrome-bg);
+      border-top: 1px solid var(--chrome-border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      gap: 16px;
+    }
+    .statusbar-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Demo Notice Banner -->
+  <div class="demo-notice-bar">
+    <span>
+      <span class="badge">PROTOTYPE DEMO</span>
+      Taomni UI 布局与易用性重构方案 — 交互式原型页面 (docs-feature/ui-layout-demo.html)
+    </span>
+    <div class="demo-actions">
+      <button class="demo-btn" onclick="toggleOverviewModal(true)">⚡ 打开多 Tab 大预览网格 (Ctrl+Tab / ⊞)</button>
+      <button class="demo-btn" onclick="toggleActivityDrawer()">切换左侧栏</button>
+      <button class="demo-btn" onclick="toggleTaoDrawer()">切换右侧 Tao 智能体</button>
+    </div>
+  </div>
+
+  <!-- Main Window -->
+  <div class="app-window">
+
+    <!-- 1. Window Titlebar -->
+    <div class="titlebar">
+      <!-- Traffic Lights (macOS mode) -->
+      <div class="traffic-lights">
+        <div class="traffic-dot traffic-close"></div>
+        <div class="traffic-dot traffic-min"></div>
+        <div class="traffic-dot traffic-max"></div>
+      </div>
+
+      <!-- App Brand & Main Menu -->
+      <div class="brand-block" title="Taomni 主菜单">
+        <div class="brand-logo">T</div>
+        <span>Taomni</span>
+      </div>
+
+      <!-- Center Tabs Strip -->
+      <div class="tabbar-container">
+        <!-- 4. Pinned Welcome / Home Tab (Always visible!) -->
+        <button class="home-tab-btn active" id="tab-btn-welcome" onclick="switchTab('welcome')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          主页
+        </button>
+
+        <!-- Session Tabs Strip -->
+        <div class="tab-strip" id="session-tabs">
+          <div class="session-tab" id="tab-btn-term1" onclick="switchTab('term1')">
+            <span class="type-badge type-terminal"></span>
+            <span>prod-k8s-node-01</span>
+            <span class="tab-close" onclick="event.stopPropagation(); closeTab('term1')">×</span>
+          </div>
+
+          <div class="session-tab" id="tab-btn-db1" onclick="switchTab('db1')">
+            <span class="type-badge type-db"></span>
+            <span>analytics-dw (ClickHouse)</span>
+            <span class="tab-close" onclick="event.stopPropagation(); closeTab('db1')">×</span>
+          </div>
+
+          <div class="session-tab" id="tab-btn-code1" onclick="switchTab('code1')">
+            <span class="type-badge type-code"></span>
+            <span>taomni-frontend (Git: feat/ui)</span>
+            <span class="tab-close" onclick="event.stopPropagation(); closeTab('code1')">×</span>
+          </div>
+
+          <div class="session-tab" id="tab-btn-mail" onclick="switchTab('mail')">
+            <span class="type-badge type-mail"></span>
+            <span>工作邮箱 (2)</span>
+            <span class="tab-close" onclick="event.stopPropagation(); closeTab('mail')">×</span>
+          </div>
+        </div>
+
+        <button class="new-tab-btn" title="新建会话 / 终端 / 查询" onclick="showNewMenu()">+</button>
+      </div>
+
+      <!-- Right Action Clusters -->
+      <div class="titlebar-actions">
+        <!-- Cluster 1: Tab Overview & Layout -->
+        <div class="action-group">
+          <!-- Multi-Tab Big Preview Switcher -->
+          <button class="overview-trigger" title="打开大预览网格快速切换" onclick="toggleOverviewModal(true)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+            <span>预览网格</span>
+            <kbd>⊞</kbd>
+          </button>
+          <button class="icon-btn" title="分屏布局 (水平/垂直/网格)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg>
+          </button>
+        </div>
+
+        <!-- Cluster 2: Quick Tools (Screenshot) -->
+        <div class="action-group">
+          <button class="icon-btn" title="系统截图工具 (截屏/延时/长截屏)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+          </button>
+        </div>
+
+        <!-- Cluster 3: Tao AI Assistant & Alert Inbox -->
+        <div class="action-group">
+          <button class="icon-btn active" id="btn-tao-toggle" title="Tao 统一智能体 (AI对话 + 随手记 + 统一通知)" onclick="toggleTaoDrawer()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg>
+            <span class="tao-badge"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Workspace Body (Activity Rail + Drawer + Main Stage + Tao) -->
+    <div class="workspace-body">
+
+      <!-- Left Activity Rail (VSCode / IDEA Style Clean Icons) -->
+      <div class="activity-rail">
+        <button class="rail-btn active" id="rail-btn-home" title="主页仪表盘 (Welcome)" onclick="switchTab('welcome')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </button>
+        <button class="rail-btn" id="rail-btn-sessions" title="服务器会话树" onclick="switchRailTab('sessions')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+        </button>
+        <button class="rail-btn" id="rail-btn-sftp" title="SFTP 文件管理器 (活动终端联动)" onclick="switchRailTab('sftp')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+        </button>
+        <button class="rail-btn" id="rail-btn-git" title="Git 版本控制" onclick="switchRailTab('git')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        </button>
+        <button class="rail-btn" id="rail-btn-database" title="数据库对象浏览器" onclick="switchRailTab('database')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+        </button>
+        <div class="rail-spacer"></div>
+        <button class="rail-btn" title="网络工具与隧道" onclick="switchRailTab('tools')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="m17 5-5-3-5 3"/><path d="m17 19-5 3-5-3"/><rect width="18" height="10" x="3" y="7" rx="2"/></svg>
+        </button>
+        <button class="rail-btn" title="设置" onclick="alert('进入系统设置')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+
+      <!-- Left Collapsible Content Panel -->
+      <div class="side-drawer" id="side-drawer">
+        <div class="drawer-header">
+          <span id="drawer-title">已保存会话</span>
+          <span style="cursor: pointer;" onclick="toggleActivityDrawer()">◀</span>
+        </div>
+        <div class="drawer-content" id="drawer-content-sessions">
+          <div class="tree-node selected" onclick="switchTab('term1')">
+            <span>🖥️</span>
+            <span>prod-k8s-node-01</span>
+            <span class="tree-badge">SSH</span>
+          </div>
+          <div class="tree-node" onclick="switchTab('db1')">
+            <span>🗄️</span>
+            <span>analytics-dw</span>
+            <span class="tree-badge">CK</span>
+          </div>
+          <div class="tree-node" onclick="switchTab('code1')">
+            <span>💻</span>
+            <span>taomni-frontend</span>
+            <span class="tree-badge">Git</span>
+          </div>
+          <div class="tree-node">
+            <span>📁</span>
+            <span>生产集群-华北二区</span>
+            <span class="tree-badge">6</span>
+          </div>
+          <div class="tree-node">
+            <span>📁</span>
+            <span>开发测试机</span>
+            <span class="tree-badge">3</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Stage -->
+      <div class="main-stage">
+
+        <!-- 1. Welcome Viewport (Hero + Recents + Quick Connect) -->
+        <div class="viewport active" id="view-welcome">
+          <div class="welcome-container">
+            <div class="welcome-hero">
+              <div>
+                <div class="welcome-title">
+                  <span>👋 欢迎使用 Taomni 全能工作台</span>
+                </div>
+                <div class="welcome-subtitle">DevOps、数据库、代码工作区与远程协作的一站式枢纽</div>
+              </div>
+              <div class="quick-search-box">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input type="text" placeholder="输入 ssh host、目录或按 Cmd+K 搜索...">
+              </div>
+            </div>
+
+            <!-- Restore Bar -->
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-weight: 600; color: #fff;">上次未关闭的 4 个工作会话</span>
+                <span style="color: var(--text-muted); font-size: 12px; margin-left: 8px;">(prod-k8s-node-01, analytics-dw, taomni-frontend, mail)</span>
+              </div>
+              <button class="demo-btn" style="background: var(--accent); border: none; font-weight: 600;" onclick="switchTab('term1')">一键恢复全部会话</button>
+            </div>
+
+            <!-- Recent Sessions Grid -->
+            <div>
+              <div class="welcome-section-title">
+                <span>最近连接的会话 (Recent Sessions)</span>
+                <a href="#" style="color: var(--accent); text-decoration: none; font-size: 12px;">查看全部 (24)</a>
+              </div>
+              <div class="card-grid">
+                <div class="session-card" onclick="switchTab('term1')">
+                  <div class="card-top">
+                    <div class="card-icon" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">🖥️</div>
+                    <div>
+                      <div class="card-title">prod-k8s-node-01</div>
+                      <div class="card-desc">10.244.15.82 · root · SSH 端口 22</div>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <span>10 分钟前使用</span>
+                    <span style="color: var(--accent-green);">● 在线</span>
+                  </div>
+                </div>
+
+                <div class="session-card" onclick="switchTab('db1')">
+                  <div class="card-top">
+                    <div class="card-icon" style="background: rgba(74, 222, 128, 0.2); color: #4ade80;">🗄️</div>
+                    <div>
+                      <div class="card-title">analytics-dw (ClickHouse)</div>
+                      <div class="card-desc">192.168.10.50:8123 · default</div>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <span>1 小时前使用</span>
+                    <span>3 个查询编辑器</span>
+                  </div>
+                </div>
+
+                <div class="session-card" onclick="switchTab('code1')">
+                  <div class="card-top">
+                    <div class="card-icon" style="background: rgba(192, 132, 252, 0.2); color: #c084fc;">💻</div>
+                    <div>
+                      <div class="card-title">taomni-frontend</div>
+                      <div class="card-desc">c:/code/person/taomni · main</div>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <span>刚刚活跃</span>
+                    <span>12 个未提交改动</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Launchers -->
+            <div>
+              <div class="welcome-section-title">
+                <span>快捷启动 (Quick Actions)</span>
+              </div>
+              <div class="card-grid" style="grid-template-columns: repeat(4, 1fr);">
+                <div class="session-card" style="align-items: center; text-align: center;" onclick="switchTab('term1')">
+                  <div style="font-size: 24px;">⚡</div>
+                  <div class="card-title">新建本地终端</div>
+                  <div class="card-desc">PowerShell / Zsh</div>
+                </div>
+                <div class="session-card" style="align-items: center; text-align: center;">
+                  <div style="font-size: 24px;">🌐</div>
+                  <div class="card-title">快速 SSH 连接</div>
+                  <div class="card-desc">输入主机一键直连</div>
+                </div>
+                <div class="session-card" style="align-items: center; text-align: center;">
+                  <div style="font-size: 24px;">📊</div>
+                  <div class="card-title">新建 SQL 查询</div>
+                  <div class="card-desc">MySQL / PG / CK</div>
+                </div>
+                <div class="session-card" style="align-items: center; text-align: center;">
+                  <div style="font-size: 24px;">📁</div>
+                  <div class="card-title">打开代码工程</div>
+                  <div class="card-desc">IDEA 级编辑体验</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 2. Terminal Viewport (SSH Session) -->
+        <div class="viewport" id="view-term1">
+          <!-- Context Sub-Bar (Clean active tab tools) -->
+          <div class="context-bar">
+            <div class="session-badge">
+              <span class="status-dot-green"></span>
+              <span>prod-k8s-node-01 (10.244.15.82)</span>
+            </div>
+            <span>延迟: 18ms</span>
+            <span>编码: UTF-8</span>
+            <div class="context-actions">
+              <div class="context-chip" onclick="switchRailTab('sftp')">📂 打开联动 SFTP</div>
+              <div class="context-chip">⚡ 广播执行</div>
+              <div class="context-chip">📋 复制会话</div>
+              <div class="context-chip">🪟 独立窗口</div>
+            </div>
+          </div>
+
+          <div class="terminal-view">
+            <div>Last login: Sat Oct 3 14:10:22 2026 from 10.244.0.1</div>
+            <div>[root@prod-k8s-node-01 ~]# <span class="term-cmd">kubectl get pods -n production</span></div>
+            <div class="term-output">
+NAME                                  READY   STATUS    RESTARTS   AGE<br>
+taomni-gateway-7b98fbc8d-k4q2x        1/1     Running   0          42d<br>
+taomni-auth-service-58dc9f7b4-2l9xm   1/1     Running   0          18d<br>
+taomni-worker-async-849cf8f78-z92pk   2/2     Running   1          9d<br>
+clickhouse-cluster-shard-0-0          1/1     Running   0          120d
+            </div>
+            <br>
+            <div>[root@prod-k8s-node-01 ~]# <span class="term-cmd">docker stats --no-stream</span></div>
+            <div class="term-output">
+CONTAINER ID   NAME                 CPU %     MEM USAGE / LIMIT     MEM %     NET I/O<br>
+a1c92ef9012a   k8s_gateway_prod     0.82%     342.1MiB / 8GiB       4.18%     1.24GB / 2.81GB<br>
+998f4a189bd1   k8s_worker_async     2.15%     1.12GiB / 16GiB       7.01%     5.89GB / 9.12GB
+            </div>
+            <br>
+            <div>[root@prod-k8s-node-01 ~]# <span class="term-prompt">➜</span> <span class="term-path">/var/log/taomni</span> <span class="term-cmd">tail -f gateway-access.log</span><span style="animation: blink 1s infinite;">_</span></div>
+          </div>
+        </div>
+
+        <!-- 3. Database Viewport -->
+        <div class="viewport" id="view-db1">
+          <div class="context-bar">
+            <div class="session-badge">
+              <span class="status-dot-green"></span>
+              <span>analytics-dw (ClickHouse Native Protocol)</span>
+            </div>
+            <span>数据库: default</span>
+            <div class="context-actions">
+              <div class="context-chip">▶ 执行 (F5)</div>
+              <div class="context-chip">⚡ 执行解释 (Explain)</div>
+              <div class="context-chip">📥 导出结果 (CSV/JSON)</div>
+            </div>
+          </div>
+          <div class="db-view">
+            <div class="sql-editor-mock">
+              <span class="sql-keyword">SELECT</span> service_name, <span class="sql-keyword">count</span>(*) <span class="sql-keyword">AS</span> total_requests,<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="sql-keyword">avg</span>(latency_ms) <span class="sql-keyword">AS</span> avg_latency,<br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="sql-keyword">quantile</span>(0.99)(latency_ms) <span class="sql-keyword">AS</span> p99_latency<br>
+              <span class="sql-keyword">FROM</span> taomni_telemetry.http_access_logs<br>
+              <span class="sql-keyword">WHERE</span> event_date = <span class="sql-string">'2026-10-03'</span><br>
+              <span class="sql-keyword">GROUP BY</span> service_name <span class="sql-keyword">ORDER BY</span> total_requests <span class="sql-keyword">DESC</span>;
+            </div>
+            <table class="db-results-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>service_name</th>
+                  <th>total_requests</th>
+                  <th>avg_latency</th>
+                  <th>p99_latency</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>api-gateway</td>
+                  <td>1,429,830</td>
+                  <td>12.4ms</td>
+                  <td>48.2ms</td>
+                </tr>
+                <tr>
+                  <td>2</td>
+                  <td>auth-service</td>
+                  <td>890,211</td>
+                  <td>8.1ms</td>
+                  <td>32.0ms</td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>storage-worker</td>
+                  <td>512,042</td>
+                  <td>24.6ms</td>
+                  <td>94.1ms</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 4. Code Workspace Viewport -->
+        <div class="viewport" id="view-code1">
+          <div class="context-bar">
+            <div class="session-badge">
+              <span class="status-dot-green"></span>
+              <span>taomni-frontend · git:(feat/ui-layout-redesign)</span>
+            </div>
+            <span>TypeScript 5.8 · ESLint Clean</span>
+            <div class="context-actions">
+              <div class="context-chip">🌿 Git Panel</div>
+              <div class="context-chip">🔨 Build</div>
+              <div class="context-chip">▶ Run Preview</div>
+            </div>
+          </div>
+          <div style="flex: 1; display: flex; font-family: var(--font-mono); font-size: 12px; background: #1e1f22;">
+            <div style="width: 44px; background: #191a1c; border-right: 1px solid var(--chrome-border); color: #64748b; padding: 12px 6px; text-align: right; line-height: 1.6;">
+              1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10
+            </div>
+            <div style="flex: 1; padding: 12px 16px; line-height: 1.6; color: #d4d4d4;">
+              <span style="color: #6aa6f8;">import</span> { <span style="color: #4ade80;">create</span> } <span style="color: #6aa6f8;">from</span> <span style="color: #fbbf24;">"zustand"</span>;<br>
+              <span style="color: #6aa6f8;">import</span> type { <span style="color: #c084fc;">TabOverviewState</span> } <span style="color: #6aa6f8;">from</span> <span style="color: #fbbf24;">"../types"</span>;<br><br>
+              <span style="color: #64748b;">// Taomni UI Redesign 2026: Fast Overview Gallery</span><br>
+              <span style="color: #6aa6f8;">export const</span> <span style="color: #4ade80;">useTabOverviewStore</span> = create&lt;<span style="color: #c084fc;">TabOverviewState</span>&gt;((set) =&gt; ({<br>
+              &nbsp;&nbsp;isOpen: <span style="color: #f43f5e;">false</span>,<br>
+              &nbsp;&nbsp;activeFilter: <span style="color: #fbbf24;">"all"</span>,<br>
+              &nbsp;&nbsp;openOverview: () =&gt; set({ isOpen: <span style="color: #f43f5e;">true</span> }),<br>
+              &nbsp;&nbsp;closeOverview: () =&gt; set({ isOpen: <span style="color: #f43f5e;">false</span> }),<br>
+              }));
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Mail Viewport -->
+        <div class="viewport" id="view-mail">
+          <div class="context-bar">
+            <div class="session-badge">
+              <span class="status-dot-green"></span>
+              <span>统一工作邮箱 (IMAP / Exchange)</span>
+            </div>
+            <span>未读: 2 封</span>
+            <div class="context-actions">
+              <div class="context-chip">✏️ 写邮件</div>
+              <div class="context-chip">🔄 同步收件箱</div>
+            </div>
+          </div>
+          <div style="flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="background: var(--card-bg); border: 1px solid var(--chrome-border); border-radius: var(--radius-md); padding: 12px 16px; cursor: pointer;">
+              <div style="display: flex; justify-content: space-between; font-weight: 600; color: #fff;">
+                <span>[告警中心] Kubernetes 集群节点内存使用率超过 80%</span>
+                <span style="color: var(--accent); font-size: 11px;">14:15</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">来自 Prometheus Alertmanager · 发往 devops@taomni.internal</div>
+            </div>
+            <div style="background: var(--card-bg); border: 1px solid var(--chrome-border); border-radius: var(--radius-md); padding: 12px 16px; cursor: pointer;">
+              <div style="display: flex; justify-content: space-between; font-weight: 600; color: #fff;">
+                <span>周报提醒：请提交本周 Sprint 42 进展</span>
+                <span style="color: var(--text-muted); font-size: 11px;">10:30</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">来自 项目管理 PMO · 请在今日 18:00 前完成更新</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Tao Copilot Panel (Unified AI + Notes + Alert Inbox) -->
+      <div class="tao-drawer" id="tao-drawer">
+        <div class="tao-tabs">
+          <div class="tao-tab-btn active" id="tao-tab-chat" onclick="switchTaoTab('chat')">
+            <span>✦ Copilot</span>
+          </div>
+          <div class="tao-tab-btn" id="tao-tab-notes" onclick="switchTaoTab('notes')">
+            <span>📝 便签</span>
+          </div>
+          <div class="tao-tab-btn" id="tao-tab-inbox" onclick="switchTaoTab('inbox')">
+            <span>🔔 通知 (3)</span>
+          </div>
+        </div>
+
+        <div class="tao-content" id="tao-content-chat">
+          <div style="font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+            <span style="color: var(--accent);">🔗 已绑定上下文:</span>
+            <span id="tao-context-label" style="color: #fff; font-weight: 500;">prod-k8s-node-01</span>
+          </div>
+
+          <div class="chat-bubble assistant">
+            你好！我是 Tao 智能副驾。我已连接到您当前活动的终端 <code>prod-k8s-node-01</code>。需要我帮您分析 Kubernetes Pod 状态还是解释日志？
+          </div>
+
+          <div class="chat-bubble user">
+            帮我看一下 gateway 日志里有没有 5xx 错误。
+          </div>
+
+          <div class="chat-bubble assistant">
+            为您排查了最近 5000 行日志，发现 2 处 HTTP 502 Bad Gateway，主要是因为 <code>taomni-auth-service</code> 在 14:02 进行滚动更新导致的瞬间连接重置，目前已恢复正常。
+          </div>
+
+          <div class="chat-input-box">
+            <textarea rows="2" placeholder="给当前会话发送指令或提问... (Enter 发送)"></textarea>
+            <div class="chat-input-footer">
+              <span>模型: Claude 3.7 Sonnet</span>
+              <button class="demo-btn" style="background: var(--accent); border: none;">发送</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tao-content" id="tao-content-notes" style="display: none;">
+          <div style="font-size: 12px; color: var(--text-muted);">当前会话备忘录：</div>
+          <div style="background: var(--card-bg); padding: 10px; border-radius: 6px; font-size: 12px; line-height: 1.5;">
+            📌 华北二区发布注意事项：<br>
+            1. 记得先做 ClickHouse 备份快照<br>
+            2. 灰度权重切 10% 观察 5 分钟
+          </div>
+        </div>
+
+        <div class="tao-content" id="tao-content-inbox" style="display: none;">
+          <div style="font-size: 12px; color: var(--text-muted);">全局系统通知：</div>
+          <div style="background: var(--card-bg); padding: 8px 10px; border-radius: 6px; font-size: 12px; display: flex; gap: 8px;">
+            <span>✅</span>
+            <div>
+              <div style="font-weight: 600; color: #fff;">代码工作区后台构建完成</div>
+              <div style="color: var(--text-muted); font-size: 11px;">taomni-frontend 编译成功 (2.4s)</div>
+            </div>
+          </div>
+          <div style="background: var(--card-bg); padding: 8px 10px; border-radius: 6px; font-size: 12px; display: flex; gap: 8px;">
+            <span>⚠️</span>
+            <div>
+              <div style="font-weight: 600; color: #fff;">新邮件已接收</div>
+              <div style="color: var(--text-muted); font-size: 11px;">Prometheus Alertmanager 告警通知</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 3. Bottom Status Bar -->
+    <div class="app-statusbar">
+      <div class="statusbar-item">
+        <span class="status-dot-green"></span>
+        <span>系统就绪</span>
+      </div>
+      <div class="statusbar-item">
+        <span>当前会话: <strong id="status-current-tab" style="color: #fff;">主页仪表盘 (Welcome)</strong></span>
+      </div>
+      <div class="statusbar-item" style="margin-left: auto;">
+        <span>UTF-8</span>
+      </div>
+      <div class="statusbar-item">
+        <span>快捷键: 预览网格 (Ctrl+Tab) · Tao 助手 (Cmd+J) · 搜索 (Cmd+K)</span>
+      </div>
+    </div>
+
+    <!-- 4. VISUAL TAB OVERVIEW MODAL (The Great Gallery Grid Switcher) -->
+    <div class="tab-overview-overlay" id="tab-overview-modal" onclick="onModalOverlayClick(event)">
+      <div class="overview-header">
+        <div class="overview-top-row">
+          <div class="overview-title">
+            <span>⊞ 所有打开的会话大画廊预览 (Tab Overview)</span>
+            <span id="overview-count-badge">4 个活跃会话</span>
+          </div>
+          <button class="overview-close-btn" onclick="toggleOverviewModal(false)">✕</button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="overview-search-bar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="overview-search-input" placeholder="输入名称、IP、命令、路径或类型快速过滤... (按 Esc 退出，Enter 直接切入)" oninput="filterCards()">
+          <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 11px; color: var(--text-muted);">ESC 关闭</kbd>
+        </div>
+
+        <!-- Filter Pills -->
+        <div class="overview-filter-pills">
+          <div class="filter-pill active" onclick="setCategoryFilter('all', this)">全部 (4)</div>
+          <div class="filter-pill" onclick="setCategoryFilter('terminal', this)">终端 SSH (1)</div>
+          <div class="filter-pill" onclick="setCategoryFilter('db', this)">数据库 (1)</div>
+          <div class="filter-pill" onclick="setCategoryFilter('code', this)">代码工作区 (1)</div>
+          <div class="filter-pill" onclick="setCategoryFilter('mail', this)">邮件与通讯 (1)</div>
+        </div>
+      </div>
+
+      <!-- Overview Cards Grid -->
+      <div class="overview-grid" id="overview-cards-container">
+
+        <!-- Card 1: Terminal -->
+        <div class="preview-card" data-category="terminal" data-title="prod-k8s-node-01" onclick="selectTabFromOverview('term1')">
+          <div class="preview-card-header">
+            <div class="card-header-left">
+              <span class="type-badge type-terminal"></span>
+              <span class="preview-card-title">prod-k8s-node-01</span>
+            </div>
+            <div class="card-actions-hover">
+              <div class="card-btn" title="固定">📌</div>
+              <div class="card-btn" title="关闭" onclick="event.stopPropagation(); closeTab('term1');">✕</div>
+            </div>
+          </div>
+          <div class="preview-card-body">
+            <span style="color: #4ade80;">➜ /var/log/taomni</span> tail -f gateway-access.log<br>
+            [14:12:08] 200 OK GET /api/v1/workspaces<br>
+            [14:12:09] 200 OK POST /api/v1/auth/token<br>
+            [14:12:11] 200 OK GET /api/v1/telemetry/stats<br>
+            [14:12:15] <span style="color: #fbbf24;">404 Not Found GET /favicon.ico</span><br>
+            [14:12:18] 200 OK GET /api/v1/sessions/live
+          </div>
+          <div class="preview-card-footer">
+            <span>SSH · 10.244.15.82:22</span>
+            <span style="color: var(--accent-green);">● 运行中 (实时输出)</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Database -->
+        <div class="preview-card" data-category="db" data-title="analytics-dw ClickHouse" onclick="selectTabFromOverview('db1')">
+          <div class="preview-card-header">
+            <div class="card-header-left">
+              <span class="type-badge type-db"></span>
+              <span class="preview-card-title">analytics-dw (ClickHouse)</span>
+            </div>
+            <div class="card-actions-hover">
+              <div class="card-btn" title="固定">📌</div>
+              <div class="card-btn" title="关闭" onclick="event.stopPropagation(); closeTab('db1');">✕</div>
+            </div>
+          </div>
+          <div class="preview-card-body" style="background: #17181c;">
+            <span style="color: #f43f5e;">SELECT</span> service_name, count(*) AS reqs<br>
+            <span style="color: #f43f5e;">FROM</span> http_access_logs<br>
+            <span style="color: #f43f5e;">WHERE</span> event_date = '2026-10-03'<br>
+            <span style="color: #f43f5e;">GROUP BY</span> service_name;<br>
+            ------------------------------------<br>
+            1 | api-gateway     | 1,429,830<br>
+            2 | auth-service    | 890,211<br>
+            3 | storage-worker  | 512,042
+          </div>
+          <div class="preview-card-footer">
+            <span>ClickHouse · 192.168.10.50</span>
+            <span>查询耗时: 42ms · 3 行</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Code Workspace -->
+        <div class="preview-card" data-category="code" data-title="taomni-frontend Git" onclick="selectTabFromOverview('code1')">
+          <div class="preview-card-header">
+            <div class="card-header-left">
+              <span class="type-badge type-code"></span>
+              <span class="preview-card-title">taomni-frontend (Git: feat/ui)</span>
+            </div>
+            <div class="card-actions-hover">
+              <div class="card-btn" title="固定">📌</div>
+              <div class="card-btn" title="关闭" onclick="event.stopPropagation(); closeTab('code1');">✕</div>
+            </div>
+          </div>
+          <div class="preview-card-body">
+            <span style="color: #6aa6f8;">import</span> { create } <span style="color: #6aa6f8;">from</span> "zustand";<br>
+            <span style="color: #64748b;">// Taomni UI Redesign 2026</span><br>
+            <span style="color: #6aa6f8;">export const</span> useTabOverviewStore = create((set) =&gt; ({<br>
+            &nbsp;&nbsp;isOpen: false,<br>
+            &nbsp;&nbsp;openOverview: () =&gt; set({ isOpen: true }),<br>
+            }));
+          </div>
+          <div class="preview-card-footer">
+            <span>c:/code/person/taomni</span>
+            <span style="color: var(--accent-purple);">12 个待提交变更</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Mail -->
+        <div class="preview-card" data-category="mail" data-title="工作邮箱 Mail" onclick="selectTabFromOverview('mail')">
+          <div class="preview-card-header">
+            <div class="card-header-left">
+              <span class="type-badge type-mail"></span>
+              <span class="preview-card-title">统一工作邮箱 (2 封未读)</span>
+            </div>
+            <div class="card-actions-hover">
+              <div class="card-btn" title="固定">📌</div>
+              <div class="card-btn" title="关闭" onclick="event.stopPropagation(); closeTab('mail');">✕</div>
+            </div>
+          </div>
+          <div class="preview-card-body">
+            ✉️ [告警] Kubernetes 节点内存超过 80% (14:15)<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;来自 Prometheus Alertmanager<br><br>
+            ✉️ 周报提醒：请提交本周进展 (10:30)<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;来自 项目管理 PMO
+          </div>
+          <div class="preview-card-footer">
+            <span>IMAP 协议 · 已同步</span>
+            <span style="color: var(--accent-amber);">2 封高优先邮件</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Tab switching state
+    let activeTabId = 'welcome';
+    let currentCategory = 'all';
+
+    function switchTab(tabId) {
+      activeTabId = tabId;
+
+      // Update Tab bar buttons
+      document.querySelectorAll('.session-tab, .home-tab-btn').forEach(el => el.classList.remove('active'));
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Update Viewport
+      document.querySelectorAll('.viewport').forEach(el => el.classList.remove('active'));
+      const targetView = document.getElementById(`view-${tabId}`);
+      if (targetView) targetView.classList.add('active');
+
+      // Update Status Bar
+      const titles = {
+        'welcome': '主页仪表盘 (Welcome)',
+        'term1': 'SSH 终端: prod-k8s-node-01',
+        'db1': '数据库: analytics-dw (ClickHouse)',
+        'code1': '代码工作区: taomni-frontend',
+        'mail': '统一工作邮箱'
+      };
+      document.getElementById('status-current-tab').innerText = titles[tabId] || tabId;
+
+      // Update Tao context badge
+      const contextLabels = {
+        'welcome': '全局主页',
+        'term1': 'prod-k8s-node-01',
+        'db1': 'analytics-dw (CK)',
+        'code1': 'taomni-frontend',
+        'mail': '工作邮箱'
+      };
+      const taoContext = document.getElementById('tao-context-label');
+      if (taoContext) taoContext.innerText = contextLabels[tabId] || tabId;
+
+      // Update Rail button active if welcome
+      document.getElementById('rail-btn-home').classList.toggle('active', tabId === 'welcome');
+    }
+
+    function closeTab(tabId) {
+      const tabBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (tabBtn) tabBtn.remove();
+      if (activeTabId === tabId) {
+        switchTab('welcome');
+      }
+    }
+
+    // Left Drawer toggles
+    function toggleActivityDrawer() {
+      const drawer = document.getElementById('side-drawer');
+      drawer.classList.toggle('collapsed');
+    }
+
+    function switchRailTab(tabKey) {
+      const drawer = document.getElementById('side-drawer');
+      const title = document.getElementById('drawer-title');
+      drawer.classList.remove('collapsed');
+
+      document.querySelectorAll('.rail-btn').forEach(b => b.classList.remove('active'));
+      const activeRail = document.getElementById(`rail-btn-${tabKey}`);
+      if (activeRail) activeRail.classList.add('active');
+
+      const titles = {
+        'sessions': '已保存会话',
+        'sftp': '联动 SFTP 文件浏览',
+        'git': 'Git 分支与变更',
+        'database': '数据库架构对象',
+        'tools': '网络工具与隧道'
+      };
+      title.innerText = titles[tabKey] || tabKey;
+    }
+
+    // Right Tao Drawer toggles
+    function toggleTaoDrawer() {
+      const tao = document.getElementById('tao-drawer');
+      const btn = document.getElementById('btn-tao-toggle');
+      tao.classList.toggle('collapsed');
+      btn.classList.toggle('active', !tao.classList.contains('collapsed'));
+    }
+
+    function switchTaoTab(tabName) {
+      document.querySelectorAll('.tao-tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('[id^="tao-content-"]').forEach(c => c.style.display = 'none');
+
+      document.getElementById(`tao-tab-${tabName}`).classList.add('active');
+      document.getElementById(`tao-content-${tabName}`).style.display = 'flex';
+    }
+
+    // Overview Gallery Modal
+    function toggleOverviewModal(open) {
+      const modal = document.getElementById('tab-overview-modal');
+      modal.classList.toggle('open', open);
+      if (open) {
+        // Highlight active tab card
+        document.querySelectorAll('.preview-card').forEach(card => {
+          card.classList.remove('is-active-tab');
+        });
+        const activeCard = document.querySelector(`.preview-card[onclick*="'${activeTabId}'"]`);
+        if (activeCard) activeCard.classList.add('is-active-tab');
+
+        const searchInput = document.getElementById('overview-search-input');
+        searchInput.value = '';
+        searchInput.focus();
+        filterCards();
+      }
+    }
+
+    function onModalOverlayClick(e) {
+      if (e.target.id === 'tab-overview-modal') {
+        toggleOverviewModal(false);
+      }
+    }
+
+    function selectTabFromOverview(tabId) {
+      switchTab(tabId);
+      toggleOverviewModal(false);
+    }
+
+    function setCategoryFilter(cat, btn) {
+      currentCategory = cat;
+      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      filterCards();
+    }
+
+    function filterCards() {
+      const query = document.getElementById('overview-search-input').value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.preview-card');
+      let visibleCount = 0;
+
+      cards.forEach(card => {
+        const cat = card.getAttribute('data-category');
+        const title = card.getAttribute('data-title').toLowerCase();
+        const bodyText = card.innerText.toLowerCase();
+
+        const matchCat = (currentCategory === 'all' || cat === currentCategory);
+        const matchQuery = (!query || title.includes(query) || bodyText.includes(query));
+
+        if (matchCat && matchQuery) {
+          card.style.display = 'flex';
+          visibleCount++;
+        } else {
+          card.style.display = 'none';
+        }
+      });
+
+      document.getElementById('overview-count-badge').innerText = `${visibleCount} 个匹配会话`;
+    }
+
+    function showNewMenu() {
+      alert("新建会话菜单：\n1. 远程终端 (SSH)\n2. 数据库连接 (MySQL / PostgreSQL / ClickHouse)\n3. 代码工作区\n4. 本地终端 (PowerShell / Zsh)\n5. RDP / VNC 远程桌面");
+    }
+
+    // Keyboard Shortcuts Listener
+    document.addEventListener('keydown', (e) => {
+      // Escape closes overview
+      if (e.key === 'Escape') {
+        toggleOverviewModal(false);
+      }
+      // Ctrl+Tab or Cmd+Shift+O opens overview
+      if ((e.ctrlKey && e.key === 'Tab') || ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o')) {
+        e.preventDefault();
+        const modal = document.getElementById('tab-overview-modal');
+        toggleOverviewModal(!modal.classList.contains('open'));
+      }
+      // Cmd/Ctrl + J toggles Tao Drawer
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        toggleTaoDrawer();
+      }
+      // Cmd/Ctrl + Shift + H goes to Welcome Home
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        switchTab('welcome');
+      }
+    });
+  </script>
+</body>
+</html>
