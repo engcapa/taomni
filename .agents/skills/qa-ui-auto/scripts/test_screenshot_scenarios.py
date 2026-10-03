@@ -49,13 +49,20 @@ class ScreenshotScenariosTest(TestCase):
                 self.assertTrue(any(json.loads(path.read_text())["transportError"] == str(error) for path in files))
 
     def test_new_scenarios_only_invoke_their_fixed_commands(self):
-        for scenario, command in (("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand"), ("controls", "screenshot_qa_controls"), ("full-recorder", "screenshot_qa_full_recorder")):
+        for scenario, command in (("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand"), ("controls", "screenshot_qa_controls"), ("full-recorder", "screenshot_qa_full_recorder"), ("scroll-permission-error", "screenshot_qa_scroll_permission_error")):
             self.ctx.session.execute.side_effect = [True, {"done": True, "value": 'OK {"pixels":100}'}, True]
             run_scenario(self.ctx, {"scenario": scenario})
             self.assertIn(command, self.ctx.session.execute.call_args_list[-3].args[0])
 
+    def test_macos_source_passes_only_the_format_to_fixed_command(self):
+        self.ctx.session.execute.side_effect = [True, {"done": True, "value": 'OK {"streamOpens":0,"snapshotReads":20}'}, True]
+        run_scenario(self.ctx, {"scenario": "macos-capture-source", "format": "gif"})
+        script = self.ctx.session.execute.call_args_list[0].args[0]
+        self.assertIn('"screenshot_qa_macos_capture_source"', script)
+        self.assertIn('{"format": "gif"}', script)
+
     def test_rejects_arbitrary_commands_and_invalid_arguments(self):
-        for args in ({"scenario": "shell_exec"}, {"scenario": "record"},
+        for args in ({"scenario": "macos-capture-source"}, {"scenario": "macos-capture-source", "format": "gif", "secs": 2}, {"scenario": "shell_exec"}, {"scenario": "record"},
                      {"scenario": "pin", "format": "gif"},
                      {"scenario": "capture", "secs": 3},
                      {"scenario": "record", "format": "gif", "secs": True},

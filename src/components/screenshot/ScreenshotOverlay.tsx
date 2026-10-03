@@ -1501,7 +1501,7 @@ export function ScreenshotOverlay() {
           style={{ zIndex: 70, ...panelStyle }}
         >
           <p className="break-words">{t("screenshot.scrollFailed", { error: scrollError })}</p>
-          <button type="button" className="mt-2 rounded px-3 py-2" onClick={close}>
+          <button type="button" data-testid="screenshot-scroll-error-close" className="mt-2 rounded px-3 py-2" onClick={close}>
             {t("screenshot.cancel")} (Esc)
           </button>
         </div>

@@ -423,9 +423,25 @@ pub struct FrameSource {
     desktop_origin: (i32, i32),
 }
 
+// Observe actual constructors/reads in debug QA without replacing capture pixels.
+#[cfg(all(debug_assertions, target_os = "macos"))]
+static QA_STREAM_OPENS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+#[cfg(all(debug_assertions, target_os = "macos"))]
+static QA_SNAPSHOT_READS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub(super) fn qa_source_counts() -> (u64, u64) {
+    use std::sync::atomic::Ordering;
+    (
+        QA_STREAM_OPENS.load(Ordering::Relaxed),
+        QA_SNAPSHOT_READS.load(Ordering::Relaxed),
+    )
+}
+
 impl FrameSource {
     /// Persistent backend when available (Linux always needs it for stills).
     pub fn open(app: &AppHandle, display: DisplayInfo) -> Self {
+        #[cfg(all(debug_assertions, target_os = "macos"))]
+        QA_STREAM_OPENS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let log =
             crate::servers::engine::LogEmitter::new(app.clone(), crate::servers::ServerType::Rdp);
         let native_id = native_display_id(&display);
@@ -509,6 +525,8 @@ impl FrameSource {
     }
 
     fn decode_one_shot(&self) -> anyhow::Result<RgbaImage> {
+        #[cfg(all(debug_assertions, target_os = "macos"))]
+        QA_SNAPSHOT_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let full = capture_one_shot(&self.app, &self.display)?;
         match self.region {
             None => Ok(full),

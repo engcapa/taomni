@@ -23,6 +23,8 @@ SCENARIOS = {
     "hotkey": "screenshot_qa_hotkey",
     "controls": "screenshot_qa_controls",
     "full-recorder": "screenshot_qa_full_recorder",
+    "macos-capture-source": "screenshot_qa_macos_capture_source",
+    "scroll-permission-error": "screenshot_qa_scroll_permission_error",
 }
 
 
@@ -33,12 +35,12 @@ def run_scenario(ctx, args):
     if scenario not in SCENARIOS:
         raise StepError(f"native_screenshot_scenario: unknown scenario {scenario!r}")
     params = {}
-    if scenario in {"record", "recorder"}:
+    if scenario in {"record", "recorder", "macos-capture-source"}:
         if args.get("format") not in {"gif", "mp4"}:
-            raise StepError("native_screenshot_scenario: record/recorder requires gif or mp4")
+            raise StepError("native_screenshot_scenario: record/recorder/macos-capture-source requires gif or mp4")
         params["format"] = args["format"]
     elif "format" in args:
-        raise StepError("native_screenshot_scenario: format only applies to record/recorder")
+        raise StepError("native_screenshot_scenario: format only applies to record/recorder/macos-capture-source")
     if scenario == "record":
         secs = args.get("secs", 3)
         if isinstance(secs, bool) or not isinstance(secs, int) or not 1 <= secs <= 8:
