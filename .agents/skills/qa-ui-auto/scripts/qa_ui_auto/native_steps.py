@@ -210,7 +210,7 @@ def _wait_for(ctx: NativeStepContext, args: Any) -> str:
     while time.time() < deadline:
         for sel in selectors:
             found = _find_quiet(ctx, sel)
-            # "visible" is a geometry probe: display:none/zero-size nodes are
+            # "visible" checks layout and CSS visibility: zero-size nodes are
             # hidden even though they exist in the DOM. "attached" is plain
             # presence, matching the WebDriver element lookup semantics.
             visible = found and _element_has_layout(ctx, sel) if state in ("visible", "hidden") else found
@@ -233,7 +233,8 @@ def _element_has_layout(ctx: NativeStepContext, selector: str) -> bool:
             f"const el = document.querySelector({json.dumps(selector)});"
             "if (!el) return false;"
             "const rect = el.getBoundingClientRect();"
-            "return rect.width > 0 && rect.height > 0;"
+            "const visibility = getComputedStyle(el).visibility;"
+            "return rect.width > 0 && rect.height > 0 && visibility !== 'hidden' && visibility !== 'collapse';"
         ))
     except Exception:  # noqa: BLE001
         return False
@@ -242,19 +243,17 @@ def _element_has_layout(ctx: NativeStepContext, selector: str) -> bool:
 def _assert_visible(ctx: NativeStepContext, args: Any) -> str:
     selector, timeout = _selector_args(args)
     try:
-        ctx.session.find(selector, timeout=timeout)
+        return _wait_for(ctx, {"selector": selector, "timeout_sec": timeout, "state": "visible"})
     except Exception as e:  # noqa: BLE001
         raise StepError(f"assert_visible failed: {selector} ({e})") from e
-    return f"visible {selector}"
 
 
 def _assert_not_visible(ctx: NativeStepContext, args: Any) -> str:
     selector, timeout = _selector_args(args)
     try:
-        ctx.session.wait_absent(selector, timeout=timeout)
+        return _wait_for(ctx, {"selector": selector, "timeout_sec": timeout, "state": "hidden"})
     except Exception as e:  # noqa: BLE001
         raise StepError(f"assert_not_visible failed: {e}") from e
-    return f"absent {selector}"
 
 
 def _selector_args(args: Any) -> tuple[str, float]:
@@ -1654,6 +1653,13 @@ def _do_assert_attribute(ctx: NativeStepContext, args: Any) -> str:
     return _assert_attribute(ctx, args)
 
 
+@_verb("assert_element_geometry")
+def _do_assert_element_geometry(ctx: NativeStepContext, args: Any) -> str:
+    from .element_geometry import run_geometry
+
+    return run_geometry(args, lambda expression: ctx.session.execute(f"return ({expression});"), ctx.case_dir)
+
+
 @_verb("assert_localstorage")
 def _do_assert_localstorage(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "key" not in args:
@@ -1965,6 +1971,17 @@ def _do_assert_native_process_delta(ctx: NativeStepContext, args: Any) -> str:
 @_verb("native_editor_performance")
 def _do_native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
     return _native_editor_performance(ctx, args)
+
+
+@_verb("native_window_drag")
+def _do_native_window_drag(ctx: NativeStepContext, args: Any) -> str:
+    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+        raise StepError("native_window_drag: requires a Linux X11 display")
+    if not isinstance(args, dict) or not isinstance(args.get("selector"), str) or not {"dx", "dy"} <= args.keys():
+        raise StepError("native_window_drag: expected {selector, dx, dy, y_fraction?}")
+    from .window_drag import run_window_drag
+    window_id, identity = _activate_x11_application(ctx.session.application)
+    return run_window_drag(ctx, args, window_id, identity)
 
 
 @_verb("native_click")

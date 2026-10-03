@@ -432,37 +432,15 @@ body.notes-detached-document,
   color: var(--taomni-code-syntax-invalid);
 }
 
-/* Vertical side tabs */
-.taomni-side-tab {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  /* Centred when the rail widens to host a tab's tool window bar (ED-PARITY-027). */
-  display: flex;
-  align-items: center;
-  padding: 12px 4px;
-  font-size: calc(var(--taomni-ui-font-size) - 1px);
-  letter-spacing: 0.04em;
-  color: var(--taomni-text);
-  border-bottom: 1px solid var(--taomni-sidebar-border);
-  cursor: pointer;
-  user-select: none;
-  transition: var(--taomni-transition);
+/* Tool buttons keep their width in WebKitGTK/WKWebView as well as Chromium.
+   A scrollbar may otherwise reserve space only in the tab-owned part of the
+   merged rail, making those icons and click targets narrower than Sessions. */
+.taomni-tool-window-rail {
+  scrollbar-width: none;
 }
-/* CJK reads naturally top-to-bottom in vertical-rl; skip the 180° flip that
-   keeps Latin readable head-tilt-left so Chinese characters stay upright. */
-.taomni-side-tab:lang(zh) {
-  transform: none;
-  letter-spacing: 0.08em;
-}
-.taomni-side-tab[data-active="true"] {
-  background: var(--taomni-tab-active);
-  color: var(--taomni-accent);
-  font-weight: 600;
-  border-right: 2px solid var(--taomni-accent);
-}
-.taomni-side-tab[data-active="true"]:lang(zh) {
-  border-right: none;
-  border-left: 2px solid var(--taomni-accent);
+.taomni-tool-window-rail::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* Pill badge */
@@ -827,18 +805,39 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   max-width: min(220px, 28vw);
 }
 
-/* Keep a visible, stable window-move target outside the scrollable tab strip. */
+/* Reserve a slim full-height grip beside the main tool window bar. The first
+   6px belong to native edge resizing; the grip stays independently hittable. */
+.taomni-main-window {
+  padding-left: 18px;
+  /* Fractional borders and overlays must stay inside the fixed window frame. */
+  overflow-x: clip;
+}
 .taomni-window-drag-handle {
-  width: 48px;
+  position: absolute;
+  inset: 0 auto 0 6px;
+  z-index: 20;
+  width: 12px;
   color: var(--taomni-text-muted);
   cursor: grab;
-  border-left: 1px solid color-mix(in srgb, var(--taomni-divider) 55%, transparent);
+  user-select: none;
   border-right: 1px solid color-mix(in srgb, var(--taomni-divider) 55%, transparent);
   transition: var(--taomni-transition);
+}
+.taomni-window-drag-handle::before {
+  content: "";
+  position: absolute;
+  inset: 16px 3px;
+  pointer-events: none;
+  background-image: radial-gradient(circle, currentColor 0.8px, transparent 1px);
+  background-size: 3px 7px;
+  opacity: 0.4;
 }
 .taomni-window-drag-handle:hover {
   color: var(--taomni-text);
   background: var(--taomni-hover);
+}
+.taomni-window-drag-handle:hover::before {
+  opacity: 0.8;
 }
 .taomni-window-drag-handle:active {
   cursor: grabbing;

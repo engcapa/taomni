@@ -1,0 +1,88 @@
+id: TC-MAIN-RAIL-03
+title: The upper, middle and lower left grip move the actual Linux native window
+description: >-
+  Real X11 pointer input into the packaged WebKitGTK app and independent window
+  geometry readback prove that the full-height grip moves rather than resizes
+  the window. Raw displacement and geometry restoration are retained for all
+  three positions; Sessions/Tools remain operable after moving the window.
+covers: [F1.2, F1.3, F6.2, F-Sockscap-1]
+tags: [main, sidebar, window, p1]
+modes: [native]
+native_platforms: [Linux]
+fixtures: [reset_db, linux_x11_required]
+timeout_sec: 120
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-main-rail-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage: {key: taomni.sidebarCollapsed, value: 'false'}
+  - reload_window: null
+  - wait_for: '[data-testid="session-tree"]'
+  - eval_readonly:
+      expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height - innerHeight) < 1
+      expect_truthy: true
+  - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.15, dx: 24, dy: 18}
+  - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.5, dx: 24, dy: 18}
+  - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+  - wait_for: '[data-testid="collapsed-sidebar-rail"]'
+  - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.85, dx: 24, dy: 18}
+  - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+  - wait_for: '[data-testid="session-tree"]'
+  - screenshot: main-rail-linux-after-window-moves.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Linux 原生窗口上中下三个拖拽位置产生请求位移且不改变大小；折叠后同样可拖拽，移动后两个常驻按钮可操作。
+    actions:
+    - 1
+    - 5
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 7
+      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
+        - innerHeight) < 1", "expect_truthy": true}}'
+    - step: 8
+      expectation: '{"native_window_drag": {"selector": "[data-testid=\"window-drag-handle\"]", "y_fraction": 0.15, "dx":
+        24, "dy": 18}}'
+    - step: 9
+      expectation: '{"native_window_drag": {"selector": "[data-testid=\"window-drag-handle\"]", "y_fraction": 0.5, "dx": 24,
+        "dy": 18}}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 12
+      expectation: '{"native_window_drag": {"selector": "[data-testid=\"window-drag-handle\"]", "y_fraction": 0.85, "dx":
+        24, "dy": 18}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    results:
+    - 3
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 16
+  visual:
+  - check: 检查对应截图的图标、名称、选中态、全高拖拽带以及点击区域无缩小、遮挡或截断。
+    method: manual
+    reason: 实际尺寸断言辅助视觉评审；CI 图片在下载后评审。
+  native:
+  - check: 原生 WebView 交互和尺寸由真实 QA 应用执行；Linux 窗口拖动另由 TC-MAIN-RAIL-03 的 X11 输入和独立几何读数证明。
+    method: automated
+    reason: browser 不能证明 OS 窗口移动，未执行平台不计作通过。

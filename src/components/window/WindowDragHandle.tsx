@@ -1,10 +1,10 @@
-import { GripHorizontal } from "lucide-react";
 import { useT } from "../../lib/i18n";
+import { startWindowDrag } from "../../lib/windowDrag";
 
 /**
  * A fixed, visible drag target for the borderless main window. Keeping this
- * separate from the tab strip means tab count cannot consume the only useful
- * window-move affordance.
+ * at the left edge for the entire window height means neither tab count nor
+ * tool window buttons can consume the window-move affordance.
  */
 export function WindowDragHandle() {
   const t = useT();
@@ -16,9 +16,8 @@ export function WindowDragHandle() {
       data-window-drag
       title={label}
       aria-label={label}
-      className="taomni-window-drag-handle h-full shrink-0 inline-flex items-center justify-center"
-    >
-      <GripHorizontal aria-hidden="true" className="w-4 h-4" />
-    </div>
+      className="taomni-window-drag-handle"
+      onMouseDown={startWindowDrag}
+    />
   );
 }

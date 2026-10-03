@@ -41,7 +41,7 @@ describe("ED-PARITY-010 tool window rail", () => {
     expect(rail).toHaveAttribute("data-embedded", "true");
     expect(rail.className).toContain("flex-1");
     expect(rail.className).not.toContain("bg-[var(--taomni-code-gutter-bg)]");
-    expect(rail.style.width).toBe("59px");
+    expect(rail.style.width).toBe("100%");
     expect(screen.getByTestId("attached-sftp-toggle")).toHaveTextContent("SFTP");
   });
 
