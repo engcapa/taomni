@@ -38,6 +38,8 @@ def is_check(step: dict) -> bool:
         return bool(args.get("expected"))
     if verb == "native_screenshot_scenario":
         return bool(args.get("scenario"))
+    if verb == "native_window_drag":
+        return bool(args.get("dx") or args.get("dy"))
     if verb == "rdp_probe":
         # A foreground probe asserts its exit code and report expectations.
         return not args.get("background") and ("expect" in args or "expect_exit" in args)

@@ -171,21 +171,21 @@ export function ToolWindowRail({
       data-testid={`code-workspace-tool-rail-${side}`}
       data-show-names={showNames || undefined}
       data-embedded={embedded || undefined}
-      style={{ width }}
+      style={{ width: embedded ? "100%" : width }}
       className={embedded
-        ? "relative flex min-h-0 flex-1 shrink-0 flex-col items-stretch overflow-y-auto overflow-x-hidden border-t border-[var(--taomni-sidebar-border)] py-1 [scrollbar-width:none]"
-        : `relative flex h-full shrink-0 flex-col items-stretch overflow-y-auto overflow-x-hidden bg-[var(--taomni-code-gutter-bg)] py-1 [scrollbar-width:none] ${side === "left"
+        ? "taomni-tool-window-rail relative flex min-h-0 flex-1 shrink-0 flex-col items-stretch overflow-y-auto overflow-x-hidden border-t border-[var(--taomni-sidebar-border)] py-1"
+        : `taomni-tool-window-rail relative flex h-full shrink-0 flex-col items-stretch overflow-y-auto overflow-x-hidden bg-[var(--taomni-code-gutter-bg)] py-1 ${side === "left"
           ? "border-r border-[var(--taomni-code-border)]"
           : "border-l border-[var(--taomni-code-border)]"}`}
       onContextMenu={openStripeMenu}
     >
-      <div className="flex flex-col items-stretch gap-1 px-1">
+      <div className="flex shrink-0 flex-col items-stretch gap-1 px-1">
         {top.map((item, index) => (
           <ToolWindowRailButtonSlot key={item.id} item={item} showNames={showNames} previous={top[index - 1]} onContextMenu={openButtonMenu} />
         ))}
       </div>
       <div className="min-h-2 flex-1" />
-      <div className="flex flex-col items-stretch gap-1 px-1">
+      <div className="flex shrink-0 flex-col items-stretch gap-1 px-1">
         {bottom.map((item) => (
           <ToolWindowRailButton key={item.id} item={item} showNames={showNames} onContextMenu={openButtonMenu} />
         ))}
@@ -241,10 +241,12 @@ export function ToolWindowRailButton({
   item,
   showNames = false,
   onContextMenu,
+  onDoubleClick,
 }: {
   item: ToolWindowRailItem;
   showNames?: boolean;
   onContextMenu?: (event: ReactMouseEvent, item: ToolWindowRailItem) => void;
+  onDoubleClick?: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
   const title = [item.label, item.shortcut].filter(Boolean).join(" ")
     + (item.disabled && item.disabledReason ? ` — ${item.disabledReason}` : "");
@@ -264,9 +266,10 @@ export function ToolWindowRailButton({
       title={title}
       className={toolWindowRailButtonClass}
       onClick={item.onSelect}
+      onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu ? (event) => onContextMenu(event, item) : undefined}
     >
-      <span className="flex h-5 w-5 items-center justify-center [&>svg]:h-4 [&>svg]:w-4">{item.icon}</span>
+      <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center [&>svg]:h-4 [&>svg]:w-4">{item.icon}</span>
       {showNames && (
         <span className="w-full truncate px-0.5 text-center text-[10px] leading-3">{item.label}</span>
       )}
@@ -279,7 +282,7 @@ export function ToolWindowRailButton({
   );
 }
 
-export const toolWindowRailButtonClass = "relative flex min-h-8 w-full shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0 py-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)] disabled:opacity-40 data-[active=true]:bg-[var(--taomni-accent)] data-[active=true]:text-white";
+export const toolWindowRailButtonClass = "relative flex min-h-8 w-full shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0 py-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--taomni-accent)] disabled:opacity-40 data-[active=true]:bg-[var(--taomni-accent)] data-[active=true]:text-white";
 
 /**
  * IDEA "More tool windows" (…) at the end of the left stripe: every tool

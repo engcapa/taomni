@@ -33,6 +33,10 @@ controls:
     selector: '[data-testid="collapsed-sidebar-rail"]'
     kind: interactive
     optional: true       # only when sidebar collapsed
+  - id: expanded-sidebar-panel
+    selector: '[data-testid="expanded-sidebar-panel"]'
+    kind: display
+    optional: true
   - id: sidebar-tool-window-rail      # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
     selector: '[data-testid="sidebar-tool-window-rail"]'
     kind: display
@@ -42,6 +46,10 @@ controls:
   - id: sidebar-resize-handle
     selector: '[data-testid="main-sidebar-resize-handle"]'
     kind: display    # drag handle — meaningless to click; existence is the assertion
+  - id: sidebar-rail-menu-show-names
+    selector: '[data-testid="sidebar-rail-menu-show-names"]'
+    kind: interactive
+    optional: true
 -->
 
 - 顶部菜单栏 `MenuBar`（File/Edit/View/Sessions/Tools/Help）
@@ -51,6 +59,7 @@ controls:
 - 中间 Tab 栏 + 内容区
 - 底部状态栏 `StatusBar`（活跃连接数、当前应用主题、状态消息）
 - 侧边栏宽度通过 `react-resizable-panels` 持久化
+- Sessions/Tools 常驻图标按钮与 Code Workspace/SFTP 工具窗口共用名称显示设置和按钮样式；右键常驻按钮可切换名称，键盘 Enter/Space 可展开或收起。
 
 ### 1.3 自定义标题栏与窗口控制 ✅
 
@@ -62,6 +71,7 @@ components: [AppTitleBar, WindowControls, WindowResizeHandles, TitleBarTrayContr
 files:
   - src/components/tabbar/ControlBar.tsx
   - src/components/window/WindowDragHandle.tsx
+  - src/lib/windowDrag.ts
   - src/components/window/AppTitleBar.tsx
   - src/components/window/WindowControls.tsx
   - src/components/window/TitleBarTrayControls.tsx
@@ -81,7 +91,7 @@ controls:
     optional: true
   - id: window-drag-handle
     selector: '[data-testid="window-drag-handle"]'
-    kind: display    # dedicated native window-move target; presence is asserted in browser mode
+    kind: display    # full-height left grip; Linux native verifies actual OS displacement
   - id: titlebar-actions-more
     selector: '[data-testid="titlebar-actions-more"]'
     kind: interactive

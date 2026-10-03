@@ -666,6 +666,7 @@ const dict = {
     noRecent: "No recent connections yet.",
     sideTabSessions: "Sessions",
     sideTabTools: "Tools",
+    showToolWindowNames: "Show Tool Window Names",
     sideTabMacros: "Macros",
     showLabel: "Show {label}",
     sideTabHint: "{label} - click active tab again or double-click to hide",

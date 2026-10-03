@@ -542,6 +542,17 @@
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
         },
+        "native_window_drag": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector", "dx", "dy"],
+          "properties": {
+            "selector": {"type": "string", "minLength": 1},
+            "dx": {"type": "integer", "minimum": -100, "maximum": 100},
+            "dy": {"type": "integer", "minimum": -100, "maximum": 100},
+            "y_fraction": {"type": "number", "minimum": 0.05, "maximum": 0.95}
+          }
+        },
         "native_screenshot_scenario": {
           "type": "object",
           "additionalProperties": false,

@@ -665,6 +665,7 @@ export const zhCN: DeepPartial<typeof en> = {
     noRecent: "暂无最近连接。",
     sideTabSessions: "会话",
     sideTabTools: "工具",
+    showToolWindowNames: "显示工具窗口名称",
     sideTabMacros: "宏",
     showLabel: "显示 {label}",
     sideTabHint: "{label} —— 再次点击当前选中页或双击可隐藏",

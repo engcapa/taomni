@@ -30,12 +30,11 @@ import {
   Braces,
 } from "lucide-react";
 import { useRef, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TabBar } from "./TabBar";
 import { OpenTabsMenu } from "./OpenTabsMenu";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
-import { WindowDragHandle } from "../window/WindowDragHandle";
+import { startWindowDrag } from "../../lib/windowDrag";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
 import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
@@ -106,24 +105,6 @@ export function ControlBar({
     exportHtml,
     previewNode,
   } = useSessionImportExport();
-
-  // Borderless window: we move it ourselves via startDragging() on every
-  // platform, triggered by a left-button press on any [data-window-drag]
-  // region. macOS previously relied on the native overlay title bar's
-  // data-tauri-drag-region, but that IPC is unreliable there (e.g. macOS 14
-  // Intel) and Tauri only honours the exact mousedown target — so the large
-  // tab-strip filler never dragged. A double-click toggles maximize to keep
-  // the native title-bar gesture on all platforms.
-  const startDrag = (event: React.MouseEvent) => {
-    if (event.button !== 0) return;
-    if (!(event.target as HTMLElement).closest("[data-window-drag]")) return;
-    const win = getCurrentWindow();
-    if (event.detail === 2) {
-      void win.toggleMaximize().catch(() => {});
-    } else {
-      void win.startDragging().catch(() => {});
-    }
-  };
 
   const openMainMenu = (event: React.MouseEvent) => {
     const importExportItems: MenuItem[] = [
@@ -226,7 +207,7 @@ export function ControlBar({
     <div
       data-testid="control-bar"
       className="taomni-control-bar h-8 flex items-center min-w-0"
-      onMouseDown={startDrag}
+      onMouseDown={startWindowDrag}
     >
       {ctx.render}
       {previewNode}
@@ -238,7 +219,6 @@ export function ControlBar({
           <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
       </div>
-      <WindowDragHandle />
       <div className="min-w-0 flex-1 self-stretch">
         <TabBar
           onStartLocalTerminal={onStartLocalTerminal}

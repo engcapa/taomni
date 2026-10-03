@@ -1967,6 +1967,17 @@ def _do_native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
     return _native_editor_performance(ctx, args)
 
 
+@_verb("native_window_drag")
+def _do_native_window_drag(ctx: NativeStepContext, args: Any) -> str:
+    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+        raise StepError("native_window_drag: requires a Linux X11 display")
+    if not isinstance(args, dict) or not isinstance(args.get("selector"), str) or not {"dx", "dy"} <= args.keys():
+        raise StepError("native_window_drag: expected {selector, dx, dy, y_fraction?}")
+    from .window_drag import run_window_drag
+    window_id, identity = _activate_x11_application(ctx.session.application)
+    return run_window_drag(ctx, args, window_id, identity)
+
+
 @_verb("native_click")
 def _do_native_click(ctx: NativeStepContext, args: Any) -> str:
     """Click a visible control through X11 in the exact test application."""

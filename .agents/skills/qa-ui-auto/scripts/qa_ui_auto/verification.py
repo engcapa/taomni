@@ -17,7 +17,7 @@ from .console import configure_console_encoding
 
 PLATFORMS = ("Linux", "Windows", "macOS")
 LINUX_VERBS = {"native_set_writable", "assert_native_process_delta", "native_process_snapshot",
-               "native_click", "native_pointer_drag", "native_ime_keys", "native_clipboard_owner",
+               "native_click", "native_pointer_drag", "native_window_drag", "native_ime_keys", "native_clipboard_owner",
                "assert_system_clipboard", "native_clipboard_image"}
 # Verbs available on a subset of native platforms beyond Linux-only ones.
 PLATFORM_VERBS = {"native_show_image_window": {"Linux", "Windows"}, "native_about": {"macOS"}}

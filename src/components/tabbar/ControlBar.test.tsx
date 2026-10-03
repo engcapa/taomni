@@ -25,7 +25,7 @@ vi.mock("../../lib/runtime", () => ({
 vi.mock("./TabBar", () => ({
   TabBar: (props: { detailsRevealExternal?: boolean }) => {
     tabBarMocks.props.push(props);
-    return <div data-testid="tab-bar" />;
+    return <div data-testid="tab-bar"><div data-window-drag data-testid="tabbar-drag-region" /></div>;
   },
 }));
 
@@ -160,9 +160,9 @@ describe("ControlBar settings button", () => {
     expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
   });
 
-  it("keeps a dedicated drag handle and preserves the maximize gesture", () => {
+  it("preserves dragging and maximize gestures in the tab strip filler", () => {
     renderControlBar(vi.fn());
-    const handle = screen.getByTestId("window-drag-handle");
+    const handle = screen.getByTestId("tabbar-drag-region");
 
     fireEvent.mouseDown(handle, { button: 0, detail: 1 });
     expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);

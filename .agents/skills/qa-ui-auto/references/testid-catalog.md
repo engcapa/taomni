@@ -1287,9 +1287,11 @@
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail
+- `[data-testid="expanded-sidebar-panel"]` — display [optional] — F1.2.expanded-sidebar-panel
 - `[data-testid="sidebar-tool-window-rail"]` — display [optional] — F1.2.sidebar-tool-window-rail
   ↳ `[data-testid="sidebar-rail"]` — alias
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
+- `[data-testid="sidebar-rail-menu-show-names"]` — interactive [optional] — F1.2.sidebar-rail-menu-show-names
 
 ## main/commands (F1.9)
 
