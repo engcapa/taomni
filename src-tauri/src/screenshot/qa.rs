@@ -263,6 +263,13 @@ async fn open_fixture(
     let _ = window.set_focus();
     // Let the window manager map and raise it.
     tokio::time::sleep(Duration::from_millis(700)).await;
+    if route == "anim" {
+        // A previous scroll scenario leaves the OS cursor over the fixture.
+        // CoreGraphics snapshots include it even when a different WebView has
+        // focus, so park it outside the source for every recording scenario.
+        park_pointer(input_point((display.x + 16, display.y + 16), s)).await?;
+        tokio::time::sleep(Duration::from_millis(350)).await;
+    }
     let pos = window.inner_position().context("fixture position")?;
     let size = window.inner_size().context("fixture size")?;
     let content_width = run_js(&window, "const root = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return root.querySelector('canvas')?.getBoundingClientRect().width ?? root.clientWidth;", Duration::from_secs(5)).await?.as_f64().context("fixture content width")?;
@@ -1435,12 +1442,30 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         if (status?.frames >= 4) return status;
         await new Promise(r => setTimeout(r, 100));
       }
-      throw new Error('scroll did not capture a second frame');
+      throw new Error('scroll did not capture four frames');
     "#,
         Duration::from_secs(15),
     )
     .await
     .map_err(|e| format!("scroll progress: {e}"))?;
+    // Wheel distance per notch varies by OS. Wait for the fixture's observed
+    // movement, not a frame count, to guarantee an image taller than the preview.
+    let long_source = format!(
+        r#"
+      const root = document.querySelector('[data-testid="screenshot-qa-fixture-ready"]');
+      for (let i = 0; i < 300; i++) {{
+        if (root.scrollTop * {scale} + {height} > {target}) return true;
+        await new Promise(r => setTimeout(r, 100));
+      }}
+      throw new Error('scroll source did not move far enough for a long preview: ' + root.scrollTop);
+    "#,
+        scale = source.scale,
+        height = region.3,
+        target = display.height + 100
+    );
+    run_js(&fixture, &long_source, Duration::from_secs(35))
+        .await
+        .map_err(|e| format!("long preview fixture: {e}"))?;
     let geometry = capture_surfaces(&app, &display, region, super::surfaces::SCROLL_LABEL, true)
         .await
         .map_err(|e| e.to_string())?;
@@ -1656,13 +1681,6 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let (fixture, display, region) = open_fixture(&app, "anim")
         .await
         .map_err(|e| format!("{e:#}"))?;
-    // Keep the OS cursor outside the recorded region. CoreGraphics includes the
-    // cursor in display snapshots on macOS, which would otherwise add a false
-    // pixel mismatch to the frame oracle.
-    park_pointer(input_point((display.x + 16, display.y + 16), display.scale_factor))
-        .await
-        .map_err(|e| format!("{e:#}"))?;
-    tokio::time::sleep(Duration::from_millis(350)).await;
     let started = super::screenshot_start_recording(
         app.clone(),
         Some(display.id.clone()),
