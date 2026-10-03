@@ -640,7 +640,7 @@ class NativeSession:
                         + [{"type": "pause", "duration": 0} for _ in pointer_core]
                         + [{"type": "keyUp", "value": value} for value in reversed(modifier_values)]})
                 actions.append({
-                    "type": "pointer", "id": "context-mouse",
+                    "type": "pointer", "id": "mouse",
                     "parameters": {"pointerType": "mouse"},
                     "actions": [{"type": "pause", "duration": 0} for _ in modifier_values]
                         + pointer_core + [{"type": "pause", "duration": 0} for _ in modifier_values],
@@ -733,7 +733,7 @@ class NativeSession:
                 "actions": [
                     {
                         "type": "pointer",
-                        "id": "native-pointer",
+                        "id": "mouse",
                         "parameters": {"pointerType": "mouse"},
                         "actions": [
                             {"type": "pointerMove", "duration": 100, "x": x, "y": y, "origin": "viewport"},
@@ -805,7 +805,7 @@ class NativeSession:
             actions.append({"type": "key", "id": "drag-keyboard", "actions": key_actions})
         actions.append({
             "type": "pointer",
-            "id": "native-drag-pointer",
+            "id": "mouse",
             "parameters": {"pointerType": "mouse"},
             "actions": pointer_actions,
         })

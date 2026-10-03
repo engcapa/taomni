@@ -23,6 +23,7 @@ class NativeSessionTransportTest(TestCase):
         with self.assertRaisesRegex(WebDriverError, "input failed"):
             session.pointer_button_click("#row", 0, ["Control", "Shift"])
         keys, pointer = session.request.call_args_list[1].args[2]["actions"]
+        self.assertEqual(pointer["id"], "mouse")
         self.assertEqual(len(keys["actions"]), len(pointer["actions"]))
         self.assertEqual(keys["actions"][:2], [{"type": "keyDown", "value": "\ue009"}, {"type": "keyDown", "value": "\ue008"}])
         self.assertEqual(keys["actions"][-2:], [{"type": "keyUp", "value": "\ue008"}, {"type": "keyUp", "value": "\ue009"}])
@@ -485,6 +486,7 @@ class NativeSessionPointerClickTest(TestCase):
         self.assertEqual(result, {"x": 50, "y": 35})
         action = session.request.call_args_list[1].args[2]["actions"][0]
         self.assertEqual(action["parameters"], {"pointerType": "mouse"})
+        self.assertEqual(action["id"], "mouse")
         self.assertEqual(action["actions"][0], {
             "type": "pointerMove",
             "duration": 100,
@@ -515,6 +517,7 @@ class NativeSessionPointerClickTest(TestCase):
         self.assertEqual(keyboard["actions"][0], {"type": "keyDown", "value": "\ue00a"})
         self.assertEqual(keyboard["actions"][-1], {"type": "keyUp", "value": "\ue00a"})
         self.assertEqual(pointer["parameters"], {"pointerType": "mouse"})
+        self.assertEqual(pointer["id"], "mouse")
         self.assertEqual(pointer["actions"][1]["x"], 30)
         self.assertEqual(pointer["actions"][3]["x"], 80)
         self.assertEqual(pointer["actions"][2]["type"], "pointerDown")
