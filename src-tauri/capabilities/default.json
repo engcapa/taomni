@@ -8,6 +8,8 @@
     "rdp-*",
     "vnc-*",
     "terminal-*",
+    "database-*",
+    "git-*",
     "lan-chat-*",
     "notes-*",
     "screenshot-overlay",

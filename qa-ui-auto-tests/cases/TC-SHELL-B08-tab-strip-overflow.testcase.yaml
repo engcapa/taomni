@@ -1,0 +1,142 @@
+id: TC-SHELL-B08
+title: Thirty terminals preserve active visibility, pinning and close set
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b08.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-recent-open-all"]'
+- wait_for: '[data-testid="tab-item"][data-active="true"]:has-text("qa-029")'
+- wait_for: '[data-testid="shell-tab-overflow"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 7
+- assert_not_visible: '[data-testid="shell-overview"]'
+- click: '[data-testid="shell-tab-overflow"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 31
+- assert_attribute:
+    selector: '[data-testid="shell-tab-count"]'
+    name: data-total
+    equals: '31'
+- click: '[data-testid="shell-tab-card"]:has-text("qa-000") [data-testid="shell-tab-card-pin"]'
+- assert_attribute:
+    selector: '[data-testid="shell-tab-card"]:has-text("qa-000")'
+    name: data-pinned
+    equals: 'true'
+- click: '[data-testid="shell-tab-card"]:has-text("qa-001") [data-testid="shell-tab-card-more"]'
+- click: '[data-testid="shell-tab-close-all"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-cancel"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 31
+- click: '[data-testid="shell-tab-card"]:has-text("qa-001") [data-testid="shell-tab-card-more"]'
+- click: '[data-testid="shell-tab-close-all"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-confirm"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]:has-text("qa-000")'
+    equal: 1
+- screenshot: tc-shell-b08.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Opening all 30 saved entries creates 30 terminals while the strip
+      shows six and the overview stays closed.
+    actions:
+    - 3
+    - 8
+    checkpoints:
+    - step: 4
+      expectation: Opening all 30 saved entries creates 30 terminals while the strip
+        shows six and the overview stays closed.
+    - step: 5
+      expectation: Opening all 30 saved entries creates 30 terminals while the strip
+        shows six and the overview stays closed.
+    - step: 6
+      expectation: Opening all 30 saved entries creates 30 terminals while the strip
+        shows six and the overview stays closed.
+    - step: 7
+      expectation: Opening all 30 saved entries creates 30 terminals while the strip
+        shows six and the overview stays closed.
+    - step: 9
+      expectation: Opening all 30 saved entries creates 30 terminals while the strip
+        shows six and the overview stays closed.
+    - step: 10
+      expectation: Opening all 30 saved entries creates 30 terminals while the strip
+        shows six and the overview stays closed.
+    results:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+  - id: R2
+    requirement: Pinning preserves the explicit item during close all; cancelling
+      preserves the complete set.
+    actions:
+    - 11
+    - 13
+    - 14
+    - 16
+    - 18
+    - 19
+    - 21
+    checkpoints:
+    - step: 12
+      expectation: Pinning preserves the explicit item during close all; cancelling
+        preserves the complete set.
+    - step: 15
+      expectation: Pinning preserves the explicit item during close all; cancelling
+        preserves the complete set.
+    - step: 17
+      expectation: Pinning preserves the explicit item during close all; cancelling
+        preserves the complete set.
+    - step: 20
+      expectation: Pinning preserves the explicit item during close all; cancelling
+        preserves the complete set.
+    - step: 22
+      expectation: Pinning preserves the explicit item during close all; cancelling
+        preserves the complete set.
+    - step: 23
+      expectation: Pinning preserves the explicit item during close all; cancelling
+        preserves the complete set.
+    results:
+    - 12
+    - 15
+    - 17
+    - 20
+    - 22
+    - 23
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

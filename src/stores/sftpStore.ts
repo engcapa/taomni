@@ -252,6 +252,13 @@ function isSftpRefreshDirectorySignal(err: unknown): boolean {
  */
 const sessionRefCounts = new Map<string, number>();
 
+/** A transfer holds its actual WebView connection until the worker reaches a terminal state. */
+export function retainSftpResource(sessionId: string): () => Promise<void> {
+  sessionRefCounts.set(sessionId, (sessionRefCounts.get(sessionId) ?? 0) + 1);
+  let released = false;
+  return async () => { if (released) return; released = true; await useSftpStore.getState().detach(sessionId); };
+}
+
 /**
  * In-flight backend attach promises, keyed by session id. When a second
  * consumer calls attach before the first one finishes the backend handshake,

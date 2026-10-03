@@ -23,6 +23,9 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `goto` | same as `open` | Alias. |
 | `wait` | seconds (number or `"3s"`) | Hard sleep; use sparingly. |
 | `wait_for` | selector string **or** `{selector, timeout_sec?, state?}` | `state` ∈ `attached/detached/visible/hidden`, default `visible`. |
+| `switch_window` | `{route, timeout_sec?}` | Browser/native. Selects an already open window whose URL contains `route`; empty route selects the main document without a hash. Uses real browser pages or W3C window handles (including the QA WKWebView bridge). Does not synthesize a window or assert OS focus. |
+| `close_window` | `null` | Browser/native. Requests close on the selected real window; product close protection and acknowledgement still own the outcome, which the case must assert in the surviving window. |
+| `restart_native_app` | `null` | Native only. Terminates the owned isolated QA process/driver session and starts another with the same QA data/config/cache profile. No reset fixture runs between the two processes. Use UI Exit and assert successful close first when claiming graceful exit; this verb alone proves a process restart. |
 | `screenshot` | filename string **or** `{path, selector?, full_page?}` | Saved under `qa-ui-auto-report/<run>/<TC-id>/`. |
 
 ## Mouse
@@ -79,6 +82,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_text` | `{selector, contains, timeout_sec?}` | Polls `text_content` and `data-terminal-text` (xterm canvas fallback). |
 | `assert_text_equals` | `{selector, equals, timeout_sec?}` | Browser/native: requires exactly one DOM match and exact `textContent`, preserving whitespace. No substring or terminal-buffer fallback. |
 | `assert_items` | `{selector, equals: [string, ...], attribute?, timeout_sec?}` | Browser/native: exact ordered list of all matching DOM textContent values (or named attributes). Checks missing, extra, duplicate, reordered and changed items. For editor contents select `.cm-line` and include empty trailing lines; for virtualized documents use disk assertions for full content. |
+| `assert_value` | `{selector, equals, timeout_sec?}` | Browser/native: checks the live value property of an input, textarea or select; exact text including whitespace. Does not type or mutate the control. |
 | `assert_pattern` | `{selector, regex, timeout_sec?}` | Browser and native; polls Python regex against element text (terminal buffer fallback for `terminal-pane`). Use anchored output assertions to distinguish shell output from command echo, and await shell readiness before typing. |
 | `assert_count` | `{selector, min?/max?/equal?}` | Browser/native. Pick at least one bound; checks current count, including hidden matches. Wait for readiness separately. |
 | `assert_element_geometry` | `{selector, min_width, min_height, min_count?, same_width?, icon_size?, tolerance?}` | Browser/native, all platforms. Reads every matched element's actual rectangle and first SVG icon; checks minimum dimensions, optional equal widths and icon size (default tolerance 1 CSS px, maximum 2). Hidden matches fail minimum dimensions. Retains raw values in `element-geometries.jsonl`, including failures. Wait for readiness separately. |
@@ -88,6 +92,11 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_menu_items` | `[label, label, ...]` | Browser/native. After `right_click`; checks each label visible inside `[data-testid="context-menu"]` using substring matching. |
 
 ## App-specific helpers (use these instead of inlining selector chains)
+
+| Verb | Args | Boundary |
+|---|---|---|
+| `shell_backend_scenario` | `{action: fail-next\|hold\|release, command?, owner?}` | Browser only with `shell_browser_catalog`; alters one allowlisted external IPC reply, never an app store. Held replies retain the product's 10-second preparation deadline. |
+| `assert_shell_backend` | `{command, count, owner?, status?: requested\|failed\|held}` | Browser only; exact observation count and retained sanitized IPC log. Does not establish native side effects. |
 
 | Verb | Args | Notes |
 |------|------|-------|
@@ -108,6 +117,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | Verb | Args | Notes |
 |------|------|-------|
 | `assert_localstorage` | `{key, exists?/contains?/equals?}` | Read & assert localStorage[key]. Pass at least one of exists/contains/equals. |
+| `remove_storage` | `taomni.*` key string | Browser/native: remove exactly one persisted fixture input. Reload to exercise the production decoder/migration; does not change runtime stores. |
+| `assert_element_geometry` bounds | add `within_viewport: true`, `hit_center: true` to the existing geometry arguments | Browser/native: assert actual viewport containment and unobstructed, non-inert center hit; writes every raw rectangle to element-geometries.jsonl. |
 | `assert_attribute` | `{selector, name, equals}` | Read element attribute and assert exact match. E.g. `type=password`. |
 | `assert_disabled` | selector | Pass when element is disabled. |
 | `assert_enabled` | selector | Pass when element is enabled. |
@@ -272,3 +283,5 @@ Relative paths resolve from the repository root.
 - ❌ Selectors based on Tailwind classes like `.text-\\[11px\\]` — they break on a font tweak. Add a `data-testid` to the source instead.
 - ❌ Hard-coded passwords. Use `${env.QA_SSH_PASSWORD}` (set externally).
 - ❌ Skipping `fixtures: [reset_db]` for any case that mutates persistent state.
+
+| `seed_storage` | `{key, value, raw?: true}` | Browser/native input fixture. Value is literal JSON text by default; `raw: true` explicitly permits malformed data only under `taomni.*` for corruption recovery cases. Reload to consume the input. Never writes runtime stores. |

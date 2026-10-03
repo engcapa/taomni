@@ -125,6 +125,19 @@ export function FileBrowser(props: FileBrowserProps) {
   const [mappings, setMappings] = useState<SftpPathMapping[]>(props.pathMappings ?? []);
 
   const orientationScope = props.orientationScope ?? props.sessionId;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [availableSize, setAvailableSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const node = rootRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setAvailableSize({ width, height });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const constrainedHeight = availableSize.height > 0 && availableSize.height < 460;
   const [orientation, setOrientationState] = useState<Orientation>(() =>
     loadOrientation(orientationScope, props.defaultOrientation ?? "horizontal"),
   );
@@ -137,6 +150,7 @@ export function FileBrowser(props: FileBrowserProps) {
   );
 
   const pendingTerminalSyncRef = useRef(false);
+  const effectiveOrientation = constrainedHeight && availableSize.width >= 540 ? "horizontal" : orientation;
   const pendingMfaRequestIdRef = useRef<string | null>(null);
   const authPromptReadyRef = useRef<Promise<unknown>>(Promise.resolve());
   const requestedCwdVersionRef = useRef(props.cwdHintVersion ?? 0);
@@ -193,12 +207,11 @@ export function FileBrowser(props: FileBrowserProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let attachedLease = false;
     ensureSession(props.sessionId);
     void (async () => {
       await authPromptReadyRef.current.catch(() => undefined);
       if (cancelled) return;
-      const current = useSftpStore.getState().sessions[props.sessionId];
-      if (current?.attached || current?.attaching) return;
       attach({
         sessionId: props.sessionId,
         host: props.host,
@@ -209,6 +222,8 @@ export function FileBrowser(props: FileBrowserProps) {
         networkSettingsJson: props.networkSettingsJson ?? null,
       })
         .then(() => {
+          attachedLease = true;
+          if (cancelled) { attachedLease = false; void detach(props.sessionId); return; }
           if (!cancelled && props.initialPath) {
             void navigate(props.sessionId, "remote", props.initialPath);
           }
@@ -221,24 +236,10 @@ export function FileBrowser(props: FileBrowserProps) {
     })();
     return () => {
       cancelled = true;
+      if (attachedLease) { attachedLease = false; void detach(props.sessionId); }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.sessionId]);
-
-  // Tear down the SFTP channel when this view unmounts. The store
-  // ref-counts attaches, so a sidebar + detached window with the same
-  // session id are safe. We do not detach the attached sidebar session on
-  // unmount so that the session, its navigated folders, and active transfers
-  // are preserved when the user merely hides the sidebar.
-  useEffect(() => {
-    const sid = props.sessionId;
-    const isAttachedSidebar = sid.startsWith("attached-") && !sid.endsWith("__detached");
-    return () => {
-      if (!isAttachedSidebar) {
-        void detach(sid);
-      }
-    };
-  }, [props.sessionId, detach]);
 
   useEffect(() => {
     const handleTerminalReconnected = (e: Event) => {
@@ -710,7 +711,7 @@ export function FileBrowser(props: FileBrowserProps) {
   const showCwdToolbar = !!props.onRequestTerminalCwd || props.cwdHint != null;
 
   return (
-    <div data-testid="sftp-browser" className="w-full h-full flex flex-col" style={{ background: "var(--taomni-bg)" }}>
+    <div ref={rootRef} data-testid="sftp-browser" className="relative w-full h-full min-h-0 flex flex-col" style={{ background: "var(--taomni-bg)" }}>
       {props.showHeader && (
         <div
           className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0 gap-1"
@@ -910,7 +911,7 @@ export function FileBrowser(props: FileBrowserProps) {
           // Re-mount the panel group when orientation flips so
           // react-resizable-panels reads new sizes cleanly.
           key={orientation}
-          orientation={orientation}
+          orientation={effectiveOrientation}
           id={`sftp-browser-v2-${orientationScope}-${orientation}`}
           defaultLayout={loadResizableLayout(`sftp-browser-v2-${orientationScope}-${orientation}`, ["remote", "local"])}
           onLayoutChanged={saveResizableLayout(`sftp-browser-v2-${orientationScope}-${orientation}`)}
@@ -966,7 +967,7 @@ export function FileBrowser(props: FileBrowserProps) {
           </Panel>
           <PanelResizeHandle
             className={
-              orientation === "horizontal"
+              effectiveOrientation === "horizontal"
                 ? "w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
                 : "h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize"
             }
@@ -1034,6 +1035,8 @@ export function FileBrowser(props: FileBrowserProps) {
       </div>
       <FileTransferQueue
         sessionId={props.sessionId}
+        constrained={constrainedHeight}
+        maxHeight={Math.max(104, availableSize.height - 48)}
         showCrossHostBanner
         onCancel={(id) => void controller.cancelTransfer(id)}
         onPause={(id) => void controller.pauseTransfer(id)}

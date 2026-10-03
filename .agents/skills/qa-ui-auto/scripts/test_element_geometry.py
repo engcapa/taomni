@@ -37,6 +37,16 @@ class ElementGeometryTest(TestCase):
         with self.assertRaises(StepError):
             assert_geometry(self.args, self.samples)
 
+    def test_rejects_offscreen_and_obscured_controls(self):
+        args = dict(self.args, min_count=1, within_viewport=True, hit_center=True)
+        item = dict(self.samples[0], left=4, top=4, right=38, bottom=36,
+                    viewport_width=400, viewport_height=450, hit_center=True)
+        assert_geometry(args, [item])
+        with self.assertRaisesRegex(StepError, "outside the viewport"):
+            assert_geometry(args, [dict(item, right=410)])
+        with self.assertRaisesRegex(StepError, "blocked or inert"):
+            assert_geometry(args, [dict(item, hit_center=False)])
+
     def test_keeps_actual_measurements_when_an_assertion_fails(self):
         self.samples[-1]["height"] = 24
         with TemporaryDirectory() as directory:

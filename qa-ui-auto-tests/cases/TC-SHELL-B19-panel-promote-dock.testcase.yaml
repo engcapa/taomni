@@ -1,0 +1,157 @@
+id: TC-SHELL-B19
+title: SFTP promotion and close to dock preserve the resource
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b19.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F7.4
+- F1.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-promote"]'
+- assert_not_visible: '[data-testid="shell-host"]'
+- assert_count:
+    selector: '[data-testid="sftp-browser"]:visible'
+    equal: 1
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-cancel"]'
+- assert_count:
+    selector: '[data-testid="sftp-browser"]:visible'
+    equal: 1
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-dock"]'
+- click: '[data-testid="shell-close-confirm"]'
+- wait_for: '[data-testid="shell-host"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host"]'
+    name: data-edge
+    equals: right
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- screenshot: tc-shell-b19.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Promoting Files uses the same browser and no extra connection; close
+      cancel keeps the promoted view.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 9
+    - 10
+    - 14
+    - 16
+    checkpoints:
+    - step: 5
+      expectation: Promoting Files uses the same browser and no extra connection;
+        close cancel keeps the promoted view.
+    - step: 7
+      expectation: Promoting Files uses the same browser and no extra connection;
+        close cancel keeps the promoted view.
+    - step: 8
+      expectation: Promoting Files uses the same browser and no extra connection;
+        close cancel keeps the promoted view.
+    - step: 11
+      expectation: Promoting Files uses the same browser and no extra connection;
+        close cancel keeps the promoted view.
+    - step: 12
+      expectation: Promoting Files uses the same browser and no extra connection;
+        close cancel keeps the promoted view.
+    - step: 13
+      expectation: Promoting Files uses the same browser and no extra connection;
+        close cancel keeps the promoted view.
+    - step: 15
+      expectation: Promoting Files uses the same browser and no extra connection;
+        close cancel keeps the promoted view.
+    - step: 17
+      expectation: Promoting Files uses the same browser and no extra connection;
+        close cancel keeps the promoted view.
+    results:
+    - 5
+    - 7
+    - 8
+    - 11
+    - 12
+    - 13
+    - 15
+    - 17
+  - id: R2
+    requirement: Returning through close to dock restores the original owner and reuses
+      the browser.
+    actions:
+    - 18
+    - 20
+    - 21
+    checkpoints:
+    - step: 19
+      expectation: Returning through close to dock restores the original owner and
+        reuses the browser.
+    - step: 22
+      expectation: Returning through close to dock restores the original owner and
+        reuses the browser.
+    - step: 23
+      expectation: Returning through close to dock restores the original owner and
+        reuses the browser.
+    - step: 24
+      expectation: Returning through close to dock restores the original owner and
+        reuses the browser.
+    - step: 25
+      expectation: Returning through close to dock restores the original owner and
+        reuses the browser.
+    - step: 26
+      expectation: Returning through close to dock restores the original owner and
+        reuses the browser.
+    results:
+    - 19
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

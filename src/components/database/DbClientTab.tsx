@@ -110,6 +110,9 @@ import {
 } from "../../lib/ai/answerLanguage";
 import { buildDbAiPrompt, truncateStatement } from "../../lib/database/dbAiPrompts";
 import { registerQueryTab } from "../../lib/queryRegistry";
+import { registerCloseAdapter } from "../../lib/shell/closeCoordinator";
+import { waitShellReady } from "../../lib/shell/readiness";
+import type { CloseRisk } from "../../lib/shell/types";
 import { alertAppDialog, choiceAppDialog, confirmAppDialog } from "../../lib/appDialogs";
 import { dangerousConfirmationMessage } from "../../lib/sqlDangerousStatements";
 import { explainSqlFor } from "../../lib/sqlExplain";
@@ -1038,9 +1041,36 @@ export default function DbClientTab({
   }, [persistWorkspaceSnapshot, setStatusMessage, workspaceReady]);
 
   const flushWorkspace = useCallback(async () => {
-    await autoSaveWorkspace();
-    await autoSaveWorkspace();
-  }, [autoSaveWorkspace]);
+    if (autoSaveInFlightRef.current) await autoSaveInFlightRef.current;
+    if (!workspaceReady) throw new Error("Query workspace has not finished loading");
+    const result = await persistWorkspaceSnapshot(panelsRef.current, activePanelIdRef.current);
+    if (result.savedQueryErrors.length) throw new Error(result.savedQueryErrors.join("; "));
+  }, [persistWorkspaceSnapshot, workspaceReady]);
+
+  useEffect(() => registerCloseAdapter(tabId, {
+    getRisks: async () => {
+      const tx = txStatusRef.current;
+      const running = panelsRef.current.flatMap((p) => p.sheets.filter((s) => s.running).map((s) => `${p.id}:${s.id}:${s.createdAt}`));
+      const risks: CloseRisk[] = running.length ? [{ kind: "job", id: `${tabId}:queries`, ownerId: tabId,
+        revision: running.sort().join(","), detail: t("shell.queryCloseRisk", { count: running.length }), choices: ["cancel-job", "cancel"] }] : [];
+      if (tx?.manual && tx.pending > 0) risks.push({ kind: "transaction", id: `${tabId}:transaction`, ownerId: tabId,
+        revision: `${tx.generation}:${tx.pending}`, detail: t("shell.transactionCloseRisk", { count: tx.pending }), choices: ["commit", "rollback", "cancel"] });
+      return risks;
+    },
+    resolve: async (risk, choice, signal) => {
+      if (!connectionSessionId) throw new Error("Database connection is unavailable");
+      if (risk.kind === "job" && choice === "cancel-job") {
+        for (const panel of panelsRef.current) if (panel.sheets.some((sheet) => sheet.running)) cancelRequestedRef.current[panel.id] = true;
+        await dbCancel(connectionSessionId);
+        await waitShellReady(() => !panelsRef.current.some((p) => p.sheets.some((s) => s.running)), signal);
+        return;
+      }
+      if (choice !== "commit" && choice !== "rollback") throw new Error("Unsupported transaction choice");
+      const next = await (choice === "commit" ? dbTxCommit : dbTxRollback)(connectionSessionId);
+      applyTxStatus(next);
+    },
+    flush: async () => { await flushWorkspace(); },
+  }), [tabId, connectionSessionId, applyTxStatus, flushWorkspace, t]);
 
   const scheduleWorkspaceSave = useCallback(() => {
     if (autoSaveDebounceRef.current) clearTimeout(autoSaveDebounceRef.current);
@@ -1108,7 +1138,7 @@ export default function DbClientTab({
         clearTimeout(autoSaveDebounceRef.current);
         autoSaveDebounceRef.current = null;
       }
-      void flushWorkspace();
+      void flushWorkspace().catch((error) => setStatusMessage(`Query workspace save failed: ${String(error)}`));
     };
   }, [autoSaveWorkspace, flushWorkspace]);
 
@@ -1547,8 +1577,9 @@ export default function DbClientTab({
       insertQuery: insertQueryFromOutside,
       appendEchoSql: appendEchoSqlFromOutside,
       flushWorkspace,
+      ready: () => workspaceReady && !!connectionSessionId && !connError,
     });
-  }, [appendEchoSqlFromOutside, flushWorkspace, info.engine, insertQueryFromOutside, queryRegistryTitle, tabId]);
+  }, [appendEchoSqlFromOutside, flushWorkspace, info.engine, insertQueryFromOutside, queryRegistryTitle, tabId, workspaceReady, connectionSessionId, connError]);
 
   const cancelQuery = useCallback((panelId?: string) => {
     for (const panel of panelsRef.current) {

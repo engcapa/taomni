@@ -1,0 +1,261 @@
+id: TC-SHELL-B44
+title: Extreme width and low height keep primary and window actions reachable
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b44.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.2
+- F1.6
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- set_viewport:
+    width: 400
+    height: 450
+- assert_visible: '[data-testid="shell-rail-home"]'
+- assert_visible: '[data-testid="shell-quick-switch"]'
+- assert_visible: '[data-testid="shell-overview-trigger"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview-trigger"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_visible: '[data-testid="welcome-panel"]'
+- set_viewport:
+    width: 560
+    height: 450
+- assert_visible: '[data-testid="shell-rail-home"]'
+- assert_visible: '[data-testid="shell-quick-switch"]'
+- assert_visible: '[data-testid="shell-overview-trigger"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview-trigger"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_visible: '[data-testid="welcome-panel"]'
+- set_viewport:
+    width: 720
+    height: 320
+- assert_visible: '[data-testid="shell-rail-home"]'
+- assert_visible: '[data-testid="shell-quick-switch"]'
+- assert_visible: '[data-testid="shell-overview-trigger"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview-trigger"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_visible: '[data-testid="welcome-panel"]'
+- set_viewport:
+    width: 1440
+    height: 900
+- assert_visible: '[data-testid="shell-rail-home"]'
+- assert_visible: '[data-testid="shell-quick-switch"]'
+- assert_visible: '[data-testid="shell-overview-trigger"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview-trigger"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_visible: '[data-testid="welcome-panel"]'
+- screenshot: tc-shell-b44.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: At 400×450, Home, quick and overview remain visible; the overview
+      stays inside the viewport.
+    actions:
+    - 3
+    - 8
+    - 10
+    checkpoints:
+    - step: 4
+      expectation: At 400×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 5
+      expectation: At 400×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 6
+      expectation: At 400×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 7
+      expectation: At 400×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 9
+      expectation: At 400×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 11
+      expectation: At 400×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    results:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 11
+  - id: R2
+    requirement: At 560×450, Home, quick and overview remain visible; the overview
+      stays inside the viewport.
+    actions:
+    - 12
+    - 17
+    - 19
+    checkpoints:
+    - step: 13
+      expectation: At 560×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 14
+      expectation: At 560×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 15
+      expectation: At 560×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 16
+      expectation: At 560×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 18
+      expectation: At 560×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 20
+      expectation: At 560×450, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    results:
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 20
+  - id: R3
+    requirement: At 720×320, Home, quick and overview remain visible; the overview
+      stays inside the viewport.
+    actions:
+    - 21
+    - 26
+    - 28
+    checkpoints:
+    - step: 22
+      expectation: At 720×320, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 23
+      expectation: At 720×320, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 24
+      expectation: At 720×320, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 25
+      expectation: At 720×320, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 27
+      expectation: At 720×320, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 29
+      expectation: At 720×320, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    results:
+    - 22
+    - 23
+    - 24
+    - 25
+    - 27
+    - 29
+  - id: R4
+    requirement: At 1440×900, Home, quick and overview remain visible; the overview
+      stays inside the viewport.
+    actions:
+    - 30
+    - 35
+    - 37
+    checkpoints:
+    - step: 31
+      expectation: At 1440×900, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 32
+      expectation: At 1440×900, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 33
+      expectation: At 1440×900, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 34
+      expectation: At 1440×900, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 36
+      expectation: At 1440×900, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    - step: 38
+      expectation: At 1440×900, Home, quick and overview remain visible; the overview
+        stays inside the viewport.
+    results:
+    - 31
+    - 32
+    - 33
+    - 34
+    - 36
+    - 38
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

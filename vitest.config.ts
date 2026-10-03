@@ -33,6 +33,8 @@ export default defineConfig({
       "**/.claude/worktrees/**",
       // Retained fixtures / baseline checkouts are evidence, not current tests.
       "**/qa-ui-auto-report/**",
+      // These standalone script tests use node:test and run with node --test.
+      "scripts/**/*.test.mjs",
     ],
   },
 });

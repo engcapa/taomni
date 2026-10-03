@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { shellTaoBridge } from "../lib/shell/layoutBridge";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../lib/ipc";
@@ -351,7 +352,7 @@ interface ChatStore {
   /// Pass `null` (or omit) to clear so the thread inherits the global setting.
   setThreadOutputFormat: (threadId: string, format: string | null) => Promise<void>;
   setActiveThread: (threadId: string | null) => void;
-  loadMessages: (threadId: string) => Promise<void>;
+  loadMessages: (threadId: string) => Promise<boolean>;
   sendMessage: (threadId: string, content: string, terminalContext?: string, attachments?: ChatAttachment[]) => Promise<void>;
   /// Send now if the thread is idle, otherwise park behind the running turn.
   /// Every user-facing send path goes through here — the composer and the
@@ -662,8 +663,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     try {
       const msgs = await invoke<ChatMessage[]>("chat_list_messages", { threadId });
       set((s) => ({ messages: { ...s.messages, [threadId]: msgs } }));
+      return true;
     } catch (e) {
       console.error("chat_list_messages failed:", e);
+      return false;
     }
   },
 
@@ -1072,32 +1075,38 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
   setDrawerWidth: (w) => {
     const width = clampDrawerWidth(w);
+    const bridge = shellTaoBridge(); if (bridge) { bridge.update({ width }); return; }
     writeDrawerLayoutPrefs({ width });
     set({ drawerWidth: width });
   },
   setDrawerHeight: (h) => {
     const height = clampDrawerHeight(h);
+    const bridge = shellTaoBridge(); if (bridge) { bridge.update({ height }); return; }
     writeDrawerLayoutPrefs({ height });
     set({ drawerHeight: height });
   },
   setDrawerPosition: (position) => {
     const pinned = position === "left" || position === "right";
+    const bridge = shellTaoBridge(); if (bridge) { bridge.update({ edge: position, pinned }); return; }
     writeDrawerLayoutPrefs({ position, pinned });
     set({ drawerPosition: position, drawerPinned: pinned });
   },
   setDrawerPinned: (pinned) => {
+    const bridge = shellTaoBridge(); if (bridge) { bridge.update({ pinned }); return; }
     // Any edge can now be pinned (top/bottom dock as a horizontal band; §8).
     writeDrawerLayoutPrefs({ pinned });
     set({ drawerPinned: pinned });
   },
   setDrawerFloatingOpacity: (opacity) => {
     const floatingOpacity = clampDrawerFloatingOpacity(opacity);
+    const bridge = shellTaoBridge(); if (bridge) { bridge.update({ opacity: floatingOpacity }); return; }
     writeDrawerLayoutPrefs({ floatingOpacity });
     set({ drawerFloatingOpacity: floatingOpacity });
   },
   setRibbonPlacement: (position, offsetRatio) => {
     const pinned = position === "left" || position === "right";
     const ribbonOffsetRatio = Math.min(1, Math.max(0, offsetRatio));
+    const bridge = shellTaoBridge(); if (bridge) { bridge.update({ edge: position, pinned, ribbonOffsetRatio }); return; }
     writeDrawerLayoutPrefs({ position, pinned, ribbonOffsetRatio });
     set({ drawerPosition: position, drawerPinned: pinned, ribbonOffsetRatio });
   },

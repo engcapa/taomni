@@ -1,0 +1,92 @@
+id: TC-SHELL-B07
+title: Lane selection and empty lane retain the previous real surface
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b07.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- assert_visible: '[data-testid="shell-lane-empty"]'
+- assert_attribute:
+    selector: '[data-testid="shell-work-area"]'
+    name: inert
+    equals: ''
+- click: '[data-testid="shell-lane-empty-home"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- assert_visible: '[data-testid="terminal-pane"]:visible'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- screenshot: tc-shell-b07.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Connect resolves the same terminal; an empty Communicate lane has
+      its own inert surface and Home return.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 9
+    - 11
+    checkpoints:
+    - step: 5
+      expectation: Connect resolves the same terminal; an empty Communicate lane has
+        its own inert surface and Home return.
+    - step: 7
+      expectation: Connect resolves the same terminal; an empty Communicate lane has
+        its own inert surface and Home return.
+    - step: 8
+      expectation: Connect resolves the same terminal; an empty Communicate lane has
+        its own inert surface and Home return.
+    - step: 10
+      expectation: Connect resolves the same terminal; an empty Communicate lane has
+        its own inert surface and Home return.
+    - step: 12
+      expectation: Connect resolves the same terminal; an empty Communicate lane has
+        its own inert surface and Home return.
+    - step: 13
+      expectation: Connect resolves the same terminal; an empty Communicate lane has
+        its own inert surface and Home return.
+    results:
+    - 5
+    - 7
+    - 8
+    - 10
+    - 12
+    - 13
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

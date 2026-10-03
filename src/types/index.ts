@@ -424,6 +424,8 @@ export interface RecentWorkspace {
 
 export interface Tab {
   id: string;
+  /** A promoted Context Host surface. Business content continues in its stable container. */
+  shellPanelId?: string;
   /**
    * Stable id used for AI chat thread binding when it should outlive a visual
    * tab id change, e.g. detach -> reattach. Defaults to `id`.

@@ -126,6 +126,7 @@ describe("WelcomePanel", () => {
     expect(historyTabs.map((tab) => tab.getAttribute("data-testid"))).toEqual([
       "welcome-history-tab-sessions",
       "welcome-history-tab-workspaces",
+      "welcome-history-tab-mail",
       "welcome-history-tab-directories",
     ]);
     expect(historyTabs[0]).toHaveAttribute("aria-selected", "true");

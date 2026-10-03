@@ -58,6 +58,15 @@ def step_assert_visible(ctx: StepContext, args: Any) -> None:
         raise StepError(f"not visible: {selector} ({e})") from e
 
 
+@verb("assert_value")
+def step_assert_value(ctx: StepContext, args: Any) -> None:
+    if ctx.dry_run:
+        return
+    loc = ctx.page.locator(args["selector"]).first
+    _wait_for_match(ctx, lambda: loc.input_value() == args["equals"], args.get("timeout_sec", 10),
+                    f"{args['selector']}: input value does not equal {args['equals']!r}")
+
+
 @verb("assert_not_visible")
 def step_assert_not_visible(ctx: StepContext, args: Any) -> None:
     selector = args if isinstance(args, str) else args["selector"]

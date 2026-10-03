@@ -1,3 +1,5 @@
+import { WorkspaceToolSurface } from "../shell/WorkspaceToolSurface";
+import { registerCloseAdapter } from "../../lib/shell/closeCoordinator";
 import {
   Fragment,
   startTransition,
@@ -728,6 +730,7 @@ interface CodeWorkspaceTabProps {
   tabId: string;
   workspace: CodeWorkspaceTabInfo;
   visible?: boolean;
+  shellHosted?: boolean;
   onOpenGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onSyncGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onCommandsChange?: (tabId: string, registration: WorkspaceCommandRegistration | null) => void;
@@ -1437,6 +1440,7 @@ export function CodeWorkspaceTab({
   tabId,
   workspace,
   visible = true,
+  shellHosted = false,
   onOpenGitManager,
   onSyncGitManager,
   onCommandsChange,
@@ -1446,7 +1450,7 @@ export function CodeWorkspaceTab({
   // ED-PARITY-027 B: while the main sidebar is collapsed to its rail, the
   // active workspace renders its left tool window bar into that rail.
   const mainRailHost = useMainRailHostStore((s) => s.host);
-  const mainRailMergeActive = useAppStore((s) => s.mergeToolWindowRail && s.sidebarCollapsed);
+  const mainRailMergeActive = useAppStore((s) => s.mergeToolWindowRail);
   const setWorkspaceStatusSegments = useCodeWorkspaceStatusStore((s) => s.setStatus);
   const setWorkspaceStatusActions = useCodeWorkspaceStatusStore((s) => s.setActions);
   const clearWorkspaceStatus = useCodeWorkspaceStatusStore((s) => s.clearForTab);
@@ -2049,7 +2053,9 @@ export function CodeWorkspaceTab({
   const toolWindowLayoutRef = useRef(toolWindowLayout);
   toolWindowLayoutRef.current = toolWindowLayout;
   const toolWindowNodes = useToolWindowNodes();
-  const leftToolAreaOpen = toolWindowLayout.sideOpen("left");
+  const leftToolAreaOpen = shellHosted
+    ? [toolWindowLayout.visibleAt("left-top"), toolWindowLayout.visibleAt("left-bottom")].some((id) => id && !["project", "git", "problems", "terminal"].includes(id))
+    : toolWindowLayout.sideOpen("left");
   const rightToolAreaOpen = toolWindowLayout.sideOpen("right");
   /** A routed tab request suppresses the dock open that accompanies it. */
   const routedDockRequestRef = useRef<{ tab: string; dockWasOpen: boolean } | null>(null);
@@ -4826,6 +4832,7 @@ export function CodeWorkspaceTab({
   );
 
   type MutationReason =
+    | "shell-close-discard"
     | "user-edit"
     | "programmatic"
     | "reload"
@@ -7025,6 +7032,28 @@ export function CodeWorkspaceTab({
       workspaceInstanceId,
     ],
   );
+
+  useEffect(() => registerCloseAdapter(tabId, {
+    getRisks: async () => {
+      flushPendingEditorText();
+      return Object.values(openFilesRef.current).filter((file) => file.dirty && !file.library).map((file) => ({
+        kind: "dirty" as const, id: `${tabId}:dirty:${file.key}`, ownerId: tabId, revision: String(file.documentRevision ?? 0),
+        detail: `Unsaved changes: ${file.subtitle}`, choices: ["save", "discard", "cancel"] as const,
+      }));
+    },
+    resolve: async (risk, choice) => {
+      const key = risk.id.slice(`${tabId}:dirty:`.length), file = openFilesRef.current[key];
+      if (!file) return;
+      if (choice === "save") {
+        await saveFile(key);
+        flushPendingEditorText();
+        if (openFilesRef.current[key]?.dirty) throw new Error(`Could not save current changes in ${file.subtitle}`);
+      } else if (choice === "discard") {
+        mutateOpenBuffer(key, { text: file.savedText, dirty: false }, "shell-close-discard");
+      } else throw new Error("Unsupported editor close choice");
+    },
+    flush: async () => { flushPendingEditorText(); },
+  }), [tabId, flushPendingEditorText, saveFile, mutateOpenBuffer]);
 
   const reloadFile = useCallback(
     async (key: string | null = activeKey) => {
@@ -22100,6 +22129,7 @@ export function CodeWorkspaceTab({
       content: gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
         <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
           <WorkspaceGitManager
+            shellScopeId={`workspace:${workspaceInstanceId}:git`}
             workspaceName={title}
             roots={gitRoots}
             activeRepoRoot={activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null}
@@ -22377,6 +22407,7 @@ export function CodeWorkspaceTab({
     ];
   };
   const renderToolWindowPane = (id: string, options: { legacyTestIds?: boolean } = {}) => {
+    if (shellHosted && ["project", "git", "problems", "terminal"].includes(id)) return null;
     // Project keeps its own IDEA header (title, toolbar, ⋮, —) in FileTreePane.
     if (id === "project") {
       return <ToolWindowSlot nodes={toolWindowNodes} id="project" label="Project" />;
@@ -23014,6 +23045,10 @@ export function CodeWorkspaceTab({
       </PanelGroup>
         </div>
       <div ref={toolWindowNodes.setParking} hidden data-testid="code-workspace-tool-window-parking" />
+      {shellHosted && (["project", "git", "problems", "terminal"] as const).map((tool) => <WorkspaceToolSurface key={tool}
+        tabId={tabId} workspaceInstanceId={workspaceInstanceId} tool={tool} nodes={toolWindowNodes} label={toolWindowLabel(tool)}
+        gitPayload={tool === "git" ? gitManagerPayload : undefined}
+        requested={toolWindowLayout.isVisible(tool)} setRequested={(open) => { if (open) toolWindowLayout.show(tool); else toolWindowLayout.hide(tool); }} />)}
       {toolWindowContents.map((entry) => (
         <ToolWindowPortal
           key={entry.id}
@@ -23031,7 +23066,7 @@ export function CodeWorkspaceTab({
         onRestoreLayout={handleRestoreToolWindowLayout}
         renderPane={(id, placement) => renderToolWindowPane(id, { legacyTestIds: placement === "primary" })}
         secondaryTab={toolWindowLayout.visibleAt("bottom-right")}
-        open={bottomDockOpen && toolWindowLayout.anchorOf(bottomDockTab) === "bottom-left"}
+        open={bottomDockOpen && toolWindowLayout.anchorOf(bottomDockTab) === "bottom-left" && !(shellHosted && ["git", "problems", "terminal"].includes(bottomDockTab))}
         height={currentBottomDockHeight}
         maxHeight={maxBottomDockHeight}
         onHeightChange={handleBottomDockHeightChange}

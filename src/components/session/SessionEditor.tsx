@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
 import {
@@ -2686,6 +2686,8 @@ function HBaseSettings({
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 interface SessionEditorProps {
+  active?: boolean;
+  onSaved?: () => void;
   session?: SessionConfig;
   defaultGroupPath?: string | null;
   /**
@@ -2697,7 +2699,9 @@ interface SessionEditorProps {
   onClose: () => void;
 }
 
-export function SessionEditor({ session, defaultGroupPath = null, initialProto, onClose }: SessionEditorProps) {
+export function SessionEditor({ session, defaultGroupPath = null, initialProto, onClose, onSaved = onClose, active = true }: SessionEditorProps) {
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const t = useT();
   const { addSession, updateSession, removeSession, createFolderPath, sessions, groups } = useSessionStore();
   const isEdit = !!session;
@@ -3409,7 +3413,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     return null;
   };
 
-  const handleSave = async () => {
+  const handleSaveImpl = async () => {
     const error = validate();
     if (error) {
       setSaveError(error);
@@ -3666,10 +3670,18 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       } else {
         await addSession(config);
       }
-      onClose();
+      onSaved();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
     }
+  };
+
+  const handleSave = async () => {
+    if (savingRef.current || !active) return;
+    savingRef.current = true;
+    setSaving(true);
+    try { await handleSaveImpl(); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   const handleSaveTemplate = async () => {
@@ -4408,6 +4420,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   };
 
   useModalShortcuts({
+    active,
     onCancel: onClose,
     onSave: () => {
       void handleSave();
@@ -4420,7 +4433,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(20,30,45,0.4)" }}
+      inert={!active}
+      hidden={!active}
+      role={active ? "dialog" : undefined}
+      aria-modal={active || undefined}
+      style={{ background: "rgba(20,30,45,0.4)", display: active ? undefined : "none" }}
     >
       <div
         ref={containerRef}
@@ -5219,10 +5236,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
             {(testResult || saveError) && (
               <span
+                data-testid={saveError ? "session-save-error" : "session-test-result-summary"}
+                role={saveError ? "alert" : "status"}
                 className="text-[11px] min-w-0 max-w-[280px] truncate"
                 title={saveError ?? testResult?.msg}
                 style={{ color: testResult?.ok && !saveError ? "#2f8a3e" : "#b22222" }}
-                data-testid="session-test-result-summary"
               >
                 {saveError ?? testResult?.msg}
               </span>
@@ -5263,6 +5281,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             <button
               className="taomni-btn"
               data-testid="session-save"
+              disabled={saving}
               data-primary="true"
               onClick={handleSave}
               type="button"

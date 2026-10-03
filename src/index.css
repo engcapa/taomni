@@ -10,7 +10,11 @@
 @import "@fontsource/inter/600.css";
 @import "@fontsource/inter/700.css";
 
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+/* Only product sources contribute utilities. Retained QA HTML and baseline
+   checkouts otherwise make each failure artifact trigger expensive CSS work. */
+@source "./";
+@source "../index.html";
 
 :root {
   --taomni-color-scheme: light;

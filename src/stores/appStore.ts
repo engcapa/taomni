@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { shellTabActivationAllowed } from "../lib/shell/restoreFocus";
 import type {
   CodeWorkspaceFileRef,
   CodeWorkspaceLooseFileInfo,
@@ -12,7 +13,8 @@ import { t as tr } from "../lib/i18n";
 import { detectXServer, type XServerStatus } from "../lib/ipc";
 import type { TabFilter } from "../lib/tabFilter";
 import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
-import { getQueryTab } from "../lib/queryRegistry";
+import { routeTabClose } from "../lib/shell/closeCoordinator";
+import { shellSidebarBridge } from "../lib/shell/layoutBridge";
 import {
   readMergeToolWindowRail,
   readSidebarCollapsedByGroup,
@@ -245,6 +247,9 @@ interface AppState {
   duplicateTab: (id: string, overrides?: DuplicateTabOverrides) => void;
   removeTab: (id: string) => void;
   removeTabs: (ids: string[]) => void;
+  /** Internal removal after close preparation or a completed window handoff. */
+  commitRemoveTab: (id: string) => void;
+  commitRemoveTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
   /** Patch a VNC tab's connection info (Properties / remembered credentials). */
   updateTabVnc: (id: string, patch: Partial<NonNullable<Tab["vnc"]>>) => void;
@@ -950,6 +955,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addTab: (tab) =>
     set((s) => {
+      if (tab.type === "welcome") return shellTabActivationAllowed() ? { activeTabId: "welcome" } : s;
+      if (s.tabs.some((existing) => existing.id === tab.id)) return { activeTabId: shellTabActivationAllowed() ? tab.id : s.activeTabId, tabFilter: null };
       const nextTabs = [...s.tabs, tab];
       const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
@@ -964,7 +971,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return {
         tabs: nextTabs,
-        activeTabId: tab.id,
+        activeTabId: shellTabActivationAllowed() ? tab.id : s.activeTabId,
         recentWorkspaces: recentResult.recentWorkspaces,
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         // A freshly opened tab must be visible, so drop any active focus filter.
@@ -979,6 +986,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const idx = s.tabs.findIndex((t) => t.id === id);
       if (idx === -1) return s;
       const source = s.tabs[idx];
+      if (source.type === "welcome" || source.shellPanelId) return s;
       const isTerminal = source.type === "terminal";
       // Explicit renames permanently opt out of cwd-derived titles. A duplicate
       // of a manual tab must keep that choice and sequence the renamed title
@@ -1047,7 +1055,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   removeTab: (id) => {
-    void getQueryTab(id)?.flushWorkspace?.();
+    if (!get().tabs.find((tab) => tab.id === id)?.closable) return;
+    if (!routeTabClose([id])) get().commitRemoveTab(id);
+  },
+  removeTabs: (ids) => {
+    const targets = ids.filter((id) => get().tabs.find((tab) => tab.id === id)?.closable);
+    if (!routeTabClose(targets)) get().commitRemoveTabs(targets);
+  },
+  commitRemoveTab: (id) => {
+    if (!get().tabs.find((tab) => tab.id === id)?.closable) return;
     set((s) => {
       const idx = s.tabs.findIndex((t) => t.id === id);
       const tab = idx >= 0 ? s.tabs[idx] : undefined;
@@ -1083,9 +1099,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  removeTabs: (ids) =>
+  commitRemoveTabs: (ids) =>
     set((s) => {
-      const idSet = new Set(ids);
+      const idSet = new Set(ids.filter((id) => s.tabs.find((tab) => tab.id === id)?.closable));
       const activeIndex = s.tabs.findIndex((t) => t.id === s.activeTabId);
       const closingTabs = s.tabs.filter((tab) => idSet.has(tab.id));
       const next = s.tabs.filter((t) => !idSet.has(t.id));
@@ -1193,6 +1209,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveTab: (id) =>
     set((s) => {
+      if (!shellTabActivationAllowed() || !s.tabs.some((tab) => tab.id === id)) return s;
       const tab = s.tabs.find((item) => item.id === id);
       const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
@@ -1219,6 +1236,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const from = s.tabs.findIndex((t) => t.id === fromId);
       const target = s.tabs.findIndex((t) => t.id === targetId);
       if (from === -1 || target === -1) return s;
+      if (s.tabs[from].type === "welcome" || s.tabs[target].type === "welcome") return s;
 
       const next = s.tabs.slice();
       const [moved] = next.splice(from, 1);
@@ -1233,7 +1251,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const from = s.tabs.findIndex((t) => t.id === id);
       if (from === -1) return s;
-      const clamped = Math.max(0, Math.min(toIndex, s.tabs.length - 1));
+      if (s.tabs[from].type === "welcome") return s;
+      const clamped = Math.max(s.tabs[0]?.type === "welcome" ? 1 : 0, Math.min(toIndex, s.tabs.length - 1));
       if (from === clamped) return s;
       const next = s.tabs.slice();
       const [moved] = next.splice(from, 1);
@@ -1241,15 +1260,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { tabs: next };
     }),
 
-  toggleSidebar: () =>
+  toggleSidebar: () => {
+    const bridge = shellSidebarBridge();
+    if (bridge) { bridge.toggle(); return; }
     set((s) => {
       const sidebarCollapsed = !s.sidebarCollapsed;
       return { sidebarCollapsed, ...rememberSidebarForActiveGroup(s, sidebarCollapsed) };
-    }),
+    });
+  },
   setSidebarCollapsed: (collapsed) => {
+    const bridge = shellSidebarBridge();
+    if (bridge) { bridge.setCollapsed(collapsed); return; }
     set((s) => ({ sidebarCollapsed: collapsed, ...rememberSidebarForActiveGroup(s, collapsed) }));
   },
   setActiveSideTab: (tab) => {
+    const bridge = shellSidebarBridge();
+    if (bridge) { bridge.select(tab); return; }
     set((s) => ({ activeSideTab: tab, sidebarCollapsed: false, ...rememberSidebarForActiveGroup(s, false) }));
   },
   setMergeToolWindowRail: (value) => {
@@ -1257,6 +1283,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ mergeToolWindowRail: value });
   },
   applySidebarForActiveTab: () => {
+    const bridge = shellSidebarBridge();
+    if (bridge) { bridge.apply(); return; }
     const s = get();
     if (!s.mergeToolWindowRail) return;
     const active = s.tabs.find((tab) => tab.id === s.activeTabId);

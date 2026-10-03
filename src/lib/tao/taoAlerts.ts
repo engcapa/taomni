@@ -5,13 +5,13 @@ import type { NoteAlert } from "../notes";
  * badge/jump mechanism serves notes due/overdue/reminder alerts and chat
  * "AI reply ready" events today, with `mail` reserved for a future module.
  */
-export type TaoAlertSource = "chat" | "notes" | "mail";
+export type TaoAlertSource = "chat" | "notes" | "mail" | "transfer";
 export type TaoAlertKind =
   | "ai_done"
   | "note_overdue"
   | "note_due_soon"
   | "note_reminder"
-  | "mail_new";
+  | "mail_new" | "transfer_done" | "transfer_failed";
 
 export interface TaoAlert {
   id: string;
@@ -28,6 +28,8 @@ export interface TaoAlert {
   mailTabId?: string | null;
   /** Mail account/session id (source === "mail"). */
   mailAccountId?: string | null;
+  jobId?: string;
+  panelId?: string;
   fireAt: number;
 }
 
@@ -54,6 +56,8 @@ export function taoAlertPriority(kind: TaoAlertKind): number {
       return 3;
     case "mail_new":
       return 4;
+    case "transfer_failed": return -1;
+    case "transfer_done": return 5;
   }
 }
 
@@ -83,9 +87,10 @@ export function buildTaoAlerts(
   noteAlerts: NoteAlert[],
   aiDone: TaoAlert[],
   mailNew: TaoAlert[] = [],
+  transfer: TaoAlert[] = [],
 ): TaoAlert[] {
   const fromNotes = (noteAlerts ?? []).filter((a) => a.state === "pending").map(noteAlertToTao);
-  const merged = [...fromNotes, ...(aiDone ?? []), ...(mailNew ?? [])];
+  const merged = [...fromNotes, ...(aiDone ?? []), ...(mailNew ?? []), ...(transfer ?? [])];
   merged.sort((a, b) => {
     const pa = taoAlertPriority(a.kind);
     const pb = taoAlertPriority(b.kind);
@@ -109,6 +114,8 @@ export function ribbonAlertState(alerts: TaoAlert[]): RibbonAlertState {
       return "ai_done";
     case "mail_new":
       return "mail_new_future";
+    case "transfer_failed":
+    case "transfer_done": return "multiple";
   }
 }
 

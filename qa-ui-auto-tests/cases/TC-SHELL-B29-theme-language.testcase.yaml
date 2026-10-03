@@ -1,0 +1,118 @@
+id: TC-SHELL-B29
+title: Global Rail names remain usable across resize and reload
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b29.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.2
+- F1.3
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- right_click: '[data-testid="shell-rail"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text:
+    selector: '[data-testid="shell-rail-sessions"]'
+    contains: Sessions
+- set_viewport:
+    width: 800
+    height: 600
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail-home"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail-sessions"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_text:
+    selector: '[data-testid="shell-rail-sessions"]'
+    contains: Sessions
+- assert_count:
+    selector: '[data-testid="shell-rail"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-rail-home"]'
+    equal: 1
+- right_click: '[data-testid="shell-rail"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="shell-rail-sessions"]'
+    equals: ''
+- screenshot: tc-shell-b29.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The shared Show Names preference expands the rail and survives reload
+      without duplicate controls.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 9
+    - 14
+    - 15
+    checkpoints:
+    - step: 5
+      expectation: The shared Show Names preference expands the rail and survives
+        reload without duplicate controls.
+    - step: 7
+      expectation: The shared Show Names preference expands the rail and survives
+        reload without duplicate controls.
+    - step: 8
+      expectation: The shared Show Names preference expands the rail and survives
+        reload without duplicate controls.
+    - step: 10
+      expectation: The shared Show Names preference expands the rail and survives
+        reload without duplicate controls.
+    - step: 11
+      expectation: The shared Show Names preference expands the rail and survives
+        reload without duplicate controls.
+    - step: 12
+      expectation: The shared Show Names preference expands the rail and survives
+        reload without duplicate controls.
+    - step: 13
+      expectation: The shared Show Names preference expands the rail and survives
+        reload without duplicate controls.
+    - step: 16
+      expectation: The shared Show Names preference expands the rail and survives
+        reload without duplicate controls.
+    results:
+    - 5
+    - 7
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 16
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

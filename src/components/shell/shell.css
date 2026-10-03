@@ -1,0 +1,23 @@
+.taomni-main-window .taomni-control-bar { height: 42px; }
+.shell-tab-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+[data-testid="shell-root"] button:focus-visible, [data-testid="control-bar"] button:focus-visible { outline: 2px solid var(--taomni-accent); outline-offset: -2px; }
+[data-testid="shell-host"] header button { min-width: 28px; min-height: 28px; }
+[data-testid="shell-host"] [role="menuitem"] { text-align: left; padding: 6px 12px; }
+[data-testid="shell-host"] [role="menuitem"]:hover { background: var(--taomni-hover); }
+@media (max-width: 1199px) {
+  .shell-titlebar-secondary { display: none; }
+}
+@media (max-width: 719px) {
+  .shell-titlebar-tabs { max-width: 90px; }
+  .shell-titlebar-lane, .shell-titlebar-legacy { display: none; }
+  [data-testid="tab-action-slot"] { display: none; }
+  [data-testid="shell-overview-trigger"] { white-space: nowrap; }
+}
+@media (max-width: 559px) {
+  .taomni-main-window .taomni-control-bar { height: 84px; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-rows: 42px 42px; }
+  .shell-titlebar-start { grid-row: 1; grid-column: 1; }
+  .shell-titlebar-home { grid-row: 1; grid-column: 2; }
+  .shell-titlebar-tabs { grid-row: 1; grid-column: 3; max-width: unset; }
+  .shell-titlebar-system { grid-row: 1; grid-column: 4; }
+  .shell-titlebar-actions { grid-row: 2; grid-column: 1 / -1; justify-content: center; }
+}

@@ -118,7 +118,7 @@ describe("ControlBar settings button", () => {
     openTabsMocks.props.length = 0;
   });
 
-  it("keeps only the app menu in the left button group", () => {
+  it("keeps the app menu and navigator entry in the left button group", () => {
     const onCommand = vi.fn();
     renderControlBar(onCommand);
 
@@ -127,6 +127,7 @@ describe("ControlBar settings button", () => {
     expect(leftGroup).toBeTruthy();
     expect(within(leftGroup!).getAllByRole("button").map((button) => button.getAttribute("data-testid"))).toEqual([
       "app-main-menu",
+      "shell-navigator-toggle",
     ]);
     expect(screen.queryByTestId("sidebar-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ribbon-settings")).not.toBeInTheDocument();

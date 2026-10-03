@@ -1,8 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileBrowser } from "./FileBrowser";
 import { useAppTheme } from "../../lib/appTheme";
 import { subscribeCwdHint, getLatestCwdHint } from "../../lib/sftpSync";
-import { getAppPlatform } from "../../lib/runtime";
+import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
+import { useSftpStore } from "../../stores/sftpStore";
+import { activeSftpJobs, waitTransferTerminal } from "../../lib/shell/sftpShellAdapter";
+import { sftpCancelTransfer } from "../../lib/sftp";
+import { signalPanelWindow, waitPanelWindow, matchesPanelWindow } from "../../lib/shell/panelWindowTransaction";
+import type { PanelWindowEnvelope } from "../../lib/shell/types";
+import { subscribePanelWindow } from "../../lib/detachedSession";
+import { useConfirmDialog } from "../sidebar/ConfirmDialog";
 import { useT } from "../../lib/i18n";
 import {
   consumeDetachedHandoff as consumeGenericHandoff,
@@ -37,6 +46,8 @@ interface DetachedSftpParams {
   networkSettingsJson?: string | null;
   initialPath?: string;
   title?: string;
+  localPath?: string;
+  envelope?: PanelWindowEnvelope;
 }
 
 // Re-export TTL so callers expecting the previous symbol still work.
@@ -131,6 +142,60 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   // replace the indefinite "waiting…" spinner with an actionable error so
   // the popup never *looks* blank to the user.
   const [handoffTimedOut, setHandoffTimedOut] = useState(false);
+  const [windowError, setWindowError] = useState<string | null>(null);
+  const [committed, setCommitted] = useState(false);
+  const closing = useRef(false), announced = useRef(false), confirm = useConfirmDialog();
+  const confirmRef = useRef(confirm.confirm); confirmRef.current = confirm.confirm;
+  const connection = useSftpStore((s) => s.sessions[sessionId]);
+  const requestReattach = useCallback(async () => {
+    if (!params?.envelope || closing.current) return;
+    closing.current = true; setWindowError(null);
+    try {
+      const jobs = activeSftpJobs(sessionId);
+      if (jobs.length) {
+        if (!await confirmRef.current({ title: t("shell.reattach"), message: t("shell.transferCloseRisk", { count: jobs.length }), confirmLabel: t("shell.close.cancel-job"), danger: true })) return;
+        const signal = new AbortController().signal;
+        for (const job of activeSftpJobs(sessionId)) { await sftpCancelTransfer(job.id); await waitTransferTerminal(job.id, signal); }
+      }
+      const view = useSftpStore.getState().sessions[sessionId];
+      const ack = waitPanelWindow(params.envelope, "reattached");
+      signalPanelWindow(params.envelope, "request-reattach", { localPath: view?.local.path, remotePath: view?.remote.path });
+      await ack;
+      clearDetachedHandoff(sessionId);
+      if (isTauriRuntime()) await closeCurrentDetachedWindow(); else window.close();
+    } catch (error) { setWindowError(String(error)); }
+    finally { closing.current = false; }
+  }, [params, sessionId, t]);
+  useEffect(() => {
+    if (!params?.envelope) return;
+    return subscribePanelWindow((message) => {
+      if (!matchesPanelWindow(params.envelope!, message.envelope)) return;
+      if (message.envelope.event === "commit") { setCommitted(true); clearDetachedHandoff(sessionId); }
+      if (message.envelope.event === "request-reattach") void requestReattach();
+      if (message.envelope.event === "request-focus" && isTauriRuntime()) void getCurrentWindow().show().then(() => getCurrentWindow().setFocus());
+      if (message.envelope.event === "cancel") { if (isTauriRuntime()) void closeCurrentDetachedWindow(); else window.close(); }
+    });
+  }, [params, sessionId, requestReattach]);
+  useEffect(() => {
+    if (!params?.envelope || announced.current || !connection) return;
+    if (connection.error) { announced.current = true; signalPanelWindow({ ...params.envelope, errorCode: connection.error }, "failed"); }
+    else if (connection.attached && !connection.remote.loading && !connection.local.loading) {
+      announced.current = true;
+      void (async () => {
+        try {
+          if (params.localPath) await useSftpStore.getState().navigate(sessionId, "local", params.localPath);
+          if (params.initialPath) await useSftpStore.getState().navigate(sessionId, "remote", params.initialPath);
+          signalPanelWindow(params.envelope!, "ready");
+        } catch (error) { signalPanelWindow({ ...params.envelope!, errorCode: String(error) }, "failed"); }
+      })();
+    }
+  }, [connection, params, sessionId]);
+  useEffect(() => {
+    if (!isTauriRuntime() || !params?.envelope) return;
+    let off: (() => void) | undefined, disposed = false;
+    void getCurrentWindow().onCloseRequested((event) => { event.preventDefault(); void requestReattach(); }).then((fn) => { if (disposed) fn(); else off = fn; });
+    return () => { disposed = true; off?.(); };
+  }, [params, requestReattach]);
   // Latest cwd hint broadcast by the parent window (terminal OSC 7). Lets
   // a detached SFTP view offer last-known terminal cwd sync even though it
   // can't see the terminal directly. We subscribe under the PARENT session id
@@ -280,6 +345,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   return (
     <div
       data-testid="sftp-detached-window"
+      data-phase={committed ? "ready" : "initializing"}
       className="w-screen h-screen flex flex-col"
       style={{ background: "var(--taomni-chrome-bg)", color: "var(--taomni-text)" }}
     >
@@ -287,8 +353,12 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
         className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
-        <span className="truncate">{title}</span>
+        <span className="truncate flex-1">{title}</span>
+        {params.envelope && <button data-testid="shell-window-reattach" onClick={() => void requestReattach()}>{t("shell.reattach")}</button>}
+        {params.envelope && <button data-testid="shell-window-hide" onClick={() => { if (isTauriRuntime()) void getCurrentWindow().hide(); }}>{t("shell.hide")}</button>}
       </div>
+      {windowError && <p role="alert" data-testid="shell-window-error">{windowError}</p>}
+      {confirm.render}
       <div className="flex-1 min-h-0">
         <FileBrowser
           sessionId={params.sessionId}

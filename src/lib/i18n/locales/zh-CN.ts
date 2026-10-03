@@ -5,6 +5,30 @@ import type { en } from "./en";
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export const zhCN: DeepPartial<typeof en> = {
+  shell: {
+    details: "详情", dirty: "未保存更改", attentionStates: { none: "无提醒", unread: "新动态", busy: "正在运行", error: "错误" },
+    closeCount: "将关闭 {count} 个所选项目", closeIncludingPinned: "关闭全部（包含固定标签）", ownerUnavailable: "原所属标签已关闭，请保留此标签或关闭实例。",
+    fallback: "工作台布局暂时无法显示。", reload: "重新加载窗口",
+    restoreWorkingSet: "恢复工作集", restoreStates: { loading: "加载中", empty: "暂无可恢复工作集", available: "可恢复", restoring: "恢复中", "awaiting-auth": "等待认证", succeeded: "已就绪", partial: "部分恢复", failed: "失败", cancelled: "已取消" },
+    workspaceDescription: "打开目录或保存的工作区，编辑、搜索、运行和管理 Git。", recentMail: "最近邮件",
+    closePromoted: "将此视图回到停靠面板，或关闭实例？",
+    transfers: "传输", notificationCount: "{count} 条未确认通知", targetUnavailable: "通知目标暂不可用。", aiDisabled: "AI 已关闭，可继续使用便签和通知。",
+    transferCloseRisk: "此面板仍有 {count} 个传输任务。",
+    queryCloseRisk: "仍有 {count} 个查询正在执行，请先取消查询再关闭。",
+    transactionCloseRisk: "有 {count} 条未提交语句，请选择提交或回滚。",
+    home: "首页", sessions: "会话", workspaces: "工作区", tao: "Tao", settings: "设置",
+    lane: "工作组", lanes: { home: "首页", connect: "连接", build: "开发", communicate: "沟通", utility: "工具" },
+    navigator: "导航", project: "项目", tools: "工具", quickSwitch: "快速切换", overview: "所有标签", panel: "上下文面板",
+    search: "搜索标签", all: "全部", attention: "仅有提醒", sort: "排序", recent: "最近使用", name: "名称", type: "类型",
+    tabCount: "{count} 个标签", currentExcluded: "当前标签不在结果中", locateCurrent: "定位当前", empty: "没有匹配的标签", emptyLane: "此工作组还没有标签",
+    clear: "清除筛选", newSession: "新建连接", openWorkspace: "打开工作区", hide: "隐藏面板", pin: "固定", unpin: "取消固定", more: "更多",
+    promote: "提升为标签", detach: "在窗口中打开", reattach: "回到面板", right: "停靠右侧", bottom: "停靠底部", closePanel: "关闭面板", retry: "重试",
+    owner: "所属：{name}", detached: "已在窗口中打开", focusWindow: "聚焦窗口", reset: "重置布局", resetConfirm: "重置工作台布局偏好？",
+    layoutWarning: "布局偏好未能恢复或保存。", closeTitle: "关闭前确认", closeConfirm: "关闭所选标签",
+    close: { save: "保存", discard: "放弃更改", commit: "提交事务", rollback: "回滚事务", background: "继续后台任务", "cancel-job": "取消任务", retry: "重试", dock: "回到面板", "close-instance": "关闭实例" },
+    keymap: "工作台快捷键", keymapConflict: "此按键已分配", record: "录入快捷键", recentPanels: "最近面板", launchStatus: "正在打开工作区…",
+    launchFailed: "工作区未能打开：{error}", restoreWorkspaces: "恢复工作区", noPreview: "暂无预览",
+  },
   app: {
     name: "Taomni",
     title: "Taomni",

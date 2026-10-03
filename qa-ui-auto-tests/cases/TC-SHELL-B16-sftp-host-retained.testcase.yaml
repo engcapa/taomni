@@ -1,0 +1,157 @@
+id: TC-SHELL-B16
+title: SFTP host hide and owner switching retain one connection
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b16.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F7.4
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host"]'
+    name: data-edge
+    equals: right
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 2
+- click: '[data-testid="shell-host-hide"]'
+- assert_not_visible: '[data-testid="shell-host"]'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-b"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- assert_not_visible: '[data-testid="shell-host"]'
+- click: '[data-testid="tab-item"]:has-text("qa-alpha")'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- screenshot: tc-shell-b16.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Files opens in the right host without an extra main tab and hide/reopen
+      reuses its connection.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 12
+    - 14
+    checkpoints:
+    - step: 5
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 7
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 8
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 9
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 10
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 11
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 13
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 15
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 16
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    - step: 17
+      expectation: Files opens in the right host without an extra main tab and hide/reopen
+        reuses its connection.
+    results:
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 15
+    - 16
+    - 17
+  - id: R2
+    requirement: Switching to Beta hides Alpha Files; returning to Alpha restores
+      its retained browser.
+    actions:
+    - 18
+    - 19
+    - 22
+    checkpoints:
+    - step: 20
+      expectation: Switching to Beta hides Alpha Files; returning to Alpha restores
+        its retained browser.
+    - step: 21
+      expectation: Switching to Beta hides Alpha Files; returning to Alpha restores
+        its retained browser.
+    - step: 23
+      expectation: Switching to Beta hides Alpha Files; returning to Alpha restores
+        its retained browser.
+    - step: 24
+      expectation: Switching to Beta hides Alpha Files; returning to Alpha restores
+        its retained browser.
+    - step: 25
+      expectation: Switching to Beta hides Alpha Files; returning to Alpha restores
+        its retained browser.
+    results:
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

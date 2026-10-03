@@ -1,0 +1,146 @@
+id: TC-SHELL-B12
+title: Tab rename cancellation, manual title and duplicate identity
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b12.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- right_click: '[data-testid="tab-item"]:has-text("qa-alpha")'
+- click: '[data-testid="shell-tab-rename"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: abandoned
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Escape
+- assert_text_equals:
+    selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+    equals: qa-alpha
+- right_click: '[data-testid="tab-item"]:has-text("qa-alpha")'
+- click: '[data-testid="shell-tab-rename"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: SHELL manual
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Enter
+- assert_text_equals:
+    selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+    equals: SHELL manual
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]:has-text("SHELL manual")'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-overview"]'
+- right_click: '[data-testid="tab-item"]:has-text("SHELL manual")'
+- click: '[data-testid="shell-tab-duplicate"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 3
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]:has-text("SHELL manual")'
+    equal: 2
+- assert_shell_backend:
+    command: create_ssh_terminal
+    count: 2
+    status: requested
+- screenshot: tc-shell-b12.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Rename Escape keeps the original title; Enter synchronizes the strip
+      and overview.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 18
+    checkpoints:
+    - step: 5
+      expectation: Rename Escape keeps the original title; Enter synchronizes the
+        strip and overview.
+    - step: 10
+      expectation: Rename Escape keeps the original title; Enter synchronizes the
+        strip and overview.
+    - step: 15
+      expectation: Rename Escape keeps the original title; Enter synchronizes the
+        strip and overview.
+    - step: 17
+      expectation: Rename Escape keeps the original title; Enter synchronizes the
+        strip and overview.
+    - step: 19
+      expectation: Rename Escape keeps the original title; Enter synchronizes the
+        strip and overview.
+    results:
+    - 5
+    - 10
+    - 15
+    - 17
+    - 19
+  - id: R2
+    requirement: Duplicate creates a second terminal without replacing the manually
+      named source.
+    actions:
+    - 20
+    - 21
+    - 23
+    checkpoints:
+    - step: 22
+      expectation: Duplicate creates a second terminal without replacing the manually
+        named source.
+    - step: 24
+      expectation: Duplicate creates a second terminal without replacing the manually
+        named source.
+    - step: 25
+      expectation: Duplicate creates a second terminal without replacing the manually
+        named source.
+    - step: 26
+      expectation: Duplicate creates a second terminal without replacing the manually
+        named source.
+    results:
+    - 22
+    - 24
+    - 25
+    - 26
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

@@ -5,6 +5,7 @@ import {
   detectDetachedSftpRoute,
 } from "./components/filebrowser/SftpDetachedWindow";
 import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
+import { GitDetachedWindow } from "./components/detached/GitDetachedWindow";
 import LanChatDetachedWindow from "./components/detached/LanChatDetachedWindow";
 import { NotesDetachedWindow } from "./components/notes/NotesDetachedWindow";
 import { ServersDialog } from "./components/servers/ServersDialog";
@@ -220,7 +221,9 @@ function App() {
     content = <SftpDetachedWindow sessionId={detachedSftpId} />;
   } else {
     const detachedRoute = detectDetachedRoute();
-    if (detachedRoute?.kind === "lan-chat") {
+    if (detachedRoute?.kind === "git") {
+      content = <GitDetachedWindow id={detachedRoute.id} />;
+    } else if (detachedRoute?.kind === "lan-chat") {
       content = <LanChatDetachedWindow id={detachedRoute.id} />;
     } else if (detachedRoute?.kind === "notes") {
       content = <NotesDetachedWindow />;

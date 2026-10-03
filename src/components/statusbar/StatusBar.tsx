@@ -29,6 +29,8 @@ import {
   type CodeWorkspaceStatusSegments,
 } from "../../stores/codeWorkspaceStatusStore";
 import { useT } from "../../lib/i18n";
+import { useShellLayoutStore } from "../../stores/shellLayoutStore";
+import { useTransferStore, isTransferActive } from "../../stores/transferStore";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 
 /**
@@ -193,6 +195,7 @@ function StatusSegment({
 }
 
 export function StatusBar() {
+  const transfers = useTransferStore((s) => s.items);
   // Per-field selectors: subscribing to the whole store re-rendered the status
   // bar on every unrelated app-store mutation, and LSP progress writes
   // `statusMessage` often enough for that to matter while typing.
@@ -241,6 +244,9 @@ export function StatusBar() {
 
   return (
     <div data-testid="status-bar" className="taomni-status min-h-6 flex items-center px-2 gap-3">
+      {transfers.length > 0 && <button data-testid="shell-transfers-trigger" className="shrink-0 text-xs" onClick={() => useShellLayoutStore.getState().revealTransfers()} aria-label={t("shell.transfers")}>
+        {t("shell.transfers")} ({transfers.filter((job) => isTransferActive(job.state)).length})
+      </button>}
       {/* ED-PARITY-010 DEC-010-06: a focused code workspace owns the status
           bar like IDEA — navigation bar left, editor widgets right. */}
       {showWorkspaceSegments && workspaceStatus ? (

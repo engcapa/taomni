@@ -144,6 +144,7 @@ interface NotesStore {
   notesLoaded: boolean;
   loading: boolean;
   activeNoteId: string | null;
+  activeNoteSnapshot: NoteItem | null;
   filter: NoteFilter;
   statusFilters: NoteFilter[];
   search: string;
@@ -206,6 +207,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   notesLoaded: false,
   loading: false,
   activeNoteId: null,
+  activeNoteSnapshot: null,
   filter: "recent_incomplete",
   statusFilters: ["recent_incomplete"],
   search: "",
@@ -276,7 +278,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     try {
       const updated = await updateNoteIpc(id, patch);
       if (updated) {
-        set((s) => ({ notes: s.notes.map((n) => (n.id === id ? updated : n)) }));
+        set((s) => ({ notes: s.notes.map((n) => (n.id === id ? updated : n)), activeNoteSnapshot: s.activeNoteSnapshot?.id === id ? updated : s.activeNoteSnapshot }));
       }
       void get().loadNotes();
       void get().refreshAlerts();
@@ -345,7 +347,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     }
   },
 
-  setActiveNote: (id) => set({ activeNoteId: id }),
+  setActiveNote: (id) => set((s) => ({ activeNoteId: id, activeNoteSnapshot: id ? s.notes.find((n) => n.id === id) ?? (s.activeNoteSnapshot?.id === id ? s.activeNoteSnapshot : null) : null })),
 
   setFilter: (filter) => {
     const statusFilters = normalizeStatusFilters(filter);

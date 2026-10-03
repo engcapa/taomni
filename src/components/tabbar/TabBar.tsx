@@ -26,6 +26,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
+import { useShellLayoutStore } from "../../stores/shellLayoutStore";
+import { stripTabs, tabLane } from "../../lib/shell/tabPresentation";
+import { dispatchShellAction } from "../../lib/shell/shellActions";
+import { TAB_LANES } from "../../lib/shell/types";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import {
@@ -46,6 +50,7 @@ import { formatTabSessionInfo } from "../../lib/tabDetails";
 import { getAppPlatform } from "../../lib/runtime";
 import { filterVisibleTabs, getFilterChipText } from "../../lib/tabFilter";
 import { TabDetailsOverlay } from "./TabDetailsOverlay";
+import { installShellTabMenu } from "../../lib/shell/tabMenu";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 type TabScrollState = { overflow: boolean; atStart: boolean; atEnd: boolean };
@@ -72,6 +77,7 @@ function setTabScrollLeft(el: HTMLElement, left: number) {
 }
 
 interface TabBarProps {
+  shellMode?: boolean;
   onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
   onConnectSession: (session: SessionConfig) => void;
   onOpenSessionEditor: () => void;
@@ -92,7 +98,9 @@ export function TabBar({
   onOpenSessionEditor,
   onDuplicateTab,
   detailsRevealExternal = false,
+  shellMode = false,
 }: TabBarProps) {
+  const shell = useShellLayoutStore();
   const {
     tabs,
     activeTabId,
@@ -298,10 +306,18 @@ export function TabBar({
 
   // Tabs actually rendered in the strip. The focus filter (issue #121) hides
   // non-matching tabs here without closing them; the `…` menu still lists all.
-  const visibleTabs = useMemo(
-    () => filterVisibleTabs(tabs, sessions, tabFilter),
-    [tabs, sessions, tabFilter],
+  const laneTabs = useMemo(
+    () => {
+      const filtered = filterVisibleTabs(tabs, sessions, tabFilter);
+      if (!shellMode) return filtered;
+      const active = tabs.find((tab) => tab.id === activeTabId);
+      const lane = shell.laneSelection ?? (active ? tabLane(active, shell.laneOverrides[active.id]) : "home");
+      return filtered.filter((tab) => tab.type !== "welcome" && tabLane(tab, shell.laneOverrides[tab.id]) === lane)
+        .sort((a, b) => Number(!!shell.pinnedTabs[b.id]) - Number(!!shell.pinnedTabs[a.id]));
+    },
+    [tabs, sessions, tabFilter, shellMode, shell.laneSelection, shell.laneOverrides, shell.pinnedTabs, activeTabId],
   );
+  const visibleTabs = shellMode ? stripTabs(laneTabs, activeTabId) : laneTabs;
 
   useEffect(() => {
     if (editingTabId && !tabs.some((t) => t.id === editingTabId)) {
@@ -431,17 +447,22 @@ export function TabBar({
 
   const handleTabContext = (e: React.MouseEvent, tab: Tab) => {
     const idx = tabs.findIndex((t) => t.id === tab.id);
-    const isFirst = idx === 0;
     const isLast = idx === tabs.length - 1;
     ctx.show(e, [
-      { label: t("tabs.close"), icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
-      { label: t("tabs.closeOthersShort"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
-      { label: t("tabs.closeAll"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.closable).map((t) => t.id)) },
+      { label: t("tabs.close"), testId: "shell-tab-close", icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
+      { label: t("tabs.closeOthersShort"), testId: "shell-tab-close-others", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable && (!shellMode || !shell.pinnedTabs[t.id])).map((t) => t.id)) },
+      { label: t("tabs.closeAll"), testId: "shell-tab-close-all", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.closable && (!shellMode || !shell.pinnedTabs[t.id])).map((t) => t.id)) },
+      ...(shellMode && tabs.some((item) => item.closable && shell.pinnedTabs[item.id]) ? [{ label: t("shell.closeIncludingPinned"), testId: "shell-tab-close-including-pinned", icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((item) => item.closable).map((item) => item.id)) }] : []),
+      ...(shellMode && tab.type !== "welcome" ? [
+        { label: t(shell.pinnedTabs[tab.id] ? "shell.unpin" : "shell.pin"), testId: "shell-tab-pin", onClick: () => shell.pinTab(tab.id, !shell.pinnedTabs[tab.id]) },
+        { label: t("shell.lane"), testId: "shell-tab-move-lane", onClick: () => {}, children: TAB_LANES.filter((lane) => lane !== "home").map((lane) => ({ label: t(`shell.lanes.${lane}`), testId: `shell-tab-move-${lane}`, onClick: () => shell.moveTab(tab.id, lane) })) },
+        { label: t("shell.reset"), testId: "shell-tab-default-lane", onClick: () => shell.moveTab(tab.id) },
+      ] : []),
       { label: "", separator: true, onClick: () => {} },
-      { label: t("tabs.rename"), icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
-      { label: t("tabs.duplicate"), icon: <Copy className="w-3 h-3" />, onClick: () => {
+      { label: t("tabs.rename"), testId: "shell-tab-rename", icon: <Pencil className="w-3 h-3" />, onClick: () => { if (shell.overlay) shell.setOverlay(null); startRename(tab); }, disabled: !tab.closable },
+      { label: t("tabs.duplicate"), testId: "shell-tab-duplicate", icon: <Copy className="w-3 h-3" />, onClick: () => {
         (onDuplicateTab ?? duplicateTab)(tab.id);
-      }, disabled: tab.type === "welcome" },
+      }, disabled: tab.type === "welcome" || !!tab.shellPanelId },
       {
         label: t("tabs.copySessionInfo"),
         testId: "tab-context-copy-session-info",
@@ -449,12 +470,17 @@ export function TabBar({
         onClick: () => copyTabSessionInfo(tab),
       },
       { label: "", separator: true, onClick: () => {} },
-      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
-      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: isFirst },
-      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx + 1), disabled: isLast },
-      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, tabs.length - 1), disabled: isLast },
+      { label: t("tabs.moveToFirst"), testId: "shell-tab-move-first", icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 1), disabled: !tab.closable || idx <= 1 },
+      { label: t("tabs.moveLeft"), testId: "shell-tab-move-left", icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: !tab.closable || idx <= 1 },
+      { label: t("tabs.moveRight"), testId: "shell-tab-move-right", icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx + 1), disabled: !tab.closable || isLast },
+      { label: t("tabs.moveToLast"), testId: "shell-tab-move-last", icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, tabs.length - 1), disabled: !tab.closable || isLast },
     ]);
   };
+
+  useEffect(() => installShellTabMenu((event, id) => {
+    const tab = tabs.find((item) => item.id === id);
+    if (tab) handleTabContext(event, tab);
+  }));
 
   const computeDropSide = (rect: DOMRect, clientX: number): "before" | "after" => {
     return clientX < rect.left + rect.width / 2 ? "before" : "after";
@@ -497,6 +523,8 @@ export function TabBar({
       style={{ background: "linear-gradient(to bottom, var(--taomni-tab-inactive), var(--taomni-chrome-bg))" }}
     >
       {ctx.render}
+      {shellMode && <button type="button" data-testid="tab-item" data-tab-id="welcome" data-tab-type="welcome" data-active={activeTabId === "welcome"} role="tab" aria-selected={activeTabId === "welcome"} className="taomni-tab shrink-0 shell-fixed-home"
+        onClick={() => { shell.selectLane(null); setActiveTab("welcome"); }}>{t("shell.home")}</button>}
       <TabDetailsOverlay
         open={detailsReveal || hoveredDetailsTabId !== null}
         tabs={visibleTabs}
@@ -530,6 +558,10 @@ export function TabBar({
           <X className="w-3 h-3 shrink-0" />
         </button>
       )}
+      {shellMode && laneTabs.length > visibleTabs.length && <button type="button" data-testid="shell-tab-overflow" data-hidden-count={laneTabs.length - visibleTabs.length}
+        className="shrink-0 px-1 text-xs h-7" aria-label={t("shell.overview")} onClick={() => dispatchShellAction("shell.overview")}>
+        +{laneTabs.length - visibleTabs.length}
+      </button>}
       {tabScrollState.overflow && (
         <IconBtn
           testId="tab-scroll-left"
@@ -596,6 +628,7 @@ export function TabBar({
               }}
               onActivate={(t) => {
                 if (editingTabId === t.id) return;
+                shell.selectLane(null);
                 setActiveTab(t.id);
               }}
               onMouseDown={handleMouseDown}
@@ -838,6 +871,11 @@ function TabItem(props: TabItemProps) {
       data-tab-id={tab.id}
       data-tab-title={tab.title}
       data-tab-type={tab.type}
+      data-lane={tabLane(tab, useShellLayoutStore.getState().laneOverrides[tab.id])}
+      data-pinned={useShellLayoutStore.getState().pinnedTabs[tab.id] || undefined}
+      role="tab"
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
       data-multiexec-selected={multiExecSelected || undefined}
       data-dragging={dragging || undefined}
       data-drop-side={dropSide}
@@ -925,7 +963,7 @@ function TabItem(props: TabItemProps) {
           tab.title
         )}
       </span>
-      {tab.closable && (
+      {tab.closable && !useShellLayoutStore.getState().pinnedTabs[tab.id] && (
         <X
           data-testid="tab-close"
           className="w-3 h-3 ml-1 opacity-60 hover:opacity-100"

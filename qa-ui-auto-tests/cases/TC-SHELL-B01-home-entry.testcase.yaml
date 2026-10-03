@@ -1,0 +1,198 @@
+id: TC-SHELL-B01
+title: Unique Home and three primary launch entries
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b01.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.2
+- F1.6
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_count:
+    selector: '[data-testid="welcome-panel"]'
+    equal: 1
+- assert_visible: '[data-testid="shell-rail-home"]'
+- assert_visible: '[data-testid="welcome-new-session"]'
+- assert_visible: '[data-testid="shell-home-open-workspace"]'
+- assert_visible: '[data-testid="welcome-open-local-terminal"]'
+- assert_items:
+    selector: '[data-testid="welcome-new-session"],[data-testid="shell-home-open-workspace"],[data-testid="welcome-open-local-terminal"]'
+    attribute: data-testid
+    equals:
+    - welcome-new-session
+    - shell-home-open-workspace
+    - welcome-open-local-terminal
+- assert_element_geometry:
+    selector: '[data-testid="welcome-new-session"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-home-open-workspace"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="welcome-open-local-terminal"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="tab-item"][data-tab-id="welcome"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="tab-item"][data-tab-id="welcome"]'
+- assert_count:
+    selector: '[data-testid="welcome-panel"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 1
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-id="welcome"] [data-testid="shell-tab-card-close"]'
+    equal: 0
+- press:
+    selector: '[data-testid="shell-tab-card"][data-tab-id="welcome"] [data-testid="shell-tab-card-open"]'
+    key: Delete
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 2
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- middle_click: '[data-testid="tab-item"][data-tab-id="welcome"]'
+- assert_count:
+    selector: '[data-testid="welcome-panel"]'
+    equal: 1
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- screenshot: tc-shell-b01.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: One Home instance exposes connection, workspace and local shell actions
+      in order.
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    - step: 4
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    - step: 5
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    - step: 6
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    - step: 7
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    - step: 8
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    - step: 9
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    - step: 10
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    - step: 11
+      expectation: One Home instance exposes connection, workspace and local shell
+        actions in order.
+    results:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+  - id: R2
+    requirement: Opening a local terminal and repeatedly returning through both Home
+      entries creates no extra Home or terminal.
+    actions:
+    - 12
+    - 14
+    - 15
+    - 16
+    - 17
+    - 20
+    checkpoints:
+    - step: 13
+      expectation: Opening a local terminal and repeatedly returning through both
+        Home entries creates no extra Home or terminal.
+    - step: 18
+      expectation: Opening a local terminal and repeatedly returning through both
+        Home entries creates no extra Home or terminal.
+    - step: 19
+      expectation: Opening a local terminal and repeatedly returning through both
+        Home entries creates no extra Home or terminal.
+    - step: 21
+      expectation: Opening a local terminal and repeatedly returning through both
+        Home entries creates no extra Home or terminal.
+    - step: 22
+      expectation: Opening a local terminal and repeatedly returning through both
+        Home entries creates no extra Home or terminal.
+    results:
+    - 13
+    - 18
+    - 19
+    - 21
+    - 22
+  - id: R3
+    requirement: Home cannot be deleted from overview or by middle clicking its fixed
+      tab.
+    actions:
+    - 23
+    - 25
+    - 26
+    checkpoints:
+    - step: 24
+      expectation: Home cannot be deleted from overview or by middle clicking its
+        fixed tab.
+    - step: 27
+      expectation: Home cannot be deleted from overview or by middle clicking its
+        fixed tab.
+    - step: 28
+      expectation: Home cannot be deleted from overview or by middle clicking its
+        fixed tab.
+    results:
+    - 24
+    - 27
+    - 28
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

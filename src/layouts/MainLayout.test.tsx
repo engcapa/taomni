@@ -7,6 +7,8 @@ import { MainLayout } from "./MainLayout";
 import { useAppStore, recentWorkspaceIdFromParts } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { useMainRailHostStore } from "../stores/mainRailHostStore";
+import { useShellLayoutStore } from "../stores/shellLayoutStore";
+import { defaultShellLayout } from "../lib/shell/shellLayoutPersistence";
 import { commitWelcomeRunSnapshot, exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
 
@@ -173,6 +175,7 @@ vi.mock("../components/quickconnect/QuickConnect", () => ({
 
 vi.mock("../components/sidebar/Sidebar", () => ({
   Sidebar: (props: {
+    navigatorOnly?: boolean;
     onConnectSession?: (session: SessionConfig) => void;
     onOpenSettings?: () => void;
     gitAction?: {
@@ -185,7 +188,7 @@ vi.mock("../components/sidebar/Sidebar", () => ({
     sidebarMock.props.push(props);
     return (
       <div data-testid="sidebar">
-        {props.gitAction && (
+        {props.gitAction && !props.navigatorOnly && (
           <button type="button" data-testid="ribbon-git" onClick={props.gitAction.onOpen}>
             Git
           </button>
@@ -464,9 +467,18 @@ vi.mock("../stores/vaultStore", () => ({
   ),
 }));
 
+beforeEach(() => {
+  useShellLayoutStore.getState().flush();
+  useShellLayoutStore.setState({ layout: defaultShellLayout(), initialized: false, writable: true, exiting: false, warning: null,
+    panels: {}, activePanelByEdge: {}, restoreRefByTab: {}, mru: [], mruCycling: false, laneSelection: null, laneOverrides: {}, pinnedTabs: {},
+    overlay: null, overlayTarget: null, navigatorOverlay: false, navigatorPage: "recent", taoOpen: false });
+  Object.defineProperty(window, "innerWidth", { value: 1440, configurable: true, writable: true });
+});
+
 describe("MainLayout attached SFTP sidebar", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.localStorage.setItem("taomni.sidebarCollapsedByGroup.v1", JSON.stringify({ terminal: false, "code-workspace": true }));
     terminalLifecycle.mounted.mockClear();
     terminalLifecycle.unmounted.mockClear();
     terminalPanelMock.props = [];
@@ -532,7 +544,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     render(<MainLayout />);
 
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("ai-chat-drawer-ribbon")).toBeInTheDocument();
+    expect(screen.getByTestId("shell-rail-tao")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
 
@@ -576,8 +588,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
   });
 
-  it("toggles the attached SFTP sidebar and handles detaching and reopening behavior", () => {
-    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null as any);
+  it("keeps the SFTP instance when hidden and preserves it when a popup is blocked", async () => {
     render(<MainLayout />);
 
     // Click SFTP button to open sidebar
@@ -586,23 +597,21 @@ describe("MainLayout attached SFTP sidebar", () => {
 
     // Click Close inside the mock sidebar (should hide sidebar)
     fireEvent.click(screen.getByTestId("sftp-mock-close"));
-    expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sftp-sidebar")).not.toBeVisible();
 
     // Click SFTP button to show sidebar again
     fireEvent.click(screen.getByRole("button", { name: /sftp/i }));
     expect(screen.getByTestId("sftp-sidebar")).toBeInTheDocument();
 
-    // Click Detach in the mock sidebar (should open detached window and close sidebar)
+    // A blocked popup must leave the ready source usable.
+    vi.mocked(tauriInvoke).mockRejectedValueOnce(new Error("Popup blocked"));
     fireEvent.click(screen.getByTestId("sftp-mock-detach"));
-    expect(windowOpenSpy).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
+    await waitFor(() => expect(tauriInvoke).toHaveBeenCalledWith("open_detached_window", expect.objectContaining({ kind: "sftp" })));
+    await waitFor(() => expect(useShellLayoutStore.getState().panels["tab:ssh-tab:sftp"].operation).toBeNull());
+    expect(screen.getByTestId("sftp-sidebar")).toBeVisible();
+    expect(useShellLayoutStore.getState().panels["tab:ssh-tab:sftp"].placement.kind).toBe("dock");
+    expect(useShellLayoutStore.getState().panels["tab:ssh-tab:sftp"].error?.code).toBe("detach");
 
-    // Click SFTP button now that it's detached (should call window.open again, NOT open sidebar)
-    fireEvent.click(screen.getByRole("button", { name: /sftp/i }));
-    expect(windowOpenSpy).toHaveBeenCalledTimes(2);
-    expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
-
-    windowOpenSpy.mockRestore();
   });
 
   it("renders the unified control bar and status bar without remounting the terminal", () => {
@@ -1017,11 +1026,12 @@ describe("MainLayout attached SFTP sidebar", () => {
     useAppStore.setState({
       sidebarCollapsed: true,
     });
+    window.localStorage.setItem("taomni.sidebarCollapsedByGroup.v1", JSON.stringify({ terminal: true }));
 
     render(<MainLayout />);
 
-    expect(screen.getByTestId("collapsed-sidebar-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("main-sidebar-resize-handle")).toHaveClass("hidden");
+    expect(screen.getByTestId("shell-rail")).toBeInTheDocument();
+    expect(screen.queryByTestId("main-sidebar-resize-handle")).not.toBeInTheDocument();
   });
 
   it("shows all terminal panes in split mode and switches layouts without remounting terminals", async () => {
@@ -1911,20 +1921,21 @@ describe("MainLayout ED-PARITY-027 single tool window bar", () => {
     await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
   });
 
-  it("keeps the store's state over a restored collapsed layout and syncs later drags", async () => {
+  it("persists Navigator resize only on commit and cancels a drag with Escape", () => {
     render(<MainLayout />);
-    const onResize = panelResizeMock.handlers.get("sidebar");
-    expect(onResize).toBeDefined();
-    // First report = the restored layout of a session that quit in a terminal.
-    act(() => onResize?.({ asPercentage: 0, inPixels: 0 }, "sidebar", undefined));
-    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
-    expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(false);
-    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
-    // A later report is a drag on the divider: a manual change for Welcome.
-    act(() => onResize?.({ asPercentage: 0, inPixels: 0 }, "sidebar", { asPercentage: 22, inPixels: 220 }));
-    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
-    expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(true);
-    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
+    const handle = screen.getByTestId("main-sidebar-resize-handle");
+    const initial = useShellLayoutStore.getState().layout.navigator.width;
+    fireEvent.pointerDown(handle, { button: 0, clientX: initial });
+    fireEvent.pointerMove(window, { clientX: initial + 40 });
+    expect(useShellLayoutStore.getState().layout.navigator.width).toBe(initial);
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.pointerUp(window);
+    expect(useShellLayoutStore.getState().layout.navigator.width).toBe(initial);
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(useShellLayoutStore.getState().layout.navigator.width).toBe(initial + 8);
+    useShellLayoutStore.getState().flush();
+    expect(JSON.parse(localStorage.getItem("taomni.shellLayout.v2")!).navigator.width).toBe(initial + 8);
+    expect(localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
   });
 
   it("remembers a manual expand for terminal tabs only", async () => {
@@ -1932,16 +1943,18 @@ describe("MainLayout ED-PARITY-027 single tool window bar", () => {
     act(() => useAppStore.getState().setActiveTab("ssh-tab"));
     await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
     act(() => useAppStore.getState().toggleSidebar());
-    expect(useAppStore.getState().sidebarCollapsedByGroup.terminal).toBe(false);
+    expect(useShellLayoutStore.getState().layout.navigator.collapsedByLane.connect).toBe(false);
     act(() => useAppStore.getState().setActiveTab("welcome"));
     act(() => useAppStore.getState().setActiveTab("ssh-tab"));
     await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
-    expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(true);
+    expect(useShellLayoutStore.getState().layout.navigator.collapsedByLane.build).toBe(true);
   });
 
   it("moves the terminal's SFTP and Chat toggles into the collapsed rail", async () => {
     render(<MainLayout />);
     act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    host.remove();
+    host = screen.getByTestId("sidebar-tool-window-rail");
     await waitFor(() => expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).not.toBeNull());
     expect(host.querySelector('[data-testid="tab-chat-toggle"]')).not.toBeNull();
     const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);
@@ -1956,7 +1969,7 @@ describe("MainLayout ED-PARITY-027 single tool window bar", () => {
     useAppStore.setState({ mergeToolWindowRail: false });
     render(<MainLayout />);
     act(() => useAppStore.getState().setActiveTab("ssh-tab"));
-    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
     expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).toBeNull();
     const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);
     expect(active?.sftpToggle).toBeDefined();

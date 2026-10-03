@@ -1,0 +1,179 @@
+id: TC-SHELL-B23
+title: Host resize keyboard, placement and persistence
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b23.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F-SHELL-1
+- F7.4
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- press:
+    selector: '[data-testid="shell-host-resize"]'
+    key: Home
+- assert_attribute:
+    selector: '[data-testid="shell-host-resize"]'
+    name: aria-valuenow
+    equals: '280'
+- press:
+    selector: '[data-testid="shell-host-resize"]'
+    key: ArrowRight
+- assert_attribute:
+    selector: '[data-testid="shell-host-resize"]'
+    name: aria-valuenow
+    equals: '288'
+- press:
+    selector: '[data-testid="shell-host-resize"]'
+    key: Shift+ArrowRight
+- assert_attribute:
+    selector: '[data-testid="shell-host-resize"]'
+    name: aria-valuenow
+    equals: '320'
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-move-bottom"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host"]'
+    name: data-edge
+    equals: bottom
+- wait_for: '[data-testid="sftp-remote-list"]'
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- click: '[data-testid="shell-host-pin"]'
+- assert_attribute:
+    selector: '[data-testid="shell-work-area"]'
+    name: inert
+    equals: ''
+- press:
+    selector: '[data-testid="shell-host-hide"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-host"]'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- screenshot: tc-shell-b23.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Right host keyboard size changes are legal and committed once; moving
+      to bottom retains Files.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 9
+    - 11
+    - 13
+    - 15
+    - 16
+    checkpoints:
+    - step: 5
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 7
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 8
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 10
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 12
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 14
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 17
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 18
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 19
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    - step: 20
+      expectation: Right host keyboard size changes are legal and committed once;
+        moving to bottom retains Files.
+    results:
+    - 5
+    - 7
+    - 8
+    - 10
+    - 12
+    - 14
+    - 17
+    - 18
+    - 19
+    - 20
+  - id: R2
+    requirement: Unpin uses an overlay with inert background and Escape hides it;
+      reopening retains size.
+    actions:
+    - 21
+    - 23
+    - 25
+    checkpoints:
+    - step: 22
+      expectation: Unpin uses an overlay with inert background and Escape hides it;
+        reopening retains size.
+    - step: 24
+      expectation: Unpin uses an overlay with inert background and Escape hides it;
+        reopening retains size.
+    - step: 26
+      expectation: Unpin uses an overlay with inert background and Escape hides it;
+        reopening retains size.
+    - step: 27
+      expectation: Unpin uses an overlay with inert background and Escape hides it;
+        reopening retains size.
+    - step: 28
+      expectation: Unpin uses an overlay with inert background and Escape hides it;
+        reopening retains size.
+    results:
+    - 22
+    - 24
+    - 26
+    - 27
+    - 28
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

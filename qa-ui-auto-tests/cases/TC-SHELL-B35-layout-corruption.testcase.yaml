@@ -1,0 +1,89 @@
+id: TC-SHELL-B35
+title: Corrupted storage is retained until explicit reset
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b35.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.shellLayout.v2
+    value: '{broken-json'
+    raw: true
+- reload_window: null
+- wait_for: '[data-testid="shell-layout-warning"]'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    equals: '{broken-json'
+- assert_count:
+    selector: '[data-testid="welcome-recent-session-row"]'
+    equal: 5
+- click: '[data-testid="shell-layout-warning"]'
+- assert_not_visible: '[data-testid="shell-layout-warning"]'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"version":2'
+- assert_count:
+    selector: '[data-testid="welcome-recent-session-row"]'
+    equal: 5
+- screenshot: tc-shell-b35.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Invalid JSON is not overwritten on reload; resetting recovers legal
+      layout without deleting the saved catalog.
+    actions:
+    - 3
+    - 4
+    - 8
+    checkpoints:
+    - step: 5
+      expectation: Invalid JSON is not overwritten on reload; resetting recovers legal
+        layout without deleting the saved catalog.
+    - step: 6
+      expectation: Invalid JSON is not overwritten on reload; resetting recovers legal
+        layout without deleting the saved catalog.
+    - step: 7
+      expectation: Invalid JSON is not overwritten on reload; resetting recovers legal
+        layout without deleting the saved catalog.
+    - step: 9
+      expectation: Invalid JSON is not overwritten on reload; resetting recovers legal
+        layout without deleting the saved catalog.
+    - step: 10
+      expectation: Invalid JSON is not overwritten on reload; resetting recovers legal
+        layout without deleting the saved catalog.
+    - step: 11
+      expectation: Invalid JSON is not overwritten on reload; resetting recovers legal
+        layout without deleting the saved catalog.
+    results:
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 11
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

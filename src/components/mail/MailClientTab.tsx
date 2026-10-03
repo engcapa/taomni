@@ -3610,6 +3610,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         className="h-full min-h-0 bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
         style={mailAppearance}
         data-testid="mail-client-tab"
+        data-account-id={info.sessionId}
         aria-hidden="true"
       />
     );
@@ -4995,6 +4996,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       className="h-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
       style={mailAppearance}
       data-testid="mail-client-tab"
+      data-account-id={info.sessionId}
     >
       <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
         <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5" data-testid="mail-compose-open" onClick={() => openCompose()}>

@@ -28,6 +28,9 @@ export interface QueryRegistryEntry {
   appendEchoSql: (sql: string, note?: string) => void;
   /** Persist the latest SQL editor buffers before the owning app tab unmounts. */
   flushWorkspace?: () => Promise<void>;
+  /** Close coordinator awaits the owning business adapter before removing this tab. */
+  closeManaged?: boolean;
+  ready?: () => boolean;
 }
 
 interface QueryRegistryShape {

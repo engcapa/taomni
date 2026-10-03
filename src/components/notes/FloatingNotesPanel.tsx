@@ -7,6 +7,7 @@ import { NotesPanel } from "./NotesPanel";
 import { isTauriRuntime } from "../../lib/runtime";
 import { openDetachedWindow } from "../../lib/detachWindowing";
 import { subscribeNotesDockSignal } from "../../lib/notes/notesWindowSync";
+import { SurfaceSlot } from "../shell/SurfaceSlot";
 
 const MIN_WIDTH = 240;
 const MIN_HEIGHT = 220;
@@ -27,7 +28,7 @@ function clampPosition(pos: NotesPanelPosition): NotesPanelPosition {
  * root, so there is never more than one notes panel. Its z-index stays below
  * modal dialogs (z-50: vault unlock, auth prompts) so it can never occlude them.
  */
-export function FloatingNotesPanel() {
+export function FloatingNotesPanel({ shellHosted = false }: { shellHosted?: boolean } = {}) {
   const t = useT();
   const panelMode = useNotesStore((s) => s.panelMode);
   const panelPosition = useNotesStore((s) => s.panelPosition);
@@ -173,7 +174,7 @@ export function FloatingNotesPanel() {
 
       {/* Notes content */}
       <div className="flex-1 min-h-0 flex flex-col">
-        <NotesPanel showPanelModeToggle={false} />
+        {shellHosted ? <SurfaceSlot id="notes:floating" className="flex-1 min-h-0 flex flex-col" /> : <NotesPanel showPanelModeToggle={false} />}
       </div>
 
       {/* Resize handle (bottom-right) */}

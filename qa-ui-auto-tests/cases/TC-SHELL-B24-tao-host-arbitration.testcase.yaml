@@ -1,0 +1,141 @@
+id: TC-SHELL-B24
+title: Tao same edge suppression restores only the current owner
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b24.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F-SHELL-1
+- F-TAO-1
+- F7.4
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- assert_not_visible: '[data-testid="shell-host"]'
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-b"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-rail-tao"]'
+- assert_not_visible: '[data-testid="shell-host"]'
+- click: '[data-testid="tab-item"]:has-text("qa-alpha")'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- screenshot: tc-shell-b24.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Opening Tao suppresses same edge Files and closing restores its retained
+      view.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 9
+    - 12
+    checkpoints:
+    - step: 5
+      expectation: Opening Tao suppresses same edge Files and closing restores its
+        retained view.
+    - step: 7
+      expectation: Opening Tao suppresses same edge Files and closing restores its
+        retained view.
+    - step: 8
+      expectation: Opening Tao suppresses same edge Files and closing restores its
+        retained view.
+    - step: 10
+      expectation: Opening Tao suppresses same edge Files and closing restores its
+        retained view.
+    - step: 11
+      expectation: Opening Tao suppresses same edge Files and closing restores its
+        retained view.
+    - step: 13
+      expectation: Opening Tao suppresses same edge Files and closing restores its
+        retained view.
+    - step: 14
+      expectation: Opening Tao suppresses same edge Files and closing restores its
+        retained view.
+    - step: 15
+      expectation: Opening Tao suppresses same edge Files and closing restores its
+        retained view.
+    results:
+    - 5
+    - 7
+    - 8
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+  - id: R2
+    requirement: Switching owner while Tao is open returns to Beta without resurrecting
+      Alpha host.
+    actions:
+    - 16
+    - 17
+    - 18
+    - 20
+    - 22
+    checkpoints:
+    - step: 19
+      expectation: Switching owner while Tao is open returns to Beta without resurrecting
+        Alpha host.
+    - step: 21
+      expectation: Switching owner while Tao is open returns to Beta without resurrecting
+        Alpha host.
+    - step: 23
+      expectation: Switching owner while Tao is open returns to Beta without resurrecting
+        Alpha host.
+    - step: 24
+      expectation: Switching owner while Tao is open returns to Beta without resurrecting
+        Alpha host.
+    - step: 25
+      expectation: Switching owner while Tao is open returns to Beta without resurrecting
+        Alpha host.
+    results:
+    - 19
+    - 21
+    - 23
+    - 24
+    - 25
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

@@ -1,0 +1,91 @@
+id: TC-SHELL-B40
+title: Batch close retains Home and pinned tabs
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b40.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- right_click: '[data-testid="tab-item"]:has-text("qa-alpha")'
+- click: '[data-testid="shell-tab-pin"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-b"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- right_click: '[data-testid="tab-item"]:has-text("qa-beta")'
+- click: '[data-testid="shell-tab-close-all"]'
+- assert_not_visible: '[data-testid="tab-item"]:has-text("qa-beta")'
+- assert_count:
+    selector: '[data-testid="tab-item"]:has-text("qa-alpha")'
+    equal: 1
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 2
+- assert_attribute:
+    selector: '[data-testid="shell-tab-card"]:has-text("qa-alpha")'
+    name: data-pinned
+    equals: 'true'
+- screenshot: tc-shell-b40.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Close all removes Beta while retaining the pinned Alpha and Home.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 15
+    checkpoints:
+    - step: 5
+      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+    - step: 10
+      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+    - step: 13
+      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+    - step: 14
+      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+    - step: 16
+      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+    - step: 17
+      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+    results:
+    - 5
+    - 10
+    - 13
+    - 14
+    - 16
+    - 17
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

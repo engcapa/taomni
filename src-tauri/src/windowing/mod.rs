@@ -23,6 +23,7 @@ fn default_size(kind: &str) -> (f64, f64, f64, f64) {
         "rdp" | "vnc" => (1280.0, 800.0, 800.0, 480.0),
         "terminal" => (1024.0, 680.0, 640.0, 360.0),
         "database" => (1280.0, 820.0, 780.0, 480.0),
+        "git" => (1100.0, 720.0, 720.0, 480.0),
         "notes" => (260.0, 320.0, 220.0, 220.0),
         // A detached LanChat window mirrors the main panel's two-pane
         // layout (≈252px roster + conversation), so it needs room for both.
@@ -46,9 +47,8 @@ fn label_for(kind: &str, session_id: &str) -> String {
 
 fn validate_kind(kind: &str) -> Result<(), String> {
     match kind {
-        "sftp" | "rdp" | "vnc" | "terminal" | "database" | "lan-chat" | "notes" | "servers" => {
-            Ok(())
-        }
+        "sftp" | "rdp" | "vnc" | "terminal" | "database" | "git" | "lan-chat" | "notes"
+        | "servers" => Ok(()),
         other => Err(format!("unsupported detached window kind: {}", other)),
     }
 }
@@ -98,6 +98,7 @@ pub async fn open_detached_window(
         "vnc" => format!("VNC — {}", session_id),
         "terminal" => format!("Terminal — {}", session_id),
         "database" => format!("Database — {}", session_id),
+        "git" => format!("Git — {}", session_id),
         "lan-chat" => "内网通讯".to_string(),
         "notes" => "便签".to_string(),
         "servers" => "Local servers".to_string(),

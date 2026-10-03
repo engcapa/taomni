@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => ({
       "react",
       "react-dom",
       "react-dom/client",
-      "gifenc",
+      "lucide-react",
       // react-konva's ESM entry imports named exports from the CommonJS
       // scheduler package. Optimizing the top-level entry lets Vite bundle
       // that nested dependency and synthesize the browser-safe exports.

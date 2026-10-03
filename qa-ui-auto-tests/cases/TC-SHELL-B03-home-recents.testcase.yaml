@@ -1,0 +1,141 @@
+id: TC-SHELL-B03
+title: Home recent filters, exact ordering and workspace identity
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b03.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.6
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- fill:
+    selector: '[data-testid="welcome-recent-filter"]'
+    value: qa-alpha
+- assert_items:
+    selector: '[data-testid="welcome-recent-session-row"]'
+    attribute: data-session-id
+    equals:
+    - shell-a
+- fill:
+    selector: '[data-testid="welcome-recent-filter"]'
+    value: beta.invalid
+- assert_items:
+    selector: '[data-testid="welcome-recent-session-row"]'
+    attribute: data-session-id
+    equals:
+    - shell-b
+- fill:
+    selector: '[data-testid="welcome-recent-filter"]'
+    value: Shell/乙
+- assert_items:
+    selector: '[data-testid="welcome-recent-session-row"]'
+    attribute: data-session-id
+    equals:
+    - shell-b
+- click: '[data-testid="welcome-recent-clear-filter"]'
+- assert_count:
+    selector: '[data-testid="welcome-recent-session-row"]'
+    equal: 5
+- select_option:
+    selector: '[data-testid="welcome-recent-type-filter"]'
+    value: SSH
+- select_option:
+    selector: '[data-testid="welcome-recent-sort"]'
+    value: name-asc
+- assert_items:
+    selector: '[data-testid="welcome-recent-session-row"]'
+    attribute: data-session-id
+    equals:
+    - shell-a
+    - shell-b
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 1
+- screenshot: tc-shell-b03.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Name, host and group filters return exact saved identities and clearing
+      restores the catalog.
+    actions:
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 12
+    checkpoints:
+    - step: 4
+      expectation: Name, host and group filters return exact saved identities and
+        clearing restores the catalog.
+    - step: 6
+      expectation: Name, host and group filters return exact saved identities and
+        clearing restores the catalog.
+    - step: 8
+      expectation: Name, host and group filters return exact saved identities and
+        clearing restores the catalog.
+    - step: 10
+      expectation: Name, host and group filters return exact saved identities and
+        clearing restores the catalog.
+    - step: 13
+      expectation: Name, host and group filters return exact saved identities and
+        clearing restores the catalog.
+    results:
+    - 4
+    - 6
+    - 8
+    - 10
+    - 13
+  - id: R2
+    requirement: A recent workspace opens once and reopening reuses the surviving
+      workspace identity.
+    actions:
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    checkpoints:
+    - step: 16
+      expectation: A recent workspace opens once and reopening reuses the surviving
+        workspace identity.
+    - step: 19
+      expectation: A recent workspace opens once and reopening reuses the surviving
+        workspace identity.
+    - step: 21
+      expectation: A recent workspace opens once and reopening reuses the surviving
+        workspace identity.
+    results:
+    - 16
+    - 19
+    - 21
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

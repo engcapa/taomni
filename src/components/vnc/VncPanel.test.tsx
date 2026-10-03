@@ -629,6 +629,7 @@ describe("VncPanel viewer options (VNC-CLIP-001, VNC-PERF-004, VNC-INPUT-003)", 
 
     it("pastes an external Linux clipboard when WebKit reports an empty value", async () => {
       const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux");
+      const userAgent = vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (X11; Linux x86_64)");
       vi.stubGlobal("__TAURI_INTERNALS__", {});
       const defaultInvoke = mocks.invoke.getMockImplementation();
       mocks.invoke.mockImplementation((command: string, args?: unknown) => {
@@ -647,6 +648,7 @@ describe("VncPanel viewer options (VNC-CLIP-001, VNC-PERF-004, VNC-INPUT-003)", 
         expect(mocks.invoke).toHaveBeenCalledWith("clipboard_read_text");
       } finally {
         platform.mockRestore();
+        userAgent.mockRestore();
       }
     });
 

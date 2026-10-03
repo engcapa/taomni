@@ -75,6 +75,8 @@ import {
   type TagSectionId,
 } from "../../lib/gitRefList";
 import { useAppStore } from "../../stores/appStore";
+import { registerCloseAdapter } from "../../lib/shell/closeCoordinator";
+import { registerGitShellController, type GitShellSnapshot } from "../../lib/shell/gitShellState";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { GitPanel } from "./GitPanel";
@@ -97,6 +99,9 @@ import {
 } from "../../lib/workspaceGitCommitTarget";
 
 interface WorkspaceGitManagerProps {
+  shellScopeId?: string;
+  initialShellSnapshot?: GitShellSnapshot | null;
+  onReady?(error?: string): void;
   workspaceName?: string | null;
   roots: GitWorkspaceRootInfo[];
   activeRepoRoot?: string | null;
@@ -130,6 +135,7 @@ type RepoScope =
   | { mode: "custom"; repoRoots: string[] };
 
 export function WorkspaceGitManager({
+  shellScopeId, initialShellSnapshot, onReady,
   workspaceName,
   roots,
   activeRepoRoot,
@@ -167,6 +173,34 @@ export function WorkspaceGitManager({
   });
   /** Repo paths that failed with missing-cwd style errors; skip further snapshots. */
   const [deadRepoRoots, setDeadRepoRoots] = useState<Set<string>>(() => new Set());
+  const shellSnapshotRef = useRef<GitShellSnapshot>(null!);
+  shellSnapshotRef.current = { commitMessage, targetBranch, selectedChangeKeys: [...selectedChangeKeys], uncheckedChangeKeys: [...uncheckedChangeKeys], focusedChangeKey, treeMode };
+  const restoreShell = useCallback((snapshot: GitShellSnapshot) => { setCommitMessage(snapshot.commitMessage); setTargetBranch(snapshot.targetBranch); setSelectedChangeKeys(new Set(snapshot.selectedChangeKeys)); setUncheckedChangeKeys(new Set(snapshot.uncheckedChangeKeys)); setFocusedChangeKey(snapshot.focusedChangeKey); setTreeMode(snapshot.treeMode); }, []);
+  const savedMessageRef = useRef("");
+  useEffect(() => {
+    if (initialShellSnapshot) restoreShell(initialShellSnapshot);
+    else if (shellScopeId) {
+      try { const text = localStorage.getItem(`taomni.git.draft.${shellScopeId}`); if (text !== null) { setCommitMessage(text); savedMessageRef.current = text; } } catch { /* close will report a write failure */ }
+    }
+  }, [shellScopeId, initialShellSnapshot, restoreShell]);
+  useEffect(() => {
+    if (!shellScopeId) return;
+    const offController = registerGitShellController(shellScopeId, { snapshot: () => shellSnapshotRef.current, restore: restoreShell });
+    const offClose = registerCloseAdapter(shellScopeId, {
+      getRisks: async () => shellSnapshotRef.current.commitMessage !== savedMessageRef.current ? [{ kind: "dirty", id: `${shellScopeId}:commit-draft`, ownerId: shellScopeId, revision: shellSnapshotRef.current.commitMessage, detail: "Unsaved Git commit message", choices: ["save", "discard", "cancel"] }] : [],
+      resolve: async (_risk, choice) => { if (choice === "save") { const text = shellSnapshotRef.current.commitMessage; localStorage.setItem(`taomni.git.draft.${shellScopeId}`, text); savedMessageRef.current = text; }
+        else if (choice === "discard") { localStorage.removeItem(`taomni.git.draft.${shellScopeId}`); savedMessageRef.current = ""; shellSnapshotRef.current = { ...shellSnapshotRef.current, commitMessage: "" }; setCommitMessage(""); }
+        else throw new Error("Unsupported Git draft close choice"); },
+      flush: async () => undefined,
+    });
+    return () => { offClose(); offController(); };
+  }, [shellScopeId, restoreShell]);
+  const readyRef = useRef(false);
+  useEffect(() => {
+    if (!onReady || readyRef.current || !normalizedRoots.length) return;
+    if (normalizedRoots.every((root) => snapshots[root.repoRoot]?.snapshot)) { readyRef.current = true; onReady(); }
+    else { const error = normalizedRoots.map((root) => snapshots[root.repoRoot]?.error).find(Boolean); if (error) { readyRef.current = true; onReady(error); } }
+  }, [onReady, normalizedRoots, snapshots]);
   const anchorChangeKeyRef = useRef<string | null>(null);
   /** Per-repository snapshot request sequence; only the latest response may commit. */
   const refreshSequenceRef = useRef(new Map<string, number>());
@@ -759,6 +793,8 @@ export function WorkspaceGitManager({
         return "completed";
       });
       setCommitMessage("");
+      savedMessageRef.current = "";
+      if (shellScopeId) localStorage.removeItem(`taomni.git.draft.${shellScopeId}`);
     })();
   }, [
     checkedChangeKeys.size,

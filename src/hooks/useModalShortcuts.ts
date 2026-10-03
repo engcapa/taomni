@@ -2,14 +2,17 @@ import { useEffect } from "react";
 import { getAppPlatform } from "../lib/runtime";
 
 interface ModalShortcutsOptions {
+  active?: boolean;
   onCancel?: () => void;
   onSave?: () => void;
   onTest?: () => void;
 }
 
-export function useModalShortcuts({ onCancel, onSave, onTest }: ModalShortcutsOptions) {
+export function useModalShortcuts({ onCancel, onSave, onTest, active = true }: ModalShortcutsOptions) {
   useEffect(() => {
+    if (!active) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing || e.defaultPrevented) return;
       // 1. Esc -> Cancel
       if (e.key === "Escape") {
         if (e.defaultPrevented) return;
@@ -51,7 +54,7 @@ export function useModalShortcuts({ onCancel, onSave, onTest }: ModalShortcutsOp
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onCancel, onSave, onTest]);
+  }, [onCancel, onSave, onTest, active]);
 }
 
 export function getShortcutSuffixes() {

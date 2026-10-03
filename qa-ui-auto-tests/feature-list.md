@@ -138,7 +138,10 @@ status: backend-only
 area: main/window
 components: []
 files: []
-controls: []
+controls:
+- id: session-save-error
+  selector: '[data-testid="session-save-error"]'
+  kind: display
 -->
 
 > 2026-08-25（R2 目录对账）：紧凑 UI 模式已从产品移除 —— `CompactTitleBar.tsx`、`compact-titlebar` / `compact-main-menu` / `compact-sidebar-drawer` testid、`taomni.compactMode` 持久化与 Ctrl+Shift+M 均不存在于当前源码。原 F1.4 用例已改写为覆盖存续的标题栏/统一菜单表面（见 TC-101、TC-auto-F1-4）。本条目保留为占位，待产品确认后删除。
@@ -10709,3 +10712,367 @@ controls:
 > - Ribbon `Tools`（除 Tunneling 之外的网络工具）
 > - Ribbon `Packages`、`Macros`
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
+
+## 29. Workspace Shell v2 🟡
+
+<!-- feature
+id: F-SHELL-1
+status: partial
+area: main/workspace-shell
+components:
+- WorkspaceShell
+- GlobalRail
+- ShellNavigator
+- ContextPanelHost
+- TabNavigator
+- StableSurface
+- ShellNotesSurface
+files:
+- src/components/shell/ContextPanelHost.tsx
+- src/components/shell/GlobalRail.tsx
+- src/components/shell/PrimaryGitSurface.tsx
+- src/components/shell/SftpShellSurface.tsx
+- src/components/shell/shell.css
+- src/components/shell/ShellCloseDialog.tsx
+- src/components/shell/ShellKeymapSettings.tsx
+- src/components/shell/ShellNavigator.tsx
+- src/components/shell/ShellNotesSurface.tsx
+- src/components/shell/ShellResumeRow.tsx
+- src/components/shell/ShellTransfers.tsx
+- src/components/shell/SurfaceSlot.tsx
+- src/components/shell/TabNavigator.tsx
+- src/components/shell/WorkspaceShell.tsx
+- src/components/shell/WorkspaceToolSurface.tsx
+- src/lib/shell/closeCoordinator.ts
+- src/lib/shell/gitPanelWindow.ts
+- src/lib/shell/gitShellState.ts
+- src/lib/shell/layoutBridge.ts
+- src/lib/shell/layoutPolicy.ts
+- src/lib/shell/panelActions.ts
+- src/lib/shell/panelRegistry.ts
+- src/lib/shell/panelWindowTransaction.ts
+- src/lib/shell/promotedSurfaceClose.ts
+- src/lib/shell/readiness.ts
+- src/lib/shell/restoreFocus.ts
+- src/lib/shell/sessionWindow.ts
+- src/lib/shell/sftpPanelWindow.ts
+- src/lib/shell/sftpShellAdapter.ts
+- src/lib/shell/shellActions.ts
+- src/lib/shell/shellKeymap.ts
+- src/lib/shell/shellLayoutPersistence.ts
+- src/lib/shell/shellTargetResolver.ts
+- src/lib/shell/tabMenu.ts
+- src/lib/shell/tabPresentation.ts
+- src/lib/shell/types.ts
+- src/stores/shellLayoutStore.ts
+- src/hooks/useShellCloseBridge.tsx
+- src/hooks/useShellLayoutBridge.ts
+- src/hooks/useShellResumeComposer.ts
+- src/hooks/useShellShortcuts.ts
+- src/components/detached/GitDetachedWindow.tsx
+controls:
+- id: shell-close-cancel
+  selector: '[data-testid="shell-close-cancel"]'
+  kind: interactive
+- id: shell-close-confirm
+  selector: '[data-testid="shell-close-confirm"]'
+  kind: interactive
+- id: shell-close-count
+  selector: '[data-testid="shell-close-count"]'
+  kind: display
+- id: shell-close-dialog
+  selector: '[data-testid="shell-close-dialog"]'
+  kind: display
+- id: shell-close-dock
+  selector: '[data-testid="shell-close-dock"]'
+  kind: interactive
+- id: shell-close-error
+  selector: '[data-testid="shell-close-error"]'
+  kind: display
+- id: shell-close-risk
+  selector: '[data-testid="shell-close-risk"]'
+  kind: display
+- id: shell-detached-focus
+  selector: '[data-testid="shell-detached-focus"]'
+  kind: interactive
+- id: shell-detached-placeholder
+  selector: '[data-testid="shell-detached-placeholder"]'
+  kind: display
+- id: shell-fallback
+  selector: '[data-testid="shell-fallback"]'
+  kind: display
+- id: shell-fallback-reload
+  selector: '[data-testid="shell-fallback-reload"]'
+  kind: interactive
+- id: shell-fallback-reset
+  selector: '[data-testid="shell-fallback-reset"]'
+  kind: interactive
+- id: shell-git-window
+  selector: '[data-testid="shell-git-window"]'
+  kind: display
+- id: shell-home-launch-status
+  selector: '[data-testid="shell-home-launch-status"]'
+  kind: display
+- id: shell-home-open-workspace
+  selector: '[data-testid="shell-home-open-workspace"]'
+  kind: interactive
+- id: shell-host
+  selector: '[data-testid="shell-host"]'
+  kind: display
+- id: shell-host-hide
+  selector: '[data-testid="shell-host-hide"]'
+  kind: interactive
+- id: shell-host-more
+  selector: '[data-testid="shell-host-more"]'
+  kind: interactive
+- id: shell-host-owner
+  selector: '[data-testid="shell-host-owner"]'
+  kind: display
+- id: shell-host-pin
+  selector: '[data-testid="shell-host-pin"]'
+  kind: interactive
+- id: shell-host-resize
+  selector: '[data-testid="shell-host-resize"]'
+  kind: interactive
+- id: shell-host-retry
+  selector: '[data-testid="shell-host-retry"]'
+  kind: interactive
+- id: shell-host-tab
+  selector: '[data-testid="shell-host-tab"]'
+  kind: interactive
+- id: shell-keymap
+  selector: '[data-testid="shell-keymap"]'
+  kind: display
+- id: shell-keymap-cancel
+  selector: '[data-testid="shell-keymap-cancel"]'
+  kind: interactive
+- id: shell-keymap-capture
+  selector: '[data-testid="shell-keymap-capture"]'
+  kind: interactive
+- id: shell-keymap-conflict
+  selector: '[data-testid="shell-keymap-conflict"]'
+  kind: display
+- id: shell-keymap-dialog
+  selector: '[data-testid="shell-keymap-dialog"]'
+  kind: display
+- id: shell-keymap-record
+  selector: '[data-testid="shell-keymap-record"]'
+  kind: interactive
+- id: shell-keymap-row
+  selector: '[data-testid="shell-keymap-row"]'
+  kind: display
+- id: shell-keymap-save
+  selector: '[data-testid="shell-keymap-save"]'
+  kind: interactive
+- id: shell-lane-empty
+  selector: '[data-testid="shell-lane-empty"]'
+  kind: display
+- id: shell-lane-empty-home
+  selector: '[data-testid="shell-lane-empty-home"]'
+  kind: interactive
+- id: shell-lane-select
+  selector: '[data-testid="shell-lane-select"]'
+  kind: interactive
+- id: shell-layout-warning
+  selector: '[data-testid="shell-layout-warning"]'
+  kind: interactive
+- id: shell-navigator
+  selector: '[data-testid="shell-navigator"]'
+  kind: display
+- id: shell-navigator-hide
+  selector: '[data-testid="shell-navigator-hide"]'
+  kind: interactive
+- id: shell-navigator-page
+  selector: '[data-testid="shell-navigator-page"]'
+  kind: interactive
+- id: shell-overview
+  selector: '[data-testid="shell-overview"]'
+  kind: interactive
+- id: shell-overview-trigger
+  selector: '[data-testid="shell-overview-trigger"]'
+  kind: interactive
+- id: shell-panel-close
+  selector: '[data-testid="shell-panel-close"]'
+  kind: interactive
+- id: shell-panel-detach
+  selector: '[data-testid="shell-panel-detach"]'
+  kind: interactive
+- id: shell-panel-move-bottom
+  selector: '[data-testid="shell-panel-move-bottom"]'
+  kind: interactive
+- id: shell-panel-move-right
+  selector: '[data-testid="shell-panel-move-right"]'
+  kind: interactive
+- id: shell-panel-promote
+  selector: '[data-testid="shell-panel-promote"]'
+  kind: interactive
+- id: shell-panel-reattach
+  selector: '[data-testid="shell-panel-reattach"]'
+  kind: interactive
+- id: shell-quick-dialog
+  selector: '[data-testid="shell-quick-dialog"]'
+  kind: display
+- id: shell-quick-input
+  selector: '[data-testid="shell-quick-input"]'
+  kind: interactive
+- id: shell-quick-option
+  selector: '[data-testid="shell-quick-option"]'
+  kind: display
+- id: shell-quick-overview
+  selector: '[data-testid="shell-quick-overview"]'
+  kind: interactive
+- id: shell-quick-switch
+  selector: '[data-testid="shell-quick-switch"]'
+  kind: interactive
+- id: shell-rail
+  selector: '[data-testid="shell-rail"]'
+  kind: display
+- id: shell-rail-home
+  selector: '[data-testid="shell-rail-home"]'
+  kind: interactive
+- id: shell-rail-sessions
+  selector: '[data-testid="shell-rail-sessions"]'
+  kind: interactive
+- id: shell-rail-settings
+  selector: '[data-testid="shell-rail-settings"]'
+  kind: interactive
+- id: shell-rail-tao
+  selector: '[data-testid="shell-rail-tao"]'
+  kind: interactive
+- id: shell-rail-workspaces
+  selector: '[data-testid="shell-rail-workspaces"]'
+  kind: interactive
+- id: shell-recent-workspace
+  selector: '[data-testid="shell-recent-workspace"]'
+  kind: interactive
+- id: shell-restore-entry
+  selector: '[data-testid="shell-restore-entry"]'
+  kind: display
+- id: shell-restore-error
+  selector: '[data-testid="shell-restore-error"]'
+  kind: display
+- id: shell-restore-row
+  selector: '[data-testid="shell-restore-row"]'
+  kind: display
+- id: shell-root
+  selector: '[data-testid="shell-root"]'
+  kind: display
+- id: shell-surface-slot
+  selector: '[data-testid="shell-surface-slot"]'
+  kind: display
+- id: shell-tab-attention-filter
+  selector: '[data-testid="shell-tab-attention-filter"]'
+  kind: interactive
+- id: shell-tab-backdrop
+  selector: '[data-testid="shell-tab-backdrop"]'
+  kind: display
+- id: shell-tab-card
+  selector: '[data-testid="shell-tab-card"]'
+  kind: display
+- id: shell-tab-card-close
+  selector: '[data-testid="shell-tab-card-close"]'
+  kind: interactive
+- id: shell-tab-card-detail
+  selector: '[data-testid="shell-tab-card-detail"]'
+  kind: display
+- id: shell-tab-card-details
+  selector: '[data-testid="shell-tab-card-details"]'
+  kind: interactive
+- id: shell-tab-card-more
+  selector: '[data-testid="shell-tab-card-more"]'
+  kind: interactive
+- id: shell-tab-card-open
+  selector: '[data-testid="shell-tab-card-open"]'
+  kind: interactive
+- id: shell-tab-card-pin
+  selector: '[data-testid="shell-tab-card-pin"]'
+  kind: interactive
+- id: shell-tab-card-preview
+  selector: '[data-testid="shell-tab-card-preview"]'
+  kind: display
+- id: shell-tab-card-status
+  selector: '[data-testid="shell-tab-card-status"]'
+  kind: display
+- id: shell-tab-card-summary
+  selector: '[data-testid="shell-tab-card-summary"]'
+  kind: display
+- id: shell-tab-card-title
+  selector: '[data-testid="shell-tab-card-title"]'
+  kind: display
+- id: shell-tab-clear
+  selector: '[data-testid="shell-tab-clear"]'
+  kind: interactive
+- id: shell-tab-close-all
+  selector: '[data-testid="shell-tab-close-all"]'
+  kind: interactive
+- id: shell-tab-count
+  selector: '[data-testid="shell-tab-count"]'
+  kind: display
+- id: shell-tab-current
+  selector: '[data-testid="shell-tab-current"]'
+  kind: interactive
+- id: shell-tab-default-lane
+  selector: '[data-testid="shell-tab-default-lane"]'
+  kind: interactive
+- id: shell-tab-duplicate
+  selector: '[data-testid="shell-tab-duplicate"]'
+  kind: interactive
+- id: shell-tab-empty
+  selector: '[data-testid="shell-tab-empty"]'
+  kind: display
+- id: shell-tab-empty-home
+  selector: '[data-testid="shell-tab-empty-home"]'
+  kind: interactive
+- id: shell-tab-empty-new
+  selector: '[data-testid="shell-tab-empty-new"]'
+  kind: interactive
+- id: shell-tab-lane-filter
+  selector: '[data-testid="shell-tab-lane-filter"]'
+  kind: interactive
+- id: shell-tab-move-build
+  selector: '[data-testid="shell-tab-move-build"]'
+  kind: interactive
+- id: shell-tab-move-first
+  selector: '[data-testid="shell-tab-move-first"]'
+  kind: interactive
+- id: shell-tab-move-lane
+  selector: '[data-testid="shell-tab-move-lane"]'
+  kind: interactive
+- id: shell-tab-navigator-close
+  selector: '[data-testid="shell-tab-navigator-close"]'
+  kind: interactive
+- id: shell-tab-overflow
+  selector: '[data-testid="shell-tab-overflow"]'
+  kind: interactive
+- id: shell-tab-pin
+  selector: '[data-testid="shell-tab-pin"]'
+  kind: interactive
+- id: shell-tab-rename
+  selector: '[data-testid="shell-tab-rename"]'
+  kind: interactive
+- id: shell-tab-search
+  selector: '[data-testid="shell-tab-search"]'
+  kind: interactive
+- id: shell-tab-sort
+  selector: '[data-testid="shell-tab-sort"]'
+  kind: interactive
+- id: shell-transfers
+  selector: '[data-testid="shell-transfers"]'
+  kind: display
+- id: shell-transfers-close
+  selector: '[data-testid="shell-transfers-close"]'
+  kind: interactive
+- id: shell-window-error
+  selector: '[data-testid="shell-window-error"]'
+  kind: display
+- id: shell-window-reattach
+  selector: '[data-testid="shell-window-reattach"]'
+  kind: interactive
+- id: shell-work-area
+  selector: '[data-testid="shell-work-area"]'
+  kind: display
+-->
+
+- 统一 Rail/Navigator、五个意图 lane、总览/快速切换、Context Host、Tao 和 Notes 稳定实例。
+- 统一关闭事务、布局迁移和两阶段窗口移动已接入；高覆盖用例与三平台边界验证进行中。
+- 验收与尚未验证的分支见 [实施任务](../docs-feature/workspace-shell-ux-redesign-tasks.md)。

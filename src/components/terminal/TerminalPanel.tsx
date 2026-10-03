@@ -3422,6 +3422,10 @@ export function TerminalPanel({
       startSshConnection(createTerminalSessionId(), "reconnect");
     };
 
+    // Skip irreversible launches from the setup that StrictMode immediately
+    // disposes. The surviving setup owns one PTY/SSH connection and output sink.
+    queueMicrotask(() => {
+    if (destroyed) return;
     if (adopted) {
       connectionStateRef.current = "connecting";
       appendEvent("connection", `Reattaching terminal ${sid}`);
@@ -3494,6 +3498,8 @@ export function TerminalPanel({
         )
         .catch((err) => handleConnectFailure(err, "initial"));
     }
+
+    });
 
     return () => {
       destroyed = true;

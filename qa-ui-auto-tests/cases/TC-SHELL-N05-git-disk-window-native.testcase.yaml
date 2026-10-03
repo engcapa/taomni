@@ -1,0 +1,168 @@
+id: TC-SHELL-N05
+title: Real two-repository Git Host retains draft through a native window
+description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n05
+  records the complete scenario and any remaining manual boundary.
+covers:
+- F25.5
+- F-SHELL-1
+- F-Detach-1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "shell-native", "name": "Shell Git", "roots": [{"id": "shell",
+      "name": "shell", "path": "${fixture.parity008_root}", "kind": "folder"}], "looseFiles":
+      [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind": "root",
+      "rootId": "shell", "path": "repo-a/same.txt"}}]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host"]'
+    name: data-edge
+    equals: bottom
+- wait_for:
+    selector: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+    timeout_sec: 60
+- assert_items:
+    selector: '[data-testid="workspace-change-row"]'
+    attribute: aria-label
+    equals:
+    - repo-a same.txt Staged
+    - repo-a untracked.txt Untracked
+    - repo-b same.txt Modified
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_a}/.git/index
+    equals: ${fixture.parity008_repo_a_index_sha256}
+- fill:
+    selector: textarea[placeholder*="Commit"]
+    value: SHELL-COMMIT
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-detach"]'
+- switch_window:
+    route: '#git='
+- wait_for: '[data-testid="shell-git-window"]'
+- assert_value:
+    selector: textarea[placeholder*="Commit"]
+    equals: SHELL-COMMIT
+- click: '[data-testid="shell-window-reattach"]'
+- switch_window:
+    route: ''
+- wait_for: '[data-testid="shell-host"]'
+- assert_value:
+    selector: textarea[placeholder*="Commit"]
+    equals: SHELL-COMMIT
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_a}/same.txt
+    equals: ${fixture.parity008_repo_a_worktree_sha256}
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_b}/same.txt
+    equals: ${fixture.parity008_repo_b_worktree_sha256}
+- screenshot: tc-shell-n05.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Git Host reads both disposable repositories without modifying their
+      index or worktree.
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 10
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"]",
+        "name": "data-edge", "equals": "bottom"}}'
+    - step: 13
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-change-row\"][data-repo-root$=\"repo-b\"][data-path=\"same.txt\"]",
+        "timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-change-row\"]",
+        "attribute": "aria-label", "equals": ["repo-a same.txt Staged", "repo-a untracked.txt
+        Untracked", "repo-b same.txt Modified"]}}'
+    - step: 15
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/index",
+        "equals": "${fixture.parity008_repo_a_index_sha256}"}}'
+    results:
+    - 6
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+  - id: R2
+    requirement: Detaching and reattaching the real Git window returns the complete
+      commit draft.
+    actions:
+    - 16
+    - 17
+    - 18
+    - 19
+    - 22
+    - 23
+    checkpoints:
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"shell-git-window\"]"}'
+    - step: 21
+      expectation: '{"assert_value": {"selector": "textarea[placeholder*=\"Commit\"]",
+        "equals": "SHELL-COMMIT"}}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
+    - step: 25
+      expectation: '{"assert_value": {"selector": "textarea[placeholder*=\"Commit\"]",
+        "equals": "SHELL-COMMIT"}}'
+    - step: 26
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/same.txt",
+        "equals": "${fixture.parity008_repo_a_worktree_sha256}"}}'
+    - step: 27
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/same.txt",
+        "equals": "${fixture.parity008_repo_b_worktree_sha256}"}}'
+    results:
+    - 20
+    - 21
+    - 24
+    - 25
+    - 26
+    - 27
+  visual:
+  - check: Read final screenshot for clipped controls and retained content
+    method: manual
+    reason: Screenshot generation is not a visual verdict.
+  native:
+  - check: Real Tauri IPC, packaged WebView and declared disk/process/window results
+    method: automated
+    reason: Uses the isolated QA binary; no browser backend stubs.
+  - check: OS window-manager focus and interrupted child creation branches in V-N05.
+    method: manual
+    reason: See linked native case; this YAML alone does not establish this boundary.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

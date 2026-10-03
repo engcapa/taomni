@@ -23,16 +23,29 @@ def step_seed_storage(ctx: StepContext, args: Any) -> None:
         raise StepError("seed_storage: expected {key, value}")
     key = str(args["key"])
     value = str(args["value"])
-    try:
-        json.loads(value)
-    except json.JSONDecodeError as e:
-        raise StepError(f"seed_storage: value must be valid JSON ({e})") from e
+    if not args.get("raw", False):
+        try:
+            json.loads(value)
+        except json.JSONDecodeError as e:
+            raise StepError(f"seed_storage: value must be valid JSON ({e})") from e
+    elif not key.startswith("taomni."):
+        raise StepError("seed_storage: raw input requires a taomni.* key")
     if ctx.dry_run:
         return
     ctx.page.evaluate(  # type: ignore[attr-defined]
         "([k, v]) => { window.localStorage.setItem(k, v); }",
         [key, value],
     )
+
+
+@verb("remove_storage")
+def step_remove_storage(ctx: StepContext, args: Any) -> None:
+    """Remove one named persisted fixture input without changing runtime stores."""
+    if not isinstance(args, str) or not args.startswith("taomni."):
+        raise StepError("remove_storage: expected a taomni.* storage key")
+    if ctx.dry_run:
+        return
+    ctx.page.evaluate("key => localStorage.removeItem(key)", args)
 
 
 @verb("reload_window")

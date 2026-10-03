@@ -46,6 +46,7 @@ interface SidebarProps {
     onOpen: () => void;
   };
   compact?: boolean;
+  navigatorOnly?: boolean;
 }
 
 export function Sidebar({
@@ -56,6 +57,7 @@ export function Sidebar({
   onCommand,
   gitAction,
   compact = false,
+  navigatorOnly = false,
 }: SidebarProps) {
   const {
     activeSideTab,
@@ -126,7 +128,7 @@ export function Sidebar({
   return (
     <>
     <div data-testid="sidebar" className="h-full flex">
-      <div
+      {!navigatorOnly && <div
         data-testid="sidebar-rail"
         data-show-names={stripeSettings.showNames || undefined}
         className="flex min-h-0 flex-col shrink-0"
@@ -209,7 +211,7 @@ export function Sidebar({
             {t("menu.settings")}
           </span>
         </button>
-      </div>
+      </div>}
       {compact && null}
       {!compact && (
       <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--taomni-sidebar-bg)", borderRight: "1px solid var(--taomni-sidebar-border)" }}>

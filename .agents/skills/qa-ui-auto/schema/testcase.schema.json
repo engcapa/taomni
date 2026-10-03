@@ -96,7 +96,9 @@
           "release_build_required",
           "rdp_baseline_required",
           "rdp_audio_required",
-          "xrdp_server_required"
+          "xrdp_server_required",
+          "shell_browser_catalog",
+          "shell_native_files"
         ]
       },
       "uniqueItems": true
@@ -304,20 +306,57 @@
       "maxProperties": 1,
       "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
       "properties": {
-        "native_about": { "type": "null" },
-        "updater_fixture_mode": { "enum": ["correct", "broken", "slow"] },
-        "updater_release": { "enum": [1, 2] },
-        "assert_updater_installed": { "enum": ["aarch64", "x86_64"] },
-        "assert_updater_unchanged": { "type": "null" },
+        "native_about": {
+          "type": "null"
+        },
+        "updater_fixture_mode": {
+          "enum": [
+            "correct",
+            "broken",
+            "slow"
+          ]
+        },
+        "updater_release": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "assert_updater_installed": {
+          "enum": [
+            "aarch64",
+            "x86_64"
+          ]
+        },
+        "assert_updater_unchanged": {
+          "type": "null"
+        },
         "assert_updater_progress": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["min", "max"],
+          "required": [
+            "min",
+            "max"
+          ],
           "properties": {
-            "min": { "type": "integer", "minimum": 0, "maximum": 100 },
-            "max": { "type": "integer", "minimum": 0, "maximum": 100 },
-            "seconds": { "type": "number", "minimum": 0.1, "maximum": 30 },
-            "old_transfer_done": { "type": "boolean" }
+            "min": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "seconds": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 30
+            },
+            "old_transfer_done": {
+              "type": "boolean"
+            }
           }
         },
         "open": {
@@ -371,10 +410,22 @@
         "drag_path": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["selector", "points"],
+          "required": [
+            "selector",
+            "points"
+          ],
           "properties": {
-            "selector": {"$ref": "#/$defs/selector"},
-            "points": {"type": "array", "minItems": 2, "maxItems": 256, "items": {"$ref": "#/$defs/point"}}
+            "selector": {
+              "$ref": "#/$defs/selector"
+            },
+            "points": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 256,
+              "items": {
+                "$ref": "#/$defs/point"
+              }
+            }
           }
         },
         "terminal_drag_selection": {
@@ -513,29 +564,62 @@
         "screenshot_reference": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["selector"],
-          "properties": {"selector": {"$ref": "#/$defs/selector"}}
+          "required": [
+            "selector"
+          ],
+          "properties": {
+            "selector": {
+              "$ref": "#/$defs/selector"
+            }
+          }
         },
         "assert_screenshot_mask": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["selector", "crop", "polygon"],
+          "required": [
+            "selector",
+            "crop",
+            "polygon"
+          ],
           "properties": {
-            "selector": {"$ref": "#/$defs/selector"},
+            "selector": {
+              "$ref": "#/$defs/selector"
+            },
             "crop": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["x", "y", "width", "height"],
+              "required": [
+                "x",
+                "y",
+                "width",
+                "height"
+              ],
               "properties": {
-                "x": {"type": "integer", "minimum": 0},
-                "y": {"type": "integer", "minimum": 0},
-                "width": {"type": "integer", "minimum": 1},
-                "height": {"type": "integer", "minimum": 1}
+                "x": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "y": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1
+                }
               }
             },
             "polygon": {
-              "type": "array", "minItems": 3, "maxItems": 256,
-              "items": {"$ref": "#/$defs/point"}
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 256,
+              "items": {
+                "$ref": "#/$defs/point"
+              }
             }
           }
         },
@@ -545,36 +629,112 @@
         "assert_element_geometry": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["selector", "min_width", "min_height"],
+          "required": [
+            "selector",
+            "min_width",
+            "min_height"
+          ],
           "properties": {
-            "selector": {"type": "string", "minLength": 1},
-            "min_width": {"type": "number", "minimum": 1},
-            "min_height": {"type": "number", "minimum": 1},
-            "min_count": {"type": "integer", "minimum": 1},
-            "same_width": {"type": "boolean"},
-            "icon_size": {"type": "number", "minimum": 1},
-            "tolerance": {"type": "number", "minimum": 0, "maximum": 2}
+            "selector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "min_width": {
+              "type": "number",
+              "minimum": 1
+            },
+            "min_height": {
+              "type": "number",
+              "minimum": 1
+            },
+            "min_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "same_width": {
+              "type": "boolean"
+            },
+            "within_viewport": {
+              "type": "boolean"
+            },
+            "hit_center": {
+              "type": "boolean"
+            },
+            "icon_size": {
+              "type": "number",
+              "minimum": 1
+            },
+            "tolerance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            }
           }
         },
         "native_window_drag": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["selector", "dx", "dy"],
+          "required": [
+            "selector",
+            "dx",
+            "dy"
+          ],
           "properties": {
-            "selector": {"type": "string", "minLength": 1},
-            "dx": {"type": "integer", "minimum": -100, "maximum": 100},
-            "dy": {"type": "integer", "minimum": -100, "maximum": 100},
-            "y_fraction": {"type": "number", "minimum": 0.05, "maximum": 0.95}
+            "selector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dx": {
+              "type": "integer",
+              "minimum": -100,
+              "maximum": 100
+            },
+            "dy": {
+              "type": "integer",
+              "minimum": -100,
+              "maximum": 100
+            },
+            "y_fraction": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 0.95
+            }
           }
         },
         "native_screenshot_scenario": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["scenario"],
+          "required": [
+            "scenario"
+          ],
           "properties": {
-            "scenario": {"enum": ["capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand", "controls", "full-recorder"]},
-            "format": {"enum": ["gif", "mp4"]},
-            "secs": {"type": "integer", "minimum": 1, "maximum": 8}
+            "scenario": {
+              "enum": [
+                "capture",
+                "capture-fidelity",
+                "scroll",
+                "overlay-copy",
+                "record",
+                "recorder",
+                "pin",
+                "hotkey",
+                "ocr-redact",
+                "freehand",
+                "controls",
+                "full-recorder"
+              ]
+            },
+            "format": {
+              "enum": [
+                "gif",
+                "mp4"
+              ]
+            },
+            "secs": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
           }
         },
         "assert_file_contains": {
@@ -720,10 +880,19 @@
             "value": {
               "type": "string",
               "minLength": 1,
-              "description": "JSON text stored verbatim under key."
+              "description": "JSON text stored verbatim under key; raw permits a corrupt taomni.* fixture."
+            },
+            "raw": {
+              "type": "boolean",
+              "default": false
             }
           },
           "description": "Controlled persistence fixture: write one localStorage entry so native cases can enter a workspace without the undrivable native folder picker."
+        },
+        "remove_storage": {
+          "type": "string",
+          "pattern": "^taomni\\..+",
+          "description": "Browser/native controlled fixture: remove one named persisted input; runtime stores are unchanged until reload."
         },
         "reload_window": {
           "oneOf": [
@@ -1441,7 +1610,10 @@
           "$ref": "#/$defs/mouse_path_arg"
         },
         "mouse_button": {
-          "enum": ["down", "up"]
+          "enum": [
+            "down",
+            "up"
+          ]
         },
         "seed_clipboard_image": {
           "$ref": "#/$defs/seed_clipboard_image_arg"
@@ -1469,6 +1641,90 @@
         },
         "rdp_canvas_assert": {
           "$ref": "#/$defs/rdp_canvas_assert_arg"
+        },
+        "shell_backend_scenario": {
+          "type": "object",
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "enum": [
+                "fail-next",
+                "hold",
+                "release"
+              ]
+            },
+            "command": {
+              "enum": [
+                "create_local_terminal",
+                "create_ssh_terminal",
+                "save_session",
+                "sftp_attach",
+                "workspace_list_dir",
+                "workspace_write_file",
+                "db_save_query_workspace",
+                "open_detached_window",
+                "get_welcome_run_snapshot"
+              ]
+            },
+            "owner": {
+              "type": "string"
+            }
+          }
+        },
+        "assert_shell_backend": {
+          "type": "object",
+          "required": [
+            "command",
+            "count"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "owner": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "requested",
+                "failed",
+                "held"
+              ]
+            }
+          }
+        },
+        "switch_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "route"
+          ],
+          "properties": {
+            "route": {
+              "type": "string"
+            },
+            "timeout_sec": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "close_window": {
+          "type": "null"
+        },
+        "restart_native_app": {
+          "type": "null"
+        },
+        "assert_value": {
+          "$ref": "#/$defs/assert_text_equals_arg"
         }
       }
     },
@@ -1686,10 +1942,17 @@
     "point": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["x", "y"],
+      "required": [
+        "x",
+        "y"
+      ],
       "properties": {
-        "x": {"type": "number"},
-        "y": {"type": "number"}
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
       }
     },
     "fill_arg": {
@@ -2324,14 +2587,32 @@
     "terminal_drag_selection_arg": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["selector"],
+      "required": [
+        "selector"
+      ],
       "properties": {
-        "selector": {"type": "string", "minLength": 1},
-        "direction": {"enum": ["forward", "reverse"], "default": "forward"},
+        "selector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ],
+          "default": "forward"
+        },
         "modifiers": {
           "type": "array",
           "uniqueItems": true,
-          "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}
+          "items": {
+            "enum": [
+              "Alt",
+              "Control",
+              "Meta",
+              "Shift"
+            ]
+          }
         }
       }
     },
@@ -3269,10 +3550,15 @@
     "host_rdp_logoff_arg": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["user_env"],
+      "required": [
+        "user_env"
+      ],
       "properties": {
         "user_env": {
-          "enum": ["QA_RDP_BASELINE_USER1", "QA_RDP_BASELINE_USER2"]
+          "enum": [
+            "QA_RDP_BASELINE_USER1",
+            "QA_RDP_BASELINE_USER2"
+          ]
         }
       }
     },

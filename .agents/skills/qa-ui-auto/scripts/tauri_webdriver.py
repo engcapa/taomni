@@ -537,6 +537,22 @@ class NativeSession:
             if on_close is not None:
                 on_close()
 
+    def restart(self) -> None:
+        """End this QA process and start another on the same isolated profile."""
+        harness = getattr(self, "_harness", None)
+        if harness is None:
+            raise WebDriverError("restart requires the owning isolated NativeHarness")
+        deadline = self.deadline
+        try:
+            self.close()
+        except (WebDriverError, OSError):
+            # An app which already exited cannot acknowledge DELETE. Its
+            # owned driver tree was still reaped by close's finally block.
+            pass
+        harness.deadline = deadline
+        replacement = harness.create_session()
+        self.__dict__.update(replacement.__dict__)
+
     def endpoint(self, suffix: str) -> str:
         if not self.session_id:
             raise WebDriverError("WebDriver session is not started")
@@ -1236,6 +1252,7 @@ class NativeHarness:
                 encoding="utf-8",
             )
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
+        session._harness = self
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()

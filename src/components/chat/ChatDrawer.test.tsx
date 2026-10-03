@@ -587,16 +587,16 @@ describe("ChatDrawer layout resizing", () => {
 
     fireEvent.click(screen.getByTestId("tao-hub-tab-chat"));
     expect(useTaoHubStore.getState().hubTab).toBe("chat");
-    expect(screen.queryByTestId("notes-panel")).not.toBeInTheDocument();
+    expect(screen.getByTestId("notes-panel")).not.toBeVisible();
   });
 
-  it("opens mail notifications as a Tao Hub tab and clears only the clicked mail tab", () => {
+  it("counts notification records and acknowledges mail only after its target is visible", async () => {
     useTaoHubStore.setState({ hubTab: "chat" });
     useAppStore.setState({
       tabs: [
         { id: "term-1", type: "terminal", title: "Terminal 1", closable: true },
-        { id: "mail-1", type: "mail", title: "Work mail", closable: true },
-        { id: "mail-2", type: "mail", title: "Ops mail", closable: true },
+        { id: "mail-1", type: "mail", title: "Work mail", sessionId: "acct-1", closable: true },
+        { id: "mail-2", type: "mail", title: "Ops mail", sessionId: "acct-2", closable: true },
       ],
       activeTabId: "term-1",
     });
@@ -630,12 +630,17 @@ describe("ChatDrawer layout resizing", () => {
     fireEvent.click(screen.getByTestId("tao-hub-tab-notifications"));
     expect(screen.getByTestId("tao-alert-inbox")).toBeInTheDocument();
     expect(screen.getAllByTestId("tao-alert-inbox-item")).toHaveLength(2);
-    expect(screen.getByTestId("tao-hub-notifications-badge")).toHaveTextContent("4");
+    expect(screen.getByTestId("tao-hub-notifications-badge")).toHaveTextContent("2");
 
     fireEvent.click(screen.getAllByTestId("tao-alert-jump")[0]);
 
     expect(useAppStore.getState().activeTabId).toBe("mail-1");
-    expect(useTaoAlertStore.getState().mailNew.map((alert) => alert.mailTabId)).toEqual(["mail-2"]);
+    expect(useTaoAlertStore.getState().mailNew).toHaveLength(2);
+    const target = document.createElement("div"); target.dataset.testid = "mail-client-tab"; target.dataset.accountId = "acct-1";
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({ width: 400, height: 300 } as DOMRect);
+    document.body.appendChild(target);
+    await waitFor(() => expect(useTaoAlertStore.getState().mailNew.map((alert) => alert.mailTabId)).toEqual(["mail-2"]));
+    target.remove();
   });
 
   it("keeps dismissed notifications hidden until history is searched and supports clearing history", async () => {

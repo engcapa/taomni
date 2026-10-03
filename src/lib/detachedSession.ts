@@ -25,7 +25,11 @@
  * sitting in localStorage indefinitely.
  */
 
+import { emit, listen } from "@tauri-apps/api/event";
+import { isTauriRuntime } from "./runtime";
+
 export type DetachedKind =
+  | "git"
   | "sftp"
   | "rdp"
   | "vnc"
@@ -206,12 +210,15 @@ export function detectDetachedRoute():
       const eq = hash.indexOf("=");
       if (eq > 1) {
         const key = hash.slice(1, eq);
-        const value = hash.slice(eq + 1);
+        const encodedValue = hash.slice(eq + 1);
+        let value = encodedValue;
+        try { value = decodeURIComponent(encodedValue); } catch { /* Legacy plain ids can contain %. */ }
         if (isDetachedKind(key) && value) return { kind: key, id: value };
       }
     }
     const url = new URL(window.location.href);
     for (const kind of [
+      "git",
       "sftp",
       "rdp",
       "vnc",
@@ -233,6 +240,7 @@ export function detectDetachedRoute():
 function isDetachedKind(value: string): value is DetachedKind {
   return (
     value === "sftp" ||
+    value === "git" ||
     value === "rdp" ||
     value === "vnc" ||
     value === "terminal" ||
@@ -264,6 +272,42 @@ let reattachChannel: BroadcastChannel | null = null;
 let reattachSeq = 0;
 const reattachListeners = new Set<(msg: ReattachMessage) => void>();
 const seenReattach = new Map<string, number>();
+export interface PanelWindowMessage { type: "panel-window"; envelope: import("./shell/types").PanelWindowEnvelope; data?: unknown; from: string; seq: number }
+const panelWindowListeners = new Set<(message: PanelWindowMessage) => void>();
+const panelWindowSeen = new Set<string>();
+const PANEL_WINDOW_PREFIX = "taomni.shell.panel.message.";
+let panelNativeReady: Promise<unknown> | undefined;
+function ensurePanelNativeChannel() {
+  if (isTauriRuntime() && !panelNativeReady) {
+    panelNativeReady = listen<PanelWindowMessage>("taomni-shell-panel-window", (event) => deliverPanelWindow(event.payload)).catch(() => { panelNativeReady = undefined; });
+  }
+  return panelNativeReady;
+}
+function deliverPanelWindow(message: PanelWindowMessage) {
+  const env = message?.envelope;
+  if (message?.type !== "panel-window" || message.from === senderId || env?.version !== 1 || typeof env.operationId !== "string" || typeof env.panelId !== "string" || typeof env.windowLabel !== "string" || !Number.isInteger(env.generation) || !Number.isInteger(message.seq) || !["ready", "failed", "request-reattach", "reattached", "closed", "commit", "cancel", "request-focus"].includes(env.event)) return;
+  const key = `${message.from}:${message.seq}`;
+  if (panelWindowSeen.has(key)) return;
+  panelWindowSeen.add(key); if (panelWindowSeen.size > 1000) panelWindowSeen.delete(panelWindowSeen.values().next().value!);
+  panelWindowListeners.forEach((listener) => { try { listener(message); } catch (error) { console.warn("[shell-window]", error); } });
+}
+export function broadcastPanelWindow(envelope: PanelWindowMessage["envelope"], data?: unknown): void {
+  const message: PanelWindowMessage = { type: "panel-window", envelope, data, from: senderId, seq: ++reattachSeq };
+  try { ensureChannel()?.postMessage(message); } catch { /* native/storage fallback */ }
+  if (isTauriRuntime()) void Promise.resolve(ensurePanelNativeChannel()).then(() => emit("taomni-shell-panel-window", message)).catch(() => undefined);
+  const key = `${PANEL_WINDOW_PREFIX}${senderId}.${message.seq}`;
+  try { localStorage.setItem(key, JSON.stringify({ message, createdAt: Date.now() })); } catch { /* live channel remains available */ }
+  setTimeout(() => { try { localStorage.removeItem(key); } catch { /* best effort */ } }, 10000);
+}
+export function subscribePanelWindow(listener: (message: PanelWindowMessage) => void): () => void {
+  ensureChannel(); ensurePanelNativeChannel(); panelWindowListeners.add(listener);
+  const onStorage = (event: StorageEvent) => {
+    if (!event.key?.startsWith(PANEL_WINDOW_PREFIX) || !event.newValue) return;
+    try { const value = JSON.parse(event.newValue); if (Date.now() - value.createdAt < 10000) deliverPanelWindow(value.message); } catch { /* invalid envelope */ }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => { panelWindowListeners.delete(listener); window.removeEventListener("storage", onStorage); };
+}
 
 function ensureChannel(): BroadcastChannel | null {
   if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
@@ -272,8 +316,9 @@ function ensureChannel(): BroadcastChannel | null {
   if (reattachChannel) return reattachChannel;
   try {
     reattachChannel = new BroadcastChannel(REATTACH_CHANNEL_NAME);
-    reattachChannel.onmessage = (event: MessageEvent<ReattachMessage>) => {
+    reattachChannel.onmessage = (event: MessageEvent<ReattachMessage | PanelWindowMessage>) => {
       const msg = event.data;
+      if (msg?.type === "panel-window") { deliverPanelWindow(msg); return; }
       if (!msg || msg.type !== "reattach" || msg.from === senderId) return;
       const dedupeKey = `${msg.kind}.${msg.id}.${msg.seq}`;
       const lastSeq = seenReattach.get(`${msg.kind}.${msg.id}`) ?? -1;

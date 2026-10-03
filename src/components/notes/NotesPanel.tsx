@@ -36,6 +36,7 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
   const toggleComplete = useNotesStore((s) => s.toggleComplete);
   const setActiveNote = useNotesStore((s) => s.setActiveNote);
   const activeNoteId = useNotesStore((s) => s.activeNoteId);
+  const activeNoteSnapshot = useNotesStore((s) => s.activeNoteSnapshot);
   const theme = useNotesStore((s) => s.theme);
   const font = useNotesStore((s) => s.font);
   const fontSize = useNotesStore((s) => s.fontSize);
@@ -53,7 +54,7 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const activeNote = activeNoteId ? notes.find((n) => n.id === activeNoteId) ?? null : null;
+  const activeNote = activeNoteId ? notes.find((n) => n.id === activeNoteId) ?? (activeNoteSnapshot?.id === activeNoteId ? activeNoteSnapshot : null) : null;
   const themeStyle = notesThemeStyle(theme);
   const fontStyle = notesFontStyle(font);
   const fontSizeStyle = notesFontSizeStyle(fontSize);
@@ -91,7 +92,13 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
       style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)", ...themeStyle, ...fontStyle, ...fontSizeStyle }}
     >
       {activeNote ? (
+        <>
+        {showPanelModeToggle && <button type="button" data-testid="notes-floating-toggle" className="taomni-btn shrink-0 self-end m-1 h-6 w-6 p-0 inline-flex items-center justify-center"
+          title={floatingActive ? t("notes.panelModeHub") : t("notes.panelModeFloating")} aria-label={floatingActive ? t("notes.panelModeHub") : t("notes.panelModeFloating")} aria-pressed={floatingActive} onClick={toggleFloatingPanel}>
+          {floatingActive ? <PanelRightClose className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+        </button>}
         <NoteEditor note={activeNote} onClose={() => setActiveNote(null)} />
+        </>
       ) : (
         <>
           {/* Toolbar */}

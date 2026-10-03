@@ -59,6 +59,8 @@ function sourceLabel(alert: TaoAlert, t: TranslateFn): string {
       return t("tao.tabNotes");
     case "mail":
       return t("tao.alertSourceMail");
+    case "transfer":
+      return t("shell.transfers");
   }
 }
 

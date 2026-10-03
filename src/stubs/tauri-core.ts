@@ -1,3 +1,4 @@
+import { shellScenarioBefore, shellScenarioInvoke } from "./shellScenario";
 import {
   installStubMailQaControl,
   stubMailAppend,
@@ -1718,6 +1719,9 @@ function stubSystemRdpStatus(): Record<string, unknown> {
 }
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  await shellScenarioBefore(cmd, args);
+  const shellReply = await shellScenarioInvoke(cmd, args);
+  if (shellReply) return shellReply.value as T;
   // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).
   if (parity008Handles(cmd, args)) return await parity008Invoke(cmd, args) as T;
   // MFA authenticator: localStorage mirror of mfa.db gated by the stub vault.

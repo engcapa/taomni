@@ -1,0 +1,160 @@
+id: TC-SHELL-N06
+title: Project rehosting retains editor history and saves real bytes
+description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n06
+  records the complete scenario and any remaining manual boundary.
+covers:
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- shell_native_files
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell",
+      "name": "shell", "path": "${fixture.shell_root}", "kind": "folder"}], "looseFiles":
+      [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind": "root",
+      "rootId": "shell", "path": "README.md"}}]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - alpha
+    - beta
+    - gamma
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+End
+- type: z
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - alpha
+    - beta
+    - gamma
+    - z
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+s
+- assert_file_sha256:
+    path: ${fixture.shell_readme}
+    equals: ${fixture.shell_edited_sha256}
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+z
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+s
+- assert_file_sha256:
+    path: ${fixture.shell_readme}
+    equals: ${fixture.shell_readme_sha256}
+- screenshot: tc-shell-n06.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A disposable real file opens through Home recent workspace.
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "timeout_sec": 60}}'
+    - step: 10
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-line", "equals": ["alpha", "beta", "gamma", ""]}}'
+    results:
+    - 6
+    - 9
+    - 10
+  - id: R2
+    requirement: Rehosting preserves the full buffer; save writes the expected SHA-256,
+      undo and save restore original bytes.
+    actions:
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 30
+    - 32
+    - 33
+    checkpoints:
+    - step: 29
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-line", "equals": ["alpha", "beta", "gamma", "z"]}}'
+    - step: 31
+      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_readme}", "equals":
+        "${fixture.shell_edited_sha256}"}}'
+    - step: 34
+      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_readme}", "equals":
+        "${fixture.shell_readme_sha256}"}}'
+    results:
+    - 29
+    - 31
+    - 34
+  visual:
+  - check: Read final screenshot for clipped controls and retained content
+    method: manual
+    reason: Screenshot generation is not a visual verdict.
+  native:
+  - check: Real Tauri IPC, packaged WebView and declared disk/process/window results
+    method: automated
+    reason: Uses the isolated QA binary; no browser backend stubs.
+  - check: Real permission-denied save recovery in V-N06.
+    method: manual
+    reason: See linked native case; this YAML alone does not establish this boundary.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

@@ -1,0 +1,167 @@
+id: TC-SHELL-B31
+title: Quick switch focus trap, composition and overlay dismissal
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b31.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-quick-switch"]'
+- assert_attribute:
+    selector: '[data-testid="shell-quick-input"]'
+    name: role
+    equals: combobox
+- compose_text:
+    selector: '[data-testid="shell-quick-input"]'
+    text: 中文
+- assert_visible: '[data-testid="shell-quick-dialog"]'
+- assert_count:
+    selector: '[data-testid="shell-quick-option"]'
+    equal: 0
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Shift+Tab
+- assert_attribute:
+    selector: '[data-testid="shell-tab-empty-new"]:focus'
+    name: data-testid
+    equals: shell-tab-empty-new
+- press:
+    selector: '[data-testid="shell-tab-empty-new"]'
+    key: Tab
+- eval_readonly:
+    expression: document.activeElement.getAttribute('data-testid') === 'shell-quick-input'
+    expect_truthy: true
+    timeout_sec: 5
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-quick-dialog"]'
+- eval_readonly:
+    expression: document.activeElement.getAttribute('data-testid') === 'shell-quick-switch'
+    expect_truthy: true
+    timeout_sec: 5
+- set_viewport:
+    width: 800
+    height: 600
+- click: '[data-testid="shell-rail-sessions"]'
+- assert_attribute:
+    selector: '[data-testid="shell-root"]'
+    name: data-overlay
+    equals: navigator
+- assert_attribute:
+    selector: '[data-testid="shell-work-area"]'
+    name: inert
+    equals: ''
+- press:
+    selector: '[data-testid="shell-navigator-hide"]'
+    key: Escape
+- assert_not_visible: '[data-testid="session-tree"]'
+- set_viewport:
+    width: 1440
+    height: 900
+- click: '[data-testid="shell-rail-home"]'
+- assert_visible: '[data-testid="session-tree"]'
+- screenshot: tc-shell-b31.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Quick switch has combobox semantics; composition preserves the dialog
+      and does not activate a tab.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 8
+    - 11
+    - 13
+    - 15
+    checkpoints:
+    - step: 5
+      expectation: Quick switch has combobox semantics; composition preserves the
+        dialog and does not activate a tab.
+    - step: 7
+      expectation: Quick switch has combobox semantics; composition preserves the
+        dialog and does not activate a tab.
+    - step: 9
+      expectation: Quick switch has combobox semantics; composition preserves the
+        dialog and does not activate a tab.
+    - step: 10
+      expectation: Quick switch has combobox semantics; composition preserves the
+        dialog and does not activate a tab.
+    - step: 12
+      expectation: Quick switch has combobox semantics; composition preserves the
+        dialog and does not activate a tab.
+    - step: 14
+      expectation: Quick switch has combobox semantics; composition preserves the
+        dialog and does not activate a tab.
+    - step: 16
+      expectation: Quick switch has combobox semantics; composition preserves the
+        dialog and does not activate a tab.
+    - step: 17
+      expectation: Quick switch has combobox semantics; composition preserves the
+        dialog and does not activate a tab.
+    results:
+    - 5
+    - 7
+    - 9
+    - 10
+    - 12
+    - 14
+    - 16
+    - 17
+  - id: R2
+    requirement: A narrow Navigator is a dismissible dialog with inert work area and
+      retains the wide preference.
+    actions:
+    - 18
+    - 19
+    - 22
+    - 24
+    - 25
+    checkpoints:
+    - step: 20
+      expectation: A narrow Navigator is a dismissible dialog with inert work area
+        and retains the wide preference.
+    - step: 21
+      expectation: A narrow Navigator is a dismissible dialog with inert work area
+        and retains the wide preference.
+    - step: 23
+      expectation: A narrow Navigator is a dismissible dialog with inert work area
+        and retains the wide preference.
+    - step: 26
+      expectation: A narrow Navigator is a dismissible dialog with inert work area
+        and retains the wide preference.
+    results:
+    - 20
+    - 21
+    - 23
+    - 26
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

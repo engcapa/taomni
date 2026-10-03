@@ -522,6 +522,7 @@ describe("TerminalPanel focus behavior", () => {
   });
 
   it("installs SSH cwd reporting when a delayed startup later reaches an idle prompt", async () => {
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
     let onOutput: ((data: Uint8Array) => void) | undefined;
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
       onOutput = args[9] as (data: Uint8Array) => void;
@@ -582,6 +583,7 @@ describe("TerminalPanel focus behavior", () => {
   });
 
   it("holds keystrokes while a hidden SSH setup line is still being installed", async () => {
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
     let onOutput: ((data: Uint8Array) => void) | undefined;
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
       onOutput = args[9] as (data: Uint8Array) => void;

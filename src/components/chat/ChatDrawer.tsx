@@ -64,9 +64,11 @@ import { useTaoHubStore } from "../../stores/taoHubStore";
 import { useNotesStore } from "../../stores/notesStore";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { NotesPanel } from "../notes/NotesPanel";
+import { SurfaceSlot } from "../shell/SurfaceSlot";
 import { notesThemeStyle } from "../../lib/notes/notesTheme";
 import { TaoAlertInbox } from "../tao/TaoAlertInbox";
 import { alertColorBucket, buildTaoAlerts, topAlertKind, type TaoAlert } from "../../lib/tao/taoAlerts";
+import { revealShellTarget, targetForAlert } from "../../lib/shell/shellTargetResolver";
 
 /** Stable empty array so a thread with no queue does not churn renders. */
 const EMPTY_QUEUE: QueuedSend[] = [];
@@ -77,6 +79,7 @@ const SIDE_RIBBON_HOVER_OPEN_DELAY_MS = 260;
 const TOP_BOTTOM_RIBBON_HOVER_OPEN_DELAY_MS = 650;
 
 interface ChatDrawerProps {
+  shellHosted?: boolean;
   /**
    * Optional fallback terminal scrollback. When omitted (the default in the
    * production layout), the drawer pulls live buffer text from the terminal
@@ -85,7 +88,7 @@ interface ChatDrawerProps {
   terminalContext?: string;
 }
 
-export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
+export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerProps) {
   const t = useT();
   const {
     threads, activeThreadId, messages, sendingByThreadId, sendQueues, drawerOpen, drawerWidth,
@@ -101,11 +104,15 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const hubTab = useTaoHubStore((s) => s.hubTab);
   const setHubTab = useTaoHubStore((s) => s.setHubTab);
   const notesTheme = useNotesStore((s) => s.theme);
+  const notesPanelMode = useNotesStore((s) => s.panelMode);
+  const dockNotes = useNotesStore((s) => s.setPanelMode);
+  const [notesUsed, setNotesUsed] = useState(hubTab === "notes");
+  useEffect(() => { if (hubTab === "notes") setNotesUsed(true); }, [hubTab]);
   const noteAlerts = useNotesStore((s) => s.alerts);
-  const setActiveNote = useNotesStore((s) => s.setActiveNote);
   const ackNoteAlert = useNotesStore((s) => s.ackAlert);
   const aiDoneAlerts = useTaoAlertStore((s) => s.aiDone);
   const mailNewAlerts = useTaoAlertStore((s) => s.mailNew);
+  const transferAlerts = useTaoAlertStore((s) => s.transfer);
   const alertHistory = useTaoAlertStore((s) => s.history);
   const alertHistoryLimit = useTaoAlertStore((s) => s.historyLimit);
   const recordAlertHistory = useTaoAlertStore((s) => s.recordHistory);
@@ -114,6 +121,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const ackAiDone = useTaoAlertStore((s) => s.ack);
   const clearMailTab = useTaoAlertStore((s) => s.clearMailTab);
   const [error, setError] = useState<string | null>(null);
+  const navigationRef = useRef<AbortController | null>(null);
+  useEffect(() => () => navigationRef.current?.abort(), []);
   // Per-thread render-format override applied client-side ONLY (the persisted
   // `output_format` is locked once the thread has any messages — see issue
   // #3). Setting this lets the user re-render the existing transcript in
@@ -141,7 +150,6 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const activeTab = useAppStore((s) =>
     s.tabs.find((tab) => tab.id === s.activeTabId) ?? null,
   );
-  const setActiveAppTab = useAppStore((s) => s.setActiveTab);
   const activeTabId = activeTab?.id ?? null;
   const activeTabType = activeTab?.type ?? null;
   const activeChatTabId = isChatCapableTabType(activeTabType)
@@ -194,36 +202,26 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     [drawerTabId, threads],
   );
   const taoAlerts = useMemo(
-    () => buildTaoAlerts(noteAlerts, aiDoneAlerts, mailNewAlerts),
-    [noteAlerts, aiDoneAlerts, mailNewAlerts],
+    () => buildTaoAlerts(noteAlerts, aiDoneAlerts, mailNewAlerts, transferAlerts),
+    [noteAlerts, aiDoneAlerts, mailNewAlerts, transferAlerts],
   );
   const alertBadgeCount = useMemo(
-    () => taoAlerts.reduce((sum, alert) => sum + (alert.count ?? 1), 0),
+    () => taoAlerts.length,
     [taoAlerts],
   );
   useEffect(() => {
     recordAlertHistory(taoAlerts);
   }, [recordAlertHistory, taoAlerts]);
 
-  const jumpToAlert = (alert: TaoAlert) => {
-    if (alert.source === "notes") {
-      setHubTab("notes");
-      if (alert.noteId) setActiveNote(alert.noteId);
-      const rawId = alert.id.startsWith("note:") ? alert.id.slice("note:".length) : alert.id;
-      void ackNoteAlert(rawId);
-      return;
-    }
-    if (alert.source === "mail") {
-      const tabId = alert.mailTabId;
-      if (tabId && useAppStore.getState().tabs.some((tab) => tab.id === tabId)) {
-        setActiveAppTab(tabId);
-        clearMailTab(tabId);
-      }
-      return;
-    }
-    setHubTab("chat");
-    if (alert.threadId) setActiveThread(alert.threadId);
-    ackAiDone(alert.id);
+  const jumpToAlert = async (alert: TaoAlert) => {
+    const target = targetForAlert(alert);
+    if (!target) { setError(t("shell.targetUnavailable")); return; }
+    navigationRef.current?.abort();
+    const navigation = new AbortController(); navigationRef.current = navigation;
+    const result = await revealShellTarget(target, navigation.signal);
+    if (navigationRef.current !== navigation || navigation.signal.aborted) return;
+    if (result.status === "revealed") { ackAlert(alert); setError(null); }
+    else if (result.status === "failed") setError(result.message);
   };
 
   const ackAlert = (alert: TaoAlert) => {
@@ -241,6 +239,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   // Provider switcher dropdown — pulls the live provider list from aiStore.
   const aiConfig = useAiStore((s) => s.config);
+  const aiDisabled = aiConfig?.fully_disabled === true;
   const defaultCcModel = aiConfig?.cc_bridge.default_model?.trim() || DEFAULT_CLAUDE_CODE_MODEL;
   const defaultCodexModel = aiConfig?.codex_bridge.default_model?.trim() || DEFAULT_CODEX_MODEL;
   const isLocalAgentProvider = activeThread?.provider_id === "claude-code" || activeThread?.provider_id === "codex";
@@ -322,6 +321,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   // Narrow windows keep the tab usable by hiding to the ribbon; medium widths
   // float the drawer instead of consuming layout width.
   useEffect(() => {
+    if (shellHosted) return;
     const handle = () => {
       const w = window.innerWidth;
       if (w < 760) {
@@ -333,7 +333,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     window.addEventListener("resize", handle);
     handle();
     return () => window.removeEventListener("resize", handle);
-  }, [drawerPinned, drawerPosition, hideDrawer, setDrawerPinned]);
+  }, [drawerPinned, drawerPosition, hideDrawer, setDrawerPinned, shellHosted]);
 
   // Load messages when active thread changes.
   useEffect(() => {
@@ -557,7 +557,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const topBottomFloating = floating && (drawerPosition === "top" || drawerPosition === "bottom");
 
   useEffect(() => {
-    if (!drawerOpen || !floating) return;
+    if (!drawerOpen || !floating || shellHosted) return;
 
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null;
@@ -577,7 +577,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
     window.addEventListener("pointerdown", onPointerDown, true);
     return () => window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [dismissDrawer, drawerOpen, floating]);
+  }, [dismissDrawer, drawerOpen, floating, shellHosted]);
 
   // Drag-to-resize the drawer.
   const handleResizeStart = (
@@ -717,8 +717,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   return (
     <div
-      className={containerClass}
-      style={themedContainerStyle}
+      className={shellHosted ? "relative w-full h-full min-w-0 min-h-0" : containerClass}
+      style={shellHosted ? { ...themedContainerStyle, position: "relative", width: "100%", height: "100%", left: undefined, right: undefined, top: undefined, bottom: undefined, transform: undefined, maxWidth: "100%" } : themedContainerStyle}
       data-testid="ai-chat-drawer"
       data-position={drawerPosition}
       data-pinned={drawerPinned || undefined}
@@ -926,6 +926,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             type="button"
             role="tab"
             aria-selected={hubTab === "chat"}
+            disabled={aiDisabled}
+            title={aiDisabled ? t("shell.aiDisabled") : undefined}
             data-testid="tao-hub-tab-chat"
             className={`flex-1 h-7 inline-flex items-center justify-center gap-1 border-b-2 transition-colors ${
               hubTab === "chat"
@@ -970,6 +972,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               <span
                 className="min-w-[14px] h-[14px] px-1 rounded-full text-[8px] font-bold flex items-center justify-center bg-[var(--taomni-accent)] text-white"
                 data-testid="tao-hub-notifications-badge"
+                aria-label={t("shell.notificationCount", { count: alertBadgeCount })}
               >
                 {alertBadgeCount > 99 ? "99+" : alertBadgeCount}
               </span>
@@ -977,7 +980,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           </button>
         </div>
 
-        {hubTab === "notifications" ? (
+        {error && <p data-testid="shell-target-error" role="alert" className="px-2 py-1 text-xs text-red-500">{error}</p>}
+        <div className="flex-1 min-h-0 flex flex-col" style={{ display: hubTab === "notifications" ? "flex" : "none" }} inert={hubTab !== "notifications"}>
           <TaoAlertInbox
             alerts={taoAlerts}
             history={alertHistory}
@@ -988,9 +992,15 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             onClearHistory={clearAlertHistory}
             embedded
           />
-        ) : hubTab === "notes" ? (
-          <NotesPanel />
-        ) : (
+        </div>
+        <div className="flex-1 min-h-0 flex flex-col" style={{ display: hubTab === "notes" ? "flex" : "none" }} inert={hubTab !== "notes"}>
+          {shellHosted ? <>
+            {notesPanelMode === "floating" && <button data-testid="shell-notes-dock" className="taomni-btn m-3" onClick={() => dockNotes("hub")}>{t("notes.dock")}</button>}
+            <SurfaceSlot id="notes:hub" className="flex-1 min-h-0 flex flex-col" />
+          </> : (notesUsed || hubTab === "notes") && <NotesPanel />}
+        </div>
+        <div data-testid="shell-chat-content" data-thread-id={activeThreadId ?? ""} data-ready={activeThreadId && Array.isArray(messages[activeThreadId]) ? "true" : "false"} className="flex-1 min-h-0 flex flex-col" style={{ display: hubTab === "chat" ? "flex" : "none" }} inert={hubTab !== "chat"}>
+        {aiDisabled ? <p data-testid="shell-chat-disabled" className="p-3 text-sm">{t("shell.aiDisabled")}</p> : (
         <>
         {/* History panel */}
         {showHistory && (
@@ -1258,6 +1268,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         />
         </>
         )}
+        </div>
       </div>
     </div>
   );
@@ -1277,6 +1288,7 @@ export function ChatDrawerRibbon() {
   const mailNewAlerts = useTaoAlertStore((s) => s.mailNew);
   const recordAlertHistory = useTaoAlertStore((s) => s.recordHistory);
   const pruneMailTabs = useTaoAlertStore((s) => s.pruneMailTabs);
+  const transferAlerts = useTaoAlertStore((s) => s.transfer);
   const bumpRef = useRef(0);
   const [bumping, setBumping] = useState(false);
   const tabs = useAppStore((s) => s.tabs);
@@ -1301,11 +1313,11 @@ export function ChatDrawerRibbon() {
 
   // Unified Tao alerts (notes due/overdue/reminder + chat ai_done + mail), priority-sorted.
   const taoAlerts = useMemo(
-    () => buildTaoAlerts(noteAlerts, aiDoneAlerts, mailNewAlerts),
-    [noteAlerts, aiDoneAlerts, mailNewAlerts],
+    () => buildTaoAlerts(noteAlerts, aiDoneAlerts, mailNewAlerts, transferAlerts),
+    [noteAlerts, aiDoneAlerts, mailNewAlerts, transferAlerts],
   );
   const alertBadgeCount = useMemo(
-    () => taoAlerts.reduce((sum, alert) => sum + (alert.count ?? 1), 0),
+    () => taoAlerts.length,
     [taoAlerts],
   );
   useEffect(() => {

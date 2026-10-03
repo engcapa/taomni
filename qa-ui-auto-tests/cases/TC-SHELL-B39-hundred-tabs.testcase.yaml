@@ -1,0 +1,113 @@
+id: TC-SHELL-B39
+title: One hundred terminals remain searchable and activatable
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b39.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-recent-open-all"]'
+- wait_for: '[data-testid="shell-tab-overflow"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 7
+- click: '[data-testid="shell-tab-overflow"]'
+- wait_for: '[data-testid="shell-tab-count"][data-total="101"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 101
+- assert_attribute:
+    selector: '[data-testid="shell-tab-count"]'
+    name: data-total
+    equals: '101'
+- fill:
+    selector: '[data-testid="shell-tab-search"]'
+    value: qa-099
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="shell-tab-card-title"]'
+    equals: qa-099
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Enter
+- assert_text_equals:
+    selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+    equals: qa-099
+- assert_not_visible: '[data-testid="shell-overview"]'
+- screenshot: tc-shell-b39.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Opening a hundred entries keeps six strip entries and every exact
+      identity in the overview.
+    actions:
+    - 3
+    - 6
+    - 10
+    - 13
+    checkpoints:
+    - step: 4
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    - step: 5
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    - step: 7
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    - step: 8
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    - step: 9
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    - step: 11
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    - step: 12
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    - step: 14
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    - step: 15
+      expectation: Opening a hundred entries keeps six strip entries and every exact
+        identity in the overview.
+    results:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

@@ -1,0 +1,335 @@
+id: TC-SHELL-N02
+title: Real PTY survives Shell lane and Tao switches
+description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n02
+  records the complete scenario and any remaining manual boundary.
+covers:
+- F1.6
+- F1.5
+- F2.1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- shell_native_files
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]:visible[data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"]:visible'
+    text: echo QA_SHELL_START
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]:visible'
+    regex: (?m)^QA_SHELL_START\s*$
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"]:visible'
+    text: echo QA_SHELL_KEEP
+    submit: false
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: communicate
+- wait_for: '[data-testid="shell-lane-empty"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="shell-rail-tao"]'
+- press:
+    selector: '[data-testid="terminal-pane"]:visible'
+    key: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]:visible'
+    regex: (?m)^QA_SHELL_KEEP\s*$
+    timeout_sec: 20
+- screenshot: tc-shell-n02.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Home launches a real shell and produces an anchored output line.
+    actions:
+    - 4
+    - 6
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible[data-terminal-ready=\"true\"]"}'
+    - step: 7
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]:visible",
+        "regex": "(?m)^QA_SHELL_START\\s*$", "timeout_sec": 20}}'
+    results:
+    - 5
+    - 7
+  - id: R2
+    requirement: An unsubmitted command remains in the same PTY after 20 lane switches
+      and Hub show/hide.
+    actions:
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 27
+    - 29
+    - 30
+    - 32
+    - 33
+    - 35
+    - 36
+    - 38
+    - 39
+    - 41
+    - 42
+    - 44
+    - 45
+    - 47
+    - 48
+    - 50
+    - 51
+    - 53
+    - 54
+    - 56
+    - 57
+    - 59
+    - 60
+    - 62
+    - 63
+    - 65
+    - 66
+    - 68
+    - 69
+    - 71
+    - 72
+    checkpoints:
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 55
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 58
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 61
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 64
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 67
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 70
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 73
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]:visible",
+        "regex": "(?m)^QA_SHELL_KEEP\\s*$", "timeout_sec": 20}}'
+    results:
+    - 10
+    - 13
+    - 16
+    - 19
+    - 22
+    - 25
+    - 28
+    - 31
+    - 34
+    - 37
+    - 40
+    - 43
+    - 46
+    - 49
+    - 52
+    - 55
+    - 58
+    - 61
+    - 64
+    - 67
+    - 70
+    - 73
+  visual:
+  - check: Read final screenshot for clipped controls and retained content
+    method: manual
+    reason: Screenshot generation is not a visual verdict.
+  native:
+  - check: Real Tauri IPC, packaged WebView and declared disk/process/window results
+    method: automated
+    reason: Uses the isolated QA binary; no browser backend stubs.
+  - check: External PID/cwd inheritance and split process termination in V-N02.
+    method: manual
+    reason: See linked native case; this YAML alone does not establish this boundary.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

@@ -12,6 +12,9 @@ interface FileTransferQueueProps {
   onRetry?: (transferId: string) => void;
   compact?: boolean;
   showCrossHostBanner?: boolean;
+  forceOpen?: boolean;
+  constrained?: boolean;
+  maxHeight?: number;
 }
 
 const STORAGE_KEY_PREFIX = "taomni.sftp.transferQueueHeight.";
@@ -83,6 +86,9 @@ export function FileTransferQueue({
   onRetry,
   compact,
   showCrossHostBanner,
+  forceOpen,
+  constrained,
+  maxHeight,
 }: FileTransferQueueProps) {
   const t = useT();
   const items = useTransferStore((s) => s.items);
@@ -90,6 +96,8 @@ export function FileTransferQueue({
   const clearCompleted = useTransferStore((s) => s.clearCompleted);
   const [height, setHeight] = useState(() => loadHeight(sessionId, compact));
   const [isOpen, setIsOpen] = useState(() => loadOpen(sessionId));
+  const [peekOpen, setPeekOpen] = useState(false);
+  useEffect(() => { if (forceOpen) setIsOpen(true); }, [forceOpen]);
 
   useEffect(() => {
     setHeight(loadHeight(sessionId, compact));
@@ -97,12 +105,13 @@ export function FileTransferQueue({
   }, [compact, sessionId]);
 
   const toggleOpen = useCallback(() => {
+    if (constrained) { setPeekOpen((value) => !value); return; }
     setIsOpen((prev) => {
       const next = !prev;
       saveOpen(sessionId, next);
       return next;
     });
-  }, [sessionId]);
+  }, [constrained, sessionId]);
 
   const updateHeight = useCallback(
     (nextHeight: number) => {
@@ -175,7 +184,7 @@ export function FileTransferQueue({
     prevCountRef.current = filtered.length;
   }, [filtered, isOpen, sessionId]);
 
-  if (!isOpen) {
+  if (constrained ? !peekOpen && !forceOpen : !isOpen) {
     return (
       <div
         data-testid="sftp-transfer-queue-collapsed"
@@ -215,8 +224,8 @@ export function FileTransferQueue({
   return (
     <div
       data-testid="sftp-transfer-queue"
-      className="border-t flex flex-col shrink-0 relative"
-      style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)", height }}
+      className={`border-t flex flex-col shrink-0 ${constrained ? "absolute inset-x-0 bottom-0 z-20 shadow-xl" : "relative"}`}
+      style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)", height: Math.min(height, maxHeight ?? height) }}
     >
       <div
         data-testid="sftp-transfer-queue-resize-handle"
@@ -308,6 +317,9 @@ export function FileTransferQueue({
           return (
             <div
               key={it.id}
+              data-testid="transfer-job"
+              data-job-id={it.id}
+              data-state={it.state}
               className="px-2 py-1 border-b"
               style={{ borderColor: "var(--taomni-divider)" }}
             >

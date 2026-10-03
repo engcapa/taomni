@@ -1,0 +1,131 @@
+id: TC-SHELL-B05
+title: Navigator toggles preserve the primary tab and tool entry points
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b05.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.2
+- F1.3
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-sessions"]'
+- assert_not_visible: '[data-testid="session-tree"]'
+- click: '[data-testid="shell-rail-sessions"]'
+- assert_visible: '[data-testid="session-tree"]'
+- click: '[data-testid="shell-rail-workspaces"]'
+- assert_visible: '[data-testid="shell-recent-workspace"]'
+- assert_attribute:
+    selector: '[data-testid="shell-navigator"]'
+    name: data-area
+    equals: workspaces
+- click: '[data-testid="shell-navigator-page"][data-page="tools"]'
+- assert_visible: '[data-testid="sidebar-tools-panel"]'
+- assert_count:
+    selector: '[data-testid="welcome-panel"]'
+    equal: 1
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="shell-rail-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="settings"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 3
+- screenshot: tc-shell-b05.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Sessions hides and reopens without replacing Home; Workspaces selects
+      recent and tools pages without launching a workspace.
+    actions:
+    - 3
+    - 5
+    - 7
+    - 10
+    checkpoints:
+    - step: 4
+      expectation: Sessions hides and reopens without replacing Home; Workspaces selects
+        recent and tools pages without launching a workspace.
+    - step: 6
+      expectation: Sessions hides and reopens without replacing Home; Workspaces selects
+        recent and tools pages without launching a workspace.
+    - step: 8
+      expectation: Sessions hides and reopens without replacing Home; Workspaces selects
+        recent and tools pages without launching a workspace.
+    - step: 9
+      expectation: Sessions hides and reopens without replacing Home; Workspaces selects
+        recent and tools pages without launching a workspace.
+    - step: 11
+      expectation: Sessions hides and reopens without replacing Home; Workspaces selects
+        recent and tools pages without launching a workspace.
+    - step: 12
+      expectation: Sessions hides and reopens without replacing Home; Workspaces selects
+        recent and tools pages without launching a workspace.
+    results:
+    - 4
+    - 6
+    - 8
+    - 9
+    - 11
+    - 12
+  - id: R2
+    requirement: Project tool launch remains reachable and settings opens one Utility
+      tab.
+    actions:
+    - 13
+    - 15
+    - 17
+    - 18
+    checkpoints:
+    - step: 14
+      expectation: Project tool launch remains reachable and settings opens one Utility
+        tab.
+    - step: 16
+      expectation: Project tool launch remains reachable and settings opens one Utility
+        tab.
+    - step: 19
+      expectation: Project tool launch remains reachable and settings opens one Utility
+        tab.
+    - step: 20
+      expectation: Project tool launch remains reachable and settings opens one Utility
+        tab.
+    - step: 21
+      expectation: Project tool launch remains reachable and settings opens one Utility
+        tab.
+    results:
+    - 14
+    - 16
+    - 19
+    - 20
+    - 21
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

@@ -6,6 +6,31 @@ type Dict = {
 };
 
 const dict = {
+  shell: {
+    details: "Details", dirty: "Unsaved changes", attentionStates: { none: "No alerts", unread: "New activity", busy: "Running", error: "Error" },
+    closeCount: "Close {count} selected item(s)", closeIncludingPinned: "Close all, including pinned tabs", ownerUnavailable: "The original owner is closed. Keep this tab open or close the instance.",
+    fallback: "Workspace layout could not be displayed.", reload: "Reload window",
+    restoreWorkingSet: "Restore working set", restoreStates: { loading: "Loading", empty: "No working set to restore", available: "Ready to restore", restoring: "Restoring", "awaiting-auth": "Awaiting authentication", succeeded: "Ready", partial: "Partially restored", failed: "Failed", cancelled: "Cancelled" },
+    workspaceDescription: "Open a folder or a saved workspace to edit, search, run and manage Git.", recentMail: "Recent mail",
+    closePromoted: "Return this view to its panel or close the instance?",
+    transfers: "Transfers", notificationCount: "{count} unacknowledged notifications", targetUnavailable: "The notification target is unavailable.", aiDisabled: "AI is disabled. Notes and notifications remain available.",
+    transferCloseRisk: "{count} active transfer(s) are owned by this panel.",
+    queryCloseRisk: "{count} query(s) are still running. Cancel them before closing.",
+    transactionCloseRisk: "{count} uncommitted statement(s). Choose commit or rollback.",
+    home: "Home", sessions: "Sessions", workspaces: "Workspaces", tao: "Tao", settings: "Settings",
+    lane: "Workspace group", lanes: { home: "Home", connect: "Connect", build: "Build", communicate: "Communicate", utility: "Utility" },
+    navigator: "Navigator", project: "Project", tools: "Tools", quickSwitch: "Quick switch", overview: "All tabs", panel: "Context panel",
+    search: "Search tabs", all: "All", attention: "With alerts", sort: "Sort", recent: "Recently used", name: "Name", type: "Type",
+    tabCount: "{count} tabs", currentExcluded: "The current tab is outside these results", locateCurrent: "Locate current",
+    empty: "No matching tabs", emptyLane: "No tabs in this group", clear: "Clear filters", newSession: "New connection", openWorkspace: "Open workspace",
+    hide: "Hide panel", pin: "Pin", unpin: "Unpin", more: "More", promote: "Open as tab", detach: "Open in window", reattach: "Return to panel",
+    right: "Dock right", bottom: "Dock bottom", closePanel: "Close panel", retry: "Retry", owner: "Owner: {name}", detached: "Opened in a window", focusWindow: "Focus window",
+    reset: "Reset layout", resetConfirm: "Reset workspace layout preferences?", layoutWarning: "Layout preferences could not be restored or saved.",
+    closeTitle: "Review before closing", closeConfirm: "Close selected tabs", close: { save: "Save", discard: "Discard", commit: "Commit", rollback: "Roll back",
+      background: "Continue in background", "cancel-job": "Cancel tasks", retry: "Retry", dock: "Return to panel", "close-instance": "Close instance" },
+    keymap: "Shell shortcuts", keymapConflict: "This key is already assigned", record: "Record shortcut", recentPanels: "Recent panels",
+    launchStatus: "Opening workspace…", launchFailed: "Workspace could not be opened: {error}", restoreWorkspaces: "Restore workspaces", noPreview: "No preview available",
+  },
   app: {
     name: "Taomni",
     title: "Taomni",

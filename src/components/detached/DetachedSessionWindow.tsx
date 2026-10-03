@@ -32,6 +32,7 @@ import {
   consumeDetachedHandoff,
   clearDetachedHandoff,
   broadcastReattach,
+  subscribePanelWindow,
   HANDOFF_TTL_MS,
 } from "../../lib/detachedSession";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
@@ -57,6 +58,11 @@ import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
 import { ChatDrawer } from "../chat/ChatDrawer";
 import { TaoRibbon } from "../tao/TaoRibbon";
 import { CcAgentBridge } from "../agent/CcAgentBridge";
+import type { SessionWindowMetadata } from "../../lib/shell/sessionWindow";
+import { sessionTabReady } from "../../lib/shell/sessionWindow";
+import { matchesPanelWindow, signalPanelWindow, waitPanelWindow } from "../../lib/shell/panelWindowTransaction";
+import { waitShellReady } from "../../lib/shell/readiness";
+import { getCloseAdapter } from "../../lib/shell/closeCoordinator";
 
 const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
 const VncPanel = lazy(() => import("../vnc/VncPanel"));
@@ -64,7 +70,7 @@ const DbClientTab = lazy(() => import("../database/DbClientTab"));
 
 /* ── Handoff payload shapes ──────────────────────────────────────────── */
 
-export interface DetachedRdpParams {
+export interface DetachedRdpParams extends SessionWindowMetadata {
   tabId?: string;
   sessionId: string;
   host: string;
@@ -76,7 +82,7 @@ export interface DetachedRdpParams {
   title?: string;
 }
 
-export interface DetachedVncParams {
+export interface DetachedVncParams extends SessionWindowMetadata {
   tabId?: string;
   sessionId: string;
   host: string;
@@ -92,7 +98,7 @@ export interface DetachedVncParams {
   claimId?: string;
 }
 
-export interface DetachedTerminalParams {
+export interface DetachedTerminalParams extends SessionWindowMetadata {
   tabId?: string;
   title?: string;
   terminalTitleMode?: Tab["terminalTitleMode"];
@@ -105,7 +111,7 @@ export interface DetachedTerminalParams {
   reattach?: TerminalReattachState;
 }
 
-export interface DetachedDbParams {
+export interface DetachedDbParams extends SessionWindowMetadata {
   tabId?: string;
   title?: string;
   info: DbConnectInfo;
@@ -148,6 +154,17 @@ export default function DetachedSessionWindow({
     consumeDetachedHandoff<unknown>(kind, id),
   );
   const [handoffTimedOut, setHandoffTimedOut] = useState(false);
+  const [windowError, setWindowError] = useState<string | null>(null);
+  const [committed, setCommitted] = useState(false);
+  const metadata = params as (SessionWindowMetadata & { tabId?: string }) | null;
+  useEffect(() => {
+    if (!metadata?.envelope || !metadata.tabId) return;
+    const controller = new AbortController();
+    void waitShellReady(() => sessionTabReady(kind, metadata.tabId!), controller.signal).then(() => {
+      signalPanelWindow(metadata.envelope!, "ready");
+    }).catch((error) => { if (!controller.signal.aborted) { setWindowError(String(error)); signalPanelWindow({ ...metadata.envelope!, errorCode: String(error) }, "failed"); } });
+    return () => controller.abort();
+  }, [metadata?.envelope?.operationId, metadata?.tabId, kind]);
   // A VNC claim is one-shot. Keep its in-flight request stable when StrictMode
   // replays this effect so the successful first consumption is not discarded.
   const vncClaimRequestRef = useRef<{
@@ -308,6 +325,13 @@ export default function DetachedSessionWindow({
     if (reattachingRef.current) return;
     if (!params) return;
     reattachingRef.current = true;
+    setWindowError(null);
+    try {
+    if (kind === "database") {
+      const adapter = getCloseAdapter(metadata?.tabId ?? "");
+      if ((await adapter?.getRisks(false))?.length) throw new Error("Finish or cancel the running query and commit or roll back the transaction before returning this window.");
+      await adapter?.flush(new AbortController().signal);
+    }
     let payload = mergeTerminalReattachState(state);
     if (kind === "vnc") {
       const current = params as DetachedVncParams;
@@ -324,7 +348,11 @@ export default function DetachedSessionWindow({
       });
       payload = redactVncHandoff({ ...current, viewerOptions: undefined }, claimId);
     }
-    broadcastReattach(kind, id, payload);
+    if (metadata?.envelope) {
+      const ack = waitPanelWindow(metadata.envelope, "reattached");
+      signalPanelWindow(metadata.envelope, "request-reattach", payload);
+      await ack;
+    } else broadcastReattach(kind, id, payload);
     clearDetachedHandoff(kind, id);
     try {
       if (tauri) {
@@ -332,18 +360,19 @@ export default function DetachedSessionWindow({
       } else {
         window.close();
       }
-    } catch {
-      try {
-        if (tauri) {
-          const current = getCurrentWindow();
-          await current.hide().catch(() => undefined);
-          await current.destroy();
-        }
-      } catch {
-        /* noop */
-      }
-    }
+    } catch (error) { setWindowError(String(error)); reattachingRef.current = false; }
+    } catch (error) { setWindowError(String(error)); reattachingRef.current = false; }
   }, [kind, id, mergeTerminalReattachState, params, tauri]);
+  useEffect(() => {
+    if (!metadata?.envelope) return;
+    return subscribePanelWindow((message) => {
+      if (!matchesPanelWindow(metadata.envelope!, message.envelope)) return;
+      if (message.envelope.event === "commit") { setCommitted(true); clearDetachedHandoff(kind, id); }
+      if (message.envelope.event === "request-focus" && tauri) void getCurrentWindow().show().then(() => getCurrentWindow().setFocus());
+      if (message.envelope.event === "request-reattach") void requestReattach();
+      if (message.envelope.event === "cancel") { reattachingRef.current = true; if (tauri) void closeCurrentDetachedWindow(); else window.close(); }
+    });
+  }, [metadata?.envelope, requestReattach, kind, id, tauri]);
 
   // Treat OS-close (title-bar X) as Reattach. The Tauri close-requested
   // hook fires before the window is destroyed; we cancel Tauri's default
@@ -511,9 +540,11 @@ export default function DetachedSessionWindow({
         data-testid="detached-session-window"
         data-detached-kind={kind}
         data-detached-id={id}
+        data-phase={committed ? "ready" : "initializing"}
         className="w-screen h-screen relative flex flex-col"
         style={{ background: "#000", color: "var(--taomni-text)" }}
       >
+        {windowError && <p role="alert" data-testid="shell-window-error" className="p-2">{windowError}</p>}
         <div
           className="h-8 shrink-0 flex items-center justify-end px-1"
           style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}

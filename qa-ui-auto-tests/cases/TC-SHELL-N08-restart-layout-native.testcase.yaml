@@ -1,0 +1,149 @@
+id: TC-SHELL-N08
+title: Real QA process restart keeps layout and explicit workspace restore
+description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n08
+  records the complete scenario and any remaining manual boundary.
+covers:
+- F1.6
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- shell_native_files
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell",
+      "name": "shell", "path": "${fixture.shell_root}", "kind": "folder"}], "looseFiles":
+      [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind": "root",
+      "rootId": "shell", "path": "README.md"}}]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- press:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    key: Home
+- press:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    key: Shift+ArrowRight
+- assert_attribute:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    name: aria-valuenow
+    equals: '232'
+- click: '[data-testid="shell-rail-home"]'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"width":232'
+- restart_native_app: null
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_attribute:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    name: aria-valuenow
+    equals: '232'
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tab"]'
+    timeout_sec: 60
+- click: '[data-testid="shell-rail-home"]'
+- assert_attribute:
+    selector: '[data-testid="welcome-restore-status"]'
+    name: data-state
+    equals: succeeded
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"]'
+    equal: 1
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 1
+- screenshot: tc-shell-n08.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Workspace and Navigator preferences are persisted before a process
+      restart.
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 10
+    - 11
+    - 13
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
+        "name": "aria-valuenow", "equals": "232"}}'
+    - step: 14
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains":
+        "\"width\":232"}}'
+    results:
+    - 6
+    - 9
+    - 12
+    - 14
+  - id: R2
+    requirement: A new QA process using the same isolated profile starts at Home with
+      saved preferences and restores exactly one workspace.
+    actions:
+    - 15
+    - 18
+    - 20
+    - 23
+    checkpoints:
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
+        "name": "aria-valuenow", "equals": "232"}}'
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]",
+        "timeout_sec": 60}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]",
+        "name": "data-state", "equals": "succeeded"}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]",
+        "equal": 1}}'
+    - step: 24
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
+        "equal": 1}}'
+    results:
+    - 16
+    - 17
+    - 19
+    - 21
+    - 22
+    - 24
+  visual:
+  - check: Read final screenshot for clipped controls and retained content
+    method: manual
+    reason: Screenshot generation is not a visual verdict.
+  native:
+  - check: Real Tauri IPC, packaged WebView and declared disk/process/window results
+    method: automated
+    reason: Uses the isolated QA binary; no browser backend stubs.
+  - check: Graceful UI exit and corrupt-profile restart branches in V-N08.
+    method: manual
+    reason: See linked native case; this YAML alone does not establish this boundary.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

@@ -2547,15 +2547,27 @@ def _do_seed_storage(ctx: NativeStepContext, args: Any) -> str:
     key = str(args["key"])
     value = str(args["value"])
     import json as _json
-    try:
-        _json.loads(value)
-    except ValueError as e:
-        raise StepError(f"seed_storage: value must be valid JSON ({e})") from e
+    if not args.get("raw", False):
+        try:
+            _json.loads(value)
+        except ValueError as e:
+            raise StepError(f"seed_storage: value must be valid JSON ({e})") from e
+    elif not key.startswith("taomni."):
+        raise StepError("seed_storage: raw input requires a taomni.* key")
     ctx.session.execute(
         f"window.localStorage.setItem({_json.dumps(key)}, {_json.dumps(value)});"
         "return window.localStorage.getItem(" + _json.dumps(key) + ") !== null;"
     )
     return f"seeded {key}"
+
+
+@_verb("remove_storage")
+def _do_remove_storage(ctx: NativeStepContext, args: Any) -> str:
+    if not isinstance(args, str) or not args.startswith("taomni."):
+        raise StepError("remove_storage: expected a taomni.* storage key")
+    import json as _json
+    ctx.session.execute(f"window.localStorage.removeItem({_json.dumps(args)}); return true;")
+    return f"removed {args}"
 
 
 @_verb("reload")
@@ -3150,3 +3162,44 @@ def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
 # them in VERBS (it imports `_verb`/`NativeStepContext` defined above).
 from . import rdp_steps  # noqa: E402,F401
 from . import updater_steps  # noqa: E402,F401
+
+
+@_verb("switch_window")
+def _do_switch_window(ctx, args):
+    from .window_routes import matches_window_route
+    deadline = time.monotonic() + args.get("timeout_sec", 10)
+    session = ctx.session
+    while time.monotonic() < deadline:
+        handles = session.request("GET", session.endpoint("/window/handles"))
+        for handle in handles:
+            session.request("POST", session.endpoint("/window"), {"handle": handle})
+            url = session.request("GET", session.endpoint("/url"))
+            if matches_window_route(url, args["route"]):
+                session.install_console_hook()
+                return "selected existing native window " + str(handle)
+        time.sleep(.1)
+    raise StepError("switch_window: no native window matches route " + repr(args["route"]))
+
+
+@_verb("close_window")
+def _do_close_window(ctx, args):
+    ctx.session.request("DELETE", ctx.session.endpoint("/window"))
+    return "requested native window close"
+
+
+@_verb("restart_native_app")
+def _do_restart_native_app(ctx, args):
+    ctx.session.restart()
+    return "restarted isolated QA process with the same profile"
+
+
+@_verb("assert_value")
+def _do_assert_value(ctx, args):
+    deadline = time.monotonic() + args.get("timeout_sec", 10)
+    value = None
+    while time.monotonic() < deadline:
+        value = ctx.session.execute("return document.querySelector(" + json.dumps(args["selector"]) + ")?.value ?? null;")
+        if value == args["equals"]:
+            return "input value equals expected content"
+        time.sleep(.1)
+    raise StepError(f"{args['selector']}: input value {value!r} does not equal {args['equals']!r}")

@@ -1,0 +1,165 @@
+id: TC-SHELL-B09
+title: Overview AND search, filters, ordering and empty result actions
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b09.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-b"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-overview-trigger"]'
+- fill:
+    selector: '[data-testid="shell-tab-search"]'
+    value: ' QA-ALPHA alpha.invalid '
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="shell-tab-card-title"]'
+    equals: qa-alpha
+- assert_visible: '[data-testid="shell-tab-current"]'
+- click: '[data-testid="shell-tab-current"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 3
+- select_option:
+    selector: '[data-testid="shell-tab-lane-filter"]'
+    value: connect
+- fill:
+    selector: '[data-testid="shell-tab-search"]'
+    value: does-not-exist
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 0
+- assert_visible: '[data-testid="shell-tab-clear"]'
+- assert_visible: '[data-testid="shell-tab-empty-home"]'
+- assert_visible: '[data-testid="shell-tab-empty-new"]'
+- click: '[data-testid="shell-tab-clear"]'
+- select_option:
+    selector: '[data-testid="shell-tab-sort"]'
+    value: name
+- assert_items:
+    selector: '[data-testid="shell-tab-card-title"]'
+    equals:
+    - qa-alpha
+    - qa-beta
+    - Welcome
+- assert_attribute:
+    selector: '[data-testid="shell-tab-count"]'
+    name: data-total
+    equals: '3'
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_text_equals:
+    selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+    equals: qa-beta
+- screenshot: tc-shell-b09.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Searching case insensitive host and title tokens returns only Alpha
+      without changing the active Beta.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 10
+    - 14
+    checkpoints:
+    - step: 5
+      expectation: Searching case insensitive host and title tokens returns only Alpha
+        without changing the active Beta.
+    - step: 8
+      expectation: Searching case insensitive host and title tokens returns only Alpha
+        without changing the active Beta.
+    - step: 11
+      expectation: Searching case insensitive host and title tokens returns only Alpha
+        without changing the active Beta.
+    - step: 12
+      expectation: Searching case insensitive host and title tokens returns only Alpha
+        without changing the active Beta.
+    - step: 13
+      expectation: Searching case insensitive host and title tokens returns only Alpha
+        without changing the active Beta.
+    - step: 15
+      expectation: Searching case insensitive host and title tokens returns only Alpha
+        without changing the active Beta.
+    results:
+    - 5
+    - 8
+    - 11
+    - 12
+    - 13
+    - 15
+  - id: R2
+    requirement: Lane and query combine, empty results retain clear/Home/new entry
+      points, name sort gives an exact list.
+    actions:
+    - 16
+    - 17
+    - 22
+    - 23
+    - 26
+    checkpoints:
+    - step: 18
+      expectation: Lane and query combine, empty results retain clear/Home/new entry
+        points, name sort gives an exact list.
+    - step: 19
+      expectation: Lane and query combine, empty results retain clear/Home/new entry
+        points, name sort gives an exact list.
+    - step: 20
+      expectation: Lane and query combine, empty results retain clear/Home/new entry
+        points, name sort gives an exact list.
+    - step: 21
+      expectation: Lane and query combine, empty results retain clear/Home/new entry
+        points, name sort gives an exact list.
+    - step: 24
+      expectation: Lane and query combine, empty results retain clear/Home/new entry
+        points, name sort gives an exact list.
+    - step: 25
+      expectation: Lane and query combine, empty results retain clear/Home/new entry
+        points, name sort gives an exact list.
+    - step: 27
+      expectation: Lane and query combine, empty results retain clear/Home/new entry
+        points, name sort gives an exact list.
+    results:
+    - 18
+    - 19
+    - 20
+    - 21
+    - 24
+    - 25
+    - 27
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

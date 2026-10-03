@@ -92,8 +92,8 @@ export interface RestoreCallbacks {
 export interface UseWelcomeSessionResumeResult {
   view: RestoreViewState;
   refresh: () => void;
-  startRestore: () => void;
-  retryFailed: () => void;
+  startRestore: () => Promise<EntryOutcome[]>;
+  retryFailed: () => Promise<EntryOutcome[]>;
   cancelRestore: () => void;
   clearRecord: () => Promise<void>;
   outcomes: EntryOutcome[];
@@ -356,10 +356,10 @@ export function useWelcomeSessionResume(
     }
   }, []);
 
-  const startRestore = useCallback(() => {
-    if (operationRef.current) return; // single operation guarantee
+  const startRestore = useCallback(async () => {
+    if (operationRef.current) return []; // single operation guarantee
     const record = recordRef.current;
-    if (!record || record.entries.length === 0) return;
+    if (!record || record.entries.length === 0) return [];
     const operationId = `restore-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
     operationRef.current = { id: operationId, cancelled: false };
     setOutcomes([]);
@@ -372,23 +372,24 @@ export function useWelcomeSessionResume(
       total: record.entries.length,
       awaitingEntry: null,
     });
-    void runEntries(operationId, record.entries).then((finalOutcomes) => {
+    return runEntries(operationId, record.entries).then((finalOutcomes) => {
       // Only finish if this operation is still the active one.
       if (operationRef.current?.id === operationId) {
         finishOperation(finalOutcomes);
       }
+      return finalOutcomes;
     });
   }, [runEntries, finishOperation]);
 
-  const retryFailed = useCallback(() => {
-    if (operationRef.current) return;
+  const retryFailed = useCallback(async () => {
+    if (operationRef.current) return [];
     const record = recordRef.current;
-    if (!record) return;
+    if (!record) return [];
     const targets = outcomesRef.current
       .filter((o) => o.status === "failed" || o.status === "cancelled")
       .map((o) => record.entries.find((entry) => entry.identity === o.identity))
       .filter((entry): entry is SnapshotEntry => Boolean(entry));
-    if (targets.length === 0) return;
+    if (targets.length === 0) return [];
     const operationId = `restore-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
     operationRef.current = { id: operationId, cancelled: false };
     setView({
@@ -399,10 +400,11 @@ export function useWelcomeSessionResume(
       total: targets.length,
       awaitingEntry: null,
     });
-    void runEntries(operationId, targets).then((finalOutcomes) => {
+    return runEntries(operationId, targets).then((finalOutcomes) => {
       if (operationRef.current?.id === operationId) {
         finishOperation(finalOutcomes);
       }
+      return finalOutcomes;
     });
   }, [runEntries, finishOperation]);
 
@@ -444,6 +446,7 @@ export function useWelcomeSessionResume(
       setView({ state: "empty" });
     } catch (error) {
       setView({ state: "unavailable", reason: "storage", message: String(error) });
+      throw error;
     }
   }, []);
 

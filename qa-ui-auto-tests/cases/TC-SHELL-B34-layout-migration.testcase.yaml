@@ -1,0 +1,111 @@
+id: TC-SHELL-B34
+title: Legacy preferences migrate once and damaged versions stay recoverable
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b34.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.2
+- F1.6
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- remove_storage: taomni.shellLayout.v2
+- seed_storage:
+    key: taomni.chatDrawer.layout.v1
+    value: '{"position":"left","pinned":true,"width":380,"floatingOpacity":0.8,"ribbonOffsetRatio":0.3}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"edge":"left"'
+- assert_localstorage:
+    key: taomni.chatDrawer.layout.v1
+    contains: '"position":"left"'
+- seed_storage:
+    key: taomni.shellLayout.v2
+    value: '{"version":999,"sentinel":"preserve"}'
+- reload_window: null
+- wait_for: '[data-testid="shell-layout-warning"]'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    equals: '{"version":999,"sentinel":"preserve"}'
+- click: '[data-testid="shell-layout-warning"]'
+- assert_not_visible: '[data-testid="shell-layout-warning"]'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"version":2'
+- assert_count:
+    selector: '[data-testid="welcome-panel"]'
+    equal: 1
+- screenshot: tc-shell-b34.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Legacy Tao edge migrates; legacy keys remain intact.
+    actions:
+    - 3
+    - 4
+    - 5
+    checkpoints:
+    - step: 6
+      expectation: Legacy Tao edge migrates; legacy keys remain intact.
+    - step: 7
+      expectation: Legacy Tao edge migrates; legacy keys remain intact.
+    - step: 8
+      expectation: Legacy Tao edge migrates; legacy keys remain intact.
+    results:
+    - 6
+    - 7
+    - 8
+  - id: R2
+    requirement: An unknown layout version is preserved with a reset warning; resetting
+      restores legal preferences and retains Home.
+    actions:
+    - 9
+    - 10
+    - 13
+    checkpoints:
+    - step: 11
+      expectation: An unknown layout version is preserved with a reset warning; resetting
+        restores legal preferences and retains Home.
+    - step: 12
+      expectation: An unknown layout version is preserved with a reset warning; resetting
+        restores legal preferences and retains Home.
+    - step: 14
+      expectation: An unknown layout version is preserved with a reset warning; resetting
+        restores legal preferences and retains Home.
+    - step: 15
+      expectation: An unknown layout version is preserved with a reset warning; resetting
+        restores legal preferences and retains Home.
+    - step: 16
+      expectation: An unknown layout version is preserved with a reset warning; resetting
+        restores legal preferences and retains Home.
+    results:
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

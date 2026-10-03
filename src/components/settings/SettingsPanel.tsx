@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { ShellKeymapSettings } from "../shell/ShellKeymapSettings";
 import {
   Bot,
   ChevronDown,
@@ -529,6 +530,7 @@ export function SettingsPanel() {
             <SettingsAnchor id="language">
               <LanguageSection />
             </SettingsAnchor>
+            <SettingsAnchor id="shell-keymap"><ShellKeymapSettings /></SettingsAnchor>
             <SettingsAnchor id="app-theme">
               <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
                 <div className="mb-2 flex items-center gap-3">

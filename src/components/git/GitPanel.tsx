@@ -1,3 +1,5 @@
+import { registerGitShellController, type GitShellSnapshot } from "../../lib/shell/gitShellState";
+import { registerCloseAdapter } from "../../lib/shell/closeCoordinator";
 import {
   useCallback,
   useEffect,
@@ -120,6 +122,9 @@ import { useAppStore } from "../../stores/appStore";
 import { useT } from "../../lib/i18n";
 
 interface GitPanelProps {
+  shellScopeId?: string;
+  initialShellSnapshot?: GitShellSnapshot | null;
+  onReady?: (error?: string) => void;
   repoRoot: string;
   visible?: boolean;
   embedded?: boolean;
@@ -161,6 +166,7 @@ const EMPTY_SETTINGS: GitRepoSettings = {
 };
 
 export function GitPanel({
+  shellScopeId, initialShellSnapshot, onReady,
   repoRoot,
   visible = true,
   embedded = false,
@@ -206,6 +212,26 @@ export function GitPanel({
     }
   });
   const [amendChecked, setAmendChecked] = useState(false);
+  const shellSnapshotRef = useRef<GitShellSnapshot>({ commitMessage, targetBranch: remoteName, selectedChangeKeys: [...selected], uncheckedChangeKeys: [...unchecked], focusedChangeKey: selectedPath, treeMode });
+  shellSnapshotRef.current = { commitMessage, targetBranch: remoteName, selectedChangeKeys: [...selected], uncheckedChangeKeys: [...unchecked], focusedChangeKey: selectedPath, treeMode };
+  const savedMessageRef = useRef("");
+  const restoreShell = useCallback((state: GitShellSnapshot) => { setCommitMessage(state.commitMessage); setRemoteName(state.targetBranch); setSelected(new Set(state.selectedChangeKeys)); setUnchecked(new Set(state.uncheckedChangeKeys)); setSelectedPath(state.focusedChangeKey); setTreeMode(state.treeMode); }, []);
+  useEffect(() => {
+    if (initialShellSnapshot) restoreShell(initialShellSnapshot);
+    else if (shellScopeId) { try { const saved = localStorage.getItem(`taomni.git.draft.${shellScopeId}`); if (saved !== null) { savedMessageRef.current = saved; setCommitMessage(saved); } } catch { /* close reports write errors */ } }
+  }, [initialShellSnapshot, shellScopeId, restoreShell]);
+  useEffect(() => {
+    if (!shellScopeId) return;
+    const off = registerGitShellController(shellScopeId, { snapshot: () => shellSnapshotRef.current, restore: restoreShell });
+    const offClose = registerCloseAdapter(shellScopeId, {
+      getRisks: async () => shellSnapshotRef.current.commitMessage !== savedMessageRef.current ? [{ kind: "dirty", id: `${shellScopeId}:draft`, ownerId: shellScopeId, revision: shellSnapshotRef.current.commitMessage, detail: "Unsaved Git commit message", choices: ["save", "discard", "cancel"] }] : [],
+      resolve: async (_risk, choice) => { if (choice === "save") { const text = shellSnapshotRef.current.commitMessage; localStorage.setItem(`taomni.git.draft.${shellScopeId}`, text); savedMessageRef.current = text; } else if (choice === "discard") { localStorage.removeItem(`taomni.git.draft.${shellScopeId}`); savedMessageRef.current = ""; shellSnapshotRef.current.commitMessage = ""; setCommitMessage(""); } else throw new Error("Unsupported draft decision"); },
+      flush: async () => undefined,
+    });
+    return () => { off(); offClose(); };
+  }, [shellScopeId, restoreShell]);
+  const readySent = useRef(false);
+  useEffect(() => { if (!readySent.current && onReady && (snapshot || error)) { readySent.current = true; onReady(error ?? undefined); } }, [snapshot, error, onReady]);
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
   const [commitMenu, setCommitMenu] = useState<{ x: number; y: number; entry: GitLogEntry } | null>(null);
@@ -527,6 +553,8 @@ export function GitPanel({
       async () => {
         await gitCommit(repoRoot, commitMessage, amendChecked, checkedPaths);
         setCommitMessage("");
+        savedMessageRef.current = "";
+        if (shellScopeId) localStorage.removeItem(`taomni.git.draft.${shellScopeId}`);
         setAmendChecked(false);
         if (push) {
           await gitPush(repoRoot, remoteName || null, snapshot?.currentBranch ?? null, !snapshot?.upstream);

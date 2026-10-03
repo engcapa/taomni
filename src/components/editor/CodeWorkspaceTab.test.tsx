@@ -2275,12 +2275,14 @@ describe("CodeWorkspaceTab", () => {
       expect(host.querySelector('[data-tool-window-id="project"]')).not.toBeNull();
       // The right bar stays inside the workspace.
       expect(host.querySelector('[data-testid="code-workspace-tool-rail-right"]')).toBeNull();
-      // Expanding the sidebar returns the bar to the workspace.
+      // Shell v2 keeps the context rail in the permanent GlobalRail host.
       act(() => useAppStore.setState({ sidebarCollapsed: false }));
+      expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toHaveAttribute("data-embedded", "true");
+      act(() => useAppStore.setState({ mergeToolWindowRail: false }));
       await waitFor(() => expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toBeNull());
       expect(screen.getByTestId("code-workspace-tool-rail-left")).not.toHaveAttribute("data-embedded");
       // An inactive workspace never claims the rail.
-      act(() => useAppStore.setState({ sidebarCollapsed: true }));
+      act(() => useAppStore.setState({ sidebarCollapsed: true, mergeToolWindowRail: true }));
       rerender(<CodeWorkspaceTab tabId="tab-code" workspace={workspace} visible={false} />);
       expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toBeNull();
     } finally {

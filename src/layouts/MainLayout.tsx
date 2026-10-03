@@ -1,3 +1,19 @@
+import { detachSftpPanel, returnSftpWindowsBeforeExit } from "../lib/shell/sftpPanelWindow";
+import { returnGitWindowsBeforeExit } from "../lib/shell/gitPanelWindow";
+import { getPanelActions } from "../lib/shell/panelActions";
+import { openSessionWindow, installSessionWindowReceiver, returnSessionWindowsBeforeExit } from "../lib/shell/sessionWindow";
+import { waitShellReady } from "../lib/shell/readiness";
+import { PrimaryGitSurface } from "../components/shell/PrimaryGitSurface";
+import { SftpShellSurface } from "../components/shell/SftpShellSurface";
+import { WorkspaceShell, ShellFrame } from "../components/shell/WorkspaceShell";
+import { ShellNavigator } from "../components/shell/ShellNavigator";
+import { StableSurface, SurfaceSlot } from "../components/shell/SurfaceSlot";
+import { useShellLayoutStore } from "../stores/shellLayoutStore";
+import { registerShellActions } from "../lib/shell/shellActions";
+import { requestTabClose } from "../lib/shell/closeCoordinator";
+import { installShellTargetOpeners } from "../lib/shell/shellTargetResolver";
+import { useShellResumeComposer, type ShellRestoreOutcome } from "../hooks/useShellResumeComposer";
+import { workspaceListDir } from "../lib/editor/workspace";
 import {
   Fragment,
   lazy,
@@ -13,13 +29,6 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import {
-  Group as PanelGroup,
-  Panel,
-  Separator as PanelResizeHandle,
-  type PanelImperativeHandle,
-  type PanelSize,
-} from "react-resizable-panels";
 import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
 import type { AppCommand } from "../components/menubar/commands";
 import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
@@ -64,21 +73,13 @@ import { MailClientTab } from "../components/mail/MailClientTab";
 import { MailUnifiedTab } from "../components/mail/MailUnifiedTab";
 import { sessionToObjectStorageConfig, objectStorageHasVaultSecret } from "../lib/objectStorage";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
-import { useSftpStore } from "../stores/sftpStore";
 import { getAppPlatform, isTauriRuntime } from "../lib/runtime";
-import { effectiveFileType, openExternalUrl, openSftpWindow, sftpOpenPath, sftpStat } from "../lib/sftp";
-import { openDetachedWindow } from "../lib/detachWindowing";
+import { effectiveFileType, openExternalUrl, sftpOpenPath, sftpStat } from "../lib/sftp";
 import { writeTerminal } from "../lib/ipc";
 import { encodeBase64 } from "../lib/ipc";
 import {
-  clearDetachedHandoff,
-  detachedWindowUrl,
-  writeDetachedHandoff,
 } from "../components/filebrowser/SftpDetachedWindow";
 import {
-  writeDetachedHandoff as writeGenericHandoff,
-  clearDetachedHandoff as clearGenericHandoff,
-  detachedWindowUrl as detachedGenericUrl,
   subscribeReattach,
   drainPendingReattach,
   clearReattachHandoff,
@@ -94,13 +95,12 @@ import {
   writeVncViewerOptions,
 } from "../lib/vncOptions";
 import type { VncSessionProperties } from "../components/vnc/VncPropertiesDialog";
-import { Bot, Columns2, FolderOpen, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import { Bot, Columns2, FolderOpen, GitBranch, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
 import { useToolWindowStripeStore } from "../components/editor/workspace/toolWindowStripeStore";
 import { useMainRailHostStore } from "../stores/mainRailHostStore";
-import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
 import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { normalizeLocalStartCwd, terminalCwdTitlePrefix } from "../lib/terminalCwd";
@@ -128,7 +128,6 @@ import {
   type TerminalProfile,
 } from "../lib/terminalProfile";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
-import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout";
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
 import { parseRdpOptions } from "../types/rdp";
 import type {
@@ -147,17 +146,15 @@ import {
 } from "../lib/welcomeSessionResume";
 import { useWelcomeSessionResume, type OpenEntryResult } from "../hooks/useWelcomeSessionResume";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
-import { TaoRibbon } from "../components/tao/TaoRibbon";
 import { FloatingNotesPanel } from "../components/notes/FloatingNotesPanel";
+import { ShellNotesSurface } from "../components/shell/ShellNotesSurface";
 import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
-import { resolveChatDock } from "../lib/chat/chatDock";
-import { useViewportSize } from "../hooks/useViewportSize";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
 import { useChatStore, isChatCapableTabType } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
 import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
 import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
-import { listQueryTabs, setActiveQueryTab } from "../lib/queryRegistry";
+import { setActiveQueryTab } from "../lib/queryRegistry";
 import { t as tr, useT } from "../lib/i18n";
 import { gitInitRepo, gitProbePath, gitRepoName } from "../lib/git";
 import { alertAppDialog, confirmAppDialog } from "../lib/appDialogs";
@@ -726,16 +723,13 @@ function normalizeGitWorkspaceRoots(roots: readonly GitWorkspaceRootInfo[]): Git
   return next.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
-function gitWorkspaceRootsKey(roots: readonly GitWorkspaceRootInfo[]): string {
-  return roots.map((root) => root.repoRoot).sort((a, b) => a.localeCompare(b)).join("\n");
-}
+
 
 export function MainLayout() {
   const t = useT();
   const {
     tabs,
     activeTabId,
-    sidebarCollapsed,
     mergeToolWindowRail,
     xServerEnabled,
     refreshXServer,
@@ -773,13 +767,9 @@ export function MainLayout() {
     clearRecentWorkspaces,
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
-  const activeTab = tabs.find((t) => t.id === activeTabId);
-  // ED-PARITY-027 A: every tab group restores its own sidebar state (tool
-  // window tabs start collapsed to the rail).
-  const activeRailGroup = sidebarRailGroup(activeTab?.type);
-  useEffect(() => {
-    useAppStore.getState().applySidebarForActiveTab();
-  }, [activeRailGroup, mergeToolWindowRail]);
+  const laneSelection = useShellLayoutStore((state) => state.laneSelection);
+  const activeTab = laneSelection ? undefined : tabs.find((t) => t.id === activeTabId);
+  const shellPanels = useShellLayoutStore((state) => state.panels);
   const terminalProfilesBySessionId = useMemo(() => {
     const profiles = new Map<string, TerminalProfile | undefined>();
     for (const session of sessions) {
@@ -861,15 +851,16 @@ export function MainLayout() {
   const tabsRef = useRef(tabs);
   const executeControlToolRef = useRef<ControlToolExecutor | null>(null);
   const seenControlToolCallsRef = useRef<Set<string>>(new Set());
-  const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
-  const lastSidebarSizeRef = useRef(22);
   const [showSessionEditor, setShowSessionEditor] = useState(false);
+  const [sessionEditorMounted, setSessionEditorMounted] = useState(false);
+  useEffect(() => { if (showSessionEditor) setSessionEditorMounted(true); }, [showSessionEditor]);
   const [editingSession, setEditingSession] = useState<SessionConfig | undefined>();
   const [newSessionGroupPath, setNewSessionGroupPath] = useState<string | null>(null);
   const [newSessionInitialProto, setNewSessionInitialProto] = useState<string | undefined>();
   const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
   const [showAbout, setShowAbout] = useState(false);
-  const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
+  const sftpOwnerTabsRef = useRef<Record<string, Tab>>({});
+  const attachedSidebars = Object.fromEntries(Object.values(shellPanels).filter((panel) => panel.kind === "sftp" && panel.owner.kind === "tab").map((panel) => [panel.owner.kind === "tab" ? panel.owner.tabId : "", panel.requestedOpen]));
   const [sftpDetachedTabs, setSftpDetachedTabs] = useState<Record<string, boolean>>({});
   const [pendingSftpUploadRequests, setPendingSftpUploadRequests] = useState<Record<string, SftpPendingUploadRequest>>({});
   const [quickConnectVisible, setQuickConnectVisible] = useState(readQuickConnectVisible);
@@ -897,7 +888,7 @@ export function MainLayout() {
       return next;
     });
   }, []);
-  const activeWorkspaceCommandRegistration = activeTabId
+  const activeWorkspaceCommandRegistration = activeTabId && !laneSelection
     ? workspaceCommandRegistrations[activeTabId] ?? null
     : null;
   // On macOS we render a native global menu bar instead of the in-app app menu.
@@ -939,6 +930,8 @@ export function MainLayout() {
   const awaitingManualAuthRef = useRef(false);
   const awaitingVaultUnlockRef = useRef(false);
   const continueConnectQueueRef = useRef<() => void>(() => undefined);
+  const connectQueueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (connectQueueTimerRef.current !== null) clearTimeout(connectQueueTimerRef.current); }, []);
   const splitPanesRef = useRef<HTMLDivElement>(null);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
@@ -950,8 +943,6 @@ export function MainLayout() {
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
-  const chatDrawerPosition = useChatStore((s) => s.drawerPosition);
-  const chatDrawerPinned = useChatStore((s) => s.drawerPinned);
 
   // Pull initial vault status so dialogs that consult it (SessionEditor,
   // TunnelEditor, AuthPrompt) render against fresh state.
@@ -1009,9 +1000,23 @@ export function MainLayout() {
   const cwdQueryResolversRef = useRef<Record<string, Array<(cwd: string | null) => void>>>({});
   const sftpUploadRequestSeqRef = useRef(0);
 
-  const toggleAttachedSidebar = useCallback((tabId: string) => {
-    setAttachedSidebars((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
+  const openAttachedSidebar = useCallback((tabId: string, toggle = false) => {
+    const tab = useAppStore.getState().tabs.find((item) => item.id === tabId);
+    if (!tab?.ssh) return;
+    sftpOwnerTabsRef.current[tabId] = tab;
+    const shell = useShellLayoutStore.getState(), id = `tab:${tabId}:sftp`;
+    let panel = shell.panels[id];
+    if (!panel) {
+      const preference = shell.layout.panelDefaults.sftp;
+      panel = { id, kind: "sftp", owner: { kind: "tab", tabId, restoreRef: shell.restoreRefByTab[tabId] }, generation: 1, phase: "initializing", requestedOpen: false,
+        pinned: preference.pinned, placement: { kind: "dock", edge: preference.edge }, operation: null, error: null };
+      shell.registerPanel(panel);
+    }
+    if (panel.placement.kind === "detached") { void getPanelActions(id)?.focus?.(); return; }
+    if (panel.placement.kind === "primary") { useAppStore.getState().setActiveTab(panel.placement.tabId); return; }
+    if (toggle && panel.requestedOpen) shell.hidePanel(id); else shell.openPanel(id);
   }, []);
+  const toggleAttachedSidebar = useCallback((tabId: string) => openAttachedSidebar(tabId, true), [openAttachedSidebar]);
 
   const prevTabIdsRef = useRef<string[]>([]);
   useEffect(() => {
@@ -1021,12 +1026,9 @@ export function MainLayout() {
     // Find closed tabs
     const closedIds = prevIds.filter((id) => !currentIds.includes(id));
     if (closedIds.length > 0) {
-      const store = useSftpStore.getState();
       for (const closedId of closedIds) {
-        const sftpSessionId = `attached-${closedId}`;
-        const detachedSessionId = `attached-${closedId}__detached`;
-        void store.detach(sftpSessionId);
-        void store.detach(detachedSessionId);
+        const panel = useShellLayoutStore.getState().panels[`tab:${closedId}:sftp`];
+        if (panel && panel.owner.kind !== "background" && panel.placement.kind !== "primary" && panel.placement.kind !== "detached") useShellLayoutStore.getState().removePanel(panel.id);
       }
       setSftpDetachedTabs((prev) => {
         const next = { ...prev };
@@ -1162,7 +1164,7 @@ export function MainLayout() {
       const id = ++sftpUploadRequestSeqRef.current;
       setTerminalSplitActive(false);
       setSftpDetachedTabs((prev) => ({ ...prev, [tabId]: false }));
-      setAttachedSidebars((prev) => ({ ...prev, [tabId]: true }));
+      openAttachedSidebar(tabId);
       setPendingSftpUploadRequests((prev) => ({
         ...prev,
         [sftpSessionId]: {
@@ -1172,7 +1174,7 @@ export function MainLayout() {
         },
       }));
     },
-    [setTerminalSplitActive, tr],
+    [setTerminalSplitActive, tr, openAttachedSidebar],
   );
 
   const broadcastToSelectedTerminals = useCallback((data: string, sourceTabId?: string) => {
@@ -1197,43 +1199,10 @@ export function MainLayout() {
   }, [setTabHasNewOutput]);
 
   const openDetachedSftp = useCallback((params: SftpTabInfo, title: string) => {
-    // Use a DIFFERENT session id for the detached window so its backend
-    // SFTP channel is independent from the sidebar's. Without this, the
-    // popup and the sidebar share one `Arc<Mutex<SftpSession>>` and any
-    // long transfer in one window stalls clicks/listings in the other.
-    // The suffix is stable per parent so re-clicking "Detach" focuses the
-    // existing popup instead of opening a second one.
-    const detachedSessionId = `${params.sessionId}__detached`;
-    writeDetachedHandoff({
-      ...params,
-      sessionId: detachedSessionId,
-      parentSessionId: params.sessionId,
-      title,
-    });
-    if (isTauriRuntime()) {
-      // Native: open a real OS window via the Rust command. The handoff
-      // payload was just written to localStorage above so the new window
-      // can read it on mount. If launching the OS window fails we must
-      // wipe the handoff immediately — otherwise the credentials sit on
-      // disk for the rest of the run with no one waiting to consume them.
-      void openSftpWindow(detachedSessionId, title).catch((err) => {
-        clearDetachedHandoff(detachedSessionId);
-        setStatusMessage(tr("status.sftpWindowError", {
-          error: err instanceof Error ? err.message : String(err),
-        }));
-      });
-      return;
-    }
-    const url = detachedWindowUrl(detachedSessionId);
-    const features = "width=1200,height=760,resizable=yes,scrollbars=yes";
-    const handle = window.open(url, `taomni_sftp_${detachedSessionId}`, features);
-    if (!handle) {
-      // Pop-up blocked — clean up the credential blob right away so it
-      // doesn't linger in localStorage waiting for a window that never
-      // arrives.
-      clearDetachedHandoff(detachedSessionId);
-      setStatusMessage(tr("status.sftpPopupBlocked"));
-    }
+    const tab = useAppStore.getState().tabs.find((item) => item.sftp?.sessionId === params.sessionId || `attached-${item.id}` === params.sessionId);
+    const panelId = tab ? `tab:${tab.id}:sftp` : Object.values(useShellLayoutStore.getState().panels).find((item) => item.owner.kind === "background" && item.owner.resourceKey === `sftp:${params.sessionId}`)?.id;
+    if (!panelId) { setStatusMessage(tr("shell.targetUnavailable")); return; }
+    void detachSftpPanel(panelId, params, title).catch((error) => setStatusMessage(String(error)));
   }, [setStatusMessage]);
 
   /**
@@ -1243,49 +1212,9 @@ export function MainLayout() {
    * `BroadcastChannel('taomni.detach.sync')` subscriber wired below.
    */
   const openDetachedGenericWindow = useCallback(
-    <T,>(
-      kind: DetachedKind,
-      sourceTabId: string,
-      detachedId: string,
-      payload: T,
-      title: string,
-    ) => {
-      writeGenericHandoff(kind, detachedId, payload);
-      if (isTauriRuntime()) {
-        void openDetachedWindow({
-          kind,
-          sessionId: detachedId,
-          title,
-        })
-          .then(() => {
-            // Once the OS window is up the source tab is no longer the
-            // owner of this connection. Drop it; the detached window owns
-            // a fresh connection of its own.
-            removeTab(sourceTabId);
-          })
-          .catch((err) => {
-            clearGenericHandoff(kind, detachedId);
-            if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
-            setStatusMessage(
-              tr("status.detachWindowError", {
-                error: err instanceof Error ? err.message : String(err),
-              }),
-            );
-          });
-        return;
-      }
-      const url = detachedGenericUrl(kind, detachedId);
-      const features = "width=1280,height=800,resizable=yes,scrollbars=yes";
-      const handle = window.open(url, `taomni_${kind}_${detachedId}`, features);
-      if (!handle) {
-        clearGenericHandoff(kind, detachedId);
-        if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
-        setStatusMessage(tr("status.detachPopupBlocked"));
-        return;
-      }
-      removeTab(sourceTabId);
-    },
-    [removeTab, setStatusMessage],
+    <T,>(kind: DetachedKind, sourceTabId: string, detachedId: string, payload: T, title: string) => {
+      void openSessionWindow(kind, sourceTabId, detachedId, payload, title).catch((error) => setStatusMessage(String(error)));
+    }, [setStatusMessage],
   );
 
   const openDetachedRdp = useCallback(
@@ -1411,6 +1340,7 @@ export function MainLayout() {
     const state = useAppStore.getState();
     const tab = state.tabs.find((item) => item.id === state.activeTabId);
     if (!tab) return;
+    if (tab.shellPanelId) { void getPanelActions(tab.shellPanelId)?.detach?.(); return; }
     if (tab.type === "terminal" && !state.terminalSplitActive) {
       openDetachedTerminal(tab.id, tab, tab.title);
     } else if (tab.type === "rdp" && tab.rdp) {
@@ -1419,6 +1349,8 @@ export function MainLayout() {
       openDetachedVnc(tab.id, tab.vnc, tab.title);
     } else if (tab.type === "database" && tab.db) {
       openDetachedDatabase(tab.id, tab.db, tab.title);
+    } else if (tab.type === "git") {
+      void getPanelActions(`tab:${tab.id}:git`)?.detach?.();
     } else if (tab.type === "sftp" && tab.sftp) {
       openDetachedSftp(tab.sftp, tab.title);
     }
@@ -1599,11 +1531,12 @@ export function MainLayout() {
       }
       clearReattachHandoff(msg.kind, msg.id);
     };
-    const unsub = subscribeReattach((msg) => { void handle(msg); });
+    const offWindows = installSessionWindowReceiver((kind, id, payload) => handle({ type: "reattach", kind, id, payload, from: "shell-window", seq: 0 }));
+    const unsub = subscribeReattach((msg) => { void handle(msg).catch((error) => setStatusMessage(String(error))); });
     // Drain any envelopes left by detached windows that closed abruptly
     // before we subscribed.
     drainPendingReattach().forEach((msg) => { void handle(msg); });
-    return unsub;
+    return () => { unsub(); offWindows(); };
   }, [addTab, setActiveTab, setStatusMessage]);
 
   useEffect(() => {
@@ -1637,21 +1570,6 @@ export function MainLayout() {
   useEffect(() => {
     tabsRef.current = tabs;
   }, [tabs]);
-
-  useEffect(() => {
-    const panel = sidebarPanelRef.current;
-    if (!panel) return;
-
-    const frame = requestAnimationFrame(() => {
-      if (sidebarCollapsed) {
-        panel.collapse();
-      } else {
-        panel.resize(`${lastSidebarSizeRef.current}%`);
-      }
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [sidebarCollapsed]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -1714,9 +1632,12 @@ export function MainLayout() {
     void (async () => {
       try {
         if (!(await confirmExitWithOpenTabs())) return;
-        await Promise.allSettled(
-          listQueryTabs().map((entry) => entry.flushWorkspace?.()),
-        );
+        try { await returnGitWindowsBeforeExit(); await returnSftpWindowsBeforeExit(); await returnSessionWindowsBeforeExit(); }
+        catch (error) { setStatusMessage(String(error)); return; }
+        useShellLayoutStore.getState().flush();
+        useShellLayoutStore.setState({ exiting: true });
+        const closeResult = await requestTabClose(useAppStore.getState().tabs.filter((tab) => tab.closable).map((tab) => tab.id), true);
+        if (closeResult.status !== "closed") return;
         for (;;) {
           try {
             await exitApp();
@@ -1733,6 +1654,7 @@ export function MainLayout() {
           }
         }
       } finally {
+        useShellLayoutStore.setState({ exiting: false });
         exitRequestInFlightRef.current = false;
       }
     })();
@@ -1799,7 +1721,6 @@ export function MainLayout() {
       terminalTitleOperation: "new",
       closable: true,
     });
-    if (sessionId) void markConnected(sessionId);
     // Structured launch outcome (design §4.1.5): resolved by the terminal's
     // onSessionReady / onSessionLaunchFailed callbacks, or cancelled when the
     // pending tab closes before either fires.
@@ -1813,9 +1734,14 @@ export function MainLayout() {
     const resolve = pendingLocalLaunchesRef.current.get(tabId);
     if (resolve) {
       pendingLocalLaunchesRef.current.delete(tabId);
+      const tab = useAppStore.getState().tabs.find((item) => item.id === tabId);
+      if (outcome.status === "started" && tab?.sessionId) void markConnected(tab.sessionId);
+      // Roll back a launch that never acquired a PTY. The Home result retains
+      // its error; a retry must not leave an unusable terminal in the work set.
+      if (outcome.status === "failed") useAppStore.getState().commitRemoveTab(tabId);
       resolve(outcome);
     }
-  }, []);
+  }, [markConnected]);
 
   // Close-before-ready: a pending launch whose tab disappears completes as
   // cancelled so Welcome's per-directory pending state never leaks.
@@ -2166,49 +2092,13 @@ export function MainLayout() {
   }, [addTab, setActiveTab]);
 
   const openWorkspaceGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
-    const workspaceRoots = normalizeGitWorkspaceRoots(payload.roots);
-    if (workspaceRoots.length === 0) return;
-    const activeRepoRoot = payload.activeRepoRoot && workspaceRoots.some((root) => root.repoRoot === payload.activeRepoRoot)
-      ? payload.activeRepoRoot
-      : workspaceRoots[0].repoRoot;
-    const name = payload.workspaceName.trim() || "Code Workspace";
-    const existing = tabsRef.current.find((tab) => {
-      if (tab.type !== "git" || !tab.git?.workspaceRoots?.length) return false;
-      if (payload.workspaceInstanceId) {
-        return tab.git.sourceWorkspaceInstanceId === payload.workspaceInstanceId;
-      }
-      return gitWorkspaceRootsKey(tab.git.workspaceRoots) === gitWorkspaceRootsKey(workspaceRoots);
-    });
-    if (existing) {
-      updateGitTabInfo(existing.id, {
-        ...existing.git!,
-        repoRoot: activeRepoRoot,
-        workspaceName: name,
-        workspaceRoots,
-        activeRepoRoot,
-        sourceWorkspaceInstanceId: payload.workspaceInstanceId ?? existing.git?.sourceWorkspaceInstanceId,
-        sourceWorkspaceId: payload.workspaceId ?? existing.git?.sourceWorkspaceId,
-        sourceWorkspaceName: name,
-      }, `Git · ${name}`);
-      setActiveTab(existing.id);
-      return;
-    }
-    addTab({
-      id: `git-workspace-${Date.now()}`,
-      type: "git",
-      title: `Git · ${name}`,
-      closable: true,
-      git: {
-        repoRoot: activeRepoRoot,
-        workspaceName: name,
-        workspaceRoots,
-        activeRepoRoot,
-        sourceWorkspaceInstanceId: payload.workspaceInstanceId,
-        sourceWorkspaceId: payload.workspaceId,
-        sourceWorkspaceName: name,
-      },
-    });
-  }, [addTab, setActiveTab, updateGitTabInfo]);
+    const owner = tabsRef.current.find((tab) => tab.type === "code-workspace" && tab.codeWorkspace?.workspaceInstanceId === payload.workspaceInstanceId);
+    if (!owner) return;
+    setActiveTab(owner.id);
+    const shell = useShellLayoutStore.getState(), id = `workspace:${payload.workspaceInstanceId}:git`;
+    if (shell.panels[id]) shell.openPanel(id);
+    else void workspaceCommandRegistrationsRef.current[owner.id]?.executeAction("workspace.gitToolWindow");
+  }, [setActiveTab]);
 
   const syncWorkspaceGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
     const sourceWorkspaceInstanceId = payload.workspaceInstanceId;
@@ -2270,6 +2160,7 @@ export function MainLayout() {
     const existing = tabsRef.current.find(
       (tab) => {
         if (tab.type !== "code-workspace" || !tab.codeWorkspace) return false;
+        if (workspace.workspaceInstanceId) return tab.codeWorkspace.workspaceInstanceId === workspace.workspaceInstanceId;
         if (workspace.workspaceId && tab.codeWorkspace.workspaceId === workspace.workspaceId) return true;
         if (tab.codeWorkspace.workspaceId === identity) return true;
         const tabRoots = tab.codeWorkspace.roots ?? [];
@@ -2280,13 +2171,14 @@ export function MainLayout() {
     );
     if (existing) {
       setActiveTab(existing.id);
-      return;
+      return existing.id;
     }
     const title = workspace.name?.trim()
       || (roots.length === 1 && looseFiles.length === 0 ? roots[0].name : "")
       || (roots.length === 0 && looseFiles.length > 0 ? "Editor Workspace" : "Code Workspace");
+    const tabId = `code-workspace-${crypto.randomUUID()}`;
     addTab({
-      id: `code-workspace-${Date.now()}`,
+      id: tabId,
       type: "code-workspace",
       title: `Code · ${title}`,
       closable: true,
@@ -2304,6 +2196,7 @@ export function MainLayout() {
         name: title,
       },
     });
+    return tabId;
   }, [addTab, setActiveTab]);
 
   const openCodeWorkspaceTab = useCallback((repoRoot: string, initialPath?: string | null) => {
@@ -2358,7 +2251,12 @@ export function MainLayout() {
 
   const openNewCodeWorkspaceFromWelcome = useCallback(async () => {
     const path = await selectFolderPath();
-    if (path) openCodeWorkspaceTab(path);
+    if (!path) return;
+    const listing = await workspaceListDir(path);
+    if (listing.state !== "ready") throw new Error(listing.state === "failed" ? listing.message : listing.state === "unavailable" ? listing.reason : "Workspace opening cancelled");
+    openCodeWorkspaceTab(path);
+    const opened = useAppStore.getState().tabs.find((tab) => tab.codeWorkspace?.repoRoot === path);
+    if (opened) await waitShellReady(() => useAppStore.getState().codeWorkspaceByTab[opened.id]);
   }, [openCodeWorkspaceTab]);
 
   const openGitRepository = useCallback(async (path?: string | null) => {
@@ -2718,15 +2616,23 @@ export function MainLayout() {
   ]);
 
   const continueConnectQueue = useCallback(() => {
-    if (connectQueueRunningRef.current || awaitingManualAuthRef.current || awaitingVaultUnlockRef.current) return;
+    if (connectQueueRunningRef.current || connectQueueTimerRef.current !== null || awaitingManualAuthRef.current || awaitingVaultUnlockRef.current) return;
     connectQueueRunningRef.current = true;
     try {
-      while (connectQueueRef.current.length > 0) {
+      let opened = 0;
+      while (connectQueueRef.current.length > 0 && opened < 4) {
         const entry = connectQueueRef.current.shift();
         if (!entry) continue;
         const outcome = openQueuedSession(entry.session, undefined, entry.resume);
         if (outcome !== "opened") return;
+        opened += 1;
       }
+      // Yield between small batches so renderer initialization cannot block the
+      // input event for a large Open All request. Authentication still pauses it.
+      if (connectQueueRef.current.length) connectQueueTimerRef.current = setTimeout(() => {
+        connectQueueTimerRef.current = null;
+        continueConnectQueueRef.current();
+      }, 0);
     } finally {
       connectQueueRunningRef.current = false;
     }
@@ -3019,6 +2925,22 @@ export function MainLayout() {
     activeTab?.type === "welcome" || !activeTab,
     restoreCallbacksRef.current,
   );
+  const openShellWorkspace = useCallback(async (workspace: CodeWorkspaceTabInfo, signal: AbortSignal): Promise<ShellRestoreOutcome> => {
+    for (const root of workspace.roots ?? []) {
+      if (signal.aborted) throw new Error("Workspace restore cancelled");
+      const listing = await workspaceListDir(root.path);
+      if (listing.state !== "ready") throw new Error(listing.state === "failed" ? listing.message : listing.state === "unavailable" ? listing.reason : "Workspace restore cancelled");
+    }
+    if (signal.aborted) throw new Error("Workspace restore cancelled");
+    const tabId = openCodeWorkspaceInfo(workspace);
+    const deadline = Date.now() + 10000;
+    while (!signal.aborted && Date.now() < deadline) {
+      if (tabId && useAppStore.getState().codeWorkspaceByTab[tabId]) return { identity: `workspace:${workspace.workspaceInstanceId}`, name: workspace.name ?? workspace.repoRoot, status: "ready", tabId };
+      await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    }
+    throw new Error(signal.aborted ? "Workspace restore cancelled" : "Workspace model did not become ready");
+  }, [openCodeWorkspaceInfo]);
+  const shellResume = useShellResumeComposer(welcomeRestore, openShellWorkspace);
   const welcomeRestoreViewRef = useRef(welcomeRestore.view);
   welcomeRestoreViewRef.current = welcomeRestore.view;
   const welcomeRestoreInstanceRef = useRef(welcomeRestore);
@@ -3072,6 +2994,7 @@ export function MainLayout() {
       if (entry && !welcomeRestoreInstanceRef.current.isIdentitySuppressed(entry.identity)) {
         entries.push(entry);
         identityByTab.set(tab.id, entry.identity);
+        useShellLayoutStore.getState().bindRestoreSource(tab.id, { kind: "run-entry", identity: entry.identity }, tabs.indexOf(tab));
       }
     }
     const activeIdentity = identityByTab.get(activeTabId ?? "") ?? null;
@@ -3079,6 +3002,7 @@ export function MainLayout() {
   }, [tabs, activeTabId, terminalCwds]);
 
   const commitRunSnapshotNow = useCallback(async () => {
+    if (exitRequestInFlightRef.current) return;
     const state = welcomeRestoreViewRef.current.state;
     if (state === "restoring" || state === "awaiting-auth") return; // suppression
     const { entries, activeIdentity } = buildRunSnapshotEntries();
@@ -3457,9 +3381,9 @@ export function MainLayout() {
             output = `tab is not closable: ${tab.id}`;
             break;
           }
-          removeTab(tab.id);
-          ok = true;
-          output = `closed tab ${tab.id}`;
+          const result = await requestTabClose([tab.id]);
+          ok = result.status === "closed";
+          output = ok ? `closed tab ${tab.id}` : `tab close ${result.status}: ${result.failed.map((failure) => failure.error).join("; ")}`;
           break;
         }
         case "tab_move": {
@@ -3631,10 +3555,13 @@ export function MainLayout() {
     return [...byId.values()];
   }, [sessions, tabs]);
 
-  const openMailAccountById = useCallback((sessionId: string) => {
+  const openMailAccountById = useCallback(async (sessionId: string) => {
     const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
-    if (session) openQueuedSession(session);
+    if (!session) throw new Error("The saved mail account no longer exists");
+    openQueuedSession(session);
+    await waitShellReady(() => useAppStore.getState().tabs.find((tab) => tab.type === "mail" && tab.mail?.sessionId === sessionId));
   }, [openQueuedSession]);
+  useEffect(() => installShellTargetOpeners({ mailAccount: openMailAccountById }), [openMailAccountById]);
 
   // Initialize LanChat at app startup (not only when the tab opens) so roster,
   // unread, and desktop notifications work even while the tab is closed.
@@ -3858,6 +3785,7 @@ export function MainLayout() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || document.querySelector('[aria-modal="true"]')) return;
       const tabIndex = macCommandDigitIndex(event);
       // A focused surface that binds the same chord (Code Workspace Cmd+1
       // Project on macOS) keeps it; its own keymap dispatches the action.
@@ -3885,7 +3813,7 @@ export function MainLayout() {
         // Read the registration map synchronously because the workspace can
         // publish a newly available claim during the same interaction in
         // which the user closes the last editor tab.
-        const currentActiveTabId = useAppStore.getState().activeTabId;
+        const currentActiveTabId = useShellLayoutStore.getState().laneSelection ? null : useAppStore.getState().activeTabId;
         const registration = currentActiveTabId
           ? workspaceCommandRegistrationsRef.current[currentActiveTabId] ?? null
           : null;
@@ -3908,7 +3836,7 @@ export function MainLayout() {
       }
 
       const state = useAppStore.getState();
-      const current = state.tabs.find((tab) => tab.id === state.activeTabId);
+      const current = useShellLayoutStore.getState().laneSelection ? undefined : state.tabs.find((tab) => tab.id === state.activeTabId);
       if (current?.type === "welcome") {
         // If a code-workspace tab exists, switch to it and let its Go to File
         // handler execute Ctrl+Shift+N instead of creating a new session.
@@ -3930,10 +3858,25 @@ export function MainLayout() {
   }, [handleCommand, setActiveTab]);
 
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
-  const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);
+  tabs.forEach((tab) => { if (tab.type === "sftp" && tab.sftp) sftpOwnerTabsRef.current[tab.id] = tab; });
+  const retainedSftpIds = Object.values(shellPanels).filter((panel) => panel.kind === "sftp").map((panel) => panel.id.slice(4, -5));
+  const sftpTabs = [...new Map([...tabs.filter((t) => !t.shellPanelId && t.type === "sftp" && t.sftp), ...retainedSftpIds.flatMap((id) => sftpOwnerTabsRef.current[id]?.sftp ? [sftpOwnerTabsRef.current[id]] : [])].map((tab) => [tab.id, tab])).values()];
   const settingsTabs = tabs.filter((t) => t.type === "settings");
-  const gitTabs = tabs.filter((t) => t.type === "git" && t.git);
-  const codeWorkspaceTabs = tabs.filter((t) => t.type === "code-workspace" && t.codeWorkspace);
+  const gitOwnersRef = useRef<Record<string, Tab>>({});
+  tabs.forEach((tab) => { if (tab.type === "git" && tab.git) gitOwnersRef.current[tab.id] = tab; });
+  const retainedGitIds = Object.values(shellPanels).filter((panel) => panel.kind === "git" && panel.id.startsWith("tab:")).map((panel) => panel.id.slice(4, -4));
+  const gitTabs = [...new Map([...tabs.filter((t) => !t.shellPanelId && t.type === "git" && t.git), ...retainedGitIds.flatMap((id) => gitOwnersRef.current[id] ? [gitOwnersRef.current[id]] : [])].map((tab) => [tab.id, tab])).values()];
+  const workspaceOwnersRef = useRef<Record<string, Tab>>({});
+  tabs.forEach((tab) => { if (tab.type === "code-workspace" && tab.codeWorkspace) workspaceOwnersRef.current[tab.id] = tab; });
+  const retainedWorkspaceIds = Object.values(shellPanels).flatMap((panel) => panel.owner.kind === "workspace" && panel.placement.kind !== "dock" ? [panel.owner.tabId] : []);
+  const codeWorkspaceTabs = [...new Map([...tabs.filter((tab) => tab.type === "code-workspace" && tab.codeWorkspace), ...retainedWorkspaceIds.flatMap((id) => workspaceOwnersRef.current[id] ? [workspaceOwnersRef.current[id]] : [])].map((tab) => [tab.id, tab])).values()];
+  useEffect(() => {
+    const live = new Set(tabs.map((tab) => tab.id));
+    const sftp = new Set(retainedSftpIds), git = new Set(retainedGitIds), workspaces = new Set(retainedWorkspaceIds);
+    for (const id of Object.keys(sftpOwnerTabsRef.current)) if (!live.has(id) && !sftp.has(id)) delete sftpOwnerTabsRef.current[id];
+    for (const id of Object.keys(gitOwnersRef.current)) if (!live.has(id) && !git.has(id)) delete gitOwnersRef.current[id];
+    for (const id of Object.keys(workspaceOwnersRef.current)) if (!live.has(id) && !workspaces.has(id)) delete workspaceOwnersRef.current[id];
+  }, [tabs, shellPanels]);
   const vncTabs = tabs.filter((t) => t.type === "vnc" && t.vnc);
   const rdpTabs = tabs.filter((t) => t.type === "rdp" && t.rdp);
   const fileBrowserTabs = tabs.filter((t) => t.type === "file-browser" && t.fileBrowser);
@@ -3946,7 +3889,7 @@ export function MainLayout() {
     terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
   // ED-PARITY-027 B: a terminal's tool windows (attached SFTP, Chat) move from
   // its floating actions into the collapsed sidebar rail.
-  const terminalRailMerged = mergeToolWindowRail && sidebarCollapsed && !!mainRailHost
+  const terminalRailMerged = mergeToolWindowRail && !!mainRailHost
     && activeTab?.type === "terminal" && !terminalSplitVisible;
   const toggleTerminalSftp = (tab: Tab) => {
     if (sftpDetachedTabs[tab.id] && tab.ssh) {
@@ -3973,6 +3916,8 @@ export function MainLayout() {
   const terminalRailItems: ToolWindowRailItem[] = [];
   if (terminalRailMerged && activeTab) {
     const railTab = activeTab;
+    if (activeTerminalGitAction) terminalRailItems.push({ id: "git", label: activeTerminalGitAction.label, icon: <GitBranch />, active: false,
+      testId: "ribbon-git", onSelect: () => void activeTerminalGitAction.onOpen() });
     if (railTab.ssh) {
       terminalRailItems.push({
         id: "sftp",
@@ -4116,23 +4061,20 @@ export function MainLayout() {
   // macOS uses the native overlay title bar (traffic lights + native resize),
   // so the custom resize handles are Windows/Linux only.
   const isMac = getAppPlatform() === "macos";
-  const chatDockViewport = useViewportSize();
-  // After the drawer has been opened once, keep ChatDrawer mounted (hidden)
-  // across tab switches so the transcript does not remount and re-animate.
   const [chatDrawerKeepAlive, setChatDrawerKeepAlive] = useState(false);
-  useEffect(() => {
-    if (chatDrawerOpen) setChatDrawerKeepAlive(true);
-  }, [chatDrawerOpen]);
-  const chatDrawerSurfaceActive = !aiFullyDisabled && (chatDrawerOpen || chatDrawerKeepAlive);
-  const chatDockMode = chatDrawerSurfaceActive
-    ? resolveChatDock(chatDrawerPosition, chatDrawerPinned, chatDockViewport.width, chatDockViewport.height)
-    : "floating";
-  const chatDrawerInline = chatDockMode === "side-inline";
-  const chatDrawerTopPinned = chatDockMode === "stacked-inline" && chatDrawerPosition === "top";
-  const chatDrawerBottomPinned = chatDockMode === "stacked-inline" && chatDrawerPosition === "bottom";
-  const chatDrawerFloating = chatDrawerSurfaceActive && chatDockMode === "floating";
+  useEffect(() => { if (chatDrawerOpen) setChatDrawerKeepAlive(true); }, [chatDrawerOpen]);
+  useEffect(() => registerShellActions({
+    "shell.home": () => { setActiveTab("welcome"); useShellLayoutStore.getState().selectLane(null); },
+    "shell.overview": () => useShellLayoutStore.getState().setOverlay("overview"),
+    "shell.quickSwitch": () => useShellLayoutStore.getState().setOverlay("quick"),
+    "shell.navigator.toggle": () => toggleSidebar(),
+    "shell.tao.toggle": () => { const chat = useChatStore.getState(); chat.setDrawerOpen(!chat.drawerOpen); },
+    "shell.panel.open": () => { if (activeTab?.type === "terminal" && activeTab.ssh) toggleTerminalSftp(activeTab); },
+    "shell.layout.reset": async () => { if (await confirmAppExit({ title: tr("shell.reset"), message: tr("shell.resetConfirm") })) useShellLayoutStore.getState().resetLayout(); },
+  }), [activeTab, toggleSidebar, setActiveTab, confirmAppExit]);
 
   return (
+    <WorkspaceShell onNewSession={handleNewSession}>
     <TabActionSlotProvider slot={tabActionSlot}>
     <div
       className="taomni-main-window relative w-full h-full flex flex-col"
@@ -4179,9 +4121,14 @@ export function MainLayout() {
         />
       )}
 
-      {chatDrawerTopPinned && <ChatDrawer />}
-
-      <div className="flex-1 flex min-h-0">
+      <ShellFrame quickConnectHeight={quickConnectVisible ? 32 : 0} gitAction={terminalRailMerged ? undefined : activeTerminalGitAction}
+        navigator={<ShellNavigator onOpenWorkspace={openRecentCodeWorkspace}>
+          <Sidebar navigatorOnly onNewSession={handleNewSession} onNewSftpSession={handleNewSftpSession}
+            onEditSession={handleEditSession} onConnectSession={handleConnectSession}
+            onOpenSettings={() => handleCommand("settings")} onCommand={handleCommand} gitAction={activeTerminalGitAction} />
+        </ShellNavigator>}
+        extras={<><FloatingNotesPanel shellHosted /><TaoAlertPoller /></>}
+      >
         {terminalRailMerged && mainRailHost && terminalRailItems.length > 0 && createPortal(
           <ToolWindowRail
             side="left"
@@ -4195,77 +4142,7 @@ export function MainLayout() {
           />,
           mainRailHost,
         )}
-        {sidebarCollapsed && (
-          <div data-testid="collapsed-sidebar-rail" className="h-full shrink-0 overflow-visible">
-            <Sidebar
-              compact
-              onNewSession={handleNewSession}
-              onNewSftpSession={handleNewSftpSession}
-              onEditSession={handleEditSession}
-              onConnectSession={handleConnectSession}
-              onOpenSettings={() => handleCommand("settings")}
-              onCommand={handleCommand}
-              gitAction={activeTerminalGitAction}
-            />
-          </div>
-        )}
-        <PanelGroup
-          orientation="horizontal"
-          id="main-layout"
-          defaultLayout={loadResizableLayout("main-layout", ["sidebar", "content"])}
-          onLayoutChanged={saveResizableLayout("main-layout")}
-          className="flex-1 min-w-0"
-          // Size the resize hit target to match the 6px visible divider.
-          // Sizing the hit target to the divider width keeps it from bleeding onto content/terminal.
-          resizeTargetMinimumSize={{ coarse: 6, fine: 6 }}
-        >
-          <Panel
-            panelRef={sidebarPanelRef}
-            id="sidebar"
-            defaultSize="22%"
-            minSize="15%"
-            maxSize="40%"
-            collapsible
-            collapsedSize={0}
-            // The panel's default scroll container can pan the fixed rail when
-            // a focused/selected session is scrolled into view. Its children
-            // own their scrolling; this frame must keep the rail in place.
-            style={{ overflow: "clip" }}
-            onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
-              const percentage = size.asPercentage;
-              if (percentage > 2) {
-                lastSidebarSizeRef.current = percentage;
-              }
-              // The first report is the restored layout, which may carry another
-              // tab group's collapsed sidebar (ED-PARITY-027); the store's state
-              // wins and the sync effect resizes the panel to it.
-              if (!prevSize) return;
-              setSidebarCollapsed(percentage <= 2);
-            }}
-          >
-            <div data-testid="expanded-sidebar-panel" className="h-full overflow-clip" style={sidebarCollapsed ? { display: "none" } : undefined}>
-              <Sidebar
-                onNewSession={handleNewSession}
-                onNewSftpSession={handleNewSftpSession}
-                onEditSession={handleEditSession}
-                onConnectSession={handleConnectSession}
-                onOpenSettings={() => handleCommand("settings")}
-                onCommand={handleCommand}
-                gitAction={activeTerminalGitAction}
-              />
-            </div>
-          </Panel>
-
-          <PanelResizeHandle
-            id="main-sidebar-resize-handle"
-            data-testid="main-sidebar-resize-handle"
-            className={sidebarCollapsed ? "hidden" : "w-[6px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"}
-          />
-
-          <Panel id="content">
-            <div className="h-full flex min-w-0">
-              {chatDrawerInline && chatDrawerPosition === "left" && <ChatDrawer />}
-              <div className="h-full flex flex-col min-w-0 flex-1">
+        <div className="h-full flex flex-col min-w-0 min-h-0">
               {multiExecActive && (
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
@@ -4277,6 +4154,73 @@ export function MainLayout() {
                 />
               )}
               <div className="flex-1 min-h-0 overflow-hidden relative">
+                {Object.values(shellPanels).filter((panel) => panel.kind === "sftp").map((panel) => {
+                  const ownerTabId = panel.id.slice(4, -5);
+                  const tab = tabs.find((item) => item.id === ownerTabId) ?? sftpOwnerTabsRef.current[ownerTabId];
+                  if (!tab?.ssh) return null;
+                      return (
+                        <SftpShellSurface key={panel.id} id={panel.id} tabId={tab.id} sessionId={`attached-${tab.id}`} title={`${tab.title} — SFTP`}
+                          onDetach={() => openDetachedSftp({ sessionId: `attached-${tab.id}`, host: tab.ssh!.host, port: tab.ssh!.port,
+                            username: tab.ssh!.username, authMethod: tab.ssh!.authMethod, authData: tab.ssh!.authData, attachedToTerminal: true }, `${tab.title} — SFTP`)}>
+                        <SftpSidebar
+                          sessionId={`attached-${tab.id}`}
+                          host={tab.ssh.host}
+                          port={tab.ssh.port}
+                          username={tab.ssh.username}
+                          authMethod={tab.ssh.authMethod}
+                          authData={tab.ssh.authData}
+                          networkSettingsJson={JSON.stringify(
+                            toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
+                          )}
+                          cwdHint={terminalCwds[tab.id] ?? null}
+                          cwdHintVersion={terminalCwdVersions[tab.id] ?? 0}
+                          title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
+                          onClose={() => toggleAttachedSidebar(tab.id)}
+                          onRequestTerminalCwd={() => requestTerminalCwd(tab.id)}
+                          pendingUploadRequest={pendingSftpUploadRequests[`attached-${tab.id}`] ?? null}
+                          onPendingUploadRequestHandled={(requestId) => {
+                            const sftpSessionId = `attached-${tab.id}`;
+                            setPendingSftpUploadRequests((prev) => {
+                              if (prev[sftpSessionId]?.id !== requestId) return prev;
+                              const next = { ...prev };
+                              delete next[sftpSessionId];
+                              return next;
+                            });
+                          }}
+                          onOpenTerminalHere={(p) => {
+                            const sid = terminalSessionIds.current[tab.id];
+                            if (!sid) return;
+                            const escaped = p.replace(/'/g, "'\\''");
+                            // The leading space is a sacrificial guard: Windows
+                            // OpenSSH/ConPTY intermittently drops the first byte of
+                            // a pty write (observed as "d '<path>'"), and bash
+                            // ignores the extra space. It also keeps the line out of
+                            // history for shells with ignorespace enabled.
+                            void writeTerminal(sid, encodeBase64(` cd '${escaped}'\r`));
+                          }}
+                          onDetach={() => {
+                            openDetachedSftp(
+                              {
+                                sessionId: `attached-${tab.id}`,
+                                host: tab.ssh!.host,
+                                port: tab.ssh!.port,
+                                username: tab.ssh!.username,
+                                authMethod: tab.ssh!.authMethod,
+                                authData: tab.ssh!.authData,
+                                networkSettingsJson: JSON.stringify(
+                                  toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh!.optionsJson)),
+                                ),
+                                initialPath: terminalCwds[tab.id],
+                                attachedToTerminal: true,
+                              },
+                              `${tab.title} — SFTP`,
+                            );
+                          }}
+                        />
+                        </SftpShellSurface>
+                      );
+                })}
+                {tabs.filter((tab) => tab.shellPanelId).map((tab) => <div key={tab.id} className="absolute inset-0" style={{ display: activeTabId === tab.id ? "block" : "none" }} inert={activeTabId !== tab.id}><SurfaceSlot id={`primary:${tab.id}`} /></div>)}
                 {/* Welcome stays mounted so filters, scroll, and shell
                     selections survive switching to another tab. */}
                 <div
@@ -4285,6 +4229,7 @@ export function MainLayout() {
                   style={{ display: (activeTab?.type === "welcome" || !activeTab) ? "block" : "none" }}
                 >
                   <WelcomePanel
+                    shellRestore={shellResume}
                     active={activeTab?.type === "welcome" || !activeTab}
                     restore={{
                       view: welcomeRestore.view,
@@ -4310,7 +4255,7 @@ export function MainLayout() {
                     onRemoveRecentWorkspace={(workspace) => removeRecentWorkspace(workspace.id)}
                     onClearRecentWorkspaces={clearRecentWorkspaces}
                     onRevealRecentWorkspace={revealRecentCodeWorkspace}
-                    onOpenNewWorkspace={() => void openNewCodeWorkspaceFromWelcome()}
+                    onOpenNewWorkspace={openNewCodeWorkspaceFromWelcome}
                     onOpenSettings={openSettingsTab}
                   />
                 </div>
@@ -4434,65 +4379,6 @@ export function MainLayout() {
                           />
                         </div>
                       );
-                      const sftpSidebarNode = sidebarOpen && tab.ssh ? (
-                        <SftpSidebar
-                          sessionId={`attached-${tab.id}`}
-                          host={tab.ssh.host}
-                          port={tab.ssh.port}
-                          username={tab.ssh.username}
-                          authMethod={tab.ssh.authMethod}
-                          authData={tab.ssh.authData}
-                          networkSettingsJson={JSON.stringify(
-                            toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
-                          )}
-                          cwdHint={terminalCwds[tab.id] ?? null}
-                          cwdHintVersion={terminalCwdVersions[tab.id] ?? 0}
-                          title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
-                          onClose={() => toggleAttachedSidebar(tab.id)}
-                          onRequestTerminalCwd={() => requestTerminalCwd(tab.id)}
-                          pendingUploadRequest={pendingSftpUploadRequests[`attached-${tab.id}`] ?? null}
-                          onPendingUploadRequestHandled={(requestId) => {
-                            const sftpSessionId = `attached-${tab.id}`;
-                            setPendingSftpUploadRequests((prev) => {
-                              if (prev[sftpSessionId]?.id !== requestId) return prev;
-                              const next = { ...prev };
-                              delete next[sftpSessionId];
-                              return next;
-                            });
-                          }}
-                          onOpenTerminalHere={(p) => {
-                            const sid = terminalSessionIds.current[tab.id];
-                            if (!sid) return;
-                            const escaped = p.replace(/'/g, "'\\''");
-                            // The leading space is a sacrificial guard: Windows
-                            // OpenSSH/ConPTY intermittently drops the first byte of
-                            // a pty write (observed as "d '<path>'"), and bash
-                            // ignores the extra space. It also keeps the line out of
-                            // history for shells with ignorespace enabled.
-                            void writeTerminal(sid, encodeBase64(` cd '${escaped}'\r`));
-                          }}
-                          onDetach={() => {
-                            setSftpDetachedTabs((prev) => ({ ...prev, [tab.id]: true }));
-                            setAttachedSidebars((prev) => ({ ...prev, [tab.id]: false }));
-                            openDetachedSftp(
-                              {
-                                sessionId: `attached-${tab.id}`,
-                                host: tab.ssh!.host,
-                                port: tab.ssh!.port,
-                                username: tab.ssh!.username,
-                                authMethod: tab.ssh!.authMethod,
-                                authData: tab.ssh!.authData,
-                                networkSettingsJson: JSON.stringify(
-                                  toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh!.optionsJson)),
-                                ),
-                                initialPath: terminalCwds[tab.id],
-                                attachedToTerminal: true,
-                              },
-                              `${tab.title} — SFTP`,
-                            );
-                          }}
-                        />
-                      ) : null;
                       const gridColumn = index % splitGridColumns + 1;
                       const gridRow = Math.floor(index / splitGridColumns) + 1;
                       return (
@@ -4562,45 +4448,7 @@ export function MainLayout() {
                               {inputLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                             </button>
                           </div>
-                          {/* Always render the PanelGroup so the terminal Panel
-                              stays mounted across sidebar open/close. */}
-                          <div className={terminalSplitVisible ? "flex-1 min-h-0" : "h-full"}>
-                            <PanelGroup
-                              orientation="horizontal"
-                              id={`terminal-sftp-${tab.id}`}
-                              defaultLayout={loadResizableLayout(
-                                `terminal-sftp-${tab.id}`,
-                                sftpSidebarNode ? ["terminal", "sftp"] : ["terminal"],
-                              )}
-                              onLayoutChanged={saveResizableLayout(`terminal-sftp-${tab.id}`)}
-                            >
-                              <Panel id="terminal" defaultSize="62%" minSize="25%" className="min-w-0">
-                                <div className="h-full">{terminalNode}</div>
-                              </Panel>
-                              {sftpSidebarNode && (
-                                <>
-                                  <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
-                                  <Panel
-                                    id="sftp"
-                                    defaultSize="38%"
-                                    minSize="20%"
-                                    maxSize="70%"
-                                    className="min-w-0"
-                                  >
-                                    <div
-                                      className="h-full"
-                                      style={{
-                                        borderLeft: "1px solid var(--taomni-divider)",
-                                        background: "var(--taomni-bg)",
-                                      }}
-                                    >
-                                      {sftpSidebarNode}
-                                    </div>
-                                  </Panel>
-                                </>
-                              )}
-                            </PanelGroup>
-                          </div>
+                          <div className={terminalSplitVisible ? "flex-1 min-h-0" : "h-full"}>{terminalNode}</div>
                         </div>
                         {terminalSplitVisible && terminalSplitLayout !== "grid" && index < terminalTabs.length - 1 && (
                           <div
@@ -4651,32 +4499,18 @@ export function MainLayout() {
                   </div>
                 </div>
 
-                {/* SFTP standalone tabs stay mounted so transfers can finish
-                    even when the user switches to another tab. */}
                 {sftpTabs.map((tab) => {
-                  if (!tab.sftp) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <FileBrowser
-                        sessionId={tab.sftp.sessionId}
-                        host={tab.sftp.host}
-                        port={tab.sftp.port}
-                        username={tab.sftp.username}
-                        authMethod={tab.sftp.authMethod}
-                        authData={tab.sftp.authData}
-                        networkSettingsJson={tab.sftp.networkSettingsJson ?? null}
-                        initialPath={tab.sftp.initialPath}
-                        pathMappings={tab.sftp.pathMappings}
-                        detachable
-                        onDetach={() => openDetachedSftp(tab.sftp!, tab.title)}
-                      />
-                    </div>
-                  );
+                  const info = tab.sftp!;
+                  const panelId = `tab:${tab.id}:sftp`, panel = shellPanels[panelId];
+                  const live = tabs.some((item) => item.id === tab.id);
+                  return <Fragment key={tab.id}>
+                    {live && <div className="absolute inset-0" data-tab-id={tab.id} style={{ display: activeTabId === tab.id ? "block" : "none" }} inert={activeTabId !== tab.id}>
+                      {panel?.placement.kind === "detached" ? <div data-testid="shell-detached-placeholder" className="p-4"><p>{tr("shell.detached")}</p><button data-testid="shell-detached-focus" onClick={() => void getPanelActions(panelId)?.focus?.()}>{tr("shell.focusWindow")}</button><button data-testid="shell-panel-reattach" onClick={() => void getPanelActions(panelId)?.reattach?.()}>{tr("shell.reattach")}</button></div> : <SurfaceSlot id={`primary:${tab.id}`} />}
+                    </div>}
+                    <SftpShellSurface id={panelId} tabId={tab.id} sessionId={info.sessionId} title={tab.title} initialPlacement={{ kind: "primary", tabId: tab.id }} onDetach={() => openDetachedSftp(info, tab.title)}>
+                      <FileBrowser sessionId={info.sessionId} host={info.host} port={info.port} username={info.username} authMethod={info.authMethod} authData={info.authData} networkSettingsJson={info.networkSettingsJson ?? null} initialPath={info.initialPath} pathMappings={info.pathMappings} detachable onDetach={() => openDetachedSftp(info, tab.title)} />
+                    </SftpShellSurface>
+                  </Fragment>;
                 })}
 
                 {settingsTabs.map((tab) => {
@@ -4693,35 +4527,17 @@ export function MainLayout() {
                   );
                 })}
 
-                {/* Git tabs stay mounted so repository views, loaded logs, and
-                    scroll position survive switching to another app tab. */}
                 {gitTabs.map((tab) => {
-                  if (!tab.git) return null;
-                  const isActive = activeTabId === tab.id;
-                  const workspaceRoots = tab.git.workspaceRoots ?? [];
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      {workspaceRoots.length > 0 ? (
-                        <WorkspaceGitManager
-                          workspaceName={tab.git.workspaceName}
-                          roots={workspaceRoots}
-                          activeRepoRoot={tab.git.activeRepoRoot ?? tab.git.repoRoot}
-                          visible={isActive}
-                          onOpenWorkspace={openCodeWorkspaceTab}
-                        />
-                      ) : (
-                        <GitPanel
-                          repoRoot={tab.git.repoRoot}
-                          visible={isActive}
-                          onOpenWorkspace={openCodeWorkspaceTab}
-                        />
-                      )}
-                    </div>
-                  );
+                  const info = tab.git!, panelId = `tab:${tab.id}:git`, panel = shellPanels[panelId];
+                  const isActive = activeTabId === tab.id, live = tabs.some((item) => item.id === tab.id);
+                  return <Fragment key={tab.id}>
+                    {live && <div className="absolute inset-0" data-tab-id={tab.id} style={{ display: isActive ? "block" : "none" }} inert={!isActive}>
+                      {panel?.placement.kind === "detached" ? <div data-testid="shell-detached-placeholder" className="p-4"><p>{tr("shell.detached")}</p><button data-testid="shell-detached-focus" onClick={() => void getPanelActions(panelId)?.focus?.()}>{tr("shell.focusWindow")}</button><button data-testid="shell-panel-reattach" onClick={() => void getPanelActions(panelId)?.reattach?.()}>{tr("shell.reattach")}</button></div> : <SurfaceSlot id={`primary:${tab.id}`} />}
+                    </div>}
+                    <PrimaryGitSurface tabId={tab.id} title={tab.title} info={info}>
+                      {info.workspaceRoots?.length ? <WorkspaceGitManager shellScopeId={panelId} workspaceName={info.workspaceName} roots={info.workspaceRoots} activeRepoRoot={info.activeRepoRoot ?? info.repoRoot} visible={isActive} onOpenWorkspace={openCodeWorkspaceTab} /> : <GitPanel shellScopeId={panelId} repoRoot={info.repoRoot} visible={isActive} onOpenWorkspace={openCodeWorkspaceTab} />}
+                    </PrimaryGitSurface>
+                  </Fragment>;
                 })}
 
                 {codeWorkspaceTabs.map((tab) => {
@@ -4734,6 +4550,7 @@ export function MainLayout() {
                       style={{ display: isActive ? "block" : "none" }}
                     >
                       <CodeWorkspaceTab
+                        shellHosted
                         tabId={tab.id}
                         workspace={tab.codeWorkspace}
                         visible={isActive}
@@ -4985,33 +4802,25 @@ export function MainLayout() {
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
               </div>
-              </div>
-              {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
-            </div>
-          </Panel>
-        </PanelGroup>
-        {chatDrawerFloating && <ChatDrawer />}
-        {!aiFullyDisabled && <TaoRibbon />}
-        <FloatingNotesPanel />
-        <TaoAlertPoller />
-      </div>
-
-      {chatDrawerBottomPinned && <ChatDrawer />}
+        </div>
+      </ShellFrame>
+      {chatDrawerKeepAlive && <StableSurface id="tao" slot="tao" visible={chatDrawerOpen}><ChatDrawer shellHosted /></StableSurface>}
+      <ShellNotesSurface />
 
       <StatusBar />
 
       <CcAgentBridge />
 
-      {showSessionEditor && (
+      {(showSessionEditor || sessionEditorMounted) && (
         <SessionEditor
+          key={editingSession?.id ?? "new-session-draft"}
+          active={showSessionEditor}
           session={editingSession}
           defaultGroupPath={newSessionGroupPath}
           initialProto={newSessionInitialProto}
+          onSaved={() => { setShowSessionEditor(false); setSessionEditorMounted(false); setEditingSession(undefined); setNewSessionGroupPath(null); setNewSessionInitialProto(undefined); }}
           onClose={() => {
             setShowSessionEditor(false);
-            setEditingSession(undefined);
-            setNewSessionGroupPath(null);
-            setNewSessionInitialProto(undefined);
           }}
         />
       )}
@@ -5067,6 +4876,7 @@ export function MainLayout() {
       <EdgeDrawer />
     </div>
     </TabActionSlotProvider>
+    </WorkspaceShell>
   );
 }
 

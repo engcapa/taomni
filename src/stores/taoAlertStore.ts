@@ -148,6 +148,8 @@ function upsertHistory(
 interface TaoAlertStore {
   aiDone: TaoAlert[];
   mailNew: TaoAlert[];
+  transfer: TaoAlert[];
+  pushTransfer(jobId: string, title: string, failed: boolean, panelId?: string): void;
   history: TaoAlertHistoryEntry[];
   historyLimit: TaoAlertHistoryLimit;
   /** Record a background chat completion (deduped per thread). */
@@ -174,6 +176,14 @@ const initialHistoryLimit = readHistoryLimit();
 export const useTaoAlertStore = create<TaoAlertStore>((set) => ({
   aiDone: [],
   mailNew: [],
+  transfer: [],
+  pushTransfer: (jobId, title, failed, panelId) => set((s) => {
+    const id = `transfer:${jobId}:${failed ? "failed" : "done"}`;
+    if (s.transfer.some((a) => a.id === id)) return s;
+    const alert: TaoAlert = { id, source: "transfer", kind: failed ? "transfer_failed" : "transfer_done", jobId, panelId, title, fireAt: Math.floor(Date.now() / 1000) };
+    const history = upsertHistory(s.history, [alert], s.historyLimit); persistHistory(history);
+    return { transfer: [...s.transfer, alert], history };
+  }),
   history: readHistory(initialHistoryLimit),
   historyLimit: initialHistoryLimit,
   pushAiDone: (threadId, title) =>
@@ -230,16 +240,16 @@ export const useTaoAlertStore = create<TaoAlertStore>((set) => ({
     persistHistory([]);
     set({ history: [] });
   },
-  ack: (id) => set((s) => ({ aiDone: s.aiDone.filter((a) => a.id !== id) })),
+  ack: (id) => set((s) => ({ aiDone: s.aiDone.filter((a) => a.id !== id), transfer: s.transfer.filter((a) => a.id !== id), mailNew: s.mailNew.filter((a) => a.id !== id) })),
   clearThread: (threadId) =>
     set((s) => ({ aiDone: s.aiDone.filter((a) => a.threadId !== threadId) })),
   clearMailTab: (tabId) =>
     set((s) => ({ mailNew: s.mailNew.filter((a) => a.mailTabId !== tabId) })),
   pruneMailTabs: (openTabIds) =>
     set((s) => {
-      const open = new Set(openTabIds);
-      const mailNew = s.mailNew.filter((a) => !!a.mailTabId && open.has(a.mailTabId));
-      return mailNew.length === s.mailNew.length ? s : { mailNew };
+      // A closed target remains an actionable alert; reveal resolves its account or reports missing.
+      void openTabIds;
+      return s;
     }),
-  clearAll: () => set({ aiDone: [], mailNew: [] }),
+  clearAll: () => set({ aiDone: [], mailNew: [], transfer: [] }),
 }));

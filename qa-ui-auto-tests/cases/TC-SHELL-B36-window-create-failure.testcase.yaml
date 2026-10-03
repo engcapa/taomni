@@ -1,0 +1,104 @@
+id: TC-SHELL-B36
+title: Rejected SFTP window creation preserves source and allows retry
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b36.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F-SHELL-1
+- F-Detach-1
+- F7.4
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- shell_backend_scenario:
+    command: open_detached_window
+    action: fail-next
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-detach"]'
+- wait_for: '[data-testid="shell-host-retry"]'
+- assert_visible: '[data-testid="sftp-remote-list"]'
+- assert_not_visible: '[data-testid="shell-detached-placeholder"]'
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- assert_shell_backend:
+    command: open_detached_window
+    count: 1
+    status: failed
+- screenshot: tc-shell-b36.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An external window creation failure keeps the original host and connection
+      usable.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 9
+    - 10
+    - 11
+    checkpoints:
+    - step: 5
+      expectation: An external window creation failure keeps the original host and
+        connection usable.
+    - step: 7
+      expectation: An external window creation failure keeps the original host and
+        connection usable.
+    - step: 8
+      expectation: An external window creation failure keeps the original host and
+        connection usable.
+    - step: 12
+      expectation: An external window creation failure keeps the original host and
+        connection usable.
+    - step: 13
+      expectation: An external window creation failure keeps the original host and
+        connection usable.
+    - step: 14
+      expectation: An external window creation failure keeps the original host and
+        connection usable.
+    - step: 15
+      expectation: An external window creation failure keeps the original host and
+        connection usable.
+    - step: 16
+      expectation: An external window creation failure keeps the original host and
+        connection usable.
+    results:
+    - 5
+    - 7
+    - 8
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.
+  review_note: Reviewed against production entries and the stated assertions. Covers
+    the implemented requirements listed here; remaining specification branches remain
+    unverified in the task document.

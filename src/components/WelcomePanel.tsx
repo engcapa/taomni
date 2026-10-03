@@ -22,7 +22,7 @@ import {
   AlertTriangle,
   RotateCcw,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listLocalShells,
   listWslDistros,
@@ -49,6 +49,8 @@ import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { useConfirmDialog } from "./sidebar/ConfirmDialog";
 import { buildSessionTerminalThemeMenuItem } from "./session/SessionTerminalThemeMenu";
 import { buildSessionConnectionCommandMenuItem } from "./session/SessionConnectionCommandMenu";
+import { ShellResumeRow } from "./shell/ShellResumeRow";
+import type { ShellResumeState } from "../hooks/useShellResumeComposer";
 
 export interface WelcomeRestoreProp {
   view: RestoreViewState;
@@ -60,6 +62,7 @@ export interface WelcomeRestoreProp {
 }
 
 interface WelcomePanelProps {
+  shellRestore?: ShellResumeState;
   /**
    * One-click restore entry for the last run's session tab set (design
    * §4.2.4). Omitted in tests that don't exercise restore.
@@ -109,9 +112,10 @@ type RecentSessionSort =
   | "type-desc"
   | "host-asc"
   | "host-desc";
-type WelcomeHistoryTab = "directories" | "workspaces" | "sessions";
+type WelcomeHistoryTab = "directories" | "workspaces" | "sessions" | "mail";
 
 export function WelcomePanel({
+  shellRestore,
   restore,
   onStartLocalTerminal,
   onNewSession,
@@ -133,6 +137,11 @@ export function WelcomePanel({
   onOpenSettings,
   active = true,
 }: WelcomePanelProps) {
+  const launchRef = useRef(false);
+  const workspaceLaunchRef = useRef(false);
+  const [launchStatus, setLaunchStatus] = useState("idle");
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  const [workspacePending, setWorkspacePending] = useState(false);
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
   const [shellStatus, setShellStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -335,6 +344,17 @@ export function WelcomePanel({
     }
   };
 
+  const startLocalTerminal = async () => {
+    if (launchRef.current) return;
+    launchRef.current = true; setLaunchStatus("pending"); setLaunchError(null);
+    try {
+      const result = await onStartLocalTerminal(localShellSelectionFromOption(selectedShell));
+      setLaunchStatus(result?.status ?? "requested");
+      if (result?.status === "failed") setLaunchError(result.error ?? t("shell.targetUnavailable"));
+    } catch (error) { setLaunchStatus("failed"); setLaunchError(String(error)); }
+    finally { launchRef.current = false; }
+  };
+
   return (
     <div data-testid="welcome-panel" className="w-full h-full min-w-0 overflow-auto" style={{ background: "var(--taomni-bg)" }}>
       <div className="w-full max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-10 py-8">
@@ -365,6 +385,17 @@ export function WelcomePanel({
           className="grid gap-4 items-stretch"
           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))" }}
         >
+          <ActionCard
+            testId="welcome-new-session"
+            icon={<Plus className="w-5 h-5" />}
+            title={t("welcome.newSessionTitle")}
+            desc={t("welcome.newSessionDesc")}
+            kbd="Ctrl+Shift+N"
+            onClick={() => onNewSession()}
+          />
+          <ActionCard testId="shell-home-open-workspace" icon={<FolderOpen className="w-5 h-5" />}
+            title={t("shell.openWorkspace")} desc={t("shell.workspaceDescription")} kbd=""
+            onClick={() => { if (!workspaceLaunchRef.current && onOpenNewWorkspace) { workspaceLaunchRef.current = true; setWorkspacePending(true); setLaunchError(null); Promise.resolve(onOpenNewWorkspace()).catch((error) => setLaunchError(String(error))).finally(() => { workspaceLaunchRef.current = false; setWorkspacePending(false); }); } }} />
           <LocalTerminalCard
             translate={t}
             shells={mergedShells}
@@ -373,12 +404,16 @@ export function WelcomePanel({
             shellStatus={shellStatus}
             onSelectShell={setSelectedShellId}
             kbd="Ctrl+Shift+T"
-            onStart={() => {
-              onStartLocalTerminal(localShellSelectionFromOption(selectedShell));
-            }}
+            pending={launchStatus === "pending"}
+            onStart={() => void startLocalTerminal()}
             onStartAsAdministrator={handleStartAsAdministrator}
             onOpenHomeFolder={onOpenLocalPath ? () => void handleOpenHomeFolder() : undefined}
           />
+        </div>
+        <p data-testid="shell-home-launch-status" data-state={workspacePending ? "pending" : launchStatus} role={launchError ? "alert" : "status"} className="mt-2 text-xs">
+          {workspacePending || launchStatus === "pending" ? t("shell.launchStatus") : launchError ?? ""}
+        </p>
+        <details className="mt-3" data-testid="shell-home-more"><summary className="cursor-pointer text-xs">{t("shell.more")}</summary><div className="mt-2 grid gap-3 grid-cols-1 sm:grid-cols-2">
           {wslStatus === "ready" && wslDistros.length > 0 && (
             <WslCard
               translate={t}
@@ -395,14 +430,6 @@ export function WelcomePanel({
               }}
             />
           )}
-          <ActionCard
-            testId="welcome-new-session"
-            icon={<Plus className="w-5 h-5" />}
-            title={t("welcome.newSessionTitle")}
-            desc={t("welcome.newSessionDesc")}
-            kbd="Ctrl+Shift+N"
-            onClick={() => onNewSession()}
-          />
           {onOpenLanChat ? (
             <ActionCard
               testId="welcome-open-lanchat"
@@ -420,14 +447,16 @@ export function WelcomePanel({
               onOpen={onOpenMailSession}
             />
           ) : null}
-        </div>
-        {restore ? (
+                </div></details>
+        {shellRestore ? <ShellResumeRow resume={shellRestore} /> : restore ? (
           <RestoreLastSessionRow restore={restore} translate={t} />
         ) : null}
 
         <WelcomeHistoryPanel
           translate={t}
           activeTab={historyTab}
+          mailCount={mailSessions.length}
+          mailPanel={<MailSessionsCard translate={t} sessions={mailSessions} onOpen={onOpenMailSession} />}
           directoryCount={localDirectories.length}
           workspaceCount={filteredRecentWorkspaces.length}
           sessionCount={filteredRecentSessions.length}
@@ -715,6 +744,8 @@ function WelcomeHistoryPanel({
   translate: t,
   activeTab,
   directoryCount,
+  mailCount,
+  mailPanel,
   workspaceCount,
   sessionCount,
   directoriesPanel,
@@ -725,6 +756,8 @@ function WelcomeHistoryPanel({
   translate: TranslateFn;
   activeTab: WelcomeHistoryTab;
   directoryCount: number;
+  mailCount: number;
+  mailPanel: React.ReactNode;
   workspaceCount: number;
   sessionCount: number;
   directoriesPanel: React.ReactNode;
@@ -750,6 +783,7 @@ function WelcomeHistoryPanel({
       count: workspaceCount,
       icon: <Folder className="w-3.5 h-3.5" />,
     },
+    { id: "mail", label: t("shell.recentMail"), count: mailCount, icon: <MailIcon className="w-3.5 h-3.5" /> },
     {
       id: "directories",
       label: t("welcome.localDirectoriesHeading"),
@@ -808,6 +842,7 @@ function WelcomeHistoryPanel({
         {activeTab === "directories" ? directoriesPanel : null}
         {activeTab === "workspaces" ? workspacesPanel : null}
         {activeTab === "sessions" ? sessionsPanel : null}
+        {activeTab === "mail" ? mailPanel : null}
       </div>
     </section>
   );
@@ -1812,6 +1847,7 @@ function LocalTerminalCard({
   onSelectShell,
   kbd,
   onStart,
+  pending = false,
   onStartAsAdministrator,
   onOpenHomeFolder,
 }: {
@@ -1823,6 +1859,7 @@ function LocalTerminalCard({
   onSelectShell: (id: string) => void;
   kbd: string;
   onStart: () => void;
+  pending?: boolean;
   onStartAsAdministrator: () => void;
   onOpenHomeFolder?: () => void;
 }) {
@@ -1882,7 +1919,7 @@ function LocalTerminalCard({
           </div>
         )}
         <div className="flex items-center justify-end gap-2 flex-wrap">
-          <button data-testid="welcome-open-local-terminal" className="taomni-btn h-8 px-3" onClick={onStart} type="button">
+          <button data-testid="welcome-open-local-terminal" disabled={pending || shellStatus === "loading"} aria-busy={pending} className="taomni-btn h-8 px-3" onClick={onStart} type="button">
             {t("welcome.open")}
           </button>
           {canElevate && (

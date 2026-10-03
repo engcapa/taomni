@@ -56,6 +56,7 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
+from . import shell_browser_catalog, shell_native_files
 from . import project_tree
 from . import parity005_completion
 from . import parity006_replace
@@ -90,6 +91,8 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "shell_browser_catalog": Fixture("shell_browser_catalog", shell_browser_catalog.setup),
+    "shell_native_files": Fixture("shell_native_files", shell_native_files.setup),
     "path_completion": Fixture("path_completion", path_completion.setup),
     "backup_policy": Fixture("backup_policy", backup_policy.setup),
     "project_tree": Fixture("project_tree", project_tree.setup),
