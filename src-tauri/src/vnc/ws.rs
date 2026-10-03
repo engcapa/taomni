@@ -376,6 +376,13 @@ impl FrameFlow {
         self.request_deferred = waiting_for_frontend;
         !waiting_for_frontend
     }
+
+    fn take_deferred_request(&mut self) -> bool {
+        // An unsolicited update or a refresh can queue another frame before
+        // this ACK arrives. Keep waiting if flush_frame sent that damage to
+        // the WebView; its own paint must be acknowledged first.
+        self.frontend_ready && self.damage.is_empty() && std::mem::take(&mut self.request_deferred)
+    }
 }
 
 type SharedFrameFlow = Arc<std::sync::Mutex<FrameFlow>>;
@@ -1197,18 +1204,18 @@ async fn run_relay(
             let result = match ctrl {
                 VncControl::Ack => {
                     // The WebView painted the previous frame: hand it the
-                    // accumulated damage and resume the request pipeline if a
-                    // hidden period paused it.
-                    let deferred = match flow_ctrl.lock() {
-                        Ok(mut flow) => {
-                            flow.frontend_ready = true;
-                            std::mem::take(&mut flow.request_deferred)
-                        }
-                        Err(_) => false,
-                    };
+                    // accumulated damage. If another frame was sent, wait for
+                    // its ACK before requesting more pixels from the server.
+                    if let Ok(mut flow) = flow_ctrl.lock() {
+                        flow.frontend_ready = true;
+                    }
                     flush_frame(&flow_ctrl, &framebuffer_ctrl, &ws_out_ctrl);
-                    if deferred {
-                        let mut writer = rfb_ctrl.lock().await;
+                    let mut writer = rfb_ctrl.lock().await;
+                    let request_now = flow_ctrl
+                        .lock()
+                        .map(|mut flow| flow.take_deferred_request())
+                        .unwrap_or(false);
+                    if request_now {
                         if quality_ready(&quality_ctrl, &flow_ctrl) {
                             apply_pending_quality(&mut writer, &quality_ctrl, &flow_ctrl)
                                 .map(|_| ())
@@ -1987,6 +1994,35 @@ mod tests {
         assert!(flow.request_deferred);
     }
 
+    #[tokio::test]
+    async fn deferred_request_waits_for_accumulated_damage_to_be_painted() {
+        let limits = crate::vnc::limits::DecodeLimits::default();
+        let framebuffer = crate::vnc::framebuffer::Framebuffer::new(2, 2, &limits)
+            .unwrap()
+            .shared();
+        let flow = Arc::new(std::sync::Mutex::new(FrameFlow::new()));
+        let (tx, rx) = FrameQueueSender::new(limits);
+
+        assert!(!flow.lock().unwrap().note_update([FbRect::new(0, 0, 1, 1)]));
+        assert!(flush_frame(&flow, &framebuffer, &tx));
+        assert!(matches!(rx.recv().await, Some(QueuedWsOutgoing::Frame(_))));
+
+        // A refresh/probe response arrives while the first frame is painting.
+        assert!(!flow.lock().unwrap().note_update([FbRect::new(1, 1, 1, 1)]));
+        flow.lock().unwrap().frontend_ready = true; // First paint ACK.
+        assert!(flush_frame(&flow, &framebuffer, &tx));
+        assert!(matches!(rx.recv().await, Some(QueuedWsOutgoing::Frame(_))));
+        assert!(
+            !flow.lock().unwrap().take_deferred_request(),
+            "the newly sent damage still needs its own paint ACK"
+        );
+
+        flow.lock().unwrap().frontend_ready = true; // Second paint ACK.
+        assert!(!flush_frame(&flow, &framebuffer, &tx));
+        assert!(flow.lock().unwrap().take_deferred_request());
+        assert!(!flow.lock().unwrap().take_deferred_request());
+    }
+
     #[test]
     fn rich_cursor_serializes_as_a_bounded_png_message() {
         let json = serialize_cursor(DecodedCursor {
@@ -2351,11 +2387,13 @@ mod tests {
         u16,
         std::thread::JoinHandle<Vec<u8>>,
         std::sync::mpsc::Sender<()>,
+        tokio::sync::oneshot::Receiver<()>,
     ) {
         use std::io::{Read as _, Write as _};
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
         let (delivered, first_frame_delivered) = std::sync::mpsc::channel::<()>();
+        let (waiting, no_request_before_ack) = tokio::sync::oneshot::channel();
         let handle = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             stream
@@ -2410,6 +2448,21 @@ mod tests {
 
             // The relay must wait for the WebView ACK before asking the old
             // server to encode another update.
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_millis(150)))
+                .unwrap();
+            let mut byte = [0u8; 1];
+            let error = stream
+                .read(&mut byte)
+                .expect_err("no RFB request is allowed before the paint ACK");
+            assert!(matches!(
+                error.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ));
+            waiting.send(()).unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+                .unwrap();
             let mut next_request = [0u8; 10];
             stream.read_exact(&mut next_request).unwrap();
 
@@ -2425,12 +2478,13 @@ mod tests {
             let _ = stream.read_to_end(&mut rest);
             next_request.to_vec()
         });
-        (port, handle, delivered)
+        (port, handle, delivered, no_request_before_ack)
     }
 
     #[tokio::test]
-    async fn relay_pipelines_requests_and_repaints_after_desktop_size() {
-        let (port, server, delivered) = start_pipeline_fixture();
+    async fn relay_waits_for_paint_ack_and_repaints_after_desktop_size() {
+        let (port, server, delivered, no_request_before_ack) = start_pipeline_fixture();
+        let mut no_request_before_ack = Some(no_request_before_ack);
         let session = spawn_vnc_relay(
             "127.0.0.1".into(),
             port,
@@ -2470,6 +2524,11 @@ mod tests {
                     if !frames.last().unwrap().is_empty() {
                         let _ = delivered.send(());
                         if !acked_first_frame {
+                            no_request_before_ack
+                                .take()
+                                .unwrap()
+                                .await
+                                .expect("server verified the ACK boundary");
                             client
                                 .send(Message::Binary(vec![0].into()))
                                 .await

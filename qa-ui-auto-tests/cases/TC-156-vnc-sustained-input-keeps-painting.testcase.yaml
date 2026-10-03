@@ -51,7 +51,9 @@ steps:
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
     timeout_sec: 20
-- wait: 1.5
+- eval_readonly:
+    expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 1'
+    timeout_sec: 10
 - mouse_path:
     points:
     - selector: '[data-testid="vnc-canvas"]'
@@ -93,20 +95,24 @@ steps:
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
     timeout_sec: 15
+- eval_readonly:
+    expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 2'
+    timeout_sec: 10
 - host_write_file:
     path: ${fixture.vnc_control}
     text: "resize 1280 720\n"
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
     timeout_sec: 15
-- wait: 1.5
+- eval_readonly:
+    expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 3'
+    timeout_sec: 10
 - host_write_file:
     path: ${fixture.vnc_control}
     text: "resize 1024 768\n"
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
     timeout_sec: 15
-- wait: 1.5
 - eval_readonly:
     expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 4'
     timeout_sec: 10
@@ -147,6 +153,8 @@ verification:
     checkpoints:
     - step: 18
       expectation: The fixture framebuffer is visible at 1280x720 before input begins.
+    - step: 19
+      expectation: The initial pixels have actually been painted before sustained input.
     - step: 25
       expectation: The fixture event log contains pointer input.
     - step: 26
@@ -155,6 +163,7 @@ verification:
       expectation: The painted-frame counter reaches at least four, accounting for the initial pixels and all three remote repaint updates after the input burst.
     results:
     - 18
+    - 19
     - 25
     - 26
     - 35
@@ -172,13 +181,19 @@ verification:
     checkpoints:
     - step: 28
       expectation: The first remote resize is reflected as a 1024x768 canvas.
-    - step: 30
+    - step: 29
+      expectation: The first resized framebuffer is painted before the next resize.
+    - step: 31
       expectation: The second remote resize returns the canvas to 1280x720.
+    - step: 32
+      expectation: The second resized framebuffer is painted before the final resize.
     - step: 35
       expectation: At least four frames have been painted after the sustained input and resize sequence.
     results:
     - 28
-    - 30
+    - 29
+    - 31
+    - 32
     - 35
   visual:
   - check: The final connected session shows the fixture gradient without a stale overlay, clipped canvas or frozen blank surface.

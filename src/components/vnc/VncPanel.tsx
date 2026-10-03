@@ -360,6 +360,11 @@ export default function VncPanel({
           sendWsBinary(encodeWsAck());
         },
         requestFullRefresh,
+        // Publish actual paints even when an idle server sends no more stats.
+        // Updating the diagnostic attribute avoids a React render per frame.
+        onFramePainted: (count) => {
+          containerRef.current?.setAttribute("data-vnc-frames-painted", String(count));
+        },
       });
     }
     return painterRef.current;
@@ -1790,7 +1795,7 @@ export default function VncPanel({
       className="vnc-container"
       data-testid="vnc-panel"
       data-vnc-scaling={String(scaling)}
-      data-vnc-frames-painted={paintStats?.framesPainted ?? 0}
+      data-vnc-frames-painted="0"
       data-vnc-full-frame-ms={paintStats?.fullFrame
         ? `${paintStats.fullFrame.receiveMs.toFixed(2)}+${paintStats.fullFrame.paintMs.toFixed(2)}`
         : undefined}

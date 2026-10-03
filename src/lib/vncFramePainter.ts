@@ -19,6 +19,7 @@ export interface VncPainterHost {
   isVisible(): boolean;
   sendAck(): void;
   requestFullRefresh(): void;
+  onFramePainted?: (count: number) => void;
   requestFrame?: (callback: () => void) => number;
   cancelFrame?: (handle: number) => void;
   now?: () => number;
@@ -212,6 +213,7 @@ export class VncFramePainter {
       if (size.width > 0 && pixels >= size.width * size.height * 0.9) {
         this.fullFrame = { receiveMs, paintMs, pixels };
       }
+      this.host.onFramePainted?.(this.framesPainted);
     }
     this.host.sendAck();
   }
