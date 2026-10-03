@@ -353,9 +353,39 @@ def _mouse_path(ctx: NativeStepContext, args: Any) -> str:
                 ]
             },
         )
+        ctx._mouse_origin = point
+        _record_mouse_input(ctx, "move")
         if point["pause_ms"]:
             time.sleep(point["pause_ms"] / 1000)
     return f"moved through {len(points)} point(s)"
+
+
+def _observe_mouse_input(ctx: NativeStepContext) -> None:
+    if not getattr(ctx, "case_dir", None) or getattr(ctx, "_mouse_observed", False):
+        return
+    ctx.session.execute("""
+        window.__qaMouseInput = [];
+        for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mousemove', 'mouseup']) {
+          window.addEventListener(type, event => {
+            if (window.__qaMouseInput.length >= 1024) return;
+            window.__qaMouseInput.push({type, x:event.clientX, y:event.clientY,
+              button:event.button, buttons:event.buttons, prevented:event.defaultPrevented,
+              target:event.target?.closest?.('[data-testid]')?.getAttribute('data-testid'),
+              session:event.target?.closest?.('[data-session-name]')?.getAttribute('data-session-name')});
+          }, {passive:true});
+        }
+    """)
+    ctx._mouse_observed = True
+
+
+def _record_mouse_input(ctx: NativeStepContext, phase: str) -> None:
+    if not getattr(ctx, "_mouse_observed", False):
+        return
+    events = ctx.session.execute("return window.__qaMouseInput || [];")
+    path = ctx.case_dir / "native-mouse-input.json"
+    records = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    records.append({"phase": phase, "origin": getattr(ctx, "_mouse_origin", None), "events": events})
+    path.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
 
 
 def _terminal_drag_selection(ctx: NativeStepContext, args: Any) -> str:
@@ -1657,11 +1687,25 @@ def _do_mouse_button(ctx: NativeStepContext, args: Any) -> str:
     action = mouse_button_action(args)
     if platform.system() == "Darwin":
         raise StepError("mouse_button: the macOS bridge does not retain pointer state across action requests")
+    actions = []
+    if action == "down":
+        point = getattr(ctx, "_mouse_origin", None)
+        if point is None:
+            raise StepError("mouse_button down requires a preceding mouse_path")
+        element = ctx.session.find(point["selector"], interactive=False)
+        # Resolve the press position in the same request as pointerDown. Some
+        # native drivers do not retain the last move's position for a bare down.
+        actions.append({"type": "pointerMove", "duration": 0,
+                        "x": int(round(point["dx"])), "y": int(round(point["dy"])),
+                        "origin": {"element-6066-11e4-a52e-4f735466cecf": element}})
+        _observe_mouse_input(ctx)
+    actions.append({"type": "pointerDown" if action == "down" else "pointerUp", "button": 0})
     try:
         ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": [{
             "type": "pointer", "id": "mouse", "parameters": {"pointerType": "mouse"},
-            "actions": [{"type": "pointerDown" if action == "down" else "pointerUp", "button": 0}],
+            "actions": actions,
         }]})
+        _record_mouse_input(ctx, action)
     except Exception:
         with suppress(Exception):
             ctx.session.request("DELETE", ctx.session.endpoint("/actions"))

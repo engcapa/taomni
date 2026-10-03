@@ -85,14 +85,19 @@ class MouseStepsTest(TestCase):
         from qa_ui_auto.native_steps import _do_mouse_button
 
         session = Mock()
+        session.find.return_value = "row-1"
         session.endpoint.return_value = "/session/qa/actions"
-        ctx = SimpleNamespace(session=session)
+        ctx = SimpleNamespace(session=session, _mouse_origin={"selector": "#row", "dx": -20, "dy": 0})
         with patch("qa_ui_auto.native_steps.platform.system", return_value="Windows"):
             _do_mouse_button(ctx, "down")
             self.assertEqual(session.request.call_count, 1)
             pointer = session.request.call_args.args[2]["actions"][0]
             self.assertEqual(pointer["id"], "mouse")
-            self.assertEqual(pointer["actions"], [{"type": "pointerDown", "button": 0}])
+            self.assertEqual(pointer["actions"], [
+                {"type": "pointerMove", "duration": 0, "x": -20, "y": 0,
+                 "origin": {"element-6066-11e4-a52e-4f735466cecf": "row-1"}},
+                {"type": "pointerDown", "button": 0},
+            ])
             _do_mouse_button(ctx, "up")
         self.assertEqual(session.request.call_args, call("DELETE", "/session/qa/actions"))
 
@@ -102,7 +107,7 @@ class MouseStepsTest(TestCase):
         session = Mock()
         session.endpoint.return_value = "/session/qa/actions"
         session.request.side_effect = [RuntimeError("driver failure"), None]
-        ctx = SimpleNamespace(session=session)
+        ctx = SimpleNamespace(session=session, _mouse_origin={"selector": "#row", "dx": 0, "dy": 0})
         with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"):
             with self.assertRaisesRegex(RuntimeError, "driver failure"):
                 _do_mouse_button(ctx, "down")
@@ -110,6 +115,15 @@ class MouseStepsTest(TestCase):
         with patch("qa_ui_auto.native_steps.platform.system", return_value="Darwin"):
             with self.assertRaisesRegex(StepError, "does not retain"):
                 _do_mouse_button(ctx, "down")
+
+    def test_native_mouse_press_requires_a_known_position(self):
+        from qa_ui_auto.native_steps import _do_mouse_button
+
+        session = Mock()
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"):
+            with self.assertRaisesRegex(StepError, "preceding mouse_path"):
+                _do_mouse_button(SimpleNamespace(session=session), "down")
+        session.request.assert_not_called()
 
     def test_native_click_passes_modifiers_and_rejects_unsupported_options(self):
         from qa_ui_auto.native_steps import _do_click
