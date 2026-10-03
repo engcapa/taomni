@@ -70,6 +70,7 @@ import {
 } from "../floating-toolbar/floatingToolbarStyles";
 import {
   readText as readClipboardText,
+  readNativeTextResult,
   readMultiFormat,
   writeMultiFormat,
   writeText as writeClipboardText,
@@ -154,6 +155,16 @@ function isPasteShortcut(e: KeyboardEvent): boolean {
 
 function hasNonAsciiText(text: string): boolean {
   return /[^\x00-\x7f]/.test(text);
+}
+
+async function readVncClipboardText(webText?: string): Promise<string> {
+  const text = webText ?? await readClipboardText();
+  // WebKitGTK can return an empty string after an external X11 owner replaces
+  // the clipboard. Resolve that empty result through the native clipboard.
+  if (!text && isTauriRuntime() && getAppPlatform() === "linux") {
+    return (await readNativeTextResult()).text;
+  }
+  return text;
 }
 
 function newAttemptId(): string {
@@ -570,7 +581,7 @@ export default function VncPanel({
       const sync = (async () => {
         let text = "";
         try {
-          text = await readClipboardText();
+          text = await readVncClipboardText();
         } catch (err) {
           console.warn(`[vnc.clip] read local clipboard for ${reason} sync failed:`, err);
           return;
@@ -612,7 +623,7 @@ export default function VncPanel({
     void (async () => {
       let text = "";
       try {
-        text = await readClipboardText();
+        text = await readVncClipboardText();
       } catch {
         return;
       }
@@ -1050,7 +1061,7 @@ export default function VncPanel({
     if (viewerRef.current.sendInitialClipboard) {
       void syncLocalClipboardToServer("connect", true);
     } else {
-      void readClipboardText()
+      void readVncClipboardText()
         .then((text) => {
           if (!disposed && lastSyncedLocalClipboardTextRef.current === null) {
             lastSyncedLocalClipboardTextRef.current = text;
@@ -1097,6 +1108,7 @@ export default function VncPanel({
     } | null> => {
       try {
         const data = await readMultiFormat();
+        data.text = await readVncClipboardText(data.text);
         if (!data.text && !data.html && !data.rtf) return null;
         return { text: data.text || "", html: data.html, rtf: data.rtf };
       } catch (err) {

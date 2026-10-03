@@ -94,6 +94,10 @@ steps:
     action: set
     kind: text
     text: client-to-server-copy-after-sync
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: client-to-server-copy-after-sync
 - click: '[data-testid="vnc-canvas"]'
 - press:
     selector: '[data-testid="vnc-canvas"]'
@@ -148,10 +152,10 @@ verification:
     - 24
     - 27
     - 30
-    - 31
     - 32
-    - 34
-    - 37
+    - 33
+    - 35
+    - 38
     checkpoints:
     - step: 22
       expectation: Finished zlib clipboard text is received exactly.
@@ -159,28 +163,30 @@ verification:
       expectation: First sync-flushed Unicode copy is received exactly.
     - step: 28
       expectation: Second independent sync-flushed copy is received exactly.
-    - step: 33
+    - step: 34
       expectation: The fixture receives the new local clipboard text after both remote copies.
-    - step: 35
-      expectation: Typing still reaches the same session.
     - step: 36
+      expectation: Typing still reaches the same session.
+    - step: 37
       expectation: Pointer input still reaches the session.
-    - step: 38
-      expectation: The relay still processes a remote desktop resize.
     - step: 39
-      expectation: The resized framebuffer contains opaque pixels.
+      expectation: The relay still processes a remote desktop resize.
     - step: 40
+      expectation: The resized framebuffer contains opaque pixels.
+    - step: 41
       expectation: There is no disconnected/reconnecting overlay.
+    - step: 31
+      expectation: The independent OS read confirms the new local text before pasting into VNC.
     results:
     - 22
     - 25
     - 28
-    - 33
-    - 35
+    - 34
     - 36
-    - 38
+    - 37
     - 39
     - 40
+    - 41
   visual:
   - check: The final screenshot shows a painted remote desktop without an error overlay.
     method: manual
