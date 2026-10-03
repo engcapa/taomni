@@ -1,11 +1,13 @@
 id: TC-MAIN-RAIL-01
-title: Permanent Sessions and Tools share the tool window icons, names and keyboard interaction
+title: Permanent Sessions, Tools and Settings share tool window icons and names without a duplicate Git action
 description: >-
   Browser and packaged native acceptance for the title-bar grip and permanent
   buttons. Native explicitly covers the requested WebView layout and interactions.
   Names toggle in both directions from both the permanent and workspace menus;
-  preferences survive reload and both entries stay available across tabs/panels.
-covers: [F1.2, F1.3, F6.2, F25.5, F-Sockscap-1, F-I18n-1]
+  preferences survive reload and permanent entries stay available across tabs/panels.
+  Settings follows the names toggle and opens by keyboard; local terminals and
+  Code Workspace do not add a separate Git action to the main sidebar.
+covers: [F1.2, F1.3, F1.9, F6.2, F25.5, F-Sockscap-1, F-I18n-1]
 tags: [main, sidebar, p1]
 modes: [browser, native]
 fixtures: [reset_db]
@@ -100,6 +102,31 @@ steps:
       expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
       expect_truthy: true
   - screenshot: main-rail-welcome.png
+  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', equals: ''}
+  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', equals: Settings}
+  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', key: Enter}
+  - wait_for: '[data-testid="settings-panel"]'
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - click: '[data-testid="welcome-open-local-terminal"]'
+  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]', equal: 0}
+  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]', equals: Settings}
+  - screenshot: main-rail-terminal-settings-names.png
+  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]', equals: ''}
+  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]', equals: Settings}
+  - screenshot: main-rail-terminal-footer.png
+  - click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+  - assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]', equal: 0}
+  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]', equals: Settings}
+  - screenshot: main-rail-workspace-footer.png
 verification:
   review: reviewed
   requirements:
@@ -278,6 +305,20 @@ verification:
     - 68
     - 69
     - 70
+  - id: R4
+    requirement: Settings 与其他 action 一起显示/隐藏名称，仍可用键盘打开设置；终端和 Code Workspace 的左下角不再出现独立 Git panel action。
+    actions: [72, 73, 75, 76, 78, 80, 81, 86, 87, 89, 90, 93]
+    checkpoints:
+    - {step: 74, expectation: Welcome hides the Settings name with all other action names.}
+    - {step: 77, expectation: Welcome restores the visible Settings name.}
+    - {step: 79, expectation: Enter on Settings opens the settings panel.}
+    - {step: 83, expectation: A local terminal adds no Git action to the main sidebar.}
+    - {step: 84, expectation: The terminal rail shows the Settings name.}
+    - {step: 88, expectation: The Settings context menu hides its name in the terminal rail.}
+    - {step: 91, expectation: The Settings context menu restores its name in the terminal rail.}
+    - {step: 94, expectation: Code Workspace adds no duplicate Git action to the main sidebar.}
+    - {step: 95, expectation: Code Workspace keeps the named Settings action in the main sidebar.}
+    results: [74, 77, 79, 83, 84, 88, 91, 94, 95]
   visual:
   - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual

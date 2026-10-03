@@ -945,7 +945,6 @@ export function MainLayout() {
   const mainRailHost = useMainRailHostStore((s) => s.host);
   const stripeSettings = useToolWindowStripeStore((s) => s.settings);
   const toggleStripeNames = useToolWindowStripeStore((s) => s.toggleShowNames);
-  const setStripeWidth = useToolWindowStripeStore((s) => s.setWidth);
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
@@ -2390,35 +2389,6 @@ export function MainLayout() {
       await alertAppDialog({ title: "Git Repository", message });
     }
   }, [openGitTab, setStatusMessage]);
-
-  const activeTerminalGitAction = useMemo(() => {
-    const tab = activeTab;
-    if (
-      !tab ||
-      tab.type !== "terminal" ||
-      tab.ssh ||
-      tab.commandTerminal ||
-      tab.sockscapTerminal
-    ) {
-      return undefined;
-    }
-    const cwd = terminalCwds[tab.id] ?? null;
-    return {
-      label: cwd ? `Git · ${cwd}` : "Git Repository",
-      title: cwd ? `Open Git panel for ${cwd}` : "Open Git panel for the current terminal directory",
-      onOpen: async () => {
-        const latestCwd = terminalCwdsRef.current[tab.id] ?? await queryTerminalCwd(tab.id);
-        if (!latestCwd) {
-          await alertAppDialog({
-            title: "Git Repository",
-            message: "The current terminal directory is not available yet.",
-          });
-          return;
-        }
-        await openGitRepository(latestCwd);
-      },
-    };
-  }, [activeTab, openGitRepository, queryTerminalCwd, terminalCwds]);
 
   const openBrowserSession = useCallback((session: SessionConfig) => {
     const url = browserUrlFromSession(session);
@@ -4188,7 +4158,6 @@ export function MainLayout() {
             width={effectiveStripeWidth(stripeSettings, "left")}
             showNames={stripeSettings.showNames}
             onToggleShowNames={toggleStripeNames}
-            onResize={(width) => setStripeWidth("left", width)}
             onHide={(id) => terminalRailItems.find((item) => item.id === id)?.onSelect()}
           />,
           mainRailHost,
@@ -4203,7 +4172,6 @@ export function MainLayout() {
               onConnectSession={handleConnectSession}
               onOpenSettings={() => handleCommand("settings")}
               onCommand={handleCommand}
-              gitAction={activeTerminalGitAction}
             />
           </div>
         )}
@@ -4249,7 +4217,6 @@ export function MainLayout() {
                 onConnectSession={handleConnectSession}
                 onOpenSettings={() => handleCommand("settings")}
                 onCommand={handleCommand}
-                gitAction={activeTerminalGitAction}
               />
             </div>
           </Panel>

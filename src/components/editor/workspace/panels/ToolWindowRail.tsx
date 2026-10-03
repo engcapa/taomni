@@ -75,7 +75,6 @@ export function ToolWindowRail({
   embedded = false,
 }: ToolWindowRailProps) {
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const namesItem: MenuItem = {
     label: "Show Tool Window Names",
@@ -127,42 +126,8 @@ export function ToolWindowRail({
     if (!onToggleShowNames) return;
     if (event.target instanceof Element && event.target.closest("button")) return;
     event.preventDefault();
+    event.stopPropagation();
     setMenu({ x: event.clientX, y: event.clientY, items: [namesItem] });
-  };
-
-  const resizable = showNames && !!onResize;
-  const onResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!resizable) return;
-    event.preventDefault();
-    const target = event.currentTarget;
-    // preventDefault suppresses the focusing mousedown; keep keyboard resize.
-    target.focus();
-    target.setPointerCapture?.(event.pointerId);
-    dragRef.current = { startX: event.clientX, startWidth: width };
-    const onMovePointer = (moveEvent: PointerEvent) => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const delta = side === "left" ? moveEvent.clientX - drag.startX : drag.startX - moveEvent.clientX;
-      onResize?.(clampStripeWidth(drag.startWidth + delta));
-    };
-    const finish = () => {
-      dragRef.current = null;
-      window.removeEventListener("pointermove", onMovePointer);
-      window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", finish);
-    };
-    window.addEventListener("pointermove", onMovePointer);
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
-  };
-  const onResizeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!resizable) return;
-    const grow = side === "left" ? "ArrowRight" : "ArrowLeft";
-    const shrink = side === "left" ? "ArrowLeft" : "ArrowRight";
-    if (event.key === grow || event.key === shrink) {
-      event.preventDefault();
-      onResize?.(clampStripeWidth(width + (event.key === grow ? 4 : -4)));
-    }
   };
 
   return (
@@ -192,25 +157,78 @@ export function ToolWindowRail({
         {bottomSlotRef && <div ref={bottomSlotRef} className="flex w-full flex-col items-stretch gap-1" />}
         {footer}
       </div>
-      {resizable && (
-        <div
-          role="separator"
-          tabIndex={0}
-          aria-orientation="vertical"
-          aria-label={`Resize ${side} tool window bar`}
-          aria-valuenow={width}
-          aria-valuemin={STRIPE_MIN_WIDTH}
-          aria-valuemax={STRIPE_MAX_WIDTH}
-          data-testid={`code-workspace-tool-rail-${side}-resize`}
-          className={`absolute inset-y-0 z-10 w-1.5 cursor-col-resize hover:bg-[var(--taomni-accent)]/60 focus:bg-[var(--taomni-accent)]/60 ${side === "left" ? "right-0" : "left-0"}`}
-          onPointerDown={onResizePointerDown}
-          onKeyDown={onResizeKeyDown}
-        />
+      {showNames && onResize && !embedded && (
+        <ToolWindowRailResizeHandle side={side} width={width} onResize={onResize} />
       )}
       {menu && (
         <ContextMenu items={menu.items} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />
       )}
     </nav>
+  );
+}
+
+/** The containing rail owns resizing, including when tab tools are embedded. */
+export function ToolWindowRailResizeHandle({
+  side,
+  width,
+  onResize,
+  testId = `code-workspace-tool-rail-${side}-resize`,
+}: {
+  side: "left" | "right";
+  width: number;
+  onResize: (width: number) => void;
+  testId?: string;
+}) {
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => dragCleanupRef.current?.(), []);
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    dragCleanupRef.current?.();
+    const target = event.currentTarget;
+    // preventDefault suppresses the focusing mousedown; keep keyboard resize.
+    target.focus();
+    target.setPointerCapture?.(event.pointerId);
+    const startX = event.clientX;
+    const onMove = (moveEvent: PointerEvent) => {
+      const delta = side === "left" ? moveEvent.clientX - startX : startX - moveEvent.clientX;
+      onResize(clampStripeWidth(width + delta));
+    };
+    const finish = () => {
+      dragCleanupRef.current = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+    };
+    dragCleanupRef.current = finish;
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  };
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const grow = side === "left" ? "ArrowRight" : "ArrowLeft";
+    const shrink = side === "left" ? "ArrowLeft" : "ArrowRight";
+    if (event.key === grow || event.key === shrink) {
+      event.preventDefault();
+      onResize(clampStripeWidth(width + (event.key === grow ? 4 : -4)));
+    }
+  };
+
+  return (
+    <div
+      role="separator"
+      tabIndex={0}
+      aria-orientation="vertical"
+      aria-label={`Resize ${side} tool window bar`}
+      aria-valuenow={width}
+      aria-valuemin={STRIPE_MIN_WIDTH}
+      aria-valuemax={STRIPE_MAX_WIDTH}
+      data-testid={testId}
+      className={`absolute inset-y-0 z-10 w-1.5 touch-none cursor-col-resize hover:bg-[var(--taomni-accent)]/60 focus:bg-[var(--taomni-accent)]/60 ${side === "left" ? "right-0" : "left-0"}`}
+      onPointerDown={onPointerDown}
+      onKeyDown={onKeyDown}
+    />
   );
 }
 

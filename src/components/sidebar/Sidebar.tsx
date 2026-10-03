@@ -28,7 +28,7 @@ import type { SessionConfig } from "../../lib/ipc";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import type { AppCommand } from "../menubar/commands";
 import { ContextMenu } from "../ContextMenu";
-import { ToolWindowRailButton } from "../editor/workspace/panels/ToolWindowRail";
+import { ToolWindowRailButton, ToolWindowRailResizeHandle } from "../editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../editor/workspace/toolWindowLayout";
 import { useToolWindowStripeStore } from "../editor/workspace/toolWindowStripeStore";
 
@@ -39,12 +39,6 @@ interface SidebarProps {
   onConnectSession?: (session: SessionConfig) => void;
   onOpenSettings?: () => void;
   onCommand?: (command: AppCommand) => void;
-  gitAction?: {
-    label: string;
-    title: string;
-    disabled?: boolean;
-    onOpen: () => void;
-  };
   compact?: boolean;
 }
 
@@ -54,7 +48,6 @@ export function Sidebar({
   onConnectSession,
   onOpenSettings,
   onCommand,
-  gitAction,
   compact = false,
 }: SidebarProps) {
   const {
@@ -75,6 +68,7 @@ export function Sidebar({
   const t = useT();
   const setRailHost = useMainRailHostStore((state) => state.setHost);
   const stripeSettings = useToolWindowStripeStore((state) => state.settings);
+  const setStripeWidth = useToolWindowStripeStore((state) => state.setWidth);
   const toggleStripeNames = useToolWindowStripeStore((state) => state.toggleShowNames);
   const [railMenu, setRailMenu] = useState<{ x: number; y: number } | null>(null);
   const selectedSessions = sessions.filter((session) => selectedSessionIds.includes(session.id));
@@ -129,8 +123,9 @@ export function Sidebar({
       <div
         data-testid="sidebar-rail"
         data-show-names={stripeSettings.showNames || undefined}
-        className="flex min-h-0 flex-col shrink-0"
+        className="relative flex min-h-0 flex-col shrink-0"
         style={{ width: effectiveStripeWidth(stripeSettings, "left"), background: "var(--taomni-tab-inactive)", boxShadow: "inset -1px 0 0 var(--taomni-sidebar-border)" }}
+        onContextMenu={handleSideTabContextMenu}
       >
         <div className="flex shrink-0 flex-col gap-1 px-1 py-1">
           {(["sessions", "tools"] as const).map((tab) => {
@@ -149,7 +144,6 @@ export function Sidebar({
                 showNames={stripeSettings.showNames}
                 onClick={(event) => handleSideTabClick(tab, event.detail)}
                 onDoubleClick={handleSideTabCollapse}
-                onContextMenu={handleSideTabContextMenu}
               />
             );
           })}
@@ -164,51 +158,30 @@ export function Sidebar({
         ) : (
           <div className="flex-1" />
         )}
-        {gitAction && (
-          <button
-            data-testid="ribbon-git"
-            type="button"
-            aria-label={gitAction.title}
-            className="group relative mb-1 h-8 w-full inline-flex items-center justify-center border-t hover:bg-[var(--taomni-hover)] text-[var(--taomni-text)] disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ borderColor: "var(--taomni-sidebar-border)" }}
-            disabled={gitAction.disabled}
-            onClick={gitAction.onOpen}
-          >
-            <GitBranch className="w-[17px] h-[17px]" />
-            <span
-              role="tooltip"
-              className="pointer-events-none absolute left-full bottom-1/2 z-50 ml-2 translate-y-1/2 whitespace-nowrap rounded border px-2 py-1 text-[11px] opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-              style={{
-                background: "var(--taomni-card-bg)",
-                borderColor: "var(--taomni-card-border)",
-                color: "var(--taomni-text)",
-              }}
-            >
-              {gitAction.label}
-            </span>
-          </button>
-        )}
-        <button
-          data-testid="ribbon-settings"
-          type="button"
-          aria-label={t("menu.settings")}
-          className="group relative mb-2 h-8 w-full inline-flex items-center justify-center border-t hover:bg-[var(--taomni-hover)] text-[var(--taomni-text)]"
+        <div
+          className="shrink-0 border-t px-1 pb-2 pt-1"
           style={{ borderColor: "var(--taomni-sidebar-border)" }}
-          onClick={onOpenSettings}
         >
-          <Settings className="w-[18px] h-[18px]" />
-          <span
-            role="tooltip"
-            className="pointer-events-none absolute left-full bottom-1/2 z-50 ml-2 translate-y-1/2 whitespace-nowrap rounded border px-2 py-1 text-[11px] opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-            style={{
-              background: "var(--taomni-card-bg)",
-              borderColor: "var(--taomni-card-border)",
-              color: "var(--taomni-text)",
+          <ToolWindowRailButton
+            item={{
+              id: "settings",
+              label: t("menu.settings"),
+              icon: <Settings />,
+              active: false,
+              testId: "ribbon-settings",
+              onSelect: () => onOpenSettings?.(),
             }}
-          >
-            {t("menu.settings")}
-          </span>
-        </button>
+            showNames={stripeSettings.showNames}
+          />
+        </div>
+        {stripeSettings.showNames && (
+          <ToolWindowRailResizeHandle
+            side="left"
+            width={effectiveStripeWidth(stripeSettings, "left")}
+            onResize={(width) => setStripeWidth("left", width)}
+            testId="sidebar-rail-resize"
+          />
+        )}
       </div>
       {compact && null}
       {!compact && (

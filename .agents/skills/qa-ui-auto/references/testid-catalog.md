@@ -1292,6 +1292,7 @@
   ↳ `[data-testid="sidebar-rail"]` — alias
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
 - `[data-testid="sidebar-rail-menu-show-names"]` — interactive [optional] — F1.2.sidebar-rail-menu-show-names
+- `[data-testid="sidebar-rail-resize"]` — interactive [optional] — F1.2.sidebar-rail-resize
 
 ## main/commands (F1.9)
 

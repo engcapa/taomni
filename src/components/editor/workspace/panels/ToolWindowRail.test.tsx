@@ -4,7 +4,10 @@ import { useState } from "react";
 import { BottomDock } from "./BottomDock";
 import { ToolWindowRail } from "./ToolWindowRail";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("ED-PARITY-010 tool window rail", () => {
   it("renders stripe buttons with pressed state, shortcut titles and disabled reasons", () => {
@@ -34,6 +37,7 @@ describe("ED-PARITY-010 tool window rail", () => {
         embedded
         width={59}
         showNames
+        onResize={vi.fn()}
         top={[{ id: "sftp", label: "SFTP", icon: null, active: false, testId: "attached-sftp-toggle", onSelect: vi.fn() }]}
       />,
     );
@@ -43,6 +47,30 @@ describe("ED-PARITY-010 tool window rail", () => {
     expect(rail.className).not.toContain("bg-[var(--taomni-code-gutter-bg)]");
     expect(rail.style.width).toBe("100%");
     expect(screen.getByTestId("attached-sftp-toggle")).toHaveTextContent("SFTP");
+    expect(screen.queryByTestId("code-workspace-tool-rail-left-resize")).toBeNull();
+  });
+
+  it.each(["left", "right"] as const)("keeps pointer and keyboard resizing on the standalone %s rail", (side) => {
+    vi.stubGlobal("PointerEvent", MouseEvent);
+    const onResize = vi.fn();
+    function ResizableRail() {
+      const [width, setWidth] = useState(59);
+      return <ToolWindowRail side={side} top={[]} showNames width={width} onResize={(next) => {
+        onResize(next);
+        setWidth(next);
+      }} />;
+    }
+    const { unmount } = render(<ResizableRail />);
+    const handle = screen.getByTestId(`code-workspace-tool-rail-${side}-resize`);
+    fireEvent.keyDown(handle, { key: side === "left" ? "ArrowRight" : "ArrowLeft" });
+    expect(screen.getByTestId(`code-workspace-tool-rail-${side}`)).toHaveStyle({ width: "63px" });
+    fireEvent.pointerDown(handle, { button: 0, clientX: 100 });
+    fireEvent.pointerMove(window, { clientX: side === "left" ? 120 : 80 });
+    expect(screen.getByTestId(`code-workspace-tool-rail-${side}`)).toHaveStyle({ width: "83px" });
+    unmount();
+    onResize.mockClear();
+    fireEvent.pointerMove(window, { clientX: 130 });
+    expect(onResize).not.toHaveBeenCalled();
   });
 
   function DockWithRail() {
