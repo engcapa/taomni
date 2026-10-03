@@ -6,6 +6,18 @@ from qa_ui_auto.steps import StepError
 
 
 class NativeAssertionsTest(TestCase):
+    def test_visibility_supports_scoped_text_role_and_xpath_selectors(self):
+        for selector in ('[data-testid="sftp-remote-pane"] >> text="REMOTE"',
+                         'role=button[name="Open"]', 'xpath=//button[@id="open"]'):
+            with self.subTest(selector=selector):
+                ctx = Mock()
+                ctx.session.find.return_value = "visible-node"
+                ctx.session.execute.return_value = True
+                run_native_step(ctx, "assert_visible", selector)
+                script = ctx.session.execute.call_args[0][0]
+                self.assertIn("document.evaluate(", script)
+                self.assertNotIn("document.querySelector(", script)
+
     def test_hidden_attached_nodes_satisfy_not_visible_but_fail_visible(self):
         ctx = Mock()
         ctx.session.find.return_value = "attached-node"
