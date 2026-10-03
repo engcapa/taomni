@@ -91,7 +91,13 @@ export function Sidebar({
     void moveSessionsToGroup(selectedSessionIds, "User sessions / Favorites");
   };
 
-  const handleSideTabClick = (tab: SideTab) => {
+  const handleSideTabClick = (tab: SideTab, clickCount = 0) => {
+    // The first click can swap the expanded Sidebar for its compact mount.
+    // Keep the second click of the same gesture from reopening that panel.
+    if (clickCount > 1) {
+      setSidebarCollapsed(true);
+      return;
+    }
     if (compact) {
       setActiveSideTab(tab);
       setSidebarCollapsed(false);
@@ -141,6 +147,7 @@ export function Sidebar({
                   onSelect: () => handleSideTabClick(tab),
                 }}
                 showNames={stripeSettings.showNames}
+                onClick={(event) => handleSideTabClick(tab, event.detail)}
                 onDoubleClick={handleSideTabCollapse}
                 onContextMenu={handleSideTabContextMenu}
               />

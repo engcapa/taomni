@@ -1,11 +1,8 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import source from "../../src-tauri/src/qa_driver_keyboard.js?raw";
 
 type Activate = (el: HTMLButtonElement, type: string, key: string, event: { defaultPrevented: boolean }, modifiers: Record<string, boolean>) => void;
-const source = readFileSync(resolve("src-tauri/src/qa_driver_keyboard.js"), "utf8");
-const createKeyboard = runInNewContext(source + "\ncreateQaButtonKeyboard", { HTMLButtonElement, document }) as () => Activate;
+const createKeyboard = new Function(source + "\nreturn createQaButtonKeyboard;")() as () => Activate;
 
 describe("macOS QA button keyboard defaults", () => {
   let button: HTMLButtonElement;

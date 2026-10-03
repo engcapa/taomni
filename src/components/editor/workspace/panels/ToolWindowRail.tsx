@@ -240,11 +240,13 @@ function ToolWindowRailButtonSlot({
 export function ToolWindowRailButton({
   item,
   showNames = false,
+  onClick,
   onContextMenu,
   onDoubleClick,
 }: {
   item: ToolWindowRailItem;
   showNames?: boolean;
+  onClick?: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   onContextMenu?: (event: ReactMouseEvent, item: ToolWindowRailItem) => void;
   onDoubleClick?: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
@@ -265,13 +267,13 @@ export function ToolWindowRailButton({
       disabled={item.disabled}
       title={title}
       className={toolWindowRailButtonClass}
-      onClick={item.onSelect}
+      onClick={onClick ?? item.onSelect}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu ? (event) => onContextMenu(event, item) : undefined}
     >
       <span aria-hidden="true" className="flex h-[20px] w-[20px] items-center justify-center [&>svg]:h-[16px] [&>svg]:w-[16px]">{item.icon}</span>
       {showNames && (
-        <span className="w-full truncate px-0.5 text-center text-[10px] leading-3">{item.label}</span>
+        <span className="w-full truncate px-0.5 text-center text-[10px] leading-[12px]">{item.label}</span>
       )}
       {showBadge && (
         <span className="absolute right-0.5 top-0.5 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-[8px] leading-3 tabular-nums text-[var(--taomni-code-text)]">

@@ -65,4 +65,20 @@ describe("Sidebar rail (ED-PARITY-027)", () => {
     expect(screen.getByTestId("sidebar-rail")).toHaveStyle({ width: "59px" });
     expect(screen.getByTestId("side-tab-tools").textContent).not.toBe("");
   });
+
+  it("keeps a double-click collapsed when its first click swaps the sidebar mount", () => {
+    function SwitchingSidebar() {
+      const compact = useAppStore((state) => state.sidebarCollapsed);
+      return <Sidebar key={compact ? "compact" : "expanded"} compact={compact} />;
+    }
+    render(<SwitchingSidebar />);
+    const expandedButton = screen.getByTestId("side-tab-sessions");
+    fireEvent.click(expandedButton, { detail: 1 });
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    const compactButton = screen.getByTestId("side-tab-sessions");
+    expect(compactButton).not.toBe(expandedButton);
+    fireEvent.click(compactButton, { detail: 2 });
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    expect(screen.getByTestId("sidebar-tool-window-rail")).toBeVisible();
+  });
 });

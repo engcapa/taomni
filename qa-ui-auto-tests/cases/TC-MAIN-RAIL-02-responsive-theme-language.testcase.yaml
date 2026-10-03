@@ -31,8 +31,9 @@ steps:
       expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height - innerHeight) < 1
       expect_truthy: true
   - eval_readonly:
-      expression: document.documentElement.scrollWidth <= innerWidth
-      expect_truthy: true
+      expression: JSON.stringify({fits:document.documentElement.scrollWidth<=innerWidth,viewport:innerWidth,document:document.documentElement.scrollWidth,main:document.querySelector('.taomni-main-window').scrollWidth,status:document.querySelector('.taomni-status').scrollWidth,title:document.querySelector('.taomni-control-bar').scrollWidth})
+      contains: '"fits":true'
+      timeout_sec: 3
   - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
   - wait_for: '[data-testid="collapsed-sidebar-rail"]'
   - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
@@ -105,8 +106,8 @@ verification:
       expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
         - innerHeight) < 1", "expect_truthy": true}}'
     - step: 20
-      expectation: '{"eval_readonly": {"expression": "document.documentElement.scrollWidth <= innerWidth", "expect_truthy":
-        true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify({fits:document.documentElement.scrollWidth<=innerWidth,viewport:innerWidth,document:document.documentElement.scrollWidth,main:document.querySelector(''.taomni-main-window'').scrollWidth,status:document.querySelector(''.taomni-status'').scrollWidth,title:document.querySelector(''.taomni-control-bar'').scrollWidth})",
+        "contains": "\"fits\":true", "timeout_sec": 3}}'
     - step: 22
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
     - step: 23

@@ -13,3 +13,5 @@
 首轮有效执行为 [37091557195](https://github.com/engcapa/taomni/actions/runs/37091557195)。Linux/macOS browser/native 的原有工作区与 SFTP 用例通过；新增名称用例因错误使用 JSON 存储夹具写入原始语言字符串而中止，现改为使用真实语言菜单和主题按钮。Linux native 的上、中、下三点拖拽均观测到 `(24,18)` 的 OS 窗口位移，窗口大小维持 `1000×680`。修正后会重新执行；暂不声明整体验收通过。
 
 macOS QA 键盘桥接补充构造事件的 HTML 按钮默认 Enter/Space 激活，遵守取消事件、禁用、焦点和修饰键。这属于 WKWebView 内的自动化交互，不能证明 macOS 物理键盘输入。macOS OS 窗口拖拽仍属于独立验证边界；本次实际 OS 拖拽自动化只支持 Linux/X11。
+
+第二轮 [37093099316](https://github.com/engcapa/taomni/actions/runs/37093099316) 的 browser 几何记录确认全部 16 个按钮均为 16px 图标，名称模式同宽 53px，纯图标模式同宽 34px、至少 32px 高。流程发现双击会在侧栏切换挂载后重新展开，现明确处理第二下点击，并补充跨挂载的单元回归。名称行高也改为 12px，避免根字体导致 10px 名称行仅为 9px。native 因新增单元测试的 Node 类型导入编译失败，现改用 Vite raw 源码导入。窄窗口断言保留严格无溢出条件，增加尺寸诊断与有界布局等待，继续验证。
