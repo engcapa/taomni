@@ -27,7 +27,7 @@ verification:
     - 1
     checkpoints:
     - step: 3
-      expectation: 'Current-window entry preselects its physical bounds while main stays visible; default entry hides main. After at least two captured frames, click Finish and observe the surviving overlay show the result preview with a longer image matching the original page pixels. Verify fit aspect ratio and bounds, original-size dimensions, and direct annotation with uniform scaling. Click Cancel in a second run and observe the original crop and one annotation preserved. Visible native controls and range borders lie outside the crop; all temporary controls and borders close after either operation.'
+      expectation: 'Current-window entry preselects its physical bounds while main stays visible; default entry hides main. After at least two captured frames, click Finish and observe the surviving overlay show the result preview with a longer image matching the original page pixels. Verify fit aspect ratio and bounds, original-size dimensions, and a directly available annotation toolbar. Draw a red rectangle in fit view, switch to 100%, undo/redo, scroll to the bottom and draw a green rectangle. Return to fit, click Done and verify the full-size OS clipboard has the red/green lines at their original image positions. Click Cancel in a second run and observe the original crop and one annotation preserved. Visible native controls and range borders lie outside the crop; all temporary controls and borders close after either operation.'
     - step: 4
       expectation: 'assert_visible: [data-testid="system-screenshot"]'
     results:

@@ -1563,7 +1563,6 @@
 - `[data-testid="screenshot-scroll-fit"]` — interactive — F27.1.screenshot-scroll-fit
 - `[data-testid="screenshot-scroll-actual"]` — interactive — F27.1.screenshot-scroll-actual
 - `[data-testid="screenshot-scroll-result-close"]` — interactive — F27.1.screenshot-scroll-result-close
-- `[data-testid="screenshot-scroll-result-edit"]` — interactive — F27.1.screenshot-scroll-result-edit
 - `[data-testid="screenshot-scroll-result-pin"]` — interactive — F27.1.screenshot-scroll-result-pin
 - `[data-testid="screenshot-scroll-result-save"]` — interactive — F27.1.screenshot-scroll-result-save
 - `[data-testid="screenshot-scroll-result-copy"]` — interactive — F27.1.screenshot-scroll-result-copy

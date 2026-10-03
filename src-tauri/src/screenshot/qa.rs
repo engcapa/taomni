@@ -1460,16 +1460,36 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
       if (Math.abs(r.width / r.height - image.naturalWidth / image.naturalHeight) > 0.005
         || r.width > image.naturalWidth + 1 || r.height > container.height || r.left < 0 || r.right > innerWidth)
         throw new Error('scroll preview stretched or clipped');
-      if (q('screenshot-hint') || q('screenshot-toolbar')) throw new Error('unexpected selection instructions');
+      if (q('screenshot-hint') || !q('screenshot-toolbar')) throw new Error('direct annotation toolbar unavailable');
       q('screenshot-scroll-actual').click(); await sleep(100);
       const actual = image.getBoundingClientRect();
       if (Math.abs(actual.width-image.naturalWidth)>1 || Math.abs(actual.height-image.naturalHeight)>1)
         throw new Error('original size is not 100%');
       q('screenshot-scroll-fit').click(); await sleep(100);
-      q('screenshot-scroll-result-edit').click(); await sleep(100);
-      if (!q('screenshot-toolbar') || q('screenshot-overlay')?.dataset.phase !== 'annotate') throw new Error('annotation unavailable');
-      const base = q('screenshot-base-image').getBoundingClientRect();
-      if (Math.abs(base.width/base.height-image.naturalWidth/image.naturalHeight)>0.005) throw new Error('annotation image distorted');
+      const fire = (el,type,x,y) => el.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,clientX:x,clientY:y}));
+      const draw = async (x,y,w,h) => {
+        const layer = q('screenshot-annotation-layer'), r = layer.getBoundingClientRect();
+        const sx = r.width/image.naturalWidth, sy = r.height/image.naturalHeight;
+        fire(layer,'mousedown',r.left+x*sx,r.top+y*sy); await sleep(50);
+        fire(layer,'mousemove',r.left+(x+w)*sx,r.top+(y+h)*sy); await sleep(50);
+        fire(window,'mouseup',r.left+(x+w)*sx,r.top+(y+h)*sy); await sleep(100);
+      };
+      q('screenshot-tool-rect').click(); await sleep(100);
+      q('screenshot-color-red').click(); await sleep(50);
+      await draw(40,80,100,70);
+      if(q('screenshot-annotation-canvas').dataset.shapes!=='1') throw new Error('fit annotation missing');
+      q('screenshot-scroll-actual').click(); await sleep(100);
+      q('screenshot-undo').click(); await sleep(100);
+      if(q('screenshot-annotation-canvas').dataset.shapes!=='0') throw new Error('undo lost after zoom');
+      q('screenshot-redo').click(); await sleep(100);
+      const viewport = q('screenshot-scroll-result-viewport');
+      viewport.scrollTop = viewport.scrollHeight; await sleep(100);
+      if(viewport.scrollTop<=0) throw new Error('long preview did not scroll');
+      q('screenshot-color-green').click(); await sleep(50);
+      await draw(40,image.naturalHeight-100,100,60);
+      q('screenshot-scroll-fit').click(); await sleep(100);
+      if(q('screenshot-annotation-canvas').dataset.shapes!=='2') throw new Error('scrolled annotation missing');
+      if(viewport.scrollTop!==0) throw new Error('fit did not reset preview scroll');
       return true;
     "#, Duration::from_secs(25)).await.map_err(|e| e.to_string())?;
     let result = super::screenshot_overlay_init().await?;
@@ -1492,8 +1512,27 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         &qa_oracle::difference(&output, &expected),
         "scroll-stop-difference.png",
     );
-    super::close_session(&app);
-    wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(5)).await;
+    overlay
+        .eval("document.querySelector('[data-testid=\"screenshot-scroll-result-copy\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let done_closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
+    let clipboard = read_clipboard_image(&app).map_err(|e| e.to_string())?;
+    let annotated_artifact = keep_image(&clipboard, "scroll-annotated-clipboard.png");
+    let mut red = 0;
+    let mut green = 0;
+    if clipboard.dimensions() == output.dimensions() {
+        for x in 45..135 {
+            let a = clipboard.get_pixel(x, 80);
+            red += usize::from(a[0] > 220 && a[1] < 120 && a[2] < 120);
+            let b = clipboard.get_pixel(x, output.height() - 100);
+            green += usize::from(b[0] < 120 && b[1] > 160 && b[2] < 100);
+        }
+    }
+    let marked_clipboard = done_closed
+        && clipboard.dimensions() == output.dimensions()
+        && red >= 85
+        && green >= 85
+        && annotated_artifact.is_some();
 
     let (_fixture, display, region) = open_fixture(&app, "scroll")
         .await
@@ -1527,6 +1566,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             && current_region.is_some()
             && default_hidden
             && completed == json!(true)
+            && marked_clipboard
             && output.height() > region.3
             && comparison.passed
             && geometry["controlsOutside"] == json!(true)
@@ -1537,6 +1577,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             && artifact.is_some(),
         json!({"currentWindowVisible":current_visible,"currentWindowSelected":selected,"currentRegion":current_region,
             "defaultHidesWindows":default_hidden,"scrollCompleted":completed,"scrollProgress":progress,"geometry":geometry,"comparison":comparison,
+            "markedClipboard":marked_clipboard,"redLinePixels":red,"greenLinePixels":green,"annotatedArtifact":annotated_artifact,
             "scrollCancelledPreservesAnnotations":cancelled,"controlsCleaned":cleanup,"artifact":artifact,
             "originalArtifact":original_artifact,"differenceArtifact":difference,"windowArtifact":window_artifact}),
     ))
