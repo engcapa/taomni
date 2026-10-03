@@ -4,11 +4,13 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, call
+from unittest.mock import patch
 
 from qa_ui_auto.steps import StepContext, StepError
 from qa_ui_auto.steps.mouse import (
     drag_offset, mouse_path_points, step_drag_to, step_mouse_path,
     step_terminal_drag_selection, terminal_selection_args, terminal_selection_points,
+    mouse_button_action, step_mouse_button,
 )
 
 
@@ -70,6 +72,142 @@ class MouseStepsTest(TestCase):
         page.wait_for_timeout.assert_called_once_with(50)
         with self.assertRaisesRegex(StepError, "selector"):
             mouse_path_points({"points": [{"dx": 1}]})
+
+    def test_mouse_button_holds_and_releases_browser_input(self):
+        ctx, page, _ = self.context()
+        step_mouse_button(ctx, "down")
+        step_mouse_button(ctx, "up")
+        self.assertEqual(page.mouse.mock_calls, [call.down(), call.up()])
+        with self.assertRaisesRegex(StepError, "down or up"):
+            mouse_button_action("click")
+
+    def test_native_mouse_button_preserves_the_mouse_path_source_until_release(self):
+        from qa_ui_auto.native_steps import _do_mouse_button
+
+        session = Mock()
+        session.find.return_value = "row-1"
+        session.endpoint.return_value = "/session/qa/actions"
+        ctx = SimpleNamespace(session=session, _mouse_origin={"selector": "#row", "dx": -20, "dy": 0})
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Windows"):
+            _do_mouse_button(ctx, "down")
+            self.assertEqual(session.request.call_count, 1)
+            pointer = session.request.call_args.args[2]["actions"][0]
+            self.assertEqual(pointer["id"], "mouse")
+            self.assertEqual(pointer["actions"], [
+                {"type": "pointerMove", "duration": 0, "x": -20, "y": 0,
+                 "origin": {"element-6066-11e4-a52e-4f735466cecf": "row-1"}},
+                {"type": "pointerDown", "button": 0},
+            ])
+            _do_mouse_button(ctx, "up")
+        self.assertEqual(session.request.call_args, call("DELETE", "/session/qa/actions"))
+
+    def test_native_mouse_button_releases_on_failure_and_rejects_the_stateless_bridge(self):
+        from qa_ui_auto.native_steps import _do_mouse_button
+
+        session = Mock()
+        session.endpoint.return_value = "/session/qa/actions"
+        session.request.side_effect = [RuntimeError("driver failure"), None]
+        ctx = SimpleNamespace(session=session, _mouse_origin={"selector": "#row", "dx": 0, "dy": 0})
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Windows"):
+            with self.assertRaisesRegex(RuntimeError, "driver failure"):
+                _do_mouse_button(ctx, "down")
+        self.assertEqual(session.request.call_args, call("DELETE", "/session/qa/actions"))
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Darwin"):
+            with self.assertRaisesRegex(StepError, "does not retain"):
+                _do_mouse_button(ctx, "down")
+
+    def test_native_mouse_press_requires_a_known_position(self):
+        from qa_ui_auto.native_steps import _do_mouse_button
+
+        session = Mock()
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"):
+            with self.assertRaisesRegex(StepError, "preceding mouse_path"):
+                _do_mouse_button(SimpleNamespace(session=session), "down")
+        session.request.assert_not_called()
+
+    def test_native_x11_path_scales_and_interpolates_in_the_owned_window(self):
+        from qa_ui_auto.native_steps import _mouse_path
+
+        session = Mock(application=Path("/tmp/qa-app"))
+        session.execute.return_value = {"x": 103, "y": 50, "width": 6, "height": 20,
+                                        "innerWidth": 400, "innerHeight": 300}
+        ctx = SimpleNamespace(session=session)
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"), \
+             patch.dict("os.environ", {"DISPLAY": ":99"}), \
+             patch("qa_ui_auto.native_steps._activate_x11_application", return_value=("0x42", "QA")) as activate, \
+             patch("qa_ui_auto.native_steps._command_output", side_effect=[
+                 "X=5\nY=7\nWIDTH=800\nHEIGHT=600", "X=100\nY=100", "",
+             ]) as command:
+            _mouse_path(ctx, {"points": [{"selector": "#row", "dx": 4, "dy": -2, "steps": 2}]})
+        activate.assert_called_once_with(session.application)
+        self.assertEqual(command.call_args_list[-1], call([
+            "xdotool", "mousemove", "160", "102", "sleep", "0.016",
+            "mousemove", "219", "103", "sleep", "0.016",
+        ]))
+        session.request.assert_not_called()
+        self.assertEqual(ctx._mouse_origin["selector"], "#row")
+
+    def test_native_x11_path_rejects_hidden_and_out_of_view_points(self):
+        from qa_ui_auto.native_steps import _x11_mouse_move
+
+        session = Mock(application=Path("/tmp/qa-app"))
+        ctx = SimpleNamespace(session=session)
+        point = {"selector": "#row", "dx": 0, "dy": 0, "steps": 1}
+        geometry = {"x": 10, "y": 10, "width": 10, "height": 10,
+                    "innerWidth": 400, "innerHeight": 300}
+        with patch.dict("os.environ", {"DISPLAY": ":99"}), \
+             patch("qa_ui_auto.native_steps._activate_x11_application", return_value=("0x42", "QA")), \
+             patch("qa_ui_auto.native_steps._command_output") as command:
+            session.execute.return_value = {**geometry, "width": 0}
+            with self.assertRaisesRegex(StepError, "visible geometry"):
+                _x11_mouse_move(ctx, point)
+            session.execute.return_value = geometry
+            with self.assertRaisesRegex(StepError, "outside"):
+                _x11_mouse_move(ctx, {**point, "dx": 400})
+        command.assert_not_called()
+
+    def test_native_x11_buttons_preserve_the_hold_and_cleanup_after_step_failure(self):
+        from qa_ui_auto.native_steps import _do_mouse_button, NativeStepContext
+
+        ctx = NativeStepContext(Mock(), Path("."), {})
+        ctx._mouse_origin = {"selector": "#row", "dx": 0, "dy": 0, "steps": 1}
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"), \
+             patch.dict("os.environ", {"DISPLAY": ":99"}), \
+             patch("qa_ui_auto.native_steps._x11_mouse_move") as move, \
+             patch("qa_ui_auto.native_steps._observe_mouse_input"), \
+             patch("qa_ui_auto.native_steps._record_mouse_input"), \
+             patch("qa_ui_auto.native_steps.time.sleep"), \
+             patch("qa_ui_auto.native_steps._command_output") as command:
+            _do_mouse_button(ctx, "down")
+            self.assertTrue(ctx._mouse_x11_down)
+            command.assert_called_once_with(["xdotool", "mousedown", "1"])
+            _do_mouse_button(ctx, "up")
+            self.assertFalse(ctx._mouse_x11_down)
+            command.assert_called_with(["xdotool", "mouseup", "1"])
+            _do_mouse_button(ctx, "down")
+            # An assertion can fail while held; ordinary context cleanup must release it.
+            ctx.restore_host_permissions()
+            command.assert_called_with(["xdotool", "mouseup", "1"])
+            self.assertFalse(ctx._mouse_x11_down)
+            command.side_effect = [RuntimeError("X11 down failed"), ""]
+            with self.assertRaisesRegex(RuntimeError, "X11 down failed"):
+                _do_mouse_button(ctx, "down")
+            self.assertFalse(ctx._mouse_x11_down)
+            command.assert_called_with(["xdotool", "mouseup", "1"])
+        self.assertEqual(move.call_count, 3)
+        ctx.session.request.assert_not_called()
+
+    def test_native_click_passes_modifiers_and_rejects_unsupported_options(self):
+        from qa_ui_auto.native_steps import _do_click
+
+        session = Mock()
+        ctx = SimpleNamespace(session=session)
+        with patch("qa_ui_auto.steps.mouse.platform.system", return_value="Windows"):
+            _do_click(ctx, {"selector": "#row", "modifiers": ["Mod", "Shift"]})
+        session.pointer_button_click.assert_called_once_with("#row", 0, ["Control", "Shift"])
+        session.click.assert_not_called()
+        with self.assertRaisesRegex(StepError, "browser-only"):
+            _do_click(ctx, {"selector": "#row", "force": True})
 
     def test_terminal_drag_starts_in_the_gutter_and_reverses_the_same_endpoints(self):
         box = {"x": 108, "y": 40, "width": 120, "height": 18}

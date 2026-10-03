@@ -1440,6 +1440,9 @@
         "mouse_path": {
           "$ref": "#/$defs/mouse_path_arg"
         },
+        "mouse_button": {
+          "enum": ["down", "up"]
+        },
         "seed_clipboard_image": {
           "$ref": "#/$defs/seed_clipboard_image_arg"
         },

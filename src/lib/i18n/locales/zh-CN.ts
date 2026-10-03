@@ -3413,6 +3413,7 @@ export const zhCN: DeepPartial<typeof en> = {
     contextDuplicate: "复制",
     contextDuplicateCount: "复制所选会话（{count}）",
     contextMoveToFolder: "移动到文件夹",
+    dragSelectedCount: "移动 {count} 个会话",
     contextSetTerminalTheme: "设置终端外观…",
     contextDelete: "删除",
     contextDeleteCount: "删除所选会话（{count}）",

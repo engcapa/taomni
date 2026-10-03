@@ -15,6 +15,21 @@ from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, select
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_modified_click_holds_keys_through_pointer_up_and_releases_them_on_failure(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="row-1")
+        session.request = Mock(side_effect=[None, WebDriverError("input failed"), None])
+        with self.assertRaisesRegex(WebDriverError, "input failed"):
+            session.pointer_button_click("#row", 0, ["Control", "Shift"])
+        keys, pointer = session.request.call_args_list[1].args[2]["actions"]
+        self.assertEqual(pointer["id"], "mouse")
+        self.assertEqual(len(keys["actions"]), len(pointer["actions"]))
+        self.assertEqual(keys["actions"][:2], [{"type": "keyDown", "value": "\ue009"}, {"type": "keyDown", "value": "\ue008"}])
+        self.assertEqual(keys["actions"][-2:], [{"type": "keyUp", "value": "\ue008"}, {"type": "keyUp", "value": "\ue009"}])
+        self.assertEqual(pointer["actions"][3:5], [{"type": "pointerDown", "button": 0}, {"type": "pointerUp", "button": 0}])
+        self.assertEqual(session.request.call_args, call("DELETE", "/session/session-1/actions"))
+
     def test_close_has_its_own_budget_after_case_or_diagnostics_timeout(self):
         closed = Mock()
         session = NativeSession("http://driver.invalid", Path("unused"), closed)
@@ -471,6 +486,7 @@ class NativeSessionPointerClickTest(TestCase):
         self.assertEqual(result, {"x": 50, "y": 35})
         action = session.request.call_args_list[1].args[2]["actions"][0]
         self.assertEqual(action["parameters"], {"pointerType": "mouse"})
+        self.assertEqual(action["id"], "mouse")
         self.assertEqual(action["actions"][0], {
             "type": "pointerMove",
             "duration": 100,
@@ -501,6 +517,7 @@ class NativeSessionPointerClickTest(TestCase):
         self.assertEqual(keyboard["actions"][0], {"type": "keyDown", "value": "\ue00a"})
         self.assertEqual(keyboard["actions"][-1], {"type": "keyUp", "value": "\ue00a"})
         self.assertEqual(pointer["parameters"], {"pointerType": "mouse"})
+        self.assertEqual(pointer["id"], "mouse")
         self.assertEqual(pointer["actions"][1]["x"], 30)
         self.assertEqual(pointer["actions"][3]["x"], 80)
         self.assertEqual(pointer["actions"][2]["type"], "pointerDown")

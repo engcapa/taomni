@@ -607,7 +607,12 @@ class NativeSession:
     def right_click(self, selector: str) -> str:
         return self.pointer_button_click(selector, 2)
 
-    def pointer_button_click(self, selector: str, button: int) -> str:
+    def pointer_button_click(self, selector: str, button: int, modifiers: list[str] | None = None) -> str:
+        modifier_values = []
+        for name in modifiers or []:
+            if name not in self.MODIFIER_MAP:
+                raise WebDriverError(f"pointer_button_click: unknown modifier {name!r}")
+            modifier_values.append(self.MODIFIER_MAP[name])
         # The row can be re-rendered (React replaces the node) between the
         # locator resolution below and the scroll/input dispatch — for example
         # right after a save or when the context menu mounts. A stale element
@@ -623,15 +628,24 @@ class NativeSession:
                     "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
                     "args": [origin],
                 })
-                self.request("POST", self.endpoint("/actions"), {"actions": [{
-                    "type": "pointer", "id": "context-mouse",
+                pointer_core = [
+                    {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
+                    {"type": "pointerDown", "button": button},
+                    {"type": "pointerUp", "button": button},
+                ]
+                actions = []
+                if modifier_values:
+                    actions.append({"type": "key", "id": "click-keyboard", "actions":
+                        [{"type": "keyDown", "value": value} for value in modifier_values]
+                        + [{"type": "pause", "duration": 0} for _ in pointer_core]
+                        + [{"type": "keyUp", "value": value} for value in reversed(modifier_values)]})
+                actions.append({
+                    "type": "pointer", "id": "mouse",
                     "parameters": {"pointerType": "mouse"},
-                    "actions": [
-                        {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
-                        {"type": "pointerDown", "button": button},
-                        {"type": "pointerUp", "button": button},
-                    ],
-                }]})
+                    "actions": [{"type": "pause", "duration": 0} for _ in modifier_values]
+                        + pointer_core + [{"type": "pause", "duration": 0} for _ in modifier_values],
+                })
+                self.request("POST", self.endpoint("/actions"), {"actions": actions})
             except WebDriverError as exc:
                 if _is_stale_element_error(exc) and attempt < 2:
                     last_stale = exc
@@ -719,7 +733,7 @@ class NativeSession:
                 "actions": [
                     {
                         "type": "pointer",
-                        "id": "native-pointer",
+                        "id": "mouse",
                         "parameters": {"pointerType": "mouse"},
                         "actions": [
                             {"type": "pointerMove", "duration": 100, "x": x, "y": y, "origin": "viewport"},
@@ -791,7 +805,7 @@ class NativeSession:
             actions.append({"type": "key", "id": "drag-keyboard", "actions": key_actions})
         actions.append({
             "type": "pointer",
-            "id": "native-drag-pointer",
+            "id": "mouse",
             "parameters": {"pointerType": "mouse"},
             "actions": pointer_actions,
         })
