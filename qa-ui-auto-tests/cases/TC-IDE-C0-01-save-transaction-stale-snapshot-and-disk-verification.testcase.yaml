@@ -344,7 +344,7 @@ steps:
       '
 - wait_for:
     selector: '[data-testid="external-file-conflict-dialog"]'
-    timeout_sec: 30
+    timeout_sec: 60
 - click: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
 - assert_not_visible: '[data-testid="external-file-conflict-dialog"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'

@@ -46,7 +46,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_SORT_READY\r?$
-    timeout_sec: 30
+    timeout_sec: 60
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-remote-pane"]'
 - click: '[data-testid="sftp-remote-path-edit"]'

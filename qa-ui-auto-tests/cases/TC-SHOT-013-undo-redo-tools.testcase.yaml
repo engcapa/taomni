@@ -1,0 +1,106 @@
+id: TC-SHOT-013
+title: Mixed annotation history supports toolbar keyboard undo redo and keyboard copy
+covers: [F27.1]
+tags: [screenshot, annotate, shortcut, history, p2]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- click: '[data-testid="screenshot-tool-rect"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 100, y: 100}
+    to_position: {x: 220, y: 180}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- click: '[data-testid="screenshot-tool-ellipse"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 280, y: 100}
+    to_position: {x: 400, y: 180}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
+- click: '[data-testid="screenshot-tool-arrow"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 460, y: 100}
+    to_position: {x: 580, y: 180}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="3"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- press:
+    key: Mod+z
+    selector: '[data-testid="screenshot-tool-arrow"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
+- press:
+    key: Mod+z
+    selector: '[data-testid="screenshot-tool-arrow"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="0"]'
+- assert_disabled: '[data-testid="screenshot-undo"]'
+- assert_enabled: '[data-testid="screenshot-redo"]'
+- press:
+    key: Mod+Shift+z
+    selector: '[data-testid="screenshot-tool-arrow"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- press:
+    key: Mod+y
+    selector: '[data-testid="screenshot-tool-arrow"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
+- click: '[data-testid="screenshot-redo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="3"]'
+- assert_enabled: '[data-testid="screenshot-undo"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- press:
+    key: Mod+c
+    selector: '[data-testid="screenshot-tool-arrow"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-3).cmd === "screenshot_save_data_url" && window.__taomniStubScreenshotCalls.at(-3).args.width === 400 && window.__taomniStubScreenshotCalls.at(-3).args.height === 300
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_copy_image" && window.__taomniStubScreenshotCalls.at(-2).args.path === window.__taomniStubScreenshotCalls.at(-3).args.path
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Three different drag-only tools each add one shape; two keyboard undos and one toolbar undo exhaust the mixed history.
+    actions: [1, 2, 4, 6, 7, 9, 10, 12, 13, 16, 18, 20]
+    checkpoints:
+    - {step: 8, expectation: Rectangle is committed.}
+    - {step: 11, expectation: Ellipse adds one shape.}
+    - {step: 14, expectation: Arrow adds one shape.}
+    - {step: 15, expectation: Drawn history has no redo branch.}
+    - {step: 17, expectation: Keyboard undo removes the arrow.}
+    - {step: 19, expectation: Keyboard undo removes the ellipse.}
+    - {step: 21, expectation: Toolbar undo removes the rectangle.}
+    - {step: 22, expectation: Undo is exhausted.}
+    - {step: 23, expectation: Redo is available after undo.}
+    results: [8, 11, 14, 15, 17, 19, 21, 22, 23]
+  - id: R2
+    requirement: Both keyboard redo bindings and toolbar redo restore one shape per action; keyboard copy exports the restored fullscreen annotation and closes capture.
+    actions: [24, 26, 28, 32]
+    checkpoints:
+    - {step: 25, expectation: Shift+Mod+Z restores the first shape.}
+    - {step: 27, expectation: Mod+Y restores the second shape.}
+    - {step: 29, expectation: Toolbar redo restores the third shape.}
+    - {step: 30, expectation: Restored shapes remain undoable.}
+    - {step: 31, expectation: Redo is exhausted.}
+    - {step: 33, expectation: Keyboard copy returns to main.}
+    - {step: 34, expectation: The overlay closes.}
+    - {step: 35, expectation: Fullscreen export decodes to the synthetic image's 400x300 dimensions.}
+    - {step: 36, expectation: Keyboard copy dispatches the exported artifact path.}
+    results: [25, 27, 29, 30, 31, 33, 34, 35, 36]
+  visual:
+  - check: Exact committed shape counts at each history transition.
+    method: automated
+    reason: data-shapes establishes mixed-tool history behavior without pretending point clicks draw drag-only tools.
+  native:
+  - check: Real screenshot and OS clipboard image bytes after history restoration.
+    method: external
+    reason: Browser copy IPC is stubbed; native output checks own actual clipboard fidelity.

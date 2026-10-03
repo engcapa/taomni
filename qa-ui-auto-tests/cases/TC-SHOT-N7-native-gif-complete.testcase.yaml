@@ -1,0 +1,50 @@
+id: TC-SHOT-N7
+title: Native GIF recorder timer stop preview copy and cleanup
+covers:
+- F27.1
+tags:
+- screenshot
+- recording
+- native
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: recorder
+    format: gif
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: gif-recorder
+    requirement: Recorder UI stops a real clip, loads GIF preview, copies first frame, preserves preview on reentry and Done
+      restores main/removes temp clip. Recording borders are visible outside the selected pixels and the control bar does
+      not intersect the recording; decoded original scene comparisons reject captured tool chrome.
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: Timer advances; every decoded GIF frame matches original state pixels/id/nonce and ordered source visibility
+        intervals (<=250ms drift) before preview/clipboard checks can pass. Preview dimensions agree, first frame clipboard
+        exists, reentry retains preview and Done restores main/removes temp. GIF, actual original PNG states, timeline and
+        difference contact sheet are retained.
+    results:
+    - 3
+  visual:
+  - check: Recorded original content
+    method: automated
+    reason: Per-frame source pixel/timeline comparison is mandatory; multiple frames and image load alone never pass. Inspect
+      paired source/decoded/difference contact sheet alongside the retained GIF.
+  native:
+  - check: Recorder lifecycle
+    method: automated
+    reason: Actual native recorder window, raw-file blob transport, encoding and clipboard.

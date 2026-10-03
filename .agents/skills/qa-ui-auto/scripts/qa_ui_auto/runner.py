@@ -566,7 +566,15 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     }
                 fixture_cleanup_started = time.monotonic()
                 cleanup_errors = []
-                for fix in reversed(applied_fixtures):
+                cleanup_fixtures = list(applied_fixtures)
+                # The updater owns a server and downloads even if setup fails
+                # partway through. Retain its fallback cleanup, but run each
+                # teardown once and report errors with the other fixtures.
+                if "macos_updater" in c.fixtures and not any(
+                    fix.name == "macos_updater" for fix in cleanup_fixtures
+                ):
+                    cleanup_fixtures.append(get_fixture("macos_updater"))
+                for fix in reversed(cleanup_fixtures):
                     teardown = getattr(fix, "teardown", None)
                     if teardown is not None:
                         try:

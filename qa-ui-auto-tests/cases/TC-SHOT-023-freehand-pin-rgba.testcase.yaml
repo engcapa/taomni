@@ -1,0 +1,95 @@
+id: TC-SHOT-023
+title: Public freehand Pin exports original interior pixels and transparent exterior for concave and crossed contours
+description: Original renderer PNG is retained before export and compared independently using fixed testcase crop/polygon geometry, not the product path. This is browser canvas evidence, not native capture or clipboard evidence.
+covers: [F27.1]
+tags: [screenshot, freehand, pin, rgba, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- screenshot_reference: {selector: '[data-testid="screenshot-base-image"]'}
+- click: '[data-testid="screenshot-selection-freehand"]'
+- drag_path:
+    selector: '[data-testid="screenshot-select-layer"]'
+    points: [{x: 100, y: 100}, {x: 500, y: 100}, {x: 500, y: 220}, {x: 220, y: 220}, {x: 220, y: 400}, {x: 100, y: 400}]
+- wait_for: '[data-testid="screenshot-toolbar"]'
+# Start on the accepted contour boundary; the shape and watermark lie in the notch.
+# The final exported interior must still match the original, and the notch must
+# have zero alpha: leaked annotations/watermark cannot be hidden by RGB checks.
+- click: '[data-testid="screenshot-tool-rect"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 220, y: 300}
+    to_position: {x: 440, y: 350}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- click: '[data-testid="screenshot-watermark"]'
+- type:
+    selector: '[data-testid="screenshot-watermark-text"]'
+    text: QA
+- click: '[data-testid="screenshot-watermark-apply"]'
+- click: '[data-testid="screenshot-pin"]'
+- wait_for: '[data-testid="screenshot-pin-image"]'
+- eval_readonly:
+    expression: document.querySelector('img').complete && document.querySelector('img').naturalWidth === 160 && document.querySelector('img').naturalHeight === 120 && getComputedStyle(document.querySelector('img').parentElement).backgroundImage.includes('conic-gradient')
+# Source PNG is 400x300 over a 1000x750 viewport: fixed scale 0.4 per axis.
+- assert_screenshot_mask:
+    selector: '[data-testid="screenshot-pin-image"]'
+    crop: {x: 40, y: 40, width: 160, height: 120}
+    polygon: [{x: 0, y: 0}, {x: 160, y: 0}, {x: 160, y: 48}, {x: 48, y: 48}, {x: 48, y: 120}, {x: 0, y: 120}]
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-pin-window"]'
+- click: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- screenshot_reference: {selector: '[data-testid="screenshot-base-image"]'}
+- click: '[data-testid="screenshot-selection-freehand"]'
+# Signed shoelace area cancels for this bow tie, but both even-odd lobes are valid.
+- drag_path:
+    selector: '[data-testid="screenshot-select-layer"]'
+    points: [{x: 150, y: 150}, {x: 550, y: 450}, {x: 150, y: 450}, {x: 550, y: 150}]
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-freehand-contour"]'
+    name: d
+    matches: '^M 150 150 L .* L 550 150 Z$'
+- click: '[data-testid="screenshot-pin"]'
+- wait_for: '[data-testid="screenshot-pin-image"]'
+- eval_readonly:
+    expression: document.querySelector('img').complete && document.querySelector('img').naturalWidth === 160 && document.querySelector('img').naturalHeight === 120 && getComputedStyle(document.querySelector('img').parentElement).backgroundImage.includes('conic-gradient')
+- assert_screenshot_mask:
+    selector: '[data-testid="screenshot-pin-image"]'
+    crop: {x: 60, y: 60, width: 160, height: 120}
+    polygon: [{x: 0, y: 0}, {x: 160, y: 120}, {x: 0, y: 120}, {x: 160, y: 0}]
+- right_click: '[data-testid="screenshot-pin-window"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-pin-window"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Public Pin retains a naturally sized concave RGBA PNG after overlay close, with original interior RGB, opaque interior and exactly transparent exterior away from contour antialiasing edges.
+    actions: [1, 2, 4, 5, 6, 8, 9, 11, 12, 13, 14, 19]
+    checkpoints:
+    - {step: 10, expectation: A boundary-started annotation extends into the empty notch before export.}
+    - {step: 16, expectation: The pinned PNG has decoded to the exact 160x120 crop.}
+    - {step: 17, expectation: 'Independent original/polygon comparison passes dimensions, fixed RGB tile thresholds and exact nonboundary alpha even with annotation and watermark drawn into the notch; original/expected/actual/difference/metrics are retained.'}
+    - {step: 18, expectation: Public Pin closes the source overlay.}
+    - {step: 21, expectation: Escape closes the retained pin route.}
+    results: [10, 16, 17, 18, 21]
+  - id: R2
+    requirement: A self-crossing freehand contour uses even-odd fill, preserves both lobes, closes on release and exports the independently expected transparent shape on a consecutive public pin.
+    actions: [22, 24, 25, 26, 29, 33]
+    checkpoints:
+    - {step: 28, expectation: A crossed contour is accepted and auto-closed rather than rejected by cancelling signed area.}
+    - {step: 31, expectation: Second public Pin decodes to the correct natural dimensions.}
+    - {step: 32, expectation: Every interior RGB tile matches the original and exterior alpha is zero under the independent even-odd polygon.}
+    - {step: 35, expectation: Right-click closes the second retained pin.}
+    results: [28, 31, 32, 35]
+  visual:
+  - {check: Real exported PNG content and alpha, method: automated, reason: 'Pillow compares retained original bytes against actual browser canvas exports using independent fixed shapes, including a crossed contour; artifacts are retained even on failure.'}
+  native:
+  - {check: 'OS capture, clipboard and floating-window displacement/topmost', method: external, reason: Browser capture/window/clipboard APIs are stubs; TC-SHOT-N11 owns the real native boundary assertions.}

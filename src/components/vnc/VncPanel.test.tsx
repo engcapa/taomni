@@ -26,6 +26,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 import { useVncStore, type VncConnectionState } from "../../stores/vncStore";
 import VncPanel from "./VncPanel";
 import { DEFAULT_VNC_VIEWER_OPTIONS } from "../../lib/vncOptions";
+import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
 
 class MockWebSocket {
   static readonly OPEN = 1;
@@ -104,6 +105,30 @@ describe("VncPanel pointer rendering", () => {
     );
 
     expect(screen.getByTestId("vnc-canvas")).toHaveStyle({ cursor: "none" });
+  });
+
+  it("offers unified current-window capture from a detached VNC window", async () => {
+    const slot = document.createElement("div");
+    document.body.append(slot);
+    try {
+      render(
+        <TabActionSlotProvider slot={slot}>
+          <VncPanel
+            tabId="vnc-tab"
+            host="windows.example.test"
+            port={5900}
+            visible
+            detachedWindowControls={{ onReattach: vi.fn(), onToggleOsFullscreen: vi.fn(), osFullscreen: false }}
+          />
+        </TabActionSlotProvider>,
+      );
+      fireEvent.click(screen.getByTestId("system-screenshot-delay-toggle"));
+      await act(async () => fireEvent.click(screen.getByTestId("system-screenshot-current-window")));
+      expect(mocks.invoke).toHaveBeenCalledWith("screenshot_open_overlay", { displayId: null, includeCurrentWindow: true });
+      expect(screen.queryByTestId("capture-menu")).not.toBeInTheDocument();
+    } finally {
+      slot.remove();
+    }
   });
 
   it("uses a local cursor after PointerPos while preserving a later cursor shape", async () => {

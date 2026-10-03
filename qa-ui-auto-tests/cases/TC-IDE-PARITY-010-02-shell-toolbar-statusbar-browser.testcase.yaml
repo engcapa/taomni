@@ -74,6 +74,16 @@ steps:
 - assert_pattern:
     selector: '[data-testid="code-workspace-empty-editor"]'
     regex: Go to File\s*(Ctrl[+]Shift|Shift[+]Cmd)[+]N
+- press: Shift
+- press: Shift
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search everywhere"]'
+    timeout_sec: 30
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    state: detached
+    timeout_sec: 10
 - click: '[data-testid="code-workspace-toolbar-settings"]'
 - wait_for:
     selector: '[data-testid="settings-panel"]'
@@ -138,12 +148,25 @@ verification:
   - id: R4
     requirement: DEC-010-04：工具栏 Settings 入口打开设置。
     actions:
-    - 38
+    - 43
     checkpoints:
-    - step: 39
+    - step: 44
       expectation: '{"wait_for": {"selector": "[data-testid=\"settings-panel\"]", "timeout_sec": 10}}'
     results:
+    - 44
+  - id: R5
+    requirement: A4：两次干净的 Shift 触发 IDEA Double Shift 手势打开 Search Everywhere，Esc 关闭；中间发生指针按下时不触发。
+    actions:
+    - 38
     - 39
+    checkpoints:
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search everywhere\"]", "timeout_sec": 30}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 10}}'
+    results:
+    - 40
+    - 42
   visual:
   - check: rail 图标/标签截断与选中蓝底需人工对照 IDEA idea-01-shell。
     method: manual

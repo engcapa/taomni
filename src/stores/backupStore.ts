@@ -46,6 +46,8 @@ interface BackupStore {
   clearError: () => void;
 }
 
+let latestHistoryRequest = 0;
+
 export const useBackupStore = create<BackupStore>((set, get) => ({
   policy: null,
   defaultBackupDir: "",
@@ -61,12 +63,11 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
   loadAll: async () => {
     set({ loading: true, error: null });
     try {
-      const [policy, defaultDir, history] = await Promise.all([
-        getBackupPolicy(),
+      const [defaultDir] = await Promise.all([
         getDefaultBackupDir(),
-        listBackupHistory(),
+        get().refreshHistory(),
       ]);
-      set({ policy, defaultBackupDir: defaultDir, history });
+      set({ defaultBackupDir: defaultDir });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -75,11 +76,17 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
   },
 
   refreshHistory: async () => {
+    const request = ++latestHistoryRequest;
     try {
-      const history = await listBackupHistory();
-      set({ history });
+      const [history, policy] = await Promise.all([
+        listBackupHistory(),
+        getBackupPolicy(),
+      ]);
+      if (request === latestHistoryRequest) set({ history, policy });
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) });
+      if (request === latestHistoryRequest) {
+        set({ error: e instanceof Error ? e.message : String(e) });
+      }
     }
   },
 
@@ -89,7 +96,9 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
     const next: BackupPolicy = { ...current, ...patch };
     try {
       await setBackupPolicy(next);
-      set({ policy: next });
+      // The backend preserves the latest timestamp from automatic backups.
+      const policy = await getBackupPolicy();
+      set({ policy });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) });
       throw e;

@@ -14,7 +14,8 @@ from qa_ui_auto.steps import StepError
 
 
 class NativeFixtureCleanupTest(unittest.TestCase):
-    def run_case(self, failure=None, setup_failure=False, cleanup_failure=False, close_failure=False):
+    def run_case(self, failure=None, setup_failure=False, cleanup_failure=False, close_failure=False,
+                 second_name="second"):
         events = []
         first = Fixture("first", lambda ctx: events.append("first-setup"),
                         lambda ctx: events.append("first-cleanup"))
@@ -29,9 +30,10 @@ class NativeFixtureCleanupTest(unittest.TestCase):
             if cleanup_failure:
                 raise RuntimeError("cleanup failed")
 
-        second = Fixture("second", second_setup, second_cleanup)
+        second = Fixture(second_name, second_setup, second_cleanup)
+        fixtures = {first.name: first, second.name: second}
         case = SimpleNamespace(id="TC-FIXTURE-OWNER", title="fixture ownership", tags=[], covers=[],
-                               modes=["native"], native_platforms=[], fixtures=["first", "second"],
+                               modes=["native"], native_platforms=[], fixtures=list(fixtures),
                                timeout_sec=60, skip=None, steps=[{"wait": 0}])
         harness = MagicMock()
         harness.__enter__.return_value = harness
@@ -46,7 +48,7 @@ class NativeFixtureCleanupTest(unittest.TestCase):
         with TemporaryDirectory() as directory, \
              patch("tauri_webdriver.NativeHarness", return_value=harness), \
              patch.object(runner.platform, "system", return_value="Linux"), \
-             patch.object(runner, "get_fixture", side_effect=[first, second]), \
+             patch.object(runner, "get_fixture", side_effect=fixtures.__getitem__), \
              patch("qa_ui_auto.native_steps.run_native_step", side_effect=failure), \
              patch.object(runner, "_capture_native_failure", return_value={}), \
              patch("qa_ui_auto.native_diagnostics.collect"), \
@@ -72,6 +74,29 @@ class NativeFixtureCleanupTest(unittest.TestCase):
         self.assertEqual(events, ["first-setup", "first-cleanup"])
         self.assertEqual(result["status"], "failed")
         self.assertIn("setup failed", result["failure"]["message"])
+
+    def test_updater_teardown_runs_once_after_session_even_when_step_fails(self):
+        for failure in [None, StepError("original step failure")]:
+            with self.subTest(failure=failure):
+                events, result = self.run_case(failure, second_name="macos_updater")
+                self.assertEqual(events, ["first-setup", "second-setup", "session-close",
+                                          "second-cleanup", "first-cleanup"])
+                self.assertEqual(result["status"], "failed" if failure else "passed")
+                if failure:
+                    self.assertEqual(result["failure"]["message"], "original step failure")
+
+    def test_updater_partial_setup_is_cleaned_without_hiding_original_failure(self):
+        for cleanup_failure in [False, True]:
+            with self.subTest(cleanup_failure=cleanup_failure):
+                events, result = self.run_case(setup_failure=True, cleanup_failure=cleanup_failure,
+                                               second_name="macos_updater")
+                self.assertEqual(events, ["first-setup", "second-cleanup", "first-cleanup"])
+                self.assertEqual(result["status"], "failed")
+                self.assertIn("setup failed", result["failure"]["message"])
+                if cleanup_failure:
+                    self.assertEqual(result["fixture_cleanup_errors"], [
+                        {"fixture": "macos_updater", "message": "cleanup failed"},
+                    ])
 
     def test_cleanup_failure_continues_restoration_and_preserves_original_failure(self):
         for failure in [None, StepError("original step failure")]:

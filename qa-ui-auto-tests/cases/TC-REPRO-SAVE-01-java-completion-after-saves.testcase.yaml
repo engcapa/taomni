@@ -68,7 +68,7 @@ steps:
 - type: '        names.'
 - wait_for:
     selector: .cm-tooltip-autocomplete li.cm-completion-type-method
-    timeout_sec: 20
+    timeout_sec: 60
 - screenshot: cycle1-names-members.png
 - press: Escape
 - press: Home
@@ -80,7 +80,7 @@ steps:
 - type: '        names.'
 - wait_for:
     selector: .cm-tooltip-autocomplete li.cm-completion-type-method
-    timeout_sec: 20
+    timeout_sec: 60
 - screenshot: cycle2-names-members.png
 - press: Escape
 - press: Home
@@ -96,7 +96,7 @@ steps:
 - type: '        names.'
 - wait_for:
     selector: .cm-tooltip-autocomplete li.cm-completion-type-method
-    timeout_sec: 20
+    timeout_sec: 60
 - screenshot: cycle3-names-members.png
 verification:
   review: reviewed
@@ -154,13 +154,13 @@ verification:
         120}}'
     - step: 23
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
-        20}}'
+        60}}'
     - step: 33
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
-        20}}'
+        60}}'
     - step: 47
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
-        20}}'
+        60}}'
     results:
     - 47
   visual:

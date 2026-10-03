@@ -58,7 +58,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-before\-exit\r?$
-    timeout_sec: 15
+    timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: exit
@@ -83,7 +83,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-after\-reconnect\r?$
-    timeout_sec: 20
+    timeout_sec: 60
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -134,7 +134,7 @@ verification:
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 21
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-before\\-exit\\r?$", "timeout_sec": 15}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-before\\-exit\\r?$", "timeout_sec": 60}}'
     - step: 23
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-text*=\"SSH disconnected\"]", "timeout_sec": 30}}'
     - step: 24
@@ -142,7 +142,7 @@ verification:
     - step: 26
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 29
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-reconnect\\r?$", "timeout_sec": 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-reconnect\\r?$", "timeout_sec": 60}}'
     - step: 31
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 33

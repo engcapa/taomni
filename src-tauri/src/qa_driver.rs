@@ -327,21 +327,8 @@ async fn element_click<R: Runtime>(
     // events. Pointer-only surfaces (the VNC and RDP canvases) ignore mouse
     // events, and a cancelled pointerdown suppresses the compatibility
     // mousedown/mouseup like a real driver.
-    script.push_str(concat!(
-        "if (!el) throw new Error('stale element'); ",
-        "const r = el.getBoundingClientRect(); ",
-        "const at = {bubbles:true,cancelable:true,composed:true,view:window,button:0,",
-        "clientX:r.left + r.width / 2,clientY:r.top + r.height / 2}; ",
-        "const pointer = {...at,pointerId:1,pointerType:'mouse',isPrimary:true}; ",
-        "const compat = el.dispatchEvent(new PointerEvent('pointerdown',{...pointer,buttons:1})); ",
-        "el.focus?.(); ",
-        "if (compat) el.dispatchEvent(new MouseEvent('mousedown',{...at,buttons:1})); ",
-        "el.dispatchEvent(new PointerEvent('pointerup',{...pointer,buttons:0})); ",
-        "if (compat) el.dispatchEvent(new MouseEvent('mouseup',{...at,buttons:0})); ",
-        "if (typeof el.click === 'function') el.click(); ",
-        "else el.dispatchEvent(new MouseEvent('click',{...at,buttons:0})); ",
-        "return true;",
-    ));
+    script.push_str(include_str!("qa_driver_pointer.js"));
+    script.push_str("return dispatchQaElementClick(el);");
     match eval_js(&state, script).await {
         Ok(value) => ok(value),
         Err(message) => error(message),
@@ -598,33 +585,14 @@ async fn actions_script<R: Runtime>(
           if (origin === 'pointer') return [lastX + ox, lastY + oy];
           return [ox, oy];
         }};
-        for (const source of __qaActions) {{
-          if (source.type === 'key') {{
-            for (const action of source.actions || []) if (action.type === 'keyDown' || action.type === 'keyUp') __qaEmitKey(action.type, action.value);
-          }} else if (source.type === 'pointer') {{
-            let x=0, y=0, clickCount=0;
-            for (const action of source.actions || []) {{
-              if (action.type === 'pointerMove') {{
-                [x, y] = __qaOrigin(action.origin, Number(action.x)||0, Number(action.y)||0);
-                lastX = x; lastY = y;
-                const target=__qaPoint(x,y);
-                target.dispatchEvent(new PointerEvent('pointermove',{{bubbles:true,clientX:x,clientY:y,buttons:0}}));
-                // WKWebView's in-process bridge does not synthesize the
-                // compatibility mouse events that a platform pointer move
-                // normally produces. React's onMouseEnter/onMouseMove menu
-                // handlers depend on mouseover/mousemove, so dispatch those
-                // events alongside pointermove for hover interactions.
-                const mouseInit={{bubbles:true,cancelable:true,clientX:x,clientY:y,buttons:0}};
-                target.dispatchEvent(new MouseEvent('mouseover',mouseInit));
-                target.dispatchEvent(new MouseEvent('mousemove',mouseInit));
-              }}
-              else if (action.type === 'pointerDown') {{ const target=__qaPoint(x,y); target.dispatchEvent(new PointerEvent('pointerdown',{{bubbles:true,button:action.button||0,buttons:1,clientX:x,clientY:y}})); }}
-              else if (action.type === 'pointerUp') {{ const target=__qaPoint(x,y); const button = action.button||0; target.dispatchEvent(new PointerEvent('pointerup',{{bubbles:true,button,buttons:0,clientX:x,clientY:y}})); if (button === 2) {{ target.dispatchEvent(new MouseEvent('contextmenu',{{bubbles:true,cancelable:true,button:2,clientX:x,clientY:y}})); }} else {{ target.dispatchEvent(new MouseEvent('click',{{bubbles:true,button,clientX:x,clientY:y}})); clickCount++; if (clickCount === 2) target.dispatchEvent(new MouseEvent('dblclick',{{bubbles:true,button:0,clientX:x,clientY:y}})); }} }}
-            }}
-          }}
-        }}
+        {pointer_script}
+        dispatchQaActions(__qaActions, __qaEmitKey, __qaModifiers, (origin, ox, oy) => {{
+          [lastX, lastY] = __qaOrigin(origin, ox, oy);
+          return [lastX, lastY];
+        }}, __qaPoint);
         return true;"#,
-        helper = lookup_helper()
+        helper = lookup_helper(),
+        pointer_script = include_str!("qa_driver_pointer.js")
     ))
 }
 
@@ -821,6 +789,88 @@ async fn desktop_screenshot(Path(session_id): Path<String>) -> Response {
     }
 }
 
+/// Activate the installed AppKit About item, including its real menu event and
+/// frontend callback. No renderer state or app command is synthesized.
+async fn native_about<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    if !session_is_valid(&session_id)
+        || !cfg!(debug_assertions)
+        || state.app.config().identifier != crate::QA_APP_ID
+    {
+        return error("native About activation requires the isolated QA session");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let app = state.app.clone();
+        let (tx, rx) = oneshot::channel();
+        if let Err(err) = state.app.run_on_main_thread(move || {
+            let result = (|| -> Result<(), String> {
+                use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
+                use objc2_foundation::NSString;
+                use tauri::menu::MenuItemKind;
+                let menu = app.menu().ok_or("application menu is not installed yet")?;
+                let Some(MenuItemKind::Submenu(submenu)) = menu.get("app") else {
+                    return Err("application submenu is not installed yet".into());
+                };
+                let Some(MenuItemKind::MenuItem(item)) = submenu.get("about") else {
+                    return Err("About item is not installed yet".into());
+                };
+                if !item.is_enabled().map_err(|e| e.to_string())? {
+                    return Err("About item is disabled".into());
+                }
+                let title = item.text().map_err(|e| e.to_string())?;
+                // SAFETY: AppKit access occurs on the main thread. Objects
+                // remain retained by the installed menu for the traversal.
+                unsafe fn activate(menu: &AnyObject, title: &str) -> bool {
+                    unsafe {
+                        let count: isize = msg_send![menu, numberOfItems];
+                        for index in 0..count {
+                            let item: Retained<AnyObject> = msg_send![menu, itemAtIndex: index];
+                            let text: Retained<NSString> = msg_send![&*item, title];
+                            if text.to_string() == title {
+                                let enabled: bool = msg_send![&*item, isEnabled];
+                                if !enabled {
+                                    return false;
+                                }
+                                let _: () = msg_send![menu, performActionForItemAtIndex: index];
+                                return true;
+                            }
+                            let child: Option<Retained<AnyObject>> = msg_send![&*item, submenu];
+                            if let Some(child) = child {
+                                if activate(&child, title) {
+                                    return true;
+                                }
+                            }
+                        }
+                        false
+                    }
+                }
+                unsafe {
+                    let application: Retained<AnyObject> =
+                        msg_send![class!(NSApplication), sharedApplication];
+                    let menu: Option<Retained<AnyObject>> = msg_send![&*application, mainMenu];
+                    if !menu.is_some_and(|menu| activate(&menu, &title)) {
+                        return Err("installed AppKit About item was not found".into());
+                    }
+                }
+                Ok(())
+            })();
+            let _ = tx.send(result);
+        }) {
+            return error(err.to_string());
+        }
+        return match tokio::time::timeout(Duration::from_secs(10), rx).await {
+            Ok(Ok(Ok(()))) => ok(json!({"activated": "about", "transport": "AppKit NSMenu"})),
+            Ok(Ok(Err(message))) => error(message),
+            _ => error("native About activation timed out"),
+        };
+    }
+    #[cfg(not(target_os = "macos"))]
+    error("native About activation requires macOS")
+}
+
 /// Start the opt-in bridge and return immediately so Tauri can finish setup.
 pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: String, port: u16) {
     if BRIDGE_STARTED.swap(true, Ordering::AcqRel) {
@@ -874,6 +924,10 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             .route(
                 "/session/{session_id}/execute/sync",
                 post(execute_sync::<R>),
+            )
+            .route(
+                "/session/{session_id}/qa/native-about",
+                post(native_about::<R>),
             )
             .route("/session/{session_id}/refresh", post(refresh::<R>))
             .route("/session/{session_id}/url", get(current_url::<R>))

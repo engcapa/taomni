@@ -64,12 +64,15 @@ from . import parity009_ssr
 from . import parity007_extract
 from . import editor_save_race
 from . import mail_server
+from . import macos_updater
 from . import rdp_server_required
 from . import system_rdp_running
 from . import release_build_required
 from . import rdp_baseline_required
 from . import rdp_audio_required
 from . import xrdp_server_required
+from . import backup_policy
+from . import path_completion
 
 
 class FixtureContext(Protocol):
@@ -87,6 +90,8 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "path_completion": Fixture("path_completion", path_completion.setup),
+    "backup_policy": Fixture("backup_policy", backup_policy.setup),
     "project_tree": Fixture("project_tree", project_tree.setup),
     "reset_db":     Fixture("reset_db",     reset_db.setup,     reset_db.teardown),
     "ssh_required": Fixture("ssh_required", ssh_required.setup),
@@ -115,6 +120,7 @@ REGISTRY: dict[str, Fixture] = {
     "parity009_ssr": Fixture("parity009_ssr", parity009_ssr.setup, parity009_ssr.teardown),
     "parity007_extract": Fixture("parity007_extract", parity007_extract.setup, parity007_extract.teardown),
     "mail_server": Fixture("mail_server", mail_server.setup, mail_server.teardown),
+    "macos_updater": Fixture("macos_updater", macos_updater.setup, macos_updater.teardown),
     "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),
     "system_rdp_running": Fixture("system_rdp_running", system_rdp_running.setup),
     "release_build_required": Fixture("release_build_required", release_build_required.setup),

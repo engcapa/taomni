@@ -9,7 +9,13 @@
     "vnc-*",
     "terminal-*",
     "lan-chat-*",
-    "notes-*"
+    "notes-*",
+    "screenshot-overlay",
+    "screenshot-recorder",
+    "screenshot-scroll",
+    "screenshot-boundary-*",
+    "screenshot-pin-*",
+    "screenshot-qa-fixture"
   ],
   "permissions": [
     "core:default",
@@ -26,6 +32,10 @@
     "core:window:allow-is-maximized",
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-size",
     "updater:default",
     "process:allow-restart",
     "notification:default",

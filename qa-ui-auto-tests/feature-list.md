@@ -480,6 +480,12 @@ files:
   - src/components/ContextMenu.tsx
   - src/components/AboutDialog.tsx
 controls:
+  - id: about-check-update
+    selector: '[data-testid="about-check-update"]'
+    kind: interactive
+  - id: about-version
+    selector: '[data-testid="about-version"]'
+    kind: interactive
   - id: app-main-menu
     selector: '[data-testid="app-main-menu"]'
     kind: interactive     # opens the unified app menu (ControlBar)
@@ -612,6 +618,7 @@ area: terminal/local
 components: [TerminalPanel]
 files:
   - src/components/terminal/TerminalPanel.tsx
+  - src/components/terminal/SelectionToolbar.tsx
   - src/components/ContextMenu.tsx
   - src/lib/terminalCommand.ts
 controls:
@@ -621,6 +628,10 @@ controls:
   - id: terminal-keyboard-target
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     kind: interactive       # xterm input target driven through terminal_input
+  - id: terminal-selection-copy
+    selector: 'button[title="Copy (Ctrl+C)"]'
+    kind: interactive
+    optional: true          # only while a terminal text selection is active
   - id: attached-sftp-toggle
     selector: '[data-testid="attached-sftp-toggle"]'
     kind: interactive
@@ -646,6 +657,7 @@ controls:
 
 - xterm.js + FitAddon + WebglAddon（失败回退 canvas）+ SearchAddon + WebLinksAddon
 - ResizeObserver + debounce 自动 fit
+- 终端第一列保留 8px 左侧留白；留白位于 xterm 内部，支持从留白处正向/反向拖选与矩形选区，FitAddon 按留白后的宽度计算列数。TC-154（browser）和 TC-155（native）验证首字符、复制内容、搜索/选区高亮及缩放/全屏后的布局，TC-110 覆盖分屏布局。
 - 容器卸载时正确 dispose 终端实例与监听器
 - 浮动工具栏包含当前 tab 绑定 Chat 入口（`tab-chat-toggle` / Ctrl+Shift+L）；全局 Chat 入口已移除
 - 命令历史持久化：每条 host 维度记录到 SQLite (`command_history` 表)，支持 `history_append / history_match_prefix / history_list_recent / history_clear`
@@ -788,6 +800,8 @@ controls:
     selector: 'role=button[name="Close"]'
     kind: interactive
     optional: true
+    aliases:
+      - "xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']"
 -->
 
 - Copy / Copy All / Paste / Paste with Shift+Insert
@@ -816,6 +830,8 @@ controls:
     selector: 'text="Zoom in"'
     kind: interactive
     optional: true
+    aliases:
+      - '[data-testid="context-menu-item-zoom-in"]'
   - id: zoom-out
     selector: 'text="Zoom out"'
     kind: interactive
@@ -824,6 +840,8 @@ controls:
     selector: 'text="Reset zoom"'
     kind: interactive
     optional: true
+    aliases:
+      - '[data-testid="context-menu-item-reset-zoom"]'
   - id: appearance
     selector: '[data-testid="context-menu-item-appearance"]'
     kind: interactive
@@ -1102,62 +1120,22 @@ controls:
 - 候选合并三类来源并去重：命令历史（host 维度）、用户自定义命令、平台预置命令（Windows / Unix 各一套，覆盖 nav / git / network / process / system / files / env）
 - 选中后注入到当前终端
 
-### 4.13 终端截图 / 滚动截屏 / GIF 录制 ✅
+### 4.13 会话截图入口已统一到系统截图 ✅
 
 <!-- feature
 id: F4.13
 status: done
-area: capture
-components: [CaptureToolbar, FloatingToolbar]
+area: screenshot/screen-record
+components: [ControlBar, OpenTabsMenu]
 files:
-  - src/components/capture/CaptureToolbar.tsx
-  - src/lib/capture/
-controls:
-  - id: toolbar-root
-    selector: '[data-testid="capture-toolbar"]'
-    kind: display
-  - id: capture-menu
-    selector: '[data-testid="capture-menu"]'
-    kind: interactive
-  - id: capture-menu-dropdown
-    selector: '[data-testid="capture-menu-dropdown"]'
-    kind: display
-    optional: true       # only renders while the capture menu is open
-  - id: save-visible
-    selector: '[data-testid="capture-save-visible"]'
-    kind: interactive
-    optional: true       # only renders when menu is open
-  - id: copy-clipboard
-    selector: '[data-testid="capture-copy-clipboard"]'
-    kind: interactive
-    optional: true
-  - id: save-full
-    selector: '[data-testid="capture-save-full"]'
-    kind: interactive
-    optional: true       # menu open AND host provides getFull
-  - id: toggle-scroll
-    selector: '[data-testid="capture-toggle-scroll"]'
-    kind: interactive
-    optional: true       # menu open AND host provides getScrollFrame
-  - id: toggle-gif
-    selector: '[data-testid="capture-toggle-gif"]'
-    kind: interactive
-    optional: true       # menu open AND host provides getGifFrame
-  - id: stop-scroll-pill   # active-capture pill, only while scroll-capturing
-    selector: '[data-testid="capture-stop-scroll"]'
-    kind: interactive
-    optional: true
-  - id: stop-gif-pill      # active-capture pill, only while recording
-    selector: '[data-testid="capture-stop-gif"]'
-    kind: interactive
-    optional: true
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/tabbar/OpenTabsMenu.tsx
+controls: []
 -->
 
-- 终端面板内嵌 `CaptureToolbar`（通过 `FloatingToolbar` 浮窗承载，可拖拽 / 折叠 / 位置持久化）
-- **可见区域 PNG**：截取当前可见 viewport，可保存到磁盘或写入剪贴板（`ClipboardItem`）
-- **滚动截屏**：滚动捕获整段 scrollback 拼接为单张长图（`startScrollCapture`）
-- **GIF 录制**：基于 `gifenc` 的实时录制，工具条显示计时与 Stop；保存为 .gif
-- 文件名前缀按上下文（terminal / vnc）自动生成时间戳后缀
+- 移除终端、数据库、RDP、VNC 的旧会话截图菜单、录制指示器与源注册。
+- 使用标题栏统一的系统截图入口；需要截图 Taomni 内容时选择“截取当前窗口”（F27.1）。
+- TC-104 验证终端和 tab 菜单没有旧入口，统一入口可打开并取消返回终端。
 
 ---
 
@@ -2093,6 +2071,8 @@ files:
   - src/components/filebrowser/FileBrowser.tsx
   - src/components/filebrowser/FilePanel.tsx
   - src/components/filebrowser/PathBreadcrumb.tsx
+  - src/components/filebrowser/PathCompletionInput.tsx
+  - src/lib/pathCompletion.ts
   - src/lib/sftp.ts
 controls:
   - id: panel-root
@@ -2250,6 +2230,8 @@ controls:
   - id: local-path
     selector: '[data-testid="sftp-local-path"]'
     kind: interactive       # click to edit, Enter to navigate
+    aliases:
+      - 'input[data-testid="sftp-local-path"]'
   - id: remote-path
     selector: '[data-testid="sftp-remote-path"]'
     kind: interactive
@@ -2261,6 +2243,22 @@ controls:
   - id: remote-path-edit
     selector: '[data-testid="sftp-remote-path-edit"]'
     kind: interactive
+  - id: local-path-suggestions
+    selector: '[data-testid="sftp-local-path-suggestions"]'
+    kind: display
+    optional: true
+  - id: remote-path-suggestions
+    selector: '[data-testid="sftp-remote-path-suggestions"]'
+    kind: display
+    optional: true
+  - id: local-path-option
+    selector: '[data-testid="sftp-local-path-suggestions"] [role="option"]'
+    kind: interactive
+    optional: true
+  - id: remote-path-option
+    selector: '[data-testid="sftp-remote-path-suggestions"] [role="option"]'
+    kind: interactive
+    optional: true
   # toolbar — local side
   - id: local-back
     selector: '[data-testid="sftp-local-back"]'
@@ -2424,6 +2422,9 @@ controls:
   - 远程：Download to local、Rename、Permissions（chmod）、Delete、New folder、New file
   - 本地：对应操作
 - chmod 对话框：Owner / Group / Other 三组权限位 + Apply
+- 地址栏：SFTP、本地 File 会话及对象存储的共享地址栏输入时自动下拉目录候选；Tab 补全唯一候选或公共前缀，↑↓ 选择，回车导航，鼠标选择保留输入焦点以继续补全。仅提供目录（含目录符号链接），支持空格、Unicode、相对路径、主目录缩写及本地 Windows 驱动器/UNC 路径；隐藏目录可用 `.` 前缀显式发现。异步查询不修改当前面板或历史，忽略失效请求，查询失败后可继续手动导航。
+- 补全覆盖：`TC-PATH-LOCAL-01` 与 `TC-PATH-SFTP-01` 均含 browser/native；原生验证实际本地文件系统与 SSH/SFTP 边界，browser 的本地 VFS 不作为原生证据。对象存储 provider 接线由 `FilePanelPathCompletion.test.tsx` 覆盖，在线对象存储服务未纳入此次托管场景。
+- Windows OpenSSH：远程地址栏将复制的 `C:/…` 或 `C:\…` 绝对地址转换为服务端 `/C:/…` 命名空间，目录提示与导航均使用同一路径解析；远程地址断言与 shell 初始化分别使用 fixture 的 SFTP 路径与 shell 路径。
 - 跨面板拖拽（REMOTE↔LOCAL）：`customDnD` 指针驱动层 + `application/x-taomni-files` MIME，支持多选与文件夹
 - OS 文件拖入远程面板 → 直接上传到当前远程目录
   - Linux/macOS：通过 Tauri `onDragDropEvent` 拿到绝对路径，前端 `sftpStat(side="local") → controller.upload`
@@ -2939,12 +2940,9 @@ controls:
 - 位置 / 折叠状态按 `storageKey` 持久化到 `localStorage`
 - 终端、VNC、SFTP 等多个面板共用
 
-### 10.2 `CaptureToolbar` ✅
-- 三类操作：可见区域 PNG、滚动 / 全帧 PNG、GIF 录制
-- 输出路由：保存到磁盘（`saveBlobToFile` 走原生保存对话框）/ 复制到剪贴板（`ClipboardItem`）
-- `startScrollCapture`：滚动区域逐帧拼接为长图（终端 scrollback / VNC 画面）
-- `createGifRecorder`：基于 `gifenc` 的 GIF 实时编码，工具条显示录制时长 + Stop
-- 文件名前缀按上下文 + 时间戳生成（`safeFilePart` / `timestampFilePart`）
+### 10.2 系统截图与录屏 ✅
+- 统一能力与用例归属 F27.1；旧会话 CaptureToolbar、store 与截图/GIF 引擎已删除。
+- 保留明确的结束按钮、进度、计时与预览导出体验；窗口和控制条均在录制像素范围外。
 
 ### 10.3 文件 IO 流式 IPC ✅
 - Tauri 命令对：`read_stream_open / read_stream_read / read_stream_close` 与 `write_stream_open / write_stream_append / write_stream_close / write_stream_abort`
@@ -3380,6 +3378,55 @@ controls:
 ---
 
 ## 13. 自动化测试基线
+
+### 自动更新与发布资产完整性
+
+<!-- feature
+id: F-Update-1
+status: done
+area: application/update
+components: [UpdateDialog, AboutDialog]
+files:
+  - src/components/UpdateDialog.tsx
+  - src/lib/updateService.ts
+  - src/stores/updateStore.ts
+  - src-tauri/src/update.rs
+  - src-tauri/src/update/qa.rs
+  - scripts/compose-updater-manifest.mjs
+  - .github/workflows/release.yml
+controls:
+  - id: update-dialog
+    selector: '[data-testid="update-dialog"]'
+    kind: display
+  - id: update-arch-arm64
+    selector: '[data-testid="update-arch-darwin-aarch64"]'
+    kind: interactive
+  - id: update-arch-intel
+    selector: '[data-testid="update-arch-darwin-x86_64"]'
+    kind: interactive
+  - id: update-download
+    selector: '[data-testid="update-download"]'
+    kind: interactive
+  - id: update-cancel-download
+    selector: '[data-testid="update-cancel-download"]'
+    kind: interactive
+  - id: update-progress
+    selector: '[data-testid="update-progress"]'
+    kind: display
+  - id: update-error
+    selector: '[data-testid="update-error"]'
+    kind: display
+  - id: update-restart
+    selector: '[data-testid="update-restart"]'
+    kind: interactive
+    optional: true # restarting into production is excluded from isolated updater installation cases
+-->
+
+- macOS 两种架构的已签名包按版本/架构独立命名；完整清单最后发布，不能以同名资产覆盖另一个架构。
+- About 检查/版本入口、原生架构推荐和选择、真实签名拒绝、隔离安装由 TC-UPDATE-MACOS-001 保护。
+- 下载取消后不再安装或回写进度，重新检查/下载使用独立句柄；安装阶段不可取消，由 TC-UPDATE-MACOS-002 与 focused unit tests 保护。
+- native 用例使用固定真实签名的 v0.4.29 包和生产公钥，安装目标仅为报告内一次性 app；不证明生产 app 重启、公证或 Rosetta 执行。
+
 
 ### 13.1 单元测试（Vitest）✅
 - 测试文件 17 个，覆盖：
@@ -10126,8 +10173,481 @@ controls:
 - 轻量核心与完整备份都包含 `databases/mfa.db`；自定义范围勾选 MFA 时强制同时包含 `vault.db`（数据密钥在保险库中）。从未使用 MFA 的配置不生成 `mfa.db`。
 - 恢复时替换 `mfa.db` 并为原文件保留安全副本；恢复后若保险库与 `mfa.db` 不匹配，MFA 标签提示并提供清空重建入口。
 
+### 27.4 后台自动备份 ✅
+
+<!-- feature
+id: F-BACKUP-1
+status: done
+area: settings/backup
+components: [BackupSettingsPanel]
+files:
+  - src-tauri/src/backup/scheduler.rs
+  - src-tauri/src/backup/coordination.rs
+  - src-tauri/src/backup/mod.rs
+  - src-tauri/src/backup/policy.rs
+  - src-tauri/src/backup/engine.rs
+  - src/stores/backupStore.ts
+  - src/components/settings/BackupSettingsPanel.tsx
+controls:
+  - id: auto-toggle
+    selector: '[data-testid="backup-auto-toggle"]'
+    kind: interactive
+  - id: frequency
+    selector: '[data-testid="backup-frequency"]'
+    kind: interactive
+  - id: retained-copies
+    selector: '[data-testid="backup-retained-copies"]'
+    kind: interactive
+  - id: last-success
+    selector: '[data-testid="backup-last-success"]'
+    kind: display
+  - id: history-refresh
+    selector: '[data-testid="backup-history-refresh"]'
+    kind: interactive
+-->
+
+- 原生后台在启动时及运行中每分钟检查到期备份；daily/weekly 距上次成功备份满 24 小时/7 天触发，休眠恢复后补做一次当前快照，失败后下次检查重试。`on_exit` 在正常退出前完成备份。
+- 手动与自动备份串行执行，自动备份使用配置范围、目录和保留数量；完成后设置页自动刷新历史和上次成功时间。策略更新保留后台最新时间戳。
+- 共用同一数据目录的实例以系统文件锁协调备份、策略更新、轮转、删除和恢复读取；获得锁后重读策略，daily/weekly 每个到期周期只生成一次。锁在进程退出或崩溃后自动释放。设置页打开期间每 15 秒读取共享历史和策略，显示其他实例的结果。
+
 ---
 
+## 27. 系统截图与录屏
+
+### 27.1 截图、标注与录屏工作流
+
+<!-- feature
+id: F27.1
+status: done
+area: screenshot/screen-record
+components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, RecorderBar, ScrollCaptureBar, ScreenshotMenuButton, ControlBar, screenshot.ts, screenshot (tauri)]
+files:
+  - src/components/screenshot/ScreenshotOverlay.tsx
+  - src/components/screenshot/AnnotationCanvas.tsx
+  - src/components/screenshot/PinnedImage.tsx
+  - src/components/screenshot/RecorderBar.tsx
+  - src/components/screenshot/ScrollCaptureBar.tsx
+  - src/components/screenshot/ScreenshotMenuButton.tsx
+  - src-tauri/src/screenshot/surfaces.rs
+  - src/lib/screenshotShortcut.ts
+  - src/App.tsx
+  - src/lib/screenshot.ts
+  - src/lib/screenshotSelection.ts
+  - src/components/tabbar/ControlBar.tsx
+  - src-tauri/src/screenshot/mod.rs
+  - src-tauri/src/screenshot/capture.rs
+  - src-tauri/src/screenshot/scroll.rs
+  - src-tauri/src/screenshot/record.rs
+  - src-tauri/src/screenshot/ocr.rs
+  - src-tauri/src/screenshot/qa.rs
+  - src-tauri/src/screenshot/qa_oracle.rs
+  - src/components/screenshot/ScreenshotQaFixture.tsx
+controls:
+  - id: system-screenshot
+    selector: '[data-testid="system-screenshot"]'
+    kind: interactive
+  - id: system-screenshot-delay-toggle
+    selector: '[data-testid="system-screenshot-delay-toggle"]'
+    kind: interactive
+  - id: system-screenshot-delay-menu
+    selector: '[data-testid="system-screenshot-delay-menu"]'
+    kind: display
+  - id: system-screenshot-delay-3
+    selector: '[data-testid="system-screenshot-delay-3"]'
+    kind: interactive
+  - id: system-screenshot-delay-5
+    selector: '[data-testid="system-screenshot-delay-5"]'
+    kind: interactive
+  - id: system-screenshot-delay-10
+    selector: '[data-testid="system-screenshot-delay-10"]'
+    kind: interactive
+  - id: system-screenshot-countdown
+    selector: '[data-testid="system-screenshot-countdown"]'
+    kind: display
+  - id: screenshot-overlay
+    selector: '[data-testid="screenshot-overlay"]'
+    kind: display
+  - id: screenshot-overlay-error
+    selector: '[data-testid="screenshot-overlay-error"]'
+    kind: display
+  - id: screenshot-base-image
+    selector: '[data-testid="screenshot-base-image"]'
+    kind: display
+  - id: screenshot-selection
+    selector: '[data-testid="screenshot-selection"]'
+    kind: display
+  - id: screenshot-selection-rectangle
+    selector: '[data-testid="screenshot-selection-rectangle"]'
+    kind: interactive
+  - id: screenshot-selection-freehand
+    selector: '[data-testid="screenshot-selection-freehand"]'
+    kind: interactive
+  - id: screenshot-freehand-contour
+    selector: '[data-testid="screenshot-freehand-contour"]'
+    kind: display
+  - id: screenshot-select-layer
+    selector: '[data-testid="screenshot-select-layer"]'
+    kind: interactive
+  - id: screenshot-selection-move
+    selector: '[data-testid="screenshot-selection-move"]'
+    kind: interactive
+  - id: screenshot-handle-nw
+    selector: '[data-testid="screenshot-handle-nw"]'
+    kind: interactive
+  - id: screenshot-handle-n
+    selector: '[data-testid="screenshot-handle-n"]'
+    kind: interactive
+  - id: screenshot-handle-ne
+    selector: '[data-testid="screenshot-handle-ne"]'
+    kind: interactive
+  - id: screenshot-handle-e
+    selector: '[data-testid="screenshot-handle-e"]'
+    kind: interactive
+  - id: screenshot-handle-se
+    selector: '[data-testid="screenshot-handle-se"]'
+    kind: interactive
+  - id: screenshot-handle-s
+    selector: '[data-testid="screenshot-handle-s"]'
+    kind: interactive
+  - id: screenshot-handle-sw
+    selector: '[data-testid="screenshot-handle-sw"]'
+    kind: interactive
+  - id: screenshot-handle-w
+    selector: '[data-testid="screenshot-handle-w"]'
+    kind: interactive
+  - id: screenshot-size-hint
+    selector: '[data-testid="screenshot-size-hint"]'
+    kind: display
+  - id: screenshot-toolbar
+    selector: '[data-testid="screenshot-toolbar"]'
+    kind: display
+  - id: screenshot-tool-rect
+    selector: '[data-testid="screenshot-tool-rect"]'
+    kind: interactive
+  - id: screenshot-tool-ellipse
+    selector: '[data-testid="screenshot-tool-ellipse"]'
+    kind: interactive
+  - id: screenshot-tool-arrow
+    selector: '[data-testid="screenshot-tool-arrow"]'
+    kind: interactive
+  - id: screenshot-tool-line
+    selector: '[data-testid="screenshot-tool-line"]'
+    kind: interactive
+  - id: screenshot-tool-pen
+    selector: '[data-testid="screenshot-tool-pen"]'
+    kind: interactive
+  - id: screenshot-tool-text
+    selector: '[data-testid="screenshot-tool-text"]'
+    kind: interactive
+  - id: screenshot-tool-mosaic
+    selector: '[data-testid="screenshot-tool-mosaic"]'
+    kind: interactive
+  - id: screenshot-tool-highlighter
+    selector: '[data-testid="screenshot-tool-highlighter"]'
+    kind: interactive
+  - id: screenshot-tool-blur
+    selector: '[data-testid="screenshot-tool-blur"]'
+    kind: interactive
+  - id: screenshot-tool-balloon
+    selector: '[data-testid="screenshot-tool-balloon"]'
+    kind: interactive
+  - id: screenshot-tool-eraser
+    selector: '[data-testid="screenshot-tool-eraser"]'
+    kind: interactive
+  - id: screenshot-tool-number
+    selector: '[data-testid="screenshot-tool-number"]'
+    kind: interactive
+  - id: screenshot-color-picker
+    selector: '[data-testid="screenshot-color-picker"]'
+    kind: interactive
+  - id: screenshot-picker-layer
+    selector: '[data-testid="screenshot-picker-layer"]'
+    kind: interactive
+  - id: screenshot-picker-hex
+    selector: '[data-testid="screenshot-picker-hex"]'
+    kind: display
+  - id: screenshot-picker-popup
+    selector: '[data-testid="screenshot-picker-popup"]'
+    kind: display
+  - id: screenshot-recrop
+    selector: '[data-testid="screenshot-recrop"]'
+    kind: interactive
+  - id: screenshot-watermark
+    selector: '[data-testid="screenshot-watermark"]'
+    kind: interactive
+  - id: screenshot-watermark-panel
+    selector: '[data-testid="screenshot-watermark-panel"]'
+    kind: display
+  - id: screenshot-watermark-text
+    selector: '[data-testid="screenshot-watermark-text"]'
+    kind: interactive
+  - id: screenshot-watermark-opacity
+    selector: '[data-testid="screenshot-watermark-opacity"]'
+    kind: interactive
+  - id: screenshot-watermark-color
+    selector: '[data-testid^="screenshot-watermark-color-"]'
+    kind: interactive
+    aliases:
+      - '[data-testid="screenshot-watermark-color-ffffff"]'
+      - '[data-testid="screenshot-watermark-color-000000"]'
+      - '[data-testid="screenshot-watermark-color-ff4444"]'
+      - '[data-testid="screenshot-watermark-color-ffcc00"]'
+      - '[data-testid="screenshot-watermark-color-00aaff"]'
+  - id: screenshot-watermark-clear
+    selector: '[data-testid="screenshot-watermark-clear"]'
+    kind: interactive
+  - id: screenshot-watermark-apply
+    selector: '[data-testid="screenshot-watermark-apply"]'
+    kind: interactive
+  - id: screenshot-pin
+    selector: '[data-testid="screenshot-pin"]'
+    kind: interactive
+  - id: screenshot-pin-window
+    selector: '[data-testid="screenshot-pin-window"]'
+    kind: interactive
+  - id: screenshot-pin-image
+    selector: '[data-testid="screenshot-pin-image"]'
+    kind: display
+  - id: screenshot-ocr
+    selector: '[data-testid="screenshot-ocr"]'
+    kind: interactive
+  - id: screenshot-ocr-panel
+    selector: '[data-testid="screenshot-ocr-panel"]'
+    kind: display
+  - id: screenshot-ocr-text
+    selector: '[data-testid="screenshot-ocr-text"]'
+    kind: display
+  - id: screenshot-ocr-close
+    selector: '[data-testid="screenshot-ocr-close"]'
+    kind: interactive
+  - id: screenshot-ocr-copy
+    selector: '[data-testid="screenshot-ocr-copy"]'
+    kind: interactive
+  - id: screenshot-auto-redact
+    selector: '[data-testid="screenshot-auto-redact"]'
+    kind: interactive
+  - id: screenshot-undo
+    selector: '[data-testid="screenshot-undo"]'
+    kind: interactive
+  - id: screenshot-redo
+    selector: '[data-testid="screenshot-redo"]'
+    kind: interactive
+  - id: screenshot-scroll-capture
+    selector: '[data-testid="screenshot-scroll-capture"]'
+    kind: interactive
+  - id: screenshot-record
+    selector: '[data-testid="screenshot-record"]'
+    kind: interactive
+  - id: screenshot-copy
+    selector: '[data-testid="screenshot-copy"]'
+    kind: interactive
+  - id: screenshot-save
+    selector: '[data-testid="screenshot-save"]'
+    kind: interactive
+  - id: screenshot-cancel
+    selector: '[data-testid="screenshot-cancel"]'
+    kind: interactive
+  - id: screenshot-fullscreen
+    selector: '[data-testid="screenshot-fullscreen"]'
+    kind: interactive
+  - id: screenshot-annotation-canvas
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    kind: display
+  - id: screenshot-annotation-layer
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    kind: interactive
+  - id: screenshot-hint
+    selector: '[data-testid="screenshot-hint"]'
+    kind: display
+  - id: screenshot-scroll-busy
+    selector: '[data-testid="screenshot-scroll-busy"]'
+    kind: display
+  - id: screenshot-color-red
+    selector: '[data-testid="screenshot-color-red"]'
+    kind: interactive
+  - id: screenshot-color-yellow
+    selector: '[data-testid="screenshot-color-yellow"]'
+    kind: interactive
+  - id: screenshot-color-green
+    selector: '[data-testid="screenshot-color-green"]'
+    kind: interactive
+  - id: screenshot-color-blue
+    selector: '[data-testid="screenshot-color-blue"]'
+    kind: interactive
+  - id: screenshot-color-white
+    selector: '[data-testid="screenshot-color-white"]'
+    kind: interactive
+  - id: screenshot-line-width-2
+    selector: '[data-testid="screenshot-line-width-2"]'
+    kind: interactive
+  - id: screenshot-line-width-4
+    selector: '[data-testid="screenshot-line-width-4"]'
+    kind: interactive
+  - id: screenshot-line-width-8
+    selector: '[data-testid="screenshot-line-width-8"]'
+    kind: interactive
+  - id: screenshot-recorder
+    selector: '[data-testid="screenshot-recorder"]'
+    kind: display
+  - id: screenshot-recorder-timer
+    selector: '[data-testid="screenshot-recorder-timer"]'
+    kind: display
+  - id: screenshot-recorder-stop
+    selector: '[data-testid="screenshot-recorder-stop"]'
+    kind: interactive
+  - id: screenshot-recorder-preview
+    selector: '[data-testid="screenshot-recorder-preview"]'
+    kind: display
+  - id: screenshot-recorder-meta
+    selector: '[data-testid="screenshot-recorder-meta"]'
+    kind: display
+  - id: screenshot-recorder-error
+    selector: '[data-testid="screenshot-recorder-error"]'
+    kind: display
+  - id: screenshot-recorder-copy
+    selector: '[data-testid="screenshot-recorder-copy"]'
+    kind: interactive
+  - id: screenshot-recorder-done
+    selector: '[data-testid="screenshot-recorder-done"]'
+    kind: interactive
+  - id: screenshot-recorder-save
+    selector: '[data-testid="screenshot-recorder-save"]'
+    kind: interactive
+  - id: screenshot-recorder-cancel
+    selector: '[data-testid="screenshot-recorder-cancel"]'
+    kind: interactive
+  - id: screenshot-record-menu
+    selector: '[data-testid="screenshot-record-menu"]'
+    kind: display
+  - id: screenshot-record-gif
+    selector: '[data-testid="screenshot-record-gif"]'
+    kind: interactive
+  - id: screenshot-record-mp4
+    selector: '[data-testid="screenshot-record-mp4"]'
+    kind: interactive
+  - id: screenshot-text-input
+    selector: '[data-testid="screenshot-text-input"]'
+    kind: interactive
+  - id: screenshot-toast
+    selector: '[data-testid="screenshot-toast"]'
+    kind: display
+  - id: system-screenshot-current-window
+    selector: '[data-testid="system-screenshot-current-window"]'
+    kind: interactive
+  - id: system-screenshot-default-hint
+    selector: '[data-testid="system-screenshot-default-hint"]'
+    kind: display
+  - id: screenshot-tool-move
+    selector: '[data-testid="screenshot-tool-move"]'
+    kind: interactive
+  - id: screenshot-annotation-selection
+    selector: '[data-testid="screenshot-annotation-selection"]'
+    kind: display
+  - id: screenshot-annotation-delete
+    selector: '[data-testid="screenshot-annotation-delete"]'
+    kind: interactive
+  - id: screenshot-scroll-confirm
+    selector: '[data-testid="screenshot-scroll-confirm"]'
+    kind: display
+  - id: screenshot-scroll-instructions
+    selector: '[data-testid="screenshot-scroll-instructions"]'
+    kind: display
+  - id: screenshot-scroll-start
+    selector: '[data-testid="screenshot-scroll-start"]'
+    kind: interactive
+  - id: screenshot-scroll-confirm-cancel
+    selector: '[data-testid="screenshot-scroll-confirm-cancel"]'
+    kind: interactive
+  - id: screenshot-scroll-controller
+    selector: '[data-testid="screenshot-scroll-controller"]'
+    kind: display
+  - id: screenshot-scroll-progress
+    selector: '[data-testid="screenshot-scroll-progress"]'
+    kind: display
+  - id: screenshot-scroll-stop
+    selector: '[data-testid="screenshot-scroll-stop"]'
+    kind: interactive
+  - id: screenshot-scroll-cancel
+    selector: '[data-testid="screenshot-scroll-cancel"]'
+    kind: interactive
+  - id: screenshot-scroll-error
+    selector: '[data-testid="screenshot-scroll-error"]'
+    kind: display
+    optional: true
+  - id: screenshot-record-hint
+    selector: '[data-testid="screenshot-record-hint"]'
+    kind: display
+  - id: screenshot-recorder-range-hint
+    selector: '[data-testid="screenshot-recorder-range-hint"]'
+    kind: display
+  - id: screenshot-recording-boundary
+    selector: '[data-testid="screenshot-recording-boundary"]'
+    kind: display
+    optional: true
+  - id: screenshot-annotation-resize-nw
+    selector: '[data-testid="screenshot-annotation-resize-nw"]'
+    kind: interactive
+  - id: screenshot-annotation-resize-ne
+    selector: '[data-testid="screenshot-annotation-resize-ne"]'
+    kind: interactive
+  - id: screenshot-annotation-resize-sw
+    selector: '[data-testid="screenshot-annotation-resize-sw"]'
+    kind: interactive
+  - id: screenshot-annotation-resize-se
+    selector: '[data-testid="screenshot-annotation-resize-se"]'
+    kind: interactive
+-->
+
+- 系统截图工具：主窗口及独立终端/数据库/RDP/VNC 窗口共用相机入口，默认隐藏应用窗口；菜单“截取当前窗口”保留调用窗口并预选其物理边界。当前配置快捷键打开截图 overlay；默认 Windows/Linux `Ctrl+Alt+A`，macOS `Ctrl+Super+A`（Control+Command+A）。菜单支持 3/5/10 秒延迟，倒计时中点击相机取消。原有 session 图像截图/录制入口及实现已移除，终端文本日志录制继续保留。
+- 区域选择与全屏选择默认处于 select 模式，显式点击矩形等工具后才开始绘制；选区可通过八方向 handles 与 move 区域调整，recrop 保留标注，选区外重新选择和滚动截图完成则清空旧标注。12 个工具包含矩形、椭圆、箭头、直线、画笔、荧光笔、文字、气泡、马赛克、模糊、编号和橡皮；实际拖拽创建形状，文字 Enter/blur 提交、Escape 取消，擦除是可撤销的变更，redo 仅在 undo 后可用。
+- “选择/移动标注”按最上层命中选择已有形状，支持拖动、四角缩放、颜色/线宽修改、Delete/Backspace 或按钮删除，以及双击修改文字；操作参与撤销/重做。标注选中边框仅显示在编辑器中，不进入导出画面。
+- 自由手绘选区：hint/toolbar 可在矩形与自由选区间切换，松手自动闭合，凹形/交叉轮廓按 even-odd 规则命中和导出；退化直线/微小轮廓不进入标注。八方向 handles 与 move 按包围盒变换轮廓并保留标注历史；轮廓外（包括包围盒内空白）按下重新选择。切回矩形保留包围盒/标注，重新进入自由选区清空旧形状。画笔仍是独立标注工具。
+- 输出支持复制、PNG 保存（取消保留选区）、贴图；自由选区在自然尺寸 PNG 中保留内部原画/标注并将外部变为透明，最终遮罩在水印之后应用。Pin 保留原有无边框/置顶/原生拖动和三种关闭入口，以棋盘背景显示透明 PNG，不扩展为跨重启图库。OCR 显示/复制识别结果，auto-redact 将返回框作为一次可撤销标注，水印支持文字/透明度/颜色的 apply/clear。滚动截图刷新 overlay；GIF/MP4 录制入口配独立状态条、停止预览、保存/完成和 GIF 首帧复制（剪贴板不承载动画）；自由选区禁用滚动/录制并提示切换矩形。
+- 滚动截图开始前说明自动滚动与结束方式，进行中显示帧数、“完成”和“取消”；完成保留已捕获长图，取消保留原始选区和标注。滚动及录制期间使用选区外的原生红色边框和控制窗口，避免依赖平台的内容保护来排除控制画面；全屏等没有安全控制位置时隐藏控制窗口，截图快捷键结束采集后再显示预览。没有安全位置且快捷键未注册时拒绝启动并提示调整范围或启用快捷键。
+- Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回同一 400×300 图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
+- Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界。N2/N9 捕获完整长页并将产物逐像素/24×24 区块与真实 renderer canvas 保留的原画比对，覆盖文字、图案、分隔线及缺失/重复/错位/拉伸，不只检查高度或单列颜色。N5–N8 对 GIF/MP4 每一解码帧核对原画 frame id、每轮随机 nonce、区域像素及有序时间线，黑帧/错区域/静态或无关多帧均不得通过；保存原始 PNG、产物、逐帧指标/时间线和原图/实际/差异接触图。
+- 新增 Browser `TC-SHOT-022` 验证自由轮廓/退化拒绝/移动缩放/历史/切换/轮廓外命中，`TC-SHOT-023` 将两种轮廓 Pin 的实际 PNG 与导出前保留原图做独立 RGB/alpha 比对。Native `TC-SHOT-N11` 使用真实 OS 鼠标绘制凹形选区，分别核对 Pin 文件与 OS 剪贴板 RGBA；实际拖动 Pin 后读取窗口位置差/置顶状态，并检查独立副本存活/销毁。run36991920385（SHA63c275da）三端新增与保留流程已通过：各 browser23/23、native11/11，零失败零跳过；三端 Pin 实际位移均80×64，原画 RGB 完全一致且非边缘 alpha 无差异。Linux 置顶读取真实 X11 ABOVE atom，保留 GTK/Tao 缓存 false 作为诊断，不用缓存或 builder 声明代替实际 WM 状态。
+- 本轮回归用例 `TC-SHOT-024`–`027` 覆盖标注编辑、当前窗口选项及滚动控制，`TC-104` 检查旧 session 图像入口移除；`TC-SHOT-N12` 核对真实窗口可见性、选区预选、滚动完成/取消和原生边框位置，`TC-SHOT-N13` 核对全屏录制停止与控制排除。N2/N9 的真实像素场景使用 CSS 隐藏鼠标指针，使桌面画面与保留的 canvas 原画一致；仍使用真实 OS 滚轮，逐像素阈值与比较区域不变。三平台执行证据以对应提交的 CI 产物为准。
+- `status: done` 表示功能代码已实装。完整原画内容比对标准下，run36973502375（SHA fb0f02c5）三端 native 各10/10、零失败零跳过；回执、构建身份、用例摘要与产物哈希均已核验，Pillow/PyAV 独立解码确认每一 GIF/MP4 帧匹配本轮原画且长图逐像素一致。该历史结果不证明新增自由选区或物理 Pin 拖动。最终扩展 run36991920385 已另行验证全部六组回执/源码/构建/配置/用例身份和产物哈希，独立解码12个 GIF/MP4 的283帧全部匹配原画/nonce/时间线，完整长图逐像素一致；27个便捷产物保留在 `qa-ui-auto-report/hosted-36991920385/outputs/{linux,windows,macos}/`，完整证据与两个独立校验 JSON 同根。旧标准 run36956493957 结果不作为该证据。混合 DPI/多显示器与 Wayland 仍未验证。
+
+### 27.2 截图快捷键设置与能力状态
+
+<!-- feature
+id: F27.2
+status: done
+area: screenshot/settings
+components: [ScreenshotSettings, SettingsPanel, screenshotShortcut, ControlBar]
+files:
+  - src/components/settings/ScreenshotSettings.tsx
+  - src/components/settings/SettingsPanel.tsx
+  - src/components/settings/settingsSearch.ts
+  - src/lib/screenshotShortcut.ts
+  - src-tauri/src/screenshot/shortcut.rs
+controls:
+  - id: settings-screenshot-shortcut
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+    kind: interactive
+  - id: settings-screenshot-shortcut-reset
+    selector: '[data-testid="settings-screenshot-shortcut-reset"]'
+    kind: interactive
+  - id: settings-screenshot-shortcut-disable
+    selector: '[data-testid="settings-screenshot-shortcut-disable"]'
+    kind: interactive
+  - id: settings-screenshot-shortcut-status
+    selector: '[data-testid="settings-screenshot-shortcut-status"]'
+    kind: display
+  - id: settings-screenshot-shortcut-error
+    selector: '[data-testid="settings-screenshot-shortcut-error"]'
+    kind: display
+  - id: settings-screenshot-probe
+    selector: '[data-testid="settings-screenshot-probe"]'
+    kind: display
+-->
+
+- Settings 可搜索截图设置，录制带修饰键或函数键的 chord，裸字母显示校验错误，Escape 放弃；支持 disable/reset，配置同步到相机 tooltip 与 app-local routing。快捷键在 input/textarea/select/contentEditable、CodeMirror 和 xterm 焦点下不抢输入。
+- Browser `TC-SHOT-018` 验证重绑、禁用、相机保留入口与恢复默认，明确只验证内存中的 app-local 配置，状态为 `Works while this window is focused.`，不显示 native probe。Native 才负责持久化、系统注册/冲突反馈和采集/OCR/MP4 权限能力，缺少注册不伪装成全局成功。
+
+---
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >

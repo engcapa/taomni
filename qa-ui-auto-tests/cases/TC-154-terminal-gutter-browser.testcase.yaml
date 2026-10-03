@@ -1,0 +1,366 @@
+id: TC-154
+title: SSH terminal gutter preserves first-column selection through zoom, fullscreen and viewport resize
+covers:
+- F2.2
+- F3.1
+- F4.1
+- F4.2
+- F4.8
+tags:
+- terminal
+- selection
+- layout
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="qc-input"]'
+- quick_connect:
+    url: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- auth: ${env.QA_SSH_PASSWORD}
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
+    expect_truthy: true
+    timeout_sec: 5
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA-LEFT-""GUTTER
+    submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: (?m)^QA-LEFT-GUTTER\r?$
+      timeout_sec: 10
+      attempts: 2
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA-LEFT-GUTTER\r?$
+    timeout_sec: 20
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="context-menu-item-find"]'
+- wait_for: input[placeholder="Find"]
+- fill:
+    selector: input[placeholder="Find"]
+    value: QA-LEFT-GUTTER
+- press: Enter
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+- eval_readonly:
+    expression: Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1
+    expect_truthy: true
+    timeout_sec: 5
+- seed_clipboard: NOT-SELECTED
+- click: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-screen'
+- wait_for:
+    selector: button[title="Copy (Ctrl+C)"]
+    state: hidden
+- terminal_drag_selection:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    direction: forward
+- wait_for: button[title="Copy (Ctrl+C)"]
+- click: button[title="Copy (Ctrl+C)"]
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))
+    expect_truthy: true
+    timeout_sec: 5
+- seed_clipboard: NOT-SELECTED
+- click: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-screen'
+- wait_for:
+    selector: button[title="Copy (Ctrl+C)"]
+    state: hidden
+- terminal_drag_selection:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    direction: reverse
+- wait_for: button[title="Copy (Ctrl+C)"]
+- click: button[title="Copy (Ctrl+C)"]
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))
+    expect_truthy: true
+    timeout_sec: 5
+- seed_clipboard: NOT-SELECTED
+- click: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-screen'
+- wait_for:
+    selector: button[title="Copy (Ctrl+C)"]
+    state: hidden
+- terminal_drag_selection:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    direction: forward
+    modifiers:
+    - Control
+    - Shift
+- wait_for: button[title="Copy (Ctrl+C)"]
+- assert_visible: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-block-selection'
+- eval_readonly:
+    expression: Math.abs(document.querySelector("[data-terminal-active] .terminal-block-selection").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1
+    expect_truthy: true
+    timeout_sec: 5
+- click: button[title="Copy (Ctrl+C)"]
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))
+    expect_truthy: true
+    timeout_sec: 5
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click_menu: Zoom in
+- wait: 0.4
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1
+    expect_truthy: true
+    timeout_sec: 5
+- seed_clipboard: NOT-SELECTED
+- click: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-screen'
+- wait_for:
+    selector: button[title="Copy (Ctrl+C)"]
+    state: hidden
+- terminal_drag_selection:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    direction: forward
+- wait_for: button[title="Copy (Ctrl+C)"]
+- click: button[title="Copy (Ctrl+C)"]
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))
+    expect_truthy: true
+    timeout_sec: 5
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click_menu: Reset zoom
+- wait: 0.4
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- hover: '[data-testid="context-menu-item-terminal-display"]'
+- click_menu: Fullscreen terminal
+- wait: 0.4
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1
+    expect_truthy: true
+    timeout_sec: 5
+- seed_clipboard: NOT-SELECTED
+- click: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-screen'
+- wait_for:
+    selector: button[title="Copy (Ctrl+C)"]
+    state: hidden
+- terminal_drag_selection:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    direction: reverse
+- wait_for: button[title="Copy (Ctrl+C)"]
+- click: button[title="Copy (Ctrl+C)"]
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot:
+    path: terminal-gutter-fullscreen.png
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- hover: '[data-testid="context-menu-item-terminal-display"]'
+- click_menu: Fullscreen terminal
+- wait: 0.4
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
+    expect_truthy: true
+    timeout_sec: 5
+- set_viewport:
+    width: 900
+    height: 620
+- wait: 0.4
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1
+    expect_truthy: true
+    timeout_sec: 5
+- seed_clipboard: NOT-SELECTED
+- click: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-screen'
+- wait_for:
+    selector: button[title="Copy (Ctrl+C)"]
+    state: hidden
+- terminal_drag_selection:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    direction: forward
+- wait_for: button[title="Copy (Ctrl+C)"]
+- click: button[title="Copy (Ctrl+C)"]
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot:
+    path: terminal-gutter-narrow.png
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- set_viewport:
+    width: 1440
+    height: 900
+- wait: 0.4
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot:
+    path: terminal-gutter-browser.png
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The first column has at least 8 CSS px of left space; the terminal screen fits its pane; forward, reverse and block drags from the gutter copy the entire output marker, including its first character. Search/block highlights stay aligned after zoom/fullscreen/viewport changes.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 11
+    - 14
+    - 16
+    - 17
+    - 21
+    - 23
+    - 25
+    - 28
+    - 30
+    - 32
+    - 35
+    - 37
+    - 41
+    - 44
+    - 50
+    - 52
+    - 54
+    - 57
+    - 60
+    - 61
+    - 67
+    - 69
+    - 71
+    - 75
+    - 76
+    - 80
+    - 86
+    - 88
+    - 90
+    - 93
+    checkpoints:
+    - step: 9
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 10
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
+    - step: 12
+      expectation: '{assert_pattern: {regex: ''(?m)^QA-LEFT-GUTTER\r?$'', selector: ''[data-testid="terminal-pane"][data-terminal-active="true"]'', timeout_sec: 20}}'
+    - step: 19
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
+    - step: 26
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))'', timeout_sec: 5}}'
+    - step: 33
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))'', timeout_sec: 5}}'
+    - step: 39
+      expectation: '{assert_visible: ''[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-block-selection''}'
+    - step: 40
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-block-selection").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
+    - step: 42
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))'', timeout_sec: 5}}'
+    - step: 46
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 47
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
+    - step: 48
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
+    - step: 55
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))'', timeout_sec: 5}}'
+    - step: 63
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 64
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
+    - step: 65
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
+    - step: 72
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))'', timeout_sec: 5}}'
+    - step: 78
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 79
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
+    - step: 82
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 83
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
+    - step: 84
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
+    - step: 91
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''navigator.clipboard.readText().then(Object.is.bind(null, "QA-LEFT-GUTTER"))'', timeout_sec: 5}}'
+    - step: 95
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 96
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
+    results:
+    - 9
+    - 10
+    - 12
+    - 19
+    - 26
+    - 33
+    - 39
+    - 40
+    - 42
+    - 46
+    - 47
+    - 48
+    - 55
+    - 63
+    - 64
+    - 65
+    - 72
+    - 78
+    - 79
+    - 82
+    - 83
+    - 84
+    - 91
+    - 95
+    - 96
+  visual:
+  - check: Inspect first-column spacing, selected text and highlight alignment in normal and fullscreen screenshots.
+    method: manual
+    reason: DOM geometry and clipboard assertions are automated; screenshots still need separate visual review.
+  native:
+  - check: Packaged WebView and OS clipboard behavior require TC-155 in native mode.
+    method: external
+    reason: Native uses the real local/SSH terminal, W3C pointer input and independent OS clipboard reads; browser mode proves the shared renderer and browser clipboard only. macOS uses the packaged WKWebView event bridge, not OS-global mouse injection.

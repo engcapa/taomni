@@ -20,7 +20,7 @@ LINUX_VERBS = {"native_set_writable", "assert_native_process_delta", "native_pro
                "native_click", "native_pointer_drag", "native_ime_keys", "native_clipboard_owner",
                "assert_system_clipboard", "native_clipboard_image"}
 # Verbs available on a subset of native platforms beyond Linux-only ones.
-PLATFORM_VERBS = {"native_show_image_window": {"Linux", "Windows"}}
+PLATFORM_VERBS = {"native_show_image_window": {"Linux", "Windows"}, "native_about": {"macOS"}}
 REVIEW_TAGS = {"needs-review", "legacy-imported"}
 
 

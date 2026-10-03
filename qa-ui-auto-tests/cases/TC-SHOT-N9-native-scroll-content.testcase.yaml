@@ -1,0 +1,27 @@
+id: TC-SHOT-N9
+title: Native repeated scroll capture keeps independent ordered outputs
+covers: [F27.1]
+tags: [screenshot, scroll-capture, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: scroll}
+- native_screenshot_scenario: {scenario: scroll}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: repeated-scroll
+    requirement: Two independent OS wheel/stitch sessions each capture the complete original page, matching all spatial pixel tiles and row structure without stale content or cropped-away omissions.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "First full native long screenshot matches the retained original source crop across every spatial tile; source/expected/output/difference PNGs are saved."}
+    - {step: 4, expectation: "Fresh fixture full capture independently passes pixel content and row-order/height checks; duplications, gaps, text/shape losses and stretched/reordered pages remain failures."}
+    results: [3, 4]
+  visual:
+  - {check: Stitch content fidelity, method: automated, reason: Compare complete original renderer page versus full native stitch; retain paired PNGs and amplified differences.}
+  native:
+  - {check: Repeated wheel and capture, method: automated, reason: "Both scenarios use actual native source and OS input. The fixture uses CSS cursor:none to match the cursor-free retained canvas original, without masking output pixels or changing the comparison thresholds."}

@@ -95,18 +95,16 @@
 
 - `[data-testid="ptt-button"]` — interactive [optional] — F-AI-2.3.ptt-button
 
-## capture (F4.13)
+## application/update (F-Update-1)
 
-- `[data-testid="capture-toolbar"]` — display — F4.13.toolbar-root
-- `[data-testid="capture-menu"]` — interactive — F4.13.capture-menu
-- `[data-testid="capture-menu-dropdown"]` — display [optional] — F4.13.capture-menu-dropdown
-- `[data-testid="capture-save-visible"]` — interactive [optional] — F4.13.save-visible
-- `[data-testid="capture-copy-clipboard"]` — interactive [optional] — F4.13.copy-clipboard
-- `[data-testid="capture-save-full"]` — interactive [optional] — F4.13.save-full
-- `[data-testid="capture-toggle-scroll"]` — interactive [optional] — F4.13.toggle-scroll
-- `[data-testid="capture-toggle-gif"]` — interactive [optional] — F4.13.toggle-gif
-- `[data-testid="capture-stop-scroll"]` — interactive [optional] — F4.13.stop-scroll-pill
-- `[data-testid="capture-stop-gif"]` — interactive [optional] — F4.13.stop-gif-pill
+- `[data-testid="update-dialog"]` — display — F-Update-1.update-dialog
+- `[data-testid="update-arch-darwin-aarch64"]` — interactive — F-Update-1.update-arch-arm64
+- `[data-testid="update-arch-darwin-x86_64"]` — interactive — F-Update-1.update-arch-intel
+- `[data-testid="update-download"]` — interactive — F-Update-1.update-download
+- `[data-testid="update-cancel-download"]` — interactive — F-Update-1.update-cancel-download
+- `[data-testid="update-progress"]` — display — F-Update-1.update-progress
+- `[data-testid="update-error"]` — display — F-Update-1.update-error
+- `[data-testid="update-restart"]` — interactive [optional] — F-Update-1.update-restart
 
 ## code-workspace/appearance-and-actions (F25.3)
 
@@ -1315,6 +1313,8 @@
 
 ## main/menubar (F1.8)
 
+- `[data-testid="about-check-update"]` — interactive — F1.8.about-check-update
+- `[data-testid="about-version"]` — interactive — F1.8.about-version
 - `[data-testid="app-main-menu"]` — interactive — F1.8.app-main-menu
 - `[data-testid="about-dialog"]` — display [optional] — F1.8.about-dialog
 - `[data-testid="context-menu-item-view"]` — interactive [optional] — F1.8.context-menu-item-view
@@ -1547,6 +1547,138 @@
 - `[data-testid="rdp-bar-minimize"]` — interactive [optional] — F9.7.bar-minimize
 - `[data-testid="rdp-bar-restore"]` — interactive [optional] — F9.7.bar-restore
 - `[data-testid="rdp-bar-disconnect"]` — interactive [optional] — F9.7.bar-disconnect
+
+## screenshot/screen-record (F27.1)
+
+- `[data-testid="system-screenshot"]` — interactive — F27.1.system-screenshot
+- `[data-testid="system-screenshot-delay-toggle"]` — interactive — F27.1.system-screenshot-delay-toggle
+- `[data-testid="system-screenshot-delay-menu"]` — display — F27.1.system-screenshot-delay-menu
+- `[data-testid="system-screenshot-delay-3"]` — interactive — F27.1.system-screenshot-delay-3
+- `[data-testid="system-screenshot-delay-5"]` — interactive — F27.1.system-screenshot-delay-5
+- `[data-testid="system-screenshot-delay-10"]` — interactive — F27.1.system-screenshot-delay-10
+- `[data-testid="system-screenshot-countdown"]` — display — F27.1.system-screenshot-countdown
+- `[data-testid="screenshot-overlay"]` — display — F27.1.screenshot-overlay
+- `[data-testid="screenshot-overlay-error"]` — display — F27.1.screenshot-overlay-error
+- `[data-testid="screenshot-base-image"]` — display — F27.1.screenshot-base-image
+- `[data-testid="screenshot-selection"]` — display — F27.1.screenshot-selection
+- `[data-testid="screenshot-selection-rectangle"]` — interactive — F27.1.screenshot-selection-rectangle
+- `[data-testid="screenshot-selection-freehand"]` — interactive — F27.1.screenshot-selection-freehand
+- `[data-testid="screenshot-freehand-contour"]` — display — F27.1.screenshot-freehand-contour
+- `[data-testid="screenshot-select-layer"]` — interactive — F27.1.screenshot-select-layer
+- `[data-testid="screenshot-selection-move"]` — interactive — F27.1.screenshot-selection-move
+- `[data-testid="screenshot-handle-nw"]` — interactive — F27.1.screenshot-handle-nw
+- `[data-testid="screenshot-handle-n"]` — interactive — F27.1.screenshot-handle-n
+- `[data-testid="screenshot-handle-ne"]` — interactive — F27.1.screenshot-handle-ne
+- `[data-testid="screenshot-handle-e"]` — interactive — F27.1.screenshot-handle-e
+- `[data-testid="screenshot-handle-se"]` — interactive — F27.1.screenshot-handle-se
+- `[data-testid="screenshot-handle-s"]` — interactive — F27.1.screenshot-handle-s
+- `[data-testid="screenshot-handle-sw"]` — interactive — F27.1.screenshot-handle-sw
+- `[data-testid="screenshot-handle-w"]` — interactive — F27.1.screenshot-handle-w
+- `[data-testid="screenshot-size-hint"]` — display — F27.1.screenshot-size-hint
+- `[data-testid="screenshot-toolbar"]` — display — F27.1.screenshot-toolbar
+- `[data-testid="screenshot-tool-rect"]` — interactive — F27.1.screenshot-tool-rect
+- `[data-testid="screenshot-tool-ellipse"]` — interactive — F27.1.screenshot-tool-ellipse
+- `[data-testid="screenshot-tool-arrow"]` — interactive — F27.1.screenshot-tool-arrow
+- `[data-testid="screenshot-tool-line"]` — interactive — F27.1.screenshot-tool-line
+- `[data-testid="screenshot-tool-pen"]` — interactive — F27.1.screenshot-tool-pen
+- `[data-testid="screenshot-tool-text"]` — interactive — F27.1.screenshot-tool-text
+- `[data-testid="screenshot-tool-mosaic"]` — interactive — F27.1.screenshot-tool-mosaic
+- `[data-testid="screenshot-tool-highlighter"]` — interactive — F27.1.screenshot-tool-highlighter
+- `[data-testid="screenshot-tool-blur"]` — interactive — F27.1.screenshot-tool-blur
+- `[data-testid="screenshot-tool-balloon"]` — interactive — F27.1.screenshot-tool-balloon
+- `[data-testid="screenshot-tool-eraser"]` — interactive — F27.1.screenshot-tool-eraser
+- `[data-testid="screenshot-tool-number"]` — interactive — F27.1.screenshot-tool-number
+- `[data-testid="screenshot-color-picker"]` — interactive — F27.1.screenshot-color-picker
+- `[data-testid="screenshot-picker-layer"]` — interactive — F27.1.screenshot-picker-layer
+- `[data-testid="screenshot-picker-hex"]` — display — F27.1.screenshot-picker-hex
+- `[data-testid="screenshot-picker-popup"]` — display — F27.1.screenshot-picker-popup
+- `[data-testid="screenshot-recrop"]` — interactive — F27.1.screenshot-recrop
+- `[data-testid="screenshot-watermark"]` — interactive — F27.1.screenshot-watermark
+- `[data-testid="screenshot-watermark-panel"]` — display — F27.1.screenshot-watermark-panel
+- `[data-testid="screenshot-watermark-text"]` — interactive — F27.1.screenshot-watermark-text
+- `[data-testid="screenshot-watermark-opacity"]` — interactive — F27.1.screenshot-watermark-opacity
+- `[data-testid^="screenshot-watermark-color-"]` — interactive — F27.1.screenshot-watermark-color
+  ↳ `[data-testid="screenshot-watermark-color-ffffff"]` — alias
+  ↳ `[data-testid="screenshot-watermark-color-000000"]` — alias
+  ↳ `[data-testid="screenshot-watermark-color-ff4444"]` — alias
+  ↳ `[data-testid="screenshot-watermark-color-ffcc00"]` — alias
+  ↳ `[data-testid="screenshot-watermark-color-00aaff"]` — alias
+- `[data-testid="screenshot-watermark-clear"]` — interactive — F27.1.screenshot-watermark-clear
+- `[data-testid="screenshot-watermark-apply"]` — interactive — F27.1.screenshot-watermark-apply
+- `[data-testid="screenshot-pin"]` — interactive — F27.1.screenshot-pin
+- `[data-testid="screenshot-pin-window"]` — interactive — F27.1.screenshot-pin-window
+- `[data-testid="screenshot-pin-image"]` — display — F27.1.screenshot-pin-image
+- `[data-testid="screenshot-ocr"]` — interactive — F27.1.screenshot-ocr
+- `[data-testid="screenshot-ocr-panel"]` — display — F27.1.screenshot-ocr-panel
+- `[data-testid="screenshot-ocr-text"]` — display — F27.1.screenshot-ocr-text
+- `[data-testid="screenshot-ocr-close"]` — interactive — F27.1.screenshot-ocr-close
+- `[data-testid="screenshot-ocr-copy"]` — interactive — F27.1.screenshot-ocr-copy
+- `[data-testid="screenshot-auto-redact"]` — interactive — F27.1.screenshot-auto-redact
+- `[data-testid="screenshot-undo"]` — interactive — F27.1.screenshot-undo
+- `[data-testid="screenshot-redo"]` — interactive — F27.1.screenshot-redo
+- `[data-testid="screenshot-scroll-capture"]` — interactive — F27.1.screenshot-scroll-capture
+- `[data-testid="screenshot-record"]` — interactive — F27.1.screenshot-record
+- `[data-testid="screenshot-copy"]` — interactive — F27.1.screenshot-copy
+- `[data-testid="screenshot-save"]` — interactive — F27.1.screenshot-save
+- `[data-testid="screenshot-cancel"]` — interactive — F27.1.screenshot-cancel
+- `[data-testid="screenshot-fullscreen"]` — interactive — F27.1.screenshot-fullscreen
+- `[data-testid="screenshot-annotation-canvas"]` — display — F27.1.screenshot-annotation-canvas
+- `[data-testid="screenshot-annotation-layer"]` — interactive — F27.1.screenshot-annotation-layer
+- `[data-testid="screenshot-hint"]` — display — F27.1.screenshot-hint
+- `[data-testid="screenshot-scroll-busy"]` — display — F27.1.screenshot-scroll-busy
+- `[data-testid="screenshot-color-red"]` — interactive — F27.1.screenshot-color-red
+- `[data-testid="screenshot-color-yellow"]` — interactive — F27.1.screenshot-color-yellow
+- `[data-testid="screenshot-color-green"]` — interactive — F27.1.screenshot-color-green
+- `[data-testid="screenshot-color-blue"]` — interactive — F27.1.screenshot-color-blue
+- `[data-testid="screenshot-color-white"]` — interactive — F27.1.screenshot-color-white
+- `[data-testid="screenshot-line-width-2"]` — interactive — F27.1.screenshot-line-width-2
+- `[data-testid="screenshot-line-width-4"]` — interactive — F27.1.screenshot-line-width-4
+- `[data-testid="screenshot-line-width-8"]` — interactive — F27.1.screenshot-line-width-8
+- `[data-testid="screenshot-recorder"]` — display — F27.1.screenshot-recorder
+- `[data-testid="screenshot-recorder-timer"]` — display — F27.1.screenshot-recorder-timer
+- `[data-testid="screenshot-recorder-stop"]` — interactive — F27.1.screenshot-recorder-stop
+- `[data-testid="screenshot-recorder-preview"]` — display — F27.1.screenshot-recorder-preview
+- `[data-testid="screenshot-recorder-meta"]` — display — F27.1.screenshot-recorder-meta
+- `[data-testid="screenshot-recorder-error"]` — display — F27.1.screenshot-recorder-error
+- `[data-testid="screenshot-recorder-copy"]` — interactive — F27.1.screenshot-recorder-copy
+- `[data-testid="screenshot-recorder-done"]` — interactive — F27.1.screenshot-recorder-done
+- `[data-testid="screenshot-recorder-save"]` — interactive — F27.1.screenshot-recorder-save
+- `[data-testid="screenshot-recorder-cancel"]` — interactive — F27.1.screenshot-recorder-cancel
+- `[data-testid="screenshot-record-menu"]` — display — F27.1.screenshot-record-menu
+- `[data-testid="screenshot-record-gif"]` — interactive — F27.1.screenshot-record-gif
+- `[data-testid="screenshot-record-mp4"]` — interactive — F27.1.screenshot-record-mp4
+- `[data-testid="screenshot-text-input"]` — interactive — F27.1.screenshot-text-input
+- `[data-testid="screenshot-toast"]` — display — F27.1.screenshot-toast
+- `[data-testid="system-screenshot-current-window"]` — interactive — F27.1.system-screenshot-current-window
+- `[data-testid="system-screenshot-default-hint"]` — display — F27.1.system-screenshot-default-hint
+- `[data-testid="screenshot-tool-move"]` — interactive — F27.1.screenshot-tool-move
+- `[data-testid="screenshot-annotation-selection"]` — display — F27.1.screenshot-annotation-selection
+- `[data-testid="screenshot-annotation-delete"]` — interactive — F27.1.screenshot-annotation-delete
+- `[data-testid="screenshot-scroll-confirm"]` — display — F27.1.screenshot-scroll-confirm
+- `[data-testid="screenshot-scroll-instructions"]` — display — F27.1.screenshot-scroll-instructions
+- `[data-testid="screenshot-scroll-start"]` — interactive — F27.1.screenshot-scroll-start
+- `[data-testid="screenshot-scroll-confirm-cancel"]` — interactive — F27.1.screenshot-scroll-confirm-cancel
+- `[data-testid="screenshot-scroll-controller"]` — display — F27.1.screenshot-scroll-controller
+- `[data-testid="screenshot-scroll-progress"]` — display — F27.1.screenshot-scroll-progress
+- `[data-testid="screenshot-scroll-stop"]` — interactive — F27.1.screenshot-scroll-stop
+- `[data-testid="screenshot-scroll-cancel"]` — interactive — F27.1.screenshot-scroll-cancel
+- `[data-testid="screenshot-scroll-error"]` — display [optional] — F27.1.screenshot-scroll-error
+- `[data-testid="screenshot-record-hint"]` — display — F27.1.screenshot-record-hint
+- `[data-testid="screenshot-recorder-range-hint"]` — display — F27.1.screenshot-recorder-range-hint
+- `[data-testid="screenshot-recording-boundary"]` — display [optional] — F27.1.screenshot-recording-boundary
+- `[data-testid="screenshot-annotation-resize-nw"]` — interactive — F27.1.screenshot-annotation-resize-nw
+- `[data-testid="screenshot-annotation-resize-ne"]` — interactive — F27.1.screenshot-annotation-resize-ne
+- `[data-testid="screenshot-annotation-resize-sw"]` — interactive — F27.1.screenshot-annotation-resize-sw
+- `[data-testid="screenshot-annotation-resize-se"]` — interactive — F27.1.screenshot-annotation-resize-se
+
+## screenshot/settings (F27.2)
+
+- `[data-testid="settings-screenshot-shortcut"]` — interactive — F27.2.settings-screenshot-shortcut
+- `[data-testid="settings-screenshot-shortcut-reset"]` — interactive — F27.2.settings-screenshot-shortcut-reset
+- `[data-testid="settings-screenshot-shortcut-disable"]` — interactive — F27.2.settings-screenshot-shortcut-disable
+- `[data-testid="settings-screenshot-shortcut-status"]` — display — F27.2.settings-screenshot-shortcut-status
+- `[data-testid="settings-screenshot-shortcut-error"]` — display — F27.2.settings-screenshot-shortcut-error
+- `[data-testid="settings-screenshot-probe"]` — display — F27.2.settings-screenshot-probe
 
 ## servers (F-Servers-1)
 
@@ -1838,6 +1970,14 @@
 - `[data-testid="sql-completion-accept-enter"]` — interactive — F11.1.sql-completion-accept-enter
 - `[data-testid="sql-completion-reset"]` — interactive — F11.1.sql-completion-reset
 
+## settings/backup (F-BACKUP-1)
+
+- `[data-testid="backup-auto-toggle"]` — interactive — F-BACKUP-1.auto-toggle
+- `[data-testid="backup-frequency"]` — interactive — F-BACKUP-1.frequency
+- `[data-testid="backup-retained-copies"]` — interactive — F-BACKUP-1.retained-copies
+- `[data-testid="backup-last-success"]` — display — F-BACKUP-1.last-success
+- `[data-testid="backup-history-refresh"]` — interactive — F-BACKUP-1.history-refresh
+
 ## settings/backup (F-MFA-3)
 
 - `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup
@@ -1933,10 +2073,15 @@
 ## sftp (F7.5)
 
 - `[data-testid="sftp-local-path"]` — interactive — F7.5.local-path
+  ↳ `input[data-testid="sftp-local-path"]` — alias
 - `[data-testid="sftp-remote-path"]` — interactive — F7.5.remote-path
   ↳ `input[data-testid="sftp-remote-path"]` — alias
 - `[data-testid="sftp-local-path-edit"]` — interactive — F7.5.local-path-edit
 - `[data-testid="sftp-remote-path-edit"]` — interactive — F7.5.remote-path-edit
+- `[data-testid="sftp-local-path-suggestions"]` — display [optional] — F7.5.local-path-suggestions
+- `[data-testid="sftp-remote-path-suggestions"]` — display [optional] — F7.5.remote-path-suggestions
+- `[data-testid="sftp-local-path-suggestions"] [role="option"]` — interactive [optional] — F7.5.local-path-option
+- `[data-testid="sftp-remote-path-suggestions"] [role="option"]` — interactive [optional] — F7.5.remote-path-option
 - `[data-testid="sftp-local-back"]` — interactive — F7.5.local-back
 - `[data-testid="sftp-local-forward"]` — interactive — F7.5.local-forward
 - `[data-testid="sftp-local-up"]` — interactive — F7.5.local-up
@@ -2039,6 +2184,7 @@
 
 - `[data-testid="terminal-pane"]` — interactive — F2.2.terminal-pane
 - `[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea` — interactive — F2.2.terminal-keyboard-target
+- `button[title="Copy (Ctrl+C)"]` — interactive [optional] — F2.2.terminal-selection-copy
 - `[data-testid="attached-sftp-toggle"]` — interactive [optional] — F2.2.attached-sftp-toggle
 - `[data-testid="tab-chat-toggle"]` — interactive [optional] — F2.2.tab-chat-toggle
 - `[data-testid="context-menu"]` — display [optional] — F2.2.context-menu
@@ -2067,12 +2213,15 @@
 - `input[placeholder="Find"]` — interactive [optional] — F4.1.find-input
 - `span:has-text("Match")` — display [optional] — F4.1.find-match-info
 - `role=button[name="Close"]` — interactive [optional] — F4.1.find-close
+  ↳ `xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']` — alias
 
 ## terminal/right-menu (F4.2)
 
 - `text="Zoom in"` — interactive [optional] — F4.2.zoom-in
+  ↳ `[data-testid="context-menu-item-zoom-in"]` — alias
 - `text="Zoom out"` — interactive [optional] — F4.2.zoom-out
 - `text="Reset zoom"` — interactive [optional] — F4.2.zoom-reset
+  ↳ `[data-testid="context-menu-item-reset-zoom"]` — alias
 - `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
 - `[data-testid="context-menu-item-terminal-display"]` — interactive [optional] — F4.2.terminal-display-menu-item

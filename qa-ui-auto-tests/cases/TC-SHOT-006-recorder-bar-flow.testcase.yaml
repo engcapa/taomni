@@ -1,0 +1,96 @@
+id: TC-SHOT-006
+title: Recorder timer stop preview first-frame copy save cancellation and done
+description: Direct browser recorder route uses a synthetic PNG preview with stub metadata; it does not encode GIF or MP4, advance real video frames, or copy OS image bytes.
+covers: [F27.1]
+tags: [screenshot, recording, p2]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-recorder
+- wait_for: '[data-testid="screenshot-recorder-stop"]:enabled'
+- assert_visible: '[data-testid="screenshot-recorder-timer"]'
+- assert_text:
+    selector: '[data-testid="screenshot-recorder-range-hint"]'
+    contains: Recording inside the red border
+- assert_pattern:
+    selector: '[data-testid="screenshot-recorder-timer"]'
+    regex: '^\d{2}:\d{2}$'
+- assert_not_visible: '[data-testid="screenshot-recorder-preview"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_current_recording"')
+- click: '[data-testid="screenshot-recorder-stop"]'
+- wait_for: '[data-testid="screenshot-recorder-preview"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-recorder-preview"]'
+    name: src
+    matches: 'data:image/png;base64,.*'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-recorder-meta"]'
+    equals: '400×300 · 00:03 · 30 frames'
+- assert_not_visible: '[data-testid="screenshot-recorder-stop"]'
+- assert_not_visible: '[data-testid="screenshot-recorder-timer"]'
+- assert_not_visible: '[data-testid="screenshot-recorder-error"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_recording" && window.__taomniStubScreenshotCalls.at(-1).args.recordingId === "stub-rec-1"
+- click: '[data-testid="screenshot-recorder-copy"]'
+- assert_text:
+    selector: '[data-testid="screenshot-recorder"]'
+    contains: Copied the first frame (clipboards cannot hold animations)
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_copy_image"
+- click: '[data-testid="screenshot-recorder-save"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="text-input-dialog-input"]'
+    name: value
+    matches: 'Taomni-recording-.*\.gif'
+- click: '[data-testid="text-input-dialog-cancel"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_visible: '[data-testid="screenshot-recorder-preview"]'
+- eval_readonly:
+    expression: >-
+      !JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_save_image"')
+- click: '[data-testid="screenshot-recorder-done"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-recorder"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_stop_recording"').length === 2 && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_close_overlay"
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A ready recorder exposes timer and stop; stop transitions to the returned preview and exact stub metadata with no remaining recording controls.
+    actions: [1, 8]
+    checkpoints:
+    - {step: 4, expectation: The running recorder identifies the recording range and states that controls stay outside.}
+    - {step: 5, expectation: The running timer is formatted as minutes and seconds.}
+    - {step: 6, expectation: Preview is absent before stop.}
+    - {step: 7, expectation: Recorder initialization queried its current recording.}
+    - {step: 10, expectation: Preview uses the actual PNG stub payload rather than pretending to be encoded video.}
+    - {step: 11, expectation: 'Width, height, duration and frame count match the returned fixture exactly.'}
+    - {step: 12, expectation: Stop is replaced by preview controls.}
+    - {step: 13, expectation: The running timer is replaced by preview metadata.}
+    - {step: 14, expectation: No recorder error is displayed.}
+    - {step: 15, expectation: Stop targets stub-rec-1.}
+    results: [4, 10, 11, 12, 13, 14, 15]
+  - id: R2
+    requirement: Preview copy reports first-frame semantics; canceling save keeps the preview and sends no save request; Done closes without stopping twice.
+    actions: [16, 19, 22, 26]
+    checkpoints:
+    - {step: 17, expectation: The notice explicitly says only the first frame was copied.}
+    - {step: 18, expectation: The image-copy command was dispatched.}
+    - {step: 21, expectation: The image-preview branch offers a GIF destination.}
+    - {step: 23, expectation: Save cancel closes the path dialog.}
+    - {step: 24, expectation: The existing preview remains visible.}
+    - {step: 25, expectation: Cancel has not sent a save-image command.}
+    - {step: 28, expectation: Done unmounts the recorder.}
+    - {step: 29, expectation: There is exactly one stop request and a final close.}
+    results: [17, 18, 21, 23, 24, 25, 28, 29]
+  visual:
+  - check: Recording controls transition to preview, metadata and completion controls.
+    method: automated
+    reason: DOM assertions establish the synthetic preview workflow; they do not measure actual frames or encoded motion.
+  native:
+  - check: Capture timing, GIF/MP4 decoding, OS first-frame clipboard and native recorder window lifecycle.
+    method: external
+    reason: Native SHOT-N recording scenarios own the media and OS boundaries; this case uses the direct browser route.

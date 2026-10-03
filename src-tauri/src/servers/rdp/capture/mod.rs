@@ -42,6 +42,8 @@ pub(crate) mod mac;
 
 #[cfg(target_os = "windows")]
 pub(crate) mod win;
+#[cfg(target_os = "windows")]
+mod win_wgc;
 
 #[cfg(target_os = "linux")]
 #[derive(Clone, Copy, Debug, PartialEq)]

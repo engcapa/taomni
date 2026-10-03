@@ -61,6 +61,8 @@
       "items": {
         "enum": [
           "reset_db",
+          "backup_policy",
+          "path_completion",
           "ssh_required",
           "sftp_required",
           "mysql_required",
@@ -88,6 +90,7 @@
           "parity009_ssr",
           "parity007_extract",
           "mail_server",
+          "macos_updater",
           "rdp_server_required",
           "system_rdp_running",
           "release_build_required",
@@ -301,6 +304,22 @@
       "maxProperties": 1,
       "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
       "properties": {
+        "native_about": { "type": "null" },
+        "updater_fixture_mode": { "enum": ["correct", "broken", "slow"] },
+        "updater_release": { "enum": [1, 2] },
+        "assert_updater_installed": { "enum": ["aarch64", "x86_64"] },
+        "assert_updater_unchanged": { "type": "null" },
+        "assert_updater_progress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "max": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "seconds": { "type": "number", "minimum": 0.1, "maximum": 30 },
+            "old_transfer_done": { "type": "boolean" }
+          }
+        },
         "open": {
           "$ref": "#/$defs/url_or_app"
         },
@@ -348,6 +367,18 @@
         },
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
+        },
+        "drag_path": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector", "points"],
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "points": {"type": "array", "minItems": 2, "maxItems": 256, "items": {"$ref": "#/$defs/point"}}
+          }
+        },
+        "terminal_drag_selection": {
+          "$ref": "#/$defs/terminal_drag_selection_arg"
         },
         "fill": {
           "$ref": "#/$defs/fill_arg"
@@ -479,8 +510,47 @@
         "send_text_via_label": {
           "$ref": "#/$defs/send_text_via_label_arg"
         },
+        "screenshot_reference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector"],
+          "properties": {"selector": {"$ref": "#/$defs/selector"}}
+        },
+        "assert_screenshot_mask": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector", "crop", "polygon"],
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "crop": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["x", "y", "width", "height"],
+              "properties": {
+                "x": {"type": "integer", "minimum": 0},
+                "y": {"type": "integer", "minimum": 0},
+                "width": {"type": "integer", "minimum": 1},
+                "height": {"type": "integer", "minimum": 1}
+              }
+            },
+            "polygon": {
+              "type": "array", "minItems": 3, "maxItems": 256,
+              "items": {"$ref": "#/$defs/point"}
+            }
+          }
+        },
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
+        },
+        "native_screenshot_scenario": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scenario"],
+          "properties": {
+            "scenario": {"enum": ["capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand", "controls", "full-recorder"]},
+            "format": {"enum": ["gif", "mp4"]},
+            "secs": {"type": "integer", "minimum": 1, "maximum": 8}
+          }
         },
         "assert_file_contains": {
           "type": "object",
@@ -1542,6 +1612,14 @@
         "to": {
           "$ref": "#/$defs/selector"
         },
+        "from_position": {
+          "$ref": "#/$defs/point",
+          "description": "Pixel offset within the 'from' element where the target-based drag starts (Playwright source_position)."
+        },
+        "to_position": {
+          "$ref": "#/$defs/point",
+          "description": "Pixel offset within the 'to' element where the target-based drag ends (Playwright target_position)."
+        },
         "by": {
           "type": "object",
           "additionalProperties": false,
@@ -1576,6 +1654,15 @@
           ]
         }
       ]
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": {"type": "number"},
+        "y": {"type": "number"}
+      }
     },
     "fill_arg": {
       "type": "object",
@@ -2206,6 +2293,20 @@
         }
       }
     },
+    "terminal_drag_selection_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector"],
+      "properties": {
+        "selector": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["forward", "reverse"], "default": "forward"},
+        "modifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}
+        }
+      }
+    },
     "eval_readonly_arg": {
       "type": "object",
       "additionalProperties": false,
@@ -2263,6 +2364,12 @@
         "contains": {
           "type": "string",
           "description": "Optional: assert that String(result) contains this substring."
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Poll the read-only condition until it passes or this timeout expires; zero evaluates once."
         }
       }
     },

@@ -52,7 +52,6 @@ import {
 } from "../../lib/vncPointerScheduler";
 import { useVncStore } from "../../stores/vncStore";
 import { isEditableTarget, isTerminalFocused } from "../../lib/terminal/keyboardGuards";
-import { useAppStore } from "../../stores/appStore";
 import {
   ExternalLink,
   Maximize,
@@ -62,15 +61,13 @@ import {
   Minimize2,
   ShieldAlert,
 } from "lucide-react";
-import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
-import { CaptureMenuButton } from "../capture/CaptureMenuButton";
+import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
 import {
   FT_BUTTON_STYLE,
   FT_ICON_BUTTON_STYLE,
   FT_SEPARATOR_STYLE,
 } from "../floating-toolbar/floatingToolbarStyles";
-import { captureCanvasPng } from "../../lib/capture";
 import {
   readText as readClipboardText,
   readMultiFormat,
@@ -1787,29 +1784,6 @@ export default function VncPanel({
     overlayView = { kind: "disconnected", reason: conn?.error ?? null };
   }
 
-  // Publish this VNC canvas as the active capture source while connected and
-  // visible, so the screenshot actions (tab-strip `⋯` menu / detached capture
-  // button) target the framebuffer.
-  useEffect(() => {
-    if (!visible || !showCanvas) return;
-    const source: CaptureSource = {
-      filenamePrefix: `vnc-${host}`,
-      getVisible: async () => {
-        if (!canvasRef.current) throw new Error(t("vnc.notReady"));
-        return await captureCanvasPng(canvasRef.current);
-      },
-      getFull: async () => {
-        if (!canvasRef.current) throw new Error(t("vnc.notReady"));
-        return await captureCanvasPng(canvasRef.current);
-      },
-      getScrollFrame: async () => canvasRef.current ?? null,
-      getGifFrame: async () => canvasRef.current ?? null,
-      onStatus: (msg) => useAppStore.getState().setStatusMessage(msg),
-    };
-    useCaptureStore.getState().setSource(source);
-    return () => useCaptureStore.getState().clearSource(source);
-  }, [visible, showCanvas, host, t]);
-
   return (
     <div
       ref={containerRef}
@@ -1838,8 +1812,8 @@ export default function VncPanel({
     >
       {/* Tab-action toolbar. Always rendered so a dropped session can still be
           restored; the scale control needs the live canvas, so it's gated on
-          the connection state. Screenshot actions live in the tab-strip `⋯`
-          menu (main window) or the detached capture button. */}
+          the connection state. System capture lives in the main window bar
+          or the detached window's action slot. */}
       <TabActions active={visible}>
         {showCanvas && (
           <>
@@ -1906,8 +1880,8 @@ export default function VncPanel({
           )}
           {detachedWindowControls && (
             <>
+              <ScreenshotMenuButton />
               <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-              <CaptureMenuButton />
               <button
                 data-testid="detached-reattach"
                 onClick={detachedWindowControls.onReattach}

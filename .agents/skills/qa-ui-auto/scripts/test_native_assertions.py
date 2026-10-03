@@ -148,9 +148,35 @@ class NativeAssertionsTest(TestCase):
         self.assertEqual(ctx.session.execute.call_count, 2)
         self.assertEqual(
             [c.args[0] for c in ctx.session.press_combo.call_args_list],
-            ["Shift", "Enter", "Shift", "Enter"],
+            ["Shift", "Enter", "Control+c", "Control+u", "Shift", "Enter"],
         )
         self.assertEqual(result, "sent 10 chars to xterm input and submitted")
+
+    def test_terminal_probe_retry_interrupts_a_truncated_command_waiting_for_stdin(self):
+        ctx = Mock()
+        state = {"attempts": 0, "reading_stdin": False, "output": ""}
+
+        def insert(_script):
+            state["attempts"] += 1
+            if state["attempts"] == 1:
+                state["reading_stdin"] = True
+            elif not state["reading_stdin"]:
+                state["output"] = "ready\n"
+            return {"found": True, "focused": True}
+
+        def press(key):
+            if key == "Control+c":
+                state["reading_stdin"] = False
+
+        ctx.session.execute.side_effect = insert
+        ctx.session.press_combo.side_effect = press
+        ctx.session.text.side_effect = lambda _selector: state["output"]
+        run_native_step(ctx, "terminal_input", {
+            "selector": ".xterm-helper-textarea", "text": "echo ready", "submit": True,
+            "verify": {"selector": "#pane", "regex": r"(?m)^ready\r?$", "timeout_sec": 0.1, "attempts": 2},
+        })
+        self.assertEqual(state["output"], "ready\n")
+        self.assertEqual(state["attempts"], 2)
 
     def test_terminal_input_reports_a_probe_that_never_appears(self):
         ctx = Mock()
@@ -185,4 +211,3 @@ class NativeAssertionsTest(TestCase):
                 "verify": {"selector": "[data-testid=\"terminal-pane\"]"},
             })
         ctx.session.execute.assert_not_called()
-

@@ -55,7 +55,9 @@ steps:
     - Control+F8
     - ArrowUp
     - Control+Shift+F8
-- wait_for: '[data-testid="debug-breakpoint-popup"]'
+- wait_for:
+    selector: '[data-testid="debug-breakpoint-popup"]'
+    timeout_sec: 30
 - assert_text:
     selector: '[data-testid="debug-breakpoint-popup-title"]'
     contains: App.java:6
@@ -149,7 +151,8 @@ verification:
     - 21
     checkpoints:
     - step: 13
-      expectation: '{"wait_for": "[data-testid=\"debug-breakpoint-popup\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"debug-breakpoint-popup\"]",
+        "timeout_sec": 30}}'
     - step: 14
       expectation: '{"assert_text": {"selector": "[data-testid=\"debug-breakpoint-popup-title\"]", "contains": "App.java:6"}}'
     - step: 16

@@ -34,21 +34,29 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `middle_click` | selector string | Browser/native: real middle-button input; verifies tab auxiliary-click routing when paired with a close result assertion. |
 | `right_click` | same as click | Native supports selector only (W3C right button); rich click options are browser-only and fail explicitly. Use before `assert_menu_items`; `click_menu` supports an exact visible label in native mode. |
 | `hover` | selector | |
-| `drag_to` | `{from, to}` | Both selectors. |
+| `drag_to` | `{from, to, from_position?, to_position?}` or `{from, by:{dx, dy?, steps?}}` | Target-based drag preserves optional `{x,y}` element offsets (Playwright `source_position`/`target_position`, browser-only). Offset mode moves from the source element's center by CSS pixels without scrolling a target into view; `to` and `by` are mutually exclusive. |
+| `drag_path` | `{selector, points:[{x,y}, ...]}` | Browser-only multipoint pointer drag; 2–256 finite element-relative points, within its bounding box. Sends real mouse down/moves/up, releasing on failure. Use for freehand drawing/selection; assertions own geometry/content results. |
+| `terminal_drag_selection` | `{selector, direction?: forward\|reverse, modifiers?}` | Browser/native, three platforms. The selector identifies the terminal pane; its active search highlight locates a first-column output marker. Drags between 4 CSS px before the highlight's left edge and 2 px inside its right edge; optional Control+Shift exercises block selection. Native W3C input uses the interactive xterm root as element origin, since the highlight ignores pointer events. macOS dispatches packaged WebView events and does not prove OS mouse input. Records geometry in `terminal-selection-drags.json` and releases input sources on failure. Pair with exact selected-text assertions; the action itself does not establish selection correctness. |
 | `native_click` | `{selector}` | Native Linux/X11 only. Activates the exact test executable window and sends W3C pointer actions through its packaged WebKitGTK session; testcase assertions own the postcondition. |
 | `native_pointer_drag` | `{selector, from:{line,column}, to:{line,column}, modifiers?}` | Native Linux/X11 only. Resolves CodeMirror line/column positions through read-only DOM geometry, then sends a real modifier-aware W3C pointer drag to the packaged WebKitGTK session. The verb records geometry/transport only; testcase assertions own selection and edit postconditions. |
 | `native_set_writable` | `{path, writable}` | Native Linux only. Toggles owner-write permission for a path inside the current retained report root and records mode metadata; used for deterministic real-write failure/recovery evidence. |
 | `host_write_file` | `{path, text}` | Writes real UTF-8 bytes (LF-preserving) to an existing path inside the current retained report root and records before/after SHA-256 metadata. Simulates a genuine external editor/process mutation while the app holds stale state; testcase assertions own the app-reaction postconditions via the file-assertion verbs. |
 | `native_clipboard_owner` | `{action, text?}` | Native Linux/X11 only. Drives an out-of-process X11 CLIPBOARD selection owner. `grant` takes the selection with `text` (postcondition verified by an external read); `deny` replaces it with an owner that advertises standard text targets but rejects their conversion, causing an immediate real OS read failure; `suspend` retains the timeout-based unresponsive-owner fault; `resume` restores the last granted text; `release` terminates it. Teardown always kills the owner and records that the host selection was replaced - it is deliberately not republished, because an X11 selection needs a live owner and faking a restore would leak a process. |
 
+## Native screenshot boundaries
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `native_screenshot_scenario` | `{scenario, format?, secs?}` | Isolated debug QA app only, Linux/Windows/macOS. `scenario`: `capture`, `capture-fidelity`, `scroll`, `overlay-copy`, `record`, `recorder`, `pin`, `freehand`, `hotkey`, `ocr-redact`, `controls`, `full-recorder`. `full-recorder` verifies whole-display capture hides controls when no safe position exists, finishes through the production hotkey route, decodes the GIF preview and cleans up; OS key delivery belongs to `hotkey`. `controls` drives the current-window menu and real scroll start/finish/cancel, checks native boundary/control geometry and compares the stopped output with the retained original page. `record`/`recorder` require `format: gif\|mp4`; only `record` accepts `secs` (1–8, default 3). Settles Rust IPC asynchronously on every WebView. `capture-fidelity` checks native row fixture pixels; `ocr-redact` requires real Tesseract language data and verifies OCR/redaction undo/redo plus clipboard export. Opens real child windows and verifies real captures, OS clipboard pixels, decoded clip frames against retained original scene pixels (per-run nonce/frame id and ordered timing), full stitched-page pixels against the retained original including text/shapes/seams, pin cleanup or OS hotkey. Timing is anchored to each original state's actual visibility interval, not just its draw instant; a real held source is separated from unexplained missing motion, with both raw/unexplained gaps reported. Media frame count/change alone cannot pass; originals, expected/actual/difference PNGs and per-frame comparison JSON use process-unique names to survive app restarts between cases. Saves the full result even on failure. Child-window DOM input is renderer automation, not physical pointer evidence; scroll/hotkey use OS injection. `freehand` draws a fixed concave contour with real OS pointer input, drives public Pin and Copy, compares original interior RGB and exact interior/exterior alpha (only a 2px contour-edge band is excluded), and verifies actual native pin displacement/topmost/survival/cleanup. Linux topmost requires a successful read of the actual X11 `_NET_WM_STATE_ABOVE` atom; the potentially stale GTK/Tao cache is retained as diagnostic data, not substituted for window-manager evidence. Permission/capability failures stay failures. |
+
 ## Keyboard
 
 | Verb | Args | Notes |
 |------|------|-------|
-| `fill` | `{selector, value}` | Replaces field content. |
+| `fill` | `{selector, value}` | Replaces field content. Native Linux password fields require exact value retention. If WebDriver string input changes shifted characters, the driver pastes through the OS clipboard, verifies the field and restores the prior clipboard text. |
 | `type` | string or `{selector, text}` | Types into the current focus, or focuses `selector` immediately before typing. Prefer `fill` for ordinary inputs. |
 | `send_keys` | string or `{selector, text}` | Same as `type`. |
-| `terminal_input` | `{selector, text, submit?}` | Dispatches standards-based text input to xterm's helper textarea, then optionally submits with a separate Enter key. A text-free Shift key cycle first resets xterm’s stale keypress suppression state. This exercises xterm `onData`, the product input path, and the real PTY while avoiding hidden-textarea key synthesis differences in Windows Chromium/WebView2. It is renderer/WebView automation, not physical OS keyboard evidence. Wait for `data-terminal-ready="true"` first. `verify` (`{selector, regex, timeout_sec?=10, attempts?=2}`) polls that selector's text / `data-terminal-text` after each dispatch and re-sends the whole input while it does not match — Windows OpenSSH/ConPTY intermittently drops part of a pty write, and re-sending the probe is the only recovery. The testcase's own assertion still owns the outcome. |
+| `terminal_input` | `{selector, text, submit?}` | Dispatches standards-based text input to xterm's helper textarea, then optionally submits with a separate Enter key. A text-free Shift key cycle first resets xterm’s stale keypress suppression state. This exercises xterm `onData`, the product input path, and the real PTY while avoiding hidden-textarea key synthesis differences in Windows Chromium/WebView2. It is renderer/WebView automation, not physical OS keyboard evidence. Wait for `data-terminal-ready="true"` first. `verify` (`{selector, regex, timeout_sec?=10, attempts?=2}`) polls that selector's text / `data-terminal-text` after each dispatch and re-sends the whole input while it does not match — Windows OpenSSH/ConPTY intermittently drops part of a pty write, a retry interrupts the failed probe with Control+C and clears the unfinished shell line with Control+U before re-sending it. Recovery applies only between verified attempts; it does not change a first attempt or an unverified draft. The testcase's own assertion still owns the outcome. |
 | `compose_text` | `{selector, text, during_key?}` | Browser-only composition lifecycle; optionally dispatches one composing key before committing text. Never substitutes for native IME evidence. |
 | `set_viewport` | `{width, height}` | Browser-only: resize the current Playwright viewport to inspect responsive UI and popup clipping. |
 | `native_keys` | `{selector, keys, transport?, focus_target?, focus_prechecked?, ready_selector?, ready_timeout_sec?, ready_stable_sec?, require_keydown_prevented?}` | Requires the selector to own focus. `focus_target: true` first focuses it through WebDriver and then verifies ownership; use this when a platform click does not reliably transfer DOM focus. Default `transport: x11` injects XTest keys through Linux/X11 and identifies the Taomni window. `transport: webdriver` uses W3C actions in the platform WebView (Windows/Linux), not OS-level input. `ready_selector` is polled after input setup and immediately before delivery; `ready_stable_sec` additionally requires the same element and markup to remain stable. `require_keydown_prevented` observes each keydown after event dispatch and proves it was consumed. `focus_prechecked: true` is limited to a testcase that asserted focus immediately before a driver fault; it omits WebDriver probes/event collection and records that limitation. `focus_target` and `focus_prechecked` are mutually exclusive. Testcase assertions own the postcondition. |
@@ -71,6 +79,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_pattern` | `{selector, regex, timeout_sec?}` | Browser and native; polls Python regex against element text (terminal buffer fallback for `terminal-pane`). Use anchored output assertions to distinguish shell output from command echo, and await shell readiness before typing. |
 | `assert_count` | `{selector, min?/max?/equal?}` | Browser/native. Pick at least one bound; checks current count, including hidden matches. Wait for readiness separately. |
 | `assert_url` | URL substring | |
+| `screenshot_reference` | `{selector}` | Browser-only: retains the decoded original PNG from one loaded image before export/unmount. Reads only image metadata/bytes into QA state and saves `screenshot-mask-original.png`; never injects pixels into the app. Requires Pillow. |
+| `assert_screenshot_mask` | `{selector, crop:{x,y,width,height}, polygon:[{x,y},...]}` | Browser-only: decodes the exported PNG and independently masks the retained original with the testcase's fixed crop-local physical polygon. Exact nonboundary interior/exterior alpha and fixed lossless RGB tile thresholds; 2px edge-only tolerance. Retains original/expected/actual/difference/metrics on failure too. Does not prove OS capture, clipboard or native window effects. |
 | `assert_menu_items` | `[label, label, ...]` | Browser/native. After `right_click`; checks each label visible inside `[data-testid="context-menu"]` using substring matching. |
 
 ## App-specific helpers (use these instead of inlining selector chains)
@@ -123,6 +133,24 @@ real JDT LS, Rust IPC or disk effects.
 | `parity005_wait_pending` | `fetch \| resolve` | Waits for a real pending request from the renderer. |
 | `parity005_release` | `fetch \| resolve` | Releases held responses; fails if none is pending. |
 | `parity005_trace` | `{fetch?, resolve?, pending?}` | Asserts exact request counts and saves the read-only event trace in the case report. |
+
+## macOS updater release regression
+
+Native macOS only, with `macos_updater`. Downloads SHA256-pinned, authentically signed
+v0.4.29 ARM/Intel assets, runs the production release manifest generator, and serves
+loopback HTTP to the real updater. Only the disposable report-owned app is replaced.
+
+| Verb | Arguments | Behavior |
+|---|---|---|
+| `native_about` | `null` | macOS QA bridge activates the installed AppKit NSMenu About item; requires enabled real menu and runs its native event/frontend callback. Does not synthesize app state or a command. |
+| `updater_fixture_mode` | `broken \| correct \| slow` | Switches the fixture manifest, not application state. `broken` pairs ARM signature with Intel URL; `correct` retains generated per-arch URLs; `slow` holds first/second streams at 20%/60%. |
+| `updater_release` | `1 \| 2` | Releases one held real HTTP download; does not synthesize IPC progress. |
+| `assert_updater_installed` | `aarch64 \| x86_64` | Independently reads installed executable SHA256, `lipo` architecture and Info.plist version against the authentic archive; retains installed-*.json. |
+| `assert_updater_unchanged` | `null` | Requires the disposable executable to retain its pre-case bytes after rejection/cancellation. |
+| `assert_updater_progress` | `{min, max, seconds?, old_transfer_done?}` | Samples native dialog phase/aria progress, requires monotonic percentages within the bounds, retains raw samples. When `old_transfer_done`, the cancelled HTTP stream must have finished and the app must be unchanged. |
+
+These cases do not establish production relaunch, Rosetta execution or Gatekeeper.
+Cancellation discards late plugin bytes; it does not claim unsupported transport abortion.
 
 ## ED-PARITY-008 / ED-PARITY-009 controlled browser fixtures
 
@@ -231,7 +259,7 @@ Relative paths resolve from the repository root.
 
 | Verb | Args | Notes |
 |------|------|-------|
-| `eval_readonly` | `{expression, expect_truthy?, contains?}` | Evaluates a single read-only JS expression. Schema **rejects** assignments, function declarations, `await`, `new`, `.click(`, `.setAttribute(`, `.dispatchEvent(`, `.innerHTML=`, `document.write`. Use for things like reading `localStorage` to verify persistence. Max 400 chars. |
+| `eval_readonly` | `{expression, expect_truthy?, contains?, timeout_sec?}` | Evaluates a read-only JS expression once by default; optional `timeout_sec` polls the same condition until it passes or the bounded timeout expires. Browser/native share the assertion and polling rules. Schema **rejects** assignments, function declarations, `await`, `new`, `.click(`, `.setAttribute(`, `.dispatchEvent(`, `.innerHTML=`, `document.write`. Use for things like reading `localStorage` to verify persistence. Max 400 chars. |
 
 ## What you should NOT do
 

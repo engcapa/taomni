@@ -1,0 +1,48 @@
+id: TC-SHOT-N12
+title: Native current window, scroll stop and cancel, visible range and exclusion
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: controls
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: controls
+    requirement: Production current-window entry preserves main visibility; default capture hides it; scroll progress reports at least two frames; Finish keeps
+      original page pixels and Cancel preserves the crop and annotations; native control and boundary rectangles never intersect
+      captured pixels.
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: 'Current-window entry preselects its physical bounds while main stays visible; default entry hides main. After at least two captured frames, click Finish and observe the surviving overlay return to selection with a longer image matching the original page pixels. Click Cancel in a second run and observe the original crop and one annotation preserved. Visible native controls and range borders lie outside the crop; all temporary controls and borders close after either operation.'
+    - step: 4
+      expectation: 'assert_visible: [data-testid="system-screenshot"]'
+    results:
+    - 3
+    - 4
+  visual:
+  - check: Observable capture UI and operation results
+    method: automated
+    reason: Assertions check the stated visible states and geometry; retained screenshots allow review.
+  native:
+  - check: Native capture and window lifecycle
+    method: automated
+    reason: Actual Tauri menu entry, OS capture, wheel input, window geometry and stopped-output pixel comparison. Linux control geometry is queried from the X server after progress begins, with Tao cache values retained for diagnosis. Renderer
+      scripts operate public controls; this does not claim physical mouse delivery.
+native_platforms:
+- Linux
+- Windows
+- macOS

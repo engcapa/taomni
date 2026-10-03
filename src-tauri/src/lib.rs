@@ -31,6 +31,7 @@ pub mod perf;
 mod proxy;
 mod qa_driver;
 mod rdp;
+mod screenshot;
 mod sdk;
 mod serial;
 mod servers;
@@ -49,13 +50,13 @@ mod vnc;
 pub use vnc::keyboard_hook::{
     HOOK_PROCESS_ARG as VNC_SPECIAL_KEY_HOOK_ARG, run_hook_process as run_vnc_special_key_hook,
 };
+mod structural_search;
 mod voice;
 mod windowing;
 mod workspace;
 mod workspace_execution;
 mod workspace_fs;
 mod workspace_search;
-mod structural_search;
 pub mod workspace_tooling;
 mod wsl;
 
@@ -66,7 +67,7 @@ use tauri::{AppHandle, Manager, State, WebviewWindowBuilder};
 
 const AI_PROCESS_REAPER_INTERVAL_SECS: u64 = 30;
 const AI_PROCESS_IDLE_REAP_SECS: u64 = 300;
-const QA_APP_ID: &str = "com.taomni.app.qa";
+pub(crate) const QA_APP_ID: &str = "com.taomni.app.qa";
 
 fn qa_override_path(raw: &str) -> Option<std::path::PathBuf> {
     let path = std::path::PathBuf::from(raw.trim());
@@ -149,7 +150,9 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
+            screenshot::init(app.handle());
             let app_data = resolved_app_data_dir(app.handle())
                 .expect("failed to resolve app data dir");
 
@@ -215,6 +218,8 @@ pub fn run() {
             let local_history = local_history::init_local_history(app.handle())
                 .expect("failed to init local history store");
             app.manage(local_history);
+
+            backup::scheduler::start(app.handle());
 
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -1041,6 +1046,7 @@ pub fn run() {
             voice::commands::voice_stop_capture,
             voice::commands::voice_stop_and_transcribe,
             update::updater_platform,
+            update::qa_updater_check,
             proxy::get_app_proxy_config,
             proxy::save_app_proxy_config,
             proxy::get_app_proxy_url,
@@ -1065,6 +1071,45 @@ pub fn run() {
             lanchat::commands::lanchat_reject_file,
             lanchat::commands::lanchat_transfer_control,
             lanchat::commands::lanchat_send_screenshot,
+            screenshot::screenshot_list_displays,
+            screenshot::screenshot_capture_full,
+            screenshot::screenshot_capture_region,
+            screenshot::screenshot_scroll_capture,
+            screenshot::screenshot_scroll_status,
+            screenshot::screenshot_stop_scroll_capture,
+            screenshot::screenshot_copy_image,
+            screenshot::screenshot_save_image,
+            screenshot::screenshot_save_data_url,
+            screenshot::screenshot_read_file,
+            screenshot::screenshot_probe,
+            screenshot::screenshot_open_overlay,
+            screenshot::screenshot_overlay_init,
+            screenshot::screenshot_overlay_update,
+            screenshot::screenshot_close_overlay,
+            screenshot::screenshot_pin_to_screen,
+            screenshot::screenshot_pin_init,
+            screenshot::screenshot_close_pin,
+            screenshot::screenshot_ocr,
+            screenshot::screenshot_auto_redact,
+            screenshot::screenshot_start_recording,
+            screenshot::screenshot_stop_recording,
+            screenshot::screenshot_cancel_recording,
+            screenshot::screenshot_current_recording,
+            screenshot::screenshot_recording_status,
+            screenshot::shortcut::screenshot_shortcut_status,
+            screenshot::shortcut::screenshot_shortcut_set,
+            screenshot::qa::screenshot_qa_capture,
+            screenshot::qa::screenshot_qa_capture_fidelity,
+            screenshot::qa::screenshot_qa_ocr_redact,
+            screenshot::qa::screenshot_qa_scroll,
+            screenshot::qa::screenshot_qa_record,
+            screenshot::qa::screenshot_qa_overlay_copy,
+            screenshot::qa::screenshot_qa_recorder,
+            screenshot::qa::screenshot_qa_controls,
+            screenshot::qa::screenshot_qa_full_recorder,
+            screenshot::qa::screenshot_qa_pin,
+            screenshot::qa::screenshot_qa_freehand,
+            screenshot::qa::screenshot_qa_hotkey,
             lanchat::commands::lanchat_send_clipboard_image,
             lanchat::commands::lanchat_send_image_bytes,
             lanchat::commands::lanchat_send_signal,
@@ -1129,10 +1174,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { code, ref api, .. } = event {
+                backup::scheduler::handle_exit_request(app_handle, code, api);
+            }
             // On app exit, cleanly stop the elevated SocksCap helper (and its
             // WinDivert driver) so no elevated process/driver leaks. The
             // helper's parent-death watchdog covers crash/kill paths.
             if let tauri::RunEvent::Exit = event {
+                screenshot::shutdown();
                 let state = app_handle.state::<AppState>();
                 sockscap::shutdown_on_exit(app_handle, &state);
             }

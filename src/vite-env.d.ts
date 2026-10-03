@@ -9,3 +9,4 @@ declare const __APP_VERSION__: string;
  */
 declare const __TAOMNI_QA_SAVE_GATE__: boolean;
 declare const __TAOMNI_QA_COMPLETION_OBSERVATION__: boolean;
+declare const __TAOMNI_QA_UPDATER__: boolean;

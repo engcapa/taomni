@@ -37,7 +37,7 @@ import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
 import { WindowDragHandle } from "../window/WindowDragHandle";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
-import { CaptureIndicators } from "../capture/CaptureIndicators";
+import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import type { AppCommand } from "../menubar/commands";
 import { getAppPlatform } from "../../lib/runtime";
@@ -253,7 +253,6 @@ export function ControlBar({
       <UpdateHint />
       {/* Per-tab contextual actions portal in here (SFTP / Chat / detach …). */}
       <div ref={slotRef} data-testid="tab-action-slot" className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" />
-      <CaptureIndicators />
       <button
         type="button"
         data-testid="tab-details-hover"
@@ -275,15 +274,17 @@ export function ControlBar({
       <div className={IS_MAC ? "w-2 self-stretch shrink-0" : "w-3 self-stretch shrink-0"} />
       {/* Divider between the tab-related buttons and the main-window controls. */}
       <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />
+      {/* System screenshot: independent of any tab — global window chrome.
+          Click captures immediately; the chevron offers timed (delayed) capture
+          Flameshot-style. Clicking during a countdown cancels it. */}
+      <ScreenshotMenuButton />
       <TitleBarTrayControls />
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>
   );
 }
 
-/** The `⋯` open-tabs overflow button + its dropdown, relocated from the tab
- *  strip to the right end of the tab-action group. The dropdown also lists the
- *  active tab's Screenshot actions (see OpenTabsMenu). */
+/** The open-tabs overflow dropdown at the right of the tab-action group. */
 function TabMore({ onDetachActiveTab }: { onDetachActiveTab?: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);

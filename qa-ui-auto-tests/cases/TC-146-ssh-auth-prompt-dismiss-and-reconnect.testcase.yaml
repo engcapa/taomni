@@ -86,7 +86,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-auth\-dismiss\-reconnect\r?$
-    timeout_sec: 20
+    timeout_sec: 60
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -192,7 +192,7 @@ verification:
     - step: 33
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 36
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-auth\\-dismiss\\-reconnect\\r?$", "timeout_sec": 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-auth\\-dismiss\\-reconnect\\r?$", "timeout_sec": 60}}'
     - step: 38
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 40

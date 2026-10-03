@@ -1,0 +1,86 @@
+id: TC-SHOT-009
+title: Number tool commits one marker per click and invalidates redo on a new branch
+description: Counts actual committed marker shapes; numeric glyph sequencing is covered by canvas/unit checks rather than inferred from DOM counts.
+covers: [F27.1]
+tags: [screenshot, annotate, history, p2]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- click: '[data-testid="screenshot-tool-number"]'
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position: {x: 100, y: 100}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position: {x: 200, y: 150}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position: {x: 300, y: 200}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="3"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="0"]'
+- assert_disabled: '[data-testid="screenshot-undo"]'
+- assert_enabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-redo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position: {x: 400, y: 250}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- click: '[data-testid="screenshot-redo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Three normal clicks on the number tool commit exactly three markers without duplicate mousedown/click placement.
+    actions: [1, 2, 4, 6, 7, 9, 11]
+    checkpoints:
+    - {step: 8, expectation: The first click commits exactly one marker.}
+    - {step: 10, expectation: The second click raises the count to two.}
+    - {step: 12, expectation: The third click raises the count to three.}
+    - {step: 13, expectation: Fresh marker placement does not enable redo.}
+    results: [8, 10, 12, 13]
+  - id: R2
+    requirement: Undo removes one marker at a time; redo restores one; a subsequent placement discards the old redo branch and remains undoable.
+    actions: [14, 16, 18, 22, 24, 27, 29, 32]
+    checkpoints:
+    - {step: 15, expectation: First undo leaves two markers.}
+    - {step: 17, expectation: Second undo leaves one marker.}
+    - {step: 19, expectation: Third undo leaves zero markers.}
+    - {step: 20, expectation: Undo is exhausted.}
+    - {step: 21, expectation: Undone placement creates redo history.}
+    - {step: 23, expectation: Redo restores exactly one marker.}
+    - {step: 25, expectation: New placement creates exactly one additional marker.}
+    - {step: 26, expectation: New placement clears the old redo branch.}
+    - {step: 28, expectation: The new placement can be undone.}
+    - {step: 30, expectation: The new placement can be redone.}
+    - {step: 31, expectation: Redo is exhausted again.}
+    - {step: 33, expectation: Cancel remains available.}
+    results: [15, 17, 19, 20, 21, 23, 25, 26, 28, 30, 31, 33]
+  visual:
+  - check: Number-marker placement and shape-list history.
+    method: automated
+    reason: data-shapes proves marker count and history, not circled-number glyph content or native rendering.
+  native:
+  - check: Native numbered-marker pixel fidelity.
+    method: external
+    reason: Synthetic browser history evidence does not certify captured native pixels.

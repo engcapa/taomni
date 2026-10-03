@@ -121,6 +121,7 @@ export interface ObjStorageSessionState {
 
 interface ObjStorageStoreState {
   sessions: Record<string, ObjStorageSessionState>;
+  listPath: (sessionId: string, side: PaneSide, path: string) => Promise<FileEntry[]>;
   attach: (sessionId: string, config: ObjectStorageConfig) => Promise<void>;
   detach: (sessionId: string) => Promise<void>;
   ensureSession: (sessionId: string) => ObjStorageSessionState;
@@ -353,6 +354,8 @@ export const useObjectStorageStore = create<ObjStorageStoreState>((set, get) => 
       return { sessions: next };
     });
   },
+
+  listPath: async (sessionId, side, path) => (await listSide(sessionId, side, path)).entries,
 
   refreshPane: async (sessionId, side) => {
     const session = get().sessions[sessionId];

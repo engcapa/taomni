@@ -1,0 +1,26 @@
+id: TC-SHOT-N3
+title: Native overlay selects annotates and copies real per-axis pixels
+covers: [F27.1]
+tags: [screenshot, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: overlay-copy}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: overlay-copy
+    requirement: Real captured image loads without canvas taint, region and rectangle commit, copy closes overlay and restores main.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "Main hidden during capture, one rectangle committed, clipboard crop matches independent physical x/y scaling and red stroke at expected edge; PNG retained."}
+    - {step: 4, expectation: Main window usable after copy.}
+    results: [3, 4]
+  visual:
+  - {check: Overlay and annotation appearance, method: external, reason: Inspect clipboard PNG; child-window DOM events prove renderer wiring not physical pointer handling.}
+  native:
+  - {check: Windows transport and clipboard, method: automated, reason: Actual Tauri overlay and raw-file IPC with OS clipboard image readback.}

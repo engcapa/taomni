@@ -51,16 +51,8 @@ import {
   writeText as clipboardWriteText,
   writeMultiFormat as clipboardWriteMultiFormat,
 } from "../../lib/clipboard";
-import {
-  captureContainerCanvasesPng,
-  captureXtermFullBuffer,
-  captureXtermVisible,
-  renderXtermVisibleToCanvas,
-  type XtermCaptureTheme,
-} from "../../lib/capture";
-import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
 import { useAppTheme } from "../../lib/appTheme";
-import { CaptureMenuButton } from "../capture/CaptureMenuButton";
+import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
 import { useConfirmDialog } from "../sidebar/ConfirmDialog";
 import {
@@ -576,6 +568,7 @@ export function TerminalPanel({
   const [searchOpen, setSearchOpen] = useState(false);
   const [eventLogOpen, setEventLogOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const searchTimerRef = useRef<number | null>(null);
   const [searchStatus, setSearchStatus] = useState("");
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
@@ -738,7 +731,6 @@ export function TerminalPanel({
     };
     setEventLog((items) => [...items.slice(-199), entry]);
   }, []);
-
 
 
   // Per-host command history for inline ghost-text suggestions.
@@ -1596,7 +1588,15 @@ export function TerminalPanel({
     setSearchStatus("");
   }, []);
 
+  const cancelPendingSearch = useCallback(() => {
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+  }, []);
+
   const closeSearch = useCallback(() => {
+    cancelPendingSearch();
     setSearchOpen(false);
     setSearchStatus("");
     setSearchMatches([]);
@@ -1605,9 +1605,10 @@ export function TerminalPanel({
     termRef.current?.clearSelection();
     clearTerminalBlockSelection();
     focusTerminal();
-  }, [clearTerminalBlockSelection, focusTerminal]);
+  }, [cancelPendingSearch, clearTerminalBlockSelection, focusTerminal]);
 
   const runSearch = useCallback((direction: "next" | "previous" = "next") => {
+    cancelPendingSearch();
     const terminal = termRef.current;
     const term = (searchInputRef.current?.value ?? searchValue).trim();
     if (!terminal || !term) {
@@ -1635,7 +1636,7 @@ export function TerminalPanel({
       setActiveSearchIndex(-1);
       setSearchStatus("No matches");
     }
-  }, [clearTerminalBlockSelection, searchValue]);
+  }, [cancelPendingSearch, clearTerminalBlockSelection, searchValue]);
 
   const renameTerminal = useCallback(async () => {
     if (!tabId) return;
@@ -2330,6 +2331,7 @@ export function TerminalPanel({
       if (!(target instanceof Node) || !containerRef.current?.contains(target)) {
         return;
       }
+      cancelPendingSearch();
       if (isTerminalBlockSelectionMouseEvent(event)) {
         startTerminalBlockSelection(event);
         return;
@@ -2340,7 +2342,7 @@ export function TerminalPanel({
       suppressNativePasteUntilRef.current = Date.now() + 500;
       middleClickSelectionRef.current = getActiveTerminalSelectionText();
     }
-  }, [clearTerminalBlockSelection, getActiveTerminalSelectionText, startTerminalBlockSelection]);
+  }, [cancelPendingSearch, clearTerminalBlockSelection, getActiveTerminalSelectionText, startTerminalBlockSelection]);
 
   const handleTerminalMouseUpCapture = useCallback((event: ReactMouseEvent) => {
     if (!isMac || event.button !== 1) return;
@@ -2413,7 +2415,6 @@ export function TerminalPanel({
   useEffect(() => {
     macroRecordingRef.current = macroRecording;
   }, [macroRecording]);
-
 
 
   // Initialize once for the lifetime of this tab. Visibility changes must not
@@ -3715,9 +3716,9 @@ export function TerminalPanel({
       return;
     }
 
-    const timer = window.setTimeout(() => runSearch("next"), 120);
-    return () => window.clearTimeout(timer);
-  }, [runSearch, searchOpen, searchValue]);
+    searchTimerRef.current = window.setTimeout(() => runSearch("next"), 120);
+    return cancelPendingSearch;
+  }, [cancelPendingSearch, runSearch, searchOpen, searchValue]);
 
   const searchHighlights = useMemo(
     () => getVisibleSearchHighlights(
@@ -3777,10 +3778,6 @@ export function TerminalPanel({
     fontLigatures ? "terminal-font-ligatures" : "terminal-no-font-ligatures",
   ].filter(Boolean).join(" ");
   const resolvedTheme = resolvePanelTheme(themeName);
-  // Latest theme/font for capture, read lazily so the registration effect below
-  // doesn't churn on every render (resolvedTheme is a fresh object each time).
-  const captureThemeRef = useRef({ resolvedTheme, fontFamily, fontSize });
-  captureThemeRef.current = { resolvedTheme, fontFamily, fontSize };
 
   // Register this terminal in the global registry so the AI Chat Drawer can
   // pull buffer context (`@terminal:last-N`) and push commands back into it
@@ -3884,53 +3881,6 @@ export function TerminalPanel({
     };
   }, [isLocal, localShell?.args, localShell?.id, localShell?.name, resolvedLocalShellId, setTerminalRuntime, tabId, registeredSessionId, tabTitle]);
 
-  // Publish this terminal's capture source while it's the active tab, so the
-  // screenshot actions (folded into the tab-strip `⋯` menu in the main window,
-  // or the capture button in a detached window) target its rendered content.
-  useEffect(() => {
-    if (!activeForShortcuts) return;
-    const themeOf = (): XtermCaptureTheme => {
-      const { resolvedTheme: rt, fontFamily: ff, fontSize: fs } = captureThemeRef.current;
-      return {
-        background: rt.background ?? "#1d1f21",
-        foreground: rt.foreground ?? "#eaeaea",
-        fontFamily: ff,
-        fontSize: fs,
-        lineHeight: 1.2,
-      };
-    };
-    const source: CaptureSource = {
-      filenamePrefix: tabTitle,
-      getVisible: async () => {
-        const term = termRef.current;
-        const container = containerRef.current;
-        if (!term) throw new Error("Terminal not ready");
-        try {
-          return await captureXtermVisible(term, themeOf());
-        } catch (err) {
-          if (container) return await captureContainerCanvasesPng(container);
-          throw err;
-        }
-      },
-      getFull: async () => {
-        const term = termRef.current;
-        if (!term) throw new Error("Terminal not ready");
-        return await captureXtermFullBuffer(term, themeOf());
-      },
-      getScrollFrame: () => {
-        const term = termRef.current;
-        return term ? renderXtermVisibleToCanvas(term, themeOf()) : null;
-      },
-      getGifFrame: () => {
-        const term = termRef.current;
-        return term ? renderXtermVisibleToCanvas(term, themeOf()) : null;
-      },
-      onStatus: (msg) => setStatusMessage(msg),
-    };
-    useCaptureStore.getState().setSource(source);
-    return () => useCaptureStore.getState().clearSource(source);
-  }, [activeForShortcuts, tabTitle, setStatusMessage]);
-
   return (
     <div
       ref={panelRef}
@@ -3958,7 +3908,7 @@ export function TerminalPanel({
       onMouseUpCapture={handleTerminalMouseUpCapture}
       onAuxClick={handleMiddleClick}
     >
-      <div ref={containerRef} className="w-full h-full overflow-hidden" />
+      <div ref={containerRef} className="terminal-host w-full h-full overflow-hidden" />
 
       <TabActions active={activeForShortcuts}>
         {sftpToggle && (
@@ -4004,9 +3954,10 @@ export function TerminalPanel({
             <ExternalLink size={14} />
           </button>
         )}
-        <CaptureMenuButton />
+
         {detachedWindowControls && (
           <>
+            <ScreenshotMenuButton />
             <button
               type="button"
               data-testid="detached-reattach"
@@ -5053,7 +5004,6 @@ function formatZmodemBytes(n: number): string {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
-
 
 // AI inline `??` rendering: stream LLM tokens directly into the terminal as
 // gray-styled ANSI text. The rendering is purely visual (xterm.write); it

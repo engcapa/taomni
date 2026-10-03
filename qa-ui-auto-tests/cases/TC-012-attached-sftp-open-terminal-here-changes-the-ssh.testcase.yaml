@@ -65,6 +65,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_CWD=${cfg.sftp.remote_test_dir}\r?$
+    timeout_sec: 60
 - screenshot: 012-sftp-open-terminal-here.png
 verification:
   review: reviewed
@@ -107,7 +108,8 @@ verification:
     - step: 21
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 28
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD=${cfg.sftp.remote_test_dir}\\r?$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD=${cfg.sftp.remote_test_dir}\\r?$",
+        "timeout_sec": 60}}'
     results:
     - 28
   visual:

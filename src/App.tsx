@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { MainLayout } from "./layouts/MainLayout";
 import {
   SftpDetachedWindow,
@@ -10,6 +10,20 @@ import { NotesDetachedWindow } from "./components/notes/NotesDetachedWindow";
 import { ServersDialog } from "./components/servers/ServersDialog";
 import { RdpServerApprovalBridge } from "./components/servers/RdpServerApprovalBridge";
 import { detectDetachedRoute } from "./lib/detachedSession";
+import {
+  isScreenshotOverlayWindow,
+  isScreenshotPinWindow,
+  isScreenshotQaFixtureWindow,
+  isScreenshotRecorderWindow,
+  isScreenshotScrollWindow,
+  isScreenshotBoundaryWindow,
+} from "./lib/screenshot";
+import { useScreenshotAppShortcut } from "./lib/screenshotShortcut";
+import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
+import { PinnedImage } from "./components/screenshot/PinnedImage";
+import { RecorderBar } from "./components/screenshot/RecorderBar";
+import { ScrollCaptureBar } from "./components/screenshot/ScrollCaptureBar";
+import { ScreenshotQaFixture } from "./components/screenshot/ScreenshotQaFixture";
 import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
 import { attachSftpSync } from "./lib/sftpSync";
@@ -26,6 +40,19 @@ function App() {
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
   const uiFontSize = useAppStore((s) => s.uiFontSize);
+  // Track the URL hash so in-app navigations (e.g. the browser stub for
+  // `screenshot_open_overlay`) re-render the route immediately.
+  const [routeHash, setRouteHash] = useState(
+    () => (typeof location !== "undefined" ? location.hash : ""),
+  );
+  useEffect(() => {
+    const onHashChange = () => setRouteHash(location.hash);
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // App-local fallback for the screenshot hotkey (see screenshotShortcut.ts).
+  useScreenshotAppShortcut();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -148,6 +175,46 @@ function App() {
 
   let content: ReactNode;
   let hostsRdpApprovals = false;
+  // Screenshot tool overlay / recorder windows render standalone, outside the
+  // main layout and the vault gate (they must work even while windows hide).
+  // The URL-hash fallback also serves browser-mode QA: opening
+  // `index.html#screenshot-overlay` renders the overlay in-page with stubbed
+  // capture backends.
+  const overlayHash = routeHash;
+  if (isScreenshotBoundaryWindow() || overlayHash.startsWith("#screenshot-boundary")) {
+    return <div data-testid="screenshot-recording-boundary" style={{ position: "fixed", inset: 0, background: "#ff4d4f", pointerEvents: "none" }} />;
+  }
+  if (isScreenshotScrollWindow() || overlayHash.startsWith("#screenshot-scroll")) return <ScrollCaptureBar />;
+  if (
+    isScreenshotOverlayWindow() ||
+    overlayHash.startsWith("#screenshot-overlay")
+  ) {
+    // The overlay needs the app-dialog host for its save-path prompt.
+    return (
+      <AppDialogProvider>
+        <ScreenshotOverlay />
+      </AppDialogProvider>
+    );
+  }
+  if (
+    isScreenshotRecorderWindow() ||
+    overlayHash.startsWith("#screenshot-recorder")
+  ) {
+    return (
+      <AppDialogProvider>
+        <RecorderBar />
+      </AppDialogProvider>
+    );
+  }
+  if (
+    isScreenshotPinWindow() ||
+    overlayHash.startsWith("#screenshot-pin")
+  ) {
+    return <PinnedImage />;
+  }
+  if (isScreenshotQaFixtureWindow() || overlayHash.startsWith("#screenshot-qa-")) {
+    return <ScreenshotQaFixture route={overlayHash.replace("#screenshot-qa-", "")} />;
+  }
   const detachedSftpId = detectDetachedSftpRoute();
   if (detachedSftpId) {
     content = <SftpDetachedWindow sessionId={detachedSftpId} />;

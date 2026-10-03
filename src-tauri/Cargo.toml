@@ -48,7 +48,8 @@ prost-build = "0.14"
 cc = "1"
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
+# Plain native windows keep capture range borders lightweight and out of the crop.
+tauri = { version = "2", features = ["protocol-asset", "unstable"] }
 tauri-plugin-log = "2"
 # In-app auto-update: pull signed bundles from GitHub Releases (see
 # claudedocs/auto-update-plan.md). `process` provides relaunch() after install.
@@ -191,7 +192,9 @@ cpal = { version = "0.17", optional = true }
 # x86 asm). Self-contained — no system ffmpeg/gstreamer. Linux-first per the
 # native-AV plan; the deps themselves are cross-platform.
 audiopus = { version = "0.3.0-rc.0", optional = true }
-openh264 = { version = "0.9", optional = true }
+# Also the screenshot tool's MP4 encoder (always on): built from source,
+# assembly is optional (nasm is used when present).
+openh264 = "0.9"
 # Camera capture for the native A/V stack (Linux: v4l2 via the `v4l` crate, which
 # uses raw videodev2 ioctls — no libv4l system dep). input-native picks the
 # platform backend; we only drive it on Linux.
@@ -238,10 +241,16 @@ socket2 = { version = "0.6", features = ["all"] }
 tauri-plugin-notification = "2.4.0"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
+# Screenshot tool recording: GIF encoder and MP4 (ISO BMFF) muxer.
+gif = "0.13"
+mp4 = "0.14"
 # Tight JPEG rectangles in the VNC client (VNC-PERF-004); already in the tree via image/tiff.
 zune-jpeg = "0.5"
 zune-core = "0.5"
 tauri-plugin-dialog = "2.7.3"
+# Screenshot hotkey. Pinned to 2.3.2: 2.4.0 requires tauri ^2.12 and would
+# force a workspace-wide tauri 2.11 -> 2.12 upgrade.
+tauri-plugin-global-shortcut = "=2.3.2"
 sqlparser = "0.62.0"
 scopeguard = "1.2"
 
@@ -274,7 +283,7 @@ screen-capture = ["dep:xcap"]
 # capture), audiopus (Opus) and openh264 (H.264). Off by default; enable for
 # Linux desktop bundles that need native voice/video. See
 # claudedocs/lanchat-linux-native-av-transport.md.
-native-av = ["dep:cpal", "dep:audiopus", "dep:openh264", "dep:nokhwa"]
+native-av = ["dep:cpal", "dep:audiopus", "dep:nokhwa"]
 asr-sherpa-onnx = []
 vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]
@@ -287,11 +296,20 @@ winapi = { version = "0.3", features = [
   "handleapi", "minwindef", "synchapi", "tlhelp32",
 ] }
 winreg = "0.55"
-# Windows console RDP capture: use xcap's WGC recorder so stop/drop closes the
-# native frame pool and session. The capture module supplies a bounded native
-# GDI fallback when Graphics Capture is unavailable.
+# Windows display enumeration/still capture uses xcap. Shared persistent
+# capture owns WGC directly to retain native sampling timestamps and lazy BGRA
+# readback; GDI remains the compatibility fallback.
 xcap = { version = "0.9.6", features = ["wgc"] }
 windows = { version = "0.62", features = [
+  "Foundation",
+  "Graphics_Capture",
+  "Graphics_DirectX_Direct3D11",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dxgi",
+  "Win32_System_Performance",
+  "Win32_System_WinRT_Direct3D11",
+  "Win32_System_WinRT_Graphics_Capture",
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
   "Win32_UI_Input_KeyboardAndMouse",

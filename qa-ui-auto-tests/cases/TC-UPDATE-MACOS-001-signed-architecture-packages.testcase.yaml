@@ -1,0 +1,90 @@
+id: TC-UPDATE-MACOS-001
+title: macOS updater rejects the overwritten ARM package, then installs each correct signed architecture
+covers: [F-Update-1, F1.8]
+tags: [p0, update, macos, packaging]
+modes: [native]
+native_platforms: [macOS]
+fixtures: [reset_db, macos_updater]
+timeout_sec: 240
+description: >-
+  Runs the real WKWebView update dialog and Tauri updater against authentic, SHA256-pinned
+  v0.4.29 ARM/Intel release bundles. The same release manifest generator stages originally
+  same-named local artifacts. First reproduce the overwritten ARM URL with its ARM signature:
+  verification must fail before touching the disposable app. Switch the loopback manifest to
+  the corrected mapping, retry from About, and install ARM then Intel via the real selector.
+  A QA-only builder redirects installation to this case's report-owned Disposable.app.
+  The running QA binary and /Applications are never replaced. No mock downloads, signatures
+  or installer. Does not establish launch/restart, Rosetta execution or notarization.
+steps:
+  - open: app
+  - wait_for: '[data-testid="welcome-panel"]'
+  - native_about: null
+  - wait_for: '[data-testid="about-dialog"]'
+  - click: '[data-testid="about-check-update"]'
+  - wait_for: '[data-testid="update-download"]'
+  - assert_attribute: {selector: '[data-testid="update-arch-darwin-aarch64"]', name: aria-pressed, equals: 'true'}
+  - click: '[data-testid="update-download"]'
+  - wait_for: {selector: '[data-testid="update-error"]', timeout_sec: 60}
+  - assert_text: {selector: '[data-testid="update-error"]', contains: signature}
+  - assert_updater_unchanged: null
+  - press: Escape
+  - updater_fixture_mode: correct
+  - native_about: null
+  - wait_for: '[data-testid="about-dialog"]'
+  - click: '[data-testid="about-check-update"]'
+  - wait_for: '[data-testid="update-download"]'
+  - click: '[data-testid="update-arch-darwin-aarch64"]'
+  - wait_for: '[data-testid="update-download"]:not(:disabled)'
+  - click: '[data-testid="update-download"]'
+  - wait_for: {selector: '[data-testid="update-restart"]', timeout_sec: 60}
+  - assert_updater_installed: aarch64
+  - press: Escape
+  - reload_window: null
+  - wait_for: '[data-testid="welcome-panel"]'
+  - native_about: null
+  - wait_for: '[data-testid="about-dialog"]'
+  - click: '[data-testid="about-version"]'
+  - wait_for: '[data-testid="update-download"]'
+  - click: '[data-testid="update-arch-darwin-x86_64"]'
+  - wait_for: '[data-testid="update-download"]:not(:disabled)'
+  - assert_attribute: {selector: '[data-testid="update-arch-darwin-x86_64"]', name: aria-pressed, equals: 'true'}
+  - click: '[data-testid="update-download"]'
+  - wait_for: {selector: '[data-testid="update-restart"]', timeout_sec: 60}
+  - assert_updater_installed: x86_64
+  - screenshot: signed-macos-packages.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-UPD-MAC-01
+      requirement: An ARM target with the overwritten Intel bytes is rejected by real minisign verification, preserving the installed app.
+      actions: [3, 5, 8]
+      checkpoints:
+        - {step: 10, expectation: Signature validation error is visible instead of the restart gate.}
+        - {step: 11, expectation: Independent host SHA256 still matches the original disposable app.}
+      results: [10, 11]
+    - id: V-UPD-MAC-02
+      requirement: Corrected ARM mapping downloads, verifies and installs the authentic ARM release through the architecture selector.
+      actions: [13, 14, 16, 18, 20]
+      checkpoints:
+        - {step: 21, expectation: Installation completes and user confirmation is required for restart.}
+        - {step: 22, expectation: 'Host executable SHA256 matches the signed archive, lipo reports arm64 and Info.plist reports 0.4.29.'}
+      results: [21, 22]
+    - id: V-UPD-MAC-03
+      requirement: The Intel choice and About version entry remain functional with the corrected release mapping.
+      actions: [24, 26, 28, 30, 33]
+      checkpoints:
+        - {step: 32, expectation: The Intel target is selected in the production dialog.}
+        - {step: 34, expectation: The Intel installation reaches the restart confirmation gate.}
+        - {step: 35, expectation: 'Host executable SHA256 matches the signed archive, lipo reports x86_64 and Info.plist reports 0.4.29.'}
+      results: [34, 35]
+  visual:
+    - check: Update architecture states and error/ready dialog remain observable.
+      method: automated
+      reason: Assert selected architecture and production controls; screenshot is retained, not a pixel-parity verdict.
+  native:
+    - check: Authentic signed release bytes cross real HTTP, Tauri updater verification and macOS filesystem installation.
+      method: automated
+      reason: Browser stubs cannot establish minisign verification or installed Mach-O bytes; install is restricted to a disposable report-owned app.
+    - check: Launch/restart, Rosetta and Developer ID/Gatekeeper behavior.
+      method: manual
+      reason: Not executed by this scoped fixture; the QA process is intentionally never replaced or restarted into a production bundle.

@@ -28,74 +28,62 @@ steps:
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Control+Shift+N
 - wait_for: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-files"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-files"][aria-selected="true"]'
+    timeout_sec: 15
 - press:
     key: Alt+ArrowRight
     macos_key: Control+ArrowRight
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-symbols"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-symbols"][aria-selected="true"]'
+    timeout_sec: 15
 - press:
     key: Alt+ArrowLeft
     macos_key: Control+ArrowLeft
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-files"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-files"][aria-selected="true"]'
+    timeout_sec: 15
 - press:
     key: Alt+ArrowLeft
     macos_key: Control+ArrowLeft
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-classes"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-classes"][aria-selected="true"]'
+    timeout_sec: 15
 - press:
     key: Alt+ArrowRight
     macos_key: Meta+Shift+BracketRight
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-files"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-files"][aria-selected="true"]'
+    timeout_sec: 15
 - press: ArrowRight
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-files"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-files"][aria-selected="true"]'
+    timeout_sec: 15
 - screenshot: tc-ide-parity-026-01-next-tab.png
 - press: Control+Tab
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-symbols"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-symbols"][aria-selected="true"]'
+    timeout_sec: 15
 - press: Control+Shift+Tab
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-files"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-files"][aria-selected="true"]'
+    timeout_sec: 15
 - press: Tab
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-symbols"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-symbols"][aria-selected="true"]'
+    timeout_sec: 15
 - press: Shift+Tab
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-files"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-files"][aria-selected="true"]'
+    timeout_sec: 15
 - press: Tab
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-symbols"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-symbols"][aria-selected="true"]'
+    timeout_sec: 15
 - press: Tab
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-actions"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-actions"][aria-selected="true"]'
+    timeout_sec: 15
 - wait_for: '[data-testid="code-workspace-search-everywhere"] [data-index="1"]'
 - eval_readonly:
     expression: document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]').length > 1
@@ -136,10 +124,9 @@ steps:
 - eval_readonly:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] input').value === ''
     expect_truthy: true
-- assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-files"]'
-    name: aria-selected
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="search-everywhere-tab-files"][aria-selected="true"]'
+    timeout_sec: 15
 - assert_visible: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
 - screenshot: tc-ide-parity-026-01-reopened.png
 - press: Escape
@@ -159,17 +146,17 @@ verification:
     - step: 14
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to file\"]"}'
     - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-classes\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-classes\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     results:
     - 14
     - 15
@@ -187,13 +174,13 @@ verification:
     - 33
     checkpoints:
     - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 34
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     results:
     - 28
     - 30
@@ -210,9 +197,9 @@ verification:
     - 48
     checkpoints:
     - step: 36
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 38
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-actions\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-actions\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 39
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"] [data-index=\"1\"]"}'
     - step: 40
@@ -253,7 +240,7 @@ verification:
     - step: 56
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] input'').value === ''''", "expect_truthy": true}}'
     - step: 57
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 58
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to file\"]"}'
     results:

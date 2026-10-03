@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import math
 import platform
 from typing import Any
 
@@ -136,7 +138,13 @@ def step_drag_to(ctx: StepContext, args: Any) -> None:
         dst = ctx.page.locator(args["to"]).first  # type: ignore[attr-defined]
         if ctx.dry_run:
             return
-        src.drag_to(dst, force=True)
+        kwargs: dict = {"force": True}
+        # Preserve explicit element offsets for screenshot canvas/handle drags.
+        if args.get("from_position"):
+            kwargs["source_position"] = args["from_position"]
+        if args.get("to_position"):
+            kwargs["target_position"] = args["to_position"]
+        src.drag_to(dst, **kwargs)
         return
     if ctx.dry_run:
         return
@@ -154,3 +162,86 @@ def step_drag_to(ctx: StepContext, args: Any) -> None:
     mouse.down()
     mouse.move(x + dx, y + dy, steps=steps)
     mouse.up()
+
+
+def terminal_selection_args(args: Any) -> tuple[str, str, list[str]]:
+    if not isinstance(args, dict) or not isinstance(args.get("selector"), str) or not args["selector"]:
+        raise StepError("terminal_drag_selection: expected {selector, direction?, modifiers?}")
+    direction = args.get("direction", "forward")
+    if direction not in {"forward", "reverse"}:
+        raise StepError("terminal_drag_selection: direction must be forward/reverse")
+    modifiers = args.get("modifiers", [])
+    if not isinstance(modifiers, list) or any(m not in {"Alt", "Control", "Meta", "Shift"} for m in modifiers):
+        raise StepError("terminal_drag_selection: modifiers must contain only Alt/Control/Meta/Shift")
+    return args["selector"], direction, modifiers
+
+
+def terminal_selection_points(box: dict[str, float] | None, direction: str) -> tuple[dict[str, float], dict[str, float]]:
+    if not box or box["width"] <= 4 or box["height"] <= 0:
+        raise StepError("terminal_drag_selection: target has no usable layout box")
+    # The search highlight identifies the output row without fixed font/row sizes.
+    # Start in the gutter; end inside the last cell so block selection has no extra column.
+    left = {"x": box["x"] - 4, "y": box["y"] + box["height"] / 2}
+    right = {"x": box["x"] + box["width"] - 2, "y": left["y"]}
+    return (left, right) if direction == "forward" else (right, left)
+
+
+def record_terminal_drag(ctx: Any, observation: dict[str, Any]) -> None:
+    path = ctx.case_dir / "terminal-selection-drags.json"
+    entries = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    entries.append(observation)
+    path.write_text(json.dumps(entries, indent=2) + "\n", encoding="utf-8")
+
+
+@verb("terminal_drag_selection")
+def step_terminal_drag_selection(ctx: StepContext, args: Any) -> None:
+    selector, direction, modifiers = terminal_selection_args(args)
+    if ctx.dry_run:
+        return
+    box = ctx.page.locator(selector + " .terminal-search-hit-active").first.bounding_box()
+    start, end = terminal_selection_points(box, direction)
+    page = ctx.page
+    held: list[str] = []
+    try:
+        for modifier in modifiers:
+            page.keyboard.down(modifier)
+            held.append(modifier)
+        page.mouse.move(**start)
+        page.mouse.down()
+        page.mouse.move(**end, steps=8)
+    finally:
+        page.mouse.up()
+        for modifier in reversed(held):
+            page.keyboard.up(modifier)
+    record_terminal_drag(ctx, {"mode": "browser", "selector": selector, "direction": direction,
+                               "modifiers": modifiers, "box": box, "start": start, "end": end})
+
+
+@verb("drag_path")
+def step_drag_path(ctx: StepContext, args: Any) -> None:
+    """Trace element-relative points with real browser pointer input, always releasing."""
+    if not isinstance(args, dict) or set(args) != {"selector", "points"}:
+        raise StepError("drag_path requires selector and points")
+    points = args["points"]
+    if not isinstance(points, list) or not 2 <= len(points) <= 256:
+        raise StepError("drag_path requires 2..256 points")
+    for p in points:
+        if (not isinstance(p, dict) or set(p) != {"x", "y"}
+                or any(isinstance(p[k], bool) or not isinstance(p[k], (int, float))
+                       or not math.isfinite(p[k]) for k in ("x", "y"))):
+            raise StepError("drag_path requires finite x/y coordinates")
+    if ctx.dry_run:
+        return
+    box = ctx.page.locator(args["selector"]).first.bounding_box()
+    if not box:
+        raise StepError("drag_path element has no visible bounding box")
+    if any(not 0 <= p["x"] <= box["width"] or not 0 <= p["y"] <= box["height"] for p in points):
+        raise StepError("drag_path point is outside the selected element")
+    mouse = ctx.page.mouse
+    mouse.move(box["x"] + points[0]["x"], box["y"] + points[0]["y"])
+    mouse.down()
+    try:
+        for p in points[1:]:
+            mouse.move(box["x"] + p["x"], box["y"] + p["y"], steps=8)
+    finally:
+        mouse.up()
