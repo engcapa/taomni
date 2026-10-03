@@ -30,6 +30,7 @@ function setup(visible = true) {
     isVisible: () => state.visible,
     sendAck: vi.fn(),
     requestFullRefresh: vi.fn(),
+    onFramePainted: vi.fn(),
     requestFrame: (callback) => {
       frames.push(callback);
       return frames.length;
@@ -60,10 +61,12 @@ describe("VncFramePainter", () => {
     painter.receive(new ArrayBuffer(0));
     expect(frames).toHaveLength(1);
     expect(host.sendAck).not.toHaveBeenCalled();
+    expect(host.onFramePainted).not.toHaveBeenCalled();
     runFrames();
     expect(putImageData).toHaveBeenCalledTimes(2);
     expect(canvas.width).toBe(4);
     expect(host.sendAck).toHaveBeenCalledTimes(1);
+    expect(host.onFramePainted).toHaveBeenCalledWith(1);
     expect(painter.scheduled).toBe(false);
     expect(painter.takeStats().fullFrame?.pixels).toBe(8);
   });
@@ -87,6 +90,7 @@ describe("VncFramePainter", () => {
     expect(putImageData).not.toHaveBeenCalled();
     expect(host.sendAck).not.toHaveBeenCalled();
     expect(host.requestFullRefresh).toHaveBeenCalledTimes(1);
+    expect(host.onFramePainted).not.toHaveBeenCalled();
   });
 
   it("forgets queued pixels on reset", () => {

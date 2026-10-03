@@ -2764,6 +2764,7 @@ controls:
 - 浏览器预览（`pnpm dev`）经 dev server VNC bridge 连接真实 RFB 服务器：None/VNCAuth、Raw、DesktopSize、Bell、legacy 与 ExtendedClipboard；不含原生 relay 的编码、OS 输入和系统剪贴板（TC-151 双模式）
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
+- 连续鼠标与键盘输入后，relay 以画布 ACK 作为帧背压、鼠标移动按显示帧合并，仍持续请求并绘制后续 framebuffer 更新（VNC-REG-001；TC-156 双模式）
 - view-only 与剪贴板方向（disabled / client→server / server→client / bidirectional）由前后端同时执行；None 默认拒绝
 - 当前不支持 VeNCrypt/X509 TLS，也不发送 RFB SetDesktopSize；RFB 18 anonymous TLS 已支持，但不提供服务器身份验证；窗口变化只调整本地显示
 

@@ -19,8 +19,8 @@ use uuid::Uuid;
 use crate::terminal::network::NetworkSettings;
 use crate::vnc::clipboard::{
     ACTION_NOTIFY, ACTION_PROVIDE, ACTION_REQUEST, ClipboardFormats, ExtendedClipboardMsg,
-    FORMAT_HTML, FORMAT_RTF, FORMAT_TEXT,
-    SUPPORTED_ACTIONS, build_caps_body, build_notify_body, build_provide_body, build_request_body,
+    FORMAT_HTML, FORMAT_RTF, FORMAT_TEXT, SUPPORTED_ACTIONS, build_caps_body, build_notify_body,
+    build_provide_body, build_request_body,
 };
 use crate::vnc::encodings::DecodedCursor;
 use crate::vnc::framebuffer::{Damage, FbRect, SharedFramebuffer};
@@ -326,21 +326,16 @@ struct ServerClipboardCaps {
     actions: u32,
 }
 
-/// How long after the last frontend ACK the relay keeps pipelining update
-/// requests. A hidden or stalled WebView stops acknowledging, so the server
-/// goes quiet instead of the relay decoding updates nobody will paint.
-const FRAME_STREAM_GRACE: Duration = Duration::from_secs(1);
-
 /// Update pacing between the RFB server, the authoritative framebuffer and
-/// the WebView. The relay requests the next incremental update as soon as one
-/// is decoded (like RealVNC Viewer) and, independently, sends the WebView the
-/// newest pixels of all accumulated damage whenever it has painted the
-/// previous frame. Slow painting therefore never drops pixels or triggers a
-/// full-refresh storm; it only coalesces more damage into the next frame.
+/// the WebView. A server request is released only after the WebView has
+/// acknowledged the frame that contains the previous damage. Old Vino
+/// versions can spend seconds encoding a 1680x1050 update; allowing a second
+/// request while WebKit is still painting makes those updates accumulate and
+/// can leave the remote desktop looking frozen. Cursor-only updates remain
+/// pipelined because they do not occupy the canvas painter.
 struct FrameFlow {
     damage: Damage,
     frontend_ready: bool,
-    last_ack: Instant,
     request_deferred: bool,
     frames_sent: u64,
     /// FramebufferUpdateRequests not yet answered by an update. Pixel-format
@@ -357,7 +352,6 @@ impl FrameFlow {
         Self {
             damage: Damage::default(),
             frontend_ready: true,
-            last_ack: Instant::now(),
             request_deferred: false,
             frames_sent: 0,
             // The handshake already sent the first full request.
@@ -368,8 +362,26 @@ impl FrameFlow {
         }
     }
 
-    fn streaming(&self) -> bool {
-        self.frontend_ready || self.last_ack.elapsed() < FRAME_STREAM_GRACE
+    /// Record the damage carried by one decoded update and report whether a
+    /// new request may be sent before the frontend ACK. Pixel damage occupies
+    /// the single canvas frame in flight; an empty update can be polled again.
+    fn note_update<I>(&mut self, rects: I) -> bool
+    where
+        I: IntoIterator<Item = FbRect>,
+    {
+        for rect in rects {
+            self.damage.add(rect);
+        }
+        let waiting_for_frontend = !self.frontend_ready || !self.damage.is_empty();
+        self.request_deferred = waiting_for_frontend;
+        !waiting_for_frontend
+    }
+
+    fn take_deferred_request(&mut self) -> bool {
+        // An unsolicited update or a refresh can queue another frame before
+        // this ACK arrives. Keep waiting if flush_frame sent that damage to
+        // the WebView; its own paint must be acknowledged first.
+        self.frontend_ready && self.damage.is_empty() && std::mem::take(&mut self.request_deferred)
     }
 }
 
@@ -582,7 +594,14 @@ fn quality_ready(quality: &SharedQuality, flow: &SharedFrameFlow) -> bool {
     if !quality.pending_needs_sync() {
         return true;
     }
-    flow.lock().map(|flow| flow.outstanding == 0).unwrap_or(false)
+    flow.lock()
+        .map(|flow| {
+            flow.outstanding == 0
+                && flow.frontend_ready
+                && flow.damage.is_empty()
+                && !flow.request_deferred
+        })
+        .unwrap_or(false)
 }
 
 fn note_request(flow: &SharedFrameFlow) {
@@ -1017,7 +1036,6 @@ async fn run_relay(
                         if let Ok(mut flow) = flow_read.lock() {
                             flow.damage.clear();
                             flow.frontend_ready = true;
-                            flow.last_ack = Instant::now();
                         }
                         let json = serde_json::to_string(&WsOutgoingText::DesktopSize {
                             width: fb_width,
@@ -1040,12 +1058,12 @@ async fn run_relay(
                             Ok(mut flow) => {
                                 flow.outstanding = flow.outstanding.saturating_sub(1);
                                 flow.last_update_at = Instant::now();
-                                for rect in rects {
-                                    flow.damage.add(rect);
-                                }
-                                let streaming = flow.streaming();
-                                flow.request_deferred = !streaming;
-                                streaming
+                                // Keep one screen frame in flight. This is
+                                // deliberately based on damage rather than
+                                // server timing: a slow old VNC server must
+                                // not receive another expensive request while
+                                // WebKit is still painting the previous one.
+                                flow.note_update(rects)
                             }
                             Err(_) => true,
                         }
@@ -1065,8 +1083,8 @@ async fn run_relay(
                                 tracing::warn!(%error, "VNC picture quality switch failed");
                             }
                         } else if request_now && !pending_quality {
-                            // Pipeline the next incremental request immediately so
-                            // server encoding overlaps relay and WebView painting.
+                            // Empty/cursor-only updates do not occupy the canvas;
+                            // keep polling those without waiting for an ACK.
                             if writer.request_update(true).is_ok() {
                                 note_request(&flow_read);
                             }
@@ -1186,21 +1204,21 @@ async fn run_relay(
             let result = match ctrl {
                 VncControl::Ack => {
                     // The WebView painted the previous frame: hand it the
-                    // accumulated damage and resume the request pipeline if a
-                    // hidden period paused it.
-                    let deferred = match flow_ctrl.lock() {
-                        Ok(mut flow) => {
-                            flow.frontend_ready = true;
-                            flow.last_ack = Instant::now();
-                            std::mem::take(&mut flow.request_deferred)
-                        }
-                        Err(_) => false,
-                    };
+                    // accumulated damage. If another frame was sent, wait for
+                    // its ACK before requesting more pixels from the server.
+                    if let Ok(mut flow) = flow_ctrl.lock() {
+                        flow.frontend_ready = true;
+                    }
                     flush_frame(&flow_ctrl, &framebuffer_ctrl, &ws_out_ctrl);
-                    if deferred {
-                        let mut writer = rfb_ctrl.lock().await;
+                    let mut writer = rfb_ctrl.lock().await;
+                    let request_now = flow_ctrl
+                        .lock()
+                        .map(|mut flow| flow.take_deferred_request())
+                        .unwrap_or(false);
+                    if request_now {
                         if quality_ready(&quality_ctrl, &flow_ctrl) {
-                            apply_pending_quality(&mut writer, &quality_ctrl, &flow_ctrl).map(|_| ())
+                            apply_pending_quality(&mut writer, &quality_ctrl, &flow_ctrl)
+                                .map(|_| ())
                         } else {
                             let result = writer.request_update(true);
                             if result.is_ok() {
@@ -1293,7 +1311,6 @@ async fn run_relay(
                     // also ask the server for a full update.
                     if let Ok(mut flow) = flow_ctrl.lock() {
                         flow.frontend_ready = true;
-                        flow.last_ack = Instant::now();
                         flow.request_deferred = false;
                     }
                     damage_full_framebuffer(&flow_ctrl, &framebuffer_ctrl);
@@ -1895,8 +1912,8 @@ async fn accept_authorized_ws(
 
 #[cfg(test)]
 mod tests {
-    use crate::vnc::encodings::ENCODING_DESKTOP_SIZE;
     use super::*;
+    use crate::vnc::encodings::ENCODING_DESKTOP_SIZE;
     use tokio::sync::oneshot;
     use tokio_tungstenite::connect_async;
     use tungstenite::client::IntoClientRequest;
@@ -1951,6 +1968,59 @@ mod tests {
         assert!(matches!(parse_binary_control(&[0]), Some(VncControl::Ack)));
         assert!(parse_binary_control(&[1]).is_none());
         assert!(parse_binary_control(&[3, 0]).is_none());
+    }
+
+    #[test]
+    fn frame_flow_waits_for_frontend_ack_after_pixel_damage() {
+        let mut flow = FrameFlow::new();
+        assert!(
+            !flow.note_update([FbRect::new(0, 0, 32, 32)]),
+            "a pixel update must occupy the one canvas frame in flight"
+        );
+        assert!(flow.request_deferred);
+
+        // Once the frame has been painted and acknowledged, an empty update
+        // can be polled immediately because it does not create another paint.
+        flow.frontend_ready = true;
+        flow.damage.clear();
+        flow.request_deferred = false;
+        assert!(flow.note_update(std::iter::empty::<FbRect>()));
+        assert!(!flow.request_deferred);
+
+        // An unsolicited update while a frame is still in flight is held for
+        // the next ACK as well.
+        flow.frontend_ready = false;
+        assert!(!flow.note_update(std::iter::empty::<FbRect>()));
+        assert!(flow.request_deferred);
+    }
+
+    #[tokio::test]
+    async fn deferred_request_waits_for_accumulated_damage_to_be_painted() {
+        let limits = crate::vnc::limits::DecodeLimits::default();
+        let framebuffer = crate::vnc::framebuffer::Framebuffer::new(2, 2, &limits)
+            .unwrap()
+            .shared();
+        let flow = Arc::new(std::sync::Mutex::new(FrameFlow::new()));
+        let (tx, rx) = FrameQueueSender::new(limits);
+
+        assert!(!flow.lock().unwrap().note_update([FbRect::new(0, 0, 1, 1)]));
+        assert!(flush_frame(&flow, &framebuffer, &tx));
+        assert!(matches!(rx.recv().await, Some(QueuedWsOutgoing::Frame(_))));
+
+        // A refresh/probe response arrives while the first frame is painting.
+        assert!(!flow.lock().unwrap().note_update([FbRect::new(1, 1, 1, 1)]));
+        flow.lock().unwrap().frontend_ready = true; // First paint ACK.
+        assert!(flush_frame(&flow, &framebuffer, &tx));
+        assert!(matches!(rx.recv().await, Some(QueuedWsOutgoing::Frame(_))));
+        assert!(
+            !flow.lock().unwrap().take_deferred_request(),
+            "the newly sent damage still needs its own paint ACK"
+        );
+
+        flow.lock().unwrap().frontend_ready = true; // Second paint ACK.
+        assert!(!flush_frame(&flow, &framebuffer, &tx));
+        assert!(flow.lock().unwrap().take_deferred_request());
+        assert!(!flow.lock().unwrap().take_deferred_request());
     }
 
     #[test]
@@ -2307,21 +2377,23 @@ mod tests {
     }
 
     /// Minimal RFB 3.8 server for relay tests: None security, 4x2 desktop.
-    /// Sends one Raw update, then waits for the client's *next* update request
-    /// (proving the relay pipelines requests without a WebView ACK), then —
-    /// once the test has received the first frame (`delivered`) — resizes to
-    /// 2x2 with a DesktopSize rect followed by a Raw rect. Without that wait
-    /// the resize can arrive while the first frame is still queued, and the
-    /// relay rightly drops frames of the old geometry.
+    /// Sends one Raw update, then waits for the client to acknowledge the
+    /// corresponding WebView frame before reading the next incremental update
+    /// request. It then resizes to 2x2 with a DesktopSize rect followed by a
+    /// Raw rect. Without the ACK boundary the resize can arrive while the
+    /// first frame is still queued, and the relay rightly drops frames of the
+    /// old geometry.
     fn start_pipeline_fixture() -> (
         u16,
         std::thread::JoinHandle<Vec<u8>>,
         std::sync::mpsc::Sender<()>,
+        tokio::sync::oneshot::Receiver<()>,
     ) {
         use std::io::{Read as _, Write as _};
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
         let (delivered, first_frame_delivered) = std::sync::mpsc::channel::<()>();
+        let (waiting, no_request_before_ack) = tokio::sync::oneshot::channel();
         let handle = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             stream
@@ -2370,12 +2442,29 @@ mod tests {
             first.extend_from_slice(&raw_rect(0, 0, 4, 2, 7));
             stream.write_all(&first).unwrap();
 
-            // The relay must ask for the next incremental update on its own.
-            let mut next_request = [0u8; 10];
-            stream.read_exact(&mut next_request).unwrap();
             first_frame_delivered
                 .recv_timeout(std::time::Duration::from_secs(10))
                 .expect("first frame delivered to the WebSocket");
+
+            // The relay must wait for the WebView ACK before asking the old
+            // server to encode another update.
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_millis(150)))
+                .unwrap();
+            let mut byte = [0u8; 1];
+            let error = stream
+                .read(&mut byte)
+                .expect_err("no RFB request is allowed before the paint ACK");
+            assert!(matches!(
+                error.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ));
+            waiting.send(()).unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+                .unwrap();
+            let mut next_request = [0u8; 10];
+            stream.read_exact(&mut next_request).unwrap();
 
             let mut resized = vec![0, 0, 0, 2];
             for field in [0u16, 0, 2, 2] {
@@ -2389,12 +2478,13 @@ mod tests {
             let _ = stream.read_to_end(&mut rest);
             next_request.to_vec()
         });
-        (port, handle, delivered)
+        (port, handle, delivered, no_request_before_ack)
     }
 
     #[tokio::test]
-    async fn relay_pipelines_requests_and_repaints_after_desktop_size() {
-        let (port, server, delivered) = start_pipeline_fixture();
+    async fn relay_waits_for_paint_ack_and_repaints_after_desktop_size() {
+        let (port, server, delivered, no_request_before_ack) = start_pipeline_fixture();
+        let mut no_request_before_ack = Some(no_request_before_ack);
         let session = spawn_vnc_relay(
             "127.0.0.1".into(),
             port,
@@ -2421,6 +2511,7 @@ mod tests {
         let mut texts = Vec::new();
         let mut frames: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        let mut acked_first_frame = false;
         while frames.iter().filter(|frame| !frame.is_empty()).count() < 2 {
             let message = tokio::time::timeout_at(deadline, client.next())
                 .await
@@ -2432,6 +2523,18 @@ mod tests {
                 Message::Binary(bytes) if bytes.is_empty() => {
                     if !frames.last().unwrap().is_empty() {
                         let _ = delivered.send(());
+                        if !acked_first_frame {
+                            no_request_before_ack
+                                .take()
+                                .unwrap()
+                                .await
+                                .expect("server verified the ACK boundary");
+                            client
+                                .send(Message::Binary(vec![0].into()))
+                                .await
+                                .expect("send framebuffer ACK");
+                            acked_first_frame = true;
+                        }
                     }
                     frames.push(Vec::new());
                 }
@@ -2439,7 +2542,7 @@ mod tests {
                 _ => {}
             }
         }
-        // No ACK was sent, yet the server saw an incremental request.
+        // The server saw an incremental request only after the first frame ACK.
         let _ = client.close(None).await;
         drop(session);
         let next_request = tokio::task::spawn_blocking(move || server.join().unwrap())
