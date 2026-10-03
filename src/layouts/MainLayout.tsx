@@ -4227,6 +4227,10 @@ export function MainLayout() {
             maxSize="40%"
             collapsible
             collapsedSize={0}
+            // The panel's default scroll container can pan the fixed rail when
+            // a focused/selected session is scrolled into view. Its children
+            // own their scrolling; this frame must keep the rail in place.
+            style={{ overflow: "clip" }}
             onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
               const percentage = size.asPercentage;
               if (percentage > 2) {
@@ -4239,7 +4243,7 @@ export function MainLayout() {
               setSidebarCollapsed(percentage <= 2);
             }}
           >
-            <div data-testid="expanded-sidebar-panel" className="h-full overflow-hidden" style={sidebarCollapsed ? { display: "none" } : undefined}>
+            <div data-testid="expanded-sidebar-panel" className="h-full overflow-clip" style={sidebarCollapsed ? { display: "none" } : undefined}>
               <Sidebar
                 onNewSession={handleNewSession}
                 onNewSftpSession={handleNewSftpSession}
