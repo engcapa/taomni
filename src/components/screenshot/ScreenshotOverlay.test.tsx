@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../lib/ipc", () => ({ listSystemFonts: async () => ["Arial", "Noto Sans"] }));
 import { ScreenshotOverlay } from "./ScreenshotOverlay";
@@ -52,7 +52,7 @@ beforeEach(() => {
     return `data:image/png;base64,${this.width}x${this.height}`;
   });
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 async function open() {
   render(<ScreenshotOverlay />);
@@ -187,6 +187,24 @@ describe("ScreenshotOverlay", () => {
     expect(screen.getByTestId("screenshot-selection")).toHaveStyle({ left: "100px", top: "100px" });
     expect(api.updateOverlayImage).not.toHaveBeenCalled();
   });
+  it.each(["button", "Escape"])("keeps scroll permission instructions visible and lets the user exit with %s", async (exit) => {
+    await open();
+    drag("screenshot-select-layer", [100, 100], [500, 450]);
+    api.scrollCapture.mockRejectedValueOnce(new Error("Scrolling capture requires macOS Accessibility permission"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
+    const error = await screen.findByRole("alert");
+    expect(error).toHaveTextContent("screenshot.scrollFailed");
+    vi.useFakeTimers();
+    act(() => vi.advanceTimersByTime(5000));
+    expect(error).toBeInTheDocument();
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "annotate");
+    expect(api.updateOverlayImage).not.toHaveBeenCalled();
+    if (exit === "button") fireEvent.click(error.querySelector("button")!);
+    else fireEvent.keyDown(window, { key: "Escape" });
+    expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce();
+  });
+
   it("selects reverse drags, activates a tool explicitly and copies an integral per-axis crop", async () => {
     await open();
     drag("screenshot-select-layer", [300, 300], [100, 100]);

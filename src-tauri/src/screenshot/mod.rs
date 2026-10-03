@@ -262,6 +262,9 @@ pub async fn screenshot_scroll_capture(
     width: u32,
     height: u32,
 ) -> Result<ScrollCaptureResult, String> {
+    // Fail while the selection UI can still show the instructions, before
+    // hiding it or creating topmost controls. Never prompt from the worker.
+    scroll::ensure_control_permission().map_err(internal_error)?;
     let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
     let region = capture::clamp_region(display.width, display.height, (x, y, width, height));
     let rect = surfaces::region_rect(&display, region);
@@ -362,7 +365,7 @@ fn open_scroll_bar(
     .shadow(false)
     .always_on_top(true)
     .skip_taskbar(true)
-    .content_protected(true)
+    .content_protected(surfaces::PROTECT_CAPTURE_SURFACES)
     .focused(false)
     .build()
     .map_err(|e| e.to_string())?;
@@ -1174,9 +1177,7 @@ fn open_recorder_bar(
         .resizable(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        // Keep the bar out of the recording (WDA_EXCLUDEFROMCAPTURE on
-        // Windows, NSWindowSharingNone on macOS; no-op on Linux).
-        .content_protected(true)
+        .content_protected(surfaces::PROTECT_CAPTURE_SURFACES)
         .build()
         .map_err(|e| format!("open recorder bar: {e}"))?;
     watch_session_window(&window);

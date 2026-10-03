@@ -7,8 +7,11 @@
 //! - Windows / macOS stills: `xcap::Monitor::capture_image` (one shot).
 //! - Linux stills: the RDP server's X11 SHM / Wayland portal capturer, which
 //!   grabs the whole virtual desktop; the target display is cropped out.
-//! - Recording (all platforms): the RDP server's persistent [`Capturer`]
-//!   (WGC on Windows, ScreenCaptureKit on macOS, X11/PipeWire on Linux)
+//! - macOS recording: one-shot CoreGraphics snapshots, avoiding the display
+//!   stream / selective-sharing path implicated in a macOS 14 WindowServer
+//!   crash on a VMware display. Both GIF and MP4 use this compatibility path.
+//! - Windows / Linux recording: the RDP server's persistent [`Capturer`]
+//!   (WGC on Windows, X11/PipeWire on Linux)
 //!   through [`FrameSource`], so the backend is not re-initialised per frame.
 //!   A backend that fails to start falls back to one-shot capture.
 //!
@@ -460,9 +463,17 @@ impl FrameSource {
         }
     }
 
-    /// Recording crops before BGRA conversion and retains only the region,
-    /// instead of copying/converting the whole desktop on every tick.
+    /// Recording retains only the requested region. Persistent backends crop
+    /// before BGRA conversion; macOS snapshots are cropped after capture.
     pub fn for_region(app: &AppHandle, display: DisplayInfo, region: (u32, u32, u32, u32)) -> Self {
+        // Select this before opening any persistent stream: WindowServer can
+        // crash after a successful start, so an error-based fallback is too late.
+        #[cfg(target_os = "macos")]
+        let mut source = {
+            log::info!("screenshot recording: using CoreGraphics snapshots on macOS");
+            Self::one_shot(app, display)
+        };
+        #[cfg(not(target_os = "macos"))]
         let mut source = Self::open(app, display);
         source.region = Some(region);
         source

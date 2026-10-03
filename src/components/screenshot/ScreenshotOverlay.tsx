@@ -351,6 +351,7 @@ export function ScreenshotOverlay() {
   const [dragging, setDragging] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [scrollError, setScrollError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [pickerMode, setPickerMode] = useState(false);
   const [pickerInfo, setPickerInfo] = useState<{ x: number; y: number; hex: string; rgb: string } | null>(null);
@@ -518,6 +519,7 @@ export function ScreenshotOverlay() {
 
   /** Drop the selection and annotations; back to region selection. */
   const resetSelection = useCallback(() => {
+    setScrollError(null);
     canvasRef.current?.clear();
     dragRef.current = null;
     setDragging(false);
@@ -761,6 +763,7 @@ export function ScreenshotOverlay() {
     runBusy(async () => {
       if (!init || !img || !sel || contour) return;
       setPhase("busy");
+      setScrollError(null);
       setRecordOpen(false);
       setScrollConfirm(false);
       try {
@@ -780,7 +783,7 @@ export function ScreenshotOverlay() {
         setTool("move");
         setPhase("preview");
       } catch (e) {
-        if (!String(e).includes("scroll capture cancelled")) showToast(t("screenshot.scrollFailed", { error: formatUnknownError(e) }));
+        if (!String(e).includes("scroll capture cancelled")) setScrollError(formatUnknownError(e));
         setPhase("annotate");
       }
     });
@@ -788,6 +791,7 @@ export function ScreenshotOverlay() {
   const handleRecord = (format: RecordFormat) =>
     runBusy(async () => {
       if (!init || !sel || contour) return;
+      setScrollError(null);
       setRecordOpen(false);
       setPhase("busy");
       try {
@@ -810,7 +814,8 @@ export function ScreenshotOverlay() {
       const mod = e.ctrlKey || e.metaKey;
       if (e.key === "Escape") {
         e.preventDefault();
-        if (scrollConfirm) setScrollConfirm(false);
+        if (scrollError) close();
+        else if (scrollConfirm) setScrollConfirm(false);
         else if (recordOpen) setRecordOpen(false);
         else if (watermarkOpen) setWatermarkOpen(false);
         else if (ocrOpen) setOcrOpen(false);
@@ -1485,6 +1490,20 @@ export function ScreenshotOverlay() {
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {scrollError && (
+        <div
+          data-testid="screenshot-scroll-error"
+          role="alert"
+          className="fixed left-1/2 -translate-x-1/2 bottom-20 w-[min(640px,90vw)] rounded-lg px-4 py-3 text-[13px] shadow-2xl"
+          style={{ zIndex: 70, ...panelStyle }}
+        >
+          <p className="break-words">{t("screenshot.scrollFailed", { error: scrollError })}</p>
+          <button type="button" className="mt-2 rounded px-3 py-2" onClick={close}>
+            {t("screenshot.cancel")} (Esc)
+          </button>
         </div>
       )}
 
