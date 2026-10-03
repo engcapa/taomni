@@ -108,7 +108,7 @@ class MouseStepsTest(TestCase):
         session.endpoint.return_value = "/session/qa/actions"
         session.request.side_effect = [RuntimeError("driver failure"), None]
         ctx = SimpleNamespace(session=session, _mouse_origin={"selector": "#row", "dx": 0, "dy": 0})
-        with patch("qa_ui_auto.native_steps.platform.system", return_value="Windows"):
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"):
             with self.assertRaisesRegex(RuntimeError, "driver failure"):
                 _do_mouse_button(ctx, "down")
         self.assertEqual(session.request.call_args, call("DELETE", "/session/qa/actions"))
@@ -124,78 +124,6 @@ class MouseStepsTest(TestCase):
             with self.assertRaisesRegex(StepError, "preceding mouse_path"):
                 _do_mouse_button(SimpleNamespace(session=session), "down")
         session.request.assert_not_called()
-
-    def test_native_x11_path_scales_and_interpolates_in_the_owned_window(self):
-        from qa_ui_auto.native_steps import _mouse_path
-
-        session = Mock(application=Path("/tmp/qa-app"))
-        session.execute.return_value = {"x": 103, "y": 50, "width": 6, "height": 20,
-                                        "innerWidth": 400, "innerHeight": 300}
-        ctx = SimpleNamespace(session=session)
-        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"), \
-             patch.dict("os.environ", {"DISPLAY": ":99"}), \
-             patch("qa_ui_auto.native_steps._activate_x11_application", return_value=("0x42", "QA")) as activate, \
-             patch("qa_ui_auto.native_steps._command_output", side_effect=[
-                 "X=5\nY=7\nWIDTH=800\nHEIGHT=600", "X=100\nY=100", "",
-             ]) as command:
-            _mouse_path(ctx, {"points": [{"selector": "#row", "dx": 4, "dy": -2, "steps": 2}]})
-        activate.assert_called_once_with(session.application)
-        self.assertEqual(command.call_args_list[-1], call([
-            "xdotool", "mousemove", "160", "102", "sleep", "0.016",
-            "mousemove", "219", "103", "sleep", "0.016",
-        ]))
-        session.request.assert_not_called()
-        self.assertEqual(ctx._mouse_origin["selector"], "#row")
-
-    def test_native_x11_path_rejects_hidden_and_out_of_view_points(self):
-        from qa_ui_auto.native_steps import _x11_mouse_move
-
-        session = Mock(application=Path("/tmp/qa-app"))
-        ctx = SimpleNamespace(session=session)
-        point = {"selector": "#row", "dx": 0, "dy": 0, "steps": 1}
-        geometry = {"x": 10, "y": 10, "width": 10, "height": 10,
-                    "innerWidth": 400, "innerHeight": 300}
-        with patch.dict("os.environ", {"DISPLAY": ":99"}), \
-             patch("qa_ui_auto.native_steps._activate_x11_application", return_value=("0x42", "QA")), \
-             patch("qa_ui_auto.native_steps._command_output") as command:
-            session.execute.return_value = {**geometry, "width": 0}
-            with self.assertRaisesRegex(StepError, "visible geometry"):
-                _x11_mouse_move(ctx, point)
-            session.execute.return_value = geometry
-            with self.assertRaisesRegex(StepError, "outside"):
-                _x11_mouse_move(ctx, {**point, "dx": 400})
-        command.assert_not_called()
-
-    def test_native_x11_buttons_preserve_the_hold_and_cleanup_after_step_failure(self):
-        from qa_ui_auto.native_steps import _do_mouse_button, NativeStepContext
-
-        ctx = NativeStepContext(Mock(), Path("."), {})
-        ctx._mouse_origin = {"selector": "#row", "dx": 0, "dy": 0, "steps": 1}
-        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"), \
-             patch.dict("os.environ", {"DISPLAY": ":99"}), \
-             patch("qa_ui_auto.native_steps._x11_mouse_move") as move, \
-             patch("qa_ui_auto.native_steps._observe_mouse_input"), \
-             patch("qa_ui_auto.native_steps._record_mouse_input"), \
-             patch("qa_ui_auto.native_steps.time.sleep"), \
-             patch("qa_ui_auto.native_steps._command_output") as command:
-            _do_mouse_button(ctx, "down")
-            self.assertTrue(ctx._mouse_x11_down)
-            command.assert_called_once_with(["xdotool", "mousedown", "1"])
-            _do_mouse_button(ctx, "up")
-            self.assertFalse(ctx._mouse_x11_down)
-            command.assert_called_with(["xdotool", "mouseup", "1"])
-            _do_mouse_button(ctx, "down")
-            # An assertion can fail while held; ordinary context cleanup must release it.
-            ctx.restore_host_permissions()
-            command.assert_called_with(["xdotool", "mouseup", "1"])
-            self.assertFalse(ctx._mouse_x11_down)
-            command.side_effect = [RuntimeError("X11 down failed"), ""]
-            with self.assertRaisesRegex(RuntimeError, "X11 down failed"):
-                _do_mouse_button(ctx, "down")
-            self.assertFalse(ctx._mouse_x11_down)
-            command.assert_called_with(["xdotool", "mouseup", "1"])
-        self.assertEqual(move.call_count, 3)
-        ctx.session.request.assert_not_called()
 
     def test_native_click_passes_modifiers_and_rejects_unsupported_options(self):
         from qa_ui_auto.native_steps import _do_click

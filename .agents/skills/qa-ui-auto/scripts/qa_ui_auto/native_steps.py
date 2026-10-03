@@ -70,7 +70,6 @@ class NativeStepContext:
         # MFA fixtures: xclip serving an image/png CLIPBOARD and the Tk window
         # showing a QR code for the screen scan, keyed by helper role.
         self._mfa_helpers: dict[str, subprocess.Popen[str]] = {}
-        self._mouse_x11_down = False
 
     def stop_mfa_helper(self, role: str) -> bool:
         proc = self._mfa_helpers.pop(role, None)
@@ -98,7 +97,6 @@ class NativeStepContext:
             except OSError:
                 pass
         self._permission_restores.clear()
-        _release_x11_mouse(self)
         for role in list(self._mfa_helpers):
             self.stop_mfa_helper(role)
         self._release_clipboard_owner()
@@ -331,13 +329,6 @@ def _mouse_path(ctx: NativeStepContext, args: Any) -> str:
 
     points = mouse_path_points(args)
     for point in points:
-        if platform.system() == "Linux":
-            _x11_mouse_move(ctx, point)
-            ctx._mouse_origin = point
-            _record_mouse_input(ctx, "move")
-            if point["pause_ms"]:
-                time.sleep(point["pause_ms"] / 1000)
-            continue
         element = ctx.session.find(point["selector"], interactive=False)
         # W3C element origin: integer offsets from the element's in-view
         # centre, the same convention as the browser runner. A duration lets
@@ -395,61 +386,8 @@ def _record_mouse_input(ctx: NativeStepContext, phase: str) -> None:
     events = ctx.session.execute("return window.__qaMouseInput || [];")
     path = ctx.case_dir / "native-mouse-input.json"
     records = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
-    records.append({"phase": phase, "origin": getattr(ctx, "_mouse_origin", None), "events": events,
-                    "transport": "X11 XTest -> GTK/WebKitGTK" if platform.system() == "Linux"
-                    else "W3C pointer actions -> platform WebView"})
+    records.append({"phase": phase, "origin": getattr(ctx, "_mouse_origin", None), "events": events})
     path.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
-
-
-def _x11_mouse_move(ctx: NativeStepContext, point: dict) -> None:
-    # WebKitGTK 2.52's W3C pointerUp loses the released button, leaving
-    # non-primary buttons pressed. Physical XTest motion/button events retain
-    # the actual device state across the held-drag steps, including Escape.
-    if not os.environ.get("DISPLAY"):
-        raise StepError("mouse_path: Linux pointer input requires an X11 display")
-    window_id, _ = _activate_x11_application(ctx.session.application)
-    geometry = ctx.session.execute(
-        f"const el=document.querySelector({json.dumps(point['selector'])});"
-        "if (!(el instanceof HTMLElement)) return null;"
-        "const r=el.getBoundingClientRect();"
-        "const left=Math.max(0,r.left),right=Math.min(innerWidth,r.right);"
-        "const top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);"
-        "return {x:(left+right)/2,y:(top+bottom)/2,width:right-left,height:bottom-top,"
-        "innerWidth,innerHeight};"
-    )
-    required = ("x", "y", "width", "height", "innerWidth", "innerHeight")
-    if not isinstance(geometry, dict) or any(
-        not isinstance(geometry.get(key), (int, float)) for key in required
-    ) or any(geometry[key] <= 0 for key in ("width", "height", "innerWidth", "innerHeight")):
-        raise StepError(f"mouse_path: target has no visible geometry: {point['selector']}")
-    x, y = geometry["x"] + point["dx"], geometry["y"] + point["dy"]
-    if not (0 <= x < geometry["innerWidth"] and 0 <= y < geometry["innerHeight"]):
-        raise StepError("mouse_path: target point is outside the native viewport")
-
-    def values(output: str) -> dict[str, int]:
-        return {key: int(value) for key, value in re.findall(r"^([A-Z]+)=(-?\d+)$", output, re.M)}
-
-    window = values(_command_output(["xdotool", "getwindowgeometry", "--shell", window_id]))
-    cursor = values(_command_output(["xdotool", "getmouselocation", "--shell"]))
-    if not {"X", "Y", "WIDTH", "HEIGHT"} <= window.keys() or not {"X", "Y"} <= cursor.keys() or min(window["WIDTH"], window["HEIGHT"]) <= 0:
-        raise StepError("mouse_path: invalid X11 window/cursor geometry")
-    # Taomni's undecorated WebView fills its client window. Scale CSS points to
-    # that window's device pixels, then interpolate on the root display.
-    target_x = window["X"] + x * window["WIDTH"] / geometry["innerWidth"]
-    target_y = window["Y"] + y * window["HEIGHT"] / geometry["innerHeight"]
-    command = ["xdotool"]
-    for index in range(1, point["steps"] + 1):
-        fraction = index / point["steps"]
-        command.extend(["mousemove", str(round(cursor["X"] + (target_x - cursor["X"]) * fraction)),
-                        str(round(cursor["Y"] + (target_y - cursor["Y"]) * fraction)), "sleep", "0.016"])
-    _command_output(command)
-
-
-def _release_x11_mouse(ctx: NativeStepContext) -> None:
-    if getattr(ctx, "_mouse_x11_down", False):
-        with suppress(Exception):
-            _command_output(["xdotool", "mouseup", "1"])
-        ctx._mouse_x11_down = False
 
 
 def _terminal_drag_selection(ctx: NativeStepContext, args: Any) -> str:
@@ -1751,28 +1689,11 @@ def _do_mouse_button(ctx: NativeStepContext, args: Any) -> str:
     action = mouse_button_action(args)
     if platform.system() == "Darwin":
         raise StepError("mouse_button: the macOS bridge does not retain pointer state across action requests")
-    point = getattr(ctx, "_mouse_origin", None)
-    if action == "down" and point is None:
-        raise StepError("mouse_button down requires a preceding mouse_path")
-    if platform.system() == "Linux":
-        if not os.environ.get("DISPLAY"):
-            raise StepError("mouse_button: Linux pointer input requires an X11 display")
-        try:
-            if action == "down":
-                _observe_mouse_input(ctx)
-                _x11_mouse_move(ctx, point)
-                ctx._mouse_x11_down = True
-            _command_output(["xdotool", "mousedown" if action == "down" else "mouseup", "1"])
-            if action == "up":
-                ctx._mouse_x11_down = False
-            time.sleep(0.05)
-            _record_mouse_input(ctx, action)
-        except Exception:
-            _release_x11_mouse(ctx)
-            raise
-        return f"X11 left mouse button {action}"
     actions = []
     if action == "down":
+        point = getattr(ctx, "_mouse_origin", None)
+        if point is None:
+            raise StepError("mouse_button down requires a preceding mouse_path")
         element = ctx.session.find(point["selector"], interactive=False)
         # Resolve the press position in the same request as pointerDown. Some
         # native drivers do not retain the last move's position for a bare down.

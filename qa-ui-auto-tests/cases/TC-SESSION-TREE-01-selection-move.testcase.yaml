@@ -1,8 +1,7 @@
 id: TC-SESSION-TREE-01
 title: Session tree Ctrl/Shift ranges and context-menu batch move persist
-description: Creates four saved local-shell sessions through the editor, tests toggle/reverse/shrinking/additive ranges
-  and ordinary single selection, then moves the batch through the retained context menu and reopens the app. No shell
-  is started.
+description: Creates four saved local-shell sessions through the editor, tests toggle/reverse/shrinking/additive ranges and
+  ordinary single selection, then moves the batch through the retained context menu and reopens the app. No shell is started.
 covers:
 - F6.2
 - F-Sidebar-1
@@ -24,9 +23,10 @@ steps:
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
-- click: '[data-testid="session-proto-shell"]'
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
+- click: '[data-testid="session-proto-shell"]'
+- wait_for: '[data-testid="session-local-shell-section"]'
 - fill:
     selector: '[data-testid="session-name"]'
     value: qa-selection-a
@@ -34,9 +34,10 @@ steps:
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
-- click: '[data-testid="session-proto-shell"]'
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
+- click: '[data-testid="session-proto-shell"]'
+- wait_for: '[data-testid="session-local-shell-section"]'
 - fill:
     selector: '[data-testid="session-name"]'
     value: qa-selection-b
@@ -44,9 +45,10 @@ steps:
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-b"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
-- click: '[data-testid="session-proto-shell"]'
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
+- click: '[data-testid="session-proto-shell"]'
+- wait_for: '[data-testid="session-local-shell-section"]'
 - fill:
     selector: '[data-testid="session-name"]'
     value: qa-selection-c
@@ -54,9 +56,10 @@ steps:
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
-- click: '[data-testid="session-proto-shell"]'
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
+- click: '[data-testid="session-proto-shell"]'
+- wait_for: '[data-testid="session-local-shell-section"]'
 - fill:
     selector: '[data-testid="session-name"]'
     value: qa-selection-d
@@ -206,99 +209,99 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Ctrl/Meta toggles individual sessions; Shift selects the visible range and retains the original anchor;
-      Mod+Shift adds a range and ordinary click returns to single selection.
+    requirement: Ctrl/Meta toggles individual sessions; Shift selects the visible range and retains the original anchor; Mod+Shift
+      adds a range and ordinary click returns to single selection.
     actions:
-    - 41
-    - 42
-    - 44
+    - 45
     - 46
-    - 47
-    - 49
+    - 48
+    - 50
     - 51
     - 53
     - 55
+    - 57
+    - 59
     checkpoints:
-    - step: 43
+    - step: 47
       expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n    selector:\
         \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
-    - step: 45
+    - step: 49
       expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-a], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
-    - step: 48
+    - step: 52
       expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-b,\n      qa-selection-c],\
         \ selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
-    - step: 50
+    - step: 54
       expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-b, qa-selection-c],\n    selector:\
         \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
-    - step: 52
+    - step: 56
       expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-b, qa-selection-c,\n      qa-selection-d],\
         \ selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
-    - step: 54
+    - step: 58
       expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-a], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
-    - step: 56
+    - step: 60
       expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-b,\n      qa-selection-c,\
         \ qa-selection-d], selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
     results:
-    - 43
-    - 45
-    - 48
-    - 50
+    - 47
+    - 49
     - 52
     - 54
     - 56
-  - id: R2
-    requirement: Right-click on a selected row preserves all four selected sessions; Move to folder moves exactly the
-      batch and reload reads their saved group paths.
-    actions:
-    - 57
-    - 60
-    - 61
-    - 63
-    - 65
-    checkpoints:
-    - step: 58
-      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-b,\n      qa-selection-c,\
-        \ qa-selection-d], selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
-    - step: 59
-      expectation: The context menu shows Connect selected sessions (4) and Move to folder.
-    - step: 62
-      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
-        \      qa-selection-target, qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"\
-        qa-selection-a\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"\
-        session-tree-item\"][data-session-name=\"qa-selection-c\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"\
-        qa-selection-d\"]'}}"
-    - step: 66
-      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
-        \      qa-selection-target, qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"\
-        qa-selection-a\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"\
-        session-tree-item\"][data-session-name=\"qa-selection-c\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"\
-        qa-selection-d\"]'}}"
-    results:
     - 58
-    - 59
-    - 62
-    - 66
-  - id: R3
-    requirement: Right-click outside the selection narrows to one session; moving it to the root retains the other three
-      saved group paths.
+    - 60
+  - id: R2
+    requirement: Right-click on a selected row preserves all four selected sessions; Move to folder moves exactly the batch
+      and reload reads their saved group paths.
     actions:
+    - 61
+    - 64
+    - 65
     - 67
     - 69
-    - 70
     checkpoints:
-    - step: 68
-      expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-c], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
-    - step: 71
-      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-c"]''}}'
-    - step: 72
-      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
-        \      qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"\
+    - step: 62
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-b,\n      qa-selection-c,\
+        \ qa-selection-d], selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 63
+      expectation: The context menu shows Connect selected sessions (4) and Move to folder.
+    - step: 66
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n     \
+        \ qa-selection-target, qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"\
         ],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
+        ][data-session-name=\"qa-selection-c\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-d\"\
+        ]'}}"
+    - step: 70
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n     \
+        \ qa-selection-target, qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"\
+        ],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
+        ][data-session-name=\"qa-selection-c\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-d\"\
+        ]'}}"
+    results:
+    - 62
+    - 63
+    - 66
+    - 70
+  - id: R3
+    requirement: Right-click outside the selection narrows to one session; moving it to the root retains the other three saved
+      group paths.
+    actions:
+    - 71
+    - 73
+    - 74
+    checkpoints:
+    - step: 72
+      expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-c], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
+    - step: 75
+      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-c"]''}}'
+    - step: 76
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n     \
+        \ qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n  \
+        \    [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
         ][data-session-name=\"qa-selection-d\"]'}}"
     results:
-    - 68
-    - 71
     - 72
+    - 75
+    - 76
   visual:
   - check: Tree hierarchy and all selected rows remain visible.
     method: manual
@@ -306,5 +309,5 @@ verification:
   native:
   - check: Packaged WebView modifier clicks and real session persistence after reload.
     method: automated
-    reason: Native uses the isolated QA app and real IPC/database. Browser uses stubs. macOS uses packaged WebView event
-      input for selection; held-pointer drag is not supported by its stateless bridge.
+    reason: Native uses the isolated QA app and real IPC/database. Browser uses stubs. macOS uses packaged WebView event input
+      for selection; held-pointer drag is not supported by its stateless bridge.
