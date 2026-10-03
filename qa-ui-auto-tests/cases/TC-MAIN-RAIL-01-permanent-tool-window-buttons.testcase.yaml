@@ -1,7 +1,7 @@
 id: TC-MAIN-RAIL-01
 title: Permanent Sessions and Tools share the tool window icons, names and keyboard interaction
 description: >-
-  Browser and packaged native acceptance for the full-height left grip and permanent
+  Browser and packaged native acceptance for the title-bar grip and permanent
   buttons. Native explicitly covers the requested WebView layout and interactions.
   Names toggle in both directions from both the permanent and workspace menus;
   preferences survive reload and both entries stay available across tabs/panels.
@@ -24,10 +24,10 @@ steps:
   - click: '[data-testid="language-option-en"]'
   - assert_visible: '[data-testid="expanded-sidebar-panel"]'
   - eval_readonly:
-      expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height - innerHeight) < 1
+      expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
       expect_truthy: true
   - eval_readonly:
-      expression: document.querySelector('[data-window-drag]').getBoundingClientRect().right <= document.querySelector('button[data-tool-window-id]').getBoundingClientRect().left
+      expression: document.querySelector('.taomni-window-drag-handle').getBoundingClientRect().bottom <= document.querySelector('button[data-tool-window-id]').getBoundingClientRect().top
       expect_truthy: true
   - assert_count: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"] svg', equal: 1}
   - assert_count: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"] svg', equal: 1}
@@ -97,14 +97,14 @@ steps:
   - assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
   - assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
   - eval_readonly:
-      expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height - innerHeight) < 1
+      expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
       expect_truthy: true
   - screenshot: main-rail-welcome.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 全高拖拽带与常驻图标位于独立区域；名称、图标、选中态和键盘展开/收起正常。
+    requirement: 标题栏抓手与常驻图标位于独立区域；名称、图标、选中态和键盘展开/收起正常。
     actions:
     - 1
     - 8
@@ -121,11 +121,9 @@ verification:
     - step: 12
       expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 13
-      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
-        - innerHeight) < 1", "expect_truthy": true}}'
+      expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
     - step: 14
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-window-drag]'').getBoundingClientRect().right
-        <= document.querySelector(''button[data-tool-window-id]'').getBoundingClientRect().left", "expect_truthy": true}}'
+      expectation: 标题栏抓手位于侧栏常驻按钮上方，没有覆盖按钮的点击区域。
     - step: 15
       expectation: '{"assert_count": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]
         svg", "equal": 1}}'
@@ -260,8 +258,7 @@ verification:
     - step: 69
       expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]"}'
     - step: 70
-      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
-        - innerHeight) < 1", "expect_truthy": true}}'
+      expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
     results:
     - 42
     - 43
@@ -282,7 +279,7 @@ verification:
     - 69
     - 70
   visual:
-  - check: 检查对应截图的图标、名称、选中态、全高拖拽带以及点击区域无缩小、遮挡或截断。
+  - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual
     reason: 实际尺寸断言辅助视觉评审；CI 图片在下载后评审。
   native:

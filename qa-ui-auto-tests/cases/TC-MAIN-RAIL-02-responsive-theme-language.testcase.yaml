@@ -1,5 +1,5 @@
 id: TC-MAIN-RAIL-02
-title: Left rail keeps upright Chinese names and a full-height grip at narrow widths in both themes
+title: Left rail keeps upright Chinese names and a title-bar grip at narrow widths in both themes
 description: Browser layout acceptance at 1280 and 800 CSS pixels with theme, locale, collapse and names changes; screenshots require visual review.
 covers: [F1.2, F1.3, F6.2, F-Sockscap-1, F25.5, F-I18n-1]
 tags: [main, sidebar, p1]
@@ -28,7 +28,7 @@ steps:
   - assert_localstorage: {key: taomni.appTheme.v1, equals: dark}
   - set_viewport: {width: 800, height: 600}
   - eval_readonly:
-      expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height - innerHeight) < 1
+      expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
       expect_truthy: true
   - eval_readonly:
       expression: JSON.stringify({fits:document.documentElement.scrollWidth<=innerWidth,viewport:innerWidth,document:document.documentElement.scrollWidth,main:document.querySelector('.taomni-main-window').scrollWidth,status:document.querySelector('.taomni-status').scrollWidth,title:document.querySelector('.taomni-control-bar').scrollWidth})
@@ -66,7 +66,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 中文横排图标名称在明暗主题和 800px 窄窗口中正常，拖拽带全高且无横向溢出；底部 Problems 点击有效。
+    requirement: 中文横排图标名称在明暗主题和 800px 窄窗口中正常，抓手位于标题栏且无横向溢出；底部 Problems 点击有效。
     actions:
     - 1
     - 3
@@ -103,8 +103,7 @@ verification:
     - step: 17
       expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "equals": "dark"}}'
     - step: 19
-      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
-        - innerHeight) < 1", "expect_truthy": true}}'
+      expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
     - step: 20
       expectation: '{"eval_readonly": {"expression": "JSON.stringify({fits:document.documentElement.scrollWidth<=innerWidth,viewport:innerWidth,document:document.documentElement.scrollWidth,main:document.querySelector(''.taomni-main-window'').scrollWidth,status:document.querySelector(''.taomni-status'').scrollWidth,title:document.querySelector(''.taomni-control-bar'').scrollWidth})",
         "contains": "\"fits\":true", "timeout_sec": 3}}'
@@ -155,7 +154,7 @@ verification:
     - 40
     - 41
   visual:
-  - check: 检查对应截图的图标、名称、选中态、全高拖拽带以及点击区域无缩小、遮挡或截断。
+  - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual
     reason: 实际尺寸断言辅助视觉评审；CI 图片在下载后评审。
   native:

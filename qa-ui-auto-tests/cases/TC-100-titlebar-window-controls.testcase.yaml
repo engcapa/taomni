@@ -45,6 +45,10 @@ steps:
     key: taomni.appTheme.v1
     exists: true
 - screenshot: 100-titlebar.png
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
+    expect_truthy: true
+    timeout_sec: 5
 verification:
   review: reviewed
   requirements:
@@ -76,6 +80,13 @@ verification:
       expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "exists": true}}'
     results:
     - 13
+  - id: R2
+    requirement: 窗口抓手位于顶部标题栏，内容区左侧没有为全高抓手预留的空白。
+    actions: [1]
+    checkpoints:
+    - step: 15
+      expectation: 抓手在 control-bar 内且高度不超过标题栏，主窗口左侧 padding 为 0。
+    results: [15]
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -7,6 +7,8 @@ description: 'Covers the terminal right-click top-level zoom actions and the uni
   '
 covers:
 - F4.2
+- F4.8
+- F5.1
 tags:
 - smoke
 - p1
@@ -40,6 +42,42 @@ steps:
 - wait_for: '[data-testid="terminal-context-font-size"]'
 - assert_visible: '[data-testid="terminal-context-font-select"]'
 - screenshot: 109-terminal-appearance-menu.png
+- click: '[data-testid^="terminal-context-theme-option-"] >> text="Kanagawa Lotus"'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('[data-terminal-active]')).backgroundColor === 'rgb(242, 236, 188)' && getComputedStyle(document.querySelector('[data-terminal-active] .xterm-viewport')).backgroundColor === 'rgb(242, 236, 188)'
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector('[data-terminal-active] .xterm-screen').getBoundingClientRect().left - document.querySelector('[data-terminal-active]').getBoundingClientRect().left >= 8
+    expect_truthy: true
+- click:
+    selector: '[data-testid="terminal-pane"]'
+    position: {x: 4, y: 120}
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: hidden
+- screenshot: 109-terminal-light-gutter.png
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position: {x: 24, y: 24}
+- hover: '[data-testid="context-menu-item-appearance"]'
+- click: '[data-testid="terminal-context-theme-option-kanagawa-wave"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('[data-terminal-active]')).backgroundColor === 'rgb(31, 31, 40)' && getComputedStyle(document.querySelector('[data-terminal-active] .xterm-viewport')).backgroundColor === 'rgb(31, 31, 40)'
+    expect_truthy: true
+    timeout_sec: 5
+- click:
+    selector: '[data-testid="terminal-pane"]'
+    position: {x: 4, y: 120}
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: hidden
+- set_viewport: {width: 800, height: 600}
+- eval_readonly:
+    expression: document.querySelector('[data-terminal-active] .xterm-screen').getBoundingClientRect().left - document.querySelector('[data-terminal-active]').getBoundingClientRect().left >= 8
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot: 109-terminal-dark-gutter-narrow.png
 verification:
   review: reviewed
   requirements:
@@ -78,6 +116,23 @@ verification:
     results:
     - 15
     - 16
+  - id: R2
+    requirement: 切换浅色和深色终端主题后，左侧留白与 session 底色一致，窄窗口仍保留首列前的 8px 选择空间。
+    actions: [18, 21, 24, 25, 26, 28, 30]
+    checkpoints:
+    - step: 19
+      expectation: Kanagawa Lotus 的终端和 xterm viewport 均为 rgb(242, 236, 188)。
+    - step: 20
+      expectation: 首列文本左侧留白至少为 8px。
+    - step: 22
+      expectation: 点击左侧留白后关闭外观菜单。
+    - step: 27
+      expectation: Kanagawa Wave 的终端和 xterm viewport 均为 rgb(31, 31, 40)。
+    - step: 29
+      expectation: 点击左侧留白后关闭外观菜单。
+    - step: 31
+      expectation: 800px 窄窗口内首列文本左侧留白至少为 8px。
+    results: [19, 20, 22, 27, 29, 31]
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
