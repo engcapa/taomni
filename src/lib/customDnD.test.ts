@@ -9,6 +9,7 @@ function pointer(type: string, clientX: number, clientY = 20) {
 describe("custom drag click handling", () => {
   afterEach(() => {
     fireEvent.keyDown(window, { key: "Escape" });
+    pointer("pointerdown", 0);
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -49,5 +50,23 @@ describe("custom drag click handling", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onEnd).toHaveBeenCalledTimes(2);
     expect(document.querySelector('[data-custom-drag-ghost="true"]')).toBeNull();
+  });
+
+  it("suppresses the delayed release click after Escape and allows a new pointer gesture", () => {
+    vi.useFakeTimers();
+    Object.defineProperty(document, "elementFromPoint", { configurable: true, value: () => document.body });
+    const onClick = vi.fn();
+    document.body.addEventListener("click", onClick);
+    startCustomDrag({ event: { clientX: 20, clientY: 20 }, data: { mime: "test", payload: {} }, ghostText: "drag" });
+    pointer("pointermove", 30);
+    fireEvent.keyDown(window, { key: "Escape" });
+    vi.advanceTimersByTime(1000);
+    pointer("pointerup", 30);
+    fireEvent.click(document.body);
+    expect(onClick).not.toHaveBeenCalled();
+    pointer("pointerdown", 30);
+    fireEvent.click(document.body);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    document.body.removeEventListener("click", onClick);
   });
 });
