@@ -2078,6 +2078,8 @@
   ↳ `input[data-testid="sftp-remote-path"]` — alias
 - `[data-testid="sftp-local-path-edit"]` — interactive — F7.5.local-path-edit
 - `[data-testid="sftp-remote-path-edit"]` — interactive — F7.5.remote-path-edit
+- `[data-testid="sftp-local-path-segments"]` — display [optional] — F7.5.local-path-segments
+- `[data-testid="sftp-remote-path-segments"]` — display [optional] — F7.5.remote-path-segments
 - `[data-testid="sftp-local-path-suggestions"]` — display [optional] — F7.5.local-path-suggestions
 - `[data-testid="sftp-remote-path-suggestions"]` — display [optional] — F7.5.remote-path-suggestions
 - `[data-testid="sftp-local-path-suggestions"] [role="option"]` — interactive [optional] — F7.5.local-path-option
