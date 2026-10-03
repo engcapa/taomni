@@ -31,8 +31,10 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollWidth === document.querySelectorAll(".taomni-path-breadcrumb")[0].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight === document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight])
     expect_truthy: true
+    contains: '[0,'
 - eval_readonly:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].offsetHeight <= document.querySelectorAll(".taomni-path-breadcrumb")[0].parentElement.clientHeight
     expect_truthy: true
@@ -72,8 +74,10 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollWidth === document.querySelectorAll(".taomni-path-breadcrumb")[0].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight === document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight])
     expect_truthy: true
+    contains: '[0,'
 - eval_readonly:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].offsetHeight <= document.querySelectorAll(".taomni-path-breadcrumb")[0].parentElement.clientHeight
     expect_truthy: true
@@ -84,8 +88,10 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollWidth > document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight === document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight])
     expect_truthy: true
+    contains: '[0,'
 - eval_readonly:
     expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).overflowY === "hidden"
     expect_truthy: true
@@ -122,8 +128,10 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollWidth === document.querySelectorAll(".taomni-path-breadcrumb")[0].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight === document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb")[0].scrollHeight])
     expect_truthy: true
+    contains: '[0,'
 - eval_readonly:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].offsetHeight <= document.querySelectorAll(".taomni-path-breadcrumb")[0].parentElement.clientHeight
     expect_truthy: true
@@ -134,8 +142,10 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollWidth > document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight === document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight])
     expect_truthy: true
+    contains: '[0,'
 - eval_readonly:
     expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).overflowY === "hidden"
     expect_truthy: true
@@ -180,8 +190,9 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth
         === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth", "expect_truthy": true}}'
     - step: 7
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
-        === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
+        - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains": "[0,"}}'
     - step: 8
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight
         <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight", "expect_truthy": true}}'
@@ -212,8 +223,9 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth
         === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth", "expect_truthy": true}}'
     - step: 22
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
-        === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
+        - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains": "[0,"}}'
     - step: 23
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight
         <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight", "expect_truthy": true}}'
@@ -224,8 +236,10 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollWidth
         > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientWidth", "expect_truthy": true}}'
     - step: 26
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight
-        === document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight
+        - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight])", "expect_truthy": true, "contains":
+        "[0,"}}'
     - step: 27
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).overflowY
         === \"hidden\"", "expect_truthy": true}}'
@@ -254,8 +268,9 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth
         === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth", "expect_truthy": true}}'
     - step: 42
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
-        === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
+        - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains": "[0,"}}'
     - step: 43
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight
         <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight", "expect_truthy": true}}'
@@ -266,8 +281,10 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollWidth
         > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientWidth", "expect_truthy": true}}'
     - step: 46
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight
-        === document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight
+        - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight])", "expect_truthy": true, "contains":
+        "[0,"}}'
     - step: 47
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).overflowY
         === \"hidden\"", "expect_truthy": true}}'
