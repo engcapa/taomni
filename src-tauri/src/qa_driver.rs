@@ -530,6 +530,7 @@ async fn actions_script<R: Runtime>(
           if (/^F([1-9]|1[0-2])$/.test(key)) return 111 + Number(key.slice(1));
           return 0;
         }};
+        {keyboard_script}
         const __qaEmitKey = (type, raw) => {{
           const key = __qaKey(raw);
           const domType = type === 'keyDown' ? 'keydown' : 'keyup';
@@ -548,22 +549,8 @@ async fn actions_script<R: Runtime>(
             }} catch (_) {{}}
           }}
           __qaActive.dispatchEvent(event);
-          if (domType === 'keydown' && !modifier && !event.defaultPrevented &&
-              !__qaModifiers.Control && !__qaModifiers.Meta && !__qaModifiers.Alt) {{
-            if (__qaActive.isContentEditable) {{
-              if (key === 'Enter') document.execCommand('insertParagraph', false, null);
-              else if (key === 'Backspace') document.execCommand('delete', false, null);
-              else if (key === 'Delete') document.execCommand('forwardDelete', false, null);
-              else if (key.length === 1) document.execCommand('insertText', false, key);
-            }} else if (__qaActive instanceof HTMLInputElement || __qaActive instanceof HTMLTextAreaElement) {{
-              if (key.length === 1 || key === 'Enter') {{
-                const start = __qaActive.selectionStart ?? __qaActive.value.length;
-                const end = __qaActive.selectionEnd ?? start;
-                const insert = key === 'Enter' ? '\\n' : key;
-                __qaActive.setRangeText(insert, start, end, 'end');
-                __qaActive.dispatchEvent(new InputEvent('input', {{bubbles:true, inputType:'insertText', data:insert}}));
-              }}
-            }}
+          if (domType === 'keydown') {{
+            dispatchQaKeyDefault(__qaActive, key, event, __qaModifiers);
           }}
         }};
         const __qaPoint = (x, y) => document.elementFromPoint(Number(x) || 0, Number(y) || 0) || document.body;
@@ -592,6 +579,7 @@ async fn actions_script<R: Runtime>(
         }}, __qaPoint);
         return true;"#,
         helper = lookup_helper(),
+        keyboard_script = include_str!("qa_driver_keyboard.js"),
         pointer_script = include_str!("qa_driver_pointer.js")
     ))
 }
