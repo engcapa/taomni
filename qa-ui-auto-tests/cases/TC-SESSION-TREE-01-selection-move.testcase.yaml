@@ -154,7 +154,9 @@ steps:
     - qa-selection-b
     - qa-selection-c
     - qa-selection-d
-- assert_visible: '[data-testid="context-menu-item-connect-selected-sessions-4"]'
+- assert_menu_items:
+  - Connect selected sessions (4)
+  - Move to folder
 - hover: '[data-testid="context-menu-item-move-to-folder"]'
 - click: '[data-testid="context-menu-item-user-sessions-qa-selection-target"]'
 - assert_items:
@@ -258,7 +260,7 @@ verification:
       expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-b,\n      qa-selection-c,\
         \ qa-selection-d], selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
     - step: 59
-      expectation: '{assert_visible: ''[data-testid="context-menu-item-connect-selected-sessions-4"]''}'
+      expectation: The context menu shows Connect selected sessions (4) and Move to folder.
     - step: 62
       expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
         \      qa-selection-target, qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"\

@@ -1952,7 +1952,6 @@
 
 - `[data-testid="session-tree-item"][data-selected="true"]` — interactive [optional] — F-Sidebar-1.selected-session-row
 - `[data-testid^="context-menu-item-connect-selected-sessions-"]` — interactive [optional] — F-Sidebar-1.connect-selected-sessions
-  ↳ `[data-testid="context-menu-item-connect-selected-sessions-4"]` — alias
 
 ## settings (F11.1)
 

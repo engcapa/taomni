@@ -4228,7 +4228,6 @@ controls:
     optional: true
   - id: connect-selected-sessions
     selector: '[data-testid^="context-menu-item-connect-selected-sessions-"]'
-    aliases: ['[data-testid="context-menu-item-connect-selected-sessions-4"]']
     kind: interactive
     optional: true
 -->
