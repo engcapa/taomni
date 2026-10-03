@@ -4,7 +4,11 @@ export interface VncPointerState {
   buttons: number;
 }
 
-export const VNC_POINTER_MOVE_INTERVAL_MS = 4;
+// Old Vino servers can spend much longer encoding a screen update than a
+// modern VNC server. Keep at most one move per display frame so a physical
+// mouse or Chromium's pointerrawupdate stream cannot fill the relay queue
+// while the remote desktop is busy.
+export const VNC_POINTER_MOVE_INTERVAL_MS = 16;
 
 type TimerHandle = ReturnType<typeof window.setTimeout>;
 

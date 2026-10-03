@@ -37,7 +37,7 @@ function createScheduler() {
 }
 
 describe("VncPointerScheduler", () => {
-  it("sends the leading move immediately and the latest trailing move at 4 ms", () => {
+  it("sends the leading move immediately and the latest trailing move at 16 ms", () => {
     const state = createScheduler();
     state.scheduler.move({ x: 1, y: 2, buttons: 0 });
     expect(state.sent).toEqual([{ x: 1, y: 2, buttons: 0 }]);
@@ -47,9 +47,9 @@ describe("VncPointerScheduler", () => {
     state.advance(1);
     state.scheduler.move({ x: 4, y: 5, buttons: 0 });
 
-    expect(state.timerDelay()).toBe(3);
+    expect(state.timerDelay()).toBe(15);
     expect(state.sent).toHaveLength(1);
-    state.advance(2);
+    state.advance(15);
     state.runTimer();
     expect(state.sent).toEqual([
       { x: 1, y: 2, buttons: 0 },
