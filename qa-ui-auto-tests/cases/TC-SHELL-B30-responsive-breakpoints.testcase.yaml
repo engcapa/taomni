@@ -20,6 +20,7 @@ steps:
 - set_viewport:
     width: 1440
     height: 900
+- wait_for: '[data-testid="shell-root"][data-mode="wide"]'
 - assert_attribute:
     selector: '[data-testid="shell-root"]'
     name: data-mode
@@ -28,6 +29,7 @@ steps:
 - set_viewport:
     width: 1199
     height: 900
+- wait_for: '[data-testid="shell-root"][data-mode="medium"]'
 - assert_attribute:
     selector: '[data-testid="shell-root"]'
     name: data-mode
@@ -46,6 +48,7 @@ steps:
 - set_viewport:
     width: 960
     height: 900
+- wait_for: '[data-testid="shell-root"][data-mode="medium"]'
 - assert_attribute:
     selector: '[data-testid="shell-root"]'
     name: data-mode
@@ -53,6 +56,7 @@ steps:
 - set_viewport:
     width: 959
     height: 900
+- wait_for: '[data-testid="shell-root"][data-mode="overlay"]'
 - assert_attribute:
     selector: '[data-testid="shell-root"]'
     name: data-mode
@@ -60,6 +64,7 @@ steps:
 - set_viewport:
     width: 720
     height: 600
+- wait_for: '[data-testid="shell-root"][data-mode="overlay"]'
 - assert_attribute:
     selector: '[data-testid="shell-root"]'
     name: data-mode
@@ -67,6 +72,7 @@ steps:
 - set_viewport:
     width: 719
     height: 600
+- wait_for: '[data-testid="shell-root"][data-mode="compact"]'
 - assert_attribute:
     selector: '[data-testid="shell-root"]'
     name: data-mode
@@ -76,6 +82,7 @@ steps:
 - set_viewport:
     width: 1440
     height: 900
+- wait_for: '[data-testid="shell-root"][data-mode="wide"]'
 - assert_attribute:
     selector: '[data-testid="shell-root"]'
     name: data-mode
@@ -90,31 +97,28 @@ verification:
       persisted preference remains expanded.
     actions:
     - 3
-    - 6
-    - 9
-    - 12
+    - 7
+    - 11
     - 14
     - 16
-    - 18
-    - 20
-    - 24
+    - 19
+    - 22
+    - 25
+    - 30
     checkpoints:
-    - step: 4
-      expectation: Navigator is temporarily collapsed or shown as an overlay while
-        its persisted preference remains expanded.
     - step: 5
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
-    - step: 7
+    - step: 6
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
-    - step: 8
+    - step: 9
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
     - step: 10
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
-    - step: 11
+    - step: 12
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
     - step: 13
@@ -123,43 +127,46 @@ verification:
     - step: 15
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
-    - step: 17
-      expectation: Navigator is temporarily collapsed or shown as an overlay while
-        its persisted preference remains expanded.
-    - step: 19
+    - step: 18
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
     - step: 21
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
-    - step: 22
+    - step: 24
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
-    - step: 23
+    - step: 27
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
-    - step: 25
+    - step: 28
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
-    - step: 26
+    - step: 29
+      expectation: Navigator is temporarily collapsed or shown as an overlay while
+        its persisted preference remains expanded.
+    - step: 32
+      expectation: Navigator is temporarily collapsed or shown as an overlay while
+        its persisted preference remains expanded.
+    - step: 33
       expectation: Navigator is temporarily collapsed or shown as an overlay while
         its persisted preference remains expanded.
     results:
-    - 4
     - 5
-    - 7
-    - 8
+    - 6
+    - 9
     - 10
-    - 11
+    - 12
     - 13
     - 15
-    - 17
-    - 19
+    - 18
     - 21
-    - 22
-    - 23
-    - 25
-    - 26
+    - 24
+    - 27
+    - 28
+    - 29
+    - 32
+    - 33
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay
       placement.

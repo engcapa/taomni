@@ -1,0 +1,146 @@
+id: TC-SHELL-B15
+title: A rejected save preserves the dirty workspace and allows retry
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b15.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - ''
+- seed_storage:
+    key: taomni.qa.shell.enabled
+    value: 'true'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+End
+- type: z
+- shell_backend_scenario:
+    action: fail-next
+    command: workspace_write_file_encoded
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-save"]'
+- click: '[data-testid="shell-close-confirm"]'
+- wait_for: '[data-testid="shell-close-error"]'
+- click: '[data-testid="shell-close-confirm"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - z
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-save"]'
+- click: '[data-testid="shell-close-confirm"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 1
+- screenshot: tc-shell-b15.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Home opens the fixture workspace with the complete file buffer.
+    actions:
+    - 3
+    - 4
+    checkpoints:
+    - step: 5
+      expectation: Home opens the fixture workspace with the complete file buffer.
+    - step: 6
+      expectation: Home opens the fixture workspace with the complete file buffer.
+    results:
+    - 5
+    - 6
+  - id: R2
+    requirement: A save failure prevents removal and surfaces an error without losing
+      text.
+    actions:
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    checkpoints:
+    - step: 13
+      expectation: A save failure prevents removal and surfaces an error without losing
+        text.
+    - step: 16
+      expectation: A save failure prevents removal and surfaces an error without losing
+        text.
+    - step: 18
+      expectation: A save failure prevents removal and surfaces an error without losing
+        text.
+    - step: 19
+      expectation: A save failure prevents removal and surfaces an error without losing
+        text.
+    - step: 20
+      expectation: A save failure prevents removal and surfaces an error without losing
+        text.
+    results:
+    - 13
+    - 16
+    - 18
+    - 19
+    - 20
+  - id: R3
+    requirement: Retrying the actual save succeeds before the workspace is removed.
+    actions:
+    - 21
+    - 23
+    - 24
+    - 26
+    checkpoints:
+    - step: 22
+      expectation: Retrying the actual save succeeds before the workspace is removed.
+    - step: 25
+      expectation: Retrying the actual save succeeds before the workspace is removed.
+    - step: 27
+      expectation: Retrying the actual save succeeds before the workspace is removed.
+    results:
+    - 22
+    - 25
+    - 27
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.

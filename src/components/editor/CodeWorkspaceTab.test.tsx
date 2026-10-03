@@ -13829,7 +13829,7 @@ end_of_record
       expect(container.querySelector('[data-testid="panel"][data-default-size="320px"]')).toBeNull();
     });
 
-    it("renders the project splitter handle with an explicit id, hot zone and disabled collapse state (ED-SPLITTER-001)", async () => {
+    it("renders the project splitter hot zone only while the panel is visible (ED-SPLITTER-001)", async () => {
       const workspace: CodeWorkspaceTabInfo = {
         repoRoot: "/repo/app",
         workspaceId: "ws-shell-splitter-handle",
@@ -13855,9 +13855,11 @@ end_of_record
         ).toBe(false);
       });
 
-      const collapsedHandle = screen.getByTestId("code-workspace-project-resize-handle");
-      expect(collapsedHandle).toHaveAttribute("aria-disabled", "true");
-      expect(collapsedHandle.className).toContain("hidden");
+      expect(screen.queryByTestId("code-workspace-project-resize-handle")).not.toBeInTheDocument();
+      fireEvent.keyDown(window, { key: "1", altKey: true });
+      const reopened = await screen.findByTestId("code-workspace-project-resize-handle");
+      expect(reopened).not.toHaveAttribute("aria-disabled");
+      expect(reopened.className).toContain("after:-left-1.5");
     });
 
     it("toggles bottom dock tool windows with Alt+6 (Problems) and Alt+4 (Run)", async () => {

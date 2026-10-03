@@ -1,0 +1,384 @@
+id: TC-SHELL-B14
+title: Dirty workspace cancellation through five visible close entries
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b14.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: &id002
+    - repo-a WORKTREE
+    - shared line
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+End
+- type: z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: &id001
+    - repo-a WORKTREE
+    - shared line
+    - z
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="shell-close-risk"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="shell-close-risk"]'
+    name: data-risk-kind
+    equals: dirty
+- click: '[data-testid="shell-close-cancel"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- middle_click: '[data-testid="tab-item"][data-active="true"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="shell-close-risk"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="shell-close-risk"]'
+    name: data-risk-kind
+    equals: dirty
+- click: '[data-testid="shell-close-cancel"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- right_click: '[data-testid="tab-item"][data-active="true"]'
+- click: '[data-testid="shell-tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="shell-close-risk"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="shell-close-risk"]'
+    name: data-risk-kind
+    equals: dirty
+- click: '[data-testid="shell-close-cancel"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="shell-close-risk"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="shell-close-risk"]'
+    name: data-risk-kind
+    equals: dirty
+- click: '[data-testid="shell-close-cancel"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- click: '[data-testid="shell-overview-trigger"]'
+- press:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+    key: Delete
+- wait_for: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="shell-close-risk"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="shell-close-risk"]'
+    name: data-risk-kind
+    equals: dirty
+- click: '[data-testid="shell-close-cancel"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id002
+- type: z
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-discard"]'
+- click: '[data-testid="shell-close-confirm"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 1
+- screenshot: tc-shell-b14.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Home opens the fixture workspace with the complete file buffer.
+    actions:
+    - 3
+    - 4
+    checkpoints:
+    - step: 5
+      expectation: Home opens the fixture workspace with the complete file buffer.
+    - step: 6
+      expectation: Home opens the fixture workspace with the complete file buffer.
+    results:
+    - 5
+    - 6
+  - id: R2
+    requirement: One edit creates a dirty risk while retaining the original undo history.
+    actions:
+    - 7
+    - 8
+    - 9
+    checkpoints:
+    - step: 10
+      expectation: One edit creates a dirty risk while retaining the original undo
+        history.
+    results:
+    - 10
+  - id: R3
+    requirement: Close entry 1 cancels the same dirty decision and keeps the complete
+      buffer.
+    actions:
+    - 11
+    - 15
+    checkpoints:
+    - step: 12
+      expectation: Close entry 1 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 13
+      expectation: Close entry 1 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 14
+      expectation: Close entry 1 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 16
+      expectation: Close entry 1 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 17
+      expectation: Close entry 1 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 18
+      expectation: Close entry 1 cancels the same dirty decision and keeps the complete
+        buffer.
+    results:
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 18
+  - id: R4
+    requirement: Close entry 2 cancels the same dirty decision and keeps the complete
+      buffer.
+    actions:
+    - 19
+    - 23
+    checkpoints:
+    - step: 20
+      expectation: Close entry 2 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 21
+      expectation: Close entry 2 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 22
+      expectation: Close entry 2 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 24
+      expectation: Close entry 2 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 25
+      expectation: Close entry 2 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 26
+      expectation: Close entry 2 cancels the same dirty decision and keeps the complete
+        buffer.
+    results:
+    - 20
+    - 21
+    - 22
+    - 24
+    - 25
+    - 26
+  - id: R5
+    requirement: Close entry 3 cancels the same dirty decision and keeps the complete
+      buffer.
+    actions:
+    - 27
+    - 28
+    - 32
+    checkpoints:
+    - step: 29
+      expectation: Close entry 3 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 30
+      expectation: Close entry 3 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 31
+      expectation: Close entry 3 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 33
+      expectation: Close entry 3 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 34
+      expectation: Close entry 3 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 35
+      expectation: Close entry 3 cancels the same dirty decision and keeps the complete
+        buffer.
+    results:
+    - 29
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+  - id: R6
+    requirement: Close entry 4 cancels the same dirty decision and keeps the complete
+      buffer.
+    actions:
+    - 36
+    - 37
+    - 41
+    - 43
+    checkpoints:
+    - step: 38
+      expectation: Close entry 4 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 39
+      expectation: Close entry 4 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 40
+      expectation: Close entry 4 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 42
+      expectation: Close entry 4 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 44
+      expectation: Close entry 4 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 45
+      expectation: Close entry 4 cancels the same dirty decision and keeps the complete
+        buffer.
+    results:
+    - 38
+    - 39
+    - 40
+    - 42
+    - 44
+    - 45
+  - id: R7
+    requirement: Close entry 5 cancels the same dirty decision and keeps the complete
+      buffer.
+    actions:
+    - 46
+    - 47
+    - 51
+    - 53
+    checkpoints:
+    - step: 48
+      expectation: Close entry 5 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 49
+      expectation: Close entry 5 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 50
+      expectation: Close entry 5 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 52
+      expectation: Close entry 5 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 54
+      expectation: Close entry 5 cancels the same dirty decision and keeps the complete
+        buffer.
+    - step: 55
+      expectation: Close entry 5 cancels the same dirty decision and keeps the complete
+        buffer.
+    results:
+    - 48
+    - 49
+    - 50
+    - 52
+    - 54
+    - 55
+  - id: R8
+    requirement: Cancelling every entry preserves undo; discard closes only the workspace.
+    actions:
+    - 56
+    - 58
+    - 59
+    - 61
+    - 62
+    - 64
+    checkpoints:
+    - step: 57
+      expectation: Cancelling every entry preserves undo; discard closes only the
+        workspace.
+    - step: 60
+      expectation: Cancelling every entry preserves undo; discard closes only the
+        workspace.
+    - step: 63
+      expectation: Cancelling every entry preserves undo; discard closes only the
+        workspace.
+    - step: 65
+      expectation: Cancelling every entry preserves undo; discard closes only the
+        workspace.
+    results:
+    - 57
+    - 60
+    - 63
+    - 65
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.

@@ -3169,16 +3169,39 @@ def _do_switch_window(ctx, args):
     from .window_routes import matches_window_route
     deadline = time.monotonic() + args.get("timeout_sec", 10)
     session = ctx.session
+    observed = {}
     while time.monotonic() < deadline:
         handles = session.request("GET", session.endpoint("/window/handles"))
         for handle in handles:
             session.request("POST", session.endpoint("/window"), {"handle": handle})
             url = session.request("GET", session.endpoint("/url"))
+            observed[str(handle)] = str(url)
             if matches_window_route(url, args["route"]):
+                session.wait_for_app_ready()
                 session.install_console_hook()
                 return "selected existing native window " + str(handle)
         time.sleep(.1)
-    raise StepError("switch_window: no native window matches route " + repr(args["route"]))
+    (ctx.case_dir / "window-routes.json").write_text(json.dumps(observed, indent=2), encoding="utf-8")
+    raise StepError("switch_window: no native window matches route " + repr(args["route"]) + "; observed " + repr(observed))
+
+
+@_verb("set_viewport")
+def _do_set_viewport(ctx, args):
+    """Resize the actual QA window and observe its client viewport, including chrome."""
+    width, height = args["width"], args["height"]
+    session = ctx.session
+    rect = session.request("GET", session.endpoint("/window/rect"))
+    viewport = session.execute("return {width:innerWidth,height:innerHeight};")
+    target = {"width": round(rect["width"] + width - viewport["width"]),
+              "height": round(rect["height"] + height - viewport["height"])}
+    session.request("POST", session.endpoint("/window/rect"), target)
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        viewport = session.execute("return {width:innerWidth,height:innerHeight};")
+        if viewport == {"width": width, "height": height}:
+            return f"native client viewport is {width}x{height}"
+        time.sleep(.1)
+    raise StepError(f"native viewport {viewport!r} did not reach {width}x{height}")
 
 
 @_verb("close_window")

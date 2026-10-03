@@ -1,7 +1,7 @@
 """Controlled external IPC faults. Never writes app stores or dispatches UI handlers."""
 import json
 from . import verb, StepError
-COMMANDS = {"create_local_terminal", "create_ssh_terminal", "save_session", "sftp_attach", "workspace_list_dir", "workspace_write_file", "db_save_query_workspace", "open_detached_window", "get_welcome_run_snapshot"}
+COMMANDS = {"create_local_terminal", "create_ssh_terminal", "save_session", "sftp_attach", "workspace_list_dir", "workspace_write_file", "workspace_write_file_encoded", "workspace_write_loose_file_encoded", "db_save_query_workspace", "open_detached_window", "get_welcome_run_snapshot"}
 
 
 @verb("shell_backend_scenario")

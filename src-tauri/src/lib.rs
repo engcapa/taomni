@@ -81,6 +81,29 @@ fn qa_override_path(raw: &str) -> Option<std::path::PathBuf> {
     }
 }
 
+/// Keep every QA WebView in the main window's isolated profile. Handoffs use
+/// origin storage, and EdgeDriver discovers only views in its own environment.
+pub(crate) fn configure_qa_webview<'a>(
+    mut builder: WebviewWindowBuilder<'a, tauri::Wry, AppHandle>,
+) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+    if cfg!(debug_assertions) {
+        if let Ok(raw) = std::env::var("NEWMOB_DATA_DIR") {
+            if let Some(data_dir) = qa_override_path(&raw) {
+                let webview_dir = data_dir.join("webview");
+                std::fs::create_dir_all(&webview_dir).ok();
+                builder = builder.data_directory(webview_dir);
+                #[cfg(target_os = "windows")]
+                if let Ok(arguments) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+                    if !arguments.trim().is_empty() {
+                        builder = builder.additional_browser_args(&arguments);
+                    }
+                }
+            }
+        }
+    }
+    builder
+}
+
 /// Resolve the app data root, honoring the debug-only QA override used by
 /// native tests. Windows' `dirs::data_dir()` uses the Known Folder API and
 /// ignores `APPDATA`, so the explicit override is required for isolation.
@@ -364,31 +387,7 @@ pub fn run() {
                     // Required on Linux/Windows for navigator.clipboard.readText().
                     // Terminal right-click paste and Shift+Insert use that API.
                     .enable_clipboard_access();
-                if cfg!(debug_assertions) {
-                    if let Ok(raw) = std::env::var("NEWMOB_DATA_DIR") {
-                        if let Some(data_dir) = qa_override_path(&raw) {
-                            let webview_dir = data_dir.join("webview");
-                            std::fs::create_dir_all(&webview_dir).ok();
-                            builder = builder.data_directory(webview_dir);
-                        }
-                    }
-                }
-                #[cfg(target_os = "windows")]
-                if cfg!(debug_assertions) && std::env::var_os("NEWMOB_DATA_DIR").is_some() {
-                    // EdgeDriver launches the QA executable with the remote
-                    // debugging arguments in this environment variable. Wry
-                    // also supplies explicit default arguments, which take
-                    // precedence over the WebView2 environment variable. Pass
-                    // the driver value explicitly so DevToolsActivePort is
-                    // created in the isolated data directory watched by it.
-                    if let Ok(arguments) =
-                        std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
-                    {
-                        if !arguments.trim().is_empty() {
-                            builder = builder.additional_browser_args(&arguments);
-                        }
-                    }
-                }
+                builder = configure_qa_webview(builder);
                 // On macOS use the native traffic-light controls with an overlay
                 // title bar so the window feels native (the frontend reserves a
                 // left inset and hides its custom min/max/close there). Windows

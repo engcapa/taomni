@@ -107,7 +107,7 @@ pub async fn open_detached_window(
     let (default_w, default_h, min_w, min_h) = default_size(&kind);
     let final_w = width.unwrap_or(default_w);
     let final_h = height.unwrap_or(default_h);
-    let builder = WebviewWindowBuilder::new(&app_handle, &label, url)
+    let builder = crate::configure_qa_webview(WebviewWindowBuilder::new(&app_handle, &label, url))
         .title(&resolved_title)
         .inner_size(final_w, final_h)
         .min_inner_size(min_w, min_h)

@@ -1664,6 +1664,8 @@
                 "sftp_attach",
                 "workspace_list_dir",
                 "workspace_write_file",
+                "workspace_write_file_encoded",
+                "workspace_write_loose_file_encoded",
                 "db_save_query_workspace",
                 "open_detached_window",
                 "get_welcome_run_snapshot"

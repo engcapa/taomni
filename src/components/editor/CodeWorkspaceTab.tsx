@@ -22997,14 +22997,11 @@ export function CodeWorkspaceTab({
               {renderToolWindowSideArea("left")}
             </div>
           </Panel>
-          <PanelResizeHandle
+          {leftToolAreaOpen && <PanelResizeHandle
             id="code-workspace-project-resize-handle"
             data-testid="code-workspace-project-resize-handle"
-            disabled={!leftToolAreaOpen}
-            className={leftToolAreaOpen
-              ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:z-20"
-              : "hidden"}
-          />
+            className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:z-20"
+          />}
           <Panel
             id="editor"
             defaultSize={languagePanelOpen ? "56%" : "80%"}
@@ -23017,11 +23014,9 @@ export function CodeWorkspaceTab({
             </div>
           ) : renderRecursiveLayoutNode(workspaceUi.layoutTreeV2, renderEditorGroup)}
         </Panel>
-          <PanelResizeHandle
-            className={rightToolAreaOpen
-              ? "w-1 bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
-              : "hidden"}
-          />
+          {rightToolAreaOpen && <PanelResizeHandle
+            className="w-1 bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
+          />}
           <Panel
             panelRef={rightPanelRef}
             id="documentation"

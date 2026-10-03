@@ -21,17 +21,17 @@ steps:
 - vault_first_run: qa-shell-native-password
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
-- wait_for: '[data-testid="terminal-pane"]:visible[data-terminal-ready="true"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
 - terminal_input:
-    selector: '[data-testid="terminal-pane"]:visible'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo QA_SHELL_START
     submit: true
 - assert_pattern:
-    selector: '[data-testid="terminal-pane"]:visible'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: (?m)^QA_SHELL_START\s*$
     timeout_sec: 20
 - terminal_input:
-    selector: '[data-testid="terminal-pane"]:visible'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo QA_SHELL_KEEP
     submit: false
 - select_option:
@@ -178,10 +178,10 @@ steps:
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="shell-rail-tao"]'
 - press:
-    selector: '[data-testid="terminal-pane"]:visible'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     key: Enter
 - assert_pattern:
-    selector: '[data-testid="terminal-pane"]:visible'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: (?m)^QA_SHELL_KEEP\s*$
     timeout_sec: 20
 - screenshot: tc-shell-n02.png
@@ -195,9 +195,9 @@ verification:
     - 6
     checkpoints:
     - step: 5
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible[data-terminal-ready=\"true\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
     - step: 7
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]:visible",
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
         "regex": "(?m)^QA_SHELL_START\\s*$", "timeout_sec": 20}}'
     results:
     - 5
@@ -294,7 +294,7 @@ verification:
     - step: 70
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     - step: 73
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]:visible",
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
         "regex": "(?m)^QA_SHELL_KEEP\\s*$", "timeout_sec": 20}}'
     results:
     - 10

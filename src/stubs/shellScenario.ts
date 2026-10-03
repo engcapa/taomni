@@ -4,7 +4,7 @@ const PREFIX = "taomni.qa.shell.";
 const terminals = new Map<string, { output?: { onmessage(data: number[]): void }; cwd: string; input: string }>();
 const sftp = new Map<string, string>();
 let sequence = 0;
-export const SHELL_SCENARIO_COMMANDS = ["create_local_terminal", "create_ssh_terminal", "save_session", "sftp_attach", "workspace_list_dir", "workspace_write_file", "db_save_query_workspace", "open_detached_window", "get_welcome_run_snapshot"] as const;
+export const SHELL_SCENARIO_COMMANDS = ["create_local_terminal", "create_ssh_terminal", "save_session", "sftp_attach", "workspace_list_dir", "workspace_write_file", "workspace_write_file_encoded", "workspace_write_loose_file_encoded", "db_save_query_workspace", "open_detached_window", "get_welcome_run_snapshot"] as const;
 export function shellScenarioEnabled() { return localStorage.getItem(`${PREFIX}enabled`) === "true"; }
 function observe(command: string, owner: string, status: string) {
   const values = JSON.parse(localStorage.getItem(`${PREFIX}observations`) ?? "[]") as unknown[];

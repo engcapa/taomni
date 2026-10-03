@@ -1,0 +1,188 @@
+id: TC-SHELL-B21
+title: Git promotion and docking retain the same complete commit draft
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b21.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - ''
+- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- fill:
+    selector: textarea[placeholder*="Commit"]:visible
+    value: SHELL-PROMOTED-DRAFT
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-promote"]'
+- assert_not_visible: '[data-testid="shell-host"]'
+- wait_for: textarea[placeholder*="Commit"]:visible
+- assert_value:
+    selector: textarea[placeholder*="Commit"]:visible
+    equals: SHELL-PROMOTED-DRAFT
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 3
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="git"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-overview"]'
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-cancel"]'
+- assert_value:
+    selector: textarea[placeholder*="Commit"]:visible
+    equals: SHELL-PROMOTED-DRAFT
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-dock"]'
+- click: '[data-testid="shell-close-confirm"]'
+- wait_for: '[data-testid="shell-host"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host"]'
+    name: data-edge
+    equals: bottom
+- assert_value:
+    selector: textarea[placeholder*="Commit"]:visible
+    equals: SHELL-PROMOTED-DRAFT
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="git"]'
+    equal: 0
+- screenshot: tc-shell-b21.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Home opens the fixture workspace with the complete file buffer.
+    actions:
+    - 3
+    - 4
+    checkpoints:
+    - step: 5
+      expectation: Home opens the fixture workspace with the complete file buffer.
+    - step: 6
+      expectation: Home opens the fixture workspace with the complete file buffer.
+    results:
+    - 5
+    - 6
+  - id: R2
+    requirement: Promoting a draft creates one primary Git view and retains its state.
+    actions:
+    - 7
+    - 9
+    - 10
+    - 11
+    - 15
+    - 18
+    checkpoints:
+    - step: 8
+      expectation: Promoting a draft creates one primary Git view and retains its
+        state.
+    - step: 12
+      expectation: Promoting a draft creates one primary Git view and retains its
+        state.
+    - step: 13
+      expectation: Promoting a draft creates one primary Git view and retains its
+        state.
+    - step: 14
+      expectation: Promoting a draft creates one primary Git view and retains its
+        state.
+    - step: 16
+      expectation: Promoting a draft creates one primary Git view and retains its
+        state.
+    - step: 17
+      expectation: Promoting a draft creates one primary Git view and retains its
+        state.
+    - step: 19
+      expectation: Promoting a draft creates one primary Git view and retains its
+        state.
+    results:
+    - 8
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 19
+  - id: R3
+    requirement: Close offers docking; cancel keeps the primary view, docking returns
+      the draft to its owner.
+    actions:
+    - 20
+    - 22
+    - 24
+    - 26
+    - 27
+    - 31
+    checkpoints:
+    - step: 21
+      expectation: Close offers docking; cancel keeps the primary view, docking returns
+        the draft to its owner.
+    - step: 23
+      expectation: Close offers docking; cancel keeps the primary view, docking returns
+        the draft to its owner.
+    - step: 25
+      expectation: Close offers docking; cancel keeps the primary view, docking returns
+        the draft to its owner.
+    - step: 28
+      expectation: Close offers docking; cancel keeps the primary view, docking returns
+        the draft to its owner.
+    - step: 29
+      expectation: Close offers docking; cancel keeps the primary view, docking returns
+        the draft to its owner.
+    - step: 30
+      expectation: Close offers docking; cancel keeps the primary view, docking returns
+        the draft to its owner.
+    - step: 32
+      expectation: Close offers docking; cancel keeps the primary view, docking returns
+        the draft to its owner.
+    - step: 33
+      expectation: Close offers docking; cancel keeps the primary view, docking returns
+        the draft to its owner.
+    results:
+    - 21
+    - 23
+    - 25
+    - 28
+    - 29
+    - 30
+    - 32
+    - 33
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.

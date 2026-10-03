@@ -1,0 +1,98 @@
+id: TC-SHELL-B04
+title: Reload and explicit restore recreate one workspace instance
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b04.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.6
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="shell-rail-home"]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="welcome-restore-last-session"]'
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="shell-rail-home"]'
+- assert_attribute:
+    selector: '[data-testid="welcome-restore-status"]'
+    name: data-state
+    equals: succeeded
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"]'
+    equal: 1
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 1
+- screenshot: tc-shell-b04.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A workspace opened from Home creates a persisted, restorable workset.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    checkpoints:
+    - step: 5
+      expectation: A workspace opened from Home creates a persisted, restorable workset.
+    - step: 8
+      expectation: A workspace opened from Home creates a persisted, restorable workset.
+    - step: 9
+      expectation: A workspace opened from Home creates a persisted, restorable workset.
+    results:
+    - 5
+    - 8
+    - 9
+  - id: R2
+    requirement: Restoring a persisted workspace reaches ready with one primary instance
+      and no renderer failure.
+    actions:
+    - 10
+    - 12
+    - 15
+    checkpoints:
+    - step: 11
+      expectation: Restoring a persisted workspace reaches ready with one primary
+        instance and no renderer failure.
+    - step: 13
+      expectation: Restoring a persisted workspace reaches ready with one primary
+        instance and no renderer failure.
+    - step: 14
+      expectation: Restoring a persisted workspace reaches ready with one primary
+        instance and no renderer failure.
+    - step: 16
+      expectation: Restoring a persisted workspace reaches ready with one primary
+        instance and no renderer failure.
+    results:
+    - 11
+    - 13
+    - 14
+    - 16
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.

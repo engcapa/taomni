@@ -1,0 +1,133 @@
+id: TC-SHELL-B22
+title: Project, Problems and Terminal retain the workspace editor buffer
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b22.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: &id001
+    - repo-a WORKTREE
+    - shared line
+    - ''
+- assert_count:
+    selector: '[data-testid="code-workspace-tree"]:visible'
+    equal: 1
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+End
+- type: z
+- click: '[data-testid="code-workspace-bottom-tab-problems"]'
+- wait_for: '[data-testid="shell-host"][data-panel-id$=":problems"]'
+- click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="code-workspace-terminal-dock"]'
+- click: '[data-testid="shell-host-hide"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - z
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- assert_count:
+    selector: '[data-testid="code-workspace-tree"]:visible'
+    equal: 1
+- screenshot: tc-shell-b22.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Home opens the fixture workspace with the complete file buffer.
+    actions:
+    - 3
+    - 4
+    checkpoints:
+    - step: 5
+      expectation: Home opens the fixture workspace with the complete file buffer.
+    - step: 6
+      expectation: Home opens the fixture workspace with the complete file buffer.
+    results:
+    - 5
+    - 6
+  - id: R2
+    requirement: Project is hosted by Navigator; tool switches and Home return preserve
+      one editor and its undo.
+    actions:
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 16
+    - 17
+    - 18
+    - 19
+    - 21
+    checkpoints:
+    - step: 7
+      expectation: Project is hosted by Navigator; tool switches and Home return preserve
+        one editor and its undo.
+    - step: 12
+      expectation: Project is hosted by Navigator; tool switches and Home return preserve
+        one editor and its undo.
+    - step: 14
+      expectation: Project is hosted by Navigator; tool switches and Home return preserve
+        one editor and its undo.
+    - step: 15
+      expectation: Project is hosted by Navigator; tool switches and Home return preserve
+        one editor and its undo.
+    - step: 20
+      expectation: Project is hosted by Navigator; tool switches and Home return preserve
+        one editor and its undo.
+    - step: 22
+      expectation: Project is hosted by Navigator; tool switches and Home return preserve
+        one editor and its undo.
+    - step: 23
+      expectation: Project is hosted by Navigator; tool switches and Home return preserve
+        one editor and its undo.
+    results:
+    - 7
+    - 12
+    - 14
+    - 15
+    - 20
+    - 22
+    - 23
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.

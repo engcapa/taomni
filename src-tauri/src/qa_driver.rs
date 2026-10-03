@@ -760,8 +760,66 @@ async fn current_url<R: Runtime>(
     if !session_is_valid(&session_id) {
         return error("unknown WebDriver session");
     }
-    match eval_js(&state, "return window.location.href;".into()).await {
-        Ok(value) => ok(value),
+    // Navigation may not yet have an evaluable document in a newly created view.
+    // Reading the native URL lets the runner select it before waiting for React.
+    match state
+        .current_window()
+        .and_then(|window| window.url().map_err(|e| e.to_string()))
+    {
+        Ok(url) => ok(json!(url.as_str())),
+        Err(message) => error(message),
+    }
+}
+
+async fn window_rect<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    if !session_is_valid(&session_id) {
+        return error("unknown WebDriver session");
+    }
+    let result = (|| -> Result<Value, String> {
+        let window = state.current_window()?;
+        let scale = window.scale_factor().map_err(|e| e.to_string())?;
+        let position = window
+            .outer_position()
+            .map_err(|e| e.to_string())?
+            .to_logical::<f64>(scale);
+        let size = window
+            .inner_size()
+            .map_err(|e| e.to_string())?
+            .to_logical::<f64>(scale);
+        Ok(json!({"x":position.x,"y":position.y,"width":size.width,"height":size.height}))
+    })();
+    match result {
+        Ok(rect) => ok(rect),
+        Err(message) => error(message),
+    }
+}
+
+async fn resize_window<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+    Json(payload): Json<Value>,
+) -> Response {
+    if !session_is_valid(&session_id) {
+        return error("unknown WebDriver session");
+    }
+    let (Some(width), Some(height)) = (
+        payload.get("width").and_then(Value::as_f64),
+        payload.get("height").and_then(Value::as_f64),
+    ) else {
+        return error("window rect requires width and height");
+    };
+    if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
+        return error("invalid window size");
+    }
+    match state.current_window().and_then(|window| {
+        window
+            .set_size(tauri::LogicalSize::new(width, height))
+            .map_err(|e| e.to_string())
+    }) {
+        Ok(()) => window_rect(State(state), Path(session_id)).await,
         Err(message) => error(message),
     }
 }
@@ -1019,6 +1077,10 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             )
             .route("/session/{session_id}/refresh", post(refresh::<R>))
             .route("/session/{session_id}/url", get(current_url::<R>))
+            .route(
+                "/session/{session_id}/window/rect",
+                get(window_rect::<R>).post(resize_window::<R>),
+            )
             .route("/session/{session_id}/screenshot", get(screenshot::<R>))
             .route(
                 "/session/{session_id}/qa/desktop-screenshot",

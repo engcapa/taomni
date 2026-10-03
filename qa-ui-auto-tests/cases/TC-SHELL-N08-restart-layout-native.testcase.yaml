@@ -19,6 +19,10 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-shell-native-password
 - wait_for: '[data-testid="welcome-panel"]'
+- set_viewport:
+    width: 1280
+    height: 800
+- wait_for: '[data-testid="shell-root"][data-mode="wide"]'
 - seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell",
@@ -48,6 +52,10 @@ steps:
     contains: '"width":232'
 - restart_native_app: null
 - wait_for: '[data-testid="welcome-panel"]'
+- set_viewport:
+    width: 1280
+    height: 800
+- wait_for: '[data-testid="shell-root"][data-mode="wide"]'
 - assert_attribute:
     selector: '[data-testid="main-sidebar-resize-handle"]'
     name: aria-valuenow
@@ -76,63 +84,73 @@ verification:
     requirement: Workspace and Navigator preferences are persisted before a process
       restart.
     actions:
-    - 4
-    - 5
+    - 6
     - 7
-    - 8
+    - 9
     - 10
-    - 11
+    - 12
     - 13
+    - 15
+    - 4
     checkpoints:
-    - step: 6
+    - step: 8
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 9
+    - step: 11
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]
         .cm-content", "timeout_sec": 60}}'
-    - step: 12
+    - step: 14
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
         "name": "aria-valuenow", "equals": "232"}}'
-    - step: 14
+    - step: 16
       expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains":
         "\"width\":232"}}'
+    - step: 5
+      expectation: Actual native client viewport reaches wide layout before using
+        the Navigator splitter.
     results:
-    - 6
-    - 9
-    - 12
+    - 8
+    - 11
     - 14
+    - 16
+    - 5
   - id: R2
     requirement: A new QA process using the same isolated profile starts at Home with
       saved preferences and restores exactly one workspace.
     actions:
-    - 15
-    - 18
-    - 20
-    - 23
-    checkpoints:
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
-        "name": "aria-valuenow", "equals": "232"}}'
-    - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]",
-        "timeout_sec": 60}}'
-    - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]",
-        "name": "data-state", "equals": "succeeded"}}'
-    - step: 22
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]",
-        "equal": 1}}'
-    - step: 24
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
-        "equal": 1}}'
-    results:
-    - 16
     - 17
-    - 19
-    - 21
     - 22
     - 24
+    - 27
+    - 19
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
+        "name": "aria-valuenow", "equals": "232"}}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]",
+        "timeout_sec": 60}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]",
+        "name": "data-state", "equals": "succeeded"}}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]",
+        "equal": 1}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
+        "equal": 1}}'
+    - step: 20
+      expectation: The restarted native window reaches wide layout before checking
+        restored Navigator width.
+    results:
+    - 18
+    - 21
+    - 23
+    - 25
+    - 26
+    - 28
+    - 20
   visual:
   - check: Read final screenshot for clipped controls and retained content
     method: manual

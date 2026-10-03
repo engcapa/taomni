@@ -16,6 +16,7 @@ class FakeSession:
         self.selected = "main"
         self.urls = {"main": "tauri://localhost/", "git": "tauri://localhost/#git=fixture"}
         self.install_console_hook = Mock()
+        self.wait_for_app_ready = Mock()
         self.restart = Mock()
 
     def endpoint(self, suffix):
@@ -90,10 +91,32 @@ class ShellWindowsTest(TestCase):
             ctx = NativeStepContext(session, Path(directory), {})
             VERBS["switch_window"](ctx, {"route": "#git="})
             self.assertEqual(session.selected, "git")
+            session.wait_for_app_ready.assert_called_once()
             VERBS["switch_window"](ctx, {"route": ""})
             self.assertEqual(session.selected, "main")
             VERBS["restart_native_app"](ctx, None)
             session.restart.assert_called_once()
+
+    def test_native_resize_compensates_for_window_chrome_and_checks_client_size(self):
+        with TemporaryDirectory() as directory:
+            session = FakeSession()
+            session.request = Mock(side_effect=[{"width": 1016, "height": 839}, None])
+            session.execute = Mock(side_effect=[{"width": 1000, "height": 800}, {"width": 1440, "height": 900}])
+            ctx = NativeStepContext(session, Path(directory), {})
+            VERBS["set_viewport"](ctx, {"width": 1440, "height": 900})
+            self.assertEqual(session.request.call_args_list[1].args, ("POST", "/window/rect", {"width": 1456, "height": 939}))
+            self.assertEqual(session.execute.call_count, 2)
+
+    def test_native_resize_rejects_a_window_that_never_reaches_requested_viewport(self):
+        from unittest.mock import patch
+        with TemporaryDirectory() as directory:
+            session = FakeSession()
+            session.request = Mock(return_value={"width": 900, "height": 700})
+            session.execute = Mock(return_value={"width": 900, "height": 700})
+            ctx = NativeStepContext(session, Path(directory), {})
+            with patch("qa_ui_auto.native_steps.time.monotonic", side_effect=[0, 11]):
+                with self.assertRaisesRegex(StepError, "did not reach"):
+                    VERBS["set_viewport"](ctx, {"width": 1440, "height": 900})
 
     def test_missing_child_is_a_failure(self):
         with TemporaryDirectory() as directory:
