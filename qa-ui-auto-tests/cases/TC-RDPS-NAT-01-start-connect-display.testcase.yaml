@@ -87,8 +87,14 @@ steps:
     artifact: probe-connect
     args:
       seconds: 3
+      compression: none
     expect:
       negotiated.drdynvc: true
+      negotiated.compression: none
+      rfx.surface_bits:
+        min: 1
+      rfx.bulk.compressed_updates: 0
+      rfx.bulk.decompression_errors: 0
       advertised_codecs:
         equals:
         - remotefx
@@ -113,10 +119,15 @@ steps:
     scenario: latency
     artifact: probe-latency
     args:
+      compression: k64
       x: 280
       y: 240
       samples: 10
     expect:
+      negotiated.compression: k64
+      rfx.bulk.compressed_updates:
+        min: 1
+      rfx.bulk.decompression_errors: 0
       timeouts:
         max: 2
       latency_ms.count:
@@ -168,7 +179,7 @@ verification:
     - step: 16
       expectation: The RDP row reports data-status=running after the vault master password is set.
     - step: 18
-      expectation: With RemoteFX only (mstsc-like) drdynvc is negotiated, graphics arrive and at least 95% of the framebuffer grid is painted.
+      expectation: With RemoteFX only and INFO_COMPRESSION absent, drdynvc is negotiated, RemoteFX graphics arrive without bulk compression and at least 95% of the framebuffer grid is painted.
     - step: 19
       expectation: With RemoteFX, QOI and QOIZ offered (Taomni client) at least 95% of the framebuffer grid is painted.
     results:
@@ -180,7 +191,7 @@ verification:
     - 20
     checkpoints:
     - step: 20
-      expectation: At least 8 of 10 clicks produce an observed pixel change, at most 2 time out.
+      expectation: MPPC-64K is declared, compressed updates decode without errors, at least 8 of 10 clicks produce an observed pixel change and at most 2 time out.
     - step: 21
       expectation: The host Tk target counted at least 10 flips in its own state file.
     results:

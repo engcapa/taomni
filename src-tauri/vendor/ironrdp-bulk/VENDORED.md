@@ -11,3 +11,10 @@ XCRUSH compression also keeps MPPC payloads marked COMPRESSED + FLUSHED.
 Previously it discarded these payloads and reset again, leaving compression
 stuck in raw mode after an incompressible packet. A sequence regression checks
 recovery, the size reduction and exact decompression with continuing histories.
+
+`BulkCompressor::estimate_mppc64k_size` allocates only an independent MPPC
+context for the server's disposable size estimate. It avoids allocating all
+six unrelated compression/decompression contexts for every dirty rectangle;
+its estimates match a fresh RDP5 coordinator byte for byte.
+The estimate output is capped at the input length, matching MPPC's own cap.
+Fresh MPPC contexts are already zeroed and need no redundant initial reset.

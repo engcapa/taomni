@@ -116,6 +116,25 @@ impl BulkCompressor {
         src_size <= COMPRESS_MIN_SIZE || src_size >= COMPRESS_MAX_SIZE
     }
 
+    /// Estimate MPPC-64K with an empty, disposable history. Only MPPC is
+    /// allocated; constructing the six send/receive contexts of the full
+    /// coordinator for each bitmap estimate would dominate small updates.
+    pub fn estimate_mppc64k_size(src_data: &[u8]) -> Result<usize, BulkError> {
+        if Self::should_skip_compression(src_data.len()) {
+            return Ok(src_data.len());
+        }
+        let mut context = MppcContext::new(1);
+        // MPPC caps its destination at the input length and falls back to
+        // raw data on expansion. Small estimates need no 64 KiB output.
+        let mut output = alloc::vec![0; src_data.len()];
+        let (size, packet_flags) = context.compress(src_data, &mut output)?;
+        Ok(if packet_flags & crate::flags::PACKET_COMPRESSED != 0 {
+            size + 1
+        } else {
+            src_data.len() + usize::from(packet_flags & BULK_COMPRESSION_FLAGS_MASK != 0)
+        })
+    }
+
     /// Decompresses bulk-compressed RDP data.
     ///
     /// `flags` contains the compression type (low 4 bits) and control flags
@@ -282,6 +301,41 @@ impl BulkCompressor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn disposable_mppc_estimates_match_fresh_compressors() {
+        let mut seed = 0x9e3779b9u32;
+        let noise: Vec<u8> = (0..16374)
+            .map(|_| {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                seed as u8
+            })
+            .collect();
+        for input in [
+            vec![],
+            vec![42; 50],
+            vec![42; 16374],
+            noise,
+            vec![42; 16384],
+        ] {
+            let mut full = BulkCompressor::new(CompressionType::Rdp5).unwrap();
+            let (size, packet_flags) = full.compress(&input).unwrap();
+            let expected = if packet_flags & crate::flags::PACKET_COMPRESSED != 0 {
+                size + 1
+            } else {
+                input.len() + usize::from(packet_flags & BULK_COMPRESSION_FLAGS_MASK != 0)
+            };
+            // Repeat to prove that earlier estimates never contribute history.
+            for _ in 0..2 {
+                assert_eq!(
+                    BulkCompressor::estimate_mppc64k_size(&input).unwrap(),
+                    expected
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_bulk_compressor_new_rdp4() {

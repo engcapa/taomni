@@ -164,7 +164,7 @@ verification:
     - step: 26
       expectation: The reference target reports ready in its own session.
     - step: 27
-      expectation: Known colors arrived through the product decoder.
+      expectation: Known colors arrived through the product decoder; pixel JSON and client WebView PNG are retained.
     results:
     - 25
     - 26
@@ -177,7 +177,7 @@ verification:
     - step: 29
       expectation: The session's own state file records a flip.
     - step: 30
-      expectation: The decoded center pixel changed from black to white.
+      expectation: The decoded center pixel changed from black to white; JSON and client WebView PNG are retained.
     results:
     - 29
     - 30
@@ -192,6 +192,8 @@ verification:
     checkpoints:
     - step: 32
       expectation: Full screen connection bar is visible.
+    - step: 34
+      expectation: Decoded fullscreen pixels and the client WebView PNG including the connection bar are retained.
     - step: 35
       expectation: The actual quality value is recorded (0..4).
     - step: 37
@@ -200,6 +202,7 @@ verification:
       expectation: Disconnect ends the reference session.
     results:
     - 32
+    - 34
     - 35
     - 37
     - 42

@@ -10,10 +10,40 @@ from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
+from qa_ui_auto.deadline import Deadline
 from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, selector_strategy
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_close_has_its_own_budget_after_case_or_diagnostics_timeout(self):
+        closed = Mock()
+        session = NativeSession("http://driver.invalid", Path("unused"), closed)
+        session.session_id = "expired-session"
+        session.deadline = Deadline(-1)
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = b'{"value": null}'
+        session._open = Mock(return_value=response)
+        session.close()
+        request = session._open.call_args.args[0]
+        self.assertEqual(request.method, "DELETE")
+        self.assertTrue(request.full_url.endswith("/session/expired-session"))
+        self.assertGreater(session._open.call_args.kwargs["timeout"], 0)
+        self.assertLessEqual(session._open.call_args.kwargs["timeout"], 5)
+        closed.assert_called_once_with()
+
+    def test_close_releases_transport_and_owner_without_a_session_id(self):
+        # POST /session can time out after the driver has spawned the app.
+        closed = Mock()
+        session = NativeSession("http://driver.invalid", Path("unused"), closed)
+        connection = Mock()
+        session._connection = connection
+        session.close()
+        session.close()
+        connection.close.assert_called_once_with()
+        closed.assert_called_once_with()
+
     def test_explicit_xpath_preserves_exact_candidate_text_matching(self):
         xpath = "//span[normalize-space(.)='String']"
         self.assertEqual(selector_strategy("xpath=" + xpath, interactive=True), ("xpath", xpath))
@@ -233,6 +263,7 @@ class NativeSessionTransportTest(TestCase):
     def test_failed_session_cleanup_preserves_original_error(self):
         harness = NativeHarness({"app": {}}, Path("/qa/run"))
         harness.driver = Mock()
+        harness.driver.mark_session_closed.side_effect = WebDriverError("could not stop owned tree")
         with patch("tauri_webdriver.NativeSession") as factory:
             session = factory.return_value
             session.start.side_effect = WebDriverError("session not created")

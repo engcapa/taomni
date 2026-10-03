@@ -1436,6 +1436,9 @@
         "host_mstsc": {
           "$ref": "#/$defs/host_mstsc_arg"
         },
+        "host_rdp_logoff": {
+          "$ref": "#/$defs/host_rdp_logoff_arg"
+        },
         "rdp_canvas_assert": {
           "$ref": "#/$defs/rdp_canvas_assert_arg"
         }
@@ -3232,6 +3235,16 @@
         "timeout_sec": {
           "type": "number",
           "exclusiveMinimum": 0
+        }
+      }
+    },
+    "host_rdp_logoff_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_env"],
+      "properties": {
+        "user_env": {
+          "enum": ["QA_RDP_BASELINE_USER1", "QA_RDP_BASELINE_USER2"]
         }
       }
     },

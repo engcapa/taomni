@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use anyhow::{Context as _, Result, anyhow};
 use ironrdp_acceptor::DesktopSize;
-use ironrdp_bulk::{BulkCompressor, CompressionType as BulkType, flags};
+use ironrdp_bulk::BulkCompressor;
+#[cfg(test)]
+use ironrdp_bulk::CompressionType as BulkType;
 use ironrdp_graphics::diff::{Rect, find_different_rects_sub};
 use ironrdp_pdu::encode_vec;
 use ironrdp_pdu::fast_path::UpdateCode;
@@ -43,24 +45,35 @@ pub struct EncoderStats {
 }
 
 const PLANAR_BULK_GIVE_UP_RATIO: f64 = 0.25;
+const PLANAR_ESTIMATE_SAMPLE_SIZE: usize = 1024;
 
 /// Estimate with a throwaway MPPC-64K history. Never touch the connection's
 /// compressor until the selected payload is actually fragmented and sent.
 fn estimate_bulk_size(data: &[u8]) -> Result<usize> {
-    let mut scratch = BulkCompressor::new(BulkType::Rdp5)?;
-    // Bound the estimate's CPU cost on photo content. The first fragment
-    // provides a conservative ratio without any previous-frame history.
-    let sample = &data[..data.len().min(MAX_FASTPATH_UPDATE_SIZE)];
-    if sample.is_empty() {
+    if data.is_empty() {
         return Ok(0);
     }
-    let (size, packet_flags) = scratch.compress(sample)?;
-    let encoded = if packet_flags & flags::PACKET_COMPRESSED != 0 {
-        size
+    // Bound the photo cost while covering the whole encoded rectangle. A
+    // prefix alone can be entirely desktop padding around a noisy photo.
+    // Four separated 256-byte strips retain runs and sample all colour planes.
+    let mut strips = [0u8; PLANAR_ESTIMATE_SAMPLE_SIZE];
+    let sample = if data.len() <= strips.len() {
+        data
     } else {
-        sample.len()
-    } + usize::from(packet_flags & 0xE0 != 0);
-    Ok((encoded * data.len()).div_ceil(sample.len()))
+        let strip_size = strips.len() / 4;
+        for index in 0..4 {
+            let start = index * (data.len() - strip_size) / 3;
+            strips[index * strip_size..(index + 1) * strip_size]
+                .copy_from_slice(&data[start..start + strip_size]);
+        }
+        &strips
+    };
+    estimate_bulk_sample(data.len(), sample)
+}
+
+fn estimate_bulk_sample(length: usize, sample: &[u8]) -> Result<usize> {
+    let encoded = BulkCompressor::estimate_mppc64k_size(sample)?;
+    Ok((encoded * length).div_ceil(sample.len()))
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -220,6 +233,7 @@ impl UpdateEncoder {
         mut self,
         compression: Option<CompressionType>,
         stats: Option<Arc<EncoderStats>>,
+        omit_bitmap_compression_header: bool,
     ) -> Result<Self> {
         self.stats = stats;
         if let Some(compression) = compression {
@@ -232,12 +246,14 @@ impl UpdateEncoder {
                 let rfx = rfx.clone();
                 self.bulk = Some(bulk::BulkEncoder::new(compression)?);
                 *updater = BitmapUpdater::Adaptive(AdaptiveHandler {
-                    bitmap: BitmapHandler::for_bulk_compression(),
+                    bitmap: BitmapHandler::for_bulk_compression(omit_bitmap_compression_header),
                     rfx,
                 });
             } else if matches!(updater, BitmapUpdater::Bitmap(_)) {
                 self.bulk = Some(bulk::BulkEncoder::new(compression)?);
-                *updater = BitmapUpdater::Bitmap(BitmapHandler::for_bulk_compression());
+                *updater = BitmapUpdater::Bitmap(BitmapHandler::for_bulk_compression(
+                    omit_bitmap_compression_header,
+                ));
             }
         }
         Ok(self)
@@ -649,23 +665,43 @@ struct AdaptiveHandler {
 
 impl BitmapUpdateHandler for AdaptiveHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
-        if bitmap.width.get() > u16::MAX / 4 {
-            return self.rfx.handle(bitmap);
+        if bitmap.width.get() > u16::MAX / 4
+            || !self.bitmap.bitmap.supports_width(bitmap.width.get())
+        {
+            return self
+                .rfx
+                .handle_compact(bitmap)
+                .map(UpdateFragmenter::without_bulk_compression);
         }
-        let planar = self.bitmap.handle(bitmap)?;
-        let estimate = estimate_bulk_size(&planar.data)?;
-        if estimate as f64 <= planar.data.len() as f64 * PLANAR_BULK_GIVE_UP_RATIO {
-            return Ok(planar);
+        let (length, estimate, planar) =
+            if let Some((length, sample)) = self.bitmap.bitmap.raw_planar_sample(bitmap)? {
+                (length, estimate_bulk_sample(length, &sample)?, None)
+            } else {
+                let planar = self.bitmap.handle(bitmap)?;
+                (
+                    planar.data.len(),
+                    estimate_bulk_size(&planar.data)?,
+                    Some(planar),
+                )
+            };
+        if estimate as f64 <= length as f64 * PLANAR_BULK_GIVE_UP_RATIO {
+            return match planar {
+                Some(planar) => Ok(planar),
+                None => self.bitmap.handle(bitmap),
+            };
         }
         // Encoding a rejected RemoteFX candidate must not consume its first
         // frame headers or advance its frame index.
         let mut candidate = self.rfx.clone();
-        let rfx = candidate.handle(bitmap)?;
+        let rfx = candidate.handle_compact(bitmap)?;
         if estimate <= rfx.data.len() {
-            Ok(planar)
+            match planar {
+                Some(planar) => Ok(planar),
+                None => self.bitmap.handle(bitmap),
+            }
         } else {
             self.rfx = candidate;
-            Ok(rfx)
+            Ok(rfx.without_bulk_compression())
         }
     }
 }
@@ -702,16 +738,18 @@ impl BitmapHandler {
         }
     }
 
-    fn for_bulk_compression() -> Self {
+    fn for_bulk_compression(omit_compression_header: bool) -> Self {
         Self {
-            bitmap: BitmapEncoder::for_bulk_compression(),
+            bitmap: BitmapEncoder::for_bulk_compression(omit_compression_header),
         }
     }
 }
 
 impl BitmapUpdateHandler for BitmapHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
-        let mut buffer = vec![0; bitmap.data.len() * 2]; // TODO: estimate bitmap encoded size
+        // Crops may retain a much wider parent stride. Reserve for pixels
+        // actually encoded rather than clearing the entire parent-sized tail.
+        let mut buffer = vec![0; self.bitmap.output_size_hint(bitmap)];
         let len = loop {
             match self.bitmap.encode(bitmap, buffer.as_mut_slice()) {
                 Err(err) => match err {
@@ -752,15 +790,35 @@ impl RemoteFxHandler {
     fn set_desktop_size(&mut self, size: DesktopSize) {
         self.desktop_size = Some(size);
     }
-}
 
-impl BitmapUpdateHandler for RemoteFxHandler {
-    fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
-        let mut buffer = vec![0; bitmap.data.len()];
+    fn handle_compact(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
+        self.encode(bitmap, true)
+    }
+
+    fn encode(&mut self, bitmap: &BitmapUpdate, compact: bool) -> Result<UpdateFragmenter> {
+        // A crop retains the parent framebuffer's stride and tail. RemoteFX
+        // reads only this rectangle, so clearing that whole tail per dirty
+        // rectangle needlessly touches megabytes on each photo frame. Restrict
+        // the new reserve/retry behavior to the adaptive path: the legacy path
+        // must retain its existing bytes, including tiny first-frame retries.
+        let pixels = usize::from(bitmap.width.get()) * usize::from(bitmap.height.get());
+        let mut buffer = vec![
+            0;
+            if compact {
+                pixels * 4 + 4096
+            } else {
+                bitmap.data.len()
+            }
+        ];
         let len = loop {
+            let desktop_size = if compact {
+                self.desktop_size
+            } else {
+                self.desktop_size.take()
+            };
             match self
                 .remotefx
-                .encode(bitmap, buffer.as_mut_slice(), self.desktop_size.take())
+                .encode(bitmap, buffer.as_mut_slice(), desktop_size)
             {
                 Err(e) => match e.kind() {
                     ironrdp_core::EncodeErrorKind::NotEnoughBytes { .. } => {
@@ -769,11 +827,22 @@ impl BitmapUpdateHandler for RemoteFxHandler {
                     }
                     _ => Err(e).context("RemoteFX encode error")?,
                 },
-                Ok(len) => break len,
+                Ok(len) => {
+                    if compact {
+                        self.desktop_size = None;
+                    }
+                    break len;
+                }
             }
         };
 
         set_surface(bitmap, self.codec_id, &buffer[..len])
+    }
+}
+
+impl BitmapUpdateHandler for RemoteFxHandler {
+    fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
+        self.encode(bitmap, false)
     }
 }
 
@@ -988,7 +1057,7 @@ mod bulk_tests {
             8 * 1024 * 1024,
         )
         .unwrap()
-        .with_bulk_compression(Some(CompressionType::Rdp61), None)
+        .with_bulk_compression(Some(CompressionType::Rdp61), None, true)
         .unwrap()
     }
 
@@ -1078,6 +1147,217 @@ mod bulk_tests {
                 .handle(&bitmap)
                 .unwrap();
             assert_eq!(encoded.code, UpdateCode::Bitmap, "width={width}");
+        }
+    }
+
+    #[test]
+    fn peers_without_header_omission_get_pixel_scan_width_and_odd_width_remotefx() {
+        let mut handler = AdaptiveHandler {
+            bitmap: BitmapHandler::for_bulk_compression(false),
+            rfx: RemoteFxHandler::new(
+                EntropyBits::Rlgr3,
+                3,
+                DesktopSize {
+                    width: 128,
+                    height: 128,
+                },
+            ),
+        };
+        for width in [64u16, 65] {
+            let bitmap = BitmapUpdate {
+                x: 0,
+                y: 0,
+                width: NonZeroU16::new(width).unwrap(),
+                height: NonZeroU16::new(128).unwrap(),
+                format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+                data: vec![42; usize::from(width) * 128 * 4].into(),
+                stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+            };
+            let encoded = handler.handle(&bitmap).unwrap();
+            if width == 64 {
+                assert_eq!(encoded.code, UpdateCode::Bitmap);
+                let bitmap: ironrdp_pdu::bitmap::BitmapUpdateData<'_> =
+                    ironrdp_core::decode(&encoded.data).unwrap();
+                for rectangle in bitmap.rectangles {
+                    assert_eq!(rectangle.compressed_data_header.unwrap().scan_width, width);
+                }
+            } else {
+                assert_eq!(encoded.code, UpdateCode::SurfaceCommands);
+            }
+        }
+    }
+
+    #[test]
+    fn scanlines_larger_than_mstsc_bitmap_buffers_use_remotefx() {
+        for omit_header in [false, true] {
+            let (width, height) = (8192u16, 2u16);
+            let bitmap = BitmapUpdate {
+                x: 0,
+                y: 0,
+                width: NonZeroU16::new(width).unwrap(),
+                height: NonZeroU16::new(height).unwrap(),
+                format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+                data: vec![42; usize::from(width) * usize::from(height) * 4].into(),
+                stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+            };
+            let mut handler = AdaptiveHandler {
+                bitmap: BitmapHandler::for_bulk_compression(omit_header),
+                rfx: RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height }),
+            };
+            assert_eq!(
+                handler.handle(&bitmap).unwrap().code,
+                UpdateCode::SurfaceCommands
+            );
+        }
+    }
+
+    #[test]
+    fn photo_after_a_plain_planar_prefix_uses_remotefx() {
+        let (width, height) = (704u16, 384u16);
+        let mut pixels = vec![48; usize::from(width) * usize::from(height) * 4];
+        let mut seed = 0x9e3779b9u32;
+        for y in 0..256usize {
+            for x in 32..672usize {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                let offset = (y * usize::from(width) + x) * 4;
+                pixels[offset..offset + 4].copy_from_slice(&[
+                    seed as u8,
+                    (seed >> 8) as u8,
+                    (seed >> 16) as u8,
+                    255,
+                ]);
+            }
+        }
+        let bitmap = BitmapUpdate {
+            x: 0,
+            y: 0,
+            width: NonZeroU16::new(width).unwrap(),
+            height: NonZeroU16::new(height).unwrap(),
+            format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+            data: pixels.into(),
+            stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+        };
+        let mut handler = AdaptiveHandler {
+            bitmap: BitmapHandler::for_bulk_compression(true),
+            rfx: RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height }),
+        };
+        assert_eq!(
+            handler.handle(&bitmap).unwrap().code,
+            UpdateCode::SurfaceCommands
+        );
+    }
+
+    #[test]
+    #[ignore = "offline CPU timings; run with --release --ignored --nocapture"]
+    fn profile_photo_encoder_costs() {
+        use std::time::{Duration, Instant};
+        for cropped in [false, true] {
+            let (width, height) = if cropped {
+                (704u16, 384u16)
+            } else {
+                (640u16, 360u16)
+            };
+            let stride = if cropped {
+                1920 * 4
+            } else {
+                usize::from(width) * 4
+            };
+            let frames: Vec<_> = (0..16u32)
+                .map(|frame| {
+                    let mut seed = 0x9e3779b9u32.wrapping_mul(frame + 1);
+                    let mut pixels =
+                        vec![48; stride * (usize::from(height) - 1) + usize::from(width) * 4];
+                    let (left, top) = if cropped { (32, 16) } else { (0, 0) };
+                    for y in 0..360usize {
+                        for x in 0..640usize {
+                            seed ^= seed << 13;
+                            seed ^= seed >> 17;
+                            seed ^= seed << 5;
+                            // The native photo target: panning gradient plus
+                            // xorshift noise, correlated B/G/R colour planes.
+                            let base = (x + (frame as usize * 3) % 640) * 180 / 640 + y * 60 / 360;
+                            let value = (base as i32 + (seed & 31) as i32 - 16).clamp(0, 255) as u8;
+                            let offset = (y + top) * stride + (x + left) * 4;
+                            pixels[offset..offset + 4].copy_from_slice(&[
+                                value,
+                                value.wrapping_add(20),
+                                value / 2,
+                                255,
+                            ]);
+                        }
+                    }
+                    BitmapUpdate {
+                        x: 0,
+                        y: 0,
+                        width: NonZeroU16::new(width).unwrap(),
+                        height: NonZeroU16::new(height).unwrap(),
+                        format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+                        data: pixels.into(),
+                        stride: NonZeroUsize::new(stride).unwrap(),
+                    }
+                })
+                .collect();
+            let mut planar = BitmapHandler::for_bulk_compression(true);
+            let mut planar_time = Duration::ZERO;
+            let mut estimate_time = Duration::ZERO;
+            let mut sample_time = Duration::ZERO;
+            for bitmap in &frames {
+                let started = Instant::now();
+                let (length, sample) = planar.bitmap.raw_planar_sample(bitmap).unwrap().unwrap();
+                estimate_bulk_sample(length, &sample).unwrap();
+                sample_time += started.elapsed();
+                let started = Instant::now();
+                let fragment = planar.handle(bitmap).unwrap();
+                planar_time += started.elapsed();
+                let started = Instant::now();
+                estimate_bulk_size(&fragment.data).unwrap();
+                estimate_time += started.elapsed();
+            }
+            eprintln!(
+                "photo cropped={cropped}: planar={:.3}ms/frame estimate={:.3}ms/frame lazy-sample={:.3}ms/frame",
+                planar_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+                estimate_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+                sample_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+            );
+            for adaptive in [false, true] {
+                let mut rfx =
+                    RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height });
+                let mut handler = AdaptiveHandler {
+                    bitmap: BitmapHandler::for_bulk_compression(true),
+                    rfx: rfx.clone(),
+                };
+                let mut bulk = bulk::BulkEncoder::new(CompressionType::Rdp61).unwrap();
+                let mut encoded_time = Duration::ZERO;
+                let mut send_time = Duration::ZERO;
+                let mut bytes = 0;
+                for bitmap in &frames {
+                    let started = Instant::now();
+                    let mut fragment = if adaptive {
+                        handler.handle(bitmap).unwrap()
+                    } else {
+                        rfx.handle(bitmap).unwrap()
+                    };
+                    assert_eq!(fragment.code, UpdateCode::SurfaceCommands);
+                    encoded_time += started.elapsed();
+                    let started = Instant::now();
+                    let mut output = vec![0; fragment.size_hint()];
+                    while let Some(size) = fragment
+                        .next(&mut output, adaptive.then_some(&mut bulk), None)
+                        .unwrap()
+                    {
+                        bytes += size;
+                    }
+                    send_time += started.elapsed();
+                }
+                eprintln!(
+                    "photo cropped={cropped} adaptive={adaptive}: encode={:.3}ms/frame bulk={:.3}ms/frame wire={}B/frame",
+                    encoded_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+                    send_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+                    bytes / frames.len()
+                );
+            }
         }
     }
 }

@@ -14,7 +14,13 @@ publish = false
 ironrdp-graphics = "=0.9.0"
 ironrdp-pdu = "=0.9.0"
 ironrdp-bulk = "=0.1.1"
+ironrdp-bulk-vendored = { package = "ironrdp-bulk", path = "../../../src-tauri/vendor/ironrdp-bulk", optional = true }
 zstd-safe = "7.2"
+
+[features]
+# Keep the original registry experiment reproducible while also checking the
+# actual patched compressor and current planar/estimator choices.
+production-vendor = ["dep:ironrdp-bulk-vendored"]
 
 [profile.release]
 debug = false

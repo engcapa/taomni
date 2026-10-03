@@ -48,7 +48,7 @@ impl MppcContext {
             (1u32, HISTORY_BUFFER_SIZE_RDP5, HISTORY_MASK_RDP5)
         };
 
-        let mut ctx = Self {
+        Self {
             compression_level: level,
             history_buffer_size: buffer_size,
             history_mask: mask,
@@ -56,9 +56,7 @@ impl MppcContext {
             history_ptr: 0,
             history_offset: 0,
             match_buffer: Box::new([0u16; MATCH_BUFFER_SIZE]),
-        };
-        ctx.reset(false);
-        ctx
+        }
     }
 
     /// Resets the MPPC context.

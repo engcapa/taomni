@@ -305,7 +305,7 @@ class TauriDriverProcess:
             cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
             if self.native_driver:
                 cmd += ["--native-driver", str(self.native_driver)]
-            with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
+            with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
                 self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=stdout, stderr=stderr, text=True)
         deadline = time.time() + self.startup_timeout
         while time.time() < deadline:
@@ -330,18 +330,15 @@ class TauriDriverProcess:
     def ensure_running(self) -> None:
         """Ensure the per-run driver endpoint is ready for a new session.
 
-        The macOS bridge lives inside the QA application and exits that
-        application when a WebDriver session is deleted.  Native cases are
-        intentionally isolated one application process at a time, so the
-        next case must wait for the old process and listening socket to go
-        away before starting a fresh one.
+        The macOS bridge lives inside the QA application. Windows releases
+        the owned driver/app tree on session close to unlock its profile.
+        Wait for the old endpoint to go away before starting the next one.
         """
-        if platform.system() != "Darwin":
+        if platform.system() not in ("Darwin", "Windows"):
             return
 
-        # The in-process bridge exits the QA application after a WebDriver
-        # session is deleted.  A new case must never attach to that old
-        # listener while the asynchronous app exit is still in flight.
+        # A new case must never attach to the previous session's listener
+        # while the asynchronous app/driver exit is still in flight.
         if self._restart_required:
             self.stop()
             self._restart_required = False
@@ -365,12 +362,27 @@ class TauriDriverProcess:
         self.start()
 
     def mark_session_closed(self) -> None:
-        """Force the next macOS session to start in a fresh QA process."""
-        if platform.system() == "Darwin":
+        """Release owned Windows children before the next fixture reset."""
+        if platform.system() in ("Darwin", "Windows"):
             self._restart_required = True
+        if platform.system() == "Windows":
+            # DELETE can fail or return while WebView2/the app still owns the
+            # profile. The isolated driver owns this entire process tree;
+            # terminate it now, before reset_db, and restart for the next case.
+            self.stop()
 
     def stop(self) -> None:
         if not self.proc:
+            return
+        if platform.system() == "Windows" and self.proc.poll() is None:
+            result = subprocess.run(
+                ["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
+                capture_output=True, text=True, timeout=20,
+            )
+            if result.returncode and self.proc.poll() is None:
+                raise WebDriverError(f"Could not stop owned native driver tree: {result.stderr}")
+            self.proc.wait(timeout=5)
+            self.proc = None
             return
         self.proc.terminate()
         try:
@@ -506,16 +518,24 @@ class NativeSession:
         raise WebDriverError(f"native app document did not become ready within {timeout:.1f}s{detail}")
 
     def close(self) -> None:
-        if self.session_id:
-            try:
+        from qa_ui_auto.deadline import Deadline
+
+        try:
+            if self.session_id:
+                # Case/failure-capture/host-restoration budgets may already
+                # be exhausted. Always give DELETE its own bounded attempt.
+                self.deadline = Deadline(5)
                 self.request("DELETE", f"/session/{self.session_id}")
-            finally:
-                self.session_id = None
-                if self._connection:
-                    self._connection.close()
-                    self._connection = None
-                if self._on_close is not None:
-                    self._on_close()
+        finally:
+            self.session_id = None
+            if self._connection:
+                self._connection.close()
+                self._connection = None
+            # A failed POST can leave an app even without a returned session
+            # ID. The owner must release that tree too; close is idempotent.
+            on_close, self._on_close = self._on_close, None
+            if on_close is not None:
+                on_close()
 
     def endpoint(self, suffix: str) -> str:
         if not self.session_id:
@@ -1223,7 +1243,8 @@ class NativeHarness:
                 session.close()
             except Exception:  # noqa: BLE001 - preserve the original failure
                 pass
-            self.driver.mark_session_closed()
+            with suppress(Exception):
+                self.driver.mark_session_closed()
             raise
         return session
 

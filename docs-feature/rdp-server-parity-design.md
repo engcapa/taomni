@@ -127,9 +127,9 @@
 
 | 指标 | 场景 | 采样 |
 |---|---|---|
-| M1 `first_frame_ms` | TCP 连接 → 首个完整画面 | 3 次连接取中位数 |
+| M1 `first_graphics_ms` | 连接 → 探针收到并解码首个 graphics update；另断言 framebuffer 绘制比例 ≥95% | 当前 PERF-01 的一次连接，原始报告保留 |
 | M2 `input_to_frame_ms` p50/p95 | 探针在目标方块上点击 → 目标翻色 → 探针解码画面中该像素变化 | 40 次，间隔 250 ms，丢弃前 3 次预热 |
-| M3 `animation_fps` | 目标窗口 1280×720 区域 60 Hz 动画，统计含变化的帧 | 10 s |
+| M3 `marker.observed_fps` | 目标窗口 640×360 区域、60 Hz draw deadline 的动画；按实际可见标记变化计帧，不能以更新 PDU 数代替 | 10 s |
 | M4 `animation_kbps` | 同 M3 的下行字节 | 10 s |
 | M5 `idle_cpu_pct` / M6 `animation_cpu_pct` | 已连接静止 / 动画时系统总 CPU（psutil） | 各 10 s |
 
@@ -143,7 +143,7 @@ Windows 基线：CI fixture 创建一次性本地账号，临时启用系统远�
 | M2 p95 | 50.1 ms（p50 29.1 ms） | ≤ 65 ms（= max(1.25×TS, TS+15 ms)） | 同上 |
 | M3 | 32.0 fps（640×360 区域可见变化） | ≥ 25.6 fps（= 0.8×TS） | 同上 |
 | M4 | 3270 kbps | ≤ 4905 kbps（= 1.5×TS） | 同上 |
-| M5 | 未测：探针尚无 CPU 采样 | 待定 | — |
+| M5 / M6 | 未测：探针尚无系统 CPU 采样；编码器 CPU-only unit 不能替代 | 待定；不计为通过 | — |
 
 两次测量都由同一 Windows runner 上的同一探针完成，只公告 RemoteFX；TermService 会话分辨率 1280×720，Taomni 采集控制台 1024×768，测量区域相同（目标窗口 640×360）。
 
@@ -228,8 +228,8 @@ workflow 改动：`Prepare local service packages` 的条件扩展到上述 capa
 | TASK-08 | AUDIO_INPUT 麦克风三端 | TASK-01、07 | 已实现并验证：NAT-05 三端通过（运行 36855295948 起；Windows 失败为探针音调分析窗口落在 VB-CABLE 起始瞬态上，已修） |
 | TASK-09 | autodetect 与 Network Characteristics Result | TASK-01 | 已实现并验证：NAT-07 三端通过；连续带宽测量需客户端字节计数，ironrdp 客户端不支持，记为缺口 |
 | TASK-10 | Taomni 客户端连接栏与质量事件 | TASK-09 | 已实现并验证：TC-RDPJ-01 三端通过（运行 36850382615 起），Vitest 10 项通过 |
-| TASK-11 | 性能调优至预算 | TASK-03 | 进行中：M1/M2/M3 Linux、Windows 达标；M4 三端约 11 Mbps 超预算 4905 kbps，macOS M2 p95 贴线、M3 约 19.6 fps 未达标。方案与任务书见 [encoder-adaptive-design.md](rdp-server-parity/encoder-adaptive-design.md)（批量压缩 + 按矩形选择位图/RemoteFX，TASK-E1~E5） |
-| TASK-12 | 集成：三端全量 RDP 用例（含联合与参考服务器 V-18~V-21）+ 保留行为回归，交付报告 | 全部 | 进行中：联合用例 TC-RDPJ-01/02 三端通过；V-17 mstsc 互通、V-21 参考服务器的设计与任务见 [encoder-adaptive-design.md](rdp-server-parity/encoder-adaptive-design.md) TASK-E6/E7（xrdp 部分待 DEC-07） |
+| TASK-11 | 性能调优至预算 | TASK-03 | 进行中：bulk + 自适应编码已使三端 M4 达标；运行 36969228597 的 Linux M1–M4 通过，macOS M2/M3 与三端照片保留帧率仍在修复和复测。方案、TASK-E1~E5 与逐轮原始结果见 [encoder-adaptive-design.md](rdp-server-parity/encoder-adaptive-design.md) |
+| TASK-12 | 集成：三端全量 RDP 用例（含联合与参考服务器 V-18~V-21）+ 保留行为回归，交付报告 | 全部 | 进行中：联合用例 TC-RDPJ-01/02 三端通过；运行 36969228597 的 xrdp REF-02 已有真实画面、翻色与全屏截图，DEC-07 已批准。Windows mstsc 与 TermService 的本轮结果待回填，见 [encoder-adaptive-design.md](rdp-server-parity/encoder-adaptive-design.md) TASK-E6/E7 |
 
 ### TASK-01 `rdp-probe`
 

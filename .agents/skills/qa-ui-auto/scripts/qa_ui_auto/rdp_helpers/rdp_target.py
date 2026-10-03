@@ -15,7 +15,9 @@ Modes:
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
+import math
 import os
 import sys
 import time
@@ -41,6 +43,59 @@ def photo_noise(width: int, height: int, frame: int) -> bytes:
     return bytes(result)
 
 
+def animation_delay_ms(started: float, now: float) -> int:
+    """Wait for the next 60 Hz deadline without adding drawing time to it.
+
+    A slow draw skips elapsed deadlines; it must not queue catch-up draws that
+    starve Tk's event loop. Markers still count actual draws, never deadlines.
+    """
+    period = 1.0 / 60.0
+    next_tick = math.floor((now - started) / period + 1e-9) + 1
+    return max(1, math.ceil((started + next_tick * period - now) * 1000))
+
+
+@contextmanager
+def _measurement_activity(enabled: bool):
+    """Keep the visible macOS target's timers eligible while a probe runs.
+
+    A Tk helper is a separate background process. App Nap / background QoS
+    can make its draw rate drift during a paired throughput measurement. The
+    assertion belongs to this process only and is released on exit; it does
+    not change machine sleep policy or the RDP encoder's scheduling.
+    """
+    if not enabled or sys.platform != "darwin":
+        yield "default"
+        return
+    import ctypes as ct
+
+    ct.CDLL("/System/Library/Frameworks/Foundation.framework/Foundation")
+    objc = ct.CDLL("/usr/lib/libobjc.A.dylib")
+    objc.objc_getClass.argtypes = [ct.c_char_p]
+    objc.objc_getClass.restype = ct.c_void_p
+    objc.sel_registerName.argtypes = [ct.c_char_p]
+    objc.sel_registerName.restype = ct.c_void_p
+    send = ct.CFUNCTYPE(ct.c_void_p, ct.c_void_p, ct.c_void_p)(("objc_msgSend", objc))
+    send_string = ct.CFUNCTYPE(ct.c_void_p, ct.c_void_p, ct.c_void_p, ct.c_char_p)(("objc_msgSend", objc))
+    begin = ct.CFUNCTYPE(ct.c_void_p, ct.c_void_p, ct.c_void_p, ct.c_uint64, ct.c_void_p)(("objc_msgSend", objc))
+    end = ct.CFUNCTYPE(None, ct.c_void_p, ct.c_void_p, ct.c_void_p)(("objc_msgSend", objc))
+    selector = objc.sel_registerName
+    process = send(objc.objc_getClass(b"NSProcessInfo"), selector(b"processInfo"))
+    reason = send_string(objc.objc_getClass(b"NSString"), selector(b"stringWithUTF8String:"),
+                         b"Taomni QA RDP animation measurement")
+    # NSActivityUserInitiatedAllowingIdleSystemSleep: keep App Nap from
+    # throttling the measurement, without preventing system idle sleep.
+    token = begin(process, selector(b"beginActivityWithOptions:reason:"),
+                  0x00FFFFFF & ~(1 << 20), reason)
+    if not token:
+        raise RuntimeError("could not acquire the macOS RDP measurement activity")
+    send(token, selector(b"retain"))
+    try:
+        yield "NSActivityUserInitiatedAllowingIdleSystemSleep"
+    finally:
+        end(process, selector(b"endActivity:"), token)
+        send(token, selector(b"release"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--geometry", default="480x320+40+80", help="WxH+X+Y in desktop pixels")
@@ -49,7 +104,11 @@ def main() -> int:
     parser.add_argument("--pattern", action="store_true", help="Known magenta/cyan markers for mstsc screenshot verification")
     parser.add_argument("--lifetime-sec", type=float, default=900.0)
     args = parser.parse_args()
+    with _measurement_activity(args.mode in {"animate", "photo"}) as activity:
+        return _run_target(args, activity)
 
+
+def _run_target(args: argparse.Namespace, activity: str) -> int:
     if sys.platform == "win32":
         # Desktop coordinates must be physical pixels, matching RDP capture.
         try:
@@ -76,6 +135,8 @@ def main() -> int:
         "frames": 0,
         "last_event_unix_ms": None,
         "ready": False,
+        "process_activity": activity,
+        "flip_samples": [],
     }
 
     def flip(_event: object = None) -> None:
@@ -84,6 +145,14 @@ def main() -> int:
         state["last_event_unix_ms"] = int(time.time() * 1000)
         canvas.configure(bg=state["color"])
         root.update_idletasks()
+        state["flip_samples"].append({
+            "flip": state["flips"],
+            "event_unix_us": state["last_event_unix_ms"] * 1000,
+            "draw_submitted_unix_us": time.time_ns() // 1000,
+        })
+        # Preserve a bounded diagnostic trace to split native input delivery
+        # from the following capture/encode/decode wait on the same host clock.
+        state["flip_samples"] = state["flip_samples"][-128:]
         write_state(args.state, state)
 
     bars: list[int] = []
@@ -107,9 +176,14 @@ def main() -> int:
         # level steps to get delivered animation frames per second.
         marker = canvas.create_rectangle(0, 0, 32, 32, fill="#080808", width=0)
         state["marker"] = {"x": 16, "y": 16, "levels": 16}
-        last_written = [time.monotonic()]
+        animation_started = time.monotonic()
+        last_written = [animation_started]
+        last_frames = [0]
+        state["animation_samples"] = []
+        draw_times = []
 
         def step() -> None:
+            draw_started = time.monotonic()
             state["frames"] += 1
             if photo_image is not None:
                 frame = state["frames"]
@@ -126,13 +200,30 @@ def main() -> int:
                 x0, _, _, _ = canvas.coords(bar)
                 if x0 > width:
                     canvas.move(bar, -(width + bar_w * 2), 0)
+            # Include the real Tk redraw in the scheduling cost. Otherwise a
+            # macOS draw plus a fresh 16 ms timer can cap the source at 25 Hz,
+            # even when the RDP capture and encoder can deliver faster.
+            root.update_idletasks()
             now = time.monotonic()
+            draw_times.append((now - draw_started) * 1000)
             if now - last_written[0] >= 1.0:
+                sorted_draw_times = sorted(draw_times)
+                state["animation_samples"].append({
+                    "elapsed_s": now - animation_started,
+                    "frames": state["frames"],
+                    "source_fps": (state["frames"] - last_frames[0]) / (now - last_written[0]),
+                    "draw_ms_p95": sorted_draw_times[math.ceil(len(sorted_draw_times) * 0.95) - 1],
+                    "draw_ms_max": sorted_draw_times[-1],
+                })
+                draw_times.clear()
                 last_written[0] = now
+                last_frames[0] = state["frames"]
+                state["animation_elapsed_s"] = now - animation_started
+                state["animation_source_fps"] = state["frames"] / state["animation_elapsed_s"]
                 write_state(args.state, state)
-            root.after(16, step)
+            root.after(animation_delay_ms(animation_started, time.monotonic()), step)
 
-        root.after(16, step)
+        root.after(animation_delay_ms(animation_started, time.monotonic()), step)
     else:
         canvas.bind("<Button-1>", flip)
         root.bind("<Key>", flip)

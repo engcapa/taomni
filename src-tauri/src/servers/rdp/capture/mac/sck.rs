@@ -12,10 +12,11 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use block2::RcBlock;
-use dispatch2::{DispatchQueue, DispatchRetained};
+use dispatch2::{DispatchQoS, DispatchQueue, DispatchQueueAttr, DispatchRetained};
 use objc2::rc::Retained;
 use objc2::runtime::{NSObjectProtocol, ProtocolObject};
 use objc2::{AnyThread, DefinedClass, define_class, msg_send};
+use objc2_core_foundation::{CFDictionary, CFNumber};
 use objc2_core_graphics::{CGDisplayPixelsHigh, CGDisplayPixelsWide, CGMainDisplayID};
 use objc2_core_media::CMSampleBuffer;
 use objc2_core_video::{
@@ -24,8 +25,8 @@ use objc2_core_video::{
 };
 use objc2_foundation::{NSArray, NSError, NSObject};
 use objc2_screen_capture_kit::{
-    SCContentFilter, SCDisplay, SCShareableContent, SCStream, SCStreamConfiguration,
-    SCStreamDelegate, SCStreamOutput, SCStreamOutputType,
+    SCContentFilter, SCDisplay, SCFrameStatus, SCShareableContent, SCStream, SCStreamConfiguration,
+    SCStreamDelegate, SCStreamFrameInfoStatus, SCStreamOutput, SCStreamOutputType,
 };
 
 use super::{Capturer, FRAME_TIMEOUT, Frame, INITIAL_FRAME_TIMEOUT, permission_granted};
@@ -34,9 +35,10 @@ use crate::servers::engine::LogEmitter;
 /// ScreenCaptureKit's native queue must remain shallow: values above this add
 /// whole display frames of latency before the delegate is even called.
 const NATIVE_QUEUE_DEPTH: isize = 3;
-/// 30 Hz is the best latency/CPU tradeoff for the current bitmap RDP encoder.
-/// The latest-frame mailbox still lets interactive updates arrive immediately.
-const FRAME_RATE: i32 = 30;
+/// GUI sources may themselves draw at ~30 Hz. Sampling at the same rate with
+/// an independent phase loses changes; a 60 Hz capture budget also reduces
+/// the input-to-frame wait. The shallow slot still coalesces work.
+const FRAME_RATE: i32 = 60;
 const CONTENT_TIMEOUT: Duration = Duration::from_secs(5);
 const STOP_TIMEOUT: Duration = Duration::from_millis(750);
 /// How long one poll waits for new desktop content before reporting an idle
@@ -276,7 +278,12 @@ impl SckCapturer {
                 Some(delegate),
             )
         };
-        let queue = DispatchQueue::new("taomni.rdp.screencapture", None);
+        // This queue is on the remote input-to-screen path. Its native wait
+        // happens before Frame::captured_at, so Rust mailbox age cannot reveal
+        // callbacks postponed by the default QoS. Keep it serial and shallow,
+        // but schedule the current desktop with interactive work.
+        let attributes = DispatchQueueAttr::with_qos_class(None, DispatchQoS::UserInteractive, 0);
+        let queue = DispatchQueue::new("taomni.rdp.screencapture", Some(&attributes));
         let stream_output: &ProtocolObject<dyn SCStreamOutput> = ProtocolObject::from_ref(&*output);
         unsafe {
             stream.addStreamOutput_type_sampleHandlerQueue_error(
@@ -564,12 +571,13 @@ pub(crate) fn stop_stream(stream: &SCStream) {
 
 /// Retain one ScreenCaptureKit IOSurface without reading its BGRA bytes.
 ///
-/// Returns `Ok(None)` for a sample that carries no pixels. ScreenCaptureKit
-/// keeps delivering buffers on the configured frame interval even when the
-/// desktop is static, and marks them `SCFrameStatusIdle` with no attached image
-/// buffer. Those idle markers are the normal steady state of an unchanging
-/// desktop, so they must not be mistaken for a capture failure.
+/// Returns `Ok(None)` for an incomplete or idle sample, including idle samples
+/// that still retain the previous image buffer. The attachment status, rather
+/// than image-buffer presence, determines whether new pixels are available.
 fn retain_bgra_frame(sample_buffer: &CMSampleBuffer) -> anyhow::Result<Option<Frame>> {
+    if sample_frame_status(sample_buffer).is_some_and(|status| status != SCFrameStatus::Complete) {
+        return Ok(None);
+    }
     let image_buffer = unsafe { sample_buffer.image_buffer() };
     let Some(pixel_buffer) = image_buffer else {
         return Ok(None);
@@ -600,6 +608,24 @@ fn retain_bgra_frame(sample_buffer: &CMSampleBuffer) -> anyhow::Result<Option<Fr
     )))
 }
 
+fn sample_frame_status(sample_buffer: &CMSampleBuffer) -> Option<SCFrameStatus> {
+    // CoreMedia owns these dictionaries and ScreenCaptureKit defines the
+    // status value as an NSNumber (toll-free bridged to CFNumber).
+    let attachments = unsafe { sample_buffer.sample_attachments_array(false) }?;
+    if attachments.count() == 0 {
+        return None;
+    }
+    let dictionary = unsafe {
+        attachments
+            .value_at_index(0)
+            .cast::<CFDictionary>()
+            .as_ref()
+    }?;
+    let key = std::ptr::from_ref(unsafe { SCStreamFrameInfoStatus });
+    let number = unsafe { dictionary.value(key.cast()).cast::<CFNumber>().as_ref() }?;
+    number.as_isize().map(SCFrameStatus)
+}
+
 fn frame_dimensions(frame: &Frame) -> anyhow::Result<(u16, u16)> {
     if frame.width == 0 || frame.height == 0 || frame.stride < usize::from(frame.width) * 4 {
         anyhow::bail!("ScreenCaptureKit returned an invalid BGRA frame");
@@ -619,12 +645,17 @@ fn frame_dimensions(frame: &Frame) -> anyhow::Result<(u16, u16)> {
 
 #[cfg(test)]
 mod tests {
+    use std::ptr::NonNull;
     use std::time::Duration;
 
-    use objc2_core_video::kCVPixelFormatType_32BGRA;
-    use objc2_screen_capture_kit::SCStreamConfiguration;
+    use objc2_core_foundation::{CFMutableDictionary, CFNumber, CFRetained};
+    use objc2_core_media::{
+        CMSampleBuffer, CMSampleTimingInfo, CMTime, CMVideoFormatDescriptionCreateForImageBuffer,
+    };
+    use objc2_core_video::{CVPixelBufferCreate, kCVPixelFormatType_32BGRA};
+    use objc2_screen_capture_kit::{SCFrameStatus, SCStreamConfiguration, SCStreamFrameInfoStatus};
 
-    use super::{Frame, FrameSlot, configure_stream};
+    use super::{Frame, FrameSlot, configure_stream, retain_bgra_frame};
 
     fn frame(value: u8) -> Frame {
         Frame::bgra(vec![value, 0, 0, 0], 0, 0, 1, 1, 4)
@@ -687,6 +718,92 @@ mod tests {
             assert_eq!(configuration.pixelFormat(), kCVPixelFormatType_32BGRA);
             assert!(!configuration.showsCursor());
             assert!(!configuration.capturesAudio());
+        }
+    }
+
+    #[test]
+    fn idle_samples_with_an_image_do_not_republish_the_previous_frame() {
+        let mut pixel_buffer = std::ptr::null_mut();
+        assert_eq!(
+            unsafe {
+                CVPixelBufferCreate(
+                    None,
+                    2,
+                    2,
+                    kCVPixelFormatType_32BGRA,
+                    None,
+                    NonNull::from(&mut pixel_buffer),
+                )
+            },
+            0
+        );
+        let pixel_buffer = unsafe { CFRetained::from_raw(NonNull::new(pixel_buffer).unwrap()) };
+        let mut description = std::ptr::null();
+        assert_eq!(
+            unsafe {
+                CMVideoFormatDescriptionCreateForImageBuffer(
+                    None,
+                    &pixel_buffer,
+                    NonNull::from(&mut description),
+                )
+            },
+            0
+        );
+        let description =
+            unsafe { CFRetained::from_raw(NonNull::new(description.cast_mut()).unwrap()) };
+        // These fixed, nonzero timescales satisfy CoreMedia's constructor.
+        let mut timing = unsafe {
+            CMSampleTimingInfo {
+                duration: CMTime::new(1, 60),
+                presentationTimeStamp: CMTime::new(0, 1),
+                decodeTimeStamp: CMTime::new(0, 1),
+            }
+        };
+        let mut sample = std::ptr::null_mut();
+        assert_eq!(
+            unsafe {
+                CMSampleBuffer::create_ready_with_image_buffer(
+                    None,
+                    &pixel_buffer,
+                    &description,
+                    NonNull::from(&mut timing),
+                    NonNull::from(&mut sample),
+                )
+            },
+            0
+        );
+        let sample = unsafe { CFRetained::from_raw(NonNull::new(sample).unwrap()) };
+        assert!(unsafe { sample.image_buffer() }.is_some());
+        let attachments = unsafe { sample.sample_attachments_array(true) }.unwrap();
+        assert_eq!(attachments.count(), 1);
+        let dictionary = unsafe {
+            attachments
+                .value_at_index(0)
+                .cast::<CFMutableDictionary>()
+                .as_ref()
+        }
+        .unwrap();
+        for status in [
+            SCFrameStatus::Complete,
+            SCFrameStatus::Idle,
+            SCFrameStatus::Blank,
+            SCFrameStatus::Suspended,
+            SCFrameStatus::Started,
+            SCFrameStatus::Stopped,
+        ] {
+            let number = CFNumber::new_isize(status.0);
+            unsafe {
+                CFMutableDictionary::set_value(
+                    Some(dictionary),
+                    std::ptr::from_ref(SCStreamFrameInfoStatus).cast(),
+                    (&*number as *const CFNumber).cast(),
+                );
+            }
+            assert_eq!(
+                retain_bgra_frame(&sample).unwrap().is_some(),
+                status == SCFrameStatus::Complete,
+                "status={status:?}"
+            );
         }
     }
 }

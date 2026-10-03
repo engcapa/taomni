@@ -15,6 +15,11 @@ description: |
   connections then reconnect to the running session. The results are
   reference numbers for the budgets, not a pass verdict on TermService:
   expectations only guard that measurement happened.
+
+  The fixture temporarily enables one session per user so reconnects reuse
+  the warmed reference desktop. After latency the owned first account is
+  logged off, releasing the hosted server's limited session slot for the
+  animation account; the runner's interactive account is never logged off.
 covers:
 - F-RdpServer-1
 tags:
@@ -83,6 +88,8 @@ steps:
         max: 4
       latency_ms.count:
         min: 36
+- host_rdp_logoff:
+    user_env: QA_RDP_BASELINE_USER1
 - rdp_probe:
     scenario: connect
     artifact: baseline-animate-logon
@@ -124,17 +131,17 @@ verification:
     requirement: TermService connect time, input-to-frame latency and animation throughput are measured with the PERF-01 probe scenarios and target geometry.
     actions:
     - 1
-    - 4
+    - 5
     checkpoints:
     - step: 2
       expectation: Once the in-session flip target reports ready, a reconnect to the warm session reports first_graphics_ms with at least 95% of the framebuffer grid painted.
     - step: 3
       expectation: At least 36 of 40 clicks on the in-session flip target produce an observed pixel change.
-    - step: 5
+    - step: 6
       expectation: At least 10 visible changes and 100 marker-counted animation frames arrive during 10 s of the in-session animation.
     results:
     - 3
-    - 5
+    - 6
   native:
   - check: Real Windows TermService sessions, NLA with local accounts and in-session initial programs on the runner.
     method: automated

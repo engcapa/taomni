@@ -67,7 +67,8 @@ steps:
     from_env_dir: QA_RDP_BASELINE_DIR
     name: flip-state.json
     to: reference-ready.json
-    timeout_sec: 90
+    # First-profile shell/Run startup took 105-127 s in the baseline evidence.
+    timeout_sec: 180
     expect:
       ready: true
 - rdp_canvas_assert:
@@ -161,7 +162,7 @@ verification:
     - step: 25
       expectation: The reference target reports ready in its own session.
     - step: 26
-      expectation: Known colors arrived through the product decoder.
+      expectation: Known colors arrived through the product decoder; pixel JSON and client WebView PNG are retained.
     results:
     - 24
     - 25
@@ -174,7 +175,7 @@ verification:
     - step: 28
       expectation: The session's own state file records a flip.
     - step: 29
-      expectation: The decoded center pixel changed from black to white.
+      expectation: The decoded center pixel changed from black to white; JSON and client WebView PNG are retained.
     results:
     - 28
     - 29
@@ -189,6 +190,8 @@ verification:
     checkpoints:
     - step: 31
       expectation: Full screen connection bar is visible.
+    - step: 33
+      expectation: Decoded fullscreen pixels and the client WebView PNG including the connection bar are retained.
     - step: 34
       expectation: The actual quality value is recorded (0..4).
     - step: 36
@@ -197,6 +200,7 @@ verification:
       expectation: Disconnect ends the reference session.
     results:
     - 31
+    - 33
     - 34
     - 36
     - 41

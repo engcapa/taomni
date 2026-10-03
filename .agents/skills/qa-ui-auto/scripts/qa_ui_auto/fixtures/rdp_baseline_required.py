@@ -26,6 +26,7 @@ only the accounts this fixture created.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 import os
 import platform
 import secrets
@@ -38,6 +39,7 @@ from typing import Any
 USERS = ("qa-rdp-base1", "qa-rdp-base2")
 WORK_DIR = Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "taomni-rdp-baseline"
 _CREATED: list[str] = []
+_SESSION_POLICY: ExitStack | None = None
 
 
 def _ps(script: str, *, check: bool = True) -> subprocess.CompletedProcess:
@@ -123,6 +125,31 @@ def _shell(python: Path, mode: str, geometry: str) -> str:
 
 
 def setup(ctx: Any) -> None:
+    """Own the reference session policy for the fixture's whole lifetime."""
+    global _SESSION_POLICY
+    if platform.system() == "Windows" and os.environ.get("GITHUB_ACTIONS") == "true":
+        import winreg
+        from ..rdp_helpers.mstsc import _registry_value
+        if _SESSION_POLICY is not None:
+            raise RuntimeError("another TermService fixture owns the session policy")
+        _SESSION_POLICY = ExitStack()
+        try:
+            _SESSION_POLICY.enter_context(_registry_value(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services",
+                "fSingleSessionPerUser", 1))
+            _setup(ctx)
+        except BaseException:
+            try:
+                teardown(ctx)
+            except Exception as cleanup_error:
+                print(f"TermService setup cleanup failed: {cleanup_error}", file=sys.stderr)
+            raise
+    else:
+        _setup(ctx)
+
+
+def _setup(ctx: Any) -> None:
     from . import FixtureSkip
 
     if platform.system() != "Windows":
@@ -150,6 +177,11 @@ def setup(ctx: Any) -> None:
              "QA_BASELINE_RUN": f'"{python}" "{WORK_DIR / "launch_target.pyw"}"',
              "QA_BASELINE_MARKER": f'cmd.exe /c echo %USERNAME% %TIME%>>"{WORK_DIR / "run-key.log"}"'},
     )
+    # Account creation may succeed before a later host operation fails.
+    # Register ownership before checking the result or doing further work.
+    lines = result.stdout.split()
+    _CREATED.extend(line.split(":", 1)[1] for line in lines if line.startswith("created:"))
+    _ANIMATION.extend(line.split(":", 1)[1] for line in lines if line.startswith("animation:"))
     if os.environ.get("GITHUB_ACTIONS") == "true":
         # The baseline accounts run the runner's Python; make sure plain
         # Users may read and execute it (CI only, never on a workstation).
@@ -158,9 +190,6 @@ def setup(ctx: Any) -> None:
     if result.returncode:
         raise FixtureSkip("could not prepare the TermService baseline (elevation required?): "
                           + (result.stderr or result.stdout)[-500:])
-    lines = result.stdout.split()
-    _CREATED.extend(line.split(":", 1)[1] for line in lines if line.startswith("created:"))
-    _ANIMATION.extend(line.split(":", 1)[1] for line in lines if line.startswith("animation:"))
     port = next((line.split(":", 1)[1] for line in lines if line.startswith("port:")), "3389")
 
     _export(ctx, "QA_RDP_BASELINE_PORT", port)
@@ -172,10 +201,90 @@ def setup(ctx: Any) -> None:
     _export(ctx, "QA_RDP_BASELINE_ANIMATE_SHELL", _shell(python, "animate", "640x360+40+80"))
 
 
+def session_ids(output: str, user: str) -> list[int]:
+    """Read quser rows without depending on localized session-state labels."""
+    sessions = []
+    for line in output.splitlines():
+        fields = line.strip().lstrip(">").split()
+        if fields and fields[0].casefold() == user.casefold():
+            # A disconnected row has no SESSIONNAME column. The ID is the
+            # first numeric field before state and idle/logon columns.
+            session = next((field for field in fields[1:] if field.isdecimal()), None)
+            if session is not None:
+                sessions.append(int(session))
+    return sessions
+
+
+def logoff_owned_session(user: str) -> list[int]:
+    """Release only an account created by this hosted reference fixture."""
+    if (platform.system() != "Windows" or os.environ.get("GITHUB_ACTIONS") != "true"
+            or user not in USERS or user not in _CREATED):
+        raise RuntimeError("TermService logoff requires an owned hosted reference account")
+    result = subprocess.run(["quser"], capture_output=True, text=True, timeout=30, check=True)
+    sessions = session_ids(result.stdout, user)
+    for session in sessions:
+        subprocess.run(["logoff", str(session)], capture_output=True, text=True,
+                       timeout=30, check=True)
+    # logoff is asynchronous; ensure the owned slot is released before the
+    # second reference account tries to sign in. Never log off runneradmin.
+    from time import monotonic, sleep
+    deadline = monotonic() + 30
+    while sessions:
+        result = subprocess.run(["quser"], capture_output=True, text=True, timeout=30, check=True)
+        if not session_ids(result.stdout, user):
+            break
+        if monotonic() >= deadline:
+            raise RuntimeError("owned TermService session did not finish logging off")
+        sleep(0.25)
+    return sessions
+
+
 def teardown(ctx: Any) -> None:
+    global _SESSION_POLICY
+    try:
+        _teardown(ctx)
+    finally:
+        if _SESSION_POLICY is not None:
+            restore, _SESSION_POLICY = _SESSION_POLICY, None
+            restore.close()
+
+
+def _teardown(ctx: Any) -> None:
     if platform.system() != "Windows":
         return
-    names = ",".join(USERS)
+    # Explorer can delay Run entries after a fresh account's desktop is already
+    # visible. Keep the session's own startup/state files before logging it off.
+    try:
+        diagnostics = Path(ctx.case_dir) / "termservice-target"
+        diagnostics.mkdir(exist_ok=True)
+        password = os.environ.get("QA_RDP_BASELINE_PASSWORD", "")
+        for source in [*WORK_DIR.glob("*.log"), *WORK_DIR.glob("*-state.json")]:
+            content = source.read_text(encoding="utf-8", errors="replace")
+            if password:
+                content = content.replace(password, "[redacted]")
+            (diagnostics / source.name).write_text(content, encoding="utf-8")
+    except Exception as error:
+        try:
+            (Path(ctx.case_dir) / "termservice-target-error.txt").write_text(str(error), encoding="utf-8")
+        except OSError:
+            pass  # Even an unavailable report directory must not prevent cleanup.
+    # Public certificates only, never private keys. Preserve the actual
+    # reference server certificate so TLS failures can be reproduced by unit
+    # verification after downloading CI evidence.
+    try:
+        result = _ps(r"""
+Get-ChildItem 'Cert:\LocalMachine\Remote Desktop' | ForEach-Object {
+  [pscustomobject]@{ Thumbprint=$_.Thumbprint; Subject=$_.Subject; Issuer=$_.Issuer;
+    SignatureAlgorithm=$_.SignatureAlgorithm.Value; PublicKeyAlgorithm=$_.PublicKey.Oid.Value;
+    CertificateDer=[Convert]::ToBase64String($_.RawData) }
+} | ConvertTo-Json
+""", check=False)
+        (Path(ctx.case_dir) / "termservice-certificates.json").write_text(result.stdout, encoding="utf-8")
+        if result.stderr:
+            (Path(ctx.case_dir) / "termservice-certificates-error.txt").write_text(result.stderr, encoding="utf-8")
+    except Exception:
+        pass  # Diagnostics must not prevent owned account/host-state cleanup.
+    names = ",".join(_CREATED)
     _ps(r"""
 $names = $env:QA_BASELINE_USERS.Split(',')
 foreach ($line in (quser 2>$null | Select-Object -Skip 1)) {

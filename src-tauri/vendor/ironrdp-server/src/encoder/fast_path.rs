@@ -31,6 +31,7 @@ pub(crate) struct UpdateFragmenter {
     #[doc(hidden)] // not part of the public API, used by benchmarks
     pub data: Vec<u8>,
     position: usize,
+    bulk_compress: bool,
 }
 
 impl fmt::Debug for UpdateFragmenter {
@@ -48,7 +49,16 @@ impl UpdateFragmenter {
             index: 0,
             data,
             position: 0,
+            bulk_compress: true,
         }
+    }
+
+    pub(super) fn without_bulk_compression(mut self) -> Self {
+        // Raw updates do not participate in either peer's bulk history. A
+        // photo already encoded with RemoteFX gains no useful compression,
+        // and attempting XCRUSH on it costs several milliseconds per frame.
+        self.bulk_compress = false;
+        self
     }
 
     pub(crate) fn size_hint(&self) -> usize {
@@ -104,7 +114,9 @@ impl UpdateFragmenter {
     ) -> Result<usize> {
         let mut cursor = WriteCursor::new(dst);
 
-        let encoded = bulk.map(|bulk| bulk.compress(raw));
+        let encoded = bulk
+            .filter(|_| self.bulk_compress)
+            .map(|bulk| bulk.compress(raw));
         let (data, flags) = encoded
             .as_ref()
             .map_or((raw, 0), |(data, flags)| (data.as_slice(), *flags));
@@ -147,6 +159,50 @@ mod tests {
     use ironrdp_core::{ReadCursor, decode_cursor};
 
     use super::*;
+
+    #[test]
+    fn raw_surface_updates_between_compressed_bitmaps_preserve_bulk_history() {
+        use ironrdp_bulk::{BulkCompressor, CompressionType as BulkType};
+        for (kind, receiver_kind) in [
+            (CompressionType::K8, BulkType::Rdp4),
+            (CompressionType::K64, BulkType::Rdp5),
+            (CompressionType::Rdp6, BulkType::Rdp6),
+            (CompressionType::Rdp61, BulkType::Rdp61),
+        ] {
+            let mut sender = BulkEncoder::new(kind).unwrap();
+            let mut receiver = BulkCompressor::new(receiver_kind).unwrap();
+            let ui: Vec<u8> = (0..6000).map(|i| (i % 29) as u8).collect();
+            for raw in [false, true, false] {
+                let data = if raw { vec![197; 40000] } else { ui.clone() };
+                let mut fragment = if raw {
+                    UpdateFragmenter::new(UpdateCode::SurfaceCommands, data.clone())
+                        .without_bulk_compression()
+                } else {
+                    UpdateFragmenter::new(UpdateCode::Bitmap, data.clone())
+                };
+                let mut decoded = Vec::new();
+                let mut output = vec![0; fragment.size_hint()];
+                while let Some(length) =
+                    fragment.next(&mut output, Some(&mut sender), None).unwrap()
+                {
+                    let mut cursor = ReadCursor::new(&output[..length]);
+                    let _: FastPathHeader = decode_cursor(&mut cursor).unwrap();
+                    let update: FastPathUpdatePdu<'_> = decode_cursor(&mut cursor).unwrap();
+                    if raw {
+                        assert!(update.compression_flags.is_none());
+                        decoded.extend_from_slice(update.data);
+                    } else {
+                        let packet_flags = u32::from(update.compression_flags.unwrap().bits())
+                            | u32::from(kind.as_u8());
+                        decoded.extend_from_slice(
+                            receiver.decompress(update.data, packet_flags).unwrap(),
+                        );
+                    }
+                }
+                assert_eq!(decoded, data, "{kind:?}, raw={raw}");
+            }
+        }
+    }
 
     #[test]
     fn all_bulk_levels_round_trip_fragments_and_signal_reactivation() {
