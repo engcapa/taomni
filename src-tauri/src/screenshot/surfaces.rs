@@ -12,6 +12,11 @@ pub const CONTROL_WIDTH: f64 = 360.0;
 // space on every platform so controls positioned above a crop stay outside it.
 pub const CONTROL_HEIGHT: f64 = 200.0;
 
+// macOS NSWindowSharingNone participates in WindowServer selective sharing,
+// implicated in the macOS 14 display-stream crash. Our controls and borders
+// are already placed outside the crop (or hidden for full-display capture).
+pub const PROTECT_CAPTURE_SURFACES: bool = cfg!(target_os = "windows");
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rect {
     pub x: i32,
@@ -203,7 +208,7 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
                 .shadow(false)
                 .always_on_top(true)
                 .skip_taskbar(true)
-                .content_protected(true)
+                .content_protected(PROTECT_CAPTURE_SURFACES)
                 .focused(false)
                 .build()
                 .map_err(|e| format!("open capture range: {e}"))?;

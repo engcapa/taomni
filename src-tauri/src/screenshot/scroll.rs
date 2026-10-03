@@ -196,9 +196,27 @@ struct Wheel {
     enigo: enigo::Enigo,
 }
 
+pub(super) fn ensure_control_permission() -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    if !crate::servers::rdp::control_permission_granted() {
+        anyhow::bail!(
+            "Scrolling capture requires macOS Accessibility permission. Press Esc to leave the screenshot overlay, then open System Settings > Privacy & Security > Accessibility and enable Taomni. If launched from Terminal, enable Terminal instead (or the terminal app named by macOS); use + to add /System/Applications/Utilities/Terminal.app if it is missing. Restart the launching app after granting permission, then retry."
+        );
+    }
+    Ok(())
+}
+
 impl Wheel {
     fn new() -> anyhow::Result<Self> {
-        let enigo = enigo::Enigo::new(&enigo::Settings::default()).map_err(|e| {
+        ensure_control_permission()?;
+        let settings = enigo::Settings {
+            // Default Enigo initialization prompts from the capture worker,
+            // behind our topmost/fullscreen windows. Preflight above instead.
+            #[cfg(target_os = "macos")]
+            open_prompt_to_get_permissions: false,
+            ..enigo::Settings::default()
+        };
+        let enigo = enigo::Enigo::new(&settings).map_err(|e| {
             anyhow::anyhow!(
                 "input synthesis unavailable ({e}); on macOS grant Accessibility permission to Taomni"
             )
