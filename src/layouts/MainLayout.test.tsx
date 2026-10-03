@@ -31,12 +31,6 @@ const sidebarMock = vi.hoisted(() => ({
   props: [] as Array<{
     onConnectSession?: (session: SessionConfig) => void;
     onOpenSettings?: () => void;
-    gitAction?: {
-      label: string;
-      title: string;
-      disabled?: boolean;
-      onOpen: () => void;
-    };
   }>,
 }));
 
@@ -175,21 +169,10 @@ vi.mock("../components/sidebar/Sidebar", () => ({
   Sidebar: (props: {
     onConnectSession?: (session: SessionConfig) => void;
     onOpenSettings?: () => void;
-    gitAction?: {
-      label: string;
-      title: string;
-      disabled?: boolean;
-      onOpen: () => void;
-    };
   }) => {
     sidebarMock.props.push(props);
     return (
       <div data-testid="sidebar">
-        {props.gitAction && (
-          <button type="button" data-testid="ribbon-git" onClick={props.gitAction.onOpen}>
-            Git
-          </button>
-        )}
         <button type="button" data-testid="ribbon-settings" onClick={props.onOpenSettings}>
           Settings
         </button>
@@ -730,18 +713,6 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(tab.codeWorkspace?.workspaceInstanceId).toBe(
       recentWorkspaceIdFromParts(tab.codeWorkspace?.roots ?? [], tab.codeWorkspace?.looseFiles ?? []),
     );
-  });
-
-  it("passes a Git rail action to the sidebar for the active local terminal", () => {
-    useAppStore.setState({
-      tabs: [{ id: "local-tab", type: "terminal", title: "Local terminal", closable: true }],
-      activeTabId: "local-tab",
-    });
-
-    render(<MainLayout />);
-
-    expect(screen.getByTestId("ribbon-git")).toBeInTheDocument();
-    expect(latestSidebarProps().gitAction?.title).toContain("Open Git panel");
   });
 
   it("routes titlebar close through the app exit command", async () => {
@@ -1829,12 +1800,6 @@ function makePasswordSession(id: string, host: string, passwordRef?: string): Se
 function latestSidebarProps(): {
   onConnectSession?: (session: SessionConfig) => void;
   onOpenSettings?: () => void;
-  gitAction?: {
-    label: string;
-    title: string;
-    disabled?: boolean;
-    onOpen: () => void;
-  };
 } {
   const props = sidebarMock.props.at(-1);
   if (!props) throw new Error("Sidebar props were not captured");

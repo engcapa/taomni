@@ -50,6 +50,10 @@ controls:
     selector: '[data-testid="sidebar-rail-menu-show-names"]'
     kind: interactive
     optional: true
+  - id: sidebar-rail-resize
+    selector: '[data-testid="sidebar-rail-resize"]'
+    kind: interactive
+    optional: true       # visible while tool window names are shown
 -->
 
 - 顶部菜单栏 `MenuBar`（File/Edit/View/Sessions/Tools/Help）
@@ -59,7 +63,7 @@ controls:
 - 中间 Tab 栏 + 内容区
 - 底部状态栏 `StatusBar`（活跃连接数、当前应用主题、状态消息）
 - 侧边栏宽度通过 `react-resizable-panels` 持久化
-- Sessions/Tools 常驻图标按钮与 Code Workspace/SFTP 工具窗口共用名称显示设置和按钮样式；右键常驻按钮可切换名称，键盘 Enter/Space 可展开或收起。
+- Sessions/Tools/Settings 常驻图标按钮与 Code Workspace/SFTP 工具窗口共用名称显示设置和按钮样式；左栏空白处、常驻按钮和设置按钮均可右键切换名称，键盘 Enter/Space 可展开或收起。欢迎页、各类标签及侧栏展开/折叠状态下，显示名称时均可从整条左栏的内侧边缘拖动宽度，也可用左右方向键调整；宽度与名称设置共享并持久化。左下角移除独立 Git panel action，避免重复入口。
 
 ### 1.3 自定义标题栏与窗口控制 ✅
 

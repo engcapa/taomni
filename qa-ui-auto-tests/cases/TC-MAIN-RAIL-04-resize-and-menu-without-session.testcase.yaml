@@ -1,0 +1,190 @@
+id: TC-MAIN-RAIL-04
+title: Main sidebar owns resizing and the names menu in every tab and panel state
+description: >-
+  Renderer regression for Welcome with no open sessions, expanded and collapsed
+  panels, Code Workspace and a local terminal. The full-height main rail edge
+  resizes independently of embedded tab tools. Background, Settings and permanent
+  buttons expose the names preference; tool buttons retain their own context menu.
+  Width and names remain shared across tab switches and survive reload.
+covers: [F1.2, F1.9, F6.2, F25.5]
+tags: [main, sidebar, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage: {key: taomni.sidebarCollapsed, value: 'false'}
+  - seed_storage: {key: taomni.sidebarCollapsedByGroup.v1, value: '{"code-workspace":true,"terminal":true}'}
+  - seed_storage: {key: taomni.mergeToolWindowRail, value: 'true'}
+  - seed_storage: {key: taomni.codeWorkspace.toolWindowStripes.v1, value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'}
+  - reload_window: null
+  - wait_for: '[data-testid="session-tree"]'
+  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail"]'
+  - assert_count: {selector: '[data-testid="context-menu"]', equal: 1}
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"showNames":false'}
+  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: ''}
+  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 59
+      expect_truthy: true
+  - drag_to: {from: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]', by: {dx: 20}}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 79
+      expect_truthy: true
+  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]', key: ArrowRight}
+  - assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"leftWidth":83'}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 83
+      expect_truthy: true
+  - click: '[data-testid="side-tab-sessions"]:visible'
+  - wait_for: '[data-testid="collapsed-sidebar-rail"]'
+  - assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]', equal: 0}
+  - eval_readonly:
+      expression: document.querySelector('[aria-valuenow]').getBoundingClientRect().height > 500
+      expect_truthy: true
+  - drag_to: {from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', by: {dx: 100}}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 100
+      expect_truthy: true
+  - drag_to: {from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', by: {dx: -200}}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 40
+      expect_truthy: true
+  - press: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', key: ArrowRight}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 44
+      expect_truthy: true
+  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - assert_count: {selector: '[data-testid="sidebar-rail-resize"]', equal: 0}
+  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 44
+      expect_truthy: true
+  - screenshot: main-rail-welcome-resized.png
+  - click: '[data-testid="side-tab-tools"]:visible'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - drag_to: {from: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]', by: {dx: 20}}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 64
+      expect_truthy: true
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
+  - assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', equal: 1}
+  - assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left-resize"]', equal: 0}
+  - press: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', key: ArrowRight}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 68
+      expect_truthy: true
+  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+  - assert_count: {selector: '[data-testid="sidebar-rail-menu-show-names"]', equal: 0}
+  - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
+  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', equals: ''}
+  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - wait_for: '[data-testid="welcome-panel"]'
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 68
+      expect_truthy: true
+  - click: '[data-testid="welcome-open-local-terminal"]'
+  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', equal: 1}
+  - drag_to: {from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', by: {dx: 12}}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 80
+      expect_truthy: true
+  - right_click: '[data-testid="side-tab-tools"]:visible'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', equals: ''}
+  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+  - click: '[data-testid="sidebar-rail-menu-show-names"]'
+  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 80
+      expect_truthy: true
+  - reload_window: null
+  - wait_for: '[data-testid="welcome-panel"]'
+  - wait_for: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]'
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 80
+      expect_truthy: true
+  - assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"showNames":true'}
+  - screenshot: main-rail-welcome-restored.png
+  - click: '[data-testid="side-tab-tools"]:visible'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
+  - click: '[data-testid="side-tab-sessions"]:visible'
+  - wait_for: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+  - press: {selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left-resize"]', key: ArrowLeft}
+  - assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"leftWidth":76'}
+  - eval_readonly:
+      expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 76
+      expect_truthy: true
+  - screenshot: main-rail-standalone-workspace.png
+verification:
+  review: reviewed
+  requirements:
+    - id: R1
+      requirement: 欢迎页没有会话时，左栏空白处和设置按钮均可切换名称，展开状态下鼠标及方向键可调宽并持久化。
+      actions: [9, 11, 14, 15, 17, 19]
+      checkpoints:
+        - {step: 10, expectation: Only one names context menu opens from the blank rail.}
+        - {step: 12, expectation: The disabled names preference is persisted.}
+        - {step: 13, expectation: Permanent buttons keep their icons and hide their names.}
+        - {step: 16, expectation: Settings restores the named rail at 59 CSS pixels.}
+        - {step: 18, expectation: A real pointer drag increases the rail to 79 CSS pixels.}
+        - {step: 20, expectation: ArrowRight persists a width of 83.}
+        - {step: 21, expectation: The rendered rail is 83 CSS pixels wide.}
+      results: [10, 12, 13, 16, 18, 20, 21]
+    - id: R2
+      requirement: 欢迎页折叠状态下整高边缘可拖动，宽度限制为 40–100；名称开关恢复已保存的宽度；展开 Tools 后仍能拖动。
+      actions: [22, 26, 28, 30, 32, 33, 35, 36, 39, 41]
+      checkpoints:
+        - {step: 24, expectation: Welcome has no embedded tab tool rail.}
+        - {step: 25, expectation: The resize edge spans over 500 CSS pixels of the rail height.}
+        - {step: 27, expectation: A large outward drag stops at 100 CSS pixels.}
+        - {step: 29, expectation: A large inward drag stops at 40 CSS pixels.}
+        - {step: 31, expectation: ArrowRight grows the rail to 44 CSS pixels.}
+        - {step: 34, expectation: Icon-only mode removes the resize edge.}
+        - {step: 37, expectation: Re-enabling names restores the saved 44 CSS pixel width.}
+        - {step: 42, expectation: The expanded Tools panel shares the rail and resizes it to 64 CSS pixels.}
+      results: [24, 25, 27, 29, 31, 34, 37, 42]
+    - id: R3
+      requirement: Code Workspace 和终端共用主侧栏拖动边缘及名称设置，工具按钮保留自身菜单；回欢迎页及 reload 后设置仍保留。
+      actions: [43, 47, 49, 51, 53, 54, 55, 58, 61, 63, 64, 66, 67, 68, 70]
+      checkpoints:
+        - {step: 45, expectation: The collapsed workspace has one main sidebar resize edge.}
+        - {step: 46, expectation: The embedded workspace supplies no overlapping resize edge.}
+        - {step: 48, expectation: The main edge grows the shared rail to 68 CSS pixels.}
+        - {step: 50, expectation: The Project context menu is not replaced by the sidebar names menu.}
+        - {step: 52, expectation: Project names toggle also hides permanent button names.}
+        - {step: 57, expectation: Welcome restores the same 68 CSS pixel rail.}
+        - {step: 60, expectation: An active local terminal still has one main sidebar resize edge.}
+        - {step: 62, expectation: A terminal-state pointer drag grows the rail to 80 CSS pixels.}
+        - {step: 65, expectation: The permanent button names menu works in the terminal state.}
+        - {step: 69, expectation: Welcome keeps the 80 CSS pixel width.}
+        - {step: 73, expectation: Reloaded Welcome renders the stored 80 CSS pixel width.}
+        - {step: 74, expectation: Names remain enabled after reload.}
+      results: [45, 46, 48, 50, 52, 57, 60, 62, 65, 69, 73, 74]
+    - id: R4
+      requirement: 展开主侧栏后 Code Workspace 独立工具栏仍可用原有边缘及方向键调整宽度，共享设置同步至主侧栏。
+      actions: [76, 78, 80, 82]
+      checkpoints:
+        - {step: 81, expectation: Expanding the sidebar returns the left tool rail to the workspace.}
+        - {step: 83, expectation: The standalone edge persists a width of 76 after ArrowLeft.}
+        - {step: 84, expectation: The main sidebar shares the resulting 76 CSS pixel width.}
+      results: [81, 83, 84]
+  visual:
+    - check: 欢迎页的整高边缘以及调整后的名称布局。
+      method: automated
+      reason: Geometry is asserted after real drags and key events; screenshots provide review artifacts.
+  native:
+    - check: Packaged WebView and real terminal IPC.
+      method: not-applicable
+      reason: This case targets renderer rail behavior; the browser terminal is stubbed and does not certify native PTY or packaged WebView behavior.

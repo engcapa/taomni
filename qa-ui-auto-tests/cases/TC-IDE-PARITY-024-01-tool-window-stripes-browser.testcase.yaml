@@ -5,6 +5,7 @@ description: 'ED-PARITY-024 A1/A2/A3 browser case: the stripes show tool window 
 
   Mode: browser.'
 covers:
+- F1.2
 - F25.5
 tags:
 - code-workspace
@@ -85,11 +86,11 @@ steps:
     expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-tool-rail-left\"]").getBoundingClientRect().width) === 40
     expect_truthy: true
 - assert_count:
-    selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
+    selector: '[data-testid="sidebar-rail-resize"]'
     equal: 0
 - right_click: '[data-testid="code-workspace-bottom-tab-terminal"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
-- click: '[data-testid="code-workspace-tool-rail-left-resize"]'
+- click: '[data-testid="sidebar-rail-resize"]'
 - press: ArrowRight
 - press: ArrowRight
 - press: ArrowRight
@@ -224,7 +225,7 @@ verification:
     - step: 40
       expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width) === 40", "expect_truthy": true}}'
     - step: 41
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-left-resize\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 0}}'
     - step: 50
       expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width) === 79", "expect_truthy": true}}'
     results:
