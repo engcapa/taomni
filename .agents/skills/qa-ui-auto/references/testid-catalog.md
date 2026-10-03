@@ -2336,6 +2336,7 @@
 - `[data-testid="mfa-account-group"]` — display — F-MFA-1.group-pill
 - `[data-testid="mfa-account-issuer"]` — display [optional] — F-MFA-1.issuer-label
 - `[data-testid="mfa-account-name"]` — display [optional] — F-MFA-1.account-label
+- `[data-testid="mfa-account-avatar"]` — display [optional] — F-MFA-1.avatar
 - `[data-testid="mfa-account-hotp-next"]` — interactive — F-MFA-1.hotp-next
 - `[data-testid="mfa-account-copy"]` — interactive — F-MFA-1.copy
 - `[data-testid="mfa-account-pin"]` — interactive — F-MFA-1.pin
@@ -2343,6 +2344,7 @@
 - `[data-testid="mfa-account-drag"]` — interactive — F-MFA-1.drag
 - `[data-testid="mfa-menu-edit"]` — interactive — F-MFA-1.menu-edit
 - `[data-testid="mfa-menu-qr"]` — interactive — F-MFA-1.menu-qr
+- `[data-testid="mfa-menu-copy-secret"]` — interactive — F-MFA-1.menu-copy-secret
 - `[data-testid="mfa-menu-pin"]` — interactive — F-MFA-1.menu-pin
 - `[data-testid="mfa-menu-move-up"]` — interactive — F-MFA-1.menu-move-up
 - `[data-testid="mfa-menu-move-down"]` — interactive — F-MFA-1.menu-move-down
@@ -2359,6 +2361,10 @@
 - `[data-testid="mfa-qr-password"]` — interactive — F-MFA-1.qr-password
 - `[data-testid="mfa-qr-reveal"]` — interactive — F-MFA-1.qr-reveal
 - `[data-testid="mfa-qr-image"]` — display — F-MFA-1.qr-image
+- `[data-testid="mfa-qr-secret"]` — display [optional] — F-MFA-1.qr-secret
+- `[data-testid="mfa-qr-toggle-secret"]` — interactive [optional] — F-MFA-1.qr-toggle-secret
+- `[data-testid="mfa-qr-copy-secret"]` — interactive [optional] — F-MFA-1.qr-copy-secret
+- `[data-testid="mfa-qr-copy-uri"]` — interactive [optional] — F-MFA-1.qr-copy-uri
 - `[data-testid="mfa-qr-error"]` — display — F-MFA-1.qr-error
 - `[data-testid="mfa-qr-close"]` — interactive — F-MFA-1.qr-close
 - `[data-testid="mfa-error"]` — display [optional] — F-MFA-1.error-banner

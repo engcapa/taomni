@@ -467,6 +467,7 @@ cases:
 - TC-MFA-009
 - TC-MFA-010
 - TC-MFA-011
+- TC-MFA-012
 - TC-MFA-101
 - TC-MFA-102
 - TC-MFA-103
@@ -474,6 +475,7 @@ cases:
 - TC-MFA-105
 - TC-MFA-106
 - TC-MFA-107
+- TC-MFA-108
 - TC-RDPS-PERF-03-photo-content
 - TC-RDPS-NAT-08-mstsc-interop
 - TC-RDPC-REF-01-termservice
