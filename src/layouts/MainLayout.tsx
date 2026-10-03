@@ -32,7 +32,6 @@ import { parseMailIdentities } from "../lib/mailIdentities";
 import { parseSpecialFolders } from "../lib/mailFolders";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
-import { WindowDragHandle } from "../components/window/WindowDragHandle";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
 import { ControlBar } from "../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
@@ -4139,7 +4138,6 @@ export function MainLayout() {
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
       {!isMac && <WindowResizeHandles />}
-      <WindowDragHandle />
       <div data-testid="app-titlebar" className="min-w-0">
         <ControlBar
           activeTabClosable={!!activeTab?.closable}

@@ -91,7 +91,7 @@ controls:
     optional: true
   - id: window-drag-handle
     selector: '[data-testid="window-drag-handle"]'
-    kind: display    # full-height left grip; Linux native verifies actual OS displacement
+    kind: display    # title-bar grip before Welcome; Linux native verifies actual OS displacement
   - id: titlebar-actions-more
     selector: '[data-testid="titlebar-actions-more"]'
     kind: interactive

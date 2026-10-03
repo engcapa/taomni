@@ -76,11 +76,11 @@ steps:
     icon_size: 16
 - eval_readonly:
     expression: >-
-      document.querySelector('#sidebar button[data-tool-window-id]:first-child').getBoundingClientRect().left>=document.querySelector('[data-window-drag]').getBoundingClientRect().right&&document.querySelector('#sidebar button[data-tool-window-id]:first-child').getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().right
+      document.querySelector('#sidebar button[data-tool-window-id]:first-child').getBoundingClientRect().left>=document.getElementById('sidebar').getBoundingClientRect().left&&document.querySelector('#sidebar button[data-tool-window-id]:first-child').getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().right
     expect_truthy: true
 - eval_readonly:
     expression: >-
-      document.querySelector('#sidebar button[data-tool-window-id]:last-child').getBoundingClientRect().left>=document.querySelector('[data-window-drag]').getBoundingClientRect().right&&document.querySelector('#sidebar button[data-tool-window-id]:last-child').getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().right
+      document.querySelector('#sidebar button[data-tool-window-id]:last-child').getBoundingClientRect().left>=document.getElementById('sidebar').getBoundingClientRect().left&&document.querySelector('#sidebar button[data-tool-window-id]:last-child').getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().right
     expect_truthy: true
 - screenshot: 011-standalone-sftp-session.png
 verification:
@@ -147,9 +147,9 @@ verification:
     - step: 34
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"] button[data-tool-window-id]", "min_count": 2, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
     - step: 35
-      expectation: 'Sessions 按钮完整落在全高拖拽带右侧和侧栏右边界之间，没有水平裁切。'
+      expectation: 'Sessions 按钮完整落在侧栏左右边界之间，没有水平裁切。'
     - step: 36
-      expectation: 'Tools 按钮完整落在全高拖拽带右侧和侧栏右边界之间，没有水平裁切。'
+      expectation: 'Tools 按钮完整落在侧栏左右边界之间，没有水平裁切。'
     results:
     - 34
     - 35

@@ -1,8 +1,8 @@
 id: TC-MAIN-RAIL-03
-title: The upper, middle and lower left grip move the actual Linux native window
+title: The title-bar grip moves the actual Linux native window
 description: >-
   Real X11 pointer input into the packaged WebKitGTK app and independent window
-  geometry readback prove that the full-height grip moves rather than resizes
+  geometry readback prove that the title-bar grip moves rather than resizes
   the window. Raw displacement and geometry restoration are retained for all
   three positions; Sessions/Tools remain operable after moving the window.
 covers: [F1.2, F1.3, F6.2, F-Sockscap-1]
@@ -19,9 +19,9 @@ steps:
   - reload_window: null
   - wait_for: '[data-testid="session-tree"]'
   - eval_readonly:
-      expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height - innerHeight) < 1
+      expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
       expect_truthy: true
-  - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.15, dx: 24, dy: 18}
+  - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.35, dx: 24, dy: 18}
   - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.5, dx: 24, dy: 18}
   - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
   - wait_for: '[data-testid="collapsed-sidebar-rail"]'
@@ -35,7 +35,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Linux 原生窗口上中下三个拖拽位置产生请求位移且不改变大小；折叠后同样可拖拽，移动后两个常驻按钮可操作。
+    requirement: Linux 原生窗口标题栏抓手的三个拖拽位置产生请求位移且不改变大小，并避开原生边缘缩放区；折叠后同样可拖拽，移动后两个常驻按钮可操作。
     actions:
     - 1
     - 5
@@ -51,10 +51,9 @@ verification:
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 7
-      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
-        - innerHeight) < 1", "expect_truthy": true}}'
+      expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
     - step: 8
-      expectation: '{"native_window_drag": {"selector": "[data-testid=\"window-drag-handle\"]", "y_fraction": 0.15, "dx":
+      expectation: '{"native_window_drag": {"selector": "[data-testid=\"window-drag-handle\"]", "y_fraction": 0.35, "dx":
         24, "dy": 18}}'
     - step: 9
       expectation: '{"native_window_drag": {"selector": "[data-testid=\"window-drag-handle\"]", "y_fraction": 0.5, "dx": 24,
@@ -79,7 +78,7 @@ verification:
     - 14
     - 16
   visual:
-  - check: 检查对应截图的图标、名称、选中态、全高拖拽带以及点击区域无缩小、遮挡或截断。
+  - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual
     reason: 实际尺寸断言辅助视觉评审；CI 图片在下载后评审。
   native:

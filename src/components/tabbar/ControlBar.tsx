@@ -34,6 +34,7 @@ import { TabBar } from "./TabBar";
 import { OpenTabsMenu } from "./OpenTabsMenu";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
+import { WindowDragHandle } from "../window/WindowDragHandle";
 import { startWindowDrag } from "../../lib/windowDrag";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
 import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
@@ -219,6 +220,7 @@ export function ControlBar({
           <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
       </div>
+      <WindowDragHandle />
       <div className="min-w-0 flex-1 self-stretch">
         <TabBar
           onStartLocalTerminal={onStartLocalTerminal}
