@@ -228,9 +228,16 @@ def _wait_for(ctx: NativeStepContext, args: Any) -> str:
 
 
 def _element_has_layout(ctx: NativeStepContext, selector: str) -> bool:
+    from tauri_webdriver import selector_strategy
+
+    using, value = selector_strategy(selector)
+    lookup = (
+        f"document.evaluate({json.dumps(value)}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue"
+        if using == "xpath" else f"document.querySelector({json.dumps(value)})"
+    )
     try:
         return bool(ctx.session.execute(
-            f"const el = document.querySelector({json.dumps(selector)});"
+            f"const el = {lookup};"
             "if (!el) return false;"
             "const rect = el.getBoundingClientRect();"
             "const visibility = getComputedStyle(el).visibility;"
