@@ -45,7 +45,7 @@ export function ScrollCaptureResult({ url, width, height, frames, toolbar, child
       </div>
     </header>
     {toolbar}
-    <div ref={viewportRef} tabIndex={0} aria-label={t("screenshot.scrollResult")} data-testid="screenshot-scroll-result-viewport" className="flex-1 min-h-0 overflow-auto p-4" style={{ background: "#202124" }}>
+    <div ref={viewportRef} tabIndex={0} aria-label={t("screenshot.scrollResult")} id="screenshot-scroll-result-viewport" data-testid="screenshot-scroll-result-viewport" className="flex-1 min-h-0 overflow-auto p-4" style={{ background: "#202124" }}>
       <div style={{ position: "relative", width: width * scale, height: height * scale, margin: "0 auto", overflow: "hidden" }}>
         <div style={{ position: "relative", width, height, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           <img data-testid="screenshot-scroll-result-image" src={url} alt={t("screenshot.scrollResult")} draggable={false}

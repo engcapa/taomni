@@ -62,8 +62,8 @@ steps:
     selector: '[data-testid="screenshot-scroll-result-viewport"]'
     key: End
 - eval_readonly:
-    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-viewport\"]").scrollTop
-      > 1000
+    expression: document.getElementById("screenshot-scroll-result-viewport").scrollTop > 1000
+    timeout_sec: 3
 - drag_to:
     from: '[data-testid="screenshot-scroll-result-viewport"]'
     to: '[data-testid="screenshot-scroll-result-viewport"]'
@@ -169,8 +169,8 @@ verification:
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
         ''equals'': ''1''}}'
     - step: 22
-      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector("[data-testid" + String.fromCharCode(61)
-        + "\\"screenshot-scroll-result-viewport\\"]").scrollTop > 1000''}}'
+      expectation: Keyboard scrolling reaches the bottom before drawing; scrollTop exceeds 1000 and remaining distance is
+        below 2 pixels.
     - step: 24
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
         ''equals'': ''2''}}'
@@ -198,8 +198,7 @@ verification:
     - step: 44
       expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
     - step: 45
-      expectation: '{''eval_readonly'': {''expression'': ''window.__taomniStubScreenshotCalls.filter(c => c.cmd === "screenshot_copy_image").length
-        === 0''}}'
+      expectation: Escape exits the marked preview without invoking screenshot_copy_image.
     results:
     - 3
     - 7

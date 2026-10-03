@@ -1432,7 +1432,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         r#"
       for (let i = 0; i < 100; i++) {
         const status = await window.__TAURI_INTERNALS__.invoke('screenshot_scroll_status');
-        if (status?.frames >= 2) return status;
+        if (status?.frames >= 4) return status;
         await new Promise(r => setTimeout(r, 100));
       }
       throw new Error('scroll did not capture a second frame');
