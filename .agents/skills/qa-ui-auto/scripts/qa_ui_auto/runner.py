@@ -459,6 +459,7 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                 dry_run=False, worker_id=0, report_root=report_root,
                 values=fixture_values, step_index=0,
             )
+            applied_fixtures = []
             try:
                 fixture_started = time.monotonic()
                 # Fixtures first — a FixtureSkip turns into "skipped".
@@ -467,6 +468,7 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     try:
                         deadline.remaining()
                         fix.setup(ctx_ns)
+                        applied_fixtures.append(fix)
                         deadline.remaining()
                     except FixtureSkip as fs:
                         r["status"] = "skipped"
@@ -514,8 +516,10 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                             json.dumps(console[-500:], ensure_ascii=False, indent=1),
                             encoding="utf-8",
                         )
-                        with suppress(Exception):
+                        try:
                             session.close()
+                        except Exception as exc:
+                            r["session_cleanup_error"] = str(exc)
                         # ED-FOLLOW-002: the app is dead here (session.close
                         # ends its process), so reaping its orphaned jdtls
                         # children cannot dangle any live session map. Never
@@ -553,11 +557,39 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     "message": f"{type(e).__name__}: {e}",
                     "artifacts": {},
                 }
-            # The updater fixture owns an HTTP server and controlled downloads;
-            # stop them after the app session even when a step or setup failed.
-            if "macos_updater" in c.fixtures:
-                with suppress(Exception):
-                    get_fixture("macos_updater").teardown(ctx_ns)
+            finally:
+                if r.get("session_cleanup_error") and r["status"] != "failed":
+                    r["status"] = "failed"
+                    r["failure"] = {
+                        "step_index": 0, "verb": "<session-cleanup>", "args": None,
+                        "message": r["session_cleanup_error"], "artifacts": {},
+                    }
+                fixture_cleanup_started = time.monotonic()
+                cleanup_errors = []
+                cleanup_fixtures = list(applied_fixtures)
+                # The updater owns a server and downloads even if setup fails
+                # partway through. Retain its fallback cleanup, but run each
+                # teardown once and report errors with the other fixtures.
+                if "macos_updater" in c.fixtures and not any(
+                    fix.name == "macos_updater" for fix in cleanup_fixtures
+                ):
+                    cleanup_fixtures.append(get_fixture("macos_updater"))
+                for fix in reversed(cleanup_fixtures):
+                    teardown = getattr(fix, "teardown", None)
+                    if teardown is not None:
+                        try:
+                            teardown(ctx_ns)
+                        except Exception as exc:  # continue restoring other owned fixtures
+                            cleanup_errors.append({"fixture": fix.name, "message": str(exc)})
+                r["timings"]["fixture_cleanup_sec"] = time.monotonic() - fixture_cleanup_started
+                if cleanup_errors:
+                    r["fixture_cleanup_errors"] = cleanup_errors
+                    if r["status"] != "failed":
+                        r["status"] = "failed"
+                        r["failure"] = {
+                            "step_index": 0, "verb": "<fixture-cleanup>", "args": None,
+                            "message": f"fixture cleanup failed: {cleanup_errors}", "artifacts": {},
+                        }
             if r["status"] == "failed":
                 r["failure"]["artifacts"] = failure_artifacts
             with suppress(Exception):

@@ -542,6 +542,31 @@
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
         },
+        "assert_element_geometry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector", "min_width", "min_height"],
+          "properties": {
+            "selector": {"type": "string", "minLength": 1},
+            "min_width": {"type": "number", "minimum": 1},
+            "min_height": {"type": "number", "minimum": 1},
+            "min_count": {"type": "integer", "minimum": 1},
+            "same_width": {"type": "boolean"},
+            "icon_size": {"type": "number", "minimum": 1},
+            "tolerance": {"type": "number", "minimum": 0, "maximum": 2}
+          }
+        },
+        "native_window_drag": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector", "dx", "dy"],
+          "properties": {
+            "selector": {"type": "string", "minLength": 1},
+            "dx": {"type": "integer", "minimum": -100, "maximum": 100},
+            "dy": {"type": "integer", "minimum": -100, "maximum": 100},
+            "y_fraction": {"type": "number", "minimum": 0.05, "maximum": 0.95}
+          }
+        },
         "native_screenshot_scenario": {
           "type": "object",
           "additionalProperties": false,
@@ -1415,6 +1440,9 @@
         "mouse_path": {
           "$ref": "#/$defs/mouse_path_arg"
         },
+        "mouse_button": {
+          "enum": ["down", "up"]
+        },
         "seed_clipboard_image": {
           "$ref": "#/$defs/seed_clipboard_image_arg"
         },
@@ -1435,6 +1463,9 @@
         },
         "host_mstsc": {
           "$ref": "#/$defs/host_mstsc_arg"
+        },
+        "host_rdp_logoff": {
+          "$ref": "#/$defs/host_rdp_logoff_arg"
         },
         "rdp_canvas_assert": {
           "$ref": "#/$defs/rdp_canvas_assert_arg"
@@ -3232,6 +3263,16 @@
         "timeout_sec": {
           "type": "number",
           "exclusiveMinimum": 0
+        }
+      }
+    },
+    "host_rdp_logoff_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_env"],
+      "properties": {
+        "user_env": {
+          "enum": ["QA_RDP_BASELINE_USER1", "QA_RDP_BASELINE_USER2"]
         }
       }
     },

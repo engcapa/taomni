@@ -158,6 +158,7 @@ struct WireStats {
     compression: Vec<Option<CompressionType>>,
     flushed: usize,
     last_was_flushed: bool,
+    compressed_flushes: Vec<bool>,
     packets: Vec<Vec<u8>>,
 }
 struct TestClient {
@@ -276,6 +277,14 @@ impl TestClient {
                     .compression_flags
                     .is_some_and(|f| f.contains(CompressionFlags::FLUSHED));
                 self.wire.flushed += usize::from(self.wire.last_was_flushed);
+                if update
+                    .compression_flags
+                    .is_some_and(|f| f.contains(CompressionFlags::COMPRESSED))
+                {
+                    self.wire
+                        .compressed_flushes
+                        .push(self.wire.last_was_flushed);
+                }
             }
         }
         for output in self.stage.process(&mut self.image, action, &payload)? {
@@ -521,12 +530,18 @@ async fn reactivation_resets_compression_history() {
         client.pump().await.unwrap();
     }
     let previous_flushes = client.wire.flushed;
+    let previous_compressed = client.wire.compressed_flushes.len();
     for i in 1..4 {
         let pixels = frame(320, 128, i, false);
         server.send_frame(320, 128, &pixels);
         client.frame(&pixels, 320, 128, false).await.unwrap();
     }
     assert!(client.wire.flushed > previous_flushes);
+    assert_eq!(
+        client.wire.compressed_flushes.get(previous_compressed),
+        Some(&true),
+        "first compressed fragment after reactivation must reset the peer's history"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

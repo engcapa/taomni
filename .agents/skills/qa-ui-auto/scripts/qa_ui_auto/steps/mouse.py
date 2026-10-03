@@ -113,6 +113,22 @@ def step_mouse_path(ctx: StepContext, args: Any) -> None:
             page.wait_for_timeout(point["pause_ms"])
 
 
+def mouse_button_action(args: Any) -> str:
+    if args not in ("down", "up"):
+        raise StepError("mouse_button: expected down or up")
+    return args
+
+
+@verb("mouse_button")
+def step_mouse_button(ctx: StepContext, args: Any) -> None:
+    action = mouse_button_action(args)
+    if not ctx.dry_run:
+        if action == "down":
+            ctx.page.mouse.down()
+        else:
+            ctx.page.mouse.up()
+
+
 @verb("middle_click")
 def step_middle_click(ctx: StepContext, args: Any) -> None:
     selector = args if isinstance(args, str) else args["selector"]

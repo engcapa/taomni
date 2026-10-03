@@ -97,7 +97,7 @@ export function PathBreadcrumb({
   return (
     <div
       data-testid={testId}
-      className="taomni-path-breadcrumb flex-1 h-6 flex items-center gap-0.5 px-1.5 overflow-x-auto text-[12px] leading-none cursor-text"
+      className="taomni-path-breadcrumb flex-1 min-w-0 h-full flex items-center gap-0.5 px-1.5 overflow-hidden text-[12px] leading-none cursor-text"
       style={{ background: "var(--taomni-input-bg)", border: "1px solid var(--taomni-input-border)", borderRadius: 2 }}
       onClick={() => setEditing(true)}
       onContextMenu={(e) => {
@@ -106,7 +106,10 @@ export function PathBreadcrumb({
       }}
       title={t("fileBrowser.pathBreadcrumbEditTitle")}
     >
-      <span className="flex items-center gap-0.5 min-w-0 overflow-x-auto">
+      <span
+        data-testid={testId ? `${testId}-segments` : undefined}
+        className="taomni-path-breadcrumb-scroll flex-1 self-stretch flex items-center gap-0.5 min-w-0 overflow-x-auto overflow-y-hidden"
+      >
         {homePath && homePath !== path && (
           <button
             type="button"

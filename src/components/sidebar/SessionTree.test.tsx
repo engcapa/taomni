@@ -70,6 +70,139 @@ function sessionRow(id: string): HTMLElement {
   return row;
 }
 
+describe("SessionTree range selection and drag", () => {
+  const sessions = [
+    makeSession("a", "Alpha", "first"),
+    makeSession("c", "Charlie", "first"),
+    makeSession("b", "Bravo", "first"),
+    makeSession("hidden", "Hidden", "middle"),
+    makeSession("z", "Zulu", "last"),
+  ];
+  const groups = [makeGroup("first"), makeGroup("middle"), makeGroup("last"), makeGroup("target")];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ipcMocks.listSessions.mockResolvedValue(sessions);
+    ipcMocks.listSessionGroups.mockResolvedValue(groups);
+    useSessionStore.setState({
+      sessions, groups, loading: false, selectedSessionId: null, selectedSessionIds: [], searchQuery: "",
+    });
+  });
+
+  afterEach(async () => {
+    fireEvent.keyDown(window, { key: "Escape" });
+    cleanup();
+    vi.unstubAllGlobals();
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+  });
+
+  function openFolders() {
+    fireEvent.click(screen.getByText("first"));
+    fireEvent.click(screen.getByText("last"));
+  }
+
+  function selectedIds() {
+    return [...useSessionStore.getState().selectedSessionIds].sort();
+  }
+
+  function pointer(target: HTMLElement | Window, type: string, x: number, y: number) {
+    return fireEvent(target, new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y }));
+  }
+
+  it("selects a visible range in tree order and retains its anchor for subsequent Shift clicks", () => {
+    render(<SessionTree />);
+    openFolders();
+    fireEvent.click(sessionRow("a"));
+    fireEvent.click(sessionRow("z"), { shiftKey: true });
+    expect(selectedIds()).toEqual(["a", "b", "c", "z"]);
+    fireEvent.click(sessionRow("b"), { shiftKey: true });
+    expect(selectedIds()).toEqual(["a", "b"]);
+    expect(useSessionStore.getState().selectedSessionId).toBe("b");
+  });
+
+  it("supports reverse ranges, additive Ctrl+Shift ranges, and Meta toggling", () => {
+    render(<SessionTree />);
+    openFolders();
+    fireEvent.click(sessionRow("z"));
+    fireEvent.click(sessionRow("c"), { ctrlKey: true });
+    fireEvent.click(sessionRow("a"), { ctrlKey: true, shiftKey: true });
+    expect(selectedIds()).toEqual(["a", "b", "c", "z"]);
+    fireEvent.click(sessionRow("b"), { metaKey: true });
+    expect(selectedIds()).toEqual(["a", "c", "z"]);
+    fireEvent.click(sessionRow("z"));
+    expect(selectedIds()).toEqual(["z"]);
+    fireEvent.click(sessionRow("a"), { shiftKey: true });
+    expect(selectedIds()).toEqual(["a", "b", "c", "z"]);
+  });
+
+  it("ranges only over search results and handles a hidden or missing anchor", () => {
+    const searchableSessions = sessions.map((session) => session.group_path === "first" ? { ...session, name: `Range ${session.name}` } : session);
+    ipcMocks.listSessions.mockResolvedValue(searchableSessions);
+    useSessionStore.setState({ sessions: searchableSessions, searchQuery: "range", selectedSessionId: "hidden", selectedSessionIds: ["hidden"] });
+    render(<SessionTree />);
+    fireEvent.click(sessionRow("a"), { shiftKey: true });
+    expect(selectedIds()).toEqual(["a"]);
+    fireEvent.click(sessionRow("c"), { shiftKey: true });
+    expect(selectedIds()).toEqual(["a", "b", "c"]);
+    expect(document.querySelector('[data-session-id="hidden"]')).toBeNull();
+  });
+
+  it("prevents text selection and drags the entire selection with a count preview", async () => {
+    render(<SessionTree />);
+    openFolders();
+    fireEvent.click(sessionRow("a"));
+    fireEvent.click(sessionRow("c"), { ctrlKey: true });
+    const target = screen.getByText("target");
+    Object.defineProperty(document, "elementFromPoint", { configurable: true, value: () => target });
+    expect(pointer(sessionRow("a"), "pointerdown", 20, 40)).toBe(false);
+    pointer(window, "pointermove", 25, 40);
+    expect(document.querySelector('[data-custom-drag-ghost="true"]')).toHaveTextContent("Move 2 sessions");
+    expect(selectedIds()).toEqual(["a", "c"]);
+    pointer(window, "pointerup", 25, 40);
+    fireEvent.click(sessionRow("a")); // The compatibility click following a drag must not collapse selection.
+    await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));
+    expect(ipcMocks.saveSession.mock.calls.map(([session]) => [session.id, session.group_path])).toEqual([
+      ["a", "User sessions / target"], ["c", "User sessions / target"],
+    ]);
+    expect(selectedIds()).toEqual(["a", "c"]);
+    expect(document.querySelector('[data-custom-drag-ghost="true"]')).toBeNull();
+  });
+
+  it("cancels a batch drag without saving, then drags an unselected row alone", async () => {
+    render(<SessionTree />);
+    openFolders();
+    fireEvent.click(sessionRow("a"));
+    fireEvent.click(sessionRow("c"), { ctrlKey: true });
+    const target = screen.getByText("target");
+    Object.defineProperty(document, "elementFromPoint", { configurable: true, value: () => target });
+    pointer(sessionRow("a"), "pointerdown", 20, 40);
+    pointer(window, "pointermove", 30, 40);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(ipcMocks.saveSession).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-custom-drag-ghost="true"]')).toBeNull();
+    expect(selectedIds()).toEqual(["a", "c"]);
+    pointer(sessionRow("z"), "pointerdown", 20, 40);
+    pointer(window, "pointermove", 30, 40);
+    expect(selectedIds()).toEqual(["z"]);
+    pointer(window, "pointerup", 30, 40);
+    await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1));
+    expect(ipcMocks.saveSession.mock.calls[0][0]).toMatchObject({ id: "z", group_path: "User sessions / target" });
+  });
+
+  it("keeps the existing selection until a press becomes a drag or click", () => {
+    render(<SessionTree />);
+    openFolders();
+    fireEvent.click(sessionRow("a"));
+    fireEvent.click(sessionRow("c"), { ctrlKey: true });
+    pointer(sessionRow("z"), "pointerdown", 20, 40);
+    expect(selectedIds()).toEqual(["a", "c"]);
+    pointer(window, "pointerup", 21, 40);
+    expect(ipcMocks.saveSession).not.toHaveBeenCalled();
+    fireEvent.click(sessionRow("z"));
+    expect(selectedIds()).toEqual(["z"]);
+  });
+});
+
 describe("SessionTree multi-select connect", () => {
   const sessions = [
     makeSession("ipy-145", "145.216", "ipy"),

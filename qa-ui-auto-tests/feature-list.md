@@ -33,6 +33,10 @@ controls:
     selector: '[data-testid="collapsed-sidebar-rail"]'
     kind: interactive
     optional: true       # only when sidebar collapsed
+  - id: expanded-sidebar-panel
+    selector: '[data-testid="expanded-sidebar-panel"]'
+    kind: display
+    optional: true
   - id: sidebar-tool-window-rail      # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
     selector: '[data-testid="sidebar-tool-window-rail"]'
     kind: display
@@ -42,6 +46,10 @@ controls:
   - id: sidebar-resize-handle
     selector: '[data-testid="main-sidebar-resize-handle"]'
     kind: display    # drag handle — meaningless to click; existence is the assertion
+  - id: sidebar-rail-menu-show-names
+    selector: '[data-testid="sidebar-rail-menu-show-names"]'
+    kind: interactive
+    optional: true
 -->
 
 - 顶部菜单栏 `MenuBar`（File/Edit/View/Sessions/Tools/Help）
@@ -51,6 +59,7 @@ controls:
 - 中间 Tab 栏 + 内容区
 - 底部状态栏 `StatusBar`（活跃连接数、当前应用主题、状态消息）
 - 侧边栏宽度通过 `react-resizable-panels` 持久化
+- Sessions/Tools 常驻图标按钮与 Code Workspace/SFTP 工具窗口共用名称显示设置和按钮样式；右键常驻按钮可切换名称，键盘 Enter/Space 可展开或收起。
 
 ### 1.3 自定义标题栏与窗口控制 ✅
 
@@ -62,6 +71,7 @@ components: [AppTitleBar, WindowControls, WindowResizeHandles, TitleBarTrayContr
 files:
   - src/components/tabbar/ControlBar.tsx
   - src/components/window/WindowDragHandle.tsx
+  - src/lib/windowDrag.ts
   - src/components/window/AppTitleBar.tsx
   - src/components/window/WindowControls.tsx
   - src/components/window/TitleBarTrayControls.tsx
@@ -81,7 +91,7 @@ controls:
     optional: true
   - id: window-drag-handle
     selector: '[data-testid="window-drag-handle"]'
-    kind: display    # dedicated native window-move target; presence is asserted in browser mode
+    kind: display    # full-height left grip; Linux native verifies actual OS displacement
   - id: titlebar-actions-more
     selector: '[data-testid="titlebar-actions-more"]'
     kind: interactive
@@ -1404,6 +1414,26 @@ controls:
   - id: session-tree-item       # individual row; pair with [data-session-name=...] / [data-session-type=...]
     selector: '[data-testid="session-tree-item"]'
     kind: interactive
+  - id: session-tree-folder
+    selector: '[data-testid="session-tree-folder"]'
+    kind: interactive
+  - id: context-move-to-folder
+    selector: '[data-testid="context-menu-item-move-to-folder"]'
+    kind: interactive
+    optional: true
+  - id: context-move-root
+    selector: '[data-testid="context-menu-item-user-sessions"]'
+    kind: interactive
+    optional: true
+  - id: context-move-destination
+    selector: '[data-testid^="context-menu-item-user-sessions-"]'
+    aliases: ['[data-testid="context-menu-item-user-sessions-qa-selection-target"]']
+    kind: interactive
+    optional: true
+  - id: drag-preview
+    selector: '[data-custom-drag-ghost="true"]'
+    kind: display
+    optional: true
   - id: session-search
     selector: '[data-testid="session-search"]'
     kind: interactive
@@ -2243,6 +2273,14 @@ controls:
   - id: remote-path-edit
     selector: '[data-testid="sftp-remote-path-edit"]'
     kind: interactive
+  - id: local-path-segments
+    selector: '[data-testid="sftp-local-path-segments"]'
+    kind: display
+    optional: true       # hidden while editing the address
+  - id: remote-path-segments
+    selector: '[data-testid="sftp-remote-path-segments"]'
+    kind: display
+    optional: true       # hidden while editing the address
   - id: local-path-suggestions
     selector: '[data-testid="sftp-local-path-suggestions"]'
     kind: display
@@ -2424,6 +2462,7 @@ controls:
 - chmod 对话框：Owner / Group / Other 三组权限位 + Apply
 - 地址栏：SFTP、本地 File 会话及对象存储的共享地址栏输入时自动下拉目录候选；Tab 补全唯一候选或公共前缀，↑↓ 选择，回车导航，鼠标选择保留输入焦点以继续补全。仅提供目录（含目录符号链接），支持空格、Unicode、相对路径、主目录缩写及本地 Windows 驱动器/UNC 路径；隐藏目录可用 `.` 前缀显式发现。异步查询不修改当前面板或历史，忽略失效请求，查询失败后可继续手动导航。
 - 补全覆盖：`TC-PATH-LOCAL-01` 与 `TC-PATH-SFTP-01` 均含 browser/native；原生验证实际本地文件系统与 SSH/SFTP 边界，browser 的本地 VFS 不作为原生证据。对象存储 provider 接线由 `FilePanelPathCompletion.test.tsx` 覆盖，在线对象存储服务未纳入此次托管场景。
+- 路径栏布局：仅路径段区域横向滚动，使用 4px 细滚动条；禁止纵向溢出，编辑按钮固定在右侧。`TC-PATH-LOCAL-02` 从 Welcome 打开文件浏览器，`TC-PATH-SFTP-02` 覆盖附加 SFTP 的远程与本地面板，两者均含 browser/native，检查短路径、长路径、编辑/取消、父目录点击和后退；原生截图与几何断言覆盖 Windows WebView2、Linux WebKitGTK、macOS WKWebView。
 - Windows OpenSSH：远程地址栏将复制的 `C:/…` 或 `C:\…` 绝对地址转换为服务端 `/C:/…` 命名空间，目录提示与导航均使用同一路径解析；远程地址断言与 shell 初始化分别使用 fixture 的 SFTP 路径与 shell 路径。
 - 跨面板拖拽（REMOTE↔LOCAL）：`customDnD` 指针驱动层 + `application/x-taomni-files` MIME，支持多选与文件夹
 - OS 文件拖入远程面板 → 直接上传到当前远程目录
@@ -4217,6 +4256,9 @@ controls:
 -->
 
 - 在 SessionTree 中按住 Ctrl / Meta 单击会话条目可累加选中
+- Shift 单击按可见树顺序选择连续范围；重复 Shift 单击保留起点，Ctrl / Meta + Shift 累加范围
+- 拖动已选中条目会批量移动整个选区，浮动提示显示会话数量；Escape 取消，树内拖拽不选择文字
+- 多选后右键 Move to folder 仍可批量移动，重新加载后保留全部会话归属
 - 选中状态通过 `data-selected` / `aria-selected` 属性暴露
 - 右键菜单首项变成 `Connect selected sessions (N)`，一次性把所有选中会话作为新 tab 打开
 - 右键菜单提供 `Set terminal theme...` 预览 flyout，可批量写入所选非 Mail 保存会话的 `terminalProfile.theme`

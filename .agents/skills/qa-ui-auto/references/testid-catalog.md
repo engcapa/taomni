@@ -1287,9 +1287,11 @@
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail
+- `[data-testid="expanded-sidebar-panel"]` — display [optional] — F1.2.expanded-sidebar-panel
 - `[data-testid="sidebar-tool-window-rail"]` — display [optional] — F1.2.sidebar-tool-window-rail
   ↳ `[data-testid="sidebar-rail"]` — alias
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
+- `[data-testid="sidebar-rail-menu-show-names"]` — interactive [optional] — F1.2.sidebar-rail-menu-show-names
 
 ## main/commands (F1.9)
 
@@ -1733,6 +1735,12 @@
 - `[data-testid="side-tab-sessions"]` — interactive — F6.2.side-tab-sessions
 - `[data-testid="session-tree"]` — display — F6.2.session-tree
 - `[data-testid="session-tree-item"]` — interactive — F6.2.session-tree-item
+- `[data-testid="session-tree-folder"]` — interactive — F6.2.session-tree-folder
+- `[data-testid="context-menu-item-move-to-folder"]` — interactive [optional] — F6.2.context-move-to-folder
+- `[data-testid="context-menu-item-user-sessions"]` — interactive [optional] — F6.2.context-move-root
+- `[data-testid^="context-menu-item-user-sessions-"]` — interactive [optional] — F6.2.context-move-destination
+  ↳ `[data-testid="context-menu-item-user-sessions-qa-selection-target"]` — alias
+- `[data-custom-drag-ghost="true"]` — display [optional] — F6.2.drag-preview
 - `[data-testid="session-search"]` — interactive — F6.2.session-search
 - `[data-testid="session-new"]` — interactive — F6.2.session-new
 - `[data-testid="session-edit"]` — interactive — F6.2.session-edit
@@ -2078,6 +2086,8 @@
   ↳ `input[data-testid="sftp-remote-path"]` — alias
 - `[data-testid="sftp-local-path-edit"]` — interactive — F7.5.local-path-edit
 - `[data-testid="sftp-remote-path-edit"]` — interactive — F7.5.remote-path-edit
+- `[data-testid="sftp-local-path-segments"]` — display [optional] — F7.5.local-path-segments
+- `[data-testid="sftp-remote-path-segments"]` — display [optional] — F7.5.remote-path-segments
 - `[data-testid="sftp-local-path-suggestions"]` — display [optional] — F7.5.local-path-suggestions
 - `[data-testid="sftp-remote-path-suggestions"]` — display [optional] — F7.5.remote-path-suggestions
 - `[data-testid="sftp-local-path-suggestions"] [role="option"]` — interactive [optional] — F7.5.local-path-option

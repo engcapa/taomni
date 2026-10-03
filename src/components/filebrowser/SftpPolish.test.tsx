@@ -448,21 +448,26 @@ describe("PathBreadcrumb Windows drives root", () => {
     expect(onSubmit).toHaveBeenCalledExactlyOnceWith("/etc");
   });
 
-  it("uses the compact horizontal scroller for a long path", () => {
+  it("retains segment navigation and edit cancellation for a long path", () => {
+    const onNavigate = vi.fn();
+    const onSubmit = vi.fn();
+    const path = "/home/me/projects/taomni/deeply/nested/directory";
     const { getByTestId, getByText } = render(
       <PathBreadcrumb
         testId="long-path"
-        path="/home/me/projects/taomni/deeply/nested/directory"
-        onNavigate={vi.fn()}
+        path={path}
+        onNavigate={onNavigate}
+        onSubmit={onSubmit}
       />,
     );
 
-    const breadcrumb = getByTestId("long-path");
-    expect(breadcrumb).toHaveClass(
-      "taomni-path-breadcrumb",
-      "overflow-x-auto",
-      "leading-none",
-    );
+    fireEvent.click(getByText("nested"));
+    expect(onNavigate).toHaveBeenCalledExactlyOnceWith("/home/me/projects/taomni/deeply/nested");
+    fireEvent.click(getByTestId("long-path-edit"));
+    expect(getByTestId("long-path")).toHaveValue(path);
+    expect(getByTestId("long-path")).toHaveFocus();
+    fireEvent.keyDown(getByTestId("long-path"), { key: "Escape" });
+    expect(onSubmit).not.toHaveBeenCalled();
     expect(getByText("directory")).toBeVisible();
   });
 

@@ -619,7 +619,7 @@ export function FilePanel({
         onToggleHidden={() => toggleHidden(sessionId, side)}
         onDetach={detachable ? onDetach : undefined}
       />
-      <div className="h-6 flex items-center gap-1 px-1 border-b shrink-0"
+      <div className="h-6 min-h-[24px] flex items-center gap-1 px-1 border-b shrink-0"
         style={{ borderColor: "var(--taomni-divider)" }}>
         {showDrivesPicker && (
           <DrivesPicker

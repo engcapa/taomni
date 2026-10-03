@@ -10,10 +10,55 @@ from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
+from qa_ui_auto.deadline import Deadline
 from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, selector_strategy
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_modified_click_holds_keys_through_pointer_up_and_releases_them_on_failure(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="row-1")
+        session.request = Mock(side_effect=[None, WebDriverError("input failed"), None])
+        with self.assertRaisesRegex(WebDriverError, "input failed"):
+            session.pointer_button_click("#row", 0, ["Control", "Shift"])
+        keys, pointer = session.request.call_args_list[1].args[2]["actions"]
+        self.assertEqual(pointer["id"], "mouse")
+        self.assertEqual(len(keys["actions"]), len(pointer["actions"]))
+        self.assertEqual(keys["actions"][:2], [{"type": "keyDown", "value": "\ue009"}, {"type": "keyDown", "value": "\ue008"}])
+        self.assertEqual(keys["actions"][-2:], [{"type": "keyUp", "value": "\ue008"}, {"type": "keyUp", "value": "\ue009"}])
+        self.assertEqual(pointer["actions"][3:5], [{"type": "pointerDown", "button": 0}, {"type": "pointerUp", "button": 0}])
+        self.assertEqual(session.request.call_args, call("DELETE", "/session/session-1/actions"))
+
+    def test_close_has_its_own_budget_after_case_or_diagnostics_timeout(self):
+        closed = Mock()
+        session = NativeSession("http://driver.invalid", Path("unused"), closed)
+        session.session_id = "expired-session"
+        session.deadline = Deadline(-1)
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = b'{"value": null}'
+        session._open = Mock(return_value=response)
+        session.close()
+        request = session._open.call_args.args[0]
+        self.assertEqual(request.method, "DELETE")
+        self.assertTrue(request.full_url.endswith("/session/expired-session"))
+        self.assertGreater(session._open.call_args.kwargs["timeout"], 0)
+        self.assertLessEqual(session._open.call_args.kwargs["timeout"], 5)
+        closed.assert_called_once_with()
+
+    def test_close_releases_transport_and_owner_without_a_session_id(self):
+        # POST /session can time out after the driver has spawned the app.
+        closed = Mock()
+        session = NativeSession("http://driver.invalid", Path("unused"), closed)
+        connection = Mock()
+        session._connection = connection
+        session.close()
+        session.close()
+        connection.close.assert_called_once_with()
+        closed.assert_called_once_with()
+
     def test_explicit_xpath_preserves_exact_candidate_text_matching(self):
         xpath = "//span[normalize-space(.)='String']"
         self.assertEqual(selector_strategy("xpath=" + xpath, interactive=True), ("xpath", xpath))
@@ -233,6 +278,7 @@ class NativeSessionTransportTest(TestCase):
     def test_failed_session_cleanup_preserves_original_error(self):
         harness = NativeHarness({"app": {}}, Path("/qa/run"))
         harness.driver = Mock()
+        harness.driver.mark_session_closed.side_effect = WebDriverError("could not stop owned tree")
         with patch("tauri_webdriver.NativeSession") as factory:
             session = factory.return_value
             session.start.side_effect = WebDriverError("session not created")
@@ -440,6 +486,7 @@ class NativeSessionPointerClickTest(TestCase):
         self.assertEqual(result, {"x": 50, "y": 35})
         action = session.request.call_args_list[1].args[2]["actions"][0]
         self.assertEqual(action["parameters"], {"pointerType": "mouse"})
+        self.assertEqual(action["id"], "mouse")
         self.assertEqual(action["actions"][0], {
             "type": "pointerMove",
             "duration": 100,
@@ -470,6 +517,7 @@ class NativeSessionPointerClickTest(TestCase):
         self.assertEqual(keyboard["actions"][0], {"type": "keyDown", "value": "\ue00a"})
         self.assertEqual(keyboard["actions"][-1], {"type": "keyUp", "value": "\ue00a"})
         self.assertEqual(pointer["parameters"], {"pointerType": "mouse"})
+        self.assertEqual(pointer["id"], "mouse")
         self.assertEqual(pointer["actions"][1]["x"], 30)
         self.assertEqual(pointer["actions"][3]["x"], 80)
         self.assertEqual(pointer["actions"][2]["type"], "pointerDown")

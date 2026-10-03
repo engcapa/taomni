@@ -1582,9 +1582,13 @@ impl RdpServer {
 
         let mut update_codecs = UpdateEncoderCodecs::new();
         let mut surface_flags = CmdFlags::empty();
+        let mut omit_bitmap_compression_header = false;
         for c in result.capabilities {
             match c {
                 CapabilitySet::General(c) => {
+                    omit_bitmap_compression_header = c
+                        .extra_flags
+                        .contains(GeneralExtraFlags::NO_BITMAP_COMPRESSION_HDR);
                     let fastpath = c
                         .extra_flags
                         .contains(GeneralExtraFlags::FASTPATH_OUTPUT_SUPPORTED);
@@ -1689,6 +1693,7 @@ impl RdpServer {
                 .then_some(result.client_compression)
                 .flatten(),
             self.opts.encoder_stats.clone(),
+            omit_bitmap_compression_header,
         )?;
 
         let state = self

@@ -12,10 +12,15 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-DIRECTORIES = ["project-alpha", "project-beta", "only space", "only space/child", ".hidden", "中文目录"]
+WIDE_DIRECTORY = "wide-" + "W" * 60
+OVERFLOW_RELATIVE = f"{WIDE_DIRECTORY}/{WIDE_DIRECTORY}"
+DIRECTORIES = ["project-alpha", "project-beta", "only space", "only space/child", ".hidden", "中文目录",
+               WIDE_DIRECTORY, OVERFLOW_RELATIVE]
 FILES = {"project.txt": "A file must never be offered as a navigation directory.\n",
          "project-beta/beta-marker.txt": "beta directory\n",
-         "only space/child/child-marker.txt": "nested directory\n"}
+         "only space/child/child-marker.txt": "nested directory\n",
+         f"{WIDE_DIRECTORY}/parent-marker.txt": "overflow parent\n",
+         f"{OVERFLOW_RELATIVE}/overflow-marker.txt": "overflow directory\n"}
 
 
 def setup(ctx: Any) -> None:
@@ -43,6 +48,9 @@ def setup(ctx: Any) -> None:
     else:
         raise RuntimeError(f"Unsupported path_completion mode: {mode}")
     ctx.values["path_completion_root"] = root
+    ctx.values["path_overflow_relative"] = OVERFLOW_RELATIVE
+    ctx.values["path_overflow_directory"] = WIDE_DIRECTORY
+    ctx.values["path_overflow_root"] = f"{root}/{OVERFLOW_RELATIVE}"
     case_dir = Path(ctx.case_dir)
     case_dir.mkdir(parents=True, exist_ok=True)
     (case_dir / "path-completion-fixture.json").write_text(

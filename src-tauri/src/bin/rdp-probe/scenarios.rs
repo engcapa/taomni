@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ironrdp::cliprdr::CliprdrClient;
 use ironrdp::cliprdr::pdu::{
@@ -265,11 +265,16 @@ async fn latency(args: &Args) -> ScenarioResult {
     }
 
     let mut samples = Vec::with_capacity(count);
+    let mut sample_events = Vec::with_capacity(count);
     let mut timeouts = 0usize;
     let mut transitions = Vec::new();
     let initial_pixel = session.pixel(sx, sy);
     for index in 0..warmup + count {
         let base = session.pixel(sx, sy).unwrap_or([0; 4]);
+        let sent_unix_us = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_micros())
+            .unwrap_or(0);
         let started = Instant::now();
         let sent = if mode == "click" {
             session.click(x as u16, y as u16).await
@@ -294,6 +299,15 @@ async fn latency(args: &Args) -> ScenarioResult {
         match observed {
             Some((ms, now)) if index >= warmup => {
                 samples.push(ms);
+                let observed_unix_us = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|duration| duration.as_micros())
+                    .unwrap_or(0);
+                sample_events.push(json!({
+                    "index": index,
+                    "sent_unix_us": sent_unix_us,
+                    "observed_unix_us": observed_unix_us,
+                }));
                 if transitions.len() < 4 {
                     transitions.push(json!({ "from": base, "to": now }));
                 }
@@ -318,6 +332,7 @@ async fn latency(args: &Args) -> ScenarioResult {
     let mut report = session.summary();
     report["latency_ms"] = stats::summary(&samples);
     report["samples_ms"] = json!(samples);
+    report["sample_events"] = json!(sample_events);
     report["timeouts"] = json!(timeouts);
     report["mode"] = json!(mode);
     report["target"] = json!({

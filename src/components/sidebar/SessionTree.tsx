@@ -105,7 +105,7 @@ import type { SessionTerminalAppearancePatch } from "../../lib/sessionTerminalTh
 const SESSION_DRAG_MIME = "taomni/session";
 
 interface SessionDragPayload {
-  sessionId: string;
+  sessionIds: string[];
 }
 
 interface SessionTreeProps {
@@ -134,7 +134,6 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     loadSessions,
     removeSessions,
     duplicateSessions,
-    moveSessionToGroup,
     moveSessionsToGroup,
     updateSessionsTerminalAppearance,
     createFolderPath,
@@ -142,6 +141,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     deleteFolderPath,
     importSessions,
     setSelectedSession,
+    setSelectedSessionIds,
     toggleSessionSelection,
     loading,
   } = useSessionStore();
@@ -175,6 +175,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     onConfirm: () => void;
   } | null>(null);
   const ctx = useContextMenu();
+  const rangeAnchorRef = useRef(selectedSessionId);
 
   useEffect(() => {
     loadSessions();
@@ -196,6 +197,23 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     () => new Set(selectedSessionIds),
     [selectedSessionIds],
   );
+  const visibleSessionIds = useMemo(() => {
+    const ids: string[] = [];
+    const visit = (node: FolderNode) => {
+      for (const folder of node.folders) {
+        if (searchQuery || expanded[folderKey(folder.path)]) visit(folder);
+      }
+      ids.push(...node.sessions.map((session) => session.id));
+    };
+    if (expanded.root !== false) visit(tree);
+    return ids;
+  }, [tree, expanded, searchQuery]);
+
+  useEffect(() => {
+    if (!rangeAnchorRef.current || !effectiveSelectedSessionIds.has(rangeAnchorRef.current)) {
+      rangeAnchorRef.current = selectedSessionId;
+    }
+  }, [effectiveSelectedSessionIds, selectedSessionId]);
 
   const toggle = (key: string) =>
     setExpanded((e) => ({ ...e, [key]: !e[key] }));
@@ -228,10 +246,10 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     return () => window.clearTimeout(timer);
   }, [selectedSessionId, sessions]);
 
-  const handleDrop = (groupPath: string | null, sessionId: string) => {
+  const handleDrop = (groupPath: string | null, sessionIds: string[]) => {
     setDragOverGroup(null);
-    if (!sessionId) return;
-    void moveSessionToGroup(sessionId, groupPath);
+    if (sessionIds.length === 0) return;
+    void moveSessionsToGroup(sessionIds, groupPath).catch(reportFileError);
     expandPath(groupPath);
   };
 
@@ -837,16 +855,48 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
   };
 
   const selectSingleSession = (session: SessionConfig) => {
+    rangeAnchorRef.current = session.id;
     setSelectedSession(session.id);
   };
 
   const handleSessionClick = (event: React.MouseEvent, session: SessionConfig) => {
+    if (event.shiftKey) {
+      event.preventDefault();
+      const anchorIndex = visibleSessionIds.indexOf(rangeAnchorRef.current ?? "");
+      const targetIndex = visibleSessionIds.indexOf(session.id);
+      if (anchorIndex >= 0 && targetIndex >= 0) {
+        const range = visibleSessionIds.slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1);
+        const ids = event.ctrlKey || event.metaKey ? [...selectedSessionIds, ...range] : range;
+        // Single-selection consumers and scrolling follow the clicked end of the range.
+        setSelectedSessionIds([...ids.filter((id) => id !== session.id), session.id]);
+        return;
+      }
+      selectSingleSession(session);
+      return;
+    }
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
+      rangeAnchorRef.current = session.id;
       toggleSessionSelection(session.id);
       return;
     }
     selectSingleSession(session);
+  };
+
+  const handleSessionPointerDown = (event: React.PointerEvent<HTMLDivElement>, session: SessionConfig) => {
+    if (event.button !== 0) return;
+    // Stop the WebView's text-selection gesture before our drag threshold is crossed.
+    event.preventDefault();
+    const sessionIds = effectiveSelectedSessionIds.has(session.id) ? selectedSessionIds : [session.id];
+    startCustomDrag({
+      event,
+      data: { mime: SESSION_DRAG_MIME, payload: { sessionIds } satisfies SessionDragPayload },
+      ghostText: sessionIds.length > 1 ? t("sessionTree.dragSelectedCount", { count: sessionIds.length }) : session.name,
+      onActivate: () => {
+        if (!effectiveSelectedSessionIds.has(session.id)) selectSingleSession(session);
+      },
+      onEnd: () => setDragOverGroup(null),
+    });
   };
 
   const mergeImportResults = (results: SessionImportResult[]): SessionImportResult =>
@@ -1514,6 +1564,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
       <div
         data-testid="session-tree"
         className="flex-1 taomni-scroll-y"
+        style={{ userSelect: "none", WebkitUserSelect: "none" }}
         onContextMenu={(event) => folderContextMenu(event, null)}
       >
         {ctx.render}
@@ -1523,7 +1574,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           open={expanded.root !== false}
           onToggle={() => toggle("root")}
           onContextMenu={(event) => folderContextMenu(event, null)}
-          onDropSession={(sessionId) => handleDrop(null, sessionId)}
+          onDropSession={(sessionIds) => handleDrop(null, sessionIds)}
           onDragOverFolder={() => handleDragOver(null)}
           onDragLeave={() => setDragOverGroup(null)}
           dragOver={dragOverGroup === "root"}
@@ -1541,6 +1592,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
             onDragOverFolder={handleDragOver}
             onDragLeave={() => setDragOverGroup(null)}
             onSessionClick={handleSessionClick}
+            onSessionPointerDown={handleSessionPointerDown}
             onConnectSession={onConnectSession}
           />
           {filteredSessions.length === 0 && !loading && (
@@ -1568,6 +1620,7 @@ function FolderContents({
   onDragOverFolder,
   onDragLeave,
   onSessionClick,
+  onSessionPointerDown,
   onConnectSession,
 }: {
   node: FolderNode;
@@ -1578,10 +1631,11 @@ function FolderContents({
   onToggle: (key: string) => void;
   onFolderContextMenu: (event: React.MouseEvent, path: string | null) => void;
   onSessionContextMenu: (event: React.MouseEvent, session: SessionConfig) => void;
-  onDropSession: (groupPath: string | null, sessionId: string) => void;
+  onDropSession: (groupPath: string | null, sessionIds: string[]) => void;
   onDragOverFolder: (groupPath: string | null) => void;
   onDragLeave: () => void;
   onSessionClick: (event: React.MouseEvent, session: SessionConfig) => void;
+  onSessionPointerDown: (event: React.PointerEvent<HTMLDivElement>, session: SessionConfig) => void;
   onConnectSession?: (session: SessionConfig) => void;
 }) {
   return (
@@ -1598,7 +1652,7 @@ function FolderContents({
             open={isOpen}
             onToggle={() => onToggle(key)}
             onContextMenu={(event) => onFolderContextMenu(event, folder.path)}
-            onDropSession={(sessionId) => onDropSession(folder.path, sessionId)}
+            onDropSession={(sessionIds) => onDropSession(folder.path, sessionIds)}
             onDragOverFolder={() => onDragOverFolder(folder.path)}
             onDragLeave={onDragLeave}
             dragOver={dragOverGroup === key}
@@ -1616,6 +1670,7 @@ function FolderContents({
               onDragOverFolder={onDragOverFolder}
               onDragLeave={onDragLeave}
               onSessionClick={onSessionClick}
+              onSessionPointerDown={onSessionPointerDown}
               onConnectSession={onConnectSession}
             />
           </TreeFolder>
@@ -1628,6 +1683,7 @@ function FolderContents({
           session={session}
           selected={selectedSessionIds.has(session.id)}
           onClick={(event) => onSessionClick(event, session)}
+          onPointerDown={(event) => onSessionPointerDown(event, session)}
           onDoubleClick={() => onConnectSession?.(session)}
           onContextMenu={(event) => onSessionContextMenu(event, session)}
         />
@@ -1654,7 +1710,7 @@ function TreeFolder({
   onToggle: () => void;
   children?: React.ReactNode;
   onContextMenu?: (event: React.MouseEvent) => void;
-  onDropSession?: (sessionId: string) => void;
+  onDropSession?: (sessionIds: string[]) => void;
   onDragOverFolder?: () => void;
   onDragLeave?: () => void;
   dragOver?: boolean;
@@ -1671,7 +1727,7 @@ function TreeFolder({
     onDragLeave: () => onDragLeave?.(),
     onDrop: (detail) => {
       const payload = detail.data.payload as SessionDragPayload | null;
-      if (payload?.sessionId) onDropSession?.(payload.sessionId);
+      if (payload?.sessionIds?.length) onDropSession?.(payload.sessionIds);
     },
   });
 
@@ -1680,6 +1736,8 @@ function TreeFolder({
       <div
         ref={headerRef}
         className="taomni-tree-row"
+        data-testid="session-tree-folder"
+        data-folder-path={node.path ?? ""}
         data-drag-over={dragOver}
         style={dragOver ? { background: "var(--taomni-selected)" } : undefined}
         onClick={onToggle}
@@ -1709,46 +1767,31 @@ function SessionItem({
   session,
   selected,
   onClick,
+  onPointerDown,
   onDoubleClick,
   onContextMenu,
 }: {
   session: SessionConfig;
   selected: boolean;
   onClick: (event: React.MouseEvent) => void;
+  onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
   const icon = sessionIcon(typeLabel);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    const el = ref.current;
-    if (!el) return;
-    startCustomDrag({
-      event: e,
-      data: {
-        mime: SESSION_DRAG_MIME,
-        payload: { sessionId: session.id } satisfies SessionDragPayload,
-      },
-      ghostText: session.name,
-      ghostElement: el,
-    });
-  };
-
   return (
     <div
-      ref={ref}
       data-testid="session-tree-item"
       data-session-id={session.id}
       data-session-name={session.name}
       data-session-type={typeLabel}
+      data-group-path={normalizeGroupPath(session.group_path) ?? ""}
       className="taomni-tree-row group"
       data-selected={selected}
       aria-selected={selected}
       style={selected ? { background: "var(--taomni-selected)" } : undefined}
-      onPointerDown={handlePointerDown}
+      onPointerDown={onPointerDown}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}

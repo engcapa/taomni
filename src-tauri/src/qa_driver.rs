@@ -484,6 +484,8 @@ async fn actions_script<R: Runtime>(
         {helper}
         const __qaActive = document.activeElement || document.body;
         const __qaModifiers = {{Control:false,Shift:false,Alt:false,Meta:false}};
+        {keyboard_script}
+        const __qaButtonKey = createQaButtonKeyboard();
         const __qaKey = (value) => ({{
           '\uE004':'Tab','\uE007':'Enter','\uE008':'Shift','\uE009':'Control',
           '\uE00A':'Alt','\uE00B':'Pause','\uE00C':'Escape','\uE00D':' ',
@@ -530,7 +532,6 @@ async fn actions_script<R: Runtime>(
           if (/^F([1-9]|1[0-2])$/.test(key)) return 111 + Number(key.slice(1));
           return 0;
         }};
-        {keyboard_script}
         const __qaEmitKey = (type, raw) => {{
           const key = __qaKey(raw);
           const domType = type === 'keyDown' ? 'keydown' : 'keyup';
@@ -549,6 +550,7 @@ async fn actions_script<R: Runtime>(
             }} catch (_) {{}}
           }}
           __qaActive.dispatchEvent(event);
+          __qaButtonKey(__qaActive, domType, key, event, __qaModifiers);
           if (domType === 'keydown') {{
             dispatchQaKeyDefault(__qaActive, key, event, __qaModifiers);
           }}
@@ -579,8 +581,8 @@ async fn actions_script<R: Runtime>(
         }}, __qaPoint);
         return true;"#,
         helper = lookup_helper(),
-        keyboard_script = include_str!("qa_driver_keyboard.js"),
-        pointer_script = include_str!("qa_driver_pointer.js")
+        pointer_script = include_str!("qa_driver_pointer.js"),
+        keyboard_script = include_str!("qa_driver_keyboard.js")
     ))
 }
 

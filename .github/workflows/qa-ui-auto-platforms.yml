@@ -113,7 +113,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_updater_fixture test_mouse_steps test_screenshot_scenarios test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -204,6 +204,27 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
           $driver >> $env:GITHUB_PATH
+          if ('${{ contains(matrix.capabilities, 'rdp') }}' -eq 'true') {
+            $dumpZip = Join-Path $env:RUNNER_TEMP 'qa-procdump.zip'
+            $dumpTools = Join-Path $env:RUNNER_TEMP 'qa-procdump'
+            Invoke-WebRequest 'https://download.sysinternals.com/files/Procdump.zip' -OutFile $dumpZip
+            Expand-Archive -LiteralPath $dumpZip -DestinationPath $dumpTools -Force
+            "QA_MSTSC_PROCDUMP=$(Join-Path $dumpTools 'procdump64.exe')" >> $env:GITHUB_ENV
+            $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe"
+            if (-not (Test-Path -LiteralPath $cdb)) {
+              # Microsoft's signed SDK bootstrapper, debugger feature only.
+              $sdkSetup = Join-Path $env:RUNNER_TEMP 'qa-debugger-setup.exe'
+              Invoke-WebRequest 'https://download.microsoft.com/download/f4b30f2a-4fc3-430e-9b03-c842b5f5f9f1/KIT_BUNDLE_WINDOWSSDK_MEDIACREATION/winsdksetup.exe' -OutFile $sdkSetup
+              if ((Get-FileHash -LiteralPath $sdkSetup -Algorithm SHA256).Hash -ne '6FA0FA27DB77A909F5ECB35183CB26A969A6775936780936FE239E4F9C66B458') { throw 'Unexpected debugger bootstrapper' }
+              $install = Start-Process -FilePath $sdkSetup -ArgumentList '/quiet /norestart /features OptionId.WindowsDesktopDebuggers' -Wait -PassThru -WindowStyle Hidden
+              if ($install.ExitCode -notin @(0,3010)) { throw "Debugger setup failed: $($install.ExitCode)" }
+            }
+            if (-not (Test-Path -LiteralPath $cdb)) { throw 'mstsc dump debugger unavailable' }
+            "QA_MSTSC_CDB=$cdb" >> $env:GITHUB_ENV
+            $gflags = Join-Path (Split-Path -Parent $cdb) 'gflags.exe'
+            if (-not (Test-Path -LiteralPath $gflags)) { throw 'mstsc heap verifier unavailable' }
+            "QA_MSTSC_GFLAGS=$gflags" >> $env:GITHUB_ENV
+          }
           choco install tesseract --yes --no-progress
           if ($LASTEXITCODE -ne 0) { throw 'Tesseract installation failed' }
           'C:\Program Files\Tesseract-OCR' >> $env:GITHUB_PATH
@@ -251,6 +272,19 @@ jobs:
         env:
           QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
         run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
+      - name: Windows mstsc startup diagnostic
+        if: runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        run: >-
+          python -m qa_ui_auto.rdp_helpers.mstsc
+          --preflight 'qa-ui-auto-report/${{ matrix.id }}/mstsc-startup'
+      - name: Retain the mstsc startup diagnostic before compiling
+        if: always() && runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-windows-mstsc-startup-${{ needs.plan.outputs.artifact_key }}
+          path: qa-ui-auto-report/${{ matrix.id }}/mstsc-startup/
+          if-no-files-found: error
+          retention-days: 14
       - name: RDP unit contracts on the native platform
         if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
         env:
@@ -265,9 +299,10 @@ jobs:
             if [[ "$RUNNER_OS" == "macOS" ]]; then bash scripts/bundle-krb5-macos.sh stage; fi
             cd src-tauri
             cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server --lib
-            cargo test --locked --release --lib servers::rdp::
-            cargo test --locked --release --lib rdp::session::tests
-            cargo test --locked --release --lib rdp::ws::tests
+            cargo test --locked --release -p ironrdp-server --lib profile_photo_encoder_costs -- --ignored --nocapture
+            # The substring filter includes both rdp::* and servers::rdp::*.
+            # One invocation covers all contracts without repeated root links.
+            cargo test --locked --release --lib rdp::
             cargo test --locked --release --bin rdp-probe
           ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/rdp-unit.log'
       - name: Run selected cases (Linux native desktop)

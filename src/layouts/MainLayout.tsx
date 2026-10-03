@@ -32,6 +32,7 @@ import { parseMailIdentities } from "../lib/mailIdentities";
 import { parseSpecialFolders } from "../lib/mailFolders";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
+import { WindowDragHandle } from "../components/window/WindowDragHandle";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
 import { ControlBar } from "../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
@@ -4134,10 +4135,11 @@ export function MainLayout() {
   return (
     <TabActionSlotProvider slot={tabActionSlot}>
     <div
-      className="relative w-full h-full flex flex-col"
+      className="taomni-main-window relative w-full h-full flex flex-col"
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
       {!isMac && <WindowResizeHandles />}
+      <WindowDragHandle />
       <div data-testid="app-titlebar" className="min-w-0">
         <ControlBar
           activeTabClosable={!!activeTab?.closable}
@@ -4194,7 +4196,7 @@ export function MainLayout() {
           mainRailHost,
         )}
         {sidebarCollapsed && (
-          <div data-testid="collapsed-sidebar-rail" className="h-full min-w-[30px] shrink-0 overflow-visible">
+          <div data-testid="collapsed-sidebar-rail" className="h-full shrink-0 overflow-visible">
             <Sidebar
               compact
               onNewSession={handleNewSession}
@@ -4225,6 +4227,10 @@ export function MainLayout() {
             maxSize="40%"
             collapsible
             collapsedSize={0}
+            // The panel's default scroll container can pan the fixed rail when
+            // a focused/selected session is scrolled into view. Its children
+            // own their scrolling; this frame must keep the rail in place.
+            style={{ overflow: "clip" }}
             onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
               const percentage = size.asPercentage;
               if (percentage > 2) {
@@ -4237,7 +4243,7 @@ export function MainLayout() {
               setSidebarCollapsed(percentage <= 2);
             }}
           >
-            <div className="h-full overflow-hidden" style={sidebarCollapsed ? { display: "none" } : undefined}>
+            <div data-testid="expanded-sidebar-panel" className="h-full overflow-clip" style={sidebarCollapsed ? { display: "none" } : undefined}>
               <Sidebar
                 onNewSession={handleNewSession}
                 onNewSftpSession={handleNewSftpSession}

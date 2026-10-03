@@ -1,0 +1,310 @@
+id: TC-SESSION-TREE-01
+title: Session tree Ctrl/Shift ranges and context-menu batch move persist
+description: Creates four saved local-shell sessions through the editor, tests toggle/reverse/shrinking/additive ranges
+  and ordinary single selection, then moves the batch through the retained context menu and reopens the app. No shell
+  is started.
+covers:
+- F6.2
+- F-Sidebar-1
+- F6.3
+- F-FolderName-1
+tags:
+- sessions
+- multi-select
+- drag
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-selection-a
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-selection-b
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-b"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-selection-c
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-selection-d
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-selection-d"]'
+- right_click: '[data-testid="session-tree-folder"][data-folder-path=""]'
+- click: '[data-testid="context-menu-item-new-folder"]'
+- wait_for: '[data-testid="folder-name-dialog"]'
+- fill:
+    selector: '[data-testid="folder-name-dialog-input"]'
+    value: qa-selection-target
+- click: '[data-testid="folder-name-dialog-confirm"]'
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    modifiers:
+    - Mod
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+    - qa-selection-c
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    modifiers:
+    - Mod
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    modifiers:
+    - Mod
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+    modifiers:
+    - Shift
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+    - qa-selection-b
+    - qa-selection-c
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-b"]'
+    modifiers:
+    - Shift
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-b
+    - qa-selection-c
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-d"]'
+    modifiers:
+    - Mod
+    - Shift
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-b
+    - qa-selection-c
+    - qa-selection-d
+- click: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-d"]'
+    modifiers:
+    - Shift
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+    - qa-selection-b
+    - qa-selection-c
+    - qa-selection-d
+- right_click: '[data-testid="session-tree-item"][data-selected="true"][data-session-name="qa-selection-b"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-a
+    - qa-selection-b
+    - qa-selection-c
+    - qa-selection-d
+- assert_menu_items:
+  - Connect selected sessions (4)
+  - Move to folder
+- hover: '[data-testid="context-menu-item-move-to-folder"]'
+- click: '[data-testid="context-menu-item-user-sessions-qa-selection-target"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"], [data-testid="session-tree-item"][data-session-name="qa-selection-b"],
+      [data-testid="session-tree-item"][data-session-name="qa-selection-c"], [data-testid="session-tree-item"][data-session-name="qa-selection-d"]'
+    attribute: data-group-path
+    equals:
+    - qa-selection-target
+    - qa-selection-target
+    - qa-selection-target
+    - qa-selection-target
+- reload: null
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"], [data-testid="session-tree-item"][data-session-name="qa-selection-b"],
+      [data-testid="session-tree-item"][data-session-name="qa-selection-c"], [data-testid="session-tree-item"][data-session-name="qa-selection-d"]'
+    attribute: data-group-path
+    equals:
+    - qa-selection-target
+    - qa-selection-target
+    - qa-selection-target
+    - qa-selection-target
+- right_click: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
+    attribute: data-session-name
+    equals:
+    - qa-selection-c
+- hover: '[data-testid="context-menu-item-move-to-folder"]'
+- click: '[data-testid="context-menu-item-user-sessions"]'
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-c"]'
+    attribute: data-group-path
+    equals:
+    - ''
+- assert_items:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-selection-a"], [data-testid="session-tree-item"][data-session-name="qa-selection-b"],
+      [data-testid="session-tree-item"][data-session-name="qa-selection-d"]'
+    attribute: data-group-path
+    equals:
+    - qa-selection-target
+    - qa-selection-target
+    - qa-selection-target
+- screenshot: session-selection-move.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Ctrl/Meta toggles individual sessions; Shift selects the visible range and retains the original anchor;
+      Mod+Shift adds a range and ordinary click returns to single selection.
+    actions:
+    - 41
+    - 42
+    - 44
+    - 46
+    - 47
+    - 49
+    - 51
+    - 53
+    - 55
+    checkpoints:
+    - step: 43
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n    selector:\
+        \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 45
+      expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-a], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
+    - step: 48
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-b,\n      qa-selection-c],\
+        \ selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 50
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-b, qa-selection-c],\n    selector:\
+        \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 52
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-b, qa-selection-c,\n      qa-selection-d],\
+        \ selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 54
+      expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-a], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
+    - step: 56
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-b,\n      qa-selection-c,\
+        \ qa-selection-d], selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    results:
+    - 43
+    - 45
+    - 48
+    - 50
+    - 52
+    - 54
+    - 56
+  - id: R2
+    requirement: Right-click on a selected row preserves all four selected sessions; Move to folder moves exactly the
+      batch and reload reads their saved group paths.
+    actions:
+    - 57
+    - 60
+    - 61
+    - 63
+    - 65
+    checkpoints:
+    - step: 58
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-b,\n      qa-selection-c,\
+        \ qa-selection-d], selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 59
+      expectation: The context menu shows Connect selected sessions (4) and Move to folder.
+    - step: 62
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
+        \      qa-selection-target, qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"\
+        qa-selection-a\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"\
+        session-tree-item\"][data-session-name=\"qa-selection-c\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"\
+        qa-selection-d\"]'}}"
+    - step: 66
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
+        \      qa-selection-target, qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"\
+        qa-selection-a\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"\
+        session-tree-item\"][data-session-name=\"qa-selection-c\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"\
+        qa-selection-d\"]'}}"
+    results:
+    - 58
+    - 59
+    - 62
+    - 66
+  - id: R3
+    requirement: Right-click outside the selection narrows to one session; moving it to the root retains the other three
+      saved group paths.
+    actions:
+    - 67
+    - 69
+    - 70
+    checkpoints:
+    - step: 68
+      expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-c], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
+    - step: 71
+      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-c"]''}}'
+    - step: 72
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
+        \      qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"\
+        ],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
+        ][data-session-name=\"qa-selection-d\"]'}}"
+    results:
+    - 68
+    - 71
+    - 72
+  visual:
+  - check: Tree hierarchy and all selected rows remain visible.
+    method: manual
+    reason: Inspect the retained screenshots; functional assertions alone do not establish visual clarity.
+  native:
+  - check: Packaged WebView modifier clicks and real session persistence after reload.
+    method: automated
+    reason: Native uses the isolated QA app and real IPC/database. Browser uses stubs. macOS uses packaged WebView event
+      input for selection; held-pointer drag is not supported by its stateless bridge.

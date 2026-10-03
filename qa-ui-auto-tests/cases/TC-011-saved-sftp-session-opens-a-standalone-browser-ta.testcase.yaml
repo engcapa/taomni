@@ -1,9 +1,9 @@
 id: TC-011
-title: Saved SFTP session opens a standalone browser tab
+title: Saved SFTP session opens a standalone tab with an unclipped permanent rail
 covers:
 - F7.4
+- F1.3
 tags:
-- legacy-imported
 - p0
 - session
 - sftp
@@ -29,8 +29,8 @@ steps:
 - fill:
     selector: '[data-testid="session-port"]'
     value: ${cfg.sftp.port}
-- send_text_via_label:
-    label_contains: Specify username
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
     checked: true
 - wait: 1
 - fill:
@@ -52,7 +52,7 @@ steps:
 - wait_for: '[data-testid="sftp-browser"]'
 - assert_visible: '[data-testid="sftp-remote-pane"]'
 - assert_visible: '[data-testid="sftp-local-pane"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - fill:
     selector: '[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}
@@ -61,11 +61,27 @@ steps:
 - assert_visible: '[data-testid="sftp-remote-pane"] >> text="REMOTE"'
 - assert_visible: '[data-testid="sftp-local-pane"] >> text="LOCAL"'
 - assert_visible: '[data-testid="sftp-transfer-queue"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: 'input[data-testid="sftp-remote-path"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
     equals: ${fixture.sftp_sync_test_dir}
+- assert_element_geometry:
+    selector: '[data-testid="expanded-sidebar-panel"] button[data-tool-window-id]'
+    min_count: 2
+    min_width: 32
+    min_height: 32
+    same_width: true
+    icon_size: 16
+- eval_readonly:
+    expression: >-
+      document.querySelector('#sidebar button[data-tool-window-id]:first-child').getBoundingClientRect().left>=document.querySelector('[data-window-drag]').getBoundingClientRect().right&&document.querySelector('#sidebar button[data-tool-window-id]:first-child').getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().right
+    expect_truthy: true
+- eval_readonly:
+    expression: >-
+      document.querySelector('#sidebar button[data-tool-window-id]:last-child').getBoundingClientRect().left>=document.querySelector('[data-window-drag]').getBoundingClientRect().right&&document.querySelector('#sidebar button[data-tool-window-id]:last-child').getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().right
+    expect_truthy: true
 - screenshot: 011-standalone-sftp-session.png
 verification:
   review: reviewed
@@ -116,10 +132,28 @@ verification:
     - step: 30
       expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
     - step: 32
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 33
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
         "${fixture.sftp_sync_test_dir}"}}'
     results:
-    - 32
+    - 33
+  - id: R2
+    requirement: 打开和认证独立 SFTP 后，展开侧栏的 Sessions/Tools 保持相同尺寸且完整落在侧栏可视范围内，不因分栏或滚动到选中会话而裁切。
+    actions:
+    - 19
+    - 20
+    checkpoints:
+    - step: 34
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"] button[data-tool-window-id]", "min_count": 2, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
+    - step: 35
+      expectation: 'Sessions 按钮完整落在全高拖拽带右侧和侧栏右边界之间，没有水平裁切。'
+    - step: 36
+      expectation: 'Tools 按钮完整落在全高拖拽带右侧和侧栏右边界之间，没有水平裁切。'
+    results:
+    - 34
+    - 35
+    - 36
   visual:
   - check: 独立标签和双栏目录显示清晰。
     method: manual

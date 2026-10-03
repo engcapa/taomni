@@ -114,7 +114,6 @@ export function startCustomDrag(opts: StartOpts): void {
       document.body.appendChild(drag.ghost);
       positionGhost(drag, clientX, clientY);
     }
-    suppressNextClick();
     opts.onActivate?.();
     return true;
   };
@@ -135,6 +134,8 @@ export function startCustomDrag(opts: StartOpts): void {
   const finish = (clientX: number, clientY: number, dropped: boolean) => {
     if (!active || active !== drag) return;
     if (drag.activated) {
+      // The compatibility click follows pointerup, potentially long after activation.
+      suppressNextClick(!dropped);
       const target = pointerTarget(clientX, clientY, drag.ghost);
       emit({
         phase: dropped ? "drop" : "cancel",
@@ -253,14 +254,33 @@ function positionGhost(drag: ActiveDrag, x: number, y: number) {
 
 // HTML5 drag suppresses the click that would otherwise fire on pointerup.
 // Mirror that so callers don't see a stray select / activate after a drop.
-function suppressNextClick() {
+function suppressNextClick(waitForPointerUp: boolean) {
+  let timer: number | undefined;
+  const cleanup = () => {
+    window.removeEventListener("click", onClick, true);
+    window.removeEventListener("pointerup", onPointerUp, true);
+    window.removeEventListener("pointerdown", cleanup, true);
+    window.removeEventListener("blur", cleanup, true);
+    window.clearTimeout(timer);
+  };
   const onClick = (ev: Event) => {
     ev.stopPropagation();
     ev.preventDefault();
-    window.removeEventListener("click", onClick, true);
+    cleanup();
+  };
+  const onPointerUp = () => {
+    timer = window.setTimeout(cleanup, 0);
   };
   window.addEventListener("click", onClick, true);
-  window.setTimeout(() => window.removeEventListener("click", onClick, true), 0);
+  // Escape can end a drag while its button is still down. Keep suppressing
+  // that gesture's click until release, without swallowing a new gesture.
+  if (waitForPointerUp) {
+    window.addEventListener("pointerup", onPointerUp, true);
+    window.addEventListener("pointerdown", cleanup, true);
+    window.addEventListener("blur", cleanup, true);
+  } else {
+    timer = window.setTimeout(cleanup, 0);
+  }
 }
 
 export interface CustomDropHandlers {
