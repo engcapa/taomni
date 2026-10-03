@@ -628,7 +628,12 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
 
     const localPos = (e: { clientX: number; clientY: number }): Point => {
       const r = wrapRef.current?.getBoundingClientRect();
-      return { x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0) };
+      // A document preview scales the whole canvas while keeping its shapes in
+      // original-image coordinates. Include that scale and the scroll offset.
+      return {
+        x: (e.clientX - (r?.left ?? 0)) * (r?.width ? imageWidth / r.width : 1),
+        y: (e.clientY - (r?.top ?? 0)) * (r?.height ? imageHeight / r.height : 1),
+      };
     };
 
     /** Keep a drag point inside the selection so shapes stay visible. */

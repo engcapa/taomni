@@ -883,6 +883,72 @@ pub async fn screenshot_qa_record(
     ))
 }
 
+/// macOS regression guard: recording must use CoreGraphics one-shot snapshots
+/// and never construct the display stream that can destabilize WindowServer.
+#[tauri::command]
+pub async fn screenshot_qa_macos_capture_source(
+    app: AppHandle,
+    format: String,
+) -> Result<String, String> {
+    ensure_qa(&app)?;
+    #[cfg(not(all(debug_assertions, target_os = "macos")))]
+    {
+        let _ = format;
+        return Err("macOS capture source scenario requires macOS".into());
+    }
+    #[cfg(all(debug_assertions, target_os = "macos"))]
+    {
+        let _cleanup = ScenarioCleanup(app.clone());
+        let format = super::record::RecordFormat::parse(&format).map_err(|e| format!("{e:#}"))?;
+        let (window, display, region) = open_fixture(&app, "anim")
+            .await
+            .map_err(|e| format!("{e:#}"))?;
+        let source_before = capture::qa_source_counts();
+        let worker = app.clone();
+        let id = tokio::task::spawn_blocking(move || {
+            super::record::start_recording(&worker, display, Some(region), format, Some(10))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("{e:#}"))?;
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        let info = tokio::task::spawn_blocking(move || super::record::stop_recording(&id))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| format!("{e:#}"))?;
+        let source = read_source(&window).await.map_err(|e| format!("{e:#}"))?;
+        close_fixture(&app);
+        let source_after = capture::qa_source_counts();
+        let stream_opens = source_after.0.saturating_sub(source_before.0);
+        let snapshot_reads = source_after.1.saturating_sub(source_before.1);
+        let ext = if format == super::record::RecordFormat::Gif {
+            "gif"
+        } else {
+            "mp4"
+        };
+        let artifact = keep_artifact(&info.path, &format!("macos-coregraphics.{ext}"));
+        let (clip, content) =
+            compare_record_original(&info.path, &source).map_err(|e| format!("{e:#}"))?;
+        let ok = stream_opens == 0
+            && snapshot_reads >= 2
+            && clip.frames >= 2
+            && clip.distinct_frames >= 2
+            && content["passed"] == json!(true)
+            && artifact.is_some();
+        Ok(report(
+            ok,
+            json!({
+                "format": ext,
+                "streamOpens": stream_opens,
+                "snapshotReads": snapshot_reads,
+                "clip": clip,
+                "originalComparison": content,
+                "artifact": artifact,
+            }),
+        ))
+    }
+}
+
 /// The full overlay flow as a user does it: open (hides app windows), the
 /// captured background loads, drag a region, draw a red rectangle, copy.
 /// Verified from outside: the overlay closed, the main window is back, and
@@ -994,16 +1060,22 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
                     p[0] > 200 && p[1] < 130 && p[2] < 130
                 })
                 .count();
-            let green_lines: Vec<usize> = [70.0, 98.8].iter().map(|top| {
-                let y0 = (top * sy).floor() as u32;
-                let y1 = ((top + 24.0) * sy).ceil() as u32;
-                ((y0)..y1.min(image.height())).flat_map(|y| {
-                    ((70.0 * sx) as u32..(150.0 * sx) as u32).map(move |x| (x, y))
-                }).filter(|&(x, y)| {
-                    let p = image.get_pixel(x.min(image.width() - 1), y);
-                    p[1] > 150 && p[0] < 140 && p[2] < 100
-                }).count()
-            }).collect();
+            let green_lines: Vec<usize> = [70.0, 98.8]
+                .iter()
+                .map(|top| {
+                    let y0 = (top * sy).floor() as u32;
+                    let y1 = ((top + 24.0) * sy).ceil() as u32;
+                    ((y0)..y1.min(image.height()))
+                        .flat_map(|y| {
+                            ((70.0 * sx) as u32..(150.0 * sx) as u32).map(move |x| (x, y))
+                        })
+                        .filter(|&(x, y)| {
+                            let p = image.get_pixel(x.min(image.width() - 1), y);
+                            p[1] > 150 && p[0] < 140 && p[2] < 100
+                        })
+                        .count()
+                })
+                .collect();
             (
                 image.width() as i64,
                 image.height() as i64,
@@ -1175,6 +1247,7 @@ async fn begin_scroll_ui(
     display: &DisplayInfo,
     region: (u32, u32, u32, u32),
     annotate: bool,
+    start: bool,
 ) -> Result<WebviewWindow, String> {
     super::open_overlay(app, Some(display.id.clone())).await?;
     let overlay = wait_window(app, super::OVERLAY_LABEL, Duration::from_secs(10))
@@ -1202,18 +1275,103 @@ async fn begin_scroll_ui(
       }}
       q('screenshot-scroll-capture').click(); await sleep(100);
       if (!q('screenshot-scroll-instructions')?.textContent) throw new Error('scroll instructions missing');
-      q('screenshot-scroll-start').click(); return true;
+      if ({start}) q('screenshot-scroll-start').click();
+      return true;
     "#,
         x = region.0,
         y = region.1,
         w = region.2,
         h = region.3,
-        annotate = annotate
+        annotate = annotate,
+        start = start
     );
     run_js(&overlay, &script, Duration::from_secs(20))
         .await
         .map_err(|e| e.to_string())?;
     Ok(overlay)
+}
+
+/// macOS permission regression: a denied Accessibility check must leave the
+/// selected image and annotations visible while presenting a persistent,
+/// closeable error instead of hiding the overlay or retrying in a loop.
+#[tauri::command]
+pub async fn screenshot_qa_scroll_permission_error(app: AppHandle) -> Result<String, String> {
+    ensure_qa(&app)?;
+    #[cfg(not(all(debug_assertions, target_os = "macos")))]
+    {
+        return Err("macOS permission scenario requires macOS".into());
+    }
+    #[cfg(all(debug_assertions, target_os = "macos"))]
+    {
+        let _cleanup = ScenarioCleanup(app.clone());
+        let mut attempts = Vec::new();
+        for escape in [false, true] {
+            super::close_session(&app);
+            let (_fixture, display, region) = open_fixture(&app, "scroll")
+                .await
+                .map_err(|e| format!("{e:#}"))?;
+            let _denial =
+                super::scroll::QaPermissionDenial::new(&app).map_err(|e| format!("{e:#}"))?;
+            let overlay = begin_scroll_ui(&app, &display, region, true, false).await?;
+            let result = run_js(
+            &overlay,
+            r#"
+              const q = (id) => document.querySelector('[data-testid="' + id + '"]');
+              const before = q('screenshot-selection').getBoundingClientRect().toJSON();
+              q('screenshot-scroll-start').click();
+              for (let i = 0; i < 100 && !q('screenshot-scroll-error'); i++) await new Promise(r => setTimeout(r, 100));
+              await new Promise(r => setTimeout(r, 3500));
+              const error = q('screenshot-scroll-error');
+              if (!error) throw new Error('scroll permission error did not remain visible');
+              const text = error.textContent || '';
+              const annotation = q('screenshot-annotation-canvas');
+              const selection = q('screenshot-selection');
+              const after = selection?.getBoundingClientRect().toJSON();
+              const preserved = !!after && ['x','y','width','height'].every(k => after[k] === before[k]) && annotation?.dataset.shapes === '1';
+              return { text, accessibility: /Accessibility|Privacy & Security/.test(text), preserved, before, after };
+            "#,
+            Duration::from_secs(20),
+        )
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+            let overlay_visible = overlay.is_visible().unwrap_or(false);
+            let no_controls = app
+                .get_webview_window(super::surfaces::SCROLL_LABEL)
+                .is_none()
+                && super::screenshot_scroll_status().await?.is_none();
+            let worker = app.clone();
+            let captured =
+                tokio::task::spawn_blocking(move || capture::capture_display(&worker, &display))
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .map_err(|e| e.to_string())?;
+            let artifact = keep_image(&captured, "macos-scroll-permission-error.png");
+            if escape {
+                overlay.eval("window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true}))")
+                .map_err(|e| e.to_string())?;
+            } else {
+                overlay.eval("document.querySelector('[data-testid=\"screenshot-scroll-error-close\"]').click()")
+            .map_err(|e| e.to_string())?;
+            }
+            let closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
+            let accessibility = result["accessibility"] == json!(true);
+            let preserved = result["preserved"] == json!(true);
+            let ok = accessibility
+                && preserved
+                && overlay_visible
+                && no_controls
+                && closed
+                && artifact.is_some();
+            attempts.push(
+                json!({ "passed": ok, "escape": escape, "error": result, "closed": closed,
+            "overlayVisible": overlay_visible, "noControls": no_controls, "artifact": artifact }),
+            );
+        }
+        Ok(report(
+            attempts.iter().all(|a| a["passed"] == json!(true)),
+            json!({"attempts": attempts}),
+        ))
+    }
 }
 
 /// Real entry/window lifecycle plus stop/cancel of the production scroll UI.
@@ -1251,7 +1409,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?;
     let source = read_source(&fixture).await.map_err(|e| e.to_string())?;
-    let overlay = begin_scroll_ui(&app, &display, region, false).await?;
+    let overlay = begin_scroll_ui(&app, &display, region, false, true).await?;
     let bar = wait_window(&app, super::surfaces::SCROLL_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| e.to_string())?;
@@ -1274,7 +1432,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         r#"
       for (let i = 0; i < 100; i++) {
         const status = await window.__TAURI_INTERNALS__.invoke('screenshot_scroll_status');
-        if (status?.frames >= 2) return status;
+        if (status?.frames >= 4) return status;
         await new Promise(r => setTimeout(r, 100));
       }
       throw new Error('scroll did not capture a second frame');
@@ -1302,16 +1460,36 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
       if (Math.abs(r.width / r.height - image.naturalWidth / image.naturalHeight) > 0.005
         || r.width > image.naturalWidth + 1 || r.height > container.height || r.left < 0 || r.right > innerWidth)
         throw new Error('scroll preview stretched or clipped');
-      if (q('screenshot-hint') || q('screenshot-toolbar')) throw new Error('unexpected selection instructions');
+      if (q('screenshot-hint') || !q('screenshot-toolbar')) throw new Error('direct annotation toolbar unavailable');
       q('screenshot-scroll-actual').click(); await sleep(100);
       const actual = image.getBoundingClientRect();
       if (Math.abs(actual.width-image.naturalWidth)>1 || Math.abs(actual.height-image.naturalHeight)>1)
         throw new Error('original size is not 100%');
       q('screenshot-scroll-fit').click(); await sleep(100);
-      q('screenshot-scroll-result-edit').click(); await sleep(100);
-      if (!q('screenshot-toolbar') || q('screenshot-overlay')?.dataset.phase !== 'annotate') throw new Error('annotation unavailable');
-      const base = q('screenshot-base-image').getBoundingClientRect();
-      if (Math.abs(base.width/base.height-image.naturalWidth/image.naturalHeight)>0.005) throw new Error('annotation image distorted');
+      const fire = (el,type,x,y) => el.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,clientX:x,clientY:y}));
+      const draw = async (x,y,w,h) => {
+        const layer = q('screenshot-annotation-layer'), r = layer.getBoundingClientRect();
+        const sx = r.width/image.naturalWidth, sy = r.height/image.naturalHeight;
+        fire(layer,'mousedown',r.left+x*sx,r.top+y*sy); await sleep(50);
+        fire(layer,'mousemove',r.left+(x+w)*sx,r.top+(y+h)*sy); await sleep(50);
+        fire(window,'mouseup',r.left+(x+w)*sx,r.top+(y+h)*sy); await sleep(100);
+      };
+      q('screenshot-tool-rect').click(); await sleep(100);
+      q('screenshot-color-red').click(); await sleep(50);
+      await draw(40,80,100,70);
+      if(q('screenshot-annotation-canvas').dataset.shapes!=='1') throw new Error('fit annotation missing');
+      q('screenshot-scroll-actual').click(); await sleep(100);
+      q('screenshot-undo').click(); await sleep(100);
+      if(q('screenshot-annotation-canvas').dataset.shapes!=='0') throw new Error('undo lost after zoom');
+      q('screenshot-redo').click(); await sleep(100);
+      const viewport = q('screenshot-scroll-result-viewport');
+      viewport.scrollTop = viewport.scrollHeight; await sleep(100);
+      if(viewport.scrollTop<=0) throw new Error('long preview did not scroll');
+      q('screenshot-color-green').click(); await sleep(50);
+      await draw(40,image.naturalHeight-100,100,60);
+      q('screenshot-scroll-fit').click(); await sleep(100);
+      if(q('screenshot-annotation-canvas').dataset.shapes!=='2') throw new Error('scrolled annotation missing');
+      if(viewport.scrollTop!==0) throw new Error('fit did not reset preview scroll');
       return true;
     "#, Duration::from_secs(25)).await.map_err(|e| e.to_string())?;
     let result = super::screenshot_overlay_init().await?;
@@ -1334,13 +1512,32 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         &qa_oracle::difference(&output, &expected),
         "scroll-stop-difference.png",
     );
-    super::close_session(&app);
-    wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(5)).await;
+    overlay
+        .eval("document.querySelector('[data-testid=\"screenshot-scroll-result-copy\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let done_closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
+    let clipboard = read_clipboard_image(&app).map_err(|e| e.to_string())?;
+    let annotated_artifact = keep_image(&clipboard, "scroll-annotated-clipboard.png");
+    let mut red = 0;
+    let mut green = 0;
+    if clipboard.dimensions() == output.dimensions() {
+        for x in 45..135 {
+            let a = clipboard.get_pixel(x, 80);
+            red += usize::from(a[0] > 220 && a[1] < 120 && a[2] < 120);
+            let b = clipboard.get_pixel(x, output.height() - 100);
+            green += usize::from(b[0] < 120 && b[1] > 160 && b[2] < 100);
+        }
+    }
+    let marked_clipboard = done_closed
+        && clipboard.dimensions() == output.dimensions()
+        && red >= 85
+        && green >= 85
+        && annotated_artifact.is_some();
 
     let (_fixture, display, region) = open_fixture(&app, "scroll")
         .await
         .map_err(|e| e.to_string())?;
-    let overlay = begin_scroll_ui(&app, &display, region, true).await?;
+    let overlay = begin_scroll_ui(&app, &display, region, true, true).await?;
     let bar = wait_window(&app, super::surfaces::SCROLL_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| e.to_string())?;
@@ -1369,6 +1566,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             && current_region.is_some()
             && default_hidden
             && completed == json!(true)
+            && marked_clipboard
             && output.height() > region.3
             && comparison.passed
             && geometry["controlsOutside"] == json!(true)
@@ -1379,6 +1577,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             && artifact.is_some(),
         json!({"currentWindowVisible":current_visible,"currentWindowSelected":selected,"currentRegion":current_region,
             "defaultHidesWindows":default_hidden,"scrollCompleted":completed,"scrollProgress":progress,"geometry":geometry,"comparison":comparison,
+            "markedClipboard":marked_clipboard,"redLinePixels":red,"greenLinePixels":green,"annotatedArtifact":annotated_artifact,
             "scrollCancelledPreservesAnnotations":cancelled,"controlsCleaned":cleanup,"artifact":artifact,
             "originalArtifact":original_artifact,"differenceArtifact":difference,"windowArtifact":window_artifact}),
     ))

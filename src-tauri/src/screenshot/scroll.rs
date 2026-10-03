@@ -196,9 +196,45 @@ struct Wheel {
     enigo: enigo::Enigo,
 }
 
+/// A denial-only fault at the permission boundary, scoped to an isolated QA scenario.
+/// Never grants permissions or modifies the host TCC database.
+#[cfg(all(debug_assertions, target_os = "macos"))]
+static QA_DENY_CONTROL: AtomicBool = AtomicBool::new(false);
+
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub(super) struct QaPermissionDenial;
+
+#[cfg(all(debug_assertions, target_os = "macos"))]
+impl QaPermissionDenial {
+    pub(super) fn new(app: &tauri::AppHandle) -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            app.config().identifier == crate::QA_APP_ID,
+            "permission fault requires isolated QA app"
+        );
+        QA_DENY_CONTROL.store(true, Ordering::SeqCst);
+        Ok(Self)
+    }
+}
+
+#[cfg(all(debug_assertions, target_os = "macos"))]
+impl Drop for QaPermissionDenial {
+    fn drop(&mut self) {
+        QA_DENY_CONTROL.store(false, Ordering::SeqCst);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn control_permission_granted() -> bool {
+    #[cfg(debug_assertions)]
+    if QA_DENY_CONTROL.load(Ordering::SeqCst) {
+        return false;
+    }
+    crate::servers::rdp::control_permission_granted()
+}
+
 pub(super) fn ensure_control_permission() -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
-    if !crate::servers::rdp::control_permission_granted() {
+    if !control_permission_granted() {
         anyhow::bail!(
             "Scrolling capture requires macOS Accessibility permission. Press Esc to leave the screenshot overlay, then open System Settings > Privacy & Security > Accessibility and enable Taomni. If launched from Terminal, enable Terminal instead (or the terminal app named by macOS); use + to add /System/Applications/Utilities/Terminal.app if it is missing. Restart the launching app after granting permission, then retry."
         );

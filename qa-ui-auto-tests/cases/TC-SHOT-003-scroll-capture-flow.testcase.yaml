@@ -1,5 +1,5 @@
 id: TC-SHOT-003
-title: Scroll result preserves aspect ratio, supports original size and starts annotation without reselecting
+title: Scroll preview directly exposes annotations while preserving aspect ratio and full-size output
 description: Tall 400x1800 browser fixture checks preview geometry and export dimensions; native N12 owns actual stitching
   and OS scrolling.
 covers:
@@ -50,7 +50,7 @@ steps:
 - click: '[data-testid="screenshot-scroll-start"]'
 - wait_for: '[data-testid="screenshot-overlay"][data-phase="preview"]'
 - assert_not_visible: '[data-testid="screenshot-selection"]'
-- assert_not_visible: '[data-testid="screenshot-toolbar"]'
+- assert_visible: '[data-testid="screenshot-toolbar"]'
 - assert_not_visible: '[data-testid="screenshot-scroll-busy"]'
 - assert_visible: '[data-testid="screenshot-scroll-result"]'
 - assert_attribute:
@@ -88,15 +88,14 @@ steps:
     expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().width
       <= 400
 - screenshot: scroll-result-fit.png
-- click: '[data-testid="screenshot-scroll-result-edit"]'
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - assert_disabled: '[data-testid="screenshot-undo"]'
 - assert_disabled: '[data-testid="screenshot-redo"]'
 - eval_readonly:
-    expression: Math.abs(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-base-image\"]").getBoundingClientRect().width
-      / document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-base-image\"]").getBoundingClientRect().height
+    expression: Math.abs(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().width
+      / document.querySelector("[data-testid" + String.fromCharCode(61) + "\"screenshot-scroll-result-image\"]").getBoundingClientRect().height
       - 400 / 1800) < 0.001
-- click: '[data-testid="screenshot-copy"]'
+- click: '[data-testid="screenshot-scroll-result-copy"]'
 - wait_for: '[data-testid="system-screenshot"]'
 - eval_readonly:
     expression: window.__taomniStubScreenshotCalls.at(-3).cmd === "screenshot_save_data_url" && window.__taomniStubScreenshotCalls.at(-3).args.width
@@ -165,7 +164,7 @@ verification:
     - step: 17
       expectation: No selection frame
     - step: 18
-      expectation: No toolbar
+      expectation: Annotation toolbar immediately available
     - step: 19
       expectation: No busy state
     - step: 20
@@ -219,57 +218,56 @@ verification:
   - id: output
     requirement: Continue annotation directly and copy full natural dimensions.
     actions:
-    - 34
-    - 39
+    - 38
     checkpoints:
-    - step: 35
+    - step: 34
       expectation: Toolbar opens
-    - step: 36
+    - step: 35
       expectation: Undo cleared
-    - step: 37
+    - step: 36
       expectation: Redo cleared
-    - step: 38
+    - step: 37
       expectation: Annotation image keeps aspect ratio
-    - step: 40
+    - step: 39
       expectation: Copy closes tool
-    - step: 41
+    - step: 40
       expectation: Export remains 400x1800
     results:
+    - 34
     - 35
     - 36
     - 37
-    - 38
+    - 39
     - 40
-    - 41
   - id: preview-actions
     requirement: Preview Save uses the chosen filename; Pin opens the captured image; Close exits directly.
     actions:
-    - 42
-    - 48
+    - 41
+    - 47
+    - 49
     - 50
-    - 51
-    - 54
-    - 60
-    - 63
-    - 65
-    - 71
-    checkpoints:
-    - step: 53
-      expectation: Save dispatched to long-capture.png
-    - step: 61
-      expectation: Pinned image appears
-    - step: 62
-      expectation: Pin IPC dispatched
-    - step: 64
-      expectation: Pin closes
-    - step: 72
-      expectation: Result closes without another selection
-    results:
     - 53
-    - 61
+    - 59
     - 62
     - 64
-    - 72
+    - 70
+    checkpoints:
+    - step: 52
+      expectation: Save dispatched to long-capture.png
+    - step: 60
+      expectation: Pinned image appears
+    - step: 61
+      expectation: Pin IPC dispatched
+    - step: 63
+      expectation: Pin closes
+    - step: 71
+      expectation: Result closes without another selection
+    results:
+    - 52
+    - 60
+    - 61
+    - 63
+    - 71
   visual:
   - check: Text, menu and result layout
     method: automated

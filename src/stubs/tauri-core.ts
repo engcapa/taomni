@@ -1659,6 +1659,7 @@ const STUB_SCREENSHOT_DATA_URL: string = "data:image/png;base64,iVBORw0KGgoAAAAN
 /** Browser-preview screenshot artifacts: stub path -> data URL. */
 const stubScreenshotFiles = new Map<string, string>();
 let stubScreenshotIncludeWindow = false;
+let stubScreenshotScrollAttempts = 0;
 function stubScreenshotCall(cmd: string, args: unknown): void {
   try {
     const w = window as unknown as Record<string, unknown>;
@@ -5112,6 +5113,11 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "screenshot_scroll_capture": {
       stubScreenshotCall(cmd, args);
+      // Browser-only deterministic fault fixture; native denial is tested at its own boundary.
+      const fault = new URLSearchParams(location.search).get("qaScreenshotScrollError");
+      if (fault === "always" || (fault === "once" && stubScreenshotScrollAttempts++ === 0)) {
+        throw new Error("Scrolling capture requires macOS Accessibility permission. Press Esc to leave the screenshot overlay, then open System Settings > Privacy & Security > Accessibility and enable Taomni. If launched from Terminal, enable Terminal instead (or the terminal app named by macOS); use + to add /System/Applications/Utilities/Terminal.app if it is missing. Restart the launching app after granting permission, then retry.");
+      }
       const canvas = document.createElement("canvas");
       canvas.width = 400;
       canvas.height = 1800;

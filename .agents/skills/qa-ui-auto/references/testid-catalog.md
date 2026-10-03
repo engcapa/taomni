@@ -1564,7 +1564,6 @@
 - `[data-testid="screenshot-scroll-fit"]` — interactive — F27.1.screenshot-scroll-fit
 - `[data-testid="screenshot-scroll-actual"]` — interactive — F27.1.screenshot-scroll-actual
 - `[data-testid="screenshot-scroll-result-close"]` — interactive — F27.1.screenshot-scroll-result-close
-- `[data-testid="screenshot-scroll-result-edit"]` — interactive — F27.1.screenshot-scroll-result-edit
 - `[data-testid="screenshot-scroll-result-pin"]` — interactive — F27.1.screenshot-scroll-result-pin
 - `[data-testid="screenshot-scroll-result-save"]` — interactive — F27.1.screenshot-scroll-result-save
 - `[data-testid="screenshot-scroll-result-copy"]` — interactive — F27.1.screenshot-scroll-result-copy
@@ -1681,6 +1680,7 @@
 - `[data-testid="screenshot-scroll-stop"]` — interactive — F27.1.screenshot-scroll-stop
 - `[data-testid="screenshot-scroll-cancel"]` — interactive — F27.1.screenshot-scroll-cancel
 - `[data-testid="screenshot-scroll-error"]` — display [optional] — F27.1.screenshot-scroll-error
+- `[data-testid="screenshot-scroll-error-close"]` — interactive — F27.1.screenshot-scroll-error-close
 - `[data-testid="screenshot-record-hint"]` — display — F27.1.screenshot-record-hint
 - `[data-testid="screenshot-recorder-range-hint"]` — display — F27.1.screenshot-recorder-range-hint
 - `[data-testid="screenshot-recording-boundary"]` — display [optional] — F27.1.screenshot-recording-boundary

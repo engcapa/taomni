@@ -17,6 +17,7 @@ vi.mock("../../lib/appDialogs", () => ({ formatUnknownError: (error: unknown) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 768 });
   api.fetchOverlayInit.mockResolvedValue({ path: "capture.png", displayId: "0,0", width: 2048, height: 1152, scaleFactor: 2 });
@@ -24,6 +25,7 @@ beforeEach(() => {
   api.saveDataUrl.mockResolvedValue({ path: "export.png", width: 400, height: 300 });
   api.copyImageToClipboard.mockResolvedValue(undefined);
   api.closeScreenshotOverlay.mockResolvedValue(undefined);
+  api.updateOverlayImage.mockResolvedValue(undefined);
   api.ocrImage.mockResolvedValue({ text: "user@example.com" });
   api.autoRedact.mockResolvedValue({ count: 2, boxes: [{ x: 10, y: 20, w: 40, h: 20 }, { x: 80, y: 20, w: 40, h: 20 }] });
   vi.stubGlobal("Image", function () {
@@ -163,13 +165,43 @@ describe("ScreenshotOverlay", () => {
     fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
     await screen.findByTestId("screenshot-scroll-result");
     expect(screen.queryByTestId("screenshot-hint")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("screenshot-toolbar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("screenshot-toolbar")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("screenshot-scroll-actual"));
     expect(screen.getByTestId("screenshot-scroll-result-image")).toHaveStyle({ width: "400px", height: "2400px" });
     fireEvent.click(screen.getByTestId("screenshot-scroll-fit"));
+    fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
+    const layer = screen.getByTestId("screenshot-annotation-layer");
+    vi.spyOn(layer, "getBoundingClientRect").mockReturnValue({ left: 300, top: 100, width: 100, height: 600 } as DOMRect);
+    drag("screenshot-annotation-layer", [310, 120], [330, 150]);
+    expect(shapes()).toBe("1");
+    fireEvent.click(screen.getByTestId("screenshot-tool-move"));
+    drag("screenshot-annotation-layer", [315, 130], [315, 130]);
+    expect(screen.getByTestId("screenshot-annotation-selection")).toHaveStyle({ left: "40px", top: "80px", width: "80px", height: "120px" });
+    fireEvent.click(screen.getByTestId("screenshot-scroll-actual"));
+    expect(shapes()).toBe("1");
+    fireEvent.click(screen.getByTestId("screenshot-undo"));
+    expect(shapes()).toBe("0");
+    fireEvent.click(screen.getByTestId("screenshot-redo"));
+    expect(shapes()).toBe("1");
     fireEvent.click(screen.getByTestId("screenshot-scroll-result-copy"));
     await waitFor(() => expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce());
     expect(api.saveDataUrl).toHaveBeenCalledWith("data:image/png;base64,400x2400");
+  });
+
+  it("exits a marked scroll preview directly with Escape without copying", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
+    api.scrollCapture.mockResolvedValueOnce({ path: "tall.png", width: 400, height: 2400, frames: 6 });
+    api.loadScreenshotUrl.mockResolvedValueOnce("data:image/png;base64,400x2400");
+    fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
+    await screen.findByTestId("screenshot-scroll-result");
+    fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
+    drag("screenshot-annotation-layer", [40, 80], [120, 200]);
+    expect(shapes()).toBe("1");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce();
+    expect(api.copyImageToClipboard).not.toHaveBeenCalled();
   });
 
   it("explains scroll capture before starting and keeps the original image when cancelled", async () => {
