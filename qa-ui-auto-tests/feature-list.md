@@ -1407,6 +1407,23 @@ controls:
   - id: session-tree-folder
     selector: '[data-testid="session-tree-folder"]'
     kind: interactive
+  - id: context-move-to-folder
+    selector: '[data-testid="context-menu-item-move-to-folder"]'
+    kind: interactive
+    optional: true
+  - id: context-move-root
+    selector: '[data-testid="context-menu-item-user-sessions"]'
+    kind: interactive
+    optional: true
+  - id: context-move-destination
+    selector: '[data-testid^="context-menu-item-user-sessions-"]'
+    aliases: ['[data-testid="context-menu-item-user-sessions-qa-selection-target"]']
+    kind: interactive
+    optional: true
+  - id: drag-preview
+    selector: '[data-custom-drag-ghost="true"]'
+    kind: display
+    optional: true
   - id: session-search
     selector: '[data-testid="session-search"]'
     kind: interactive
@@ -4211,6 +4228,7 @@ controls:
     optional: true
   - id: connect-selected-sessions
     selector: '[data-testid^="context-menu-item-connect-selected-sessions-"]'
+    aliases: ['[data-testid="context-menu-item-connect-selected-sessions-4"]']
     kind: interactive
     optional: true
 -->

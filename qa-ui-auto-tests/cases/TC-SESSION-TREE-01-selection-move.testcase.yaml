@@ -145,7 +145,7 @@ steps:
     - qa-selection-b
     - qa-selection-c
     - qa-selection-d
-- right_click: '[data-testid="session-tree-item"][data-session-name="qa-selection-b"]'
+- right_click: '[data-testid="session-tree-item"][data-selected="true"][data-session-name="qa-selection-b"]'
 - assert_items:
     selector: '[data-testid="session-tree-item"][data-selected="true"]'
     attribute: data-session-name

@@ -1734,6 +1734,11 @@
 - `[data-testid="session-tree"]` — display — F6.2.session-tree
 - `[data-testid="session-tree-item"]` — interactive — F6.2.session-tree-item
 - `[data-testid="session-tree-folder"]` — interactive — F6.2.session-tree-folder
+- `[data-testid="context-menu-item-move-to-folder"]` — interactive [optional] — F6.2.context-move-to-folder
+- `[data-testid="context-menu-item-user-sessions"]` — interactive [optional] — F6.2.context-move-root
+- `[data-testid^="context-menu-item-user-sessions-"]` — interactive [optional] — F6.2.context-move-destination
+  ↳ `[data-testid="context-menu-item-user-sessions-qa-selection-target"]` — alias
+- `[data-custom-drag-ghost="true"]` — display [optional] — F6.2.drag-preview
 - `[data-testid="session-search"]` — interactive — F6.2.session-search
 - `[data-testid="session-new"]` — interactive — F6.2.session-new
 - `[data-testid="session-edit"]` — interactive — F6.2.session-edit
@@ -1947,6 +1952,7 @@
 
 - `[data-testid="session-tree-item"][data-selected="true"]` — interactive [optional] — F-Sidebar-1.selected-session-row
 - `[data-testid^="context-menu-item-connect-selected-sessions-"]` — interactive [optional] — F-Sidebar-1.connect-selected-sessions
+  ↳ `[data-testid="context-menu-item-connect-selected-sessions-4"]` — alias
 
 ## settings (F11.1)
 
