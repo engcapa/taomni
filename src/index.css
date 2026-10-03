@@ -809,6 +809,8 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
    6px belong to native edge resizing; the grip stays independently hittable. */
 .taomni-main-window {
   padding-left: 18px;
+  /* Fractional borders and overlays must stay inside the fixed window frame. */
+  overflow-x: clip;
 }
 .taomni-window-drag-handle {
   position: absolute;

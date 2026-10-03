@@ -6,6 +6,28 @@ from qa_ui_auto.steps import StepError
 
 
 class NativeAssertionsTest(TestCase):
+    def test_hidden_attached_nodes_satisfy_not_visible_but_fail_visible(self):
+        ctx = Mock()
+        ctx.session.find.return_value = "attached-node"
+        ctx.session.execute.return_value = False
+        result = run_native_step(ctx, "assert_not_visible", "#pane")
+        self.assertEqual(result, "hidden #pane")
+        ctx.session.wait_absent.assert_not_called()
+        with patch("qa_ui_auto.native_steps.time.time", side_effect=[0, 0, 2]), \
+             patch("qa_ui_auto.native_steps.time.sleep"), \
+             self.assertRaisesRegex(StepError, "assert_visible failed"):
+            run_native_step(ctx, "assert_visible", {"selector": "#pane", "timeout_sec": 1})
+
+    def test_visible_nodes_fail_not_visible_and_pass_visible(self):
+        ctx = Mock()
+        ctx.session.find.return_value = "attached-node"
+        ctx.session.execute.return_value = True
+        self.assertEqual(run_native_step(ctx, "assert_visible", "#pane"), "visible #pane")
+        with patch("qa_ui_auto.native_steps.time.time", side_effect=[0, 0, 2]), \
+             patch("qa_ui_auto.native_steps.time.sleep"), \
+             self.assertRaisesRegex(StepError, "assert_not_visible failed"):
+            run_native_step(ctx, "assert_not_visible", {"selector": "#pane", "timeout_sec": 1})
+
     def test_checkbox_requires_real_input_and_observed_transition(self):
         ctx = Mock()
         ctx.session.execute.return_value = None

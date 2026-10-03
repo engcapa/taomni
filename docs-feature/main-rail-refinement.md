@@ -15,3 +15,5 @@
 macOS QA 键盘桥接补充构造事件的 HTML 按钮默认 Enter/Space 激活，遵守取消事件、禁用、焦点和修饰键。这属于 WKWebView 内的自动化交互，不能证明 macOS 物理键盘输入。macOS OS 窗口拖拽仍属于独立验证边界；本次实际 OS 拖拽自动化只支持 Linux/X11。
 
 第二轮 [37093099316](https://github.com/engcapa/taomni/actions/runs/37093099316) 的 browser 几何记录确认全部 16 个按钮均为 16px 图标，名称模式同宽 53px，纯图标模式同宽 34px、至少 32px 高。流程发现双击会在侧栏切换挂载后重新展开，现明确处理第二下点击，并补充跨挂载的单元回归。名称行高也改为 12px，避免根字体导致 10px 名称行仅为 9px。native 因新增单元测试的 Node 类型导入编译失败，现改用 Vite raw 源码导入。窄窗口断言保留严格无溢出条件，增加尺寸诊断与有界布局等待，继续验证。
+
+第三轮 [37094564948](https://github.com/engcapa/taomni/actions/runs/37094564948) 的三个 browser 双击用例通过，三个 native 均完成名称、Enter/Space 与 16 个按钮尺寸检查；Linux native 名称按钮实际为 `53×39.5px`、图标 `16×16px`。三个 native 的 Project 隐藏操作在截图中正常，原有 `assert_not_visible` 却检查 DOM 删除，导致误报；现与 `wait_for` 共用布局/CSS 可见状态观察，显示断言也要求实际可见。对应 Python 单元批次 46 项通过。窄窗口诊断确认标题栏、状态栏均为 782px，800px 视口的主窗口水平绘制范围为 801px；主窗口容器增加水平 clip，接下来重新验证所有选择的组合。

@@ -210,7 +210,7 @@ def _wait_for(ctx: NativeStepContext, args: Any) -> str:
     while time.time() < deadline:
         for sel in selectors:
             found = _find_quiet(ctx, sel)
-            # "visible" is a geometry probe: display:none/zero-size nodes are
+            # "visible" checks layout and CSS visibility: zero-size nodes are
             # hidden even though they exist in the DOM. "attached" is plain
             # presence, matching the WebDriver element lookup semantics.
             visible = found and _element_has_layout(ctx, sel) if state in ("visible", "hidden") else found
@@ -233,7 +233,8 @@ def _element_has_layout(ctx: NativeStepContext, selector: str) -> bool:
             f"const el = document.querySelector({json.dumps(selector)});"
             "if (!el) return false;"
             "const rect = el.getBoundingClientRect();"
-            "return rect.width > 0 && rect.height > 0;"
+            "const visibility = getComputedStyle(el).visibility;"
+            "return rect.width > 0 && rect.height > 0 && visibility !== 'hidden' && visibility !== 'collapse';"
         ))
     except Exception:  # noqa: BLE001
         return False
@@ -242,19 +243,17 @@ def _element_has_layout(ctx: NativeStepContext, selector: str) -> bool:
 def _assert_visible(ctx: NativeStepContext, args: Any) -> str:
     selector, timeout = _selector_args(args)
     try:
-        ctx.session.find(selector, timeout=timeout)
+        return _wait_for(ctx, {"selector": selector, "timeout_sec": timeout, "state": "visible"})
     except Exception as e:  # noqa: BLE001
         raise StepError(f"assert_visible failed: {selector} ({e})") from e
-    return f"visible {selector}"
 
 
 def _assert_not_visible(ctx: NativeStepContext, args: Any) -> str:
     selector, timeout = _selector_args(args)
     try:
-        ctx.session.wait_absent(selector, timeout=timeout)
+        return _wait_for(ctx, {"selector": selector, "timeout_sec": timeout, "state": "hidden"})
     except Exception as e:  # noqa: BLE001
         raise StepError(f"assert_not_visible failed: {e}") from e
-    return f"absent {selector}"
 
 
 def _selector_args(args: Any) -> tuple[str, float]:
