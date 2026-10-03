@@ -330,6 +330,3 @@ verification:
   - check: External PID/cwd inheritance and split process termination in V-N02.
     method: manual
     reason: See linked native case; this YAML alone does not establish this boundary.
-  review_note: Reviewed against production entries and the stated assertions. Covers
-    the implemented requirements listed here; remaining specification branches remain
-    unverified in the task document.

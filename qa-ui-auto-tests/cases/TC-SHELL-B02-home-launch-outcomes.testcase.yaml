@@ -181,6 +181,3 @@ verification:
     method: not-applicable
     reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
       native boundaries.
-  review_note: Reviewed against production entries and the stated assertions. Covers
-    the implemented requirements listed here; remaining specification branches remain
-    unverified in the task document.
