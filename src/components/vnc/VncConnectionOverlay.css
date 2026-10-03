@@ -1,0 +1,153 @@
+.vnc-connection-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(8, 12, 24, 0.72);
+}
+
+.vnc-connection-card {
+  width: 420px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--taomni-chrome-border);
+  border-radius: 12px;
+  background: var(--taomni-card-bg);
+  color: var(--taomni-text);
+  color-scheme: var(--taomni-color-scheme, light);
+  box-shadow: 0 18px 56px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.vnc-connection-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.vnc-connection-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--taomni-selected);
+  color: var(--taomni-accent);
+}
+
+.vnc-connection-description {
+  margin: 0 0 20px;
+  color: var(--taomni-text-muted);
+}
+
+.vnc-connection-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+
+.vnc-connection-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-weight: 400;
+}
+
+.vnc-connection-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.vnc-connection-check input {
+  accent-color: #2563eb;
+}
+
+.vnc-connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--taomni-divider);
+}
+
+.vnc-connection-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 16px;
+  border: 1px solid var(--taomni-input-border);
+  border-radius: 6px;
+  background: var(--taomni-button-from);
+  color: var(--taomni-text);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.vnc-connection-button:hover:not(:disabled) {
+  background: var(--taomni-hover);
+}
+
+.vnc-connection-button:focus-visible {
+  outline: 2px solid var(--taomni-accent);
+  outline-offset: 3px;
+}
+
+.vnc-connection-primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.vnc-connection-primary:hover:not(:disabled) {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+}
+
+.vnc-connection-button:disabled {
+  border-color: var(--taomni-input-border);
+  background: var(--taomni-button-disabled);
+  color: var(--taomni-text-muted);
+  cursor: default;
+}
+
+.vnc-connection-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.vnc-connection-error {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #dc2626 35%, var(--taomni-card-border));
+  border-radius: 6px;
+  background: color-mix(in srgb, #dc2626 8%, var(--taomni-card-bg));
+  color: #b91c1c;
+}
+
+html[data-app-theme="dark"] .vnc-connection-error {
+  color: #fca5a5;
+}

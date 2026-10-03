@@ -24,10 +24,9 @@
 //                 screenshot/clipboard PNG path instead)
 //   files 0x10   (not used; file transfer uses TightVNC/UltraVNC FT)
 
-use flate2::Compression;
-use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
-use std::io::{Read, Write};
+use flate2::{Compression, Decompress, FlushDecompress, Status};
+use std::io::Write;
 
 use crate::vnc::limits::DecodeLimits;
 
@@ -103,6 +102,49 @@ pub fn parse_extended_body(body: &[u8]) -> Option<ExtendedClipboardMsg> {
         .flatten()
 }
 
+/// TigerVNC flushes each independent Provide stream with Z_SYNC_FLUSH, not
+/// Z_FINISH. The RFB body length bounds the input; the format lengths below
+/// bound its contents. Accept that flush boundary as well as a finished zlib
+/// stream, while still rejecting truncated data and limiting inflate output.
+fn inflate_provide(payload: &[u8], max_bytes: usize) -> Result<Vec<u8>, String> {
+    let mut decoder = Decompress::new(true);
+    let mut decoded = Vec::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        let before_in = decoder.total_in();
+        let before_out = decoder.total_out();
+        let status = decoder
+            .decompress(
+                &payload[before_in as usize..],
+                &mut chunk,
+                FlushDecompress::Sync,
+            )
+            .map_err(|e| format!("extended clipboard inflate: {e}"))?;
+        let n = (decoder.total_out() - before_out) as usize;
+        if decoded
+            .len()
+            .checked_add(n)
+            .is_none_or(|size| size > max_bytes)
+        {
+            return Err("extended clipboard decompressed body exceeds configured limit".into());
+        }
+        decoded.extend_from_slice(&chunk[..n]);
+        let consumed = decoder.total_in() as usize;
+        if status == Status::StreamEnd {
+            if consumed != payload.len() {
+                return Err("extended clipboard inflate: trailing compressed data".into());
+            }
+            return Ok(decoded);
+        }
+        if n == 0 && decoder.total_in() == before_in {
+            if consumed == payload.len() && payload.ends_with(&[0, 0, 0xff, 0xff]) {
+                return Ok(decoded);
+            }
+            return Err("extended clipboard inflate: incomplete deflate stream".into());
+        }
+    }
+}
+
 /// Parse an ExtendedClipboard body with bounded compressed and decompressed
 /// storage. Unknown actions are ignored; malformed or oversized payloads are
 /// returned as an error so the owning session can close deterministically.
@@ -154,27 +196,7 @@ pub fn parse_extended_body_with_limits(
             if payload.len() > limits.max_compressed_rect_bytes {
                 return Err("extended clipboard compressed body exceeds configured limit".into());
             }
-            let mut decoder = ZlibDecoder::new(payload);
-            let mut decoded = Vec::new();
-            let mut chunk = [0u8; 8192];
-            loop {
-                let n = decoder
-                    .read(&mut chunk)
-                    .map_err(|e| format!("extended clipboard inflate: {e}"))?;
-                if n == 0 {
-                    break;
-                }
-                if decoded
-                    .len()
-                    .checked_add(n)
-                    .is_none_or(|size| size > limits.max_clipboard_decompressed_bytes)
-                {
-                    return Err(
-                        "extended clipboard decompressed body exceeds configured limit".into(),
-                    );
-                }
-                decoded.extend_from_slice(&chunk[..n]);
-            }
+            let decoded = inflate_provide(payload, limits.max_clipboard_decompressed_bytes)?;
             let mut data = ClipboardFormats::default();
             let mut cursor = 0usize;
             let mut bit = 1u32;
@@ -213,6 +235,9 @@ pub fn parse_extended_body_with_limits(
                     }
                 }
                 bit <<= 1;
+            }
+            if cursor != decoded.len() {
+                return Err("extended clipboard data exceeds declared format lengths".into());
             }
             Ok(Some(ExtendedClipboardMsg::Provide {
                 formats,
@@ -423,6 +448,78 @@ mod tests {
             }
             other => panic!("expected Provide, got {:?}", other),
         }
+    }
+
+    fn sync_flushed_provide(formats: u32, payload: &[u8]) -> Vec<u8> {
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(payload).unwrap();
+        encoder.flush().unwrap();
+        let mut body = (ACTION_PROVIDE | formats).to_be_bytes().to_vec();
+        body.extend_from_slice(encoder.get_ref());
+        assert!(body.ends_with(&[0, 0, 0xff, 0xff]));
+        body
+    }
+
+    #[test]
+    fn accepts_tigervnc_sync_flushed_provides_as_independent_messages() {
+        for text in [
+            "LXQt 复制\r\n第二行\0".to_string(),
+            "x".repeat(20_000) + "\0",
+        ] {
+            let html = "<b>LXQt</b>\0";
+            let mut payload = (text.len() as u32).to_be_bytes().to_vec();
+            payload.extend_from_slice(text.as_bytes());
+            payload.extend_from_slice(&(html.len() as u32).to_be_bytes());
+            payload.extend_from_slice(html.as_bytes());
+            let body = sync_flushed_provide(FORMAT_TEXT | FORMAT_HTML, &payload);
+            let Some(ExtendedClipboardMsg::Provide { formats_data, .. }) =
+                parse_extended_body_with_limits(&body, &DecodeLimits::default()).unwrap()
+            else {
+                panic!("expected TigerVNC Provide");
+            };
+            assert_eq!(
+                formats_data.text.as_deref(),
+                Some(text.trim_end_matches('\0').replace("\r\n", "\n").as_str())
+            );
+            assert_eq!(formats_data.html.as_deref(), Some("<b>LXQt</b>"));
+        }
+    }
+
+    #[test]
+    fn sync_flushed_provide_rejects_missing_boundary_and_incomplete_format_data() {
+        let mut payload = 4u32.to_be_bytes().to_vec();
+        payload.extend_from_slice(b"abc\0");
+        let body = sync_flushed_provide(FORMAT_TEXT, &payload);
+        for missing in 1..=4 {
+            assert!(
+                parse_extended_body_with_limits(
+                    &body[..body.len() - missing],
+                    &DecodeLimits::default()
+                )
+                .is_err()
+            );
+        }
+        payload[..4].copy_from_slice(&5u32.to_be_bytes());
+        let incomplete = sync_flushed_provide(FORMAT_TEXT, &payload);
+        assert!(
+            parse_extended_body_with_limits(&incomplete, &DecodeLimits::default())
+                .unwrap_err()
+                .contains("truncated extended clipboard data")
+        );
+    }
+
+    #[test]
+    fn sync_flushed_provide_preserves_decompressed_size_limits() {
+        let mut payload = 4096u32.to_be_bytes().to_vec();
+        payload.extend_from_slice(&vec![b'x'; 4096]);
+        let body = sync_flushed_provide(FORMAT_TEXT, &payload);
+        let mut limits = DecodeLimits::default();
+        limits.max_clipboard_decompressed_bytes = 128;
+        assert!(
+            parse_extended_body_with_limits(&body, &limits)
+                .unwrap_err()
+                .contains("decompressed body exceeds configured limit")
+        );
     }
 
     #[test]

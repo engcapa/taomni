@@ -2687,6 +2687,7 @@ files:
   - src/components/vnc/VncPanel.tsx
   - src/components/vnc/vncSessionMenu.ts
   - src/components/vnc/VncConnectionOverlay.tsx
+  - src/components/vnc/VncConnectionOverlay.css
   - src/components/vnc/VncPropertiesDialog.tsx
   - src/components/vnc/VncSessionInfoDialog.tsx
   - src/components/vnc/VncFullScreenToolbar.tsx
@@ -2758,6 +2759,14 @@ controls:
     selector: '[data-testid="vnc-auth-password"]'
     kind: interactive
     optional: true          # in-session authentication form, shown only when the server asks for a password (VNC-AUTH-002, DEC-VNC-21)
+  - id: vnc-auth-username
+    selector: '[data-testid="vnc-auth-username"]'
+    kind: interactive
+    optional: true          # username/password form; TC-157 checks both themes
+  - id: vnc-auth-error
+    selector: '[data-testid="vnc-auth-error"]'
+    kind: display
+    optional: true          # rejected credentials; TC-157 corrects the password
   - id: vnc-auth-ok
     selector: '[data-testid="vnc-auth-ok"]'
     kind: interactive
@@ -2795,6 +2804,9 @@ controls:
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
 - 连续鼠标与键盘输入后，relay 以画布 ACK 作为帧背压、鼠标移动按显示帧合并，仍持续请求并绘制后续 framebuffer 更新（VNC-REG-001；TC-156 双模式）
+- 连接警告、用户名/密码表单和认证错误使用浅色/深色主题的实色卡片，保留密码焦点、遮掩与 Enter 提交（TC-157 双模式，截图检查对比度与布局）
+- ExtendedClipboard 接收兼容完整 zlib 流与 TigerVNC 的每消息 Z_SYNC_FLUSH 边界，继续限制解压大小并拒绝截断格式数据；连续远端复制后反向复制、输入与绘制保持连接（TC-158 native 系统剪贴板、TC-159 browser bridge）
+- Linux WebKitGTK 读取剪贴板为空时，VNC 使用原生读取核对外部 X11 剪贴板，避免反向粘贴丢失新文本（TC-158，系统剪贴板写入后先独立读取核验）
 - view-only 与剪贴板方向（disabled / client→server / server→client / bidirectional）由前后端同时执行；None 默认拒绝
 - 当前不支持 VeNCrypt/X509 TLS，也不发送 RFB SetDesktopSize；RFB 18 anonymous TLS 已支持，但不提供服务器身份验证；窗口变化只调整本地显示
 

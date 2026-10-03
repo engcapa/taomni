@@ -9,7 +9,7 @@
  * encodings, OS input or system clipboard.
  */
 import net from "node:net";
-import { deflateSync, inflateSync } from "node:zlib";
+import { constants as zlibConstants, deflateSync, inflateSync } from "node:zlib";
 import { WebSocket, type RawData } from "ws";
 import { vncAuthResponse } from "./vncDes";
 
@@ -281,7 +281,13 @@ export function buildProvideBody(data: ClipboardFormats): Buffer {
 }
 
 export function parseProvideBody(flags: number, payload: Buffer): ClipboardFormats {
-  const data = inflateSync(payload, { maxOutputLength: 2 * MAX_CLIPBOARD_BYTES });
+  // TigerVNC's fresh per-message stream ends at Z_SYNC_FLUSH, without the
+  // Z_FINISH trailer. Require the explicit flush boundary for that variant.
+  const syncFlushed = payload.subarray(-4).equals(Buffer.from([0, 0, 0xff, 0xff]));
+  const data = inflateSync(payload, {
+    maxOutputLength: 2 * MAX_CLIPBOARD_BYTES,
+    finishFlush: syncFlushed ? zlibConstants.Z_SYNC_FLUSH : zlibConstants.Z_FINISH,
+  });
   const out: ClipboardFormats = {};
   let cursor = 0;
   for (let bit = 1; bit <= 0x8000; bit <<= 1) {
@@ -300,6 +306,7 @@ export function parseProvideBody(flags: number, payload: Buffer): ClipboardForma
     else if (bit === FORMAT_RTF) out.rtf = value;
     else if (bit === FORMAT_HTML) out.html = value;
   }
+  if (cursor !== data.length) throw new Error("extended clipboard data exceeds declared format lengths");
   return out;
 }
 

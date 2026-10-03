@@ -551,22 +551,8 @@ async fn actions_script<R: Runtime>(
           }}
           __qaActive.dispatchEvent(event);
           __qaButtonKey(__qaActive, domType, key, event, __qaModifiers);
-          if (domType === 'keydown' && !modifier && !event.defaultPrevented &&
-              !__qaModifiers.Control && !__qaModifiers.Meta && !__qaModifiers.Alt) {{
-            if (__qaActive.isContentEditable) {{
-              if (key === 'Enter') document.execCommand('insertParagraph', false, null);
-              else if (key === 'Backspace') document.execCommand('delete', false, null);
-              else if (key === 'Delete') document.execCommand('forwardDelete', false, null);
-              else if (key.length === 1) document.execCommand('insertText', false, key);
-            }} else if (__qaActive instanceof HTMLInputElement || __qaActive instanceof HTMLTextAreaElement) {{
-              if (key.length === 1 || key === 'Enter') {{
-                const start = __qaActive.selectionStart ?? __qaActive.value.length;
-                const end = __qaActive.selectionEnd ?? start;
-                const insert = key === 'Enter' ? '\\n' : key;
-                __qaActive.setRangeText(insert, start, end, 'end');
-                __qaActive.dispatchEvent(new InputEvent('input', {{bubbles:true, inputType:'insertText', data:insert}}));
-              }}
-            }}
+          if (domType === 'keydown') {{
+            dispatchQaKeyDefault(__qaActive, key, event, __qaModifiers);
           }}
         }};
         const __qaPoint = (x, y) => document.elementFromPoint(Number(x) || 0, Number(y) || 0) || document.body;

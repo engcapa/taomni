@@ -627,6 +627,29 @@ describe("VncPanel viewer options (VNC-CLIP-001, VNC-PERF-004, VNC-INPUT-003)", 
       expect(clipboardTexts(socket)).toEqual([]);
     });
 
+    it("pastes an external Linux clipboard when WebKit reports an empty value", async () => {
+      const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux");
+      vi.stubGlobal("__TAURI_INTERNALS__", {});
+      const defaultInvoke = mocks.invoke.getMockImplementation();
+      mocks.invoke.mockImplementation((command: string, args?: unknown) => {
+        if (command === "clipboard_read_text") return Promise.resolve("copied externally");
+        return defaultInvoke?.(command, args);
+      });
+      local = "";
+      try {
+        const { socket, canvas } = await renderConnected();
+        await act(async () => {
+          fireEvent.keyDown(canvas, { key: "v", code: "KeyV", ctrlKey: true });
+          fireEvent.keyUp(canvas, { key: "v", code: "KeyV", ctrlKey: true });
+          await vi.advanceTimersByTimeAsync(300);
+        });
+        expect(clipboardTexts(socket)).toEqual(["copied externally"]);
+        expect(mocks.invoke).toHaveBeenCalledWith("clipboard_read_text");
+      } finally {
+        platform.mockRestore();
+      }
+    });
+
     it("types the clipboard as keystrokes from the session menu", async () => {
       const { socket, canvas } = await renderConnected();
       local = "Ab1\n";

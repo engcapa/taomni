@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { EventEmitter } from "node:events";
 import net from "node:net";
-import { deflateSync } from "node:zlib";
+import { constants as zlibConstants, deflateSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { buildProvideBody, connectRfb, parseProvideBody, VncBridgeFailure, VncBridgeSession } from "./vncBridge";
@@ -371,5 +371,19 @@ describe("VncBridgeSession", () => {
       return [length, p];
     }));
     expect(parseProvideBody(1 | 8, deflateSync(payload))).toEqual({ text: "hi" });
+  });
+
+  it("accepts TigerVNC sync-flushed clipboard data and rejects truncated format data", () => {
+    const text = Buffer.from("LXQt 复制\r\n第二行\0");
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(text.length);
+    const packed = deflateSync(Buffer.concat([length, text]), { finishFlush: zlibConstants.Z_SYNC_FLUSH });
+    expect(packed.subarray(-4)).toEqual(Buffer.from([0, 0, 0xff, 0xff]));
+    expect(parseProvideBody(1, packed)).toEqual({ text: "LXQt 复制\n第二行" });
+    expect(() => parseProvideBody(1, packed.subarray(0, -1))).toThrow();
+    length.writeUInt32BE(text.length + 1);
+    expect(() => parseProvideBody(1, deflateSync(Buffer.concat([length, text]), {
+      finishFlush: zlibConstants.Z_SYNC_FLUSH,
+    }))).toThrow("truncated or oversized extended clipboard data");
   });
 });
