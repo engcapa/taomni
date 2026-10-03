@@ -116,7 +116,7 @@ steps:
 - press: Escape
 - wait_for: '[data-testid="system-screenshot"]'
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.filter(c => c.cmd === "screenshot_copy_image").length === 0
+    expression: !JSON.stringify(window.__taomniStubScreenshotCalls).includes("screenshot_copy_image")
 verification:
   review: reviewed
   requirements:
