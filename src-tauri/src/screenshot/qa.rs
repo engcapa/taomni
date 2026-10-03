@@ -1483,8 +1483,13 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
       if(q('screenshot-annotation-canvas').dataset.shapes!=='0') throw new Error('undo lost after zoom');
       q('screenshot-redo').click(); await sleep(100);
       const viewport = q('screenshot-scroll-result-viewport');
-      viewport.scrollTop = viewport.scrollHeight; await sleep(100);
-      if(viewport.scrollTop<=0) throw new Error('long preview did not scroll');
+      for (let i = 0; i < 20; i++) {
+        viewport.scrollTop = viewport.scrollHeight;
+        viewport.scrollTo(0, viewport.scrollHeight);
+        if (viewport.scrollTop > 0) break;
+        await sleep(100);
+      }
+      if(viewport.scrollTop<=0) throw new Error(`long preview did not scroll (image=${image.naturalWidth}x${image.naturalHeight}, viewport=${viewport.clientWidth}x${viewport.clientHeight}, scrollHeight=${viewport.scrollHeight})`);
       q('screenshot-color-green').click(); await sleep(50);
       await draw(40,image.naturalHeight-100,100,60);
       q('screenshot-scroll-fit').click(); await sleep(100);
