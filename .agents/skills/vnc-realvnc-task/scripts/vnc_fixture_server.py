@@ -13,6 +13,7 @@ commands on the control port (one per connection or newline separated):
     resize W H      DesktopSize change (when the client advertised -223)
     cuttext TEXT    legacy ServerCutText to every client
     extclip TEXT    ExtendedClipboard notify (client requests, server provides)
+    extclip-sync TEXT  TigerVNC-style per-message Z_SYNC_FLUSH clipboard Provide
     bell            Bell
     drop            close every client socket abruptly (network drop)
     freeze / thaw   stop / resume answering (hung server; sockets stay open)
@@ -462,10 +463,17 @@ class Client:
         elif action == CLIP_REQUEST:
             text = getattr(self, "server_clipboard", "")
             payload = text.replace("\n", "\r\n").encode() + b"\0"
-            packed = zlib.compress(struct.pack(">I", len(payload)) + payload)
+            data = struct.pack(">I", len(payload)) + payload
+            sync_flushed = getattr(self, "server_clipboard_sync", False)
+            if sync_flushed:
+                compressor = zlib.compressobj()
+                packed = compressor.compress(data) + compressor.flush(zlib.Z_SYNC_FLUSH)
+            else:
+                packed = zlib.compress(data)
             provide = struct.pack(">I", CLIP_PROVIDE | CLIP_TEXT) + packed
             self.queue(b"\x03\0\0\0" + struct.pack(">i", -len(provide)) + provide)
             self.log.write(self.id, "ext_clipboard", action="request", formats=flags & 0xFFFF)
+            self.log.write(self.id, "clipboard_sent", flush="sync" if sync_flushed else "finish", text=text)
         else:
             self.log.write(self.id, "ext_clipboard", action=f"0x{action:08x}")
 
@@ -640,9 +648,10 @@ def handle_command(server: Server, line: str) -> str:
         payload = rest.encode("latin-1", "replace")
         for client in clients:
             client.queue(b"\x03\0\0\0" + struct.pack(">I", len(payload)) + payload)
-    elif verb == "extclip":
+    elif verb in ("extclip", "extclip-sync"):
         for client in clients:
             client.server_clipboard = rest
+            client.server_clipboard_sync = verb == "extclip-sync"
             notify = struct.pack(">I", CLIP_NOTIFY | CLIP_TEXT)
             client.queue(b"\x03\0\0\0" + struct.pack(">i", -len(notify)) + notify)
     elif verb == "bell":

@@ -1,0 +1,233 @@
+id: TC-157
+title: VNC connection dialogs are readable in light and dark themes
+description: Inspect the unencrypted warning, username/password form and authentication error in both themes. Preserve
+  password autofocus, masking, disabled empty-password submission and Enter-to-submit. Screenshots require visual
+  review; the successful fixture handshake proves corrected credentials still connect.
+covers:
+- F9.6
+tags:
+- vnc
+- p1
+- regression
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- vnc_required
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: light
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-vnc"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${fixture.vnc_host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.vnc_port}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-vnc-fixture
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-fixture"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-fixture"]'
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 20
+- screenshot: 157-warning-light.png
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- screenshot: 157-warning-dark.png
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 20
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'vnc-auth-password'
+    timeout_sec: 5
+- assert_attribute:
+    selector: '[data-testid="vnc-auth-password"]'
+    name: type
+    equals: password
+- assert_disabled: '[data-testid="vnc-auth-ok"]'
+- fill:
+    selector: '[data-testid="vnc-auth-username"]'
+    value: qa-vnc-user
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: invalid-test-password
+- assert_enabled: '[data-testid="vnc-auth-ok"]'
+- screenshot: 157-auth-dark.png
+- click: '[data-testid="theme-cycle"]'
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: light
+- screenshot: 157-auth-light.png
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-error"]'
+    timeout_sec: 20
+- screenshot: 157-error-light.png
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- assert_visible: '[data-testid="vnc-auth-error"]'
+- screenshot: 157-error-dark.png
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_VNC_PASSWORD}
+- press:
+    selector: '[data-testid="vnc-auth-password"]'
+    key: Enter
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 20
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
+    timeout_sec: 20
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "auth", "ok": true, "security": "VNCAuth"'
+- host_write_file:
+    path: ${fixture.vnc_control}
+    text: 'drop
+
+      '
+- wait_for:
+    selector: '[data-testid="vnc-reconnect"]'
+    timeout_sec: 15
+- screenshot: 157-disconnected-dark.png
+- click: '[data-testid="vnc-reconnect"]'
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 20
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
+    timeout_sec: 20
+- eval_readonly:
+    expression: document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16, 1, 1).data[3]
+      === 255
+    timeout_sec: 10
+- wait: 1.5
+- screenshot: 157-reconnected.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Connection warning and authentication form support both themes while preserving password focus,
+      masking and keyboard submission.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 18
+    - 21
+    - 26
+    - 27
+    - 30
+    - 31
+    - 34
+    - 37
+    - 41
+    - 42
+    - 44
+    checkpoints:
+    - step: 4
+      expectation: The warning opens in light theme.
+    - step: 19
+      expectation: The warning remains open in dark theme.
+    - step: 23
+      expectation: The password field receives initial focus.
+    - step: 24
+      expectation: The password is masked.
+    - step: 25
+      expectation: An empty password cannot be submitted.
+    - step: 28
+      expectation: Entering credentials enables submission.
+    - step: 32
+      expectation: The filled authentication form remains in light theme.
+    - step: 45
+      expectation: Enter submits corrected credentials and displays the remote canvas.
+    - step: 46
+      expectation: The server confirms a successful VNCAuth handshake.
+    - step: 43
+      expectation: A new attempt after rejected credentials asks to confirm the unencrypted connection again.
+    results:
+    - 45
+    - 46
+  - id: R2
+    requirement: Authentication failure stays visible in both themes and the user can correct the password to connect.
+    actions:
+    - 34
+    - 37
+    - 41
+    - 42
+    - 44
+    checkpoints:
+    - step: 35
+      expectation: The rejected password displays an error in light theme.
+    - step: 38
+      expectation: Switching theme preserves the error state.
+    - step: 39
+      expectation: The authentication error remains visible in dark theme.
+    - step: 46
+      expectation: Corrected credentials authenticate successfully.
+    - step: 43
+      expectation: A new attempt after rejected credentials asks to confirm the unencrypted connection again.
+    results:
+    - 46
+  - id: R3
+    requirement: A remote disconnect exposes a readable reconnect action; reconnect confirms the unencrypted connection
+      and paints a new framebuffer.
+    actions:
+    - 47
+    - 50
+    - 52
+    checkpoints:
+    - step: 48
+      expectation: The reconnect action is visible after the fixture drops the session.
+    - step: 51
+      expectation: A fresh connection asks for the unencrypted warning.
+    - step: 53
+      expectation: Reconnect restores the remote desktop.
+    - step: 54
+      expectation: The reconnected canvas contains rendered pixels.
+    results:
+    - 53
+    - 54
+  visual:
+  - check: 'Review dialog screenshots: opaque theme-appropriate cards; readable titles, descriptions, field labels,
+      entered username, buttons and error text; visible focus and no clipping. Check the disconnected card and reconnect
+      button too.'
+    method: manual
+    reason: Theme attributes and successful input do not prove contrast or visual quality.
+  native:
+  - check: Native mode renders the dialogs in the packaged WebView and connects through the Rust relay; browser
+      mode covers the shared renderer only.
+    method: automated
+    reason: The native fixture handshake verifies the actual authentication boundary.

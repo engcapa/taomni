@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw, ShieldAlert, Square } from "lucide-react";
+import { LockKeyhole, RefreshCw, ShieldAlert, Square } from "lucide-react";
 import { useT } from "../../lib/i18n";
+import "./VncConnectionOverlay.css";
 
 /**
  * Connection lifecycle overlays (VNC-SESS-003), modelled on RealVNC Viewer:
@@ -24,30 +25,6 @@ export interface VncOverlayActions {
   cancelAuth: () => void;
 }
 
-const PANEL_STYLE: React.CSSProperties = {
-  background: "var(--taomni-bg-elevated, #22223a)",
-  color: "var(--taomni-text, #ddd)",
-  border: "1px solid var(--taomni-border, rgba(255,255,255,0.2))",
-  borderRadius: 6,
-  padding: 16,
-  minWidth: 360,
-  maxWidth: "90%",
-  boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-  fontSize: 12,
-};
-
-const BUTTON_STYLE: React.CSSProperties = {
-  background: "rgba(255,255,255,0.1)",
-  border: "1px solid rgba(255,255,255,0.3)",
-  borderRadius: 4,
-  padding: "5px 14px",
-  cursor: "pointer",
-  color: "inherit",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-};
-
 export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; actions: VncOverlayActions }) {
   const t = useT();
   const [dontWarn, setDontWarn] = useState(false);
@@ -65,15 +42,7 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
   const backdrop = (content: React.ReactNode, testId: string) => (
     <div
       data-testid={testId}
-      style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(0,0,0,0.65)",
-        zIndex: 6,
-      }}
+      className="vnc-connection-backdrop"
     >
       {content}
     </div>
@@ -82,9 +51,9 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
   switch (view.kind) {
     case "connecting":
       return backdrop(
-        <div style={{ color: "#bbb", textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+        <div className="vnc-connection-card vnc-connection-status" role="status">
           <p>{t("vnc.connectingHost", { host: view.host, port: view.port })}</p>
-          <button ref={primaryRef} type="button" data-testid="vnc-connect-stop" style={BUTTON_STYLE} onClick={actions.stop}>
+          <button ref={primaryRef} type="button" data-testid="vnc-connect-stop" className="vnc-connection-button" onClick={actions.stop}>
             <Square size={12} />
             {t("vnc.stop")}
           </button>
@@ -93,13 +62,13 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
       );
     case "unencrypted":
       return backdrop(
-        <div role="dialog" aria-modal="true" aria-labelledby="vnc-unencrypted-title" style={PANEL_STYLE}>
-          <h2 id="vnc-unencrypted-title" style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, display: "flex", gap: 6, alignItems: "center" }}>
-            <ShieldAlert size={16} />
+        <div role="dialog" aria-modal="true" aria-labelledby="vnc-unencrypted-title" aria-describedby="vnc-unencrypted-body" className="vnc-connection-card">
+          <h2 id="vnc-unencrypted-title" className="vnc-connection-title">
+            <span className="vnc-connection-icon"><ShieldAlert size={20} /></span>
             {t("vnc.unencryptedTitle")}
           </h2>
-          <p style={{ marginBottom: 12, lineHeight: 1.5 }}>{t("vnc.unencryptedBody", { host: `${view.host}:${view.port}` })}</p>
-          <label style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 16 }}>
+          <p id="vnc-unencrypted-body" className="vnc-connection-description">{t("vnc.unencryptedBody", { host: `${view.host}:${view.port}` })}</p>
+          <label className="vnc-connection-check">
             <input
               type="checkbox"
               data-testid="vnc-unencrypted-dont-warn"
@@ -108,18 +77,18 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
             />
             {t("vnc.unencryptedDontWarn")}
           </label>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <div className="vnc-connection-actions">
+            <button type="button" data-testid="vnc-unencrypted-cancel" className="vnc-connection-button" onClick={actions.cancelUnencrypted}>
+              {t("vnc.cancel")}
+            </button>
             <button
               ref={primaryRef}
               type="button"
               data-testid="vnc-unencrypted-continue"
-              style={BUTTON_STYLE}
+              className="vnc-connection-button vnc-connection-primary"
               onClick={() => actions.continueUnencrypted(dontWarn)}
             >
               {t("vnc.continue")}
-            </button>
-            <button type="button" data-testid="vnc-unencrypted-cancel" style={BUTTON_STYLE} onClick={actions.cancelUnencrypted}>
-              {t("vnc.cancel")}
             </button>
           </div>
         </div>,
@@ -131,7 +100,8 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
           role="dialog"
           aria-modal="true"
           aria-labelledby="vnc-auth-title"
-          style={PANEL_STYLE}
+          aria-describedby="vnc-auth-body"
+          className="vnc-connection-card"
           onSubmit={(event) => {
             event.preventDefault();
             if (!password) return;
@@ -144,34 +114,37 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
             }
           }}
         >
-          <h2 id="vnc-auth-title" style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{t("vnc.authTitle")}</h2>
-          <p style={{ marginBottom: 8 }}>{t("vnc.authBody", { host: `${view.host}:${view.port}` })}</p>
+          <h2 id="vnc-auth-title" className="vnc-connection-title">
+            <span className="vnc-connection-icon"><LockKeyhole size={20} /></span>
+            {t("vnc.authTitle")}
+          </h2>
+          <p id="vnc-auth-body" className="vnc-connection-description">{t("vnc.authBody", { host: `${view.host}:${view.port}` })}</p>
           {view.error && (
-            <p data-testid="vnc-auth-error" role="alert" style={{ color: "#e66", marginBottom: 8 }}>{view.error}</p>
+            <p data-testid="vnc-auth-error" role="alert" className="vnc-connection-error">{view.error}</p>
           )}
-          <label style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <label className="vnc-connection-field">
             {t("vnc.authUsername")}
             <input
               data-testid="vnc-auth-username"
-              className="taomni-input"
+              className="taomni-input vnc-connection-input"
               value={username}
               autoComplete="username"
               onChange={(event) => setUsername(event.target.value)}
             />
           </label>
-          <label style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <label className="vnc-connection-field">
             {t("vnc.authPassword")}
             <input
               ref={passwordRef}
               data-testid="vnc-auth-password"
-              className="taomni-input"
+              className="taomni-input vnc-connection-input"
               type="password"
               value={password}
               autoComplete="current-password"
               onChange={(event) => setPassword(event.target.value)}
             />
           </label>
-          <label style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 16 }}>
+          <label className="vnc-connection-check">
             <input
               type="checkbox"
               data-testid="vnc-auth-remember"
@@ -180,12 +153,12 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
             />
             {t("vnc.authRemember")}
           </label>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button type="submit" data-testid="vnc-auth-ok" style={BUTTON_STYLE} disabled={!password}>
-              {t("vnc.ok")}
-            </button>
-            <button type="button" data-testid="vnc-auth-cancel" style={BUTTON_STYLE} onClick={actions.cancelAuth}>
+          <div className="vnc-connection-actions">
+            <button type="button" data-testid="vnc-auth-cancel" className="vnc-connection-button" onClick={actions.cancelAuth}>
               {t("vnc.cancel")}
+            </button>
+            <button type="submit" data-testid="vnc-auth-ok" className="vnc-connection-button vnc-connection-primary" disabled={!password}>
+              {t("vnc.ok")}
             </button>
           </div>
         </form>,
@@ -193,17 +166,17 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
       );
     case "reconnecting":
       return backdrop(
-        <div style={{ color: "#ccc", textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
-          <p style={{ color: "#e88" }}>{view.reason ? t("vnc.disconnectedReason", { reason: view.reason }) : t("vnc.disconnected")}</p>
+        <div className="vnc-connection-card vnc-connection-status">
+          <p className="vnc-connection-error">{view.reason ? t("vnc.disconnectedReason", { reason: view.reason }) : t("vnc.disconnected")}</p>
           <p data-testid="vnc-reconnect-countdown">
             {t("vnc.reconnectingIn", { attempt: view.attempt, seconds: view.secondsLeft })}
           </p>
           <div style={{ display: "flex", gap: 8 }}>
-            <button ref={primaryRef} type="button" data-testid="vnc-reconnect" style={BUTTON_STYLE} onClick={actions.reconnect}>
+            <button ref={primaryRef} type="button" data-testid="vnc-reconnect" className="vnc-connection-button vnc-connection-primary" onClick={actions.reconnect}>
               <RefreshCw size={14} />
               {t("vnc.reconnectNow")}
             </button>
-            <button type="button" data-testid="vnc-reconnect-stop" style={BUTTON_STYLE} onClick={actions.stop}>
+            <button type="button" data-testid="vnc-reconnect-stop" className="vnc-connection-button" onClick={actions.stop}>
               <Square size={12} />
               {t("vnc.stop")}
             </button>
@@ -213,11 +186,11 @@ export function VncConnectionOverlay({ view, actions }: { view: VncOverlayView; 
       );
     case "disconnected":
       return backdrop(
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <div style={{ color: "#e44", textAlign: "center" }}>
+        <div className="vnc-connection-card vnc-connection-status">
+          <div className="vnc-connection-error">
             <p>{view.reason ? t("vnc.disconnectedReason", { reason: view.reason }) : t("vnc.disconnected")}</p>
           </div>
-          <button ref={primaryRef} type="button" data-testid="vnc-reconnect" style={BUTTON_STYLE} onClick={actions.reconnect}>
+          <button ref={primaryRef} type="button" data-testid="vnc-reconnect" className="vnc-connection-button vnc-connection-primary" onClick={actions.reconnect}>
             <RefreshCw size={14} />
             {t("vnc.reconnect")}
           </button>

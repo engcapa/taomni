@@ -116,6 +116,10 @@ steps:
 - eval_readonly:
     expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 4'
     timeout_sec: 10
+- eval_readonly:
+    expression: "document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16, 1, 1).data[3] === 255"
+    timeout_sec: 10
+- wait: 1.5
 - screenshot: 156-vnc-sustained-input.png
 verification:
   review: reviewed
@@ -161,12 +165,15 @@ verification:
       expectation: The fixture event log contains the keysym for the typed key.
     - step: 35
       expectation: The painted-frame counter reaches at least four, accounting for the initial pixels and all three remote repaint updates after the input burst.
+    - step: 36
+      expectation: The final resized framebuffer contains opaque pixels instead of a cleared canvas.
     results:
     - 18
     - 19
     - 25
     - 26
     - 35
+    - 36
   - id: R2
     requirement: Remote DesktopSize changes still reach the canvas after sustained input, proving the relay continues requesting and painting updates.
     actions:
@@ -189,12 +196,15 @@ verification:
       expectation: The second resized framebuffer is painted before the final resize.
     - step: 35
       expectation: At least four frames have been painted after the sustained input and resize sequence.
+    - step: 36
+      expectation: The final resized canvas still contains rendered pixels.
     results:
     - 28
     - 29
     - 31
     - 32
     - 35
+    - 36
   visual:
   - check: The final connected session shows the fixture gradient without a stale overlay, clipped canvas or frozen blank surface.
     method: manual

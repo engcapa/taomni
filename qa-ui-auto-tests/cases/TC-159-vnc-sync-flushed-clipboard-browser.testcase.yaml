@@ -1,0 +1,185 @@
+id: TC-159
+title: VNC accepts TigerVNC sync-flushed clipboard and preserves bidirectional copy (browser)
+description: Receive a finished zlib stream, then two independent TigerVNC-style Z_SYNC_FLUSH messages with Unicode
+  text. Verify exact clipboard content, send a new local clipboard back, and then verify pointer/key input and repaint.
+  Browser clipboard reads cover the preview bridge; TC-158 proves the native boundary.
+covers:
+- F9.6
+tags:
+- vnc
+- p1
+- regression
+modes:
+- browser
+fixtures:
+- reset_db
+- vnc_required
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-vnc"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${fixture.vnc_host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.vnc_port}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-vnc-sync-clipboard-browser
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-sync-clipboard-browser"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-sync-clipboard-browser"]'
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 20
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 20
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_VNC_PASSWORD}
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
+    timeout_sec: 20
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "auth", "ok": true, "security": "VNCAuth"'
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "ext_clipboard", "action": "caps"'
+- host_write_file:
+    path: ${fixture.vnc_control}
+    text: 'extclip finished-stream-copy
+
+      '
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, 'finished-stream-copy'))
+    timeout_sec: 15
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "clipboard_sent", "flush": "finish", "text": "finished-stream-copy"'
+- host_write_file:
+    path: ${fixture.vnc_control}
+    text: 'extclip-sync LXQt 复制一 中文 123
+
+      '
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, 'LXQt 复制一 中文 123'))
+    timeout_sec: 15
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "clipboard_sent", "flush": "sync", "text": "LXQt 复制一 中文 123"'
+- host_write_file:
+    path: ${fixture.vnc_control}
+    text: 'extclip-sync LXQt 复制二 第二次 fresh stream
+
+      '
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, 'LXQt 复制二 第二次 fresh stream'))
+    timeout_sec: 15
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "clipboard_sent", "flush": "sync", "text": "LXQt 复制二 第二次 fresh stream"'
+- seed_clipboard: client-to-server-copy-after-sync
+- click: '[data-testid="vnc-canvas"]'
+- press:
+    selector: '[data-testid="vnc-canvas"]'
+    key: Control+v
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "ext_clipboard", "action": "provide", "formats": 1, "text": "client-to-server-copy-after-sync"'
+- press:
+    selector: '[data-testid="vnc-canvas"]'
+    key: a
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"keysym": 97, "keysym_hex": "0x61"'
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "pointer", "mask": 1'
+- host_write_file:
+    path: ${fixture.vnc_control}
+    text: 'resize 1024 768
+
+      '
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
+    timeout_sec: 15
+- eval_readonly:
+    expression: document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16, 1, 1).data[3]
+      === 255
+    timeout_sec: 10
+- assert_not_visible: '[data-testid="vnc-reconnect"]'
+- wait: 1.5
+- screenshot: 159-vnc-clipboard-still-connected.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Finished and independent sync-flushed remote copies reach the clipboard exactly; reverse copy,
+      input and repaint still work without disconnecting.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 12
+    - 14
+    - 16
+    - 17
+    - 21
+    - 24
+    - 27
+    - 30
+    - 31
+    - 32
+    - 34
+    - 37
+    checkpoints:
+    - step: 22
+      expectation: Finished zlib clipboard text is received exactly.
+    - step: 25
+      expectation: First sync-flushed Unicode copy is received exactly.
+    - step: 28
+      expectation: Second independent sync-flushed copy is received exactly.
+    - step: 33
+      expectation: The fixture receives the new local clipboard text after both remote copies.
+    - step: 35
+      expectation: Typing still reaches the same session.
+    - step: 36
+      expectation: Pointer input still reaches the session.
+    - step: 38
+      expectation: The relay still processes a remote desktop resize.
+    - step: 39
+      expectation: The resized framebuffer contains opaque pixels.
+    - step: 40
+      expectation: There is no disconnected/reconnecting overlay.
+    results:
+    - 22
+    - 25
+    - 28
+    - 33
+    - 35
+    - 36
+    - 38
+    - 39
+    - 40
+  visual:
+  - check: The final screenshot shows a painted remote desktop without an error overlay.
+    method: manual
+    reason: Clipboard contents and DOM dimensions do not establish visual correctness.
+  native:
+  - check: This case exercises Chromium clipboard and the preview bridge only; use TC-158 for OS/Rust evidence.
+    method: not-applicable
+    reason: Browser clipboard cannot establish the packaged native clipboard boundary.
