@@ -1308,3 +1308,5 @@ SSH 启动回归补充：TC-155 与 TC-IDE-PARITY-027-02 在真实认证、原 r
 N15 路径输入补充：在 Enter 之前用 `assert_value` 要求路径框精确等于隔离 fixture 的完整本地目录。它补充既有上传 growing/pause、退出取消、MySQL rollback 与进程退出检查；原 126 个动作和结果均保留，总预算仍为 600 秒。原生输入器复用已存在的 verified focus，避免 WebKit 重新点击 blur-commit 输入框使 Ctrl+A 落到整页。当前修复的单测通过不代替三端原生复验。
 
 独立进程 oracle 补充：Windows 使用 Toolhelp32 和 QueryFullProcessImageNameW 读取 OS 进程树与完整 executable，Linux/macOS 继续使用独立 OS 枚举。running 必须在本轮 driver 后代树中找到唯一 QA executable 并记录 PID；exited 必须确认该进程消失，原 PID 的 executable 暂时不可读不记退出。N15 在 [run 37216273760](https://github.com/engcapa/taomni/actions/runs/37216273760) 的 Linux/macOS 127 步已通过；Windows 原 CIM 枚举超时的失败报告保留，新 oracle 待 GitHub 复验。预算未改变。
+
+Windows N15 的新 oracle 已在固定输入 `dadb395d374a49524bc652bea351b987ae91fe86` 的 [run 37217880429](https://github.com/engcapa/taomni/actions/runs/37217880429) 127 步全部通过，报告身份、native build 和原始 ZIP hashes 匹配。随后同输入的六端 249 ID 运行中，Linux browser 190/0/0、macOS browser 189/1/0；macOS B18 原定位命中了隐藏 alpha view，现对 alpha/beta 的 list/file/download 操作分别限定真实 Host owner。95 步、150 秒和全部业务结果保持，修正输入待 GitHub 复验。

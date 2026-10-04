@@ -23,7 +23,7 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。Windows SSH、三端退出重启和 Host 往返已经精准复验通过；N15 的路径修复已在 Linux/macOS 通过，Windows 独立进程枚举超时需要修复输入复验。历史失败证据完整保留。
+TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。Windows SSH、三端退出重启、Host 往返与 N15 已精准复验通过；完整 249 ID 的运行仍在收集报告，macOS B18 命中隐藏 owner 的用例定位需要修正复验。历史失败证据完整保留。
 
 当前完整范围为 249 个独立 ID：browser 三端各 190，native Linux 67 / Windows 61 / macOS 60，共 758 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-269.txt`，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
@@ -228,3 +228,10 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - [run 37216273760](https://github.com/engcapa/taomni/actions/runs/37216273760)，固定输入 `2bec9b26d5238e271d101b3ec33db27bfe449ee4`：Linux/macOS native 各 1/0/0，Windows 0/1/0。三份身份、receipt/config、native build 与 ZIP hashes 匹配。两端 N15 完整 127 步通过，Linux 路径修复得到实际证明；已检查 Linux 的 DB/Notes 同屏原图，无明显裁切。Windows 在 step 47 的独立 `Get-CimInstance` 全进程查询超过原有 15 秒预算，尚未执行该输入的 SFTP 路径部分。
 - Windows 独立 oracle 改为 Toolhelp32 + QueryFullProcessImageNameW，读取真实 PID、父 PID、完整 Unicode executable；所有已打开句柄在成功/失败时关闭。保护进程或查询时已退出的 PID 保留未知路径；观察到原 PID 但无法读取路径，不能误判 app 已退出。保留原 15 秒观察和 N15 600 秒 case 预算，未读取 renderer 的 PID 作为独立证据。WebView2 精确 profile 清理继续保持原身份保护。
 - 本地工具单测 285：124 项，115 pass / 9 平台限定 skip / 0 fail。包含 Windows API 实测识别本次 Python 单测进程的 PID、parent 和真实 executable，以及 Unicode 路径、访问拒绝、API 枚举失败/句柄清理和未知 executable 不能证明退出。284 的误判退出测试改前真实失败；另一个旧 mock 的 TypeError 保留但不计为根因证明。产品和 native build 输入未修改；下一输入先复验 Windows N15，再执行最终六端集合。
+
+### 六端统一运行与 SFTP owner 定位
+
+- [Windows N15 run 37217880429](https://github.com/engcapa/taomni/actions/runs/37217880429)，输入 `dadb395d374a49524bc652bea351b987ae91fe86`：1 pass / 0 fail / 0 skip，全部 127 步通过；source/runner/case/selection/receipt/config/native build 与 ZIP hashes 匹配。真实 Win32 oracle、路径输入、SFTP growing/pause、取消保留、MySQL rollback 与进程退出通过。
+- [统一 run 37218987069](https://github.com/engcapa/taomni/actions/runs/37218987069)，同一固定输入，249 ID / 758 次，selection 无 gaps/unreviewed。已收齐 Linux browser 190/0/0、macOS browser 189/1/0；两份身份、receipt/config 与 ZIP hashes 匹配，其余报告尚在运行。已查看这两端共 22 张 Home/Code/Git/SFTP/Tao 等原图，无明显遮挡；不提前宣布六端通过。
+- macOS B18 step 25 的 `.first` 命中了 parking 中被隐藏的 alpha 文件行；实际 Host 为可见且 ready 的 beta，原图中目标 job.txt 存在。用例现在以 Host owner 前缀精确限定两次 list/file/download 操作；隐藏的旧 controller/view 按设计保留。完整 95 步和 150 秒预算不变，所有 bytes/state/count、后台、pause/resume、完成通知与 held cancel 的断言保留。产品和 runner 未修改。
+- 293 audit gate 通过，baseline 未降低；294 的 StableSurface / sftpController 既有单测 2 files / 4 tests 全通过。修正只涉及六个定位 selector，未用 force click 或扩大超时；下一输入先三端 browser 精准复验 B18，同时收齐统一运行的其余原始报告。
