@@ -125,6 +125,8 @@ static OPENING: AtomicBool = AtomicBool::new(false);
 static STARTING_RECORDING: AtomicBool = AtomicBool::new(false);
 static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
 static PIN_COUNTER: AtomicU64 = AtomicU64::new(1);
+#[cfg(all(debug_assertions, target_os = "macos"))]
+static QA_WINDOW_HIDE_CALLS: AtomicU64 = AtomicU64::new(0);
 
 struct RecordingStartGuard;
 
@@ -542,7 +544,12 @@ fn hide_app_windows(app: &AppHandle) -> bool {
         {
             continue;
         }
-        if window.is_visible().unwrap_or(false) && window.hide().is_ok() {
+        if !window.is_visible().unwrap_or(false) {
+            continue;
+        }
+        #[cfg(all(debug_assertions, target_os = "macos"))]
+        QA_WINDOW_HIDE_CALLS.fetch_add(1, Ordering::SeqCst);
+        if window.hide().is_ok() {
             hid_any = true;
             if !state.hidden.contains(&label) {
                 state.hidden.push(label);
@@ -647,6 +654,12 @@ async fn open_overlay_inner(
     current_window: Option<WebviewWindow>,
 ) -> Result<(), String> {
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
+    capture::request_capture_permission(app)
+        .await
+        .map_err(internal_error)?;
+    if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
+        return Err("screenshot opening was cancelled".into());
+    }
     let display = {
         let app = app.clone();
         blocking("display lookup", move || match display_id {

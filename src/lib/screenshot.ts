@@ -110,6 +110,7 @@ export type ScrollMode = "auto" | "manual";
 /** Event the backend emits when a recording stops on its own. */
 export const RECORDING_ENDED_EVENT = "screenshot://recording-ended";
 export const SCROLL_PROGRESS_EVENT = "screenshot://scroll-progress";
+export const SCREENSHOT_OPEN_FAILED_EVENT = "screenshot://open-failed";
 
 export interface ScrollStatus { frames: number; mode: ScrollMode; needsOverlap: boolean; }
 

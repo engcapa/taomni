@@ -37,6 +37,7 @@ function bundleType(name) {
 export function composeUpdaterManifest({
   artifactsDir, outputDir, tag, repository, notes = "", pubDate = new Date().toISOString(),
   requiredPlatforms = RELEASE_PLATFORMS,
+  requireMacosInstallers = false,
 }) {
   if (!/^v\d+\.\d+\.\d+(?:-[\da-zA-Z.-]+)?(?:\+[\da-zA-Z.-]+)?$/.test(tag)) throw new Error("Invalid release tag");
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error("Invalid GitHub repository");
@@ -44,6 +45,8 @@ export function composeUpdaterManifest({
   const baseUrl = `https://github.com/${repository}/releases/download/${encodeURIComponent(tag)}`;
   const entries = new Map();
   const assets = [];
+  const installers = [];
+  const installerPlatforms = new Set();
   const names = new Set();
   const register = (key, entry) => {
     if (entries.has(key)) throw new Error(`Duplicate updater target: ${key}`);
@@ -54,6 +57,16 @@ export function composeUpdaterManifest({
     if (!artifact.isDirectory()) throw new Error(`Expected artifact directory: ${artifact.name}`);
     const { os, arch } = artifactPlatform(artifact.name, version);
     const files = filesIn(join(artifactsDir, artifact.name));
+    for (const installer of files.filter((path) => path.endsWith(".dmg"))) {
+      if (os !== "darwin") throw new Error(`macOS installer in a non-macOS artifact: ${installer}`);
+      const name = basename(installer);
+      if (names.has(name)) throw new Error(`Conflicting release asset filename: ${name}`);
+      names.add(name);
+      const platform = `${os}-${arch}`;
+      if (installerPlatforms.has(platform)) throw new Error(`Duplicate macOS installer: ${platform}`);
+      installerPlatforms.add(platform);
+      installers.push({ source: installer, name });
+    }
     for (const bundle of files.filter((path) => bundleType(basename(path)))) {
       if (!existsSync(`${bundle}.sig`)) throw new Error(`Missing signature: ${bundle}.sig`);
     }
@@ -81,6 +94,9 @@ export function composeUpdaterManifest({
   if (windows) register("windows-x86_64", windows);
   for (const key of requiredPlatforms) {
     if (!entries.has(key)) throw new Error(`missing required platform: ${key}`);
+    if (requireMacosInstallers && key.startsWith("darwin-") && !installerPlatforms.has(key)) {
+      throw new Error(`Missing macOS release installer: ${key}`);
+    }
   }
   if (assets.length === 0) throw new Error("No signed updater assets found");
   if (existsSync(outputDir) && (!statSync(outputDir).isDirectory() || readdirSync(outputDir).length)) {
@@ -95,8 +111,9 @@ export function composeUpdaterManifest({
     copyFileSync(asset.bundle, join(outputDir, asset.name));
     copyFileSync(asset.sig, join(outputDir, `${asset.name}.sig`));
   }
+  for (const installer of installers) copyFileSync(installer.source, join(outputDir, installer.name));
   writeFileSync(join(outputDir, "latest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  return { manifest, assets: assets.map((asset) => asset.name) };
+  return { manifest, assets: assets.map((asset) => asset.name), installers: installers.map((installer) => installer.name) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -105,6 +122,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const result = composeUpdaterManifest({
     artifactsDir, outputDir, tag: process.env.TAG, repository: process.env.GITHUB_REPOSITORY,
     notes: process.env.RELEASE_NOTES, pubDate: process.env.PUB_DATE,
+    requireMacosInstallers: true,
   });
-  console.log(`Staged ${result.assets.length} signed updater assets for ${Object.keys(result.manifest.platforms).length} platform keys`);
+  console.log(`Staged ${result.assets.length} signed updater assets and ${result.installers.length} macOS installers for ${Object.keys(result.manifest.platforms).length} platform keys`);
 }

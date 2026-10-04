@@ -1,0 +1,27 @@
+id: TC-SHOT-N19
+title: macOS screenshot permission denial blocks partial captures before hiding windows
+covers: [F27.1, F27.2]
+tags: [screenshot, macos, native, regression, p1]
+modes: [native]
+native_platforms: [macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: capture-permission-error}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: still-capture-permission
+    requirement: Full and region capture commands reject denied Screen Recording access; default/current-window UI entries and the production global-shortcut handler show dismissible settings/restart instructions before any application-window hide or screenshot artifact.
+    actions: [1]
+    checkpoints:
+    - step: 3
+      expectation: Native IPC errors name Screen Recording. Each UI entry shows a visible permission alert with settings, reauthorization and restart instructions; window hide calls remain zero, main remains visible, and no overlay or new artifact exists. Dismiss the alert and confirm the screenshot button is enabled again.
+    - {step: 4, expectation: Main screenshot entry remains usable.}
+    results: [3, 4]
+  visual:
+  - {check: Permission remediation alert, method: automated, reason: "Actual packaged WKWebView alert visibility, text and dismissal are inspected."}
+  native:
+  - {check: Denied capture and window boundary, method: automated, reason: "Inject only denial in the isolated debug QA app; call production commands/UI entries and observe actual window-hide calls. No host TCC permission is granted or reset. The shortcut handler is exercised directly; physical OS key delivery and Apple's consent dialog are outside this case."}

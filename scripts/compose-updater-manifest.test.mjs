@@ -107,3 +107,32 @@ test("refuses to overwrite nonempty staging directories", (t) => {
   assert.throws(() => composeUpdaterManifest(f.options), /empty/);
   assert.equal(readFileSync(join(f.outputDir, "keep.txt"), "utf8"), "preserve me");
 });
+
+test("stages both macOS DMG installers alongside unchanged signed updater archives", (t) => {
+  const f = fixture(t);
+  for (const arch of ["aarch64", "x86_64"]) {
+    writeFileSync(join(f.artifactsDir, `taomni-0.4.29-macos-${arch}`, `Taomni_0.4.29_${arch}.dmg`), `${arch} signed installer bytes`);
+  }
+  const result = composeUpdaterManifest({ ...f.options, requireMacosInstallers: true });
+  assert.equal(result.installers.length, 2);
+  for (const arch of ["aarch64", "x86_64"]) {
+    assert.equal(readFileSync(join(f.outputDir, `Taomni_0.4.29_${arch}.dmg`), "utf8"), `${arch} signed installer bytes`);
+  }
+  assert(!Object.values(result.manifest.platforms).some((entry) => entry.url.endsWith(".dmg")));
+});
+
+test("requires both macOS installers for release staging without imposing installers on updater-only QA fixtures", (t) => {
+  const f = fixture(t);
+  assert.throws(() => composeUpdaterManifest({ ...f.options, requireMacosInstallers: true }), /Missing macOS release installer/);
+  assert(!readdirSync(f.root).includes("staged"));
+  assert.doesNotThrow(() => composeUpdaterManifest(f.options));
+});
+
+test("rejects same-named DMG installers before staging", (t) => {
+  const f = fixture(t);
+  for (const arch of ["aarch64", "x86_64"]) {
+    writeFileSync(join(f.artifactsDir, `taomni-0.4.29-macos-${arch}`, "Taomni.dmg"), `${arch} installer`);
+  }
+  assert.throws(() => composeUpdaterManifest(f.options), /Conflicting release asset filename/);
+  assert(!readdirSync(f.root).includes("staged"));
+});

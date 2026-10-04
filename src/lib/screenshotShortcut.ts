@@ -5,8 +5,11 @@
 // (chord owned by another app, Wayland, browser preview) the same chord is
 // still handled while a Taomni window is focused.
 
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { create } from "zustand";
+import { useAppDialogs, formatUnknownError } from "./appDialogs";
+import { useT } from "./i18n";
 import { getAppPlatform, isTauriRuntime } from "./runtime";
 import {
   eventMatchesAccelerator,
@@ -19,6 +22,7 @@ import {
   openScreenshotOverlay,
   setShortcut,
   shortcutStatus,
+  SCREENSHOT_OPEN_FAILED_EVENT,
   type ShortcutStatus,
 } from "./screenshot";
 
@@ -85,12 +89,35 @@ export function screenshotShortcutLabel(status: ShortcutStatus): string {
  * the screenshot tool's own windows.
  */
 export function useScreenshotAppShortcut(): void {
+  const dialogs = useAppDialogs();
+  const t = useT();
   const status = useScreenshotShortcutStore((s) => s.status);
   const refresh = useScreenshotShortcutStore((s) => s.refresh);
+  const showOpenError = useCallback((error: unknown) => dialogs.alert({
+    title: t("screenshot.tooltip"),
+    message: t("screenshot.openFailed", { error: formatUnknownError(error) }),
+    tone: "error",
+  }), [dialogs, t]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!isTauriRuntime() || getCurrentWindow().label.startsWith("screenshot-")) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWindow().listen<string>(SCREENSHOT_OPEN_FAILED_EVENT, ({ payload }) => {
+      void showOpenError(payload);
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    }).catch((error) => console.error("[screenshot] error listener failed", error));
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [showOpenError]);
 
   useEffect(() => {
     if (!status.enabled || (isTauriRuntime() && status.registered)) return;
@@ -102,10 +129,10 @@ export function useScreenshotAppShortcut(): void {
       if (target?.closest("input, textarea, select, [contenteditable='true'], .cm-editor, .xterm")) return;
       event.preventDefault();
       void openScreenshotOverlay().catch((err) => {
-        console.error("[screenshot] app shortcut failed", err);
+        void showOpenError(err);
       });
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [status]);
+  }, [status, showOpenError]);
 }

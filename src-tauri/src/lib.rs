@@ -1115,6 +1115,7 @@ pub fn run() {
             screenshot::qa::screenshot_qa_recorder,
             screenshot::qa::screenshot_qa_controls,
             screenshot::qa::screenshot_qa_scroll_permission_error,
+            screenshot::qa::screenshot_qa_capture_permission_error,
             screenshot::qa::screenshot_qa_full_recorder,
             screenshot::qa::screenshot_qa_pin,
             screenshot::qa::pin_tools::screenshot_qa_pin_tools,

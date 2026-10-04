@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from qa_ui_auto.screenshot_scenarios import run_scenario
+from qa_ui_auto.screenshot_scenarios import SCENARIOS, run_scenario
 from qa_ui_auto.steps import StepError
 
 
@@ -14,6 +14,13 @@ class ScreenshotScenariosTest(TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.ctx = Mock()
         self.ctx.case_dir = Path(self.tmp.name)
+
+    def test_schema_and_runner_accept_the_same_native_scenarios(self):
+        schema_path = Path(__file__).resolve().parent.parent / "schema" / "testcase.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        scenarios = schema["$defs"]["step"]["properties"]["native_screenshot_scenario"]["properties"]["scenario"]["enum"]
+        self.assertEqual(len(scenarios), len(set(scenarios)))
+        self.assertEqual(set(scenarios), set(SCENARIOS))
 
     def test_settles_promises_instead_of_serializing_pending_promise(self):
         self.ctx.session.execute.side_effect = [True, {"done": False},
@@ -49,7 +56,7 @@ class ScreenshotScenariosTest(TestCase):
                 self.assertTrue(any(json.loads(path.read_text())["transportError"] == str(error) for path in files))
 
     def test_new_scenarios_only_invoke_their_fixed_commands(self):
-        for scenario, command in (("pin-tools", "screenshot_qa_pin_tools"), ("scroll-manual", "screenshot_qa_scroll_manual"), ("colors", "screenshot_qa_colors"), ("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand"), ("controls", "screenshot_qa_controls"), ("full-recorder", "screenshot_qa_full_recorder"), ("scroll-permission-error", "screenshot_qa_scroll_permission_error")):
+        for scenario, command in (("pin-tools", "screenshot_qa_pin_tools"), ("scroll-manual", "screenshot_qa_scroll_manual"), ("colors", "screenshot_qa_colors"), ("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand"), ("controls", "screenshot_qa_controls"), ("full-recorder", "screenshot_qa_full_recorder"), ("scroll-permission-error", "screenshot_qa_scroll_permission_error"), ("capture-permission-error", "screenshot_qa_capture_permission_error")):
             self.ctx.session.execute.side_effect = [True, {"done": True, "value": 'OK {"pixels":100}'}, True]
             run_scenario(self.ctx, {"scenario": scenario})
             self.assertIn(command, self.ctx.session.execute.call_args_list[-3].args[0])
