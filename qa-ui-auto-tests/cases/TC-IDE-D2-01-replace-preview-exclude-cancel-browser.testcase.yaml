@@ -15,7 +15,8 @@ description: 'Browser gate case (ED-FIND-004 A1/A2). Fills the preview file with
 
   Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
   user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  retained. Before filling the CodeMirror buffer, use its platform Mod+A binding
+  to select the whole document and assert the complete input before opening preview.'
 covers:
 - F25.5
 tags:
@@ -43,6 +44,9 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+a
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     value: 'first needle line
@@ -50,6 +54,13 @@ steps:
       second needle line
 
       '
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - first needle line
+    - second needle line
+    - ''
+    timeout_sec: 10
 - press: Control+s
 - wait: 1
 - press: Control+Shift+F
@@ -109,53 +120,64 @@ steps:
 verification:
   review: reviewed
   requirements:
+  - id: INPUT-R0
+    requirement: 编辑器全选后输入完整两行文本；打开替换预览前确认默认文件内容已被完整替换
+    actions:
+    - 13
+    - 14
+    - 15
+    checkpoints:
+    - step: 16
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["first needle line", "second needle line", ""], "timeout_sec": 10}}'
+    results:
+    - 16
   - id: R1
     requirement: 替换预览文件排除使计数从2降到0，取消后完整缓冲区不变
     actions:
-    - 24
-    - 28
-    - 31
+    - 26
+    - 30
+    - 33
     checkpoints:
-    - step: 25
+    - step: 27
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
-    - step: 26
+    - step: 28
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]",
         "contains": "2 of 2", "timeout_sec": 10}}'
-    - step: 27
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-replace-file-toggle\"]"}'
     - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-replace-file-toggle\"]"}'
+    - step: 31
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]",
         "contains": "0 of 2", "timeout_sec": 10}}'
-    - step: 30
+    - step: 32
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-preview\"]",
         "contains": "Every occurrence is excluded"}}'
-    - step: 32
+    - step: 34
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
         .cm-content .cm-line", "equals": ["first needle line", "second needle line",
         ""], "timeout_sec": 10}}'
     results:
-    - 32
+    - 34
   - id: R2
     requirement: 重新打开预览恢复2项；排除单条变为1项，取消后所有行仍完全不变
     actions:
-    - 33
-    - 36
+    - 35
     - 38
+    - 40
     checkpoints:
-    - step: 34
+    - step: 36
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
-    - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]",
-        "contains": "2 of 2", "timeout_sec": 10}}'
     - step: 37
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]",
-        "contains": "1 of 2", "timeout_sec": 10}}'
+        "contains": "2 of 2", "timeout_sec": 10}}'
     - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]",
+        "contains": "1 of 2", "timeout_sec": 10}}'
+    - step: 41
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
         .cm-content .cm-line", "equals": ["first needle line", "second needle line",
         ""], "timeout_sec": 10}}'
     results:
-    - 39
+    - 41
   visual:
   - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
     method: manual
