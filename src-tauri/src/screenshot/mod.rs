@@ -884,6 +884,8 @@ fn open_pin(
         .inner_size((lw * fit).round().max(240.0), (lh * fit).round().max(160.0))
         .transparent(true)
         .decorations(false)
+        // A native shadow darkens the desktop through translucent pin pixels on macOS.
+        .shadow(false)
         .resizable(true)
         .always_on_top(true)
         .skip_taskbar(true)

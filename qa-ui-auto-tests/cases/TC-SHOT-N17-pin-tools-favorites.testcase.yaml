@@ -47,4 +47,4 @@ verification:
   native:
   - check: OS input, clipboard, windows and persistent files
     method: automated
-    reason: Native fixed scenarios verify actual OS geometry including the 64x64 logical compact window, real desktop opacity and independent original pixels. Save uses the OS dialog and exact destination, with US physical shortcut keycodes on hosted macOS; no dialog mock substitutes for the native save.
+    reason: Native fixed scenarios verify actual OS geometry including the 64x64 logical compact window, real desktop opacity matching the original-image/background blend without extra shadow darkening, and independent original pixels. Save uses the OS dialog and exact destination, with US physical shortcut keycodes on hosted macOS; no dialog mock substitutes for the native save.
