@@ -1,11 +1,10 @@
 id: TC-DB-TX-002-reconnect-close-native
-title: Native manual commit warns after a reconnect and rolls back on tab close
-description: |
-  DB-TX-002 V3/V4. On a real MySQL/MariaDB session in Manual mode, killing the
-  session connection drops a pending INSERT: the next statement reconnects and
-  the app shows "Connection re-established" with the lost count. Closing the
-  tab with a pending INSERT rolls it back and says so in the status bar; the
-  reopened session is back in Auto mode and the row is absent.
+title: Native reconnect drops a transaction; explicit close cancellation retains it and rollback removes
+  its row
+description: 'Real MySQL/MariaDB. KILL CONNECTION_ID loses one pending INSERT and reconnect reports the
+  loss. Shell v2 close first requires an explicit transaction choice: cancel retains the pending statement,
+  then rollback closes the tab. Reopening independently verifies Auto mode and count-0. Original SQL and
+  reconnect assertions are retained.'
 covers:
 - F-DB-1
 tags:
@@ -28,8 +27,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-db-tx2-password
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="side-tab-sessions"]'
+- shell_navigate: tools
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree"]'
 - wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
@@ -81,7 +80,7 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "CREATE TABLE IF NOT EXISTS qa_db_tx002_t (id INT); DELETE FROM qa_db_tx002_t WHERE id >= 0;"
+- type: CREATE TABLE IF NOT EXISTS qa_db_tx002_t (id INT); DELETE FROM qa_db_tx002_t WHERE id >= 0;
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="result-log-tab"]'
@@ -97,7 +96,7 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "INSERT INTO qa_db_tx002_t VALUES (1);"
+- type: INSERT INTO qa_db_tx002_t VALUES (1);
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="db-tx-pending"]'
@@ -105,7 +104,7 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "KILL CONNECTION_ID();"
+- type: KILL CONNECTION_ID();
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="db-execution-log"]'
@@ -116,7 +115,7 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx002_t;"
+- type: SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx002_t;
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="alert-dialog"]'
@@ -135,16 +134,39 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "INSERT INTO qa_db_tx002_t VALUES (2);"
+- type: INSERT INTO qa_db_tx002_t VALUES (2);
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="db-tx-pending"]'
     contains: 'Pending: 1'
     timeout_sec: 60
 - click: '[data-testid="tab-item"][data-tab-type="database"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="shell-close-risk"]'
+    name: data-risk-kind
+    equals: transaction
+- assert_disabled: '[data-testid="shell-close-confirm"]'
+- click: '[data-testid="shell-close-cancel"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="database"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="db-tx-pending"]'
+    contains: 'Pending: 1'
+    timeout_sec: 30
+- click: '[data-testid="tab-item"][data-tab-type="database"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-rollback"]'
+- click: '[data-testid="shell-close-confirm"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="database"]'
+    equal: 0
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
-    contains: Rolled back 1 uncommitted
+    contains: Rolled back 1 pending statement(s).
     timeout_sec: 30
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-tx2"]'
 - wait_for:
@@ -156,10 +178,153 @@ steps:
     equals: auto
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx002_t;"
+- type: SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx002_t;
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="query-result-grid"]'
     contains: count-0
     timeout_sec: 60
 - screenshot: db-tx-002-reconnect-close-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Reconnect reports the lost pending statement and the independent SELECT proves the INSERT
+      was rolled back.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    - 31
+    - 32
+    - 33
+    - 34
+    - 36
+    - 38
+    - 40
+    - 41
+    - 42
+    - 43
+    - 45
+    - 46
+    - 47
+    - 48
+    - 51
+    - 52
+    - 53
+    - 54
+    - 57
+    - 60
+    - 61
+    - 62
+    - 63
+    checkpoints:
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-run\"]:first-of-type
+        [data-testid=\"db-execution-log-summary\"]", "contains": "Success: 2", "timeout_sec": 60}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        1", "timeout_sec": 60}}'
+    - step: 50
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-run\"]:first-of-type
+        [data-testid=\"db-execution-log-summary\"]", "contains": "Failed: 1", "timeout_sec": 60}}'
+    - step: 56
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains":
+        "1 uncommitted statement(s) were lost"}}'
+    - step: 58
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "count-0",
+        "timeout_sec": 60}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        0", "timeout_sec": 60}}'
+    - step: 64
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        1", "timeout_sec": 60}}'
+    results:
+    - 29
+    - 37
+    - 44
+    - 50
+    - 56
+    - 58
+    - 59
+    - 64
+  - id: R2
+    requirement: Cancel close retains the same Manual transaction; explicitly rolling back closes the
+      tab and a reopened real connection independently reads count-0 in Auto mode.
+    actions:
+    - 65
+    - 69
+    - 73
+    - 75
+    - 76
+    - 80
+    - 83
+    - 84
+    - 85
+    - 86
+    checkpoints:
+    - step: 67
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-close-risk\"]", "name": "data-risk-kind",
+        "equals": "transaction"}}'
+    - step: 68
+      expectation: '{"assert_disabled": "[data-testid=\"shell-close-confirm\"]"}'
+    - step: 70
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 71
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"database\"]",
+        "equal": 1}}'
+    - step: 72
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        1", "timeout_sec": 30}}'
+    - step: 77
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 78
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"database\"]",
+        "equal": 0}}'
+    - step: 79
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Rolled
+        back 1 pending statement(s).", "timeout_sec": 30}}'
+    - step: 82
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"db-tx-mode\"]", "name": "data-mode",
+        "equals": "auto"}}'
+    - step: 87
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "count-0",
+        "timeout_sec": 60}}'
+    results:
+    - 67
+    - 68
+    - 70
+    - 71
+    - 72
+    - 77
+    - 78
+    - 79
+    - 82
+    - 87
+  visual:
+  - check: Read the final SQL result screenshot for readable transaction and grid feedback
+    method: manual
+    reason: Screenshot creation alone is not visual acceptance.
+  native:
+  - check: Real MySQL reconnect, cancelled close, explicit rollback and independently queried row count
+    method: automated
+    reason: A stub cannot establish transaction persistence or rollback.

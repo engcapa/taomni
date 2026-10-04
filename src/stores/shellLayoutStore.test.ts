@@ -6,7 +6,7 @@ describe("Shell layout ownership and temporary navigation", () => {
   beforeEach(() => {
     localStorage.clear();
     useShellLayoutStore.setState({ layout: defaultShellLayout(), initialized: false, writable: true, warning: null,
-      navigatorOverlay: false, overlayTarget: null, taoOpen: false, panels: {}, activePanelByEdge: {} });
+      navigatorOverlay: false, overlayTarget: null, taoOpen: false, overlay: null, panels: {}, activePanelByEdge: {} });
     useShellLayoutStore.getState().initialize();
   });
   it("opens a temporarily hidden navigator and preserves the expanded preference on dismissal", () => {
@@ -39,5 +39,13 @@ describe("Shell layout ownership and temporary navigation", () => {
     shell.removePanel(panel.id);
     shell.registerPanel(panel);
     expect(useShellLayoutStore.getState().panels[panel.id].preferredSize).toBe(420);
+  });
+  it("preserves the recent-panel operation dialog when its destination suppresses Tao", () => {
+    const shell = useShellLayoutStore.getState();
+    shell.registerPanel({ id: "recent", kind: "sftp", owner: { kind: "tab", tabId: "a" }, generation: 1, phase: "initializing", requestedOpen: false, pinned: true, placement: { kind: "dock", edge: "right" }, operation: null, error: null });
+    useShellLayoutStore.setState({ overlay: "panels", taoOpen: true });
+    shell.openPanel("recent");
+    expect(useShellLayoutStore.getState()).toMatchObject({ overlay: "panels", taoOpen: false });
+    expect(useShellLayoutStore.getState().panels.recent.requestedOpen).toBe(true);
   });
 });

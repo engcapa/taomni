@@ -1066,11 +1066,13 @@ export default function DbClientTab({
         return;
       }
       if (choice !== "commit" && choice !== "rollback") throw new Error("Unsupported transaction choice");
+      const pending = txStatusRef.current?.pending ?? 0;
       const next = await (choice === "commit" ? dbTxCommit : dbTxRollback)(connectionSessionId);
       applyTxStatus(next);
+      setStatusMessage(`${choice === "commit" ? "Committed" : "Rolled back"} ${pending} pending statement(s).`);
     },
     flush: async () => { await flushWorkspace(); },
-  }), [tabId, connectionSessionId, applyTxStatus, flushWorkspace, t]);
+  }), [tabId, connectionSessionId, applyTxStatus, flushWorkspace, setStatusMessage, t]);
 
   const scheduleWorkspaceSave = useCallback(() => {
     if (autoSaveDebounceRef.current) clearTimeout(autoSaveDebounceRef.current);

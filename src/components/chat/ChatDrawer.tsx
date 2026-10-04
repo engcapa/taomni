@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { isTauriRuntime } from "../../lib/runtime";
 import {
   Bell,
   Bot,
@@ -57,6 +58,7 @@ import { getQueryTab } from "../../lib/queryRegistry";
 import type { ChatOutputFormat } from "../../lib/chat/renderFormatted";
 import type { ChatAttachment } from "../../lib/chat/attachments";
 import { useT, type TranslateFn } from "../../lib/i18n";
+import { confirmAppDialog } from "../../lib/appDialogs";
 import { placementFromPoint, ribbonPositionStyle } from "../../lib/tao/ribbonPlacement";
 import { resolveChatDock } from "../../lib/chat/chatDock";
 import { useViewportSize } from "../../hooks/useViewportSize";
@@ -91,7 +93,7 @@ interface ChatDrawerProps {
 export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerProps) {
   const t = useT();
   const {
-    threads, activeThreadId, messages, sendingByThreadId, sendQueues, drawerOpen, drawerWidth,
+    threads, threadsError, messageErrors, activeThreadId, messages, sendingByThreadId, sendQueues, drawerOpen, drawerWidth,
     drawerHeight, drawerPosition, drawerPinned, drawerFloatingOpacity, drawerTabId,
     loadThreads, newThread, deleteThread, setActiveThread, loadMessages,
     enqueueMessage, dequeueSend, hideDrawer, setDrawerWidth, setDrawerHeight, setDrawerPosition,
@@ -109,6 +111,8 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
   const [notesUsed, setNotesUsed] = useState(hubTab === "notes");
   useEffect(() => { if (hubTab === "notes") setNotesUsed(true); }, [hubTab]);
   const noteAlerts = useNotesStore((s) => s.alerts);
+  const noteAlertError = useNotesStore((s) => s.alertError);
+  const contextPinned = useChatStore((s) => s.contextPinned);
   const ackNoteAlert = useNotesStore((s) => s.ackAlert);
   const aiDoneAlerts = useTaoAlertStore((s) => s.aiDone);
   const mailNewAlerts = useTaoAlertStore((s) => s.mailNew);
@@ -499,6 +503,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
     // currently focused terminal tab; final fallback is the legacy prop the
     // caller passed (kept for tests / programmatic use).
     const linked = activeThread?.linked_session_id ?? null;
+    if (shellHosted && linked && !linkedTab) return undefined;
     const entry = getTerminal(linked) ?? (linkedTab ? getTerminal(linkedTab.id) : null) ?? focusedTerminal;
     if (entry) {
       return entry.getLastLines(lines);
@@ -517,6 +522,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
     // fall back to whatever the host (TerminalPanel) staged.
     const ctx = attachedTerminalCtx ?? terminalContext;
     setError(null);
+    if (shellHosted && activeThread?.linked_session_id && !linkedTab) { setError(t("shell.targetUnavailable")); return; }
     try {
       let threadId = activeThreadId;
       if (!threadId) {
@@ -926,7 +932,6 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
             type="button"
             role="tab"
             aria-selected={hubTab === "chat"}
-            disabled={aiDisabled}
             title={aiDisabled ? t("shell.aiDisabled") : undefined}
             data-testid="tao-hub-tab-chat"
             className={`flex-1 h-7 inline-flex items-center justify-center gap-1 border-b-2 transition-colors ${
@@ -982,6 +987,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
 
         {error && <p data-testid="shell-target-error" role="alert" className="px-2 py-1 text-xs text-red-500">{error}</p>}
         <div className="flex-1 min-h-0 flex flex-col" style={{ display: hubTab === "notifications" ? "flex" : "none" }} inert={hubTab !== "notifications"}>
+          {noteAlertError && <div role="alert" data-testid="shell-alert-error" className="p-2 text-xs"><p>{noteAlertError}</p><button data-testid="shell-alert-retry" onClick={() => void useNotesStore.getState().refreshAlerts()}>{t("common.retry")}</button></div>}
           <TaoAlertInbox
             alerts={taoAlerts}
             history={alertHistory}
@@ -989,19 +995,29 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
             onJump={jumpToAlert}
             onAck={ackAlert}
             onHistoryLimitChange={setAlertHistoryLimit}
-            onClearHistory={clearAlertHistory}
+            onClearHistory={() => {
+              void confirmAppDialog({ message: t("tao.alertHistoryClearConfirm"), confirmLabel: t("tao.alertHistoryClear"), danger: true })
+                .then((confirmed) => { if (confirmed) clearAlertHistory(); });
+            }}
             embedded
           />
         </div>
         <div className="flex-1 min-h-0 flex flex-col" style={{ display: hubTab === "notes" ? "flex" : "none" }} inert={hubTab !== "notes"}>
           {shellHosted ? <>
-            {notesPanelMode === "floating" && <button data-testid="shell-notes-dock" className="taomni-btn m-3" onClick={() => dockNotes("hub")}>{t("notes.dock")}</button>}
+            {notesPanelMode === "floating" && <button data-testid="shell-notes-dock" className="taomni-btn m-3" onClick={() => {
+              if (isTauriRuntime()) void import("../../lib/shell/notesPanelWindow").then(({ requestNotesReturn }) => requestNotesReturn());
+              else dockNotes("hub");
+            }}>{t("notes.dock")}</button>}
             <SurfaceSlot id="notes:hub" className="flex-1 min-h-0 flex flex-col" />
           </> : (notesUsed || hubTab === "notes") && <NotesPanel />}
         </div>
-        <div data-testid="shell-chat-content" data-thread-id={activeThreadId ?? ""} data-ready={activeThreadId && Array.isArray(messages[activeThreadId]) ? "true" : "false"} className="flex-1 min-h-0 flex flex-col" style={{ display: hubTab === "chat" ? "flex" : "none" }} inert={hubTab !== "chat"}>
+        <div data-testid="shell-chat-content" data-thread-id={activeThreadId ?? ""} data-ready={activeThreadId && Array.isArray(messages[activeThreadId]) && !messageErrors[activeThreadId] ? "true" : "false"} className="flex-1 min-h-0 flex flex-col" style={{ display: hubTab === "chat" ? "flex" : "none" }} inert={hubTab !== "chat"}>
         {aiDisabled ? <p data-testid="shell-chat-disabled" className="p-3 text-sm">{t("shell.aiDisabled")}</p> : (
         <>
+        {(threadsError || activeThreadId && messageErrors[activeThreadId]) && <div role="alert" data-testid="shell-tao-error" className="p-2 text-xs">
+          {threadsError ?? (activeThreadId ? messageErrors[activeThreadId] : "")}
+          <button data-testid="shell-tao-retry" onClick={() => { if (threadsError) void loadThreads(); else if (activeThreadId) void loadMessages(activeThreadId); }}>{t("shell.retry")}</button>
+        </div>}
         {/* History panel */}
         {showHistory && (
           <div className="h-48 shrink-0 border-b border-[var(--taomni-divider)] overflow-hidden">
@@ -1017,6 +1033,13 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
 
         {/* Mode + provider switcher */}
         <div className="px-2 py-1 text-[10px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
+          {shellHosted && <div data-testid="shell-tao-context" data-binding={contextPinned ? "fixed" : "follow"} className="inline-flex items-center gap-1 text-xs">
+            <span>{linkedTabTitle ?? activeTab?.title ?? t("shell.targetUnavailable")}</span>
+            <button data-testid="shell-tao-context-pin" aria-pressed={contextPinned} aria-label={t("shell.pinContext")} onClick={() => {
+              useChatStore.setState({ contextPinned: !contextPinned });
+              if (contextPinned) void useChatStore.getState().syncTabChatWithActiveTab(activeChatTabId);
+            }}><Pin className="w-3 h-3" /></button>
+          </div>}
           {/* Scope badge: every visible thread is bound to a concrete app tab. */}
           {activeThread?.linked_session_id && (
             <span

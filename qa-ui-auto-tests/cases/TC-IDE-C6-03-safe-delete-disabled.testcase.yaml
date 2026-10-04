@@ -8,7 +8,10 @@ description: '§8.22.2 U1 refactor safety gate case. In the absence of a dedicat
 
   reason in UI, and fail closed with zero provider requests and zero disk writes.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -25,7 +28,7 @@ timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'

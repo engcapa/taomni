@@ -2,11 +2,11 @@
 
 > 配套设计：[详细设计 v2](./workspace-shell-ux-redesign-design.md)。基线 `5fb098474f072f4e0c7e99407ab0d072b7d49c53`，2026-10-03。
 >
-> 交接阶段：设计完成，所有运行结果为 **待执行**；本文不是自动化通过报告。
+> 设计规格与实际实施记录分开保存。以下 B/N 场景是完整验收规格；已实现 YAML 和实际执行范围见 [实施任务记录](./workspace-shell-ux-redesign-tasks.md#验证记录)，未落实的步骤仍为待实现/待执行。
 >
 > 规范：[qa-ui-auto authoring](../.agents/skills/qa-ui-auto/references/authoring.md#design-to-implementation-handoff)、[verb catalog](../.agents/skills/qa-ui-auto/references/verb-catalog.md)、[native testing](../.agents/skills/qa-ui-auto/references/native-testing.md)。
 >
-> 44 条 browser + 18 条 native，新增 ID `TC-SHELL-B01…B44` / `TC-SHELL-N01…N18` 已与当前 cases/、policy.yaml 去重；**均为拟新增，尚未登记或可执行**。足够的已有 case 应原位加强并回填实际 ID，避免重复维护。
+> 44 条 browser + 18 条 native，稳定 ID 为 `TC-SHELL-B01…B44` / `TC-SHELL-N01…N18`。当前已登记 44 browser + 13 native Shell YAML；N01/N13/N14 的自动化部分复用既有用例，N11 与 N17 的必要边界仍单列。数量与 schema/contract 通过不代表完整规格已验收，实际范围以 YAML requirements 和当前平台报告为准。
 
 导航：[browser 用例](#browser-cases) · [native 用例](#native-cases) · [运行与交接](#execution-handoff)。单条用例有稳定 `#v-b01` / `#v-n01` 形式的锚点，YAML checklist 可直接引用。
 
@@ -1131,6 +1131,8 @@
 
 ## 5. 实施后的运行命令与三端手册
 
+当前批次按用户要求，本地只完成单元测试与静态检查，browser/native 在 GitHub 的 `qa-ui-auto-platforms.yml` 执行。下列本地 CMD-B/CMD-N 保留为维护和手工边界的操作手册，不是本批次已运行或计划启动的本地回归。CI 的精确范围、SHA 与报告以 [实施任务](./workspace-shell-ux-redesign-tasks.md) 最新记录为准。
+
 ### CMD-B：browser
 
 以下从仓库根目录、PowerShell 执行；只在本设计的 YAML/fixtures/控件已落地后使用。先核实 localhost:5000 的 Vite 确实服务当前 checkout；已有健康服务可复用。后台 helper 避免驻留进程阻塞工具会话。
@@ -1213,16 +1215,34 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 
 ## 6. 交接登记与当前结果
 
+<a id="current-execution"></a>
+
 | 产物 / 范围 | 当前结果 | 实施完成时回填 |
 |---|---|---|
-| 44 browser 详细用例 | 已设计；未实现、未执行 | 实际 YAML ID/path、reviewed contract、report/checkpoint、target/retained结果 |
-| 18 native 详细用例 | 已设计；三端全部待执行 | 每个平台自动/手工步骤、binary identity、真实副作用、清理证据 |
-| fixture / verb / control 增补 | 已列职责与边界，尚未新增 | REGISTRY/schema/catalog/feature-list/policy 对应修改 |
-| 改前基线 | 静态源码与旧case已查；运行基线待执行 | 相关旧case增强后的实际结果，失败原因及输入身份 |
-| 视觉与可访问性 | 有明确尺寸/状态/操作断言，尚未评审产品画面 | 截图对应状态、几何、人工视觉结论、读屏/IME平台 |
+| 44 browser 详细用例 | B01～B44 YAML 已登记；前轮 32 条三端通过，后续源码及扩展分支待当前 SHA 的 GitHub 执行 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
+| 18 native 详细用例 | 13 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用；每个平台以最新报告为准 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
+| fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
+| 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
+| 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸已有自动化断言；历史部分画面已检查 | 当前 SHA 画面、读屏、OS DPI/跨屏与系统控件仍按平台单列 |
 | 性能 | 指标、负载、样本和比较方法已定；没有实测结论 | 原始baseline/candidate、噪声、p50/p95与资源，不宣称理论提速 |
-| 产品构建/协议服务 | 本轮未运行 | 仅实现后的必要构建/服务就绪与真正执行数，不记录空命令成功为覆盖 |
+| 产品构建/协议服务 | 历史两轮 GitHub 和 Windows QA 构建证据保留；当前重构输入需 GitHub 重新构建 | selection、实际执行数、服务就绪、receipt 与源码/二进制身份 |
 
-责任任务均在主设计 TASK-01～12；其中 TASK-11 将本稿转成规范 YAML 并维护目录，TASK-12汇总当前Windows结果、其它平台待执行项和真实缺口。若复用现有ID替代拟新增ID，保留 V-Bxx / V-Nxx 不变并更新路径与矩阵；不为了保持“62条”重复一套等价测试。
+责任任务均在主设计 TASK-01～12；其中 TASK-11 将本稿转成规范 YAML 并维护目录，TASK-12 汇总三平台实际结果和真实缺口。下表链接当前可执行自动化，不把整个设计条目的每个分支都视为已覆盖。
 
-本批已有授权是设计与用例编写；本次交付不表示产品已实现、真实服务已运行、浏览器或三端桌面已验证通过。
+| V / 规格 | 实际 case | 自动化边界 / 尚未建立的证据 |
+|---|---|---|
+| V-B01～B44 | `qa-ui-auto-tests/cases/TC-SHELL-Bxx-*.testcase.yaml`，ID 与设计一致 | 按每个 YAML 的 reviewed requirements 验收；B04 已覆盖 workspace 部分成功、迟到结果、取消和重试，混合会话认证/类型变化的额外组合仍以真实分支证据为准 |
+| V-N01 | [TC-MAIN-RAIL-03](../qa-ui-auto-tests/cases/TC-MAIN-RAIL-03-linux-native-window-drag.testcase.yaml)、N15 | Linux 实际 OS 拖动、应用退出；Windows/macOS 系统移动、最小化/最大化、交通灯及故障退出尚未由这些 case 证明 |
+| V-N02～N08 | `TC-SHELL-N02…N08` | 真实进程/SFTP/Git/工作区/Notes/磁盘/窗口与重启恢复；只覆盖 YAML 中的有序分支 |
+| V-N09 | [剪贴板](../qa-ui-auto-tests/cases/TC-SHELL-N09-clipboard-native.testcase.yaml)、既有 IDE-C3-02 | 三端 OS 文本读取、标签栏/总览内容精确相同、paste 一次与 undo；写入拒绝及非文本剪贴板恢复仍有明确缺口 |
+| V-N10 | [Linux 真 IME](../qa-ui-auto-tests/cases/TC-SHELL-N10-ime-linux-native.testcase.yaml)、既有 IDE-IMPROVE-008 | Linux X11/fcitx5 候选 commit/cancel；Windows/macOS 实际 IME 与系统应用切换尚未执行 |
+| V-N11 | 本文 MN-1 及 V-N11 完整步骤；B43 chooser/download 只提供 browser 部分 | 真实 OS picker 取消/权限拒绝、UNC/只读路径、失败后恢复尚未执行，不能由 browser chooser 代替 |
+| V-N12 | [数据库关闭](../qa-ui-auto-tests/cases/TC-SHELL-N12-database-close-native.testcase.yaml)及既有 DB-TX/EXEC | 真 MySQL commit/rollback、取消执行/关闭和独立 SQL 结果；故障组合仅在有明确对应步骤时算覆盖 |
+| V-N13 | [MAIL-IDLE](../qa-ui-auto-tests/cases/TC-MAIL-IDLE-01-push-while-open.testcase.yaml)、MAIL-UNIFIED | 独立 mail fixture 推送、Tao 跳转和实际 unread；完整草稿/断线/恢复规格仍未全部覆盖 |
+| V-N14 | [VNC 151](../qa-ui-auto-tests/cases/TC-151-vnc-fixture-session-input-and-desktop-resize.testcase.yaml)、156、158、[RDP loopback](../qa-ui-auto-tests/cases/TC-RDPJ-01-client-server-loopback.testcase.yaml) | 真协议/input/viewport/clipboard；不代表所有 detach 故障、竞争和所有 OS 输入组合通过 |
+| V-N15 | [退出](../qa-ui-auto-tests/cases/TC-SHELL-N15-application-exit-native.testcase.yaml) | Notes 子窗口、paused SFTP、MySQL 事务和实际进程退出；清理网络拒绝/重试的额外分支尚未建立运行证据 |
+| V-N16 | [原生 WebView 布局](../qa-ui-auto-tests/cases/TC-SHELL-N16-webview-layout-native.testcase.yaml) | 1440×900/800×600 客户区的几何、命中、Project/Tao 内容；OS DPI、跨屏、交通灯、读屏仍需独立执行 |
+| V-N17 | 本文 V-N17 性能测量步骤 | 匹配硬件/WebView/profile 的 baseline/candidate、原始样本和资源数据未完成；不声称性能无退化 |
+| V-N18 | [窗口中断恢复](../qa-ui-auto-tests/cases/TC-SHELL-N18-window-interruption-recovery-native.testcase.yaml) | 真实子窗口生命周期与 Notes 草稿恢复；权限/系统窗口故障的其余组合不由单一路径替代 |
+
+用户已授权实现、单测、推送及 GitHub browser/native 验证；当前任务状态与结果持续更新在 [实施任务](./workspace-shell-ux-redesign-tasks.md)。本稿的设计步骤保持完整，自动化数量、静态检查和单测通过均不代表全部三端桌面及人工边界已验收。

@@ -89,10 +89,15 @@ export function getCloseAdapter(id: string): CloseAdapter | undefined { return a
 type TabCloseHandler = (ids: string[], exit?: boolean) => Promise<CloseResult>;
 let tabCloseHandler: TabCloseHandler | undefined;
 let tabMoveHandler: ((id: string) => Promise<CloseResult>) | undefined;
-export function installTabCloseHandler(handler: TabCloseHandler, move?: (id: string) => Promise<CloseResult>): () => void {
+let surfaceCloseHandler: ((targets: CloseTarget[], exit: boolean) => Promise<CloseResult>) | undefined;
+export function installTabCloseHandler(handler: TabCloseHandler, move?: (id: string) => Promise<CloseResult>, surfaces?: (targets: CloseTarget[], exit: boolean) => Promise<CloseResult>): () => void {
   tabCloseHandler = handler;
   tabMoveHandler = move;
-  return () => { if (tabCloseHandler === handler) { tabCloseHandler = undefined; tabMoveHandler = undefined; } };
+  surfaceCloseHandler = surfaces;
+  return () => { if (tabCloseHandler === handler) { tabCloseHandler = undefined; tabMoveHandler = undefined; surfaceCloseHandler = undefined; } };
+}
+export function prepareSurfaceClose(targets: CloseTarget[], exit = false): Promise<CloseResult> {
+  return surfaceCloseHandler ? surfaceCloseHandler(targets, exit) : Promise.resolve({ status: "failed", closed: [], failed: [{ id: "shell", error: "Close coordinator is unavailable" }] });
 }
 export function prepareTabMove(id: string): Promise<CloseResult> {
   return tabMoveHandler ? tabMoveHandler(id) : Promise.resolve({ status: "failed", closed: [], failed: [{ id, error: "The close coordinator is unavailable" }] });

@@ -1,6 +1,7 @@
 id: TC-auto-F11-1-sql-completion-settings
 title: SQL completion preferences persist and reset
-description: 'Covers the searchable global settings surface and the SQL completion controls.
+description: 'Covers the searchable global settings surface and the SQL completion
+  controls.
 
   Records a non-conflicting completion shortcut, changes automatic/accept behavior,
 
@@ -8,7 +9,10 @@ description: 'Covers the searchable global settings surface and the SQL completi
 
   database because completion preferences are browser-local editor settings.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F11.1
 tags:
@@ -25,8 +29,8 @@ fixtures:
 timeout_sec: 30
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -103,7 +107,7 @@ verification:
     - 26
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 6
@@ -115,13 +119,17 @@ verification:
     - step: 18
       expectation: '{"assert_visible": "[data-testid=\"sql-completion-shortcut-error\"]"}'
     - step: 23
-      expectation: '{"assert_localstorage": {"key": "taomni.sqlCompletionPreferences.v1", "contains": "\"triggerShortcut\":\"Alt-i\""}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.sqlCompletionPreferences.v1",
+        "contains": "\"triggerShortcut\":\"Alt-i\""}}'
     - step: 24
-      expectation: '{"assert_localstorage": {"key": "taomni.sqlCompletionPreferences.v1", "contains": "\"activateOnTyping\":false"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.sqlCompletionPreferences.v1",
+        "contains": "\"activateOnTyping\":false"}}'
     - step: 25
-      expectation: '{"assert_localstorage": {"key": "taomni.sqlCompletionPreferences.v1", "contains": "\"acceptWithEnter\":false"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.sqlCompletionPreferences.v1",
+        "contains": "\"acceptWithEnter\":false"}}'
     - step: 27
-      expectation: '{"assert_localstorage": {"key": "taomni.sqlCompletionPreferences.v1", "equals": "{\"activateOnTyping\":true,\"triggerShortcut\":\"Ctrl-Space\",\"acceptWithTab\":true,\"acceptWithEnter\":true}"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.sqlCompletionPreferences.v1",
+        "equals": "{\"activateOnTyping\":true,\"triggerShortcut\":\"Ctrl-Space\",\"acceptWithTab\":true,\"acceptWithEnter\":true}"}}'
     results:
     - 27
   visual:

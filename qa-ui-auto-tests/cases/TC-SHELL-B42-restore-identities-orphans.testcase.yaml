@@ -1,0 +1,556 @@
+id: TC-SHELL-B42
+title: Restore identities remain independent; missing recent-panel owners require explicit rebinding
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b42.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.6
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+- parity008_git
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.shellLayout.v2
+    value: '{"version": 2, "restoreSources": {"workspace:restore-A": {"kind": "workspace", "workspaceInstanceId":
+      "restore-A", "workspace": {"repoRoot": "/preview/parity008", "workspaceId": "same-directory", "name":
+      "同路径甲", "roots": [{"id": "root-restore-A", "name": "parity008", "path": "/preview/parity008", "kind":
+      "folder"}], "looseFiles": [], "initialFile": {"kind": "root", "rootId": "root-restore-A", "path":
+      "repo-a/same.txt"}}}, "workspace:restore-B": {"kind": "workspace", "workspaceInstanceId": "restore-B",
+      "workspace": {"repoRoot": "/preview/parity008", "workspaceId": "same-directory", "name": "同路径乙",
+      "roots": [{"id": "root-restore-B", "name": "parity008", "path": "/preview/parity008", "kind": "folder"}],
+      "looseFiles": [], "initialFile": {"kind": "root", "rootId": "root-restore-B", "path": "repo-a/same.txt"}}}},
+      "restoredTabs": {"workspace:restore-A": {"pinned": true, "order": 1, "laneOverride": "connect"},
+      "workspace:restore-B": {"pinned": false, "order": 0}}, "panelOverrides": {"workspace:restore-A:git":
+      {"edge": "right", "size": 350, "pinned": true}, "workspace:restore-B:git": {"edge": "bottom", "size":
+      280, "pinned": true}}, "lastActiveRestoreRef": "workspace:restore-A", "recentPanels": [{"kind":
+      "git", "restoreRef": "workspace:restore-A", "preferredPlacement": "detached", "lastUsedAt": 1},
+      {"kind": "sftp", "restoreRef": "run-entry:saved:deleted-owner", "preferredPlacement": "dock", "lastUsedAt":
+      0}]}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 0
+- shell_backend_scenario:
+    action: hold
+    command: workspace_list_dir
+    owner: /preview/parity008
+    once: true
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait_for: '[data-testid="shell-restore-entry"][data-entry-id="workspace:restore-A"][data-status="ready"]'
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"][data-entry-id="workspace:restore-B"]'
+    equal: 0
+- assert_visible: '[data-testid="welcome-panel"]'
+- shell_backend_scenario:
+    action: release
+    command: workspace_list_dir
+- wait_for: '[data-testid="tab-item"][data-active="true"]:has-text("同路径甲")'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- assert_not_visible: '[data-testid="shell-detached-placeholder"]'
+- click: '[data-testid="shell-rail-home"]'
+- assert_attribute:
+    selector: '[data-testid="welcome-restore-status"]'
+    name: data-state
+    equals: succeeded
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"]'
+    equal: 2
+- assert_items:
+    selector: '[data-testid="shell-restore-entry"]'
+    attribute: data-entry-id
+    equals:
+    - workspace:restore-B
+    - workspace:restore-A
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).recentPanels[0].restoreRef ===
+      'workspace:restore-A' && JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).recentPanels[0].preferredPlacement
+      === 'detached'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 3
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"][data-lane="connect"][data-pinned="true"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"][data-lane="build"][data-pinned="false"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: 同路径甲
+- assert_count:
+    selector: '[data-testid="shell-quick-option"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Enter
+- wait_for: '[data-testid="tab-item"][data-active="true"]:has-text("同路径甲")'
+- click: '[data-testid="code-workspace-git-panel-toggle"]:visible'
+- wait_for: '[data-testid="shell-host"][data-panel-id="workspace:restore-A:git"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host"][data-panel-id="workspace:restore-A:git"]'
+    name: data-edge
+    equals: right
+- fill:
+    selector: '[data-testid="shell-host"][data-panel-id="workspace:restore-A:git"] textarea[placeholder*="Commit"]'
+    value: RESTORE-restore-A 中文 draft
+- assert_value:
+    selector: '[data-testid="shell-host"][data-panel-id="workspace:restore-A:git"] textarea[placeholder*="Commit"]'
+    equals: RESTORE-restore-A 中文 draft
+- click: '[data-testid="shell-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: 同路径乙
+- assert_count:
+    selector: '[data-testid="shell-quick-option"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Enter
+- wait_for: '[data-testid="tab-item"][data-active="true"]:has-text("同路径乙")'
+- click: '[data-testid="code-workspace-git-panel-toggle"]:visible'
+- wait_for: '[data-testid="shell-host"][data-panel-id="workspace:restore-B:git"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host"][data-panel-id="workspace:restore-B:git"]'
+    name: data-edge
+    equals: bottom
+- fill:
+    selector: '[data-testid="shell-host"][data-panel-id="workspace:restore-B:git"] textarea[placeholder*="Commit"]'
+    value: RESTORE-restore-B 中文 draft
+- assert_value:
+    selector: '[data-testid="shell-host"][data-panel-id="workspace:restore-B:git"] textarea[placeholder*="Commit"]'
+    equals: RESTORE-restore-B 中文 draft
+- click: '[data-testid="shell-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: 同路径甲
+- assert_count:
+    selector: '[data-testid="shell-quick-option"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Enter
+- wait_for: '[data-testid="tab-item"][data-active="true"]:has-text("同路径甲")'
+- assert_value:
+    selector: '[data-testid="shell-host"][data-panel-id="workspace:restore-A:git"] textarea[placeholder*="Commit"]'
+    equals: RESTORE-restore-A 中文 draft
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 2
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 2
+- eval_readonly:
+    expression: Object.keys(JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).restoreSources).length
+      === 2
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot: tc-shell-b42.png
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-b"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- assert_shell_backend:
+    command: create_ssh_terminal
+    count: 1
+    status: requested
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="shell-menu-recent-panels"]'
+- wait_for: '[data-testid="shell-recent-panels"]'
+- assert_count:
+    selector: '[data-testid="shell-recent-panel"]'
+    equal: 3
+- click: '[data-testid="shell-recent-panel"][data-restore-ref="run-entry:saved:deleted-owner"]'
+- wait_for: '[data-testid="shell-recent-panel-owner-choice"]'
+- assert_value:
+    selector: '[data-testid="shell-recent-panel-owner"]'
+    equals: ''
+- assert_disabled: '[data-testid="shell-recent-panel-bind"]'
+- assert_shell_backend:
+    command: create_ssh_terminal
+    count: 1
+    status: requested
+- assert_shell_backend:
+    command: sftp_attach
+    count: 0
+    status: requested
+- click: '[data-testid="shell-recent-panel-cancel"]'
+- assert_not_visible: '[data-testid="shell-recent-panel-owner-choice"]'
+- assert_shell_backend:
+    command: create_ssh_terminal
+    count: 1
+    status: requested
+- click: '[data-testid="shell-recent-panel"][data-restore-ref="run-entry:saved:deleted-owner"]'
+- wait_for: '[data-testid="shell-recent-panel-owner-choice"]'
+- select_option:
+    selector: '[data-testid="shell-recent-panel-owner"]'
+    value: shell-a
+- shell_backend_scenario:
+    action: fail-next
+    command: sftp_attach
+    owner: alpha.invalid
+- click: '[data-testid="shell-recent-panel-bind"]'
+- wait_for: '[data-testid="shell-recent-panel-retry"]'
+- assert_text:
+    selector: '[data-testid="shell-recent-panel-error"]'
+    contains: QA fixture rejected sftp_attach
+- assert_count:
+    selector: '[data-testid="shell-recent-panel"][data-restore-ref="run-entry:saved:deleted-owner"]'
+    equal: 1
+- assert_shell_backend:
+    command: create_ssh_terminal
+    count: 2
+    status: requested
+- assert_shell_backend:
+    command: sftp_attach
+    owner: alpha.invalid
+    count: 1
+    status: failed
+- click: '[data-testid="shell-recent-panel-retry"]'
+- wait_for: '[data-testid="shell-recent-panel-show"]'
+- assert_not_visible: '[data-testid="shell-recent-panel-error"]'
+- assert_count:
+    selector: '[data-testid="shell-recent-panel"][data-restore-ref="run-entry:saved:deleted-owner"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="shell-recent-panel"][data-restore-ref="run-entry:saved:shell-a"]'
+    equal: 1
+- assert_shell_backend:
+    command: sftp_attach
+    owner: alpha.invalid
+    count: 2
+    status: requested
+- assert_shell_backend:
+    command: sftp_attach
+    owner: beta.invalid
+    count: 0
+    status: requested
+- click: '[data-testid="shell-recent-panel-show"]'
+- wait_for: '[data-testid="shell-host"][data-panel-id$=":sftp"][data-phase="ready"]'
+- assert_text:
+    selector: '[data-testid="shell-host-owner"]'
+    contains: qa-alpha
+- assert_shell_backend:
+    command: create_ssh_terminal
+    count: 2
+    status: requested
+- screenshot: tc-shell-b42-orphan-bound.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Explicit restore opens two same-directory workspaces in saved order, selects the saved
+      active identity and preserves detached intent without inventing a live window.
+    actions:
+    - 3
+    - 4
+    - 8
+    - 16
+    - 21
+    - 25
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 0}}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-active=\"true\"]:has-text(\"同路径甲\")"}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    - step: 15
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-detached-placeholder\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name":
+        "data-state", "equals": "succeeded"}}'
+    - step: 18
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 2}}'
+    - step: 19
+      expectation: '{"assert_items": {"selector": "[data-testid=\"shell-restore-entry\"]", "attribute":
+        "data-entry-id", "equals": ["workspace:restore-B", "workspace:restore-A"]}}'
+    - step: 20
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).recentPanels[0].restoreRef
+        === ''workspace:restore-A'' && JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).recentPanels[0].preferredPlacement
+        === ''detached''", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 3}}'
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"][data-lane=\"connect\"][data-pinned=\"true\"]",
+        "equal": 1}}'
+    - step: 24
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"][data-lane=\"build\"][data-pinned=\"false\"]",
+        "equal": 1}}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    results:
+    - 5
+    - 6
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 23
+    - 24
+    - 26
+  - id: R2
+    requirement: 同路径甲 has its own restored right Git placement and complete commit draft.
+    actions:
+    - 27
+    - 28
+    - 30
+    - 32
+    - 35
+    checkpoints:
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-active=\"true\"]:has-text(\"同路径甲\")"}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"shell-host\"][data-panel-id=\"workspace:restore-A:git\"]"}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"][data-panel-id=\"workspace:restore-A:git\"]",
+        "name": "data-edge", "equals": "right"}}'
+    - step: 36
+      expectation: '{"assert_value": {"selector": "[data-testid=\"shell-host\"][data-panel-id=\"workspace:restore-A:git\"]
+        textarea[placeholder*=\"Commit\"]", "equals": "RESTORE-restore-A 中文 draft"}}'
+    results:
+    - 29
+    - 31
+    - 33
+    - 34
+    - 36
+  - id: R3
+    requirement: 同路径乙 has its own restored bottom Git placement and complete commit draft.
+    actions:
+    - 37
+    - 38
+    - 40
+    - 42
+    - 45
+    checkpoints:
+    - step: 39
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-active=\"true\"]:has-text(\"同路径乙\")"}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"shell-host\"][data-panel-id=\"workspace:restore-B:git\"]"}'
+    - step: 44
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"][data-panel-id=\"workspace:restore-B:git\"]",
+        "name": "data-edge", "equals": "bottom"}}'
+    - step: 46
+      expectation: '{"assert_value": {"selector": "[data-testid=\"shell-host\"][data-panel-id=\"workspace:restore-B:git\"]
+        textarea[placeholder*=\"Commit\"]", "equals": "RESTORE-restore-B 中文 draft"}}'
+    results:
+    - 39
+    - 41
+    - 43
+    - 44
+    - 46
+  - id: R4
+    requirement: Returning to the first identity preserves its draft and never merges the two logical
+      workspaces.
+    actions:
+    - 47
+    - 48
+    - 50
+    - 54
+    checkpoints:
+    - step: 49
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-active=\"true\"]:has-text(\"同路径甲\")"}'
+    - step: 52
+      expectation: '{"assert_value": {"selector": "[data-testid=\"shell-host\"][data-panel-id=\"workspace:restore-A:git\"]
+        textarea[placeholder*=\"Commit\"]", "equals": "RESTORE-restore-A 中文 draft"}}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 2}}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
+        "equal": 2}}'
+    - step: 56
+      expectation: '{"eval_readonly": {"expression": "Object.keys(JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).restoreSources).length
+        === 2", "expect_truthy": true, "timeout_sec": 5}}'
+    results:
+    - 49
+    - 51
+    - 52
+    - 53
+    - 55
+    - 56
+  - id: R5
+    requirement: Recent panels stay independent of primary tabs. A deleted owner requires an explicit
+      selection; cancel creates no connection or SFTP channel and never binds to another live owner.
+    actions:
+    - 63
+    - 64
+    - 65
+    - 68
+    - 74
+    checkpoints:
+    - step: 66
+      expectation: '{"wait_for": "[data-testid=\"shell-recent-panels\"]"}'
+    - step: 67
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-recent-panel\"]", "equal": 3}}'
+    - step: 69
+      expectation: '{"wait_for": "[data-testid=\"shell-recent-panel-owner-choice\"]"}'
+    - step: 70
+      expectation: '{"assert_value": {"selector": "[data-testid=\"shell-recent-panel-owner\"]", "equals":
+        ""}}'
+    - step: 71
+      expectation: '{"assert_disabled": "[data-testid=\"shell-recent-panel-bind\"]"}'
+    - step: 72
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 1, "status":
+        "requested"}}'
+    - step: 73
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "count": 0, "status": "requested"}}'
+    - step: 75
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-recent-panel-owner-choice\"]"}'
+    - step: 76
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 1, "status":
+        "requested"}}'
+    results:
+    - 66
+    - 67
+    - 69
+    - 70
+    - 71
+    - 72
+    - 73
+    - 75
+    - 76
+  - id: R6
+    requirement: Explicitly choosing Alpha creates its own ready connection and SFTP surface, replaces
+      only the orphan metadata and leaves Beta's connection untouched.
+    actions:
+    - 77
+    - 79
+    - 87
+    - 94
+    checkpoints:
+    - step: 78
+      expectation: '{"wait_for": "[data-testid=\"shell-recent-panel-owner-choice\"]"}'
+    - step: 88
+      expectation: '{"wait_for": "[data-testid=\"shell-recent-panel-show\"]"}'
+    - step: 89
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-recent-panel-error\"]"}'
+    - step: 90
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-recent-panel\"][data-restore-ref=\"run-entry:saved:deleted-owner\"]",
+        "equal": 0}}'
+    - step: 91
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-recent-panel\"][data-restore-ref=\"run-entry:saved:shell-a\"]",
+        "equal": 1}}'
+    - step: 92
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count":
+        2, "status": "requested"}}'
+    - step: 93
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "beta.invalid", "count":
+        0, "status": "requested"}}'
+    - step: 95
+      expectation: '{"wait_for": "[data-testid=\"shell-host\"][data-panel-id$=\":sftp\"][data-phase=\"ready\"]"}'
+    - step: 96
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host-owner\"]", "contains": "qa-alpha"}}'
+    - step: 97
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status":
+        "requested"}}'
+    results:
+    - 78
+    - 88
+    - 89
+    - 90
+    - 91
+    - 92
+    - 93
+    - 95
+    - 96
+    - 97
+  - id: R7
+    requirement: Failed attachment retains the orphan and selected connection; UI retry attaches exactly
+      once more without creating a duplicate SSH connection.
+    actions:
+    - 80
+    - 81
+    - 87
+    checkpoints:
+    - step: 82
+      expectation: '{"wait_for": "[data-testid=\"shell-recent-panel-retry\"]"}'
+    - step: 83
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-recent-panel-error\"]", "contains":
+        "QA fixture rejected sftp_attach"}}'
+    - step: 84
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-recent-panel\"][data-restore-ref=\"run-entry:saved:deleted-owner\"]",
+        "equal": 1}}'
+    - step: 85
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status":
+        "requested"}}'
+    - step: 86
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count":
+        1, "status": "failed"}}'
+    - step: 92
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count":
+        2, "status": "requested"}}'
+    - step: 97
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status":
+        "requested"}}'
+    results:
+    - 82
+    - 83
+    - 84
+    - 85
+    - 86
+    - 92
+    - 97
+  - id: R8
+    requirement: Independent same-directory instances become ready out of order; Home retains focus until
+      all restore outcomes settle.
+    actions:
+    - 7
+    - 8
+    checkpoints:
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"shell-restore-entry\"][data-entry-id=\"workspace:restore-A\"][data-status=\"ready\"]"}'
+    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"][data-entry-id=\"workspace:restore-B\"]",
+        "equal": 0}}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    results:
+    - 9
+    - 10
+    - 11
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

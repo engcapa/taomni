@@ -1,5 +1,6 @@
 id: TC-SHELL-B40
-title: Batch close retains Home and pinned tabs
+title: Strip and Overview Action entries share pin, rename, duplicate, lane move and protected batch close
+  results
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b40.
   Browser IPC fixtures prove renderer outcomes only.'
 covers:
@@ -39,6 +40,71 @@ steps:
     selector: '[data-testid="shell-tab-card"]:has-text("qa-alpha")'
     name: data-pinned
     equals: 'true'
+- click: '[data-testid="shell-tab-card"][data-pinned="true"]:has-text("qa-alpha") [data-testid="shell-tab-card-pin"]'
+- assert_attribute:
+    selector: '[data-testid="shell-tab-card"]:has-text("qa-alpha")'
+    name: data-pinned
+    equals: 'false'
+- click: '[data-testid="shell-tab-card"]:has-text("qa-alpha") [data-testid="shell-tab-card-more"]'
+- click: '[data-testid="shell-tab-pin"]'
+- assert_attribute:
+    selector: '[data-testid="shell-tab-card"]:has-text("qa-alpha")'
+    name: data-pinned
+    equals: 'true'
+- click: '[data-testid="shell-tab-card"][data-pinned="true"]:has-text("qa-alpha") [data-testid="shell-tab-card-more"]'
+- click: '[data-testid="shell-tab-rename"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: SHELL action
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Enter
+- assert_text_equals:
+    selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+    equals: SHELL action
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-pinned="true"]:has-text("SHELL action") [data-testid="shell-tab-card-more"]'
+- click: '[data-testid="shell-tab-duplicate"]'
+- wait_for: '[data-testid="shell-tab-card"][data-pinned="false"]:has-text("SHELL action")'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 3
+- click: '[data-testid="shell-tab-card"][data-pinned="false"]:has-text("SHELL action") [data-testid="shell-tab-card-more"]'
+- click: '[data-testid="shell-tab-rename"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: SHELL action copy
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Enter
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("SHELL action
+    copy")) [data-testid="shell-tab-card-more"]'
+- hover: '[data-testid="shell-tab-move-lane"]'
+- click: '[data-testid="shell-tab-move-utility"]'
+- assert_attribute:
+    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("SHELL
+      action copy"))'
+    name: data-lane
+    equals: utility
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-pinned="true"][data-lane="connect"]'
+    equal: 1
+- assert_shell_backend:
+    command: create_ssh_terminal
+    status: requested
+    count: 3
+- click: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("SHELL action
+    copy")) [data-testid="shell-tab-card-close"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-pinned="true"][data-lane="connect"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="welcome"]'
+    equal: 1
 - screenshot: tc-shell-b40.png
 verification:
   review: reviewed
@@ -57,17 +123,19 @@ verification:
     - 15
     checkpoints:
     - step: 5
-      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
     - step: 10
-      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
     - step: 13
-      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-item\"]:has-text(\"qa-beta\")"}'
     - step: 14
-      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]:has-text(\"qa-alpha\")",
+        "equal": 1}}'
     - step: 16
-      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 2}}'
     - step: 17
-      expectation: Close all removes Beta while retaining the pinned Alpha and Home.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-tab-card\"]:has-text(\"qa-alpha\")",
+        "name": "data-pinned", "equals": "true"}}'
     results:
     - 5
     - 10
@@ -75,14 +143,78 @@ verification:
     - 14
     - 16
     - 17
+  - id: R2
+    requirement: Overview direct pin and More menu pin address the same Alpha; Overview rename/duplicate/move/close
+      keep the original pinned Connect target and Home intact.
+    actions:
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 26
+    - 28
+    - 29
+    - 30
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 44
+    checkpoints:
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-tab-card\"]:has-text(\"qa-alpha\")",
+        "name": "data-pinned", "equals": "false"}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-tab-card\"]:has-text(\"qa-alpha\")",
+        "name": "data-pinned", "equals": "true"}}'
+    - step: 27
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]
+        [data-testid=\"tab-title\"]", "equals": "SHELL action"}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"shell-tab-card\"][data-pinned=\"false\"]:has-text(\"SHELL
+        action\")"}'
+    - step: 32
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 3}}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"]:text-is(\"SHELL
+        action copy\"))", "name": "data-lane", "equals": "utility"}}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-pinned=\"true\"][data-lane=\"connect\"]",
+        "equal": 1}}'
+    - step: 43
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "status": "requested",
+        "count": 3}}'
+    - step: 45
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 2}}'
+    - step: 46
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-pinned=\"true\"][data-lane=\"connect\"]",
+        "equal": 1}}'
+    - step: 47
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"welcome\"]",
+        "equal": 1}}'
+    results:
+    - 19
+    - 22
+    - 27
+    - 31
+    - 32
+    - 41
+    - 42
+    - 43
+    - 45
+    - 46
+    - 47
   visual:
-  - check: Inspect the final screenshot for readable controls, clipping and overlay
-      placement.
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual
-    reason: Screenshots require a visual verdict; geometry assertions are recorded
-      separately.
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
   native:
   - check: Tauri, OS window, physical input and real service effects
     method: not-applicable
-    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
-      native boundaries.
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

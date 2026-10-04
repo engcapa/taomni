@@ -43,3 +43,12 @@ def step_assert_file_contains(ctx: StepContext, args: Any) -> None:
 
     _report_root_path(ctx, args, "assert_file_contains")
     _assert_file_contains(ctx, args)  # type: ignore[arg-type]
+
+
+@verb("assert_json_file")
+def step_assert_json_file(ctx: StepContext, args: Any) -> None:
+    if ctx.dry_run:
+        return
+    _report_root_path(ctx, args, "assert_json_file")
+    from ..rdp_steps import _do_assert_json_file
+    _do_assert_json_file(ctx, args)

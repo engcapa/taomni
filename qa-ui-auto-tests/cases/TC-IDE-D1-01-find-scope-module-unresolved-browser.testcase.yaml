@@ -12,7 +12,10 @@ description: 'Browser gate case (ED-FIND-003 A1/A3). Opens the Find in Files pan
 
   and the native provider gate.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -29,7 +32,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -93,13 +96,13 @@ verification:
     - step: 15
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-find-scope-notice\"]"}'
     - step: 16
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-scope-notice\"]", "contains":
-        "Maven tooling returned no usable result", "timeout_sec": 10}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-scope-notice\"]",
+        "contains": "Maven tooling returned no usable result", "timeout_sec": 10}}'
     - step: 18
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-find-directory-input\"]"}'
     - step: 20
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-find-directory-input\"]", "name":
-        "value", "equals": "src"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-find-directory-input\"]",
+        "name": "value", "equals": "src"}}'
     results:
     - 20
   visual:

@@ -1,12 +1,16 @@
 id: TC-IDE-C2-10-completion-input-ownership
 title: Editor keyboard input ownership and focus surface boundaries
-description: 'Browser verification for editor keyboard input ownership: normal arrow navigation
+description: 'Browser verification for editor keyboard input ownership: normal arrow
+  navigation
 
   and Enter newlines when popup is closed vs ArrowDown navigation and Enter acceptance
 
   when completion popup is active.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -24,7 +28,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -94,13 +98,17 @@ verification:
     - step: 15
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
     - step: 19
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\") === null", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\")
+        === null", "expect_truthy": true}}'
     - step: 21
-      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec":
+        10}}'
     - step: 24
-      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"]", "contains": "soutm"}}'
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"]",
+        "contains": "soutm"}}'
     - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "System.out.println("}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "contains": "System.out.println("}}'
     results:
     - 26
   visual:

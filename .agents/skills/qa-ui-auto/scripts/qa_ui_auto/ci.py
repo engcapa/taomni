@@ -90,6 +90,8 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("mysql")
         if "vnc_required" in fixtures:
             result.add("vnc")
+        if "shell_sftp_server" in fixtures:
+            result.add("sftp-fixture")
         if "ard_required" in fixtures:
             result.add("ard")
         if mode == "native":

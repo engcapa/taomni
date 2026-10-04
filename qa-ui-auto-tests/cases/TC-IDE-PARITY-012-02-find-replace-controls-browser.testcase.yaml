@@ -1,11 +1,19 @@
 id: TC-IDE-PARITY-012-02
-title: 'IDEA Find/Replace row: history, clear, multiline, filter, Exclude and Ctrl+R focus'
-description: 'ED-PARITY-012 A1/A3/A4 and DEC-012-02..05: the Find row carries history, a clear button, multiline and the inline context filter; Ctrl+R shows Replace while focus stays in Find, Tab enters Replace; Exclude keeps a match out of Replace All and one undo restores the buffer; Esc returns focus to the editor and the history dropdown offers session queries.
+title: 'IDEA Find/Replace row: history, clear, multiline, filter, Exclude and Ctrl+R
+  focus'
+description: 'ED-PARITY-012 A1/A3/A4 and DEC-012-02..05: the Find row carries history,
+  a clear button, multiline and the inline context filter; Ctrl+R shows Replace while
+  focus stays in Find, Tab enters Replace; Exclude keeps a match out of Replace All
+  and one undo restores the buffer; Esc returns focus to the editor and the history
+  dropdown offers session queries.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -22,7 +30,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -52,16 +60,20 @@ steps:
 - eval_readonly:
     expression: document.activeElement?.getAttribute('name') === 'search'
     expect_truthy: true
-- assert_not_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Clear search"]'
+- assert_not_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Clear
+    search"]'
 - type:
     selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
     text: foo
 - assert_text:
     selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
     contains: 1 / 3
-- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Clear search"]'
-- assert_visible: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-row button[aria-label="Filter context"]'
-- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Search history"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Clear
+    search"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-row
+    button[aria-label="Filter context"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Search
+    history"]'
 - assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Multiline"]'
 - press: Enter
 - assert_text:
@@ -76,7 +88,8 @@ steps:
 - eval_readonly:
     expression: document.activeElement?.getAttribute('name') === 'search'
     expect_truthy: true
-- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Exclude current match"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Exclude
+    current match"]'
 - press: Tab
 - eval_readonly:
     expression: document.activeElement?.getAttribute('name') === 'replace'
@@ -84,11 +97,13 @@ steps:
 - type:
     selector: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
     text: qux
-- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Exclude current match"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Exclude
+    current match"]'
 - assert_text:
     selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
     contains: 1 excluded
-- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace all matches"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace
+    all matches"]'
 - assert_text:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     contains: foo bar qux baz qux
@@ -146,13 +161,17 @@ verification:
     - 34
     checkpoints:
     - step: 24
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'') === ''search''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'')
+        === ''search''", "expect_truthy": true}}'
     - step: 27
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "1 / 3"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        .cm-workspace-search-status", "contains": "1 / 3"}}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "2 / 3"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        .cm-workspace-search-status", "contains": "2 / 3"}}'
     - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "1 / 3"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        .cm-workspace-search-status", "contains": "1 / 3"}}'
     results:
     - 24
     - 33
@@ -166,21 +185,29 @@ verification:
     - 51
     checkpoints:
     - step: 25
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Clear search\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-search\"]
+        button[aria-label=\"Clear search\"]"}'
     - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Clear search\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"]
+        button[aria-label=\"Clear search\"]"}'
     - step: 29
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-row button[aria-label=\"Filter context\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"]
+        .cm-workspace-search-row button[aria-label=\"Filter context\"]"}'
     - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Search history\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"]
+        button[aria-label=\"Search history\"]"}'
     - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Multiline\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"]
+        button[aria-label=\"Multiline\"]"}'
     - step: 48
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] textarea[name=\"search-multiline\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"]
+        textarea[name=\"search-multiline\"]"}'
     - step: 50
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] input[name=\"search\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"]
+        input[name=\"search\"]"}'
     - step: 52
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "0 results"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        .cm-workspace-search-status", "contains": "0 results"}}'
     results:
     - 28
     - 29
@@ -193,11 +220,14 @@ verification:
     - 40
     checkpoints:
     - step: 37
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] input[name=\"replace\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"]
+        input[name=\"replace\"]"}'
     - step: 38
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'') === ''search''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'')
+        === ''search''", "expect_truthy": true}}'
     - step: 41
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'') === ''replace''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'')
+        === ''replace''", "expect_truthy": true}}'
     results:
     - 38
     - 41
@@ -209,13 +239,17 @@ verification:
     - 57
     checkpoints:
     - step: 39
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Exclude current match\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"]
+        button[aria-label=\"Exclude current match\"]"}'
     - step: 44
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "1 excluded"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        .cm-workspace-search-status", "contains": "1 excluded"}}'
     - step: 46
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "foo bar qux baz qux"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "contains": "foo bar qux baz qux"}}'
     - step: 58
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "foo bar foo baz foo"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "contains": "foo bar foo baz foo"}}'
     results:
     - 46
     - 58
@@ -228,17 +262,23 @@ verification:
     - 63
     checkpoints:
     - step: 55
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-search\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-search\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 56
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 61
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] [role=\"listbox\"]", "contains": "bar"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        [role=\"listbox\"]", "contains": "bar"}}'
     - step: 62
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] [role=\"listbox\"]", "contains": "foo"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        [role=\"listbox\"]", "contains": "foo"}}'
     - step: 64
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-workspace-search-input'').value === ''bar''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-workspace-search-input'').value
+        === ''bar''", "expect_truthy": true}}'
     - step: 67
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     results:
     - 56
     - 61

@@ -56,7 +56,8 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
-from . import shell_browser_catalog, shell_native_files
+from . import shell_browser_catalog, shell_native_files, local_terminal_preview
+from . import shell_sftp_server
 from . import project_tree
 from . import parity005_completion
 from . import parity006_replace
@@ -91,6 +92,8 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "shell_sftp_server": Fixture("shell_sftp_server", shell_sftp_server.setup, shell_sftp_server.teardown),
+    "local_terminal_preview": Fixture("local_terminal_preview", local_terminal_preview.setup),
     "shell_browser_catalog": Fixture("shell_browser_catalog", shell_browser_catalog.setup),
     "shell_native_files": Fixture("shell_native_files", shell_native_files.setup),
     "path_completion": Fixture("path_completion", path_completion.setup),

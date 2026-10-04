@@ -244,6 +244,9 @@ controls:
     selector: '[data-testid="context-menu-item-tunneling"]'
     kind: interactive
     optional: true
+  - id: tab-context-copy-session-info
+    selector: '[data-testid="tab-context-copy-session-info"]'
+    kind: interactive
 -->
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
@@ -414,6 +417,12 @@ controls:
   - id: version-footer
     selector: '[data-testid="welcome-version-footer"]'
     kind: display
+  - id: shell-home-more
+    selector: '[data-testid="shell-home-more"]'
+    kind: interactive
+  - id: welcome-open-lanchat
+    selector: '[data-testid="welcome-open-lanchat"]'
+    kind: interactive
 -->
 
 - 启动入口：开始本地终端、新建会话、导入 OpenSSH config
@@ -546,6 +555,15 @@ controls:
     selector: '[data-testid="context-menu-item-toggle-sidebar"]'
     kind: interactive
     optional: true
+  - id: context-menu-item-multiexec
+    selector: '[data-testid="context-menu-item-multiexec"]'
+    kind: interactive
+  - id: context-menu-item-lan-chat
+    selector: '[data-testid="context-menu-item-lan-chat"]'
+    kind: interactive
+  - id: context-menu-item-sockscap
+    selector: '[data-testid="context-menu-item-sockscap"]'
+    kind: interactive
 -->
 
 - 原 per-menu `MenuBar`（menu-bar/menu-terminal/menu-view…）已从产品移除；统一入口是标题栏的 `app-main-menu` 按钮，经共享 ContextMenu 渲染一级/二级菜单。
@@ -561,40 +579,43 @@ controls:
 id: F1.9
 status: done
 area: main/commands
-components: [ControlBar, Sidebar]
+components:
+- ControlBar
+- Sidebar
 files:
-  - src/components/tabbar/ControlBar.tsx
-  - src/components/sidebar/Sidebar.tsx
-  - src/components/menubar/commands.ts
+- src/components/tabbar/ControlBar.tsx
+- src/components/sidebar/Sidebar.tsx
+- src/components/menubar/commands.ts
+- src/components/shell/GlobalRail.tsx
 controls:
-  - id: command-session
-    selector: '[data-testid="context-menu-item-new-remote-session"]'
-    kind: interactive
-  - id: command-sftp
-    selector: '[data-testid="context-menu-item-new-sftp"]'
-    kind: interactive
-  - id: ribbon-settings
-    selector: '[data-testid="ribbon-settings"]'
-    kind: interactive
-  - id: command-help
-    selector: '[data-testid="context-menu-item-help"]'
-    kind: interactive
-  - id: command-settings-menu
-    selector: '[data-testid="context-menu-item-settings"]'
-    kind: interactive
-    optional: true
-  - id: command-servers
-    selector: '[data-testid="context-menu-item-servers"]'
-    kind: interactive
-    optional: true
-  - id: command-exit
-    selector: '[data-testid="context-menu-item-exit"]'
-    kind: interactive
-    optional: true
-  - id: command-close-active
-    selector: '[data-testid="context-menu-item-close-active-tab"]'
-    kind: interactive
-    optional: true
+- id: command-session
+  selector: '[data-testid="context-menu-item-new-remote-session"]'
+  kind: interactive
+- id: command-sftp
+  selector: '[data-testid="context-menu-item-new-sftp"]'
+  kind: interactive
+- id: ribbon-settings
+  selector: '[data-testid="shell-rail-settings"]'
+  kind: interactive
+- id: command-help
+  selector: '[data-testid="context-menu-item-help"]'
+  kind: interactive
+- id: command-settings-menu
+  selector: '[data-testid="context-menu-item-settings"]'
+  kind: interactive
+  optional: true
+- id: command-servers
+  selector: '[data-testid="context-menu-item-servers"]'
+  kind: interactive
+  optional: true
+- id: command-exit
+  selector: '[data-testid="context-menu-item-exit"]'
+  kind: interactive
+  optional: true
+- id: command-close-active
+  selector: '[data-testid="context-menu-item-close-active-tab"]'
+  kind: interactive
+  optional: true
 -->
 
 - 控制栏统一菜单承接原 Ribbon 大图标核心命令分发：Session / SFTP / Settings / Help / Servers / Exit。
@@ -1508,6 +1529,9 @@ controls:
     selector: '[data-testid^="session-terminal-theme-option-"]'
     kind: interactive
     optional: true       # visible while the terminal theme flyout is open
+  - id: menu-export-sessions
+    selector: '[data-testid="menu-export-sessions"]'
+    kind: interactive
 -->
 
 - 分组树（展开 / 折叠 / 拖拽到分组）
@@ -1522,10 +1546,23 @@ controls:
 id: F6.3
 status: done
 area: sessions
-components: [SessionEditor]
+components: [SessionEditor, ProxyTestTab]
 files:
   - src/components/session/SessionEditor.tsx
+  - src/components/proxy/ProxyTestTab.tsx
 controls:
+  - id: proxy-test-panel
+    selector: '[data-testid="proxy-test-panel"]'
+    kind: display
+  - id: proxy-test-url
+    selector: '[data-testid="proxy-test-url"]'
+    kind: interactive
+  - id: proxy-test-run
+    selector: '[data-testid="proxy-test-run"]'
+    kind: interactive
+  - id: proxy-test-result
+    selector: '[data-testid="proxy-test-result"]'
+    kind: display
   # Dialog frame
   - id: editor
     selector: '[data-testid="session-editor"]'
@@ -1958,6 +1995,18 @@ controls:
   - id: startup-reconnect
     selector: 'label:has-text("Reconnect on disconnection") input[type="checkbox"]'
     kind: interactive
+  - id: sidebar-tool-lan-chat
+    selector: '[data-testid="sidebar-tool-lan-chat"]'
+    kind: interactive
+  - id: sidebar-tool-network-tools
+    selector: '[data-testid="sidebar-tool-network-tools"]'
+    kind: interactive
+  - id: sidebar-tool-servers
+    selector: '[data-testid="sidebar-tool-servers"]'
+    kind: interactive
+  - id: sidebar-tool-tunneling
+    selector: '[data-testid="sidebar-tool-tunneling"]'
+    kind: interactive
 -->
 
 - 协议选择：SSH、SFTP、RDP、VNC、Browser、FTP、Telnet、Rlogin、Mosh、Serial、Shell（SSH/SFTP 原生；VNC/RDP 接入基础 client；Browser 打开系统浏览器；FTP/Telnet/Rlogin/Mosh/Serial 启动本地命令行 client；Shell 启动本地终端）
@@ -2193,6 +2242,21 @@ controls:
   - id: queue-root
     selector: '[data-testid="sftp-transfer-queue"]'
     kind: display
+  - id: transfer-job
+    selector: '[data-testid="transfer-job"]'
+    kind: display
+  - id: transfer-job-pause
+    selector: '[data-testid="transfer-job-pause"]'
+    kind: interactive
+  - id: transfer-job-resume
+    selector: '[data-testid="transfer-job-resume"]'
+    kind: interactive
+  - id: transfer-job-retry
+    selector: '[data-testid="transfer-job-retry"]'
+    kind: interactive
+  - id: transfer-job-cancel
+    selector: '[data-testid="transfer-job-cancel"]'
+    kind: interactive
 -->
 
 - 状态：进度条、速度、ETA、状态徽章
@@ -2211,29 +2275,35 @@ id: F7.4
 status: done
 area: sftp
 files:
-  - src/components/filebrowser/FileBrowser.tsx
-  - src/components/filebrowser/FileToolbar.tsx
-  - src/components/filebrowser/SftpDetachedWindow.tsx
+- src/components/filebrowser/FileBrowser.tsx
+- src/components/filebrowser/FileToolbar.tsx
+- src/components/filebrowser/SftpDetachedWindow.tsx
 controls:
-  - id: detach
-    selector: '[data-testid="sftp-detach"]'
-    kind: interactive
-    optional: true       # only when host wires onDetach
-  - id: close
-    selector: '[data-testid="sftp-close"]'
-    kind: interactive
-    optional: true       # only when host wires onClose (attached sidebar)
-  - id: orientation-toggle
-    selector: '[data-testid="sftp-orientation-toggle"]'
-    kind: interactive
-  - id: local-detach           # toolbar detach (FileToolbar testId={`sftp-${side}-detach`})
-    selector: '[data-testid="sftp-local-detach"]'
-    kind: interactive
-    optional: true
-  - id: remote-detach
-    selector: '[data-testid="sftp-remote-detach"]'
-    kind: interactive
-    optional: true
+- id: detach
+  selector: '[data-testid="sftp-detach"]'
+  kind: interactive
+  optional: true
+- id: close
+  selector: '[data-testid="sftp-close"]'
+  kind: interactive
+  optional: true
+- id: orientation-toggle
+  selector: '[data-testid="sftp-orientation-toggle"]'
+  kind: interactive
+- id: local-detach
+  selector: '[data-testid="sftp-local-detach"]'
+  kind: interactive
+  optional: true
+- id: remote-detach
+  selector: '[data-testid="sftp-remote-detach"]'
+  kind: interactive
+  optional: true
+- id: sftp-transfer-queue-collapsed
+  selector: '[data-testid="sftp-transfer-queue-collapsed"]'
+  kind: display
+- id: sftp-detached-window
+  selector: '[data-testid="sftp-detached-window"]'
+  kind: display
 -->
 
 - **附加侧边栏**：每个 SSH 终端右上角 `attached-sftp-toggle`，与终端共用凭证；远程面板首次跟随 OSC 7 跳转一次，工具条 Sync 按钮可手动重跳
@@ -5286,148 +5356,228 @@ controls:
 id: F-TAO-1
 status: done
 area: notes
-components: [TaoRibbon, NotesPanel, NotesList, NoteEditor, NoteFilters, NoteThemeSettings, FloatingNotesPanel, TaoAlertInbox, TaoAlertPoller]
+components:
+- TaoRibbon
+- NotesPanel
+- NotesList
+- NoteEditor
+- NoteFilters
+- NoteThemeSettings
+- FloatingNotesPanel
+- TaoAlertInbox
+- TaoAlertPoller
 files:
-  - src-tauri/src/notes/db.rs
-  - src-tauri/src/notes/commands.rs
-  - src/lib/notes.ts
-  - src/stores/notesStore.ts
-  - src/stores/taoHubStore.ts
-  - src/stores/taoAlertStore.ts
-  - src/lib/tao/ribbonPlacement.ts
-  - src/lib/tao/taoAlerts.ts
-  - src/lib/notes/notesTheme.ts
-  - src/lib/chat/chatDock.ts
-  - src/components/notes/NotesPanel.tsx
-  - src/components/notes/NotesList.tsx
-  - src/components/notes/NoteEditor.tsx
-  - src/components/notes/NoteFilters.tsx
-  - src/components/notes/NoteThemeSettings.tsx
-  - src/components/notes/FloatingNotesPanel.tsx
-  - src/components/tao/TaoRibbon.tsx
-  - src/components/tao/TaoAlertInbox.tsx
-  - src/components/tao/TaoAlertPoller.tsx
+- src-tauri/src/notes/db.rs
+- src-tauri/src/notes/commands.rs
+- src/lib/notes.ts
+- src/stores/notesStore.ts
+- src/stores/taoHubStore.ts
+- src/stores/taoAlertStore.ts
+- src/lib/tao/ribbonPlacement.ts
+- src/lib/tao/taoAlerts.ts
+- src/lib/notes/notesTheme.ts
+- src/lib/chat/chatDock.ts
+- src/components/notes/NotesPanel.tsx
+- src/components/notes/NotesList.tsx
+- src/components/notes/NoteEditor.tsx
+- src/components/notes/NoteFilters.tsx
+- src/components/notes/NoteThemeSettings.tsx
+- src/components/notes/FloatingNotesPanel.tsx
+- src/components/tao/TaoRibbon.tsx
+- src/components/tao/TaoAlertInbox.tsx
+- src/components/tao/TaoAlertPoller.tsx
+- src/components/notes/NotesDetachedWindow.tsx
 controls:
-  - id: tao-hub-tab-chat
-    selector: '[data-testid="tao-hub-tab-chat"]'
-    kind: interactive
-    optional: true
-  - id: tao-hub-tab-notes
-    selector: '[data-testid="tao-hub-tab-notes"]'
-    kind: interactive
-    optional: true
-  - id: tao-hub-tab-notifications
-    selector: '[data-testid="tao-hub-tab-notifications"]'
-    kind: interactive
-    optional: true
-  - id: tao-alert-inbox
-    selector: '[data-testid="tao-alert-inbox"]'
-    kind: display
-    optional: true
-  - id: tao-alert-inbox-item
-    selector: '[data-testid="tao-alert-inbox-item"]'
-    kind: display
-    optional: true
-  - id: tao-alert-history-search
-    selector: '[data-testid="tao-alert-history-search"]'
-    kind: interactive
-    optional: true
-  - id: tao-alert-history-clear
-    selector: '[data-testid="tao-alert-history-clear"]'
-    kind: interactive
-    optional: true
-  - id: tao-alert-history-limit-30
-    selector: '[data-testid="tao-alert-history-limit-30"]'
-    kind: interactive
-    optional: true
-  - id: tao-alert-history-limit-300
-    selector: '[data-testid="tao-alert-history-limit-300"]'
-    kind: interactive
-    optional: true
-  - id: tao-alert-history-result
-    selector: '[data-testid="tao-alert-history-result"]'
-    kind: display
-    optional: true       # only visible when a history search has matches
-  - id: notes-panel
-    selector: '[data-testid="notes-panel"]'
-    kind: display
-    optional: true
-  - id: notes-new
-    selector: '[data-testid="notes-new"]'
-    kind: interactive
-    optional: true
-  - id: notes-search
-    selector: '[data-testid="notes-search"]'
-    kind: interactive
-    optional: true
-  - id: notes-list-item
-    selector: '[data-testid="notes-list-item"]'
-    kind: interactive
-    optional: true
-  - id: notes-list
-    selector: '[data-testid="notes-list"]'
-    kind: display
-    optional: true
-  - id: notes-toggle-complete
-    selector: '[data-testid="notes-toggle-complete"]'
-    kind: interactive
-    optional: true
-  - id: notes-filter-menu
-    selector: '[data-testid="notes-filter-menu"]'
-    kind: interactive
-    optional: true
-  - id: notes-filter-recent
-    selector: '[data-testid="notes-filter-recent_incomplete"]'
-    kind: interactive
-    optional: true
-  - id: notes-filter-completed
-    selector: '[data-testid="notes-filter-completed"]'
-    kind: interactive
-    optional: true
-  - id: note-editor
-    selector: '[data-testid="note-editor"]'
-    kind: display
-    optional: true
-  - id: note-editor-title
-    selector: '[data-testid="note-editor-title"]'
-    kind: interactive
-    optional: true
-  - id: note-editor-back
-    selector: '[data-testid="note-editor-back"]'
-    kind: interactive
-    optional: true
-  - id: notes-settings-toggle
-    selector: '[data-testid="notes-settings-toggle"]'
-    kind: interactive
-    optional: true
-  - id: note-theme-settings
-    selector: '[data-testid="note-theme-settings"]'
-    kind: display
-    optional: true
-  - id: note-theme-select
-    selector: '[data-testid="note-theme-select"]'
-    kind: interactive
-    optional: true
-  - id: note-theme-paper
-    selector: '[data-testid="note-theme-paper"]'
-    kind: interactive
-    optional: true       # only visible while the preview dropdown is open
-  - id: notes-floating-toggle
-    selector: '[data-testid="notes-floating-toggle"]'
-    kind: interactive
-    optional: true
-  - id: floating-notes-panel
-    selector: '[data-testid="floating-notes-panel"]'
-    kind: display
-    optional: true
-  - id: floating-notes-dock
-    selector: '[data-testid="floating-notes-dock"]'
-    kind: interactive
-    optional: true
-  - id: tao-ribbon-badge
-    selector: '[data-testid="tao-ribbon-badge"]'
-    kind: display
-    optional: true
+- id: tao-hub-tab-chat
+  selector: '[data-testid="tao-hub-tab-chat"]'
+  kind: interactive
+  optional: true
+- id: tao-hub-tab-notes
+  selector: '[data-testid="tao-hub-tab-notes"]'
+  kind: interactive
+  optional: true
+- id: tao-hub-tab-notifications
+  selector: '[data-testid="tao-hub-tab-notifications"]'
+  kind: interactive
+  optional: true
+- id: tao-alert-inbox
+  selector: '[data-testid="tao-alert-inbox"]'
+  kind: display
+  optional: true
+- id: tao-alert-inbox-item
+  selector: '[data-testid="tao-alert-inbox-item"]'
+  kind: display
+  optional: true
+- id: tao-alert-history-search
+  selector: '[data-testid="tao-alert-history-search"]'
+  kind: interactive
+  optional: true
+- id: tao-alert-history-clear
+  selector: '[data-testid="tao-alert-history-clear"]'
+  kind: interactive
+  optional: true
+- id: tao-alert-history-limit-30
+  selector: '[data-testid="tao-alert-history-limit-30"]'
+  kind: interactive
+  optional: true
+- id: tao-alert-history-limit-300
+  selector: '[data-testid="tao-alert-history-limit-300"]'
+  kind: interactive
+  optional: true
+- id: tao-alert-history-result
+  selector: '[data-testid="tao-alert-history-result"]'
+  kind: display
+  optional: true
+- id: notes-panel
+  selector: '[data-testid="notes-panel"]'
+  kind: display
+  optional: true
+- id: notes-new
+  selector: '[data-testid="notes-new"]'
+  kind: interactive
+  optional: true
+- id: notes-search
+  selector: '[data-testid="notes-search"]'
+  kind: interactive
+  optional: true
+- id: notes-list-item
+  selector: '[data-testid="notes-list-item"]'
+  kind: interactive
+  optional: true
+- id: notes-list
+  selector: '[data-testid="notes-list"]'
+  kind: display
+  optional: true
+- id: notes-toggle-complete
+  selector: '[data-testid="notes-toggle-complete"]'
+  kind: interactive
+  optional: true
+- id: notes-filter-menu
+  selector: '[data-testid="notes-filter-menu"]'
+  kind: interactive
+  optional: true
+- id: notes-filter-recent
+  selector: '[data-testid="notes-filter-recent_incomplete"]'
+  kind: interactive
+  optional: true
+- id: notes-filter-completed
+  selector: '[data-testid="notes-filter-completed"]'
+  kind: interactive
+  optional: true
+- id: note-editor
+  selector: '[data-testid="note-editor"]'
+  kind: display
+  optional: true
+- id: note-editor-title
+  selector: '[data-testid="note-editor-title"]'
+  kind: interactive
+  optional: true
+- id: note-editor-back
+  selector: '[data-testid="note-editor-back"]'
+  kind: interactive
+  optional: true
+- id: notes-settings-toggle
+  selector: '[data-testid="notes-settings-toggle"]'
+  kind: interactive
+  optional: true
+- id: note-theme-settings
+  selector: '[data-testid="note-theme-settings"]'
+  kind: display
+  optional: true
+- id: note-theme-select
+  selector: '[data-testid="note-theme-select"]'
+  kind: interactive
+  optional: true
+- id: note-theme-paper
+  selector: '[data-testid="note-theme-paper"]'
+  kind: interactive
+  optional: true
+- id: notes-floating-toggle
+  selector: '[data-testid="notes-floating-toggle"]'
+  kind: interactive
+  optional: true
+- id: floating-notes-panel
+  selector: '[data-testid="floating-notes-panel"]'
+  kind: display
+  optional: true
+- id: floating-notes-dock
+  selector: '[data-testid="floating-notes-dock"]'
+  kind: interactive
+  optional: true
+- id: tao-ribbon-badge
+  selector: '[data-testid="tao-ribbon-badge"]'
+  kind: display
+  optional: true
+- id: shell-tao-context
+  selector: '[data-testid="shell-tao-context"]'
+  kind: display
+  optional: true
+- id: shell-tao-context-pin
+  selector: '[data-testid="shell-tao-context-pin"]'
+  kind: interactive
+  optional: true
+- id: shell-tao-error
+  selector: '[data-testid="shell-tao-error"]'
+  kind: display
+  optional: true
+- id: shell-tao-retry
+  selector: '[data-testid="shell-tao-retry"]'
+  kind: interactive
+  optional: true
+- id: shell-alert-error
+  selector: '[data-testid="shell-alert-error"]'
+  kind: display
+  optional: true
+- id: shell-alert-retry
+  selector: '[data-testid="shell-alert-retry"]'
+  kind: interactive
+  optional: true
+- id: shell-notes-error
+  selector: '[data-testid="shell-notes-error"]'
+  kind: display
+  optional: true
+- id: shell-notes-retry
+  selector: '[data-testid="shell-notes-retry"]'
+  kind: interactive
+  optional: true
+- id: shell-notes-window-error
+  selector: '[data-testid="shell-notes-window-error"]'
+  kind: display
+  optional: true
+- id: note-editor-scroll
+  selector: '[data-testid="note-editor-scroll"]'
+  kind: display
+  optional: true
+- id: ai-chat-send-button
+  selector: '[data-testid="ai-chat-send-button"]'
+  kind: interactive
+- id: note-editor-body
+  selector: '[data-testid="note-editor-body"]'
+  kind: interactive
+- id: note-editor-new-step
+  selector: '[data-testid="note-editor-new-step"]'
+  kind: interactive
+- id: note-editor-new-tag
+  selector: '[data-testid="note-editor-new-tag"]'
+  kind: interactive
+- id: notes-detached-dock
+  selector: '[data-testid="notes-detached-dock"]'
+  kind: interactive
+- id: notes-detached-window
+  selector: '[data-testid="notes-detached-window"]'
+  kind: display
+- id: shell-chat-content
+  selector: '[data-testid="shell-chat-content"]'
+  kind: display
+- id: shell-chat-disabled
+  selector: '[data-testid="shell-chat-disabled"]'
+  kind: display
+- id: note-editor-complete
+  selector: '[data-testid="note-editor-complete"]'
+  kind: interactive
+- id: tao-hub-notifications-badge
+  selector: '[data-testid="tao-hub-notifications-badge"]'
+  kind: display
 -->
 
 - 统一 `TaoRibbon` 四边任意位置悬浮入口，拖动落点决定 edge + offsetRatio（`localStorage: taomni.chatDrawer.layout.v1`），带节制的临期/过期/AI 完成 badge 与跳动提示
@@ -6663,192 +6813,193 @@ controls:
 id: F-Sockscap-1
 status: partial
 area: network/sockscap
-components: [SocksCapPanel]
+components:
+- SocksCapPanel
 files:
-  - src/components/sockscap/SocksCapPanel.tsx
-  - src/components/sockscap/SocksCapRootPrompt.tsx
-  - src/lib/sockscap.ts
-  - src/stubs/tauri-core.ts
+- src/components/sockscap/SocksCapPanel.tsx
+- src/components/sockscap/SocksCapRootPrompt.tsx
+- src/lib/sockscap.ts
+- src/stubs/tauri-core.ts
 controls:
-  - id: tools-side-tab
-    selector: '[data-testid="side-tab-tools"]'
-    kind: interactive
-  - id: tools-panel
-    selector: '[data-testid="sidebar-tools-panel"]'
-    kind: display
-  - id: sidebar-entry
-    selector: '[data-testid="sidebar-tool-sockscap"]'
-    kind: interactive
-  - id: panel
-    selector: '[data-testid="sockscap-panel"]'
-    kind: display
-  - id: locked-banner
-    selector: '[data-testid="sockscap-locked-banner"]'
-    kind: display
-    optional: true       # shown only while capture is preparing/running/stopping
-  - id: add-profile
-    selector: '[data-testid="sockscap-add-profile"]'
-    kind: interactive
-  - id: start
-    selector: '[data-testid="sockscap-start"]'
-    kind: interactive
-  - id: stop
-    selector: '[data-testid="sockscap-stop"]'
-    kind: interactive
-    optional: true       # shown after a running/degraded start result
-  - id: refresh-status
-    selector: '[data-testid="sockscap-refresh-status"]'
-    kind: interactive
-  - id: recover
-    selector: '[data-testid="sockscap-recover"]'
-    kind: interactive
-  - id: profile-section-toggle
-    selector: '[data-testid="sockscap-section-profile-toggle"]'
-    kind: interactive
-  - id: scope-section-toggle
-    selector: '[data-testid="sockscap-section-scope-toggle"]'
-    kind: interactive
-  - id: upstream-section-toggle
-    selector: '[data-testid="sockscap-section-upstream-toggle"]'
-    kind: interactive
-  - id: rules-section-toggle
-    selector: '[data-testid="sockscap-section-rules-toggle"]'
-    kind: interactive
-  - id: test-section-toggle
-    selector: '[data-testid="sockscap-section-test-toggle"]'
-    kind: interactive
-  - id: gfwlist-section-toggle
-    selector: '[data-testid="sockscap-section-gfwlist-toggle"]'
-    kind: interactive
-  - id: domains-toggle
-    selector: '[data-testid="sockscap-domains-toggle"]'
-    kind: interactive
-  - id: tun-warning
-    selector: '[data-testid="sockscap-tun-warning"]'
-    kind: interactive
-    optional: true       # only when a local TUN client is detected
-  - id: tun-warning-dialog
-    selector: '[data-testid="sockscap-tun-warning-dialog"]'
-    kind: display
-    optional: true       # opened from the conditional TUN warning icon
-  - id: tun-warning-close
-    selector: '[data-testid="sockscap-tun-warning-close"]'
-    kind: interactive
-    optional: true       # shown inside the conditional TUN warning dialog
-  - id: launch-only-banner
-    selector: '[data-testid="sockscap-launch-only-banner"]'
-    kind: display
-    optional: true       # Linux only when transparent capture is unavailable
-  - id: rootless-mode
-    selector: '[data-testid="sockscap-rootless-mode"]'
-    kind: display
-    optional: true       # Linux launch-only configuration summary
-  - id: rootless-app-editor
-    selector: '[data-testid="sockscap-rootless-app-editor"]'
-    kind: display
-    optional: true       # Linux launch-only command editor
-  - id: rootless-command
-    selector: '[data-testid="sockscap-rootless-command"]'
-    kind: interactive
-    optional: true       # accepts an executable path or a command resolved through PATH
-  - id: rootless-arguments
-    selector: '[data-testid="sockscap-rootless-arguments"]'
-    kind: interactive
-    optional: true       # shell-style argument input for the launch command
-  - id: rootless-launch-mode
-    selector: '[data-testid="sockscap-rootless-launch-mode"]'
-    kind: interactive
-    optional: true       # desktop application or integrated-terminal TUI launch
-  - id: add-rootless-application
-    selector: '[data-testid="sockscap-add-rootless-application"]'
-    kind: interactive
-    optional: true       # saves the command without starting capture
-  - id: pick-linux-application
-    selector: '[data-testid="sockscap-pick-linux-application"]'
-    kind: interactive
-    optional: true       # Linux desktop browse action; launch-only mode only fills the command
-  - id: launch-application
-    selector: '[data-testid^="sockscap-launch-app-"]'
-    kind: interactive
-    optional: true       # one control per configured app in Linux launch-only mode
-  - id: stop-launched-application
-    selector: '[data-testid^="sockscap-stop-launched-app-"]'
-    kind: interactive
-    optional: true       # replaces Launch while that app is running
-  - id: linux-capture-state
-    selector: '[data-testid="sockscap-linux-capture-state"]'
-    kind: display
-    optional: true       # only when the desktop backend reports Linux
-  - id: root-prompt-dialog
-    selector: '[data-testid="sockscap-root-prompt-dialog"]'
-    kind: display
-    optional: true       # only after Linux capture requests authorization
-  - id: root-password-input
-    selector: '[data-testid="sockscap-root-password-input"]'
-    kind: interactive
-    optional: true       # only after Linux capture requests authorization
-  - id: root-prompt-submit
-    selector: '[data-testid="sockscap-root-prompt-submit"]'
-    kind: interactive
-    optional: true       # only after Linux capture requests authorization
-  - id: root-prompt-cancel
-    selector: '[data-testid="sockscap-root-prompt-cancel"]'
-    kind: interactive
-    optional: true       # only after Linux capture requests authorization
-  - id: root-prompt-close
-    selector: '[data-testid="sockscap-root-prompt-close"]'
-    kind: interactive
-    optional: true       # only after Linux capture requests authorization
-  - id: refresh-gfw
-    selector: '[data-testid="sockscap-refresh-gfw"]'
-    kind: interactive
-    optional: true       # shown only while the GFWList rule mode is selected
-  - id: import-gfw
-    selector: '[data-testid="sockscap-import-gfw"]'
-    kind: interactive
-    optional: true       # shown inside the collapsible GFWList section
-  - id: rules-editor
-    selector: '[data-testid="sockscap-rules-editor"]'
-    kind: display
-    optional: true       # shown inside the collapsible rules section
-  - id: block-quic
-    selector: '[data-testid="sockscap-block-quic"]'
-    kind: interactive
-    optional: true       # shown inside the collapsible GFWList section
-  - id: test-host
-    selector: '[data-testid="sockscap-test-host"]'
-    kind: interactive
-  - id: test-target
-    selector: '[data-testid="sockscap-test-target"]'
-    kind: interactive
-  - id: test-detail
-    selector: '[data-testid="sockscap-test-detail"]'
-    kind: display
-    optional: true
-  - id: test-detail-close
-    selector: '[data-testid="sockscap-test-detail-close"]'
-    kind: interactive
-    optional: true
-  - id: probe-fail-dialog
-    selector: '[data-testid="sockscap-probe-fail-dialog"]'
-    kind: display
-    optional: true
-  - id: probe-fail-force
-    selector: '[data-testid="sockscap-probe-fail-force"]'
-    kind: interactive
-    optional: true
-  - id: probe-fail-cancel
-    selector: '[data-testid="sockscap-probe-fail-cancel"]'
-    kind: interactive
-    optional: true
-  - id: helper-start
-    selector: '[data-testid="sockscap-helper-start"]'
-    kind: interactive
-    optional: true       # privileged desktop helper; unavailable in browser preview
-  - id: windivert-probe
-    selector: '[data-testid="sockscap-windivert-probe"]'
-    kind: interactive
-    optional: true       # Windows-only helper diagnostic
+- id: tools-side-tab
+  selector: '[data-testid="shell-navigator-page"][data-page="tools"]'
+  kind: interactive
+- id: tools-panel
+  selector: '[data-testid="sidebar-tools-panel"]'
+  kind: display
+- id: sidebar-entry
+  selector: '[data-testid="sidebar-tool-sockscap"]'
+  kind: interactive
+- id: panel
+  selector: '[data-testid="sockscap-panel"]'
+  kind: display
+- id: locked-banner
+  selector: '[data-testid="sockscap-locked-banner"]'
+  kind: display
+  optional: true
+- id: add-profile
+  selector: '[data-testid="sockscap-add-profile"]'
+  kind: interactive
+- id: start
+  selector: '[data-testid="sockscap-start"]'
+  kind: interactive
+- id: stop
+  selector: '[data-testid="sockscap-stop"]'
+  kind: interactive
+  optional: true
+- id: refresh-status
+  selector: '[data-testid="sockscap-refresh-status"]'
+  kind: interactive
+- id: recover
+  selector: '[data-testid="sockscap-recover"]'
+  kind: interactive
+- id: profile-section-toggle
+  selector: '[data-testid="sockscap-section-profile-toggle"]'
+  kind: interactive
+- id: scope-section-toggle
+  selector: '[data-testid="sockscap-section-scope-toggle"]'
+  kind: interactive
+- id: upstream-section-toggle
+  selector: '[data-testid="sockscap-section-upstream-toggle"]'
+  kind: interactive
+- id: rules-section-toggle
+  selector: '[data-testid="sockscap-section-rules-toggle"]'
+  kind: interactive
+- id: test-section-toggle
+  selector: '[data-testid="sockscap-section-test-toggle"]'
+  kind: interactive
+- id: gfwlist-section-toggle
+  selector: '[data-testid="sockscap-section-gfwlist-toggle"]'
+  kind: interactive
+- id: domains-toggle
+  selector: '[data-testid="sockscap-domains-toggle"]'
+  kind: interactive
+- id: tun-warning
+  selector: '[data-testid="sockscap-tun-warning"]'
+  kind: interactive
+  optional: true
+- id: tun-warning-dialog
+  selector: '[data-testid="sockscap-tun-warning-dialog"]'
+  kind: display
+  optional: true
+- id: tun-warning-close
+  selector: '[data-testid="sockscap-tun-warning-close"]'
+  kind: interactive
+  optional: true
+- id: launch-only-banner
+  selector: '[data-testid="sockscap-launch-only-banner"]'
+  kind: display
+  optional: true
+- id: rootless-mode
+  selector: '[data-testid="sockscap-rootless-mode"]'
+  kind: display
+  optional: true
+- id: rootless-app-editor
+  selector: '[data-testid="sockscap-rootless-app-editor"]'
+  kind: display
+  optional: true
+- id: rootless-command
+  selector: '[data-testid="sockscap-rootless-command"]'
+  kind: interactive
+  optional: true
+- id: rootless-arguments
+  selector: '[data-testid="sockscap-rootless-arguments"]'
+  kind: interactive
+  optional: true
+- id: rootless-launch-mode
+  selector: '[data-testid="sockscap-rootless-launch-mode"]'
+  kind: interactive
+  optional: true
+- id: add-rootless-application
+  selector: '[data-testid="sockscap-add-rootless-application"]'
+  kind: interactive
+  optional: true
+- id: pick-linux-application
+  selector: '[data-testid="sockscap-pick-linux-application"]'
+  kind: interactive
+  optional: true
+- id: launch-application
+  selector: '[data-testid^="sockscap-launch-app-"]'
+  kind: interactive
+  optional: true
+- id: stop-launched-application
+  selector: '[data-testid^="sockscap-stop-launched-app-"]'
+  kind: interactive
+  optional: true
+- id: linux-capture-state
+  selector: '[data-testid="sockscap-linux-capture-state"]'
+  kind: display
+  optional: true
+- id: root-prompt-dialog
+  selector: '[data-testid="sockscap-root-prompt-dialog"]'
+  kind: display
+  optional: true
+- id: root-password-input
+  selector: '[data-testid="sockscap-root-password-input"]'
+  kind: interactive
+  optional: true
+- id: root-prompt-submit
+  selector: '[data-testid="sockscap-root-prompt-submit"]'
+  kind: interactive
+  optional: true
+- id: root-prompt-cancel
+  selector: '[data-testid="sockscap-root-prompt-cancel"]'
+  kind: interactive
+  optional: true
+- id: root-prompt-close
+  selector: '[data-testid="sockscap-root-prompt-close"]'
+  kind: interactive
+  optional: true
+- id: refresh-gfw
+  selector: '[data-testid="sockscap-refresh-gfw"]'
+  kind: interactive
+  optional: true
+- id: import-gfw
+  selector: '[data-testid="sockscap-import-gfw"]'
+  kind: interactive
+  optional: true
+- id: rules-editor
+  selector: '[data-testid="sockscap-rules-editor"]'
+  kind: display
+  optional: true
+- id: block-quic
+  selector: '[data-testid="sockscap-block-quic"]'
+  kind: interactive
+  optional: true
+- id: test-host
+  selector: '[data-testid="sockscap-test-host"]'
+  kind: interactive
+- id: test-target
+  selector: '[data-testid="sockscap-test-target"]'
+  kind: interactive
+- id: test-detail
+  selector: '[data-testid="sockscap-test-detail"]'
+  kind: display
+  optional: true
+- id: test-detail-close
+  selector: '[data-testid="sockscap-test-detail-close"]'
+  kind: interactive
+  optional: true
+- id: probe-fail-dialog
+  selector: '[data-testid="sockscap-probe-fail-dialog"]'
+  kind: display
+  optional: true
+- id: probe-fail-force
+  selector: '[data-testid="sockscap-probe-fail-force"]'
+  kind: interactive
+  optional: true
+- id: probe-fail-cancel
+  selector: '[data-testid="sockscap-probe-fail-cancel"]'
+  kind: interactive
+  optional: true
+- id: helper-start
+  selector: '[data-testid="sockscap-helper-start"]'
+  kind: interactive
+  optional: true
+- id: windivert-probe
+  selector: '[data-testid="sockscap-windivert-probe"]'
+  kind: interactive
+  optional: true
 -->
 
 - 提供全局/按应用 TCP 路由、上游代理、GFWList、规则 dry-run、状态与流量统计的控制面板。
@@ -9791,6 +9942,9 @@ controls:
     selector: '[data-testid="git-diff-unstage"]'
     kind: interactive
     optional: true
+  - id: commit-message
+    selector: textarea[placeholder="Commit message"]
+    kind: interactive
 -->
 
 - Workspace Git 的 Changes 按仓库分组；diff 面板显示 `HEAD <oid>` / `Working tree` 两侧标签与 `n/N files` 上一个/下一个文件导航，顺序与平铺列表一致（未跟踪文件内联计入，IDEA 另置 Unversioned 节点）。
@@ -10727,6 +10881,7 @@ components:
 - TabNavigator
 - StableSurface
 - ShellNotesSurface
+- RetainedPrimaryView
 files:
 - src/components/shell/ContextPanelHost.tsx
 - src/components/shell/GlobalRail.tsx
@@ -10770,6 +10925,15 @@ files:
 - src/hooks/useShellResumeComposer.ts
 - src/hooks/useShellShortcuts.ts
 - src/components/detached/GitDetachedWindow.tsx
+- src/lib/shell/notesPanelWindow.ts
+- src/lib/notes/notesViewState.ts
+- src/hooks/useRecentWorkspaceLaunch.ts
+- src/hooks/useRecentPanelReopen.ts
+- src/components/shell/ShellRecentPanels.tsx
+- src/components/shell/RetainedPrimaryView.tsx
+- src/lib/shell/panelWindowLifecycle.ts
+- src/lib/shell/sftpWindowState.ts
+- src/lib/sftpTransferTracking.ts
 controls:
 - id: shell-close-cancel
   selector: '[data-testid="shell-close-cancel"]'
@@ -10933,9 +11097,6 @@ controls:
 - id: shell-rail-sessions
   selector: '[data-testid="shell-rail-sessions"]'
   kind: interactive
-- id: shell-rail-settings
-  selector: '[data-testid="shell-rail-settings"]'
-  kind: interactive
 - id: shell-rail-tao
   selector: '[data-testid="shell-rail-tao"]'
   kind: interactive
@@ -11071,6 +11232,120 @@ controls:
 - id: shell-work-area
   selector: '[data-testid="shell-work-area"]'
   kind: display
+- id: shell-unavailable-view
+  selector: '[data-testid="shell-unavailable-view"]'
+  kind: display
+  optional: true
+- id: shell-keymap-conflict-scope
+  selector: '[data-testid="shell-keymap-conflict-scope"]'
+  kind: display
+  optional: true
+- id: shell-navigator-workspace-error
+  selector: '[data-testid="shell-navigator-workspace-error"]'
+  kind: display
+  optional: true
+- id: shell-navigator-workspace-relocate
+  selector: '[data-testid="shell-navigator-workspace-relocate"]'
+  kind: interactive
+  optional: true
+- id: shell-recent-workspace-error
+  selector: '[data-testid="shell-recent-workspace-error"]'
+  kind: display
+  optional: true
+- id: shell-recent-workspace-relocate
+  selector: '[data-testid="shell-recent-workspace-relocate"]'
+  kind: interactive
+  optional: true
+- id: shell-close-discard
+  selector: '[data-testid="shell-close-discard"]'
+  kind: interactive
+- id: shell-close-save
+  selector: '[data-testid="shell-close-save"]'
+  kind: interactive
+- id: shell-tab-close
+  selector: '[data-testid="shell-tab-close"]'
+  kind: interactive
+- id: retained-lanchat-composer
+  selector: '[data-testid="lanchat-composer-textarea"]'
+  kind: interactive
+- id: retained-lanchat-roster
+  selector: '[data-testid="lanchat-roster-panel"]'
+  kind: interactive
+- id: shell-close-background
+  selector: '[data-testid="shell-close-background"]'
+  kind: interactive
+- id: shell-close-cancel-job
+  selector: '[data-testid="shell-close-cancel-job"]'
+  kind: interactive
+- id: shell-close-commit
+  selector: '[data-testid="shell-close-commit"]'
+  kind: interactive
+- id: shell-close-rollback
+  selector: '[data-testid="shell-close-rollback"]'
+  kind: interactive
+- id: shell-menu-overview
+  selector: '[data-testid="shell-menu-overview"]'
+  kind: interactive
+- id: shell-menu-quick-switch
+  selector: '[data-testid="shell-menu-quick-switch"]'
+  kind: interactive
+- id: shell-menu-recent-panels
+  selector: '[data-testid="shell-menu-recent-panels"]'
+  kind: interactive
+- id: shell-menu-reset-layout
+  selector: '[data-testid="shell-menu-reset-layout"]'
+  kind: interactive
+- id: shell-notes-recovered
+  selector: '[data-testid="shell-notes-recovered"]'
+  kind: display
+- id: shell-recent-panels
+  selector: '[data-testid="shell-recent-panels"]'
+  kind: display
+- id: shell-recent-panels-close
+  selector: '[data-testid="shell-recent-panels-close"]'
+  kind: interactive
+- id: shell-recent-panel
+  selector: '[data-testid="shell-recent-panel"]'
+  kind: interactive
+- id: shell-recent-panel-empty
+  selector: '[data-testid="shell-recent-panel-empty"]'
+  kind: display
+- id: shell-recent-panel-opening
+  selector: '[data-testid="shell-recent-panel-opening"]'
+  kind: display
+- id: shell-recent-panel-error
+  selector: '[data-testid="shell-recent-panel-error"]'
+  kind: display
+- id: shell-recent-panel-owner-choice
+  selector: '[data-testid="shell-recent-panel-owner-choice"]'
+  kind: display
+- id: shell-recent-panel-owner
+  selector: '[data-testid="shell-recent-panel-owner"]'
+  kind: interactive
+- id: shell-recent-panel-bind
+  selector: '[data-testid="shell-recent-panel-bind"]'
+  kind: interactive
+- id: shell-recent-panel-cancel
+  selector: '[data-testid="shell-recent-panel-cancel"]'
+  kind: interactive
+- id: shell-recent-panel-retry
+  selector: '[data-testid="shell-recent-panel-retry"]'
+  kind: interactive
+- id: shell-recent-panel-show
+  selector: '[data-testid="shell-recent-panel-show"]'
+  kind: interactive
+- id: shell-recent-panel-detach
+  selector: '[data-testid="shell-recent-panel-detach"]'
+  kind: interactive
+- id: shell-tab-move-utility
+  selector: '[data-testid="shell-tab-move-utility"]'
+  kind: interactive
+- id: shell-target-error
+  selector: '[data-testid="shell-target-error"]'
+  kind: display
+- id: shell-transfers-trigger
+  selector: '[data-testid="shell-transfers-trigger"]'
+  kind: interactive
 -->
 
 - 统一 Rail/Navigator、五个意图 lane、总览/快速切换、Context Host、Tao 和 Notes 稳定实例。

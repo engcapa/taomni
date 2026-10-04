@@ -22,7 +22,7 @@ export function TabNavigator({ onNewSession }: { onNewSession(): void }) {
   const [attention, setAttention] = useState(false), [sort, setSort] = useState("recent"), [index, setIndex] = useState(0), [details, setDetails] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null), dialogRef = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null), frozenMru = useRef(shell.mru);
-  const isOpen = !!shell.overlay, quick = shell.overlay === "quick";
+  const isOpen = shell.overlay === "overview" || shell.overlay === "quick", quick = shell.overlay === "quick";
   useEffect(() => {
     if (!isOpen) return;
     opener.current = document.activeElement as HTMLElement;

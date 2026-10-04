@@ -35,7 +35,7 @@ steps:
 - press: Escape
 - wait_for:
     selector: '[data-testid="session-editor"]'
-    state: detached
+    state: hidden
     timeout_sec: 5
 - screenshot: F1.6-welcome-cards.png
 verification:
@@ -53,9 +53,11 @@ verification:
     - step: 3
       expectation: '{"assert_visible": "text=\"New session…\""}'
     - step: 4
-      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"] >> text=\"Import OpenSSH config\""}'
+      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"] >> text=\"Import
+        OpenSSH config\""}'
     - step: 5
-      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"] >> text=\"Refresh sessions\""}'
+      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"] >> text=\"Refresh
+        sessions\""}'
     - step: 6
       expectation: '{"assert_visible": "[data-testid=\"welcome-open-home-folder\"]"}'
     - step: 7
@@ -63,9 +65,16 @@ verification:
     - step: 9
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
-        5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]",
+        "state": "hidden", "timeout_sec": 5}}'
     results:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
     - 11
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。

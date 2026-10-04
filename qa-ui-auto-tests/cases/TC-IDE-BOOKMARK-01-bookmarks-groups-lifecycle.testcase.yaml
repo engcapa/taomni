@@ -14,7 +14,10 @@ description: 'ED-BOOKMARK-001 browser slice. Opens the browser-VFS README buffer
 
   L1 browser-wired bookmark lifecycle contract.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -33,7 +36,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -250,21 +253,29 @@ verification:
     - step: 15
       expectation: '{"wait_for": "[data-testid=\"code-workspace-todos-panel\"]"}'
     - step: 16
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"]",
+        "equal": 1}}'
     - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-todos-panel\"]", "contains": "Bookmarks"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-todos-panel\"]",
+        "contains": "Bookmarks"}}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]", "name": "data-group-name", "equals": "Review"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]",
+        "name": "data-group-name", "equals": "Review"}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]", "name": "data-group-name", "equals": "Review"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]",
+        "name": "data-group-name", "equals": "Review"}}'
     - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]", "name": "data-group-name", "equals": "Entered"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]",
+        "name": "data-group-name", "equals": "Entered"}}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]", "name": "data-group-name", "equals": "Entered"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]",
+        "name": "data-group-name", "equals": "Entered"}}'
     - step: 34
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'') === ''code-workspace-bookmark-group-rename''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'')
+        === ''code-workspace-bookmark-group-rename''", "expect_truthy": true}}'
     - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-todos-panel\"]", "contains": "No bookmarks yet"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-todos-panel\"]",
+        "contains": "No bookmarks yet"}}'
     - step: 39
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
     - step: 42
@@ -272,31 +283,39 @@ verification:
     - step: 50
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
     - step: 53
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"]", "equal": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"]",
+        "equal": 2}}'
     - step: 54
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-mnemonic\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-mnemonic\"]",
+        "equal": 1}}'
     - step: 56
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
     - step: 60
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Jumped to bookmark [J]"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]",
+        "contains": "Jumped to bookmark [J]"}}'
     - step: 62
       expectation: '{"assert_enabled": "[data-testid=\"code-workspace-nav-back\"]"}'
     - step: 66
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
     - step: 68
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
+        "timeout_sec": 15}}'
     - step: 69
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-bookmark-missing\"]", "contains": "Missing target"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-bookmark-missing\"]",
+        "contains": "Missing target"}}'
     - step: 70
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]", "equal": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
+        "equal": 2}}'
     - step: 73
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
     - step: 76
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.txt\"]"}'
     - step: 77
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"current\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"current\"]",
+        "timeout_sec": 15}}'
     - step: 78
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
+        "equal": 0}}'
     results:
     - 76
     - 77

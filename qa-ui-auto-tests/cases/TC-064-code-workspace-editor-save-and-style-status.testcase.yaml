@@ -13,7 +13,7 @@ fixtures:
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="tab-bar"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_count:
@@ -35,7 +35,8 @@ verification:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 6
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]",
+        "equal": 1}}'
     results:
     - 5
     - 6
@@ -47,3 +48,8 @@ verification:
   - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
     method: external
     reason: 明确记录执行边界和未验证平台。
+description: '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'

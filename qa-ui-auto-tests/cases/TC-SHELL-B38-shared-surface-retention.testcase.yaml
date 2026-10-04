@@ -1,0 +1,838 @@
+id: TC-SHELL-B38
+title: Twenty lane switches retain editor history, Notes and utility drafts, selection and late proxy
+  results
+description: V-B38 renderer integration. Real PTY/disk/service effects are paired with N02-N07; the other
+  retained consumers are mapped in the design evidence matrix.
+covers:
+- F1.5
+- F25.5
+- F7.4
+- F-TAO-1
+- F-SHELL-1
+- F-MFA-1
+- F1.9
+- F6.3
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+- parity008_git
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: &id002
+    - repo-a WORKTREE
+    - shared line
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+End
+- type: z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: &id001
+    - repo-a WORKTREE
+    - shared line
+    - z
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="terminal-pane"]:visible .xterm-helper-textarea'
+- type: echo SHELL_RETAIN_A
+- press: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]:visible'
+    regex: (?m)^SHELL_RETAIN_A[ \t]*$
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- click: '[data-testid="sftp-remote-list"] tr[title="/home/qa/alpha.txt"]'
+- assert_attribute:
+    selector: '[data-testid="sftp-remote-list"] tr[title="/home/qa/alpha.txt"]'
+    name: aria-selected
+    equals: 'true'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: 'SHELL-NOTE-中文
+
+      Complete second line'
+- fill:
+    selector: '[data-testid="note-editor-new-step"]'
+    value: SHELL unfinished step
+- fill:
+    selector: '[data-testid="note-editor-new-tag"]'
+    value: SHELL unfinished tag
+- assert_count:
+    selector: '[data-testid="note-editor"]'
+    equal: 1
+- click: '[data-testid="shell-rail-tao"]'
+- shell_navigate: sessions
+- dblclick: '[data-testid="session-tree-item"][data-session-name="SHELL-TYPE-proxy"]'
+- wait_for: '[data-testid="proxy-test-panel"]'
+- fill:
+    selector: '[data-testid="proxy-test-url"]'
+    value: retained.invalid:9443
+- shell_backend_scenario:
+    action: hold
+    command: test_proxy_connection
+- click: '[data-testid="proxy-test-run"]'
+- assert_disabled: '[data-testid="proxy-test-run"]'
+- click: '[data-testid="shell-rail-home"]'
+- assert_not_visible: '[data-testid="proxy-test-panel"]'
+- shell_backend_scenario:
+    action: release
+- assert_shell_backend:
+    command: test_proxy_connection
+    status: completed
+    count: 1
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-lan-chat"]'
+- wait_for: '[data-testid="lanchat-roster-panel"]'
+- click: '[data-testid="lanchat-roster-panel"] button:has-text("赵敏 · 设计部")'
+- fill:
+    selector: '[data-testid="lanchat-composer-textarea"]'
+    value: 'SHELL-LAN-中文
+
+      Unsent complete second line'
+- assert_value:
+    selector: '[data-testid="lanchat-composer-textarea"]'
+    equals: 'SHELL-LAN-中文
+
+      Unsent complete second line'
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- vault_first_run: qa-shell-retained-password
+- wait_for: '[data-testid="mfa-panel"]'
+- click: '[data-testid="mfa-add"]'
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: Shell Retained
+- fill:
+    selector: '[data-testid="mfa-add-account"]'
+    value: retained@example.invalid
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+- click: '[data-testid="mfa-add-submit"]'
+- wait_for: '[data-testid="mfa-account-row"][data-issuer="Shell Retained"]'
+- fill:
+    selector: '[data-testid="mfa-search"]'
+    value: retained@example.invalid
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
+- click: '[data-testid="shell-rail-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 7
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="note-editor"]'
+- click: '[data-testid="shell-rail-tao"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: build
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: utility
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: home
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: home
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: build
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 7
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="note-editor"]'
+- click: '[data-testid="shell-rail-tao"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: utility
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: home
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: home
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: build
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: utility
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 7
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="note-editor"]'
+- click: '[data-testid="shell-rail-tao"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: home
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: home
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: build
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: utility
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: home
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: home
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 7
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="note-editor"]'
+- click: '[data-testid="shell-rail-tao"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: build
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: utility
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: home
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: home
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: build
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id002
+- press: Mod+Shift+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]:visible'
+    regex: (?m)^SHELL_RETAIN_A[ \t]*$
+- assert_attribute:
+    selector: '[data-testid="sftp-remote-list"] tr[title="/home/qa/alpha.txt"]'
+    name: aria-selected
+    equals: 'true'
+- assert_shell_backend:
+    command: sftp_attach
+    status: requested
+    count: 1
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="note-editor"]'
+- assert_count:
+    selector: '[data-testid="note-editor"]'
+    equal: 1
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'SHELL-NOTE-中文
+
+      Complete second line'
+- assert_value:
+    selector: '[data-testid="note-editor-new-step"]'
+    equals: SHELL unfinished step
+- assert_value:
+    selector: '[data-testid="note-editor-new-tag"]'
+    equals: SHELL unfinished tag
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: SHELL-TYPE-proxy
+- assert_count:
+    selector: '[data-testid="shell-quick-option"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Enter
+- wait_for: '[data-testid="proxy-test-panel"]'
+- assert_value:
+    selector: '[data-testid="proxy-test-url"]'
+    equals: retained.invalid:9443
+- assert_text_equals:
+    selector: '[data-testid="proxy-test-result"]'
+    equals: QA proxy accepted retained.invalid:9443
+- assert_attribute:
+    selector: '[data-testid="proxy-test-result"]'
+    name: data-success
+    equals: 'true'
+- assert_shell_backend:
+    command: test_proxy_connection
+    status: requested
+    count: 1
+- click: '[data-testid="shell-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: lan-chat
+- assert_count:
+    selector: '[data-testid="shell-quick-option"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Enter
+- wait_for: '[data-testid="lanchat-composer-textarea"]'
+- assert_value:
+    selector: '[data-testid="lanchat-composer-textarea"]'
+    equals: 'SHELL-LAN-中文
+
+      Unsent complete second line'
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- click: '[data-testid="shell-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: mfa
+- assert_count:
+    selector: '[data-testid="shell-quick-option"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Enter
+- wait_for: '[data-testid="mfa-panel"]'
+- assert_value:
+    selector: '[data-testid="mfa-search"]'
+    equals: retained@example.invalid
+- assert_count:
+    selector: '[data-testid="mfa-account-row"][data-issuer="Shell Retained"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
+- screenshot: tc-shell-b38.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A single editor edit and a terminal command create independently observable state before
+      changing lanes.
+    actions:
+    - 1
+    - 3
+    - 4
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 17
+    - 19
+    - 21
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
+    - step: 6
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["repo-a WORKTREE", "shared line", ""]}}'
+    - step: 10
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["repo-a WORKTREE", "shared line", "z"]}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
+    - step: 18
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]:visible", "regex":
+        "(?m)^SHELL_RETAIN_A[ \\t]*$"}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-list\"]"}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sftp-remote-list\"] tr[title=\"/home/qa/alpha.txt\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    results:
+    - 2
+    - 5
+    - 6
+    - 10
+    - 14
+    - 18
+    - 20
+    - 22
+  - id: R2
+    requirement: Notes has exactly one editor and full body plus unfinished step/tag inputs before the
+      stress sequence.
+    actions:
+    - 23
+    - 24
+    - 25
+    - 27
+    - 28
+    - 29
+    - 31
+    - 63
+    checkpoints:
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 30
+      expectation: '{"assert_count": {"selector": "[data-testid=\"note-editor\"]", "equal": 1}}'
+    - step: 64
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    results:
+    - 26
+    - 30
+    - 64
+  - id: R3
+    requirement: Twenty lane transitions with repeated Overview and Tao open/close keep the exact four
+      primary tabs.
+    actions:
+    - 65
+    - 67
+    - 69
+    - 70
+    - 72
+    - 73
+    - 75
+    - 77
+    - 79
+    - 81
+    - 83
+    - 85
+    - 86
+    - 88
+    - 89
+    - 91
+    - 93
+    - 95
+    - 97
+    - 99
+    - 101
+    - 102
+    - 104
+    - 105
+    - 107
+    - 109
+    - 111
+    - 113
+    - 115
+    - 117
+    - 118
+    - 120
+    - 121
+    - 123
+    - 125
+    - 127
+    checkpoints:
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    - step: 68
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 7}}'
+    - step: 71
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 74
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    - step: 76
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    - step: 78
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "home"}}'
+    - step: 80
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    - step: 82
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    - step: 84
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 7}}'
+    - step: 87
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 90
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    - step: 92
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "home"}}'
+    - step: 94
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    - step: 96
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    - step: 98
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    - step: 100
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 7}}'
+    - step: 103
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 106
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "home"}}'
+    - step: 108
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    - step: 110
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    - step: 112
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    - step: 114
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "home"}}'
+    - step: 116
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 7}}'
+    - step: 119
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 122
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    - step: 124
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    - step: 126
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    - step: 128
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "home"}}'
+    results:
+    - 66
+    - 68
+    - 71
+    - 74
+    - 76
+    - 78
+    - 80
+    - 82
+    - 84
+    - 87
+    - 90
+    - 92
+    - 94
+    - 96
+    - 98
+    - 100
+    - 103
+    - 106
+    - 108
+    - 110
+    - 112
+    - 114
+    - 116
+    - 119
+    - 122
+    - 124
+    - 126
+    - 128
+  - id: R4
+    requirement: Returning to each surface preserves the full state and editor undo/redo history without
+      a second SFTP attach.
+    actions:
+    - 129
+    - 131
+    - 132
+    - 134
+    - 136
+    - 140
+    checkpoints:
+    - step: 130
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["repo-a WORKTREE", "shared line", "z"]}}'
+    - step: 133
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["repo-a WORKTREE", "shared line", ""]}}'
+    - step: 135
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["repo-a WORKTREE", "shared line", "z"]}}'
+    - step: 137
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]:visible", "regex":
+        "(?m)^SHELL_RETAIN_A[ \\t]*$"}}'
+    - step: 138
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sftp-remote-list\"] tr[title=\"/home/qa/alpha.txt\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 139
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "status": "requested", "count":
+        1}}'
+    - step: 141
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 142
+      expectation: '{"assert_count": {"selector": "[data-testid=\"note-editor\"]", "equal": 1}}'
+    - step: 143
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "SHELL-NOTE-中文\nComplete
+        second line"}}'
+    - step: 144
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-step\"]", "equals":
+        "SHELL unfinished step"}}'
+    - step: 145
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-tag\"]", "equals": "SHELL
+        unfinished tag"}}'
+    results:
+    - 130
+    - 133
+    - 135
+    - 137
+    - 138
+    - 139
+    - 141
+    - 142
+    - 143
+    - 144
+    - 145
+  - id: R5
+    requirement: Proxy completion arrives while hidden; LAN Chat retains an unsent multiline draft, and
+      MFA has one filtered account before twenty lane switches.
+    actions:
+    - 32
+    - 33
+    - 35
+    - 36
+    - 37
+    - 39
+    - 41
+    - 43
+    - 44
+    - 45
+    - 47
+    - 48
+    - 50
+    - 51
+    - 53
+    - 55
+    - 56
+    - 57
+    - 58
+    - 59
+    - 61
+    checkpoints:
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"proxy-test-panel\"]"}'
+    - step: 38
+      expectation: '{"assert_disabled": "[data-testid=\"proxy-test-run\"]"}'
+    - step: 40
+      expectation: '{"assert_not_visible": "[data-testid=\"proxy-test-panel\"]"}'
+    - step: 42
+      expectation: '{"assert_shell_backend": {"command": "test_proxy_connection", "status": "completed",
+        "count": 1}}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"lanchat-roster-panel\"]"}'
+    - step: 49
+      expectation: '{"assert_value": {"selector": "[data-testid=\"lanchat-composer-textarea\"]", "equals":
+        "SHELL-LAN-中文\nUnsent complete second line"}}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
+    - step: 60
+      expectation: '{"wait_for": "[data-testid=\"mfa-account-row\"][data-issuer=\"Shell Retained\"]"}'
+    - step: 62
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"]", "equal": 1}}'
+    results:
+    - 34
+    - 38
+    - 40
+    - 42
+    - 46
+    - 49
+    - 52
+    - 54
+    - 60
+    - 62
+  - id: R6
+    requirement: After repeated lane/overlay switches the exact LAN Chat draft, MFA filter and proxy target/result
+      remain; no proxy request reruns and no hidden MFA import opens.
+    actions:
+    - 146
+    - 147
+    - 148
+    - 150
+    - 156
+    - 157
+    - 159
+    - 163
+    - 164
+    - 166
+    checkpoints:
+    - step: 149
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 151
+      expectation: '{"wait_for": "[data-testid=\"proxy-test-panel\"]"}'
+    - step: 152
+      expectation: '{"assert_value": {"selector": "[data-testid=\"proxy-test-url\"]", "equals": "retained.invalid:9443"}}'
+    - step: 153
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"proxy-test-result\"]", "equals":
+        "QA proxy accepted retained.invalid:9443"}}'
+    - step: 154
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"proxy-test-result\"]", "name": "data-success",
+        "equals": "true"}}'
+    - step: 155
+      expectation: '{"assert_shell_backend": {"command": "test_proxy_connection", "status": "requested",
+        "count": 1}}'
+    - step: 158
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 160
+      expectation: '{"wait_for": "[data-testid=\"lanchat-composer-textarea\"]"}'
+    - step: 161
+      expectation: '{"assert_value": {"selector": "[data-testid=\"lanchat-composer-textarea\"]", "equals":
+        "SHELL-LAN-中文\nUnsent complete second line"}}'
+    - step: 162
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
+    - step: 165
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 167
+      expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
+    - step: 168
+      expectation: '{"assert_value": {"selector": "[data-testid=\"mfa-search\"]", "equals": "retained@example.invalid"}}'
+    - step: 169
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"][data-issuer=\"Shell
+        Retained\"]", "equal": 1}}'
+    - step: 170
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"]", "equal": 1}}'
+    results:
+    - 149
+    - 151
+    - 152
+    - 153
+    - 154
+    - 155
+    - 158
+    - 160
+    - 161
+    - 162
+    - 165
+    - 167
+    - 168
+    - 169
+    - 170
+  native:
+  - check: Real IPC, disk and window lifecycle
+    method: external
+    reason: Paired TC-SHELL-N02/N03/N05/N07 establish native effects; this case uses browser fixtures.
+  visual:
+  - check: Inspect readable surfaces and overlay placement in the screenshot
+    method: manual
+    reason: Functional assertions do not establish a visual verdict.

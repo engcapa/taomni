@@ -1,6 +1,7 @@
 id: TC-IDE-NAV-01
 title: Navigation bar keyboard traversal, popup selection, and cancel
-description: 'ED-NAV-001 browser slice. Opens a browser-VFS workspace and exercises the
+description: 'ED-NAV-001 browser slice. Opens a browser-VFS workspace and exercises
+  the
 
   production Navigation Bar entry with Alt+Home, Home/End and arrow traversal,
 
@@ -12,7 +13,10 @@ description: 'ED-NAV-001 browser slice. Opens a browser-VFS workspace and exerci
 
   Highest claim on green: L1 browser-wired navigation bar contract.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -30,7 +34,7 @@ timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -175,19 +179,24 @@ verification:
     - step: 22
       expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumbs\"]"}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]", "name": "tabindex", "equals": "0"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]",
+        "name": "tabindex", "equals": "0"}}'
     - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]", "name": "aria-label", "equals": "Editor breadcrumbs"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]",
+        "name": "aria-label", "equals": "Editor breadcrumbs"}}'
     - step: 32
       expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumb-popup\"]"}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumb-popup\"]", "name": "role", "equals": "listbox"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumb-popup\"]",
+        "name": "role", "equals": "listbox"}}'
     - step: 34
       expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumb-entry-file\"]"}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumb-popup-filter\"]", "name": "role", "equals": "combobox"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumb-popup-filter\"]",
+        "name": "role", "equals": "combobox"}}'
     - step: 36
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-breadcrumb-entry-directory\"]", "min": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-breadcrumb-entry-directory\"]",
+        "min": 1}}'
     - step: 38
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-breadcrumb-popup\"]"}'
     - step: 41
@@ -195,13 +204,15 @@ verification:
     - step: 43
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-breadcrumb-popup\"]"}'
     - step: 44
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]", "contains": "README.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]",
+        "contains": "README.txt"}}'
     - step: 47
       expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumb-popup-filter\"]"}'
     - step: 49
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-breadcrumb-popup\"]"}'
     - step: 50
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'') === ''code-workspace-breadcrumbs''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'')
+        === ''code-workspace-breadcrumbs''", "expect_truthy": true}}'
     results:
     - 49
     - 50

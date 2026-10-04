@@ -1,5 +1,6 @@
 id: TC-auto-F5-5
-title: Application theme switcher exposes Light / Dark / System preview options in settings
+title: Application theme switcher exposes Light / Dark / System preview options in
+  settings
 description: 'Auto-generated focused coverage for F5.5 (application theme). The
 
   AppThemeSwitcher renders a preview dropdown in the settings panel with
@@ -12,7 +13,10 @@ description: 'Auto-generated focused coverage for F5.5 (application theme). The
 
   document attribute and persisted to localStorage.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F5.5
 tags:
@@ -29,8 +33,8 @@ fixtures:
 timeout_sec: 30
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-general"]'
 - assert_visible: '[data-testid="app-theme-select"]'
@@ -60,7 +64,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Application theme switcher exposes Light / Dark / System preview options in settings：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Application theme switcher exposes Light / Dark / System preview
+      options in settings：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 3
@@ -73,7 +78,7 @@ verification:
     - 19
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 6
@@ -91,7 +96,8 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.documentElement.getAttribute(\"data-app-theme\")",
         "contains": "dark"}}'
     - step: 21
-      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "exists": true}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "exists":
+        true}}'
     results:
     - 21
   visual:

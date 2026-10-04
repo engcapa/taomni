@@ -5,6 +5,16 @@ function storage(values: Record<string, string> = {}) {
   return { values, getItem: (k: string) => values[k] ?? null, setItem: (k: string, v: string) => { values[k] = v; }, removeItem: (k: string) => { delete values[k]; } };
 }
 describe("Shell layout compatibility", () => {
+  it("turns future views into safe Utility restore sources and discards their payload", () => {
+    const layout = validateShellLayout({ ...defaultShellLayout(), restoreSources: {
+      "unsupported:future": { kind: "future-protocol", identity: "future", title: "Future view", password: "SECRET", payload: { host: "private", token: "SECRET" } },
+      "workspace:invalid": { kind: "workspace", workspaceInstanceId: "invalid", workspace: {} },
+    }, restoredTabs: { "unsupported:future": { pinned: true, order: 1 } } })!;
+    expect(layout.restoreSources["unsupported:future"]).toEqual({ kind: "unsupported", identity: "future", originalKind: "future-protocol", title: "Future view" });
+    expect(layout.restoreSources["workspace:invalid"]).toBeUndefined();
+    expect(JSON.stringify(layout)).not.toMatch(/SECRET|private/);
+    expect(validateShellLayout(layout)?.restoreSources).toEqual(layout.restoreSources);
+  });
   it("migrates actual legacy keys once while preserving legacy data", () => {
     const s = storage({ "taomni.sidebarCollapsed": "false", "taomni.sidebarCollapsedByGroup.v1": JSON.stringify({ terminal: false, "code-workspace": true }),
       "taomni.resizable-panels.v4.main-layout": JSON.stringify({ sidebar: 25, content: 75 }),
@@ -30,5 +40,12 @@ describe("Shell layout compatibility", () => {
     expect(Object.keys(validated.restoreSources)).toHaveLength(2);
     expect(JSON.stringify(validated)).not.toContain("secret");
     expect(validated.tao).toMatchObject({ width: 360, opacity: .65, ribbonOffsetRatio: 1 });
+  });
+  it("keeps the twenty most recent distinct panels, including unavailable owners", () => {
+    const recentPanels = Array.from({ length: 25 }, (_, i) => ({ kind: "sftp", restoreRef: `missing:${i}`, preferredPlacement: "dock", lastUsedAt: i }));
+    const validated = validateShellLayout({ ...defaultShellLayout(), recentPanels: [...recentPanels, { ...recentPanels[24], preferredPlacement: "detached", lastUsedAt: 30 }] })!;
+    expect(validated.recentPanels).toHaveLength(20);
+    expect(validated.recentPanels[0]).toMatchObject({ restoreRef: "missing:24", preferredPlacement: "detached", lastUsedAt: 30 });
+    expect(validated.recentPanels.at(-1)?.restoreRef).toBe("missing:5");
   });
 });

@@ -46,8 +46,14 @@ impl TransferHandle {
     /// Suspends the calling task while the transfer is paused. Returns
     /// immediately if the transfer is cancelled or not paused.
     pub async fn wait_while_paused(&self) {
-        while self.is_paused() && !self.is_cancelled() {
-            self.resume.notified().await;
+        loop {
+            let resumed = self.resume.notified();
+            tokio::pin!(resumed);
+            resumed.as_mut().enable();
+            if !self.is_paused() || self.is_cancelled() {
+                break;
+            }
+            resumed.await;
         }
     }
 }

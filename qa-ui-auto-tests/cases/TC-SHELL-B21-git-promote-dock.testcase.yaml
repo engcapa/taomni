@@ -30,14 +30,14 @@ steps:
 - click: '[data-testid="code-workspace-git-panel-toggle"]'
 - wait_for: '[data-testid="shell-host"]'
 - fill:
-    selector: textarea[placeholder*="Commit"]:visible
+    selector: textarea[placeholder="Commit message"]:visible
     value: SHELL-PROMOTED-DRAFT
 - click: '[data-testid="shell-host-more"]'
 - click: '[data-testid="shell-panel-promote"]'
 - assert_not_visible: '[data-testid="shell-host"]'
-- wait_for: textarea[placeholder*="Commit"]:visible
+- wait_for: textarea[placeholder="Commit message"]:visible
 - assert_value:
-    selector: textarea[placeholder*="Commit"]:visible
+    selector: textarea[placeholder="Commit message"]:visible
     equals: SHELL-PROMOTED-DRAFT
 - click: '[data-testid="shell-overview-trigger"]'
 - assert_count:
@@ -54,7 +54,7 @@ steps:
 - wait_for: '[data-testid="shell-close-dialog"]'
 - click: '[data-testid="shell-close-cancel"]'
 - assert_value:
-    selector: textarea[placeholder*="Commit"]:visible
+    selector: textarea[placeholder="Commit message"]:visible
     equals: SHELL-PROMOTED-DRAFT
 - click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
 - wait_for: '[data-testid="shell-close-dialog"]'
@@ -66,7 +66,7 @@ steps:
     name: data-edge
     equals: bottom
 - assert_value:
-    selector: textarea[placeholder*="Commit"]:visible
+    selector: textarea[placeholder="Commit message"]:visible
     equals: SHELL-PROMOTED-DRAFT
 - click: '[data-testid="shell-overview-trigger"]'
 - assert_count:

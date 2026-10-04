@@ -10,11 +10,13 @@ import { tabLane } from "../../lib/shell/tabPresentation";
 import { GlobalRail, type RailGitAction } from "./GlobalRail";
 import { ShellSurfaceRegistry, SurfaceSlot } from "./SurfaceSlot";
 import { ContextPanelHost } from "./ContextPanelHost";
+import { ShellRecentPanels, type ReopenRecentPanel } from "./ShellRecentPanels";
 import { TabNavigator } from "./TabNavigator";
 import { ShellTransfers } from "./ShellTransfers";
 import "./shell.css";
 import { installGitPanelWindowReceiver } from "../../lib/shell/gitPanelWindow";
 import { installSftpPanelWindowReceiver } from "../../lib/shell/sftpPanelWindow";
+import { installNotesPanelWindowReceiver } from "../../lib/shell/notesPanelWindow";
 import { t as translate } from "../../lib/i18n";
 import { useToolWindowStripeStore } from "../editor/workspace/toolWindowStripeStore";
 import { effectiveStripeWidth } from "../editor/workspace/toolWindowLayout";
@@ -24,13 +26,14 @@ class ShellBoundary extends Component<{ children: ReactNode }, { failed: boolean
   static getDerivedStateFromError() { return { failed: true }; }
   render() { return this.state.failed ? <div role="alert" data-testid="shell-fallback" className="p-4"><p>{translate("shell.fallback")}</p><button data-testid="shell-fallback-reset" onClick={() => { useShellLayoutStore.getState().resetLayout(); this.setState({ failed: false }); }}>{translate("shell.reset")}</button><button data-testid="shell-fallback-reload" onClick={() => location.reload()}>{translate("shell.reload")}</button></div> : this.props.children; }
 }
-export function WorkspaceShell({ children, onNewSession }: { children: ReactNode; onNewSession(): void }) {
+export function WorkspaceShell({ children, onNewSession, onReopenPanel }: { children: ReactNode; onNewSession(): void; onReopenPanel: ReopenRecentPanel }) {
   useShellLayoutBridge();
   useShellShortcuts();
   useEffect(installGitPanelWindowReceiver, []);
   useEffect(installSftpPanelWindowReceiver, []);
+  useEffect(installNotesPanelWindowReceiver, []);
   const closeDialog = useShellCloseBridge();
-  return <ShellSurfaceRegistry>{children}<ShellBoundary><TabNavigator onNewSession={onNewSession} /></ShellBoundary><ShellTransfers />{closeDialog}</ShellSurfaceRegistry>;
+  return <ShellSurfaceRegistry>{children}<ShellBoundary><TabNavigator onNewSession={onNewSession} /><ShellRecentPanels onOpen={onReopenPanel} /></ShellBoundary><ShellTransfers />{closeDialog}</ShellSurfaceRegistry>;
 }
 function useViewport() {
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -83,7 +86,7 @@ export function ShellFrame({ children, navigator, quickConnectHeight = 0, extras
     if (node) observer.observe(node, { childList: true, subtree: true });
     document.addEventListener("pointerdown", outside);
     return () => { observer.disconnect(); document.removeEventListener("pointerdown", outside); node?.removeEventListener("keydown", key); if (opener?.isConnected && !opener.closest('[inert]')) opener.focus({ preventScroll: true }); };
-  }, [winner, lane]);
+  }, [winner, lane, shell.layout.tao.edge]);
   const taoSide = shell.layout.tao.edge === "left" || shell.layout.tao.edge === "right";
   const overlay = shell.overlay || shell.transfersOpen || (layout.tao === "overlay" && shell.taoOpen) || layout.right === "overlay" || layout.bottom === "overlay" || (layout.navigator === "overlay" && shell.navigatorOverlay);
   const frame = (mode: "hidden" | "dock" | "overlay", edge: string, width?: number, height?: number): React.CSSProperties => mode === "hidden" ? { display: "none" } : mode === "dock" ? { position: "relative", width, height, flexShrink: 0 }

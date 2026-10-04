@@ -678,9 +678,9 @@ TASK-11 的 fixture/用例设计可先做，具体生产入口 case 必须跟随
 
 实施时以用例文档中的矩阵追踪 `AC → TASK → V → YAML/native procedure → assertion/report`。Browser 证明 renderer；native 只补 OS 窗口、真实 IPC/磁盘/进程/协议、实际 IME、剪贴板等缺口。同一 native 运行可给多个 AC 提供证据，但不能反向替代所有浏览器错误分支。
 
-首次相关产品修改前，运行/核对受影响旧行为基线；已有浅用例先加强断言。稳定后复用匹配 QA build，集中跑当前 Windows native。build、fixture、runner、source 与 config identity 对不上时，旧结果不能当新实现证据。macOS/Linux 分别保留待执行，不从 Windows 继承通过。
+首次相关产品修改前，运行/核对受影响旧行为基线；已有浅用例先加强断言。稳定后复用匹配 QA build。按用户 2026-10-04 的实施约束，本地集中完成单元测试与静态检查，browser/native 通过 `.github/workflows/qa-ui-auto-platforms.yml` 在 Linux、Windows、macOS 执行。build、fixture、runner、source 与 config identity 对不上时，旧结果不能当新实现证据；三平台分别记录结果。
 
-本次仅检查文档链接、ID、映射、路径、命令参数与源码事实；产品构建、browser case、native case、运行时基线与视觉验收均未执行。当前可开始 TASK-01 和 TASK-11 的准备，其余按依赖推进；没有额外原型最终审批关卡。
+设计交接阶段只检查了文档链接、ID、映射、路径、命令参数与源码事实，该阶段未执行产品验证。随后用户已授权领取全部任务、实现、单测、推送及 GitHub 三平台循环验证。当前代码、用例、历史失败与最新结果统一登记在 [实施任务](./workspace-shell-ux-redesign-tasks.md)，具体规格与自动化/人工边界见 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。本节的设计阶段记录不作为实现阶段的通过证据。
 
 实现完成条件：对应 AC 的新目标及受影响保留结果都得到实际证据；所有关闭/恢复/失败分支无未解释回归；已知三端不兼容为零；当前 Windows 所选 native 完成；未执行平台和手工边界如实记录。设计“可实施”不等于产品或验证“完成”。
 

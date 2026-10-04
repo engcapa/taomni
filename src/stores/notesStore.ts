@@ -60,6 +60,7 @@ const DEFAULT_NOTES_FONT_SIZE = 12;
 const MIN_NOTES_FONT_SIZE = 10;
 const MAX_NOTES_FONT_SIZE = 20;
 let loadNotesRequestSeq = 0;
+const noteWrites = new Map<string, Promise<boolean>>();
 
 const LEGACY_DEFAULT_NOTES_PANEL_SIZE = {
   width: 460,
@@ -143,6 +144,9 @@ interface NotesStore {
   notes: NoteItem[];
   notesLoaded: boolean;
   loading: boolean;
+  loadError: string | null;
+  saveError: string | null;
+  alertError: string | null;
   activeNoteId: string | null;
   activeNoteSnapshot: NoteItem | null;
   filter: NoteFilter;
@@ -164,7 +168,7 @@ interface NotesStore {
   loadNotes: () => Promise<void>;
   loadTags: () => Promise<void>;
   createNote: (input?: CreateNoteInput) => Promise<NoteItem | null>;
-  updateNote: (id: string, patch: UpdateNoteInput) => Promise<void>;
+  updateNote: (id: string, patch: UpdateNoteInput) => Promise<boolean>;
   toggleComplete: (id: string, completed: boolean) => Promise<void>;
   archiveNote: (id: string, archived: boolean) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
@@ -206,6 +210,9 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   notes: [],
   notesLoaded: false,
   loading: false,
+  loadError: null,
+  saveError: null,
+  alertError: null,
   activeNoteId: null,
   activeNoteSnapshot: null,
   filter: "recent_incomplete",
@@ -225,7 +232,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   loadNotes: async () => {
     const { filter, statusFilters, search, tagFilterId } = get();
     const requestSeq = ++loadNotesRequestSeq;
-    set({ loading: true });
+    set({ loading: true, loadError: null });
     try {
       const notes = await listNotes({
         filter,
@@ -239,7 +246,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     } catch (e) {
       if (requestSeq !== loadNotesRequestSeq) return;
       console.error("notes_list failed:", e);
-      set({ notesLoaded: true, loading: false });
+      set({ notesLoaded: true, loading: false, loadError: String(e) });
     }
   },
 
@@ -274,17 +281,26 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     }
   },
 
-  updateNote: async (id, patch) => {
-    try {
-      const updated = await updateNoteIpc(id, patch);
-      if (updated) {
+  updateNote: (id, patch) => {
+    const previous = noteWrites.get(id) ?? Promise.resolve(true);
+    const run = previous.then(async () => {
+      try {
+        const updated = await updateNoteIpc(id, patch);
+        if (!updated) throw new Error("The note could not be saved");
         set((s) => ({ notes: s.notes.map((n) => (n.id === id ? updated : n)), activeNoteSnapshot: s.activeNoteSnapshot?.id === id ? updated : s.activeNoteSnapshot }));
+        set({ saveError: null });
+        void get().loadNotes();
+        void get().refreshAlerts();
+        return true;
+      } catch (e) {
+        console.error("notes_update failed:", e);
+        set({ saveError: String(e) });
+        return false;
       }
-      void get().loadNotes();
-      void get().refreshAlerts();
-    } catch (e) {
-      console.error("notes_update failed:", e);
-    }
+    });
+    noteWrites.set(id, run);
+    void run.finally(() => { if (noteWrites.get(id) === run) noteWrites.delete(id); });
+    return run;
   },
 
   toggleComplete: async (id, completed) => {
@@ -390,9 +406,10 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   refreshAlerts: async () => {
     try {
       const alerts = await listAlerts(nowSecs());
-      set({ alerts: Array.isArray(alerts) ? alerts : [] });
+      set({ alerts: Array.isArray(alerts) ? alerts : [], alertError: null });
     } catch (e) {
       console.error("notes_list_alerts failed:", e);
+      set({ alertError: String(e) });
     }
   },
 
@@ -406,6 +423,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       }));
     } catch (e) {
       console.error("notes_ack_alert failed:", e);
+      set({ alertError: String(e) });
     }
   },
 

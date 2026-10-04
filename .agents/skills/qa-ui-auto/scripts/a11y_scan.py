@@ -101,7 +101,8 @@ def main(argv=None) -> int:
 
         # Code workspace surface
         try:
-            page.click("[data-testid='side-tab-tools']")
+            page.click("[data-testid='shell-rail-workspaces']")
+            page.click("[data-testid='shell-navigator-page'][data-page='tools']")
             page.click("[data-testid='sidebar-tool-code-workspace']")
             page.wait_for_selector("[data-testid='code-workspace-tab']", timeout=10_000)
             page.click("[data-testid='code-workspace-tree-add-folder']")

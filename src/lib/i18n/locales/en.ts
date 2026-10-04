@@ -7,6 +7,14 @@ type Dict = {
 
 const dict = {
   shell: {
+    notesWindowRecovered: "The notes window closed unexpectedly. Its latest received draft was restored here.",
+    panelWindowRecovered: "The detached window closed unexpectedly. Its latest received state was restored here.",
+    missingPanelOwner: "The original connection or workspace is unavailable. Select an owner to reopen this panel.",
+    noRecentPanels: "No recent panels", openingPanel: "Opening the panel…", reopenPanelOwner: "Reopen connection or workspace",
+    detachedIntent: "Previously opened in a window", chooseConnection: "Select a connection", chooseWorkspace: "Select a workspace", chooseOwner: "Select…",
+    showPanel: "Show panel", detachAgain: "Open in a window again",
+    panelLabels: { sftp: "SFTP", git: "Git", problems: "Problems", "workspace-terminal": "Terminal" },
+    pinContext: "Keep this conversation bound to its current view",
     details: "Details", dirty: "Unsaved changes", attentionStates: { none: "No alerts", unread: "New activity", busy: "Running", error: "Error" },
     closeCount: "Close {count} selected item(s)", closeIncludingPinned: "Close all, including pinned tabs", ownerUnavailable: "The original owner is closed. Keep this tab open or close the instance.",
     fallback: "Workspace layout could not be displayed.", reload: "Reload window",
@@ -28,7 +36,7 @@ const dict = {
     reset: "Reset layout", resetConfirm: "Reset workspace layout preferences?", layoutWarning: "Layout preferences could not be restored or saved.",
     closeTitle: "Review before closing", closeConfirm: "Close selected tabs", close: { save: "Save", discard: "Discard", commit: "Commit", rollback: "Roll back",
       background: "Continue in background", "cancel-job": "Cancel tasks", retry: "Retry", dock: "Return to panel", "close-instance": "Close instance" },
-    keymap: "Shell shortcuts", keymapConflict: "This key is already assigned", record: "Record shortcut", recentPanels: "Recent panels",
+    keymap: "Shell shortcuts", keymapConflict: "This key is already assigned", record: "Record shortcut", recentPanels: "Recent panels", relocateWorkspace: "Locate folder", unsupportedView: "This version does not support this view ({kind}). Close it to continue using your other work.",
     launchStatus: "Opening workspace…", launchFailed: "Workspace could not be opened: {error}", restoreWorkspaces: "Restore workspaces", noPreview: "No preview available",
   },
   app: {
@@ -2307,6 +2315,7 @@ const dict = {
     alertHistorySearchPlaceholder: "Search history",
     alertHistorySearchAria: "Search notification history",
     alertHistoryClear: "Clear notification history",
+    alertHistoryClearConfirm: "Clear notification history? Pending notifications will remain available.",
     alertHistoryLimit: "History retention",
     alertHistoryLimitTitle: "Keep the latest {limit} notifications",
     alertHistoryHiddenHint: "History is hidden until searched. Kept {count}/{limit}.",

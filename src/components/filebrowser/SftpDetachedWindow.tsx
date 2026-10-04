@@ -6,6 +6,7 @@ import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import { useSftpStore } from "../../stores/sftpStore";
+import { useTransferStore } from "../../stores/transferStore";
 import { activeSftpJobs, waitTransferTerminal } from "../../lib/shell/sftpShellAdapter";
 import { sftpCancelTransfer } from "../../lib/sftp";
 import { signalPanelWindow, waitPanelWindow, matchesPanelWindow } from "../../lib/shell/panelWindowTransaction";
@@ -47,6 +48,8 @@ interface DetachedSftpParams {
   initialPath?: string;
   title?: string;
   localPath?: string;
+  localSelection?: string[];
+  remoteSelection?: string[];
   envelope?: PanelWindowEnvelope;
 }
 
@@ -147,6 +150,18 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const closing = useRef(false), announced = useRef(false), confirm = useConfirmDialog();
   const confirmRef = useRef(confirm.confirm); confirmRef.current = confirm.confirm;
   const connection = useSftpStore((s) => s.sessions[sessionId]);
+  useEffect(() => {
+    if (!params?.envelope || !committed) return;
+    const envelope = params.envelope;
+    const publish = () => {
+      const view = useSftpStore.getState().sessions[sessionId];
+      signalPanelWindow(envelope, "snapshot", { localPath: view?.local.path, remotePath: view?.remote.path, localSelection: view?.local.selection, remoteSelection: view?.remote.selection, jobs: useTransferStore.getState().bySession(sessionId) });
+    };
+    signalPanelWindow(envelope, "committed");
+    publish();
+    const offView = useSftpStore.subscribe(publish), offJobs = useTransferStore.subscribe(publish);
+    return () => { offView(); offJobs(); };
+  }, [params, committed, sessionId]);
   const requestReattach = useCallback(async () => {
     if (!params?.envelope || closing.current) return;
     closing.current = true; setWindowError(null);
@@ -159,9 +174,10 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
       }
       const view = useSftpStore.getState().sessions[sessionId];
       const ack = waitPanelWindow(params.envelope, "reattached");
-      signalPanelWindow(params.envelope, "request-reattach", { localPath: view?.local.path, remotePath: view?.remote.path });
+      signalPanelWindow(params.envelope, "request-reattach", { localPath: view?.local.path, remotePath: view?.remote.path, localSelection: view?.local.selection, remoteSelection: view?.remote.selection });
       await ack;
       clearDetachedHandoff(sessionId);
+      await useSftpStore.getState().detach(sessionId);
       if (isTauriRuntime()) await closeCurrentDetachedWindow(); else window.close();
     } catch (error) { setWindowError(String(error)); }
     finally { closing.current = false; }
@@ -185,6 +201,8 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
         try {
           if (params.localPath) await useSftpStore.getState().navigate(sessionId, "local", params.localPath);
           if (params.initialPath) await useSftpStore.getState().navigate(sessionId, "remote", params.initialPath);
+          if (params.localSelection) useSftpStore.getState().setSelection(sessionId, "local", params.localSelection);
+          if (params.remoteSelection) useSftpStore.getState().setSelection(sessionId, "remote", params.remoteSelection);
           signalPanelWindow(params.envelope!, "ready");
         } catch (error) { signalPanelWindow({ ...params.envelope!, errorCode: String(error) }, "failed"); }
       })();
@@ -193,9 +211,16 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     if (!isTauriRuntime() || !params?.envelope) return;
     let off: (() => void) | undefined, disposed = false;
-    void getCurrentWindow().onCloseRequested((event) => { event.preventDefault(); void requestReattach(); }).then((fn) => { if (disposed) fn(); else off = fn; });
+    void getCurrentWindow().onCloseRequested((event) => {
+      event.preventDefault();
+      if (!committed) { void closeCurrentDetachedWindow(); return; }
+      // OS close keeps the live channel and its jobs in this window. The parent
+      // placeholder can show/focus it again; explicit return resolves jobs first.
+      if (activeSftpJobs(sessionId).length) void getCurrentWindow().hide();
+      else void requestReattach();
+    }).then((fn) => { if (disposed) fn(); else off = fn; });
     return () => { disposed = true; off?.(); };
-  }, [params, requestReattach]);
+  }, [params, sessionId, requestReattach, committed]);
   // Latest cwd hint broadcast by the parent window (terminal OSC 7). Lets
   // a detached SFTP view offer last-known terminal cwd sync even though it
   // can't see the terminal directly. We subscribe under the PARENT session id
@@ -359,7 +384,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
       </div>
       {windowError && <p role="alert" data-testid="shell-window-error">{windowError}</p>}
       {confirm.render}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" inert={!!params.envelope && !committed}>
         <FileBrowser
           sessionId={params.sessionId}
           host={params.host}

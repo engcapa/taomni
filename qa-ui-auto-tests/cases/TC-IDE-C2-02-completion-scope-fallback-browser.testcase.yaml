@@ -12,7 +12,10 @@ description: 'Browser gate case (ED-COMP-004 A3). In the stub preview no ready p
 
   by unit tests and the native provider gate.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -29,7 +32,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -78,11 +81,11 @@ verification:
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
     - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Completion
-        project scope unavailable", "timeout_sec": 20}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]",
+        "contains": "Completion project scope unavailable", "timeout_sec": 20}}'
     - step: 16
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "using document
-        scope", "timeout_sec": 10}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]",
+        "contains": "using document scope", "timeout_sec": 10}}'
     results:
     - 15
     - 16

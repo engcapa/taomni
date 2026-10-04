@@ -1,6 +1,7 @@
 id: TC-IDE-CW-LAYOUT-01-resize-and-split-browser
 title: Code Workspace project tree, editor split, and bottom dock layout
-description: 'Browser renderer regression for the workspace shell layout. It verifies the
+description: 'Browser renderer regression for the workspace shell layout. It verifies
+  the
 
   project/editor splitter and bottom dock splitter respond to pointer and
 
@@ -10,7 +11,10 @@ description: 'Browser renderer regression for the workspace shell layout. It ver
 
   Native OS focus and terminal PTY behavior are covered separately.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.1
 - F25.5
@@ -30,12 +34,12 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_visible: '[data-testid="code-workspace-tree-pane"]'
-- assert_visible: '[data-testid="code-workspace-project-resize-handle"]'
+- assert_visible: '[data-testid="main-sidebar-resize-handle"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - click: '[data-testid="text-input-dialog-confirm"]'
@@ -43,8 +47,19 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - drag_to:
-    from: '[data-testid="code-workspace-project-resize-handle"]'
+    from: '[data-testid="main-sidebar-resize-handle"]'
     to: '[data-testid="code-workspace-editor-pane"]'
+- assert_attribute:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    name: aria-valuenow
+    equals: '400'
+- press:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    key: ArrowLeft
+- assert_attribute:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    name: aria-valuenow
+    equals: '392'
 - click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-split-right"]'
 - wait_for: '[data-testid="code-workspace-editor-split"]'
@@ -75,12 +90,14 @@ steps:
     name: aria-valuemin
     equals: '49'
 - eval_readonly:
-    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuemax'))
-      > Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuemin'))
+    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61)
+      + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuemax')) >
+      Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuemin'))
     expect_truthy: true
 - eval_readonly:
-    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuenow'))
-      > 48
+    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61)
+      + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuenow')) >
+      48
     expect_truthy: true
 - drag_to:
     from: '[data-testid="code-workspace-bottom-dock-resize"]'
@@ -92,8 +109,9 @@ steps:
     selector: '[data-testid="code-workspace-bottom-dock-resize"]'
     key: ArrowDown
 - eval_readonly:
-    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuenow'))
-      < 850
+    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61)
+      + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuenow')) <
+      850
     expect_truthy: true
 - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
 - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
@@ -108,7 +126,7 @@ steps:
 - click: '[data-testid="code-workspace-bottom-tab-overflow-debug"]'
 - wait_for: '[data-testid="debug-panel"]'
 - click: '[data-testid="code-workspace-bottom-tab-terminal"]'
-- wait_for: '[data-testid="code-workspace-bottom-dock-body"]'
+- wait_for: '[data-testid="shell-host"][data-panel-id$=":terminal"][data-edge="bottom"]'
 - screenshot: tc-ide-cw-layout-01-resize-and-split.png
 verification:
   review: reviewed
@@ -124,20 +142,22 @@ verification:
     - 13
     - 15
     - 17
-    - 21
-    - 23
+    - 20
+    - 24
     - 26
     - 29
-    - 31
-    - 36
-    - 37
-    - 38
+    - 32
+    - 34
+    - 39
     - 40
-    - 42
-    - 44
-    - 46
-    - 48
-    - 50
+    - 41
+    - 43
+    - 45
+    - 47
+    - 49
+    - 51
+    - 53
+    - 55
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -148,55 +168,94 @@ verification:
     - step: 7
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
     - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-project-resize-handle\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"main-sidebar-resize-handle\"]"}'
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 14
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
+        "name": "aria-valuenow", "equals": "400"}}'
     - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
+        "name": "aria-valuenow", "equals": "392"}}'
+    - step: 21
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
-    - step: 19
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 2}}'
-    - step: 24
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 3}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "min": 2}}'
     - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "min": 3}}'
     - step: 30
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 32
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "min": 2}}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-dock-resize\"]", "name":
-        "aria-valuemin", "equals": "49"}}'
-    - step: 34
-      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61)
-        + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuemax'')) > Number(document.querySelector(''[data-testid''
-        + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuemin''))",
-        "expect_truthy": true}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "equal": 1}}'
     - step: 35
-      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61)
-        + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuenow'')) > 48", "expect_truthy":
-        true}}'
-    - step: 39
-      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61)
-        + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuenow'')) < 850", "expect_truthy":
-        true}}'
-    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-dock-resize\"]",
+        "name": "aria-valuemin", "equals": "49"}}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuemax''))
+        > Number(document.querySelector(''[data-testid'' + String.fromCharCode(61)
+        + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuemin''))",
+        "expect_truthy": true}}'
+    - step: 38
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuenow''))
+        > 48", "expect_truthy": true}}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuenow''))
+        < 850", "expect_truthy": true}}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
+    - step: 46
       expectation: '{"wait_for": "[data-testid=\"code-workspace-build-panel\"]"}'
-    - step: 43
+    - step: 48
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
-    - step: 45
+    - step: 50
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tests-panel\"]"}'
-    - step: 47
+    - step: 52
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
-    - step: 49
+    - step: 54
       expectation: '{"wait_for": "[data-testid=\"debug-panel\"]"}'
-    - step: 51
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-dock-body\"]"}'
+    - step: 56
+      expectation: 'Terminal opens in the bottom Shell Host.'
     results:
-    - 51
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 10
+    - 12
+    - 14
+    - 16
+    - 18
+    - 21
+    - 22
+    - 27
+    - 30
+    - 33
+    - 35
+    - 36
+    - 37
+    - 38
+    - 42
+    - 44
+    - 46
+    - 48
+    - 50
+    - 52
+    - 54
+    - 56
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

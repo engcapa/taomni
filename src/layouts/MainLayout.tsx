@@ -1,5 +1,6 @@
-import { detachSftpPanel, returnSftpWindowsBeforeExit } from "../lib/shell/sftpPanelWindow";
+import { detachSftpPanel, prepareSftpWindowsBeforeExit, returnSftpWindowsBeforeExit } from "../lib/shell/sftpPanelWindow";
 import { returnGitWindowsBeforeExit } from "../lib/shell/gitPanelWindow";
+import { returnNotesWindowBeforeExit } from "../lib/shell/notesPanelWindow";
 import { getPanelActions } from "../lib/shell/panelActions";
 import { openSessionWindow, installSessionWindowReceiver, returnSessionWindowsBeforeExit } from "../lib/shell/sessionWindow";
 import { waitShellReady } from "../lib/shell/readiness";
@@ -8,11 +9,14 @@ import { SftpShellSurface } from "../components/shell/SftpShellSurface";
 import { WorkspaceShell, ShellFrame } from "../components/shell/WorkspaceShell";
 import { ShellNavigator } from "../components/shell/ShellNavigator";
 import { StableSurface, SurfaceSlot } from "../components/shell/SurfaceSlot";
+import { RetainedPrimaryView } from "../components/shell/RetainedPrimaryView";
 import { useShellLayoutStore } from "../stores/shellLayoutStore";
 import { registerShellActions } from "../lib/shell/shellActions";
 import { requestTabClose } from "../lib/shell/closeCoordinator";
 import { installShellTargetOpeners } from "../lib/shell/shellTargetResolver";
 import { useShellResumeComposer, type ShellRestoreOutcome } from "../hooks/useShellResumeComposer";
+import { useRecentWorkspaceLaunch } from "../hooks/useRecentWorkspaceLaunch";
+import { useRecentPanelReopen } from "../hooks/useRecentPanelReopen";
 import { workspaceListDir } from "../lib/editor/workspace";
 import {
   Fragment,
@@ -145,7 +149,7 @@ import {
   commitWelcomeRunSnapshot,
 } from "../lib/welcomeSessionResume";
 import { useWelcomeSessionResume, type OpenEntryResult } from "../hooks/useWelcomeSessionResume";
-import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { ChatDrawer, ChatDrawerRibbon } from "../components/chat/ChatDrawer";
 import { FloatingNotesPanel } from "../components/notes/FloatingNotesPanel";
 import { ShellNotesSurface } from "../components/shell/ShellNotesSurface";
 import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
@@ -1632,7 +1636,8 @@ export function MainLayout() {
     void (async () => {
       try {
         if (!(await confirmExitWithOpenTabs())) return;
-        try { await returnGitWindowsBeforeExit(); await returnSftpWindowsBeforeExit(); await returnSessionWindowsBeforeExit(); }
+        if (!(await prepareSftpWindowsBeforeExit())) return;
+        try { await returnNotesWindowBeforeExit(); await returnGitWindowsBeforeExit(); await returnSftpWindowsBeforeExit(); await returnSessionWindowsBeforeExit(); }
         catch (error) { setStatusMessage(String(error)); return; }
         useShellLayoutStore.getState().flush();
         useShellLayoutStore.setState({ exiting: true });
@@ -2219,8 +2224,8 @@ export function MainLayout() {
     });
   }, [openCodeWorkspaceInfo]);
 
-  const openRecentCodeWorkspace = useCallback((workspace: RecentWorkspace) => {
-    openCodeWorkspaceInfo({
+  const openReadyRecentCodeWorkspace = useCallback(async (workspace: RecentWorkspace) => {
+    const tabId = openCodeWorkspaceInfo({
       repoRoot: workspace.roots[0]?.path ?? "",
       workspaceId: workspace.id,
       name: workspace.name,
@@ -2228,7 +2233,10 @@ export function MainLayout() {
       looseFiles: workspace.looseFiles,
       initialFile: workspace.lastActiveFile ?? null,
     });
+    if (tabId) await waitShellReady(() => useAppStore.getState().codeWorkspaceByTab[tabId]);
   }, [openCodeWorkspaceInfo]);
+  const recentWorkspaceLaunch = useRecentWorkspaceLaunch(openReadyRecentCodeWorkspace, useAppStore.getState().upsertRecentWorkspace);
+  const openRecentCodeWorkspace = recentWorkspaceLaunch.open;
 
   const openEmptyCodeWorkspaceTab = useCallback(() => {
     const id = `code-workspace-${Date.now()}`;
@@ -2940,7 +2948,14 @@ export function MainLayout() {
     }
     throw new Error(signal.aborted ? "Workspace restore cancelled" : "Workspace model did not become ready");
   }, [openCodeWorkspaceInfo]);
-  const shellResume = useShellResumeComposer(welcomeRestore, openShellWorkspace);
+  const openUnsupportedShellSource = useCallback(async (source: Extract<import("../lib/shell/types").ShellRestoreSource, { kind: "unsupported" }>): Promise<ShellRestoreOutcome> => {
+    const tabId = `shell-unsupported:${source.identity}`;
+    const app = useAppStore.getState();
+    if (!app.tabs.some((tab) => tab.id === tabId)) app.addTab({ id: tabId, type: "placeholder", title: source.title, closable: true, message: t("shell.unsupportedView", { kind: source.originalKind }) });
+    useShellLayoutStore.getState().bindRestoreSource(tabId, source, app.tabs.length);
+    return { identity: `unsupported:${source.identity}`, name: source.title, status: "ready", tabId };
+  }, [t]);
+  const shellResume = useShellResumeComposer(welcomeRestore, openShellWorkspace, openUnsupportedShellSource);
   const welcomeRestoreViewRef = useRef(welcomeRestore.view);
   welcomeRestoreViewRef.current = welcomeRestore.view;
   const welcomeRestoreInstanceRef = useRef(welcomeRestore);
@@ -4062,11 +4077,15 @@ export function MainLayout() {
   // so the custom resize handles are Windows/Linux only.
   const isMac = getAppPlatform() === "macos";
   const [chatDrawerKeepAlive, setChatDrawerKeepAlive] = useState(false);
+  const reopenRecentPanel = useRecentPanelReopen({ openWorkspace: openShellWorkspace, loadSession: loadSessionConfigForRestore,
+    openSession: openSavedSessionForRestore, cancelAuth: cancelPendingAuthForRestore,
+    openSftp: (tab) => { if (!useShellLayoutStore.getState().panels[`tab:${tab.id}:sftp`]?.requestedOpen) toggleTerminalSftp(tab); } });
   useEffect(() => { if (chatDrawerOpen) setChatDrawerKeepAlive(true); }, [chatDrawerOpen]);
   useEffect(() => registerShellActions({
     "shell.home": () => { setActiveTab("welcome"); useShellLayoutStore.getState().selectLane(null); },
     "shell.overview": () => useShellLayoutStore.getState().setOverlay("overview"),
     "shell.quickSwitch": () => useShellLayoutStore.getState().setOverlay("quick"),
+    "shell.panels.recent": () => useShellLayoutStore.getState().setOverlay("panels"),
     "shell.navigator.toggle": () => toggleSidebar(),
     "shell.tao.toggle": () => { const chat = useChatStore.getState(); chat.setDrawerOpen(!chat.drawerOpen); },
     "shell.panel.open": () => { if (activeTab?.type === "terminal" && activeTab.ssh) toggleTerminalSftp(activeTab); },
@@ -4074,7 +4093,7 @@ export function MainLayout() {
   }), [activeTab, toggleSidebar, setActiveTab, confirmAppExit]);
 
   return (
-    <WorkspaceShell onNewSession={handleNewSession}>
+    <WorkspaceShell onNewSession={handleNewSession} onReopenPanel={reopenRecentPanel}>
     <TabActionSlotProvider slot={tabActionSlot}>
     <div
       className="taomni-main-window relative w-full h-full flex flex-col"
@@ -4122,12 +4141,14 @@ export function MainLayout() {
       )}
 
       <ShellFrame quickConnectHeight={quickConnectVisible ? 32 : 0} gitAction={terminalRailMerged ? undefined : activeTerminalGitAction}
-        navigator={<ShellNavigator onOpenWorkspace={openRecentCodeWorkspace}>
+        navigator={<ShellNavigator onOpenWorkspace={openRecentCodeWorkspace} workspaceLaunches={recentWorkspaceLaunch.launches} onRelocateWorkspace={recentWorkspaceLaunch.relocate}>
           <Sidebar navigatorOnly onNewSession={handleNewSession} onNewSftpSession={handleNewSftpSession}
             onEditSession={handleEditSession} onConnectSession={handleConnectSession}
             onOpenSettings={() => handleCommand("settings")} onCommand={handleCommand} gitAction={activeTerminalGitAction} />
         </ShellNavigator>}
-        extras={<><FloatingNotesPanel shellHosted /><TaoAlertPoller /></>}
+        extras={<><FloatingNotesPanel shellHosted /><TaoAlertPoller />
+          <div className="shell-legacy-tao-ribbon absolute inset-0 pointer-events-none"><ChatDrawerRibbon /></div>
+        </>}
       >
         {terminalRailMerged && mainRailHost && terminalRailItems.length > 0 && createPortal(
           <ToolWindowRail
@@ -4252,6 +4273,8 @@ export function MainLayout() {
                     onEditRecentSession={handleEditSession}
                     onRevealRecentSession={handleRevealRecentSession}
                     onOpenRecentWorkspace={openRecentCodeWorkspace}
+                    recentWorkspaceLaunches={recentWorkspaceLaunch.launches}
+                    onRelocateRecentWorkspace={recentWorkspaceLaunch.relocate}
                     onRemoveRecentWorkspace={(workspace) => removeRecentWorkspace(workspace.id)}
                     onClearRecentWorkspaces={clearRecentWorkspaces}
                     onRevealRecentWorkspace={revealRecentCodeWorkspace}
@@ -4562,7 +4585,7 @@ export function MainLayout() {
                   );
                 })}
 
-                {activeTab?.type === "lan-chat" && <LanChatGate />}
+                {tabs.filter((tab) => tab.type === "lan-chat").map((tab) => <RetainedPrimaryView key={tab.id} active={activeTabId === tab.id}><LanChatGate /></RetainedPrimaryView>)}
 
                 {tabs.some((tab) => tab.type === "mail-unified") && (
                   <div className="absolute inset-0" style={{ display: activeTab?.type === "mail-unified" ? "block" : "none" }}>
@@ -4757,27 +4780,27 @@ export function MainLayout() {
                   );
                 })}
 
-                {activeTab?.type === "nettools" && (
+                {tabs.filter((tab) => tab.type === "nettools").map((tab) => <RetainedPrimaryView key={tab.id} active={activeTabId === tab.id}>
                   <TunnelManager
                     onStatusMessage={setStatusMessage}
-                    onClose={() => removeTab(activeTab.id)}
+                    onClose={() => removeTab(tab.id)}
                   />
-                )}
+                </RetainedPrimaryView>)}
 
-                {activeTab?.type === "sockscap" && (
+                {tabs.filter((tab) => tab.type === "sockscap").map((tab) => <RetainedPrimaryView key={tab.id} active={activeTabId === tab.id}>
                   <SocksCapPanel
                     onStatusMessage={setStatusMessage}
-                    onClose={() => removeTab(activeTab.id)}
+                    onClose={() => removeTab(tab.id)}
                   />
-                )}
+                </RetainedPrimaryView>)}
 
-                {activeTab?.type === "mfa" && <MfaTab onStatusMessage={setStatusMessage} />}
+                {tabs.filter((tab) => tab.type === "mfa").map((tab) => <RetainedPrimaryView key={tab.id} active={activeTabId === tab.id}><MfaTab onStatusMessage={setStatusMessage} /></RetainedPrimaryView>)}
 
-                {activeTab?.type === "proxy-test" && activeTab.proxyTest && (
+                {tabs.filter((tab) => tab.type === "proxy-test" && tab.proxyTest).map((tab) => <RetainedPrimaryView key={tab.id} active={activeTabId === tab.id}>
                   <Suspense fallback={null}>
-                    <ProxyTestTab info={activeTab.proxyTest} />
+                    <ProxyTestTab info={tab.proxyTest!} />
                   </Suspense>
-                )}
+                </RetainedPrimaryView>)}
 
                 {/* Non-terminal, non-sftp, non-vnc, non-rdp, non-welcome, non-settings, non-nettools tabs */}
                 {activeTab &&
@@ -5029,6 +5052,9 @@ function UnavailablePanel({ title, message }: { title: string; message?: string 
   const t = useT();
   return (
     <div
+      data-testid="shell-unavailable-view"
+      role="region"
+      aria-label={title}
       className="w-full h-full flex items-center justify-center text-sm p-6"
       style={{ background: "var(--taomni-term-bg)", color: "var(--taomni-term-text)" }}
     >

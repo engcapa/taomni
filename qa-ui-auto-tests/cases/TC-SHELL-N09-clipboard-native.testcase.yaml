@@ -1,0 +1,182 @@
+id: TC-SHELL-N09
+title: Shell copy actions cross the OS clipboard and editor paste retains one undo
+description: V-N09 automated text boundary on an isolated hosted desktop. Strip and Overview copy must
+  produce exactly the same independently read payload, including dynamic identifiers. Physical shortcut
+  interception and non-text clipboard restoration remain separate manual boundaries.
+covers:
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- shell_native_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "shell-native", "name": "SHELL-clipboard", "roots": [{"id": "shell", "name": "shell",
+      "path": "${fixture.shell_root}", "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo":
+      false, "lastActiveFile": {"kind": "root", "rootId": "shell", "path": "README.md"}}]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - alpha
+    - beta
+    - gamma
+    - ''
+- host_clipboard:
+    action: set
+    text: QA-SHELL-before
+- right_click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- click: '[data-testid="tab-context-copy-session-info"]'
+- host_clipboard:
+    action: assert
+    contains: 'Title: Code · SHELL-clipboard
+
+      Type: code-workspace
+
+      '
+- host_clipboard:
+    action: capture
+    name: strip-info
+    contains: SHELL-clipboard
+- host_clipboard:
+    action: set
+    text: QA-SHELL-between
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-more"]'
+- click: '[data-testid="tab-context-copy-session-info"]'
+- host_clipboard:
+    action: assert
+    same_as: strip-info
+- click: '[data-testid="shell-tab-navigator-close"]'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: 'SHELL-剪贴板
+
+      Complete second line'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+a
+- press: Mod+c
+- host_clipboard:
+    action: assert
+    equals: 'SHELL-剪贴板
+
+      Complete second line'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-navigator-close"]'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+End
+- press: Enter
+- press: Mod+v
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - SHELL-剪贴板
+    - Complete second line
+    - SHELL-剪贴板
+    - Complete second line
+- press: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - SHELL-剪贴板
+    - Complete second line
+    - ''
+- host_clipboard:
+    action: set
+    text: QA-SHELL-before
+- host_clipboard:
+    action: assert
+    equals: QA-SHELL-before
+- screenshot: tc-shell-n09.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Strip and Overview copy each cross the real OS boundary and yield the exact same QA text
+      and identifiers.
+    actions:
+    - 12
+    - 13
+    - 17
+    - 18
+    - 19
+    checkpoints:
+    - step: 14
+      expectation: '{"host_clipboard": {"action": "assert", "contains": "Title: Code · SHELL-clipboard\nType:
+        code-workspace\n"}}'
+    - step: 20
+      expectation: '{"host_clipboard": {"action": "assert", "same_as": "strip-info"}}'
+    results:
+    - 14
+    - 20
+  - id: R2
+    requirement: Real editor Copy/Paste is retained across Shell overlays, inserts the complete text once
+      and is reverted in one undo.
+    actions:
+    - 22
+    - 23
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 34
+    checkpoints:
+    - step: 25
+      expectation: '{"host_clipboard": {"action": "assert", "equals": "SHELL-剪贴板\nComplete second line"}}'
+    - step: 33
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["SHELL-剪贴板", "Complete second line", "SHELL-剪贴板", "Complete second line"]}}'
+    - step: 35
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["SHELL-剪贴板", "Complete second line", ""]}}'
+    results:
+    - 25
+    - 33
+    - 35
+  - id: R3
+    requirement: The dedicated test desktop finishes with its known QA clipboard baseline restored.
+    actions:
+    - 36
+    checkpoints:
+    - step: 37
+      expectation: '{"host_clipboard": {"action": "assert", "equals": "QA-SHELL-before"}}'
+    results:
+    - 37
+  visual:
+  - check: Inspect native geometry artifacts and screenshots for clipped labels, title safety and focus
+      rings.
+    method: manual
+    reason: DOM geometry and screenshots do not establish an OS visual verdict.
+  native:
+  - check: Actual packaged WebView and native IPC on each selected platform.
+    method: automated
+    reason: Browser stubs cannot establish this boundary.
+  - check: OS denial/recovery and non-text clipboard restoration
+    method: manual
+    reason: This case uses a disposable hosted desktop with a known text baseline; it does not simulate
+      write denial or restore arbitrary clipboard formats.

@@ -15,7 +15,7 @@ fixtures:
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="tab-bar"]'
-- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-security"]'
 - wait_for: '[data-testid="vault-settings"]'
@@ -86,11 +86,13 @@ verification:
     - step: 8
       expectation: '{"assert_visible": "[data-testid=\"vault-state-badge\"]"}'
     - step: 9
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]", "contains": "empty"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]",
+        "contains": "empty"}}'
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"vault-setup-dialog\"]"}'
     - step: 16
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]", "contains": "unlocked"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]",
+        "contains": "unlocked"}}'
     - step: 17
       expectation: '{"assert_visible": "[data-testid=\"vault-lock-button\"]"}'
     - step: 18
@@ -98,13 +100,15 @@ verification:
     - step: 19
       expectation: '{"assert_visible": "[data-testid=\"vault-entries-section\"]"}'
     - step: 22
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]", "contains": "locked"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]",
+        "contains": "locked"}}'
     - step: 23
       expectation: '{"assert_visible": "[data-testid=\"vault-unlock-button\"]"}'
     - step: 25
       expectation: '{"wait_for": "[data-testid=\"vault-unlock-dialog\"]"}'
     - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]", "contains": "unlocked"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]",
+        "contains": "unlocked"}}'
     results:
     - 29
   visual:
@@ -115,3 +119,8 @@ verification:
   - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
     method: automated
     reason: 明确记录执行边界和未验证平台。
+description: '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'

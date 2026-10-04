@@ -1,0 +1,380 @@
+id: TC-SHELL-B18
+title: Two transfer owners survive hide, background close, pause and acknowledged cancellation
+description: Workspace Shell v2 production workflow; docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b18.
+  Browser service fixtures do not establish native effects.
+covers:
+- F7.4
+- F-SHELL-1
+- F-TAO-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- click: '[data-testid="sftp-remote-list"] tr[data-row][title="/home/qa/job.txt"]'
+- click: '[data-testid="sftp-remote-download-selected"]'
+- wait_for: '[data-testid="transfer-job"][data-session-id*="shell-a"][data-state="running"]'
+- assert_attribute:
+    selector: '[data-testid="transfer-job"][data-session-id*="shell-a"]'
+    name: data-bytes
+    equals: '27033'
+- assert_count:
+    selector: '[data-testid="transfer-job"][data-session-id*="shell-a"]'
+    equal: 1
+- click: '[data-testid="shell-host-hide"]'
+- assert_not_visible: '[data-testid="shell-host"]'
+- click: '[data-testid="shell-transfers-trigger"]'
+- wait_for: '[data-testid="shell-transfers"]'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-a"]'
+    name: data-state
+    equals: running
+- assert_count:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"]'
+    equal: 1
+- click: '[data-testid="shell-transfers-close"]'
+- assert_not_visible: '[data-testid="shell-transfers"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-b"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- click: '[data-testid="sftp-remote-list"] tr[data-row][title="/home/qa/job.txt"]'
+- click: '[data-testid="sftp-remote-download-selected"]'
+- wait_for: '[data-testid="transfer-job"][data-session-id*="shell-b"][data-state="running"]'
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- shell_transfer_scenario:
+    action: advance
+    owner: alpha.invalid
+- click: '[data-testid="shell-transfers-trigger"]'
+- wait_for: '[data-testid="shell-transfers"]'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-a"]'
+    name: data-bytes
+    equals: '54067'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-b"]'
+    name: data-bytes
+    equals: '27033'
+- assert_count:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"]'
+    equal: 2
+- click: '[data-testid="shell-transfers-close"]'
+- assert_not_visible: '[data-testid="shell-transfers"]'
+- click: '[data-testid="tab-item"]:has-text("qa-alpha")'
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="shell-close-risk"]'
+    name: data-risk-kind
+    equals: job
+- click: '[data-testid="shell-close-cancel"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]:has-text("qa-alpha")'
+    equal: 1
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-background"]'
+- click: '[data-testid="shell-close-background"]'
+- click: '[data-testid="shell-close-confirm"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]:has-text("qa-alpha")'
+    equal: 0
+- click: '[data-testid="shell-transfers-trigger"]'
+- wait_for: '[data-testid="shell-transfers"]'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-a"]'
+    name: data-state
+    equals: running
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-b"]'
+    name: data-state
+    equals: running
+- click: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-b"] [data-testid="transfer-job-pause"]'
+- wait_for: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-b"][data-state="paused"]'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-a"]'
+    name: data-state
+    equals: running
+- click: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-b"] [data-testid="transfer-job-resume"]'
+- wait_for: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-b"][data-state="running"]'
+- shell_transfer_scenario:
+    action: complete
+    owner: alpha.invalid
+- wait_for: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-a"][data-state="done"]'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-a"]'
+    name: data-bytes
+    equals: '90112'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-b"]'
+    name: data-state
+    equals: running
+- click: '[data-testid="shell-transfers-close"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- wait_for: '[data-testid="tao-alert-inbox-item"][data-target-kind="transfer"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-target-kind="transfer"]'
+    equal: 1
+- click: '[data-testid="tao-alert-inbox-item"][data-target-kind="transfer"] [data-testid="tao-alert-jump"]'
+- wait_for: '[data-testid="shell-transfers"]'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-a"]'
+    name: data-state
+    equals: done
+- click: '[data-testid="shell-transfers-close"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-target-kind="transfer"]'
+    equal: 0
+- click: '[data-testid="shell-rail-tao"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="tab-item"]:has-text("qa-beta")'
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="shell-close-cancel-job"]'
+- shell_backend_scenario:
+    action: hold
+    command: sftp_cancel_transfer
+- click: '[data-testid="shell-close-cancel-job"]'
+- click: '[data-testid="shell-close-confirm"]'
+- assert_shell_backend:
+    command: sftp_cancel_transfer
+    status: held
+    count: 1
+- assert_count:
+    selector: '[data-testid="tab-item"]:has-text("qa-beta")'
+    equal: 1
+- shell_backend_scenario:
+    action: release
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]:has-text("qa-beta")'
+    equal: 0
+- click: '[data-testid="shell-transfers-trigger"]'
+- wait_for: '[data-testid="shell-transfers"]'
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-a"]'
+    name: data-state
+    equals: done
+- assert_attribute:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-session-id*="shell-b"]'
+    name: data-state
+    equals: cancelled
+- assert_count:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"]'
+    equal: 2
+- screenshot: tc-shell-b18-two-owners.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Alpha starts one transfer; hide preserves its running job and Files controller.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 8
+    - 12
+    - 14
+    - 18
+    checkpoints:
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "name": "data-bytes", "equals": "27033"}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "equal": 1}}'
+    - step: 13
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-host\"]"}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "name": "data-state", "equals": "running"}}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"]",
+        "equal": 1}}'
+    - step: 19
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-transfers\"]"}'
+    results:
+    - 10
+    - 11
+    - 13
+    - 16
+    - 17
+    - 19
+  - id: R2
+    requirement: Beta's job is independent; Alpha progresses while hidden and Tao overlays the current
+      owner.
+    actions:
+    - 20
+    - 21
+    - 23
+    - 25
+    - 26
+    - 28
+    - 30
+    - 31
+    - 36
+    checkpoints:
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "name": "data-bytes", "equals": "54067"}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-b\"]",
+        "name": "data-bytes", "equals": "27033"}}'
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"]",
+        "equal": 2}}'
+    - step: 37
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-transfers\"]"}'
+    results:
+    - 33
+    - 34
+    - 35
+    - 37
+  - id: R3
+    requirement: Cancelling owner close preserves Alpha; explicit background choice removes the tab only
+      after job ownership transfers.
+    actions:
+    - 38
+    - 39
+    - 42
+    - 45
+    - 47
+    - 48
+    - 51
+    checkpoints:
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-close-risk\"]", "name": "data-risk-kind",
+        "equals": "job"}}'
+    - step: 43
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]:has-text(\"qa-alpha\")",
+        "equal": 1}}'
+    - step: 49
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]:has-text(\"qa-alpha\")",
+        "equal": 0}}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "name": "data-state", "equals": "running"}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-b\"]",
+        "name": "data-state", "equals": "running"}}'
+    results:
+    - 41
+    - 43
+    - 44
+    - 49
+    - 50
+    - 53
+    - 54
+  - id: R4
+    requirement: Pause and resume affect only Beta; Alpha completion remains visible after its last owner
+      is gone.
+    actions:
+    - 55
+    - 58
+    - 60
+    - 64
+    - 65
+    - 66
+    - 69
+    - 72
+    - 73
+    - 74
+    - 76
+    checkpoints:
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "name": "data-state", "equals": "running"}}'
+    - step: 62
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "name": "data-bytes", "equals": "90112"}}'
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-b\"]",
+        "name": "data-state", "equals": "running"}}'
+    - step: 68
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-target-kind=\"transfer\"]",
+        "equal": 1}}'
+    - step: 71
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "name": "data-state", "equals": "done"}}'
+    - step: 75
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-target-kind=\"transfer\"]",
+        "equal": 0}}'
+    - step: 77
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    results:
+    - 57
+    - 62
+    - 63
+    - 68
+    - 71
+    - 75
+    - 77
+  - id: R5
+    requirement: Beta remains open until the worker acknowledges cancellation; Alpha's completed record
+      is preserved.
+    actions:
+    - 78
+    - 79
+    - 81
+    - 82
+    - 83
+    - 86
+    - 89
+    checkpoints:
+    - step: 84
+      expectation: '{"assert_shell_backend": {"command": "sftp_cancel_transfer", "status": "held", "count":
+        1}}'
+    - step: 85
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]:has-text(\"qa-beta\")",
+        "equal": 1}}'
+    - step: 87
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 88
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]:has-text(\"qa-beta\")",
+        "equal": 0}}'
+    - step: 91
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
+        "name": "data-state", "equals": "done"}}'
+    - step: 92
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-b\"]",
+        "name": "data-state", "equals": "cancelled"}}'
+    - step: 93
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"]",
+        "equal": 2}}'
+    results:
+    - 84
+    - 85
+    - 87
+    - 88
+    - 91
+    - 92
+    - 93
+  visual:
+  - check: Inspect the screenshot for readable job state and clipping.
+    method: manual
+    reason: A screenshot requires a visual verdict.
+  native:
+  - check: Real transfer bytes, backend resource leases and OS windows
+    method: external
+    reason: Browser service fixtures establish renderer outcomes; V-N03/N04 establish native boundaries.

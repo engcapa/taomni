@@ -59,6 +59,10 @@ export function validateShellLayout(raw: unknown): PersistedShellLayoutV2 | null
     const workspace = s.kind === "workspace" ? safeWorkspace(s.workspace) : null;
     if (workspace && string(s.workspaceInstanceId) && key === `workspace:${s.workspaceInstanceId}`)
       return [[key, { kind: "workspace", workspaceInstanceId: s.workspaceInstanceId, workspace } as ShellRestoreSource]];
+    // An unknown future view becomes a safe Utility item; never launch it as a
+    // protocol or retain its arbitrary payload/credentials in Shell storage.
+    if (string(s.kind) && !["workspace", "run-entry"].includes(String(s.kind)) && string(s.identity) && key === `unsupported:${s.identity}`)
+      return [[key, { kind: "unsupported", identity: s.identity, originalKind: string(s.originalKind) ?? s.kind, title: string(s.title) ?? String(s.kind) } as ShellRestoreSource]];
     return [];
   }));
   const restoredTabs = Object.fromEntries(Object.entries(object(value.restoredTabs)).filter(([ref]) => Object.hasOwn(restoreSources, ref)).map(([ref, rawTab]) => {
@@ -71,9 +75,14 @@ export function validateShellLayout(raw: unknown): PersistedShellLayoutV2 | null
     const ref = kind ? key.slice(0, -(kind.length + 1)) : "";
     return kind && Object.hasOwn(restoreSources, ref) ? [[key, preference(v, panelDefaults[kind])]] : [];
   }));
+  const seenPanels = new Set<string>();
   const recentPanels: PersistedShellLayoutV2["recentPanels"] = Array.isArray(value.recentPanels) ? value.recentPanels.flatMap((rawPanel) => {
     const p = object(rawPanel), kind = panelKinds.find((k) => k === p.kind), ref = string(p.restoreRef);
     return kind && ref ? [{ kind, restoreRef: ref, preferredPlacement: (p.preferredPlacement === "detached" ? "detached" : "dock") as "dock" | "detached", lastUsedAt: number(p.lastUsedAt, 0, 0, Number.MAX_SAFE_INTEGER) }] : [];
+  }).sort((a, b) => b.lastUsedAt - a.lastUsedAt).filter((panel) => {
+    const key = `${panel.restoreRef}:${panel.kind}`;
+    if (seenPanels.has(key)) return false;
+    seenPanels.add(key); return true;
   }).slice(0, 20) : [];
   const lastActiveRestoreRef = string(value.lastActiveRestoreRef);
   return { version: 2, navigator: { width: number(nav.width, 248, 200, 400),

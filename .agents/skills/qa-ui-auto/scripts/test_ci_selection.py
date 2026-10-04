@@ -16,6 +16,14 @@ def args(**overrides):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_shell_transfers_use_the_owned_protocol_service_on_all_native_targets(self):
+        plan = make_plan(args(scope='selected', case_ids='TC-SHELL-N03,TC-SHELL-N04'))
+        self.assertEqual({entry['id'] for entry in plan['entries']}, {'linux-native', 'windows-native', 'macos-native'})
+        for entry in plan['entries']:
+            self.assertIn('sftp-fixture', entry['capabilities'])
+            self.assertNotIn('ssh', entry['capabilities'])
+            self.assertEqual(entry['selected_ids'], ['TC-SHELL-N03', 'TC-SHELL-N04'])
+
     def test_smoke_expands_to_six_real_combinations(self):
         plan = make_plan(args())
         self.assertEqual(len(plan['entries']), 6)

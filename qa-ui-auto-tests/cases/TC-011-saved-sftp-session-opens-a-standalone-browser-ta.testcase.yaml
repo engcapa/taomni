@@ -62,25 +62,27 @@ steps:
 - assert_visible: '[data-testid="sftp-local-pane"] >> text="LOCAL"'
 - assert_visible: '[data-testid="sftp-transfer-queue"]'
 - click: '[data-testid="sftp-remote-path-edit"]'
-- wait_for: 'input[data-testid="sftp-remote-path"]'
+- wait_for: input[data-testid="sftp-remote-path"]
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
     equals: ${fixture.sftp_sync_test_dir}
 - assert_element_geometry:
-    selector: '[data-testid="expanded-sidebar-panel"] button[data-tool-window-id]'
-    min_count: 2
+    selector: '[data-testid="shell-rail"] > button'
+    min_count: 5
     min_width: 32
     min_height: 32
     same_width: true
-    icon_size: 16
+    icon_size: 18
 - eval_readonly:
-    expression: >-
-      document.querySelector('#sidebar button[data-tool-window-id]:first-child').getBoundingClientRect().left>=document.querySelector('[data-window-drag]').getBoundingClientRect().right&&document.querySelector('#sidebar button[data-tool-window-id]:first-child').getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().right
+    expression: document.querySelector('nav button').getBoundingClientRect().left
+      >= document.querySelector('[data-window-drag]').getBoundingClientRect().right
+      && document.querySelector('nav').getBoundingClientRect().right <= innerWidth
     expect_truthy: true
 - eval_readonly:
-    expression: >-
-      document.querySelector('#sidebar button[data-tool-window-id]:last-child').getBoundingClientRect().left>=document.querySelector('[data-window-drag]').getBoundingClientRect().right&&document.querySelector('#sidebar button[data-tool-window-id]:last-child').getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().right
+    expression: document.querySelector('nav button').getBoundingClientRect().left
+      >= document.querySelector('[data-window-drag]').getBoundingClientRect().right
+      && document.querySelector('nav').getBoundingClientRect().right <= innerWidth
     expect_truthy: true
 - screenshot: 011-standalone-sftp-session.png
 verification:
@@ -108,7 +110,8 @@ verification:
     - 31
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec":
+        60}}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 6
@@ -134,8 +137,8 @@ verification:
     - step: 32
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
-        "${fixture.sftp_sync_test_dir}"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]",
+        "name": "value", "equals": "${fixture.sftp_sync_test_dir}"}}'
     results:
     - 33
   - id: R2
@@ -145,11 +148,19 @@ verification:
     - 20
     checkpoints:
     - step: 34
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"] button[data-tool-window-id]", "min_count": 2, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]
+        > button", "min_count": 5, "min_width": 32, "min_height": 32, "same_width":
+        true, "icon_size": 18}}'
     - step: 35
-      expectation: 'Sessions 按钮完整落在全高拖拽带右侧和侧栏右边界之间，没有水平裁切。'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav
+        button'').getBoundingClientRect().left >= document.querySelector(''[data-window-drag]'').getBoundingClientRect().right
+        && document.querySelector(''nav'').getBoundingClientRect().right <= innerWidth",
+        "expect_truthy": true}}'
     - step: 36
-      expectation: 'Tools 按钮完整落在全高拖拽带右侧和侧栏右边界之间，没有水平裁切。'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav
+        button'').getBoundingClientRect().left >= document.querySelector(''[data-window-drag]'').getBoundingClientRect().right
+        && document.querySelector(''nav'').getBoundingClientRect().right <= innerWidth",
+        "expect_truthy": true}}'
     results:
     - 34
     - 35
@@ -162,3 +173,5 @@ verification:
   - check: 原生磁盘和 SFTP 链路需 native 模式的真实执行；browser 本地窗格为 VFS。
     method: automated
     reason: 按实际执行模式解释；其他平台不继承 Linux 证据。
+description: ' Permanent rail geometry now uses the Shell Rail; standalone SFTP readiness,
+  path and transfer assertions are retained.'

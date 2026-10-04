@@ -20,6 +20,9 @@ def assert_geometry(args: dict, measurements: list[dict]) -> None:
             minimum = args[f"min_{dimension}"]
             if not math.isfinite(value) or value < minimum:
                 raise StepError(f"{prefix}: {label} {dimension} {value} < {minimum}")
+            maximum = args.get(f"max_{dimension}")
+            if maximum is not None and value > maximum:
+                raise StepError(f"{prefix}: {label} {dimension} {value} > {maximum}")
         if args.get("same_width") and abs(item["width"] - measurements[0]["width"]) > tolerance:
             raise StepError(f"{prefix}: {label} width {item['width']} differs from {measurements[0]['width']}")
         if args.get("within_viewport") and (item["left"] < -tolerance or item["top"] < -tolerance

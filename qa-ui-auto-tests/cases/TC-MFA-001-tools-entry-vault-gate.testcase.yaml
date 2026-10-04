@@ -1,16 +1,26 @@
 id: TC-MFA-001
 title: MFA opens from Tools and the sidebar behind the vault gate
-description: >-
-  V-10 (AC-01, AC-02). Browser stub. The Tools menu keeps its existing entries
-  and opens one MFA tab. An empty vault shows the setup dialog; cancelling
-  leaves a placeholder whose action reopens it; setting the master password
-  mounts the empty MFA panel with its toolbar and four add entries, each of
-  which opens the add dialog in its own mode and closes by Escape, close or
-  cancel. The sidebar entry re-activates the same tab instead of adding one.
-covers: [F-MFA-1, F-MFA-2]
-tags: [mfa, smoke, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: 'V-10 (AC-01, AC-02). Browser stub. The Tools menu keeps its existing
+  entries and opens one MFA tab. An empty vault shows the setup dialog; cancelling
+  leaves a placeholder whose action reopens it; setting the master password mounts
+  the empty MFA panel with its toolbar and four add entries, each of which opens the
+  add dialog in its own mode and closes by Escape, close or cancel. The sidebar entry
+  re-activates the same tab instead of adding one.
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
+covers:
+- F-MFA-1
+- F-MFA-2
+tags:
+- mfa
+- smoke
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
@@ -24,11 +34,17 @@ steps:
 - click: '[data-testid="vault-setup-cancel"]'
 - wait_for: '[data-testid="vault-gate-placeholder"]'
 - assert_not_visible: '[data-testid="vault-setup-dialog"]'
-- assert_count: {selector: '[data-testid="mfa-panel"]', equal: 0}
+- assert_count:
+    selector: '[data-testid="mfa-panel"]'
+    equal: 0
 - click: '[data-testid="vault-gate-action"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-001}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-001}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-master-001
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-master-001
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
 - assert_visible: '[data-testid="mfa-search"]'
@@ -53,63 +69,120 @@ steps:
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
 - click: '[data-testid="mfa-add-close"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="mfa-empty"]'
-- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mfa"]', equal: 1}
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="mfa"]'
+    equal: 1
 - screenshot: mfa-001-empty-panel.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Tools → MFA authenticator opens the MFA tab while the existing Tools entries stay listed (AC-01).
-    actions: [3, 4, 6]
+    requirement: Tools → MFA authenticator opens the MFA tab while the existing Tools
+      entries stay listed (AC-01).
+    actions:
+    - 3
+    - 4
+    - 6
     checkpoints:
-    - {step: 5, expectation: Tunneling is still listed in the Tools submenu}
-    - {step: 7, expectation: the MFA tab is shown}
-    results: [7]
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-tunneling\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+    results:
+    - 7
   - id: R2
-    requirement: An empty vault blocks the panel with the setup dialog; cancel leaves a placeholder whose action reopens setup; a master password mounts the panel (AC-02).
-    actions: [9, 13, 15, 16, 17]
+    requirement: An empty vault blocks the panel with the setup dialog; cancel leaves
+      a placeholder whose action reopens setup; a master password mounts the panel
+      (AC-02).
+    actions:
+    - 9
+    - 13
+    - 15
+    - 16
+    - 17
     checkpoints:
-    - {step: 10, expectation: placeholder shown after cancelling setup}
-    - {step: 11, expectation: setup dialog closed}
-    - {step: 12, expectation: MFA panel not mounted while the vault is not set up}
-    - {step: 14, expectation: the placeholder action reopens setup}
-    - {step: 18, expectation: empty MFA panel after the master password is set}
-    results: [18]
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"vault-gate-placeholder\"]"}'
+    - step: 11
+      expectation: '{"assert_not_visible": "[data-testid=\"vault-setup-dialog\"]"}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-panel\"]", "equal":
+        0}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"vault-setup-dialog\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
+    results:
+    - 18
   - id: R3
-    requirement: The toolbar and each empty-state add entry are usable; every entry opens the add dialog in its mode and Escape, close and cancel dismiss it (AC-01, AC-17).
-    actions: [23, 25, 27, 29, 31, 33, 35, 37, 39]
+    requirement: The toolbar and each empty-state add entry are usable; every entry
+      opens the add dialog in its mode and Escape, close and cancel dismiss it (AC-01,
+      AC-17).
+    actions:
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
     checkpoints:
-    - {step: 19, expectation: search box visible}
-    - {step: 20, expectation: group filter visible}
-    - {step: 21, expectation: sort selector visible}
-    - {step: 22, expectation: add button visible}
-    - {step: 24, expectation: image mode}
-    - {step: 26, expectation: Escape closed the dialog}
-    - {step: 28, expectation: screen mode}
-    - {step: 30, expectation: close button closed the dialog}
-    - {step: 32, expectation: camera mode}
-    - {step: 34, expectation: mode tab switched to secret entry}
-    - {step: 36, expectation: cancel closed the dialog}
-    - {step: 38, expectation: secret mode from the empty state}
-    - {step: 40, expectation: dialog closed}
-    results: [40]
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"mfa-search\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"mfa-group-filter\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"mfa-sort-mode\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"mfa-add\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"mfa-add-dialog\"][data-mode=\"image\"]"}'
+    - step: 26
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"mfa-add-dialog\"][data-mode=\"screen\"]"}'
+    - step: 30
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"mfa-add-dialog\"][data-mode=\"camera\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"mfa-add-dialog\"][data-mode=\"secret\"]"}'
+    - step: 36
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"mfa-add-dialog\"][data-mode=\"secret\"]"}'
+    - step: 40
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
+    results:
+    - 40
   - id: R4
-    requirement: The sidebar entry re-activates the existing MFA tab instead of opening a second one (AC-01).
-    actions: [41, 43]
+    requirement: The sidebar entry re-activates the existing MFA tab instead of opening
+      a second one (AC-01).
+    actions:
+    - 41
+    - 43
     checkpoints:
-    - {step: 42, expectation: Tools sidebar panel shown}
-    - {step: 44, expectation: MFA panel shown}
-    - {step: 45, expectation: exactly one MFA tab}
-    results: [45]
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
+    - step: 45
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]",
+        "equal": 1}}'
+    results:
+    - 45
   visual:
   - check: Empty state, toolbar and placeholder have no clipped text in the screenshot.
     method: manual
     reason: Pixel layout needs human review; DOM assertions cover presence only.
   native:
-  - check: Desktop menu wiring, real vault IPC and packaged WebView are covered by TC-MFA-101/102.
+  - check: Desktop menu wiring, real vault IPC and packaged WebView are covered by
+      TC-MFA-101/102.
     method: external
     reason: Browser stub evidence does not certify the native vault or menus.

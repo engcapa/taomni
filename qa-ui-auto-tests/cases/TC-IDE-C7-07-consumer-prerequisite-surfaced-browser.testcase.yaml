@@ -14,7 +14,10 @@ description: 'Browser gate case (ED-PROJECT-005 A4). In the stub preview no read
 
   native provider gates.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -32,7 +35,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -46,7 +49,8 @@ steps:
 - assert_attribute:
     selector: '[data-testid="project-facts-status-badge"]'
     name: title
-    equals: Maven tooling returned no usable result; ready project facts require a build backend
+    equals: Maven tooling returned no usable result; ready project facts require a
+      build backend
 - assert_visible: '[data-testid="project-facts-refresh-btn"]'
 - assert_text:
     selector: '[data-testid="code-workspace-tree-file"]'
@@ -76,15 +80,17 @@ verification:
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"project-facts-status-badge\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"project-facts-status-badge\"]",
+        "timeout_sec": 60}}'
     - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"project-facts-status-badge\"]", "name": "title",
-        "equals": "Maven tooling returned no usable result; ready project facts require a build backend"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"project-facts-status-badge\"]",
+        "name": "title", "equals": "Maven tooling returned no usable result; ready
+        project facts require a build backend"}}'
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"project-facts-refresh-btn\"]"}'
     - step: 14
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree-file\"]", "contains": "README",
-        "timeout_sec": 10}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree-file\"]",
+        "contains": "README", "timeout_sec": 10}}'
     results:
     - 10
     - 11

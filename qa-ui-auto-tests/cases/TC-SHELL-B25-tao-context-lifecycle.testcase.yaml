@@ -1,0 +1,248 @@
+id: TC-SHELL-B25
+title: Chat follows or pins context and keeps a streaming reply in its original thread
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b25.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F-TAO-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-chat"]'
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: QA-A-PROMPT
+- shell_backend_scenario:
+    command: chat_stream
+    action: hold
+- click: '[data-testid="ai-chat-send-button"]'
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: 'QA fixture reply:'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- assert_attribute:
+    selector: '[data-testid="shell-tao-context"]'
+    name: data-binding
+    equals: follow
+- assert_text:
+    selector: '[data-testid="shell-tao-context"]'
+    contains: Shell 工作区
+- assert_pattern:
+    selector: '[data-testid="shell-chat-content"]'
+    regex: ^(?![\s\S]*QA-A-PROMPT)[\s\S]*$
+- shell_backend_scenario:
+    command: chat_stream
+    action: release
+- assert_shell_backend:
+    command: chat_stream
+    status: completed
+    count: 1
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- wait_for: '[data-testid="tao-alert-inbox-item"][data-target-kind="chat"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-target-kind="chat"] [data-testid="tao-alert-jump"]'
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: 'QA fixture reply: QA-A-PROMPT'
+- assert_attribute:
+    selector: '[data-testid="shell-tao-context"]'
+    name: data-binding
+    equals: fixed
+- click: '[data-testid="shell-rail-home"]'
+- assert_text:
+    selector: '[data-testid="shell-tao-context"]'
+    contains: qa-alpha
+- click: '[data-testid="shell-tao-context-pin"]'
+- assert_attribute:
+    selector: '[data-testid="shell-tao-context"]'
+    name: data-binding
+    equals: follow
+- assert_pattern:
+    selector: '[data-testid="shell-chat-content"]'
+    regex: ^(?![\s\S]*QA-A-PROMPT)[\s\S]*$
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: Shell 中文草稿
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: 'first line
+
+      第二行'
+- fill:
+    selector: '[data-testid="note-editor-new-step"]'
+    value: unfinished step
+- fill:
+    selector: '[data-testid="note-editor-new-tag"]'
+    value: unfinished tag
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- assert_count:
+    selector: '[data-testid="note-editor"]'
+    equal: 1
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: Shell 中文草稿
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'first line
+
+      第二行'
+- assert_value:
+    selector: '[data-testid="note-editor-new-step"]'
+    equals: unfinished step
+- assert_value:
+    selector: '[data-testid="note-editor-new-tag"]'
+    equals: unfinished tag
+- screenshot: tc-shell-b25.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An in-flight reply started on A continues on A while B follows the
+      newly active workspace.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 14
+    - 19
+    checkpoints:
+    - step: 5
+      expectation: An in-flight reply started on A continues on A while B follows
+        the newly active workspace.
+    - step: 11
+      expectation: An in-flight reply started on A continues on A while B follows
+        the newly active workspace.
+    - step: 15
+      expectation: An in-flight reply started on A continues on A while B follows
+        the newly active workspace.
+    - step: 16
+      expectation: An in-flight reply started on A continues on A while B follows
+        the newly active workspace.
+    - step: 17
+      expectation: An in-flight reply started on A continues on A while B follows
+        the newly active workspace.
+    - step: 18
+      expectation: An in-flight reply started on A continues on A while B follows
+        the newly active workspace.
+    - step: 20
+      expectation: An in-flight reply started on A continues on A while B follows
+        the newly active workspace.
+    results:
+    - 5
+    - 11
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+  - id: R2
+    requirement: The completion notification reveals the original thread; pinning
+      survives another tab and unpinning follows it.
+    actions:
+    - 21
+    - 23
+    - 26
+    - 28
+    checkpoints:
+    - step: 22
+      expectation: The completion notification reveals the original thread; pinning
+        survives another tab and unpinning follows it.
+    - step: 24
+      expectation: The completion notification reveals the original thread; pinning
+        survives another tab and unpinning follows it.
+    - step: 25
+      expectation: The completion notification reveals the original thread; pinning
+        survives another tab and unpinning follows it.
+    - step: 27
+      expectation: The completion notification reveals the original thread; pinning
+        survives another tab and unpinning follows it.
+    - step: 29
+      expectation: The completion notification reveals the original thread; pinning
+        survives another tab and unpinning follows it.
+    - step: 30
+      expectation: The completion notification reveals the original thread; pinning
+        survives another tab and unpinning follows it.
+    results:
+    - 22
+    - 24
+    - 25
+    - 27
+    - 29
+    - 30
+  - id: R3
+    requirement: One Notes editor retains title, body and unsubmitted step/tag drafts
+      through Notifications, hide and reopen.
+    actions:
+    - 31
+    - 32
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    checkpoints:
+    - step: 33
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
+        through Notifications, hide and reopen.
+    - step: 42
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
+        through Notifications, hide and reopen.
+    - step: 43
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
+        through Notifications, hide and reopen.
+    - step: 44
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
+        through Notifications, hide and reopen.
+    - step: 45
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
+        through Notifications, hide and reopen.
+    - step: 46
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
+        through Notifications, hide and reopen.
+    results:
+    - 33
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.

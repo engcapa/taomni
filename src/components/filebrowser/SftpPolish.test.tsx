@@ -16,6 +16,12 @@ const sftpDownloadMock = vi.hoisted(() => vi.fn(async () => undefined));
 const sftpDownloadDirMock = vi.hoisted(() => vi.fn(async () => undefined));
 const setStatusMock = vi.hoisted(() => vi.fn());
 
+vi.stubGlobal("ResizeObserver", class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+});
+
 vi.mock("../../lib/sftp", async () => {
   const actual = await vi.importActual<typeof import("../../lib/sftp")>(
     "../../lib/sftp",

@@ -1,0 +1,258 @@
+id: TC-SHELL-N10
+title: Real Linux IME candidates remain owned by Shell search, rename and Notes
+description: 'V-N10 Linux/X11 automated slice: actual fcitx5 wbpy input enters packaged WebKitGTK. Candidate
+  confirmation and cancellation do not accidentally activate a tab, close an overlay or commit a rename.
+  Windows/macOS physical IME and OS application switching remain manual boundaries.'
+covers:
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- shell_native_files
+- linux_x11_required
+timeout_sec: 300
+native_platforms:
+- Linux
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell", "name": "shell",
+      "path": "${fixture.shell_root}", "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo":
+      false, "lastActiveFile": {"kind": "root", "rootId": "shell", "path": "README.md"}}]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - alpha
+    - beta
+    - gamma
+    - ''
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-search"]'
+- native_ime_keys:
+    selector: '[data-testid="shell-tab-search"]'
+    expected_engine: wbpy
+    keys:
+    - n
+    - i
+    - h
+    - a
+    - o
+    - Space
+- assert_visible: '[data-testid="shell-overview"]'
+- assert_value:
+    selector: '[data-testid="shell-tab-search"]'
+    regex: '[\u4e00-\u9fff]'
+- fill:
+    selector: '[data-testid="shell-tab-search"]'
+    value: ''
+- native_ime_keys:
+    selector: '[data-testid="shell-tab-search"]'
+    expected_engine: wbpy
+    keys:
+    - n
+    - i
+    - h
+    - a
+    - o
+    - Escape
+- assert_value:
+    selector: '[data-testid="shell-tab-search"]'
+    equals: ''
+- assert_visible: '[data-testid="shell-overview"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 2
+- click: '[data-testid="shell-tab-navigator-close"]'
+- right_click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- click: '[data-testid="shell-tab-rename"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: ''
+- native_ime_keys:
+    selector: '[data-testid="tab-title-input"]'
+    expected_engine: wbpy
+    keys:
+    - n
+    - i
+    - h
+    - a
+    - o
+    - Space
+- assert_visible: '[data-testid="tab-title-input"]'
+- assert_value:
+    selector: '[data-testid="tab-title-input"]'
+    regex: '[\u4e00-\u9fff]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: ''
+- native_ime_keys:
+    selector: '[data-testid="tab-title-input"]'
+    expected_engine: wbpy
+    keys:
+    - n
+    - i
+    - h
+    - a
+    - o
+    - Escape
+- assert_visible: '[data-testid="tab-title-input"]'
+- assert_value:
+    selector: '[data-testid="tab-title-input"]'
+    equals: ''
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Escape
+- assert_not_visible: '[data-testid="tab-title-input"]'
+- assert_text_equals:
+    selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+    equals: Code · Shell Native
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- click: '[data-testid="note-editor-body"]'
+- native_ime_keys:
+    selector: '[data-testid="note-editor-body"]'
+    expected_engine: wbpy
+    keys:
+    - n
+    - i
+    - h
+    - a
+    - o
+    - Space
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    regex: '[\u4e00-\u9fff]'
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: ''
+- native_ime_keys:
+    selector: '[data-testid="note-editor-body"]'
+    expected_engine: wbpy
+    keys:
+    - n
+    - i
+    - h
+    - a
+    - o
+    - Escape
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: ''
+- assert_visible: '[data-testid="note-editor"]'
+- assert_visible: '[data-testid="ai-chat-drawer"]'
+- screenshot: tc-shell-n10-ime.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real composition commits CJK search text and cancellation leaves the empty search unchanged;
+      the Overview stays open with exactly the original two tabs.
+    actions:
+    - 11
+    - 12
+    - 13
+    - 16
+    - 17
+    checkpoints:
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"shell-overview\"]"}'
+    - step: 15
+      expectation: '{"assert_value": {"selector": "[data-testid=\"shell-tab-search\"]", "regex": "[\\u4e00-\\u9fff]"}}'
+    - step: 18
+      expectation: '{"assert_value": {"selector": "[data-testid=\"shell-tab-search\"]", "equals": ""}}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"shell-overview\"]"}'
+    - step: 20
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 2}}'
+    results:
+    - 14
+    - 15
+    - 18
+    - 19
+    - 20
+  - id: R2
+    requirement: Candidate confirmation/cancellation changes only the rename draft. A subsequent ordinary
+      Escape cancels renaming and preserves the original complete title.
+    actions:
+    - 22
+    - 23
+    - 24
+    - 25
+    - 28
+    - 29
+    - 32
+    checkpoints:
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"tab-title-input\"]"}'
+    - step: 27
+      expectation: '{"assert_value": {"selector": "[data-testid=\"tab-title-input\"]", "regex": "[\\u4e00-\\u9fff]"}}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"tab-title-input\"]"}'
+    - step: 31
+      expectation: '{"assert_value": {"selector": "[data-testid=\"tab-title-input\"]", "equals": ""}}'
+    - step: 33
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-title-input\"]"}'
+    - step: 34
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]
+        [data-testid=\"tab-title\"]", "equals": "Code · Shell Native"}}'
+    results:
+    - 26
+    - 27
+    - 30
+    - 31
+    - 33
+    - 34
+  - id: R3
+    requirement: Real Notes composition lands in its editor and a cancelled candidate leaves the document
+      empty while Notes and its Tao host remain open.
+    actions:
+    - 35
+    - 36
+    - 37
+    - 39
+    - 40
+    - 42
+    - 43
+    checkpoints:
+    - step: 41
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "regex": "[\\u4e00-\\u9fff]"}}'
+    - step: 44
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": ""}}'
+    - step: 45
+      expectation: '{"assert_visible": "[data-testid=\"note-editor\"]"}'
+    - step: 46
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    results:
+    - 41
+    - 44
+    - 45
+    - 46
+  visual:
+  - check: Inspect candidate/committed native screenshots and focus rings.
+    method: manual
+    reason: DOM text alone does not assess every visual property of the OS candidate window.
+  native:
+  - check: fcitx5 wbpy candidate commit/cancel in three Shell consumers
+    method: automated
+    reason: XTest physical key delivery crosses the actual Linux IME and packaged WebKitGTK boundary.
+  - check: Windows/macOS IME, OS shortcuts and application switching
+    method: manual
+    reason: The Linux fixture does not provide those platforms or OS behaviors; use V-N10.

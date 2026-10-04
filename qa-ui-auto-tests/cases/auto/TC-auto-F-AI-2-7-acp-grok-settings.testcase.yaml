@@ -1,6 +1,7 @@
 id: TC-auto-F-AI-2-7-acp-grok-settings
 title: Configure the generic ACP bridge and Grok preset
-description: 'Opens AI Settings, verifies the built-in Grok ACP profile, exercises both
+description: 'Opens AI Settings, verifies the built-in Grok ACP profile, exercises
+  both
 
   direct and application proxy policy, verifies the bridge/profile enable
 
@@ -8,7 +9,10 @@ description: 'Opens AI Settings, verifies the built-in Grok ACP profile, exercis
 
   The case does not run the real Grok process or require xAI credentials.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F-AI-2.7
 tags:
@@ -24,8 +28,8 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-ai"]'
 - wait_for: '[data-testid="acp-settings"]'
@@ -52,7 +56,7 @@ verification:
     - 5
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 6

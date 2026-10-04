@@ -67,6 +67,10 @@ export type TransferKind = "file" | "dir";
 export interface TransferItem {
   id: string;
   sessionId: string;
+  /** A foreign window owns this channel; its row can be controlled in Transfers. */
+  viewWindowLabel?: string;
+  originWindowLabel?: string;
+  panelId?: string;
   direction: TransferDirection;
   /**
    * Whether the source/dest is a single file or a directory tree. Stored

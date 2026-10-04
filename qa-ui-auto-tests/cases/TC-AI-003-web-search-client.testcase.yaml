@@ -1,6 +1,7 @@
 id: TC-AI-003
 title: Web Search panel exposes native vs client provider matrix
-description: 'F-AI-2.5 ProviderCaps + WebSearchPanel UI surface: the settings panel must let
+description: 'F-AI-2.5 ProviderCaps + WebSearchPanel UI surface: the settings panel
+  must let
 
   the user pick from at least 6 search providers (SearXNG / Tavily / Serper
 
@@ -10,7 +11,10 @@ description: 'F-AI-2.5 ProviderCaps + WebSearchPanel UI surface: the settings pa
 
   network calls.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F-AI-2.5
 - F-AI-2.1
@@ -25,8 +29,8 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-group-toggle-ai"]'
 - click: '[data-testid="settings-group-toggle-ai"]'
 - wait_for: text=Web Search
@@ -55,7 +59,7 @@ verification:
     - 8
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-group-toggle-ai\"]"}'
     - step: 6
@@ -69,11 +73,13 @@ verification:
     - step: 11
       expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Serper"}'
     - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Brave Search"}'
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Brave
+        Search"}'
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Exa"}'
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Google CSE"}'
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Google
+        CSE"}'
     - step: 15
       expectation: '{"assert_visible": "text=\"Confirm every time (default)\""}'
     - step: 16

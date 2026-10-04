@@ -9,20 +9,37 @@
  */
 
 export type ShellKeyClaim = (event: KeyboardEvent) => boolean;
+import type { ShortcutStroke } from "../components/editor/workspace/workspaceKeymapScheme";
+
+export interface SurfaceKeyBinding { scope: string; actionId: string; title: string; stroke: ShortcutStroke }
 
 interface Registration {
   root: Element;
   claims: ShellKeyClaim;
+  bindings?: () => SurfaceKeyBinding[];
 }
 
 const registrations = new Set<Registration>();
 
-export function registerShellKeyClaim(root: Element, claims: ShellKeyClaim): () => void {
-  const registration: Registration = { root, claims };
+export function registerShellKeyClaim(root: Element, claims: ShellKeyClaim, bindings?: () => SurfaceKeyBinding[]): () => void {
+  const registration: Registration = { root, claims, bindings };
   registrations.add(registration);
   return () => {
     registrations.delete(registration);
   };
+}
+
+/** Settings uses the same effective bindings as the live business dispatcher. */
+export function surfaceKeyConflicts(stroke: ShortcutStroke): SurfaceKeyBinding[] {
+  const conflicts = new Map<string, SurfaceKeyBinding>();
+  for (const registration of registrations) {
+    for (const binding of registration.bindings?.() ?? []) {
+      const other = binding.stroke;
+      if (other.code === stroke.code && other.ctrl === stroke.ctrl && other.meta === stroke.meta && other.alt === stroke.alt && other.shift === stroke.shift)
+        conflicts.set(`${binding.scope}:${binding.actionId}`, binding);
+    }
+  }
+  return [...conflicts.values()];
 }
 
 /** True when a surface containing the event target binds this stroke itself. */

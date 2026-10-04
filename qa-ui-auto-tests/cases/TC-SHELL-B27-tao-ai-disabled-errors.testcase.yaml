@@ -1,0 +1,186 @@
+id: TC-SHELL-B27
+title: Notes and Notifications remain usable with AI disabled and independent IPC
+  failures
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b27.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F-TAO-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="ai-master-switch"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-chat"]'
+- assert_visible: '[data-testid="shell-chat-disabled"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- shell_backend_scenario:
+    command: notes_list
+    action: fail-next
+- fill:
+    selector: '[data-testid="notes-search"]'
+    value: failure query
+- wait_for: '[data-testid="shell-notes-error"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- assert_visible: '[data-testid="tao-alert-inbox"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="shell-notes-retry"]'
+- assert_not_visible: '[data-testid="shell-notes-error"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: AI off note
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: Preserve this draft
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: AI off note
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: Preserve this draft
+- shell_backend_scenario:
+    command: notes_list_alerts
+    action: fail-next
+- blur: '[data-testid="note-editor-body"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- wait_for: '[data-testid="shell-alert-error"]'
+- click: '[data-testid="shell-alert-retry"]'
+- assert_not_visible: '[data-testid="shell-alert-error"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: AI off note
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: Preserve this draft
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="ai-master-switch"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-chat"]'
+- assert_not_visible: '[data-testid="shell-chat-disabled"]'
+- assert_visible: '[data-testid="ai-chat-composer"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: Preserve this draft
+- screenshot: tc-shell-b27.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Disabling AI through Settings keeps the Hub and Notes available.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 15
+    - 17
+    - 18
+    - 20
+    - 22
+    - 23
+    - 13
+    checkpoints:
+    - step: 4
+      expectation: Disabling AI through Settings keeps the Hub and Notes available.
+    - step: 10
+      expectation: Disabling AI through Settings keeps the Hub and Notes available.
+    - step: 14
+      expectation: Disabling AI through Settings keeps the Hub and Notes available.
+    - step: 16
+      expectation: Disabling AI through Settings keeps the Hub and Notes available.
+    - step: 19
+      expectation: Disabling AI through Settings keeps the Hub and Notes available.
+    - step: 21
+      expectation: Disabling AI through Settings keeps the Hub and Notes available.
+    - step: 24
+      expectation: The full newly edited note survives AI-off initialization.
+    - step: 25
+      expectation: The full newly edited note survives AI-off initialization.
+    results:
+    - 4
+    - 10
+    - 14
+    - 16
+    - 19
+    - 21
+    - 24
+    - 25
+  - id: R2
+    requirement: A notification poll failure preserves the note and recovers locally,
+      then enabling AI restores Chat.
+    actions:
+    - 26
+    - 27
+    - 28
+    - 30
+    - 32
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 43
+    checkpoints:
+    - step: 29
+      expectation: A notification poll failure preserves the note and recovers locally,
+        then enabling AI restores Chat.
+    - step: 31
+      expectation: A notification poll failure preserves the note and recovers locally,
+        then enabling AI restores Chat.
+    - step: 33
+      expectation: A notification poll failure preserves the note and recovers locally,
+        then enabling AI restores Chat.
+    - step: 34
+      expectation: A notification poll failure preserves the note and recovers locally,
+        then enabling AI restores Chat.
+    - step: 41
+      expectation: A notification poll failure preserves the note and recovers locally,
+        then enabling AI restores Chat.
+    - step: 42
+      expectation: A notification poll failure preserves the note and recovers locally,
+        then enabling AI restores Chat.
+    - step: 44
+      expectation: A notification poll failure preserves the note and recovers locally,
+        then enabling AI restores Chat.
+    results:
+    - 29
+    - 31
+    - 33
+    - 34
+    - 41
+    - 42
+    - 44
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.

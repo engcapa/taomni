@@ -1,10 +1,16 @@
 id: TC-DB-TX-001-manual-commit-native
 title: Native manual commit keeps writes pending until Commit or Rollback
-description: |
-  DB-TX-001 V4. On a real MySQL/MariaDB session, switching the toolbar to Manual
+description: 'DB-TX-001 V4. On a real MySQL/MariaDB session, switching the toolbar to Manual
+
   keeps an INSERT pending (Pending: 1); Rollback discards it (count 0), and a
+
   second INSERT followed by Commit persists it (count 1). Switching back to
+
   Auto with nothing pending needs no confirmation.
+
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks;
+  Settings uses its permanent Rail button. Original business checks are retained.'
 covers:
 - F-DB-1
 tags:
@@ -27,8 +33,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-db-tx-password
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="side-tab-sessions"]'
+- shell_navigate: tools
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree"]'
 - wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
@@ -80,7 +86,7 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "CREATE TABLE IF NOT EXISTS qa_db_tx001_t (id INT); DELETE FROM qa_db_tx001_t WHERE id >= 0;"
+- type: CREATE TABLE IF NOT EXISTS qa_db_tx001_t (id INT); DELETE FROM qa_db_tx001_t WHERE id >= 0;
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="result-log-tab"]'
@@ -105,7 +111,7 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "INSERT INTO qa_db_tx001_t VALUES (1);"
+- type: INSERT INTO qa_db_tx001_t VALUES (1);
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="db-tx-pending"]'
@@ -118,7 +124,7 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx001_t;"
+- type: SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx001_t;
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="query-result-grid"]'
@@ -126,7 +132,7 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "INSERT INTO qa_db_tx001_t VALUES (2);"
+- type: INSERT INTO qa_db_tx001_t VALUES (2);
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="db-tx-pending"]'
@@ -139,7 +145,7 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx001_t;"
+- type: SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx001_t;
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="query-result-grid"]'
@@ -154,3 +160,170 @@ steps:
     selector: '[data-testid="db-tx-commit"]'
     equal: 0
 - screenshot: db-tx-001-manual-commit-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Use the Shell Rail/Navigator to create and reopen the saved MySQL session; its query
+      tab and schema tree load without a connection error.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec":
+        10}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-pw1\"]", "timeout_sec": 15}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-db-tx\"]"}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"schema-tree\"]", "timeout_sec": 30}}'
+    results:
+    - 28
+    - 29
+    - 30
+  - id: R2
+    requirement: Reset the disposable table and switch auto commit to manual with zero pending statements.
+    actions:
+    - 31
+    - 32
+    - 33
+    - 34
+    - 36
+    - 39
+    checkpoints:
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"result-log-tab\"]", "timeout_sec": 60}}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-run\"]:first-of-type
+        [data-testid=\"db-execution-log-summary\"]", "contains": "Success: 2", "timeout_sec": 60}}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"db-tx-mode\"]", "name": "data-mode",
+        "equals": "auto"}}'
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-tx-mode\"][data-mode=\"manual\"]", "timeout_sec":
+        30}}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"db-tx-commit\"]"}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        0", "timeout_sec": 60}}'
+    results:
+    - 37
+    - 38
+    - 40
+    - 42
+  - id: R3
+    requirement: A real INSERT is pending; Rollback clears pending state and a SELECT observes zero rows.
+    actions:
+    - 43
+    - 44
+    - 45
+    - 46
+    - 48
+    - 50
+    - 51
+    - 52
+    - 53
+    checkpoints:
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        1", "timeout_sec": 60}}'
+    - step: 49
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        0", "timeout_sec": 60}}'
+    - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "count-0",
+        "timeout_sec": 60}}'
+    results:
+    - 47
+    - 49
+    - 54
+  - id: R4
+    requirement: A second INSERT is pending; Commit clears pending state and a SELECT observes exactly
+      one row.
+    actions:
+    - 55
+    - 56
+    - 57
+    - 58
+    - 60
+    - 62
+    - 63
+    - 64
+    - 65
+    checkpoints:
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        1", "timeout_sec": 60}}'
+    - step: 61
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        0", "timeout_sec": 60}}'
+    - step: 66
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "count-1",
+        "timeout_sec": 60}}'
+    results:
+    - 59
+    - 61
+    - 66
+  - id: R5
+    requirement: Switch back to auto commit after settlement without a confirmation or remaining manual
+      Commit control.
+    actions:
+    - 67
+    checkpoints:
+    - step: 68
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-tx-mode\"][data-mode=\"auto\"]", "timeout_sec":
+        30}}'
+    - step: 69
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 70
+      expectation: '{"assert_count": {"selector": "[data-testid=\"db-tx-commit\"]", "equal": 0}}'
+    results:
+    - 68
+    - 69
+    - 70
+  visual:
+  - check: Inspect the recorded result/dialog/log layout for clipping and readable content.
+    method: manual
+    reason: Screenshots alone do not establish a visual verdict.
+  native:
+  - check: Execute SQL through real Tauri IPC against the disposable hosted MySQL service.
+    method: automated
+    reason: Browser stubs cannot prove database execution and retained native wiring.
+  - check: Cross-client visibility and server connection teardown beyond the listed SELECT results.
+    method: external
+    reason: Those extra boundaries are covered by the paired Shell N12/N15 independent SQL/process cases,
+      not this UI log.

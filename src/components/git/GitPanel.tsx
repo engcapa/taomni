@@ -1,4 +1,4 @@
-import { registerGitShellController, type GitShellSnapshot } from "../../lib/shell/gitShellState";
+import { notifyGitShellViewChanged, registerGitShellController, type GitShellSnapshot } from "../../lib/shell/gitShellState";
 import { registerCloseAdapter } from "../../lib/shell/closeCoordinator";
 import {
   useCallback,
@@ -122,6 +122,8 @@ import { useAppStore } from "../../stores/appStore";
 import { useT } from "../../lib/i18n";
 
 interface GitPanelProps {
+  shellView?: GitView;
+  onShellViewChange?: (view: GitView) => void;
   shellScopeId?: string;
   initialShellSnapshot?: GitShellSnapshot | null;
   onReady?: (error?: string) => void;
@@ -166,6 +168,7 @@ const EMPTY_SETTINGS: GitRepoSettings = {
 };
 
 export function GitPanel({
+  shellView, onShellViewChange,
   shellScopeId, initialShellSnapshot, onReady,
   repoRoot,
   visible = true,
@@ -183,8 +186,12 @@ export function GitPanel({
 }: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
-  const [view, setView] = useState<GitView>("changes");
-  const [mountedViews, setMountedViews] = useState<Set<GitView>>(() => new Set(["changes"]));
+  const [view, setView] = useState<GitView>(shellView ?? initialShellSnapshot?.view ?? "changes");
+  const [mountedViews, setMountedViews] = useState<Set<GitView>>(() => new Set([shellView ?? initialShellSnapshot?.view ?? "changes"]));
+  useEffect(() => {
+    if (shellView) { setView(shellView); setMountedViews((current) => new Set([...current, shellView])); }
+  }, [shellView]);
+  useEffect(() => { onShellViewChange?.(view); }, [onShellViewChange, view]);
   const [snapshot, setSnapshot] = useState<GitSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -212,10 +219,10 @@ export function GitPanel({
     }
   });
   const [amendChecked, setAmendChecked] = useState(false);
-  const shellSnapshotRef = useRef<GitShellSnapshot>({ commitMessage, targetBranch: remoteName, selectedChangeKeys: [...selected], uncheckedChangeKeys: [...unchecked], focusedChangeKey: selectedPath, treeMode });
-  shellSnapshotRef.current = { commitMessage, targetBranch: remoteName, selectedChangeKeys: [...selected], uncheckedChangeKeys: [...unchecked], focusedChangeKey: selectedPath, treeMode };
+  const shellSnapshotRef = useRef<GitShellSnapshot>({ commitMessage, targetBranch: remoteName, selectedChangeKeys: [...selected], uncheckedChangeKeys: [...unchecked], focusedChangeKey: selectedPath, treeMode, view });
+  shellSnapshotRef.current = { commitMessage, targetBranch: remoteName, selectedChangeKeys: [...selected], uncheckedChangeKeys: [...unchecked], focusedChangeKey: selectedPath, treeMode, view };
   const savedMessageRef = useRef("");
-  const restoreShell = useCallback((state: GitShellSnapshot) => { setCommitMessage(state.commitMessage); setRemoteName(state.targetBranch); setSelected(new Set(state.selectedChangeKeys)); setUnchecked(new Set(state.uncheckedChangeKeys)); setSelectedPath(state.focusedChangeKey); setTreeMode(state.treeMode); }, []);
+  const restoreShell = useCallback((state: GitShellSnapshot) => { setCommitMessage(state.commitMessage); setRemoteName(state.targetBranch); setSelected(new Set(state.selectedChangeKeys)); setUnchecked(new Set(state.uncheckedChangeKeys)); setSelectedPath(state.focusedChangeKey); setTreeMode(state.treeMode); setView(state.view ?? "changes"); setMountedViews((current) => new Set([...current, state.view ?? "changes"])); }, []);
   useEffect(() => {
     if (initialShellSnapshot) restoreShell(initialShellSnapshot);
     else if (shellScopeId) { try { const saved = localStorage.getItem(`taomni.git.draft.${shellScopeId}`); if (saved !== null) { savedMessageRef.current = saved; setCommitMessage(saved); } } catch { /* close reports write errors */ } }
@@ -230,6 +237,9 @@ export function GitPanel({
     });
     return () => { off(); offClose(); };
   }, [shellScopeId, restoreShell]);
+  useEffect(() => {
+    if (shellScopeId) notifyGitShellViewChanged(shellScopeId);
+  }, [shellScopeId, commitMessage, remoteName, selected, unchecked, selectedPath, treeMode, view]);
   const readySent = useRef(false);
   useEffect(() => { if (!readySent.current && onReady && (snapshot || error)) { readySent.current = true; onReady(error ?? undefined); } }, [snapshot, error, onReady]);
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);

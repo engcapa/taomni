@@ -1,6 +1,8 @@
 id: TC-IDE-PARITY-027-01
-title: Code Workspace merges its tool window bar into the collapsed sidebar rail and remembers the sidebar state
-description: "ED-PARITY-027 (PROP-026-01 B + A) browser case. Opening a Code Workspace collapses the main sidebar to its rail and moves the workspace's left tool window bar into that rail (one bar instead of two); stripe buttons keep working there. Expanding the sidebar returns the bar to the workspace and is remembered for Code Workspace tabs while other tabs keep their own state; a relaunch starts Welcome from its own state; the Settings toggle restores the old layout.\n\n  Mode: browser.\n"
+title: Workspace stripes merge into Shell Rail independently of Navigator expansion
+description: Adapted for Workspace Shell v2. The permanent Rail, per-lane Navigator
+  and merged workspace stripes replace the old expanded/collapsed sidebar wrappers.
+  Retained results are declared in each requirement.
 covers:
 - F1.2
 - F25.5
@@ -16,83 +18,61 @@ fixtures:
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-retained-password
 - wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.shellLayout.v2
+    value: '{"version": 2, "navigator": {"collapsedByLane": {"home": false, "build":
+      true, "connect": true}, "lastArea": "sessions", "width": 360}}'
+- seed_storage:
+    key: taomni.mergeToolWindowRail
+    value: 'true'
+- seed_storage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'
+- reload_window: null
 - wait_for: '[data-testid="session-tree"]'
-- assert_count:
-    selector: '[data-testid="collapsed-sidebar-rail"]'
-    equal: 0
-- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="shell-rail-workspaces"]'
+- click: '[data-testid="shell-navigator-page"][data-page="tools"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
-- wait_for:
-    selector: '[data-testid="collapsed-sidebar-rail"]'
-    timeout_sec: 5
-- assert_not_visible: '[data-testid="session-tree"]'
-- wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-- assert_count:
-    selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
-    equal: 0
-- assert_visible: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-right"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="code-workspace-tree-file"]'
-- eval_readonly:
-    expression: (document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-tree-pane\"]").getBoundingClientRect().width > 300) && (document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-tree-pane\"]").getBoundingClientRect().width < 500)
-    expect_truthy: true
-- screenshot: tc-ide-parity-027-01-merged.png
-- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
-- wait_for:
-    selector: '[data-testid="code-workspace-tree-pane"]'
-    state: hidden
-    timeout_sec: 5
-- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
-- wait_for:
-    selector: '[data-testid="code-workspace-tree-pane"]'
-    timeout_sec: 5
-- assert_attribute:
-    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
-    name: aria-pressed
-    equals: 'true'
-- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
-- wait_for: '[data-testid="session-tree"]'
-- wait_for:
-    selector: '[data-testid="collapsed-sidebar-rail"]'
-    state: detached
-    timeout_sec: 5
-- wait_for: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
-- assert_localstorage:
-    key: taomni.sidebarCollapsedByGroup.v1
-    contains: '"code-workspace":false'
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-- wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
-- wait_for: '[data-testid="code-workspace-tab"]'
-- assert_visible: '[data-testid="session-tree"]'
-- click: '[data-testid="side-tab-sessions"]'
-- wait_for:
-    selector: '[data-testid="collapsed-sidebar-rail"]'
-    timeout_sec: 5
-- wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-- wait_for: '[data-testid="session-tree"]'
-- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
-- wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-- assert_localstorage:
-    key: taomni.sidebarCollapsed
-    equals: 'false'
-- reload_window: null
-- wait_for: '[data-testid="welcome-panel"]'
-- wait_for: '[data-testid="session-tree"]'
+- assert_not_visible: '[data-testid="session-tree"]'
 - assert_count:
-    selector: '[data-testid="collapsed-sidebar-rail"]'
+    selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
     equal: 0
-- click: '[data-testid="side-tab-tools"]:visible'
-- click: '[data-testid="sidebar-tool-code-workspace"]'
-- wait_for: '[data-testid="code-workspace-tab"]'
-- wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
-- wait_for: '[data-testid="settings-panel"]'
+- assert_visible: '[data-testid="code-workspace-tool-rail-right"]'
+- assert_element_geometry:
+    selector: '[data-testid="code-workspace-tree-pane"]'
+    min_width: 300
+    max_width: 500
+    min_height: 100
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- assert_not_visible: '[data-testid="code-workspace-tree-pane"]'
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- assert_visible: '[data-testid="code-workspace-tree-pane"]'
+- click: '[data-testid="shell-rail-sessions"]'
+- assert_visible: '[data-testid="session-tree"]'
+- assert_count:
+    selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
+    equal: 1
+- click: '[data-testid="shell-rail-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+- assert_visible: '[data-testid="session-tree"]'
+- click: '[data-testid="shell-rail-sessions"]'
+- assert_not_visible: '[data-testid="session-tree"]'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"build":true'
+- click: '[data-testid="shell-rail-settings"]'
 - click: '[data-testid="settings-group-toggle-general"]'
 - set_check:
     selector: '[data-testid="settings-merge-tool-window-rail"]'
@@ -100,154 +80,158 @@ steps:
 - assert_localstorage:
     key: taomni.mergeToolWindowRail
     equals: 'false'
-- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
-- wait_for: '[data-testid="code-workspace-tab"]'
-- wait_for: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+    equal: 1
 - assert_count:
     selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
     equal: 0
-- screenshot: tc-ide-parity-027-01-merge-off.png
+- click: '[data-testid="shell-rail-settings"]'
+- set_check:
+    selector: '[data-testid="settings-merge-tool-window-rail"]'
+    checked: true
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+- assert_count:
+    selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+    equal: 0
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="session-tree"]'
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A：从工具面板打开 Code Workspace 后，主侧栏自动折叠为左侧工具条（会话树隐藏）。
+    requirement: Opening a workspace preserves one Project view and one merged stripe,
+      with no duplicated internal bar.
     actions:
+    - 4
     - 5
     - 6
-    checkpoints:
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 8
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 5}}'
-    - step: 9
-      expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
-    results:
     - 7
-    - 8
     - 9
-  - id: R2
-    requirement: B：工作区的左工具窗口条进入主侧栏工具条（工作区内不再有第二条），右侧条仍在工作区；侧栏折叠后 Project 窗口保持像素宽度（不随工作区变宽而膨胀）；工具条里的 Project 按钮可隐藏/显示 Project 窗口。
-    actions:
-    - 19
-    - 21
-    checkpoints:
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 11
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
-    - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-right\"]"}'
-    - step: 17
-      expectation: '{"eval_readonly": {"expression": "(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tree-pane\\\"]\").getBoundingClientRect().width > 300) && (document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tree-pane\\\"]\").getBoundingClientRect().width < 500)", "expect_truthy": true}}'
-    - step: 20
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-pane\"]", "state": "hidden", "timeout_sec": 5}}'
-    - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-pane\"]", "timeout_sec": 5}}'
-    - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
-    results:
     - 10
     - 11
-    - 12
-    - 17
-    - 20
+    - 13
+    - 15
     - 22
-    - 23
-  - id: R3
-    requirement: A：在工作区里展开主侧栏后工具条回到工作区，且该选择对 Code Workspace 标签记忆（切到 Welcome 再回来仍展开）；再次折叠后工具条重新合并，且同样被记住。
-    actions:
     - 24
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 17
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 18
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"]
+        [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 1}}'
+    - step: 19
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]
+        [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-right\"]"}'
+    - step: 21
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"code-workspace-tree-pane\"]",
+        "min_width": 300, "max_width": 500, "min_height": 100}}'
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
+    results:
+    - 8
+    - 12
+    - 14
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 25
+  - id: R2
+    requirement: Navigator expansion and lane visits preserve stripe ownership and
+      per-lane preferences in the v2 single-writer store.
+    actions:
+    - 26
     - 29
     - 31
+    - 32
     - 34
-    - 37
-    - 39
     checkpoints:
-    - step: 25
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 26
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 27
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
     - step: 28
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":false"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"]
+        [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 1}}'
     - step: 30
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 32
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 33
       expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
     - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 5}}'
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
     - step: 36
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 38
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 40
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains":
+        "\"build\":true"}}'
     results:
-    - 25
-    - 26
     - 27
     - 28
     - 30
-    - 32
     - 33
     - 35
     - 36
-    - 38
-    - 40
-  - id: R4
-    requirement: 设置里关闭“单一工具窗口条”后回到旧布局：工作区保留自己的左工具条，不再并入主侧栏。
+  - id: R3
+    requirement: Disabling merge returns the stripe to its workspace; enabling it
+      returns the same stripe to the permanent Rail.
     actions:
+    - 37
+    - 38
+    - 39
+    - 41
+    - 42
+    - 45
+    - 46
+    - 47
+    - 48
+    - 51
+    checkpoints:
+    - step: 40
+      expectation: '{"assert_localstorage": {"key": "taomni.mergeToolWindowRail",
+        "equals": "false"}}'
+    - step: 43
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]
+        [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 1}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"]
+        [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+    - step: 49
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"]
+        [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 1}}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]
+        [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 53
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    results:
+    - 40
+    - 43
+    - 44
+    - 49
     - 50
     - 52
     - 53
-    - 55
-    checkpoints:
-    - step: 51
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 54
-      expectation: '{"assert_localstorage": {"key": "taomni.mergeToolWindowRail", "equals": "false"}}'
-    - step: 56
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 57
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 58
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
-    results:
-    - 51
-    - 54
-    - 56
-    - 57
-    - 58
-  - id: R5
-    requirement: A：工作区折叠侧栏时重新加载（等同重启），Welcome 仍按自己的状态展开侧栏（旧键 taomni.sidebarCollapsed 保持 false），再开工作区仍折叠合并。
-    actions:
-    - 42
-    - 46
-    - 47
-    checkpoints:
-    - step: 41
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsed", "equals": "false"}}'
-    - step: 43
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 44
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 45
-      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "equal": 0}}'
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    results:
-    - 41
-    - 43
-    - 44
-    - 45
-    - 48
-    - 49
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

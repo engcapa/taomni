@@ -1,6 +1,7 @@
 id: TC-IDE-COMPARE-01
 title: 'General editor compare workflow: clipboard, file, local history'
-description: 'ED-COMPARE-001 browser gate. The mounted production workspace routes all
+description: 'ED-COMPARE-001 browser gate. The mounted production workspace routes
+  all
 
   three compare commands into the shared compare dialog and preserves the
 
@@ -16,7 +17,10 @@ description: 'ED-COMPARE-001 browser gate. The mounted production workspace rout
 
   layer.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -34,7 +38,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -45,7 +49,8 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- right_click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key] button[title]'
+- right_click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]
+    button[title]'
 - assert_menu_items:
   - Local History
 - click_menu: Local History
@@ -55,14 +60,16 @@ steps:
     contains: No snapshots yet
 - assert_disabled: '[data-testid="code-workspace-local-history-compare"]'
 - assert_disabled: '[data-testid="code-workspace-local-history-restore"]'
-- click: '[data-testid="code-workspace-local-history-dialog"] button[aria-label="Close local history"]'
+- click: '[data-testid="code-workspace-local-history-dialog"] button[aria-label="Close
+    local history"]'
 - seed_clipboard: seeded clipboard line
 - press: Control+Shift+N
 - wait_for:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Compare with Clipboard
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Compare with Clipboard'
 - wait_for: '[data-testid="code-workspace-compare-dialog"]'
@@ -97,7 +104,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Compare with File
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Compare with File…'
 - wait_for: '[data-testid="text-input-dialog"]'
@@ -119,9 +127,11 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Compare with Local History
-- click: '[data-testid="code-workspace-search-everywhere"] >> text=Compare with Local History'
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Compare with Local
+    History'
 - wait_for: '[data-testid="code-workspace-compare-dialog"]'
 - assert_text:
     selector: '[data-testid="compare-session-metadata"]'
@@ -198,71 +208,76 @@ verification:
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"code-workspace-local-history-dialog\"]"}'
     - step: 18
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-local-history-dialog\"]", "contains":
-        "No snapshots yet"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-local-history-dialog\"]",
+        "contains": "No snapshots yet"}}'
     - step: 19
       expectation: '{"assert_disabled": "[data-testid=\"code-workspace-local-history-compare\"]"}'
     - step: 20
       expectation: '{"assert_disabled": "[data-testid=\"code-workspace-local-history-restore\"]"}'
     - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 29
       expectation: '{"wait_for": "[data-testid=\"code-workspace-compare-dialog\"]"}'
     - step: 30
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-compare-dialog\"]", "contains":
-        "Compare"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-compare-dialog\"]",
+        "contains": "Compare"}}'
     - step: 31
-      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-session-metadata\"]", "contains": "clipboard"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-session-metadata\"]",
+        "contains": "clipboard"}}'
     - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid^=\"compare-left-line-\"]", "contains": "seeded clipboard
-        line"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid^=\"compare-left-line-\"]",
+        "contains": "seeded clipboard line"}}'
     - step: 33
       expectation: '{"assert_enabled": "[data-testid=\"compare-apply-left-to-right\"]"}'
     - step: 34
-      expectation: '{"assert_text": {"selector": "[data-testid^=\"compare-right-line-\"]", "contains": "Browser
-        preview"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid^=\"compare-right-line-\"]",
+        "contains": "Browser preview"}}'
     - step: 35
       expectation: '{"assert_enabled": "[data-testid=\"compare-copy-left\"]"}'
     - step: 37
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-compare-dialog\"]", "contains":
-        "Copied"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-compare-dialog\"]",
+        "contains": "Copied"}}'
     - step: 39
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-compare-dialog\"]", "contains":
-        "Copied"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-compare-dialog\"]",
+        "contains": "Copied"}}'
     - step: 41
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains":
-        "seeded clipboard line"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "contains": "seeded clipboard line"}}'
     - step: 43
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 48
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
     - step: 51
       expectation: '{"wait_for": "[data-testid=\"code-workspace-compare-dialog\"]"}'
     - step: 52
-      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-session-metadata\"]", "contains": "file"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-session-metadata\"]",
+        "contains": "file"}}'
     - step: 53
-      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-left-unavailable\"]", "contains": "read-failed"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-left-unavailable\"]",
+        "contains": "read-failed"}}'
     - step: 54
       expectation: '{"assert_disabled": "[data-testid=\"compare-copy-left\"]"}'
     - step: 57
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 62
       expectation: '{"wait_for": "[data-testid=\"code-workspace-compare-dialog\"]"}'
     - step: 63
-      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-session-metadata\"]", "contains": "local-history"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-session-metadata\"]",
+        "contains": "local-history"}}'
     - step: 64
-      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-left-unavailable\"]", "contains": "no-history"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-left-unavailable\"]",
+        "contains": "no-history"}}'
     - step: 65
       expectation: '{"assert_disabled": "[data-testid=\"compare-apply-left-to-right\"]"}'
     - step: 67
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
-        \"compare-dialog-close\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\")
+        === \"compare-dialog-close\"", "expect_truthy": true}}'
     - step: 69
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
-        \"compare-copy-right\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\")
+        === \"compare-copy-right\"", "expect_truthy": true}}'
     - step: 71
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-compare-dialog\"]"}'
     results:

@@ -626,14 +626,26 @@ def _image_digest(ctx: NativeStepContext, png: Path) -> dict:
 
 @_verb("host_clipboard")
 def _do_host_clipboard(ctx: NativeStepContext, args: Any) -> str:
-    if not isinstance(args, dict) or args.get("action") not in {"set", "assert", "clear", "quiet"}:
-        raise StepError("host_clipboard: expected {action: set|assert|clear|quiet, kind, ...}")
+    if not isinstance(args, dict) or args.get("action") not in {"set", "assert", "clear", "quiet", "capture"}:
+        raise StepError("host_clipboard: expected {action: set|assert|clear|quiet|capture, kind, ...}")
     action, kind = args["action"], str(args.get("kind") or "text")
     timeout = float(args.get("timeout_sec") or 15)
     observations = ctx.case_dir / "host-clipboard-observations.json"
     record: dict[str, Any] = {"action": action, "kind": kind, "platform": platform.system()}
     failure = None
-    if action == "clear":
+    if action == "capture":
+        # Capture only an identified QA payload, never an arbitrary host clipboard.
+        if kind != "text" or not args.get("name") or not args.get("contains"):
+            raise StepError("host_clipboard capture requires text, name and a nonempty QA marker in contains")
+        def capture_text():
+            value = host_clipboard.get_text()
+            return str(args["contains"]) in value, value
+        value = _poll(capture_text, timeout, "identified QA text")
+        if not hasattr(ctx, "_clipboard_samples"):
+            ctx._clipboard_samples = {}
+        ctx._clipboard_samples[args["name"]] = value
+        record.update(name=args["name"], value=value)
+    elif action == "clear":
         host_clipboard.clear()
     elif action == "quiet":
         # Nothing may keep rewriting the clipboard: an echo loop between two
@@ -658,10 +670,18 @@ def _do_host_clipboard(ctx: NativeStepContext, args: Any) -> str:
     else:
         if kind == "text":
             wanted = args.get("equals")
+            if "same_as" in args:
+                samples = getattr(ctx, "_clipboard_samples", {})
+                if args["same_as"] not in samples:
+                    raise StepError("host_clipboard: same_as must identify a previously captured QA payload")
+                wanted = samples[args["same_as"]]
             contains = args.get("contains")
-            value = _poll(lambda: ((host_clipboard.get_text() == wanted) if wanted is not None
-                                    else (str(contains) in host_clipboard.get_text()),
-                                   host_clipboard.get_text()), timeout, "text")
+            if wanted is None and contains is None:
+                raise StepError("host_clipboard text assert requires equals, contains or same_as")
+            def check_text():
+                value = host_clipboard.get_text()
+                return value == wanted if wanted is not None else str(contains) in value, value
+            value = _poll(check_text, timeout, "text")
             record["value"] = value
         elif kind == "html":
             contains = str(args["contains"])

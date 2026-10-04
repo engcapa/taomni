@@ -320,6 +320,12 @@ export function FileTransferQueue({
               data-testid="transfer-job"
               data-job-id={it.id}
               data-state={it.state}
+              data-session-id={it.sessionId}
+              data-bytes={it.bytes}
+              data-total={it.size}
+              data-local-path={it.localPath}
+              data-remote-path={it.remotePath}
+              data-direction={it.direction}
               className="px-2 py-1 border-b"
               style={{ borderColor: "var(--taomni-divider)" }}
             >
@@ -344,6 +350,7 @@ export function FileTransferQueue({
                 {canPause && (
                   <button
                     type="button"
+                    data-testid="transfer-job-pause"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferPause")}
                     onClick={() => onPause!(it.id)}
@@ -354,6 +361,7 @@ export function FileTransferQueue({
                 {canResume && (
                   <button
                     type="button"
+                    data-testid="transfer-job-resume"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferResume")}
                     onClick={() => onResume!(it.id)}
@@ -364,6 +372,7 @@ export function FileTransferQueue({
                 {canRetry && (
                   <button
                     type="button"
+                    data-testid="transfer-job-retry"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferRetryTitle")}
                     onClick={() => onRetry!(it.id)}
@@ -374,6 +383,7 @@ export function FileTransferQueue({
                 {isInFlight || it.state === "paused" ? (
                   <button
                     type="button"
+                    data-testid="transfer-job-cancel"
                     className="px-1 hover:bg-[var(--taomni-hover)] rounded"
                     title={t("fileBrowser.transferCancelTitle")}
                     onClick={() => onCancel(it.id)}

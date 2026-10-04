@@ -1,11 +1,17 @@
 id: TC-IDE-PARITY-010-03
 title: Tool window switching, hide-all and default layout keep the dirty editor
-description: 'ED-PARITY-010 A3 browser case: after an unsaved edit, switching bottom tool windows through the rail, hiding and restoring every tool window (Ctrl+Shift+F12) and Restore Default Layout (Shift+F12) keep the same editor view, its text and its dirty marker.
+description: 'ED-PARITY-010 A3 browser case: after an unsaved edit, switching bottom
+  tool windows through the rail, hiding and restoring every tool window (Ctrl+Shift+F12)
+  and Restore Default Layout (Shift+F12) keep the same editor view, its text and its
+  dirty marker.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -20,7 +26,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -38,7 +44,7 @@ steps:
     equals: 'true'
 - click: '[data-testid="code-workspace-bottom-tab-problems"]'
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"]'
     timeout_sec: 10
 - click: '[data-testid="code-workspace-bottom-tab-search"]'
 - assert_text:
@@ -68,7 +74,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A3：编辑产生 dirty 后切换 Problems/Search、隐藏/恢复全部工具窗、恢复默认布局，编辑器文本与 dirty 标记保留，只有一个 editor view。
+    requirement: A3：编辑产生 dirty 后切换 Problems/Search、隐藏/恢复全部工具窗、恢复默认布局，编辑器文本与 dirty
+      标记保留，只有一个 editor view。
     actions:
     - 14
     - 16
@@ -78,16 +85,22 @@ verification:
     - 25
     checkpoints:
     - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-dirty=\"true\"]", "name": "data-dirty", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]
+        [data-dirty=\"true\"]", "name": "data-dirty", "equals": "true"}}'
     - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]",
+        "timeout_sec": 10}}'
     - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "zz010"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "contains": "zz010"}}'
     - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-dirty=\"true\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]
+        [data-dirty=\"true\"]", "equal": 1}}'
     - step: 28
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "equal": 1}}'
     results:
+    - 15
     - 24
     - 26
     - 27

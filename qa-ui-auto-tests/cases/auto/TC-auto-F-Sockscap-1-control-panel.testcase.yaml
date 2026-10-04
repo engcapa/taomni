@@ -1,6 +1,7 @@
 id: TC-auto-F-Sockscap-1
 title: SocksCap panel opens and browser-preview controls transition safely
-description: 'F-Sockscap-1 browser smoke coverage. The browser runtime deliberately has no
+description: 'F-Sockscap-1 browser smoke coverage. The browser runtime deliberately
+  has no
 
   OS packet capture, so Start must enter its degraded preview state rather than
 
@@ -12,7 +13,10 @@ description: 'F-Sockscap-1 browser smoke coverage. The browser runtime deliberat
 
   separately by Rust/Vitest tests and native desktop validation.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F-Sockscap-1
 tags:
@@ -29,7 +33,7 @@ timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-sockscap"]'
 - wait_for: '[data-testid="sockscap-panel"]'
 - assert_visible: '[data-testid="sockscap-start"]'
@@ -147,30 +151,31 @@ verification:
     - step: 8
       expectation: '{"assert_visible": "[data-testid=\"sockscap-recover\"]"}'
     - step: 10
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-profile-toggle\"]", "name":
-        "aria-expanded", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-profile-toggle\"]",
+        "name": "aria-expanded", "equals": "false"}}'
     - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-scope-toggle\"]", "name":
-        "aria-expanded", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-scope-toggle\"]",
+        "name": "aria-expanded", "equals": "false"}}'
     - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-upstream-toggle\"]", "name":
-        "aria-expanded", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-upstream-toggle\"]",
+        "name": "aria-expanded", "equals": "false"}}'
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-rules-toggle\"]", "name":
-        "aria-expanded", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-rules-toggle\"]",
+        "name": "aria-expanded", "equals": "false"}}'
     - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-gfwlist-toggle\"]", "name":
-        "aria-expanded", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-gfwlist-toggle\"]",
+        "name": "aria-expanded", "equals": "false"}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-domains-toggle\"]", "name": "aria-expanded",
-        "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-domains-toggle\"]",
+        "name": "aria-expanded", "equals": "false"}}'
     - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-test-toggle\"]", "name":
-        "aria-expanded", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-test-toggle\"]",
+        "name": "aria-expanded", "equals": "false"}}'
     - step: 32
       expectation: '{"assert_visible": "[data-testid=\"sockscap-test-detail\"]"}'
     - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sockscap-panel\"]", "contains": "方案 2"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sockscap-panel\"]",
+        "contains": "方案 2"}}'
     - step: 37
       expectation: '{"wait_for": "[data-testid=\"sockscap-probe-fail-dialog\"]"}'
     - step: 39

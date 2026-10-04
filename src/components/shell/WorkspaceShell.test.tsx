@@ -1,0 +1,40 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useAppStore } from "../../stores/appStore";
+import { useShellLayoutStore } from "../../stores/shellLayoutStore";
+import { defaultShellLayout } from "../../lib/shell/shellLayoutPersistence";
+import { ShellFrame } from "./WorkspaceShell";
+import { ShellSurfaceRegistry, StableSurface } from "./SurfaceSlot";
+
+vi.mock("./GlobalRail", () => ({ GlobalRail: () => null }));
+
+beforeEach(() => {
+  const layout = defaultShellLayout();
+  layout.tao = { ...layout.tao, edge: "top", pinned: false };
+  useAppStore.setState({ tabs: [{ id: "welcome", title: "Home", type: "welcome", closable: false }], activeTabId: "welcome" });
+  useShellLayoutStore.setState({ layout, taoOpen: true, panels: {}, laneSelection: null,
+    overlay: null, overlayTarget: null, navigatorOverlay: false, transfersOpen: false });
+});
+afterEach(cleanup);
+
+it("keeps the moved Tao overlay interactive and dismisses it only from outside its current host", () => {
+  render(<ShellSurfaceRegistry>
+    <ShellFrame navigator={null}><div>Editor</div></ShellFrame>
+    <StableSurface id="tao" slot="tao" visible>
+      <button onClick={() => useShellLayoutStore.getState().updateLayout((layout) => ({
+        ...layout, tao: { ...layout.tao, edge: "bottom" },
+      }))}>Move to bottom</button>
+      <input aria-label="Retained draft" defaultValue="draft 中文" />
+    </StableSurface>
+  </ShellSurfaceRegistry>);
+  const draft = screen.getByRole("textbox", { name: "Retained draft" });
+  fireEvent.click(screen.getByRole("button", { name: "Move to bottom" }));
+  expect(useShellLayoutStore.getState().layout.tao.edge).toBe("bottom");
+  expect(screen.getByRole("textbox", { name: "Retained draft" })).toBe(draft);
+  fireEvent.pointerDown(draft);
+  fireEvent.change(draft, { target: { value: "edited 中文" } });
+  expect(useShellLayoutStore.getState().taoOpen).toBe(true);
+  expect(draft).toHaveValue("edited 中文");
+  fireEvent.pointerDown(document.body);
+  expect(useShellLayoutStore.getState().taoOpen).toBe(false);
+});

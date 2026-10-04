@@ -63,8 +63,14 @@ def step_assert_value(ctx: StepContext, args: Any) -> None:
     if ctx.dry_run:
         return
     loc = ctx.page.locator(args["selector"]).first
-    _wait_for_match(ctx, lambda: loc.input_value() == args["equals"], args.get("timeout_sec", 10),
-                    f"{args['selector']}: input value does not equal {args['equals']!r}")
+    if "regex" in args:
+        import re
+        pattern = re.compile(args["regex"])
+        matches = lambda: pattern.search(loc.input_value()) is not None
+    else:
+        matches = lambda: loc.input_value() == args["equals"]
+    _wait_for_match(ctx, matches, args.get("timeout_sec", 10),
+                    f"{args['selector']}: input value does not match the expected {args.get('equals', args.get('regex'))!r}")
 
 
 @verb("assert_not_visible")

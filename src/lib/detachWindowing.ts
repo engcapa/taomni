@@ -5,6 +5,7 @@ export interface OpenDetachedWindowOptions {
   kind: DetachedKind;
   sessionId: string;
   title?: string;
+  operationId?: string;
   x?: number;
   y?: number;
   width?: number;
@@ -23,6 +24,7 @@ export async function openDetachedWindow(
     kind: opts.kind,
     sessionId: opts.sessionId,
     title: opts.title,
+    operationId: opts.operationId,
     x: opts.x,
     y: opts.y,
     width: opts.width,

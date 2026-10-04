@@ -18,7 +18,10 @@ description: 'ED-SAVE-004 browser behavior and accessibility slice. It opens the
 
   deferred-writer regression and real bytes by TC-IDE-C0-01.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 - F1.7
@@ -37,7 +40,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -54,9 +57,11 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Editor Appearance Settings
-- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance
+    Settings'
 - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
 - fill:
     selector: '[data-testid="workspace-editor-appearance-font-size-px"]'
@@ -193,7 +198,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Save receipt dirty/saved state, keyboard focus, announcement, and undo：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Save receipt dirty/saved state, keyboard focus, announcement, and
+      undo：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 3
@@ -233,51 +239,52 @@ verification:
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-file-status\"]"}'
     - step: 16
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 21
       expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
     - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
-        "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]",
+        "state": "detached"}}'
     - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-zoom-reset\"]", "contains": "26px"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-zoom-reset\"]",
+        "contains": "26px"}}'
     - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "dirty"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-state", "equals": "dirty"}}'
     - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "role", "equals": "status"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "role", "equals": "status"}}'
     - step: 31
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "aria-live", "equals": "polite"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "aria-live", "equals": "polite"}}'
     - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "aria-atomic", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "aria-atomic", "equals": "true"}}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "contains":
-        "Unsaved changes"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "contains": "Unsaved changes"}}'
     - step: 34
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
-        "role", "equals": "textbox"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "name": "role", "equals": "textbox"}}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
-        "aria-multiline", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "name": "aria-multiline", "equals": "true"}}'
     - step: 36
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
     - step: 39
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "saved"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-state", "equals": "saved"}}'
     - step: 40
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-result-kind", "equals": "saved-current"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-result-kind", "equals": "saved-current"}}'
     - step: 41
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-write-count", "equals": "1"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-write-count", "equals": "1"}}'
     - step: 42
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-dirty", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-dirty", "equals": "false"}}'
     - step: 43
       expectation: '{"eval_readonly": {"expression": "/^[a-f0-9]{64}$/.test(document.getElementById(\"code-workspace-save-observation\")?.getAttribute(\"data-encoded-bytes-sha256\")
         ?? \"\")", "expect_truthy": true}}'
@@ -285,38 +292,38 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-final-text-sha256\")",
         "expect_truthy": true}}'
     - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "contains":
-        "Saved README.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "contains": "Saved README.txt"}}'
     - step: 46
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
     - step: 49
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "dirty"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-state", "equals": "dirty"}}'
     - step: 52
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "clean"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-state", "equals": "clean"}}'
     - step: 53
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
     - step: 58
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "dirty"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-state", "equals": "dirty"}}'
     - step: 61
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "saved"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-state", "equals": "saved"}}'
     - step: 62
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-result-kind", "equals": "saved-current"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-result-kind", "equals": "saved-current"}}'
     - step: 63
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-write-count", "equals": "1"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-write-count", "equals": "1"}}'
     - step: 64
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-dirty", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-dirty", "equals": "false"}}'
     - step: 65
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-encoded-bytes-sha256", "equals": "5eebea28ed7980381dff6dedc26f77ca7340bfccb34f6869f83435a0fe4983c1"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "name": "data-encoded-bytes-sha256", "equals": "5eebea28ed7980381dff6dedc26f77ca7340bfccb34f6869f83435a0fe4983c1"}}'
     - step: 66
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'

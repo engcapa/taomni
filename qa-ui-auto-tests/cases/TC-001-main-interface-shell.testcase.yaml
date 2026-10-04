@@ -1,22 +1,9 @@
 id: TC-001
 title: Main interface shell renders all primary surfaces
-description: 'Smoke test for the chrome of the app in standard (non-compact) mode. Loads
-
-  the welcome screen and verifies every top-level layout surface is mounted:
-
-  menu bar, sidebar sidetab strip, session tree, tab bar, status bar,
-
-  welcome panel, and the optional ribbon / quick-connect toolbars once enabled
-
-  from View. Asserts the remaining welcome actions (Start local terminal,
-
-  New session) and the Tips section. Status bar segments are spot-checked.
-
-  (The former right-hand activity column and compact mode were removed from
-
-  the product.)
-
-  '
+description: Workspace Shell v2 chrome and retained Home actions. Quick Connect still
+  opens through View; Rail, Navigator and the three Home launch entries stay reachable.
+  More exposes LAN Chat and closes without opening a session. Existing Tips, version
+  and status segments remain protected.
 covers:
 - F1.2
 - F1.6
@@ -89,6 +76,22 @@ steps:
 - assert_text:
     selector: '[data-testid="status-bar"]'
     contains: 0.2.0 MVP
+- assert_visible: '[data-testid="shell-rail-home"]'
+- assert_visible: '[data-testid="shell-rail-sessions"]'
+- assert_visible: '[data-testid="shell-rail-workspaces"]'
+- assert_visible: '[data-testid="shell-rail-tao"]'
+- assert_visible: '[data-testid="shell-rail-settings"]'
+- assert_enabled: '[data-testid="shell-home-open-workspace"]'
+- assert_not_visible: '[data-testid="welcome-open-lanchat"]'
+- click: '[data-testid="shell-home-more"] summary'
+- assert_visible: '[data-testid="welcome-open-lanchat"]'
+- assert_enabled: '[data-testid="welcome-open-lanchat"]'
+- click: '[data-testid="shell-home-more"] summary'
+- assert_not_visible: '[data-testid="welcome-open-lanchat"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 1
 - screenshot: 001-main-interface.png
 verification:
   review: reviewed
@@ -102,7 +105,8 @@ verification:
     - 6
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": {"selector": "[data-testid=\"control-bar\"]", "timeout_sec": 55}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"control-bar\"]", "timeout_sec":
+        55}}'
     - step: 3
       expectation: '{"assert_not_visible": "[data-testid=\"quick-connect\"]"}'
     - step: 7
@@ -138,9 +142,11 @@ verification:
     - step: 22
       expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
     - step: 23
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Welcome to Taomni"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]",
+        "contains": "Welcome to Taomni"}}'
     - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]",
+        "contains": "Start local terminal"}}'
     - step: 25
       expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
     - step: 26
@@ -150,21 +156,29 @@ verification:
     - step: 28
       expectation: '{"assert_visible": "[data-testid=\"welcome-version-footer\"]"}'
     - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "New session"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]",
+        "contains": "New session"}}'
     - step: 30
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Tips"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]",
+        "contains": "Tips"}}'
     - step: 31
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Quick connect"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]",
+        "contains": "Quick connect"}}'
     - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "sessions"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains":
+        "sessions"}}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Network"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains":
+        "Network"}}'
     - step: 34
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Theme"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains":
+        "Theme"}}'
     - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "terminals"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains":
+        "terminals"}}'
     - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "0.2.0 MVP"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains":
+        "0.2.0 MVP"}}'
     results:
     - 7
     - 8
@@ -196,6 +210,44 @@ verification:
     - 34
     - 35
     - 36
+  - id: R2
+    requirement: The v2 Rail and three Home entries are reachable; More reveals and
+      hides the retained LAN Chat entry without creating tabs.
+    actions:
+    - 44
+    - 47
+    checkpoints:
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"shell-rail-home\"]"}'
+    - step: 38
+      expectation: '{"assert_visible": "[data-testid=\"shell-rail-sessions\"]"}'
+    - step: 39
+      expectation: '{"assert_visible": "[data-testid=\"shell-rail-workspaces\"]"}'
+    - step: 40
+      expectation: '{"assert_visible": "[data-testid=\"shell-rail-tao\"]"}'
+    - step: 41
+      expectation: '{"assert_visible": "[data-testid=\"shell-rail-settings\"]"}'
+    - step: 42
+      expectation: '{"assert_enabled": "[data-testid=\"shell-home-open-workspace\"]"}'
+    - step: 43
+      expectation: '{"assert_not_visible": "[data-testid=\"welcome-open-lanchat\"]"}'
+    - step: 45
+      expectation: '{"assert_visible": "[data-testid=\"welcome-open-lanchat\"]"}'
+    - step: 46
+      expectation: '{"assert_enabled": "[data-testid=\"welcome-open-lanchat\"]"}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"welcome-open-lanchat\"]"}'
+    - step: 49
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal":
+        1}}'
+    results:
+    - 45
+    - 46
+    - 48
+    - 49
+    - 50
   visual:
   - check: 主界面标题栏、侧栏和欢迎页无重叠、裁切；窄窗口另需布局检查。
     method: manual

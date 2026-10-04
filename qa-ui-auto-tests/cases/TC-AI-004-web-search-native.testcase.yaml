@@ -10,7 +10,10 @@ description: 'Companion to TC-AI-003: focuses on the provider-native search side
 
   before launching real downloads.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F-AI-2.5
 - F-AI-2.6
@@ -28,8 +31,8 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-group-toggle-ai"]'
 - click: '[data-testid="settings-group-toggle-ai"]'
 - wait_for: text=AI Settings
@@ -56,7 +59,7 @@ verification:
     - 5
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-group-toggle-ai\"]"}'
     - step: 6

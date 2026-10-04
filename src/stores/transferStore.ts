@@ -8,7 +8,7 @@ import { useShellLayoutStore } from "./shellLayoutStore";
 const jobReleases = new Map<string, () => void>();
 export function isTransferActive(state: TransferState): boolean { return !["done", "error", "cancelled"].includes(state); }
 function retainJob(item: TransferItem) {
-  if (!isTransferActive(item.state) || jobReleases.has(item.id)) return;
+  if (item.viewWindowLabel || !isTransferActive(item.state) || jobReleases.has(item.id)) return;
   const releaseConnection = retainSftpResource(item.sessionId);
   const releaseLease = shellResourceLeases.acquire(`sftp:${item.sessionId}`, item.id, "job");
   jobReleases.set(item.id, () => { releaseLease(); void releaseConnection(); });
@@ -79,6 +79,16 @@ export function newTransferId(): string {
   return `xfer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** A destroyed view relinquishes its channel; live native workers keep running. */
+export function adoptWindowTransfers(windowLabel: string) {
+  for (const item of useTransferStore.getState().items) {
+    if (item.viewWindowLabel !== windowLabel) continue;
+    const adopted = { ...item, viewWindowLabel: undefined };
+    retainJob(adopted);
+    useTransferStore.getState().patch(item.id, adopted);
+  }
+}
+
 useTransferStore.subscribe((state, previous) => {
   releaseTerminalJobs(state.items);
   for (const item of previous.items) if (!state.items.some((job) => job.id === item.id)) { jobReleases.get(item.id)?.(); jobReleases.delete(item.id); }
@@ -87,6 +97,6 @@ useTransferStore.subscribe((state, previous) => {
     if (!before || before.state === item.state || !["done", "error"].includes(item.state)) continue;
     const panel = Object.values(useShellLayoutStore.getState().panels).find((p) => p.kind === "sftp" &&
       (p.owner.kind === "background" ? p.owner.resourceKey === `sftp:${item.sessionId}` : item.sessionId === `attached-${p.owner.tabId}`));
-    useTaoAlertStore.getState().pushTransfer(item.id, item.remotePath ?? item.localPath ?? item.id, item.state === "error", panel?.id);
+    useTaoAlertStore.getState().pushTransfer(item.id, item.remotePath ?? item.localPath ?? item.id, item.state === "error", item.panelId ?? panel?.id);
   }
 });

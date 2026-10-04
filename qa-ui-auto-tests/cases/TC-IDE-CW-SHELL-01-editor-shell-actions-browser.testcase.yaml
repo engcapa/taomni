@@ -12,7 +12,10 @@ description: 'Browser regression for editor-shell actions that do not require a 
 
   does not claim provider-backed diagnostics.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -31,7 +34,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -93,7 +96,8 @@ steps:
 - press: Control+Shift+N
 - wait_for: '[data-testid="code-workspace-search-everywhere"]'
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: New Java Class...
 - press: Enter
 - wait_for: '[data-testid="new-java-class-dialog"]'
@@ -169,9 +173,11 @@ verification:
     - step: 15
       expectation: '{"assert_enabled": "[data-testid=\"file-encoding-reload\"]"}'
     - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"file-encoding-dialog\"]", "state": "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"file-encoding-dialog\"]",
+        "state": "detached"}}'
     - step: 18
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Reloaded"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]",
+        "contains": "Reloaded"}}'
     - step: 23
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-clipboard-history-revision=\"1\"]"}'
     - step: 25
@@ -191,10 +197,11 @@ verification:
     - step: 44
       expectation: '{"wait_for": "[data-testid=\"new-java-class-dialog\"]"}'
     - step: 46
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"new-java-class-kind-select\"]", "name": "value",
-        "equals": "interface"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"new-java-class-kind-select\"]",
+        "name": "value", "equals": "interface"}}'
     - step: 48
-      expectation: '{"wait_for": {"selector": "[data-testid=\"new-java-class-dialog\"]", "state": "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"new-java-class-dialog\"]",
+        "state": "detached"}}'
     - step: 49
       expectation: '{"wait_for": "[data-testid=\"code-workspace-highlighting-widget\"]"}'
     - step: 50

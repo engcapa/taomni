@@ -1,11 +1,21 @@
 id: TC-IDE-PARITY-013-03
-title: Keymap tree, Find by Shortcut, Keyboard/Mouse Shortcut recorders and derived default scheme
-description: 'ED-PARITY-013 A2.1-A2.4/A2.6/A1.3 browser case. The Keymap dialog is a collapsed category tree; Find Actions by Shortcut narrows it to the holders of Ctrl+Shift+N; the row context menu offers Add Keyboard/Mouse Shortcut; the Keyboard Shortcut sub-dialog replaces the first stroke unless Second stroke is checked; the default scheme derives an editable (copy) that appends to the inherited Ctrl+E (DEC-013-12); the Mouse Shortcut recorder rejects a plain click and records Shift+Click; Cancel writes nothing; a later Apply persists and the new chord really opens Recent Files.
+title: Keymap tree, Find by Shortcut, Keyboard/Mouse Shortcut recorders and derived
+  default scheme
+description: 'ED-PARITY-013 A2.1-A2.4/A2.6/A1.3 browser case. The Keymap dialog is
+  a collapsed category tree; Find Actions by Shortcut narrows it to the holders of
+  Ctrl+Shift+N; the row context menu offers Add Keyboard/Mouse Shortcut; the Keyboard
+  Shortcut sub-dialog replaces the first stroke unless Second stroke is checked; the
+  default scheme derives an editable (copy) that appends to the inherited Ctrl+E (DEC-013-12);
+  the Mouse Shortcut recorder rejects a plain click and records Shift+Click; Cancel
+  writes nothing; a later Apply persists and the new chord really opens Recent Files.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -21,7 +31,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -37,7 +47,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+      actions"]'
     text: Keymap Settings
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
 - wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
@@ -83,7 +94,8 @@ steps:
     state: detached
     timeout_sec: 5
 - eval_readonly:
-    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"keymap-scheme-select\"] option:checked")?.textContent?.includes("(copy)")
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) +
+      "\"keymap-scheme-select\"] option:checked")?.textContent?.includes("(copy)")
     expect_truthy: true
 - assert_pattern:
     selector: '[data-testid="keymap-replace-workspace.recentFiles-1"]'
@@ -106,7 +118,8 @@ steps:
     state: detached
     timeout_sec: 5
 - eval_readonly:
-    expression: '!(localStorage.getItem("taomni.codeWorkspace.keymap.v3:index") || "").includes("KeyJ")'
+    expression: '!(localStorage.getItem("taomni.codeWorkspace.keymap.v3:index") ||
+      "").includes("KeyJ")'
     expect_truthy: true
 - click: '[data-testid="code-workspace-tab"]'
 - press: Control+Shift+A
@@ -114,7 +127,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+      actions"]'
     text: Keymap Settings
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
 - wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
@@ -148,7 +162,8 @@ verification:
     - 20
     checkpoints:
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"keymap-group-Navigation\"]", "name": "aria-expanded", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"keymap-group-Navigation\"]",
+        "name": "aria-expanded", "equals": "false"}}'
     - step: 21
       expectation: '{"assert_visible": "[data-testid=\"keymap-row-workspace.goToFile\"]"}'
     results:
@@ -163,7 +178,8 @@ verification:
     - step: 25
       expectation: '{"assert_visible": "[data-testid=\"keymap-row-workspace.goToFile\"]"}'
     - step: 26
-      expectation: '{"assert_count": {"selector": "[data-testid=\"keymap-row-workspace.recentFiles\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"keymap-row-workspace.recentFiles\"]",
+        "equal": 0}}'
     results:
     - 25
     - 26
@@ -178,13 +194,16 @@ verification:
     - 38
     checkpoints:
     - step: 31
-      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-row-menu\"]", "contains": "Add Mouse Shortcut"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-row-menu\"]",
+        "contains": "Add Mouse Shortcut"}}'
     - step: 33
       expectation: '{"assert_visible": "[data-testid=\"keymap-recorder\"]"}'
     - step: 36
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"keymap-recorder-strokes\"]", "equals": "[KeyJ]"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"keymap-recorder-strokes\"]",
+        "equals": "[KeyJ]"}}'
     - step: 39
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"keymap-recorder-strokes\"]", "equals": "[KeyJ, KeyK]"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"keymap-recorder-strokes\"]",
+        "equals": "[KeyJ, KeyK]"}}'
     results:
     - 31
     - 36
@@ -195,9 +214,12 @@ verification:
     - 40
     checkpoints:
     - step: 42
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"keymap-scheme-select\\\"] option:checked\")?.textContent?.includes(\"(copy)\")", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"keymap-scheme-select\\\"] option:checked\")?.textContent?.includes(\"(copy)\")",
+        "expect_truthy": true}}'
     - step: 43
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"keymap-replace-workspace.recentFiles-1\"]", "regex": "Ctrl[+](Alt|Option)[+]J Ctrl[+](Alt|Option)[+]K"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"keymap-replace-workspace.recentFiles-1\"]",
+        "regex": "Ctrl[+](Alt|Option)[+]J Ctrl[+](Alt|Option)[+]K"}}'
     results:
     - 42
     - 43
@@ -211,7 +233,8 @@ verification:
     - step: 47
       expectation: '{"assert_visible": "[data-testid=\"keymap-mouse-recorder-hint\"]"}'
     - step: 49
-      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-mouse-recorder-value\"]", "contains": "Shift+Click"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-mouse-recorder-value\"]",
+        "contains": "Shift+Click"}}'
     results:
     - 47
     - 49
@@ -224,13 +247,16 @@ verification:
     - 69
     checkpoints:
     - step: 53
-      expectation: '{"eval_readonly": {"expression": "!(localStorage.getItem(\"taomni.codeWorkspace.keymap.v3:index\") || \"\").includes(\"KeyJ\")", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!(localStorage.getItem(\"taomni.codeWorkspace.keymap.v3:index\")
+        || \"\").includes(\"KeyJ\")", "expect_truthy": true}}'
     - step: 61
-      expectation: '{"assert_count": {"selector": "[data-testid=\"keymap-replace-workspace.recentFiles-1\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"keymap-replace-workspace.recentFiles-1\"]",
+        "equal": 0}}'
     - step: 70
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-recent-files\"]"}'
     - step: 71
-      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.keymap.v3:index", "contains": "KeyJ"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.keymap.v3:index",
+        "contains": "KeyJ"}}'
     results:
     - 53
     - 61

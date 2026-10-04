@@ -1,11 +1,20 @@
 id: TC-IDE-PARITY-013-01
-title: Find Action (Ctrl+Shift+A) opens Actions without editing, Alt+Enter assigns a shortcut, Esc returns focus
-description: 'ED-PARITY-013 A4.1/A1.1/A2.1 browser case. Ctrl+Shift+A used to be unbound and the following typing replaced the editor selection. It now opens Search Everywhere on the Actions tab, typing lands in its query box, the row shortcut is the shared formatter label, Alt+Enter opens the Keymap dialog straight into the Keyboard Shortcut recorder for that action, and closing everything returns focus to the editor (DEC-ALIGN-11). An unbound Ctrl+Shift+Q never changes the document (DEC-013-04).
+title: Find Action (Ctrl+Shift+A) opens Actions without editing, Alt+Enter assigns
+  a shortcut, Esc returns focus
+description: 'ED-PARITY-013 A4.1/A1.1/A2.1 browser case. Ctrl+Shift+A used to be unbound
+  and the following typing replaced the editor selection. It now opens Search Everywhere
+  on the Actions tab, typing lands in its query box, the row shortcut is the shared
+  formatter label, Alt+Enter opens the Keymap dialog straight into the Keyboard Shortcut
+  recorder for that action, and closing everything returns focus to the editor (DEC-ALIGN-11).
+  An unbound Ctrl+Shift+Q never changes the document (DEC-013-04).
 
 
   Mode: browser — renderer routing and focus; native platform entries are TC-IDE-PARITY-013-05.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -21,7 +30,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -43,17 +52,20 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - wait_for:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+      actions"]'
     timeout_sec: 10
 - assert_attribute:
     selector: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
     name: aria-selected
     equals: 'true'
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+      actions"]'
     text: reformat
 - assert_attribute:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+      actions"]'
     name: value
     equals: reformat
 - assert_items:
@@ -98,31 +110,40 @@ verification:
     - 18
     checkpoints:
     - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] >> role=tab[name=\"Actions\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]
+        >> role=tab[name=\"Actions\"]", "name": "aria-selected", "equals": "true"}}'
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search actions\"]", "name": "value", "equals": "reformat"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]
+        input[aria-label=\"Search actions\"]", "name": "value", "equals": "reformat"}}'
     - step: 20
-      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["Browser preview uses an in-memory virtual local filesystem.", "Drop OS files here or download remote files to persist them in IndexedDB.", "The real Tauri build uses your actual OS filesystem.", ""]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-line", "equals": ["Browser preview uses an in-memory virtual local filesystem.",
+        "Drop OS files here or download remote files to persist them in IndexedDB.",
+        "The real Tauri build uses your actual OS filesystem.", ""]}}'
     results:
     - 17
     - 19
     - 20
   - id: R2
-    requirement: A1.1/A4.3：Actions 行快捷键为统一格式化标签（Ctrl+Alt+L / mac Ctrl+Option+L），并提示 Alt+Enter 指派快捷键。
+    requirement: A1.1/A4.3：Actions 行快捷键为统一格式化标签（Ctrl+Alt+L / mac Ctrl+Option+L），并提示
+      Alt+Enter 指派快捷键。
     actions:
     - 18
     checkpoints:
     - step: 21
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"search-everywhere-shortcut-workspace.format\"]", "regex": "^Ctrl[+](Alt|Option)[+]L$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"search-everywhere-shortcut-workspace.format\"]",
+        "regex": "^Ctrl[+](Alt|Option)[+]L$"}}'
     - step: 22
       expectation: '{"assert_visible": "[data-testid=\"search-everywhere-assign-shortcut-hint\"]"}'
     results:
     - 21
     - 22
   - id: R3
-    requirement: A2.1/DEC-013-03：Alt+Enter 打开 Keymap 对话框并直接进入该动作的 Keyboard Shortcut 录制框，过滤框预填动作标题。
+    requirement: A2.1/DEC-013-03：Alt+Enter 打开 Keymap 对话框并直接进入该动作的 Keyboard Shortcut
+      录制框，过滤框预填动作标题。
     actions:
     - 23
     checkpoints:
@@ -131,25 +152,33 @@ verification:
     - step: 25
       expectation: '{"assert_visible": "[data-testid=\"keymap-recorder\"]"}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"keymap-action-filter\"]", "name": "value", "equals": "Format Document"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"keymap-action-filter\"]",
+        "name": "value", "equals": "Format Document"}}'
     results:
     - 25
     - 26
   - id: R4
-    requirement: DEC-013-10/DEC-ALIGN-11：Esc 逐层关闭录制框与对话框后焦点回到编辑器 .cm-content；未绑定的 Ctrl+Shift+Q 不修改文档。
+    requirement: DEC-013-10/DEC-ALIGN-11：Esc 逐层关闭录制框与对话框后焦点回到编辑器 .cm-content；未绑定的
+      Ctrl+Shift+Q 不修改文档。
     actions:
     - 27
     - 29
     - 32
     checkpoints:
     - step: 28
-      expectation: '{"wait_for": {"selector": "[data-testid=\"keymap-recorder\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"keymap-recorder\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-keymap-settings-dialog\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-keymap-settings-dialog\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 31
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\") === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\")
+        === true", "expect_truthy": true}}'
     - step: 33
-      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["Browser preview uses an in-memory virtual local filesystem.", "Drop OS files here or download remote files to persist them in IndexedDB.", "The real Tauri build uses your actual OS filesystem.", ""]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-line", "equals": ["Browser preview uses an in-memory virtual local filesystem.",
+        "Drop OS files here or download remote files to persist them in IndexedDB.",
+        "The real Tauri build uses your actual OS filesystem.", ""]}}'
     results:
     - 31
     - 33

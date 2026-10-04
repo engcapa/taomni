@@ -1,65 +1,117 @@
 id: TC-MFA-104
 title: Copying a native MFA code puts the plain digits on the real X11 clipboard
-description: >-
-  V-22 (AC-10). Packaged Linux/WebKitGTK app under Xvfb. The copy button and
-  the code button each write the digits without the display space to the OS
-  CLIPBOARD, read back by a separate process (`assert_system_clipboard`), for
-  the counter-0 and counter-1 RFC 4226 codes.
-covers: [F-MFA-1]
-tags: [mfa, clipboard, native-boundary, p1]
-modes: [native]
-native_platforms: [Linux]
-fixtures: [linux_x11_required, reset_db]
+description: 'V-22 (AC-10). Packaged Linux/WebKitGTK app under Xvfb. The copy button
+  and the code button each write the digits without the display space to the OS CLIPBOARD,
+  read back by a separate process (`assert_system_clipboard`), for the counter-0 and
+  counter-1 RFC 4226 codes.
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
+covers:
+- F-MFA-1
+tags:
+- mfa
+- clipboard
+- native-boundary
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+fixtures:
+- linux_x11_required
+- reset_db
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
-- click: '[data-testid="side-tab-tools"]'
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-native-104}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-native-104}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-native-104
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-native-104
 - click: '[data-testid="vault-setup-confirm"]'
-- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
 - click: '[data-testid="mfa-add"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
-- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA Clip}
-- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA Clip
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
 - click: '[data-testid="mfa-add-advanced"]'
 - wait_for: '[data-testid="mfa-add-advanced-panel"]'
-- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
 - click: '[data-testid="mfa-add-submit"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Clip"] *)', equals: 755 224}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Clip"] *)'
+    equals: 755 224
 - click: '[data-testid="mfa-account-copy"]:is([data-issuer="QA Clip"] *)'
-- assert_system_clipboard: {equals: '755224'}
+- assert_system_clipboard:
+    equals: '755224'
 - click: '[data-testid="mfa-account-hotp-next"]:is([data-issuer="QA Clip"] *)'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Clip"] *)', equals: 287 082}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Clip"] *)'
+    equals: 287 082
 - click: '[data-testid="mfa-account-code"]:is([data-issuer="QA Clip"] *)'
-- assert_system_clipboard: {equals: '287082'}
+- assert_system_clipboard:
+    equals: '287082'
 - screenshot: mfa-104-clipboard.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The copy button writes the current code's digits to the OS clipboard (AC-10).
-    actions: [11, 13, 14, 15, 17, 18, 20]
+    requirement: The copy button writes the current code's digits to the OS clipboard
+      (AC-10).
+    actions:
+    - 11
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
     checkpoints:
-    - {step: 19, expectation: code 755 224 shown}
-    - {step: 21, expectation: X11 CLIPBOARD equals 755224}
-    results: [21]
+    - step: 19
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"mfa-account-code\"]:is([data-issuer=\"QA
+        Clip\"] *)", "equals": "755 224"}}'
+    - step: 21
+      expectation: '{"assert_system_clipboard": {"equals": "755224"}}'
+    results:
+    - 21
   - id: R2
-    requirement: After Next, clicking the code copies the new digits to the OS clipboard (AC-09, AC-10).
-    actions: [22, 24]
+    requirement: After Next, clicking the code copies the new digits to the OS clipboard
+      (AC-09, AC-10).
+    actions:
+    - 22
+    - 24
     checkpoints:
-    - {step: 23, expectation: code 287 082 shown}
-    - {step: 25, expectation: X11 CLIPBOARD equals 287082}
-    results: [25]
+    - step: 23
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"mfa-account-code\"]:is([data-issuer=\"QA
+        Clip\"] *)", "equals": "287 082"}}'
+    - step: 25
+      expectation: '{"assert_system_clipboard": {"equals": "287082"}}'
+    results:
+    - 25
   visual:
   - check: Copied row highlight is visible in the screenshot.
     method: manual
     reason: Transient highlight needs human review.
   native:
-  - check: Windows and macOS clipboard writes are not read back out of process; only the in-app announcement is asserted there (TC-MFA-101).
+  - check: Windows and macOS clipboard writes are not read back out of process; only
+      the in-app announcement is asserted there (TC-MFA-101).
     method: external
     reason: assert_system_clipboard is Linux/X11-only.

@@ -1,0 +1,774 @@
+id: TC-SHELL-B06
+title: Every known TabKind opens through UI in its default lane; unknown restore stays safe
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b06.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+- parity008_git
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.shellLayout.v2
+    value: '{"version": 2, "restoreSources": {"unsupported:future": {"kind": "future-protocol", "identity":
+      "future", "title": "Future view", "password": "DISCARD-ME", "payload": {"token": "DISCARD-ME"}}}}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-restore-last-session"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- fill:
+    selector: '[data-testid="shell-tab-search"]'
+    value: Future view
+- click: '[data-testid="shell-tab-card"][data-tab-type="placeholder"] [data-testid="shell-tab-card-open"]'
+- wait_for: '[data-testid="shell-unavailable-view"]'
+- assert_text:
+    selector: '[data-testid="shell-unavailable-view"]'
+    contains: future-protocol
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="placeholder"][data-lane="utility"]'
+    equal: 1
+- click: '[data-testid="shell-tab-card"][data-tab-type="placeholder"] [data-testid="shell-tab-card-close"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="placeholder"]'
+    equal: 0
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- click: '[data-testid="shell-rail-home"]'
+- eval_readonly:
+    expression: '!localStorage.getItem(''taomni.shellLayout.v2'')?.includes(''DISCARD-ME'')'
+    expect_truthy: true
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- assert_count:
+    selector: '[data-testid="welcome-panel"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- screenshot: tc-shell-b06.png
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-s"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="sftp"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-f"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-rdp"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="rdp"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-vnc"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="vnc"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-object"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="object-storage"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: connect
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-d"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="database"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-redis"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="redis"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-hbase"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="hbase-shell"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-mail"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="mail"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: communicate
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-proxy"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="proxy-test"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-tunneling"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="nettools"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="sockscap"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-mail-unified"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="mail-unified"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: communicate
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-lan-chat"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="lan-chat"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: communicate
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-network-tools"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="placeholder"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="mfa"][data-active="true"]'
+- vault_first_run: qa-shell-types-password
+- wait_for: '[data-testid="mfa-panel"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- click: '[data-testid="shell-rail-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-promote"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="git"][data-active="true"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 21
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="welcome"][data-lane="home"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="terminal"][data-lane="connect"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="sftp"][data-lane="connect"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="rdp"][data-lane="connect"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="vnc"][data-lane="connect"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="file-browser"][data-lane="connect"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="object-storage"][data-lane="connect"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="database"][data-lane="build"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="redis"][data-lane="build"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="hbase-shell"][data-lane="build"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"][data-lane="build"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="git"][data-lane="build"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="mail"][data-lane="communicate"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="mail-unified"][data-lane="communicate"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="lan-chat"][data-lane="communicate"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="settings"][data-lane="utility"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="nettools"][data-lane="utility"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="sockscap"][data-lane="utility"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="proxy-test"][data-lane="utility"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="mfa"][data-lane="utility"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="placeholder"][data-lane="utility"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: build
+- click: '[data-testid="tab-item"][data-tab-type="database"]'
+- right_click: '[data-testid="tab-item"][data-tab-type="database"]'
+- click: '[data-testid="shell-tab-move-lane"]'
+- hover: '[data-testid="shell-tab-move-lane"]'
+- click: '[data-testid="shell-tab-move-utility"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: utility
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-active="true"]'
+    name: data-tab-type
+    equals: database
+- right_click: '[data-testid="tab-item"][data-tab-type="database"]'
+- click: '[data-testid="shell-tab-default-lane"]'
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: build
+- screenshot: tc-shell-b06-all-types.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The persistence decoder preserves a safe unknown-view descriptor and explicit restore
+      opens a readable Utility fallback.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"shell-unavailable-view\"]"}'
+    - step: 11
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-unavailable-view\"]", "contains":
+        "future-protocol"}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    results:
+    - 5
+    - 10
+    - 11
+    - 12
+  - id: R2
+    requirement: Closing the unknown view removes only it and sanitizes arbitrary secrets; Connect remains
+      operational.
+    actions:
+    - 13
+    - 15
+    - 17
+    - 18
+    - 20
+    checkpoints:
+    - step: 14
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"placeholder\"][data-lane=\"utility\"]",
+        "equal": 1}}'
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"placeholder\"]",
+        "equal": 0}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "!localStorage.getItem(''taomni.shellLayout.v2'')?.includes(''DISCARD-ME'')",
+        "expect_truthy": true}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-panel\"]", "equal": 1}}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    results:
+    - 14
+    - 16
+    - 19
+    - 21
+    - 22
+    - 23
+  - id: R3
+    requirement: The saved sftp UI opener creates its primary view in connect; this is renderer routing
+      evidence.
+    actions:
+    - 25
+    - 26
+    - 27
+    checkpoints:
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"sftp\"][data-active=\"true\"]"}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    results:
+    - 28
+    - 29
+  - id: R4
+    requirement: The saved file-browser UI opener creates its primary view in connect; this is renderer
+      routing evidence.
+    actions:
+    - 30
+    - 31
+    - 32
+    checkpoints:
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"][data-active=\"true\"]"}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    results:
+    - 33
+    - 34
+  - id: R5
+    requirement: The saved rdp UI opener creates its primary view in connect; this is renderer routing
+      evidence.
+    actions:
+    - 35
+    - 36
+    - 37
+    checkpoints:
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"rdp\"][data-active=\"true\"]"}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    results:
+    - 38
+    - 39
+  - id: R6
+    requirement: The saved vnc UI opener creates its primary view in connect; this is renderer routing
+      evidence.
+    actions:
+    - 40
+    - 41
+    - 42
+    checkpoints:
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"vnc\"][data-active=\"true\"]"}'
+    - step: 44
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    results:
+    - 43
+    - 44
+  - id: R7
+    requirement: The saved object-storage UI opener creates its primary view in connect; this is renderer
+      routing evidence.
+    actions:
+    - 45
+    - 46
+    - 47
+    checkpoints:
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"object-storage\"][data-active=\"true\"]"}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
+    results:
+    - 48
+    - 49
+  - id: R8
+    requirement: The saved database UI opener creates its primary view in build; this is renderer routing
+      evidence.
+    actions:
+    - 50
+    - 51
+    - 52
+    checkpoints:
+    - step: 53
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"database\"][data-active=\"true\"]"}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    results:
+    - 53
+    - 54
+  - id: R9
+    requirement: The saved redis UI opener creates its primary view in build; this is renderer routing
+      evidence.
+    actions:
+    - 55
+    - 56
+    - 57
+    checkpoints:
+    - step: 58
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"redis\"][data-active=\"true\"]"}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    results:
+    - 58
+    - 59
+  - id: R10
+    requirement: The saved hbase-shell UI opener creates its primary view in build; this is renderer routing
+      evidence.
+    actions:
+    - 60
+    - 61
+    - 62
+    checkpoints:
+    - step: 63
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"hbase-shell\"][data-active=\"true\"]"}'
+    - step: 64
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    results:
+    - 63
+    - 64
+  - id: R11
+    requirement: The saved mail UI opener creates its primary view in communicate; this is renderer routing
+      evidence.
+    actions:
+    - 65
+    - 66
+    - 67
+    checkpoints:
+    - step: 68
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mail\"][data-active=\"true\"]"}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "communicate"}}'
+    results:
+    - 68
+    - 69
+  - id: R12
+    requirement: The saved proxy-test UI opener creates its primary view in utility; this is renderer
+      routing evidence.
+    actions:
+    - 70
+    - 71
+    - 72
+    checkpoints:
+    - step: 73
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"proxy-test\"][data-active=\"true\"]"}'
+    - step: 74
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    results:
+    - 73
+    - 74
+  - id: R13
+    requirement: The existing tunneling utility entry opens nettools in utility.
+    actions:
+    - 75
+    - 76
+    checkpoints:
+    - step: 77
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"nettools\"][data-active=\"true\"]"}'
+    - step: 78
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    results:
+    - 77
+    - 78
+  - id: R14
+    requirement: The existing sockscap utility entry opens sockscap in utility.
+    actions:
+    - 79
+    - 80
+    checkpoints:
+    - step: 81
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"sockscap\"][data-active=\"true\"]"}'
+    - step: 82
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    results:
+    - 81
+    - 82
+  - id: R15
+    requirement: The existing mail-unified utility entry opens mail-unified in communicate.
+    actions:
+    - 83
+    - 84
+    checkpoints:
+    - step: 85
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mail-unified\"][data-active=\"true\"]"}'
+    - step: 86
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "communicate"}}'
+    results:
+    - 85
+    - 86
+  - id: R16
+    requirement: The existing lan-chat utility entry opens lan-chat in communicate.
+    actions:
+    - 87
+    - 88
+    checkpoints:
+    - step: 89
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"lan-chat\"][data-active=\"true\"]"}'
+    - step: 90
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "communicate"}}'
+    results:
+    - 89
+    - 90
+  - id: R17
+    requirement: The existing network-tools utility entry opens placeholder in utility.
+    actions:
+    - 91
+    - 92
+    checkpoints:
+    - step: 93
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"placeholder\"][data-active=\"true\"]"}'
+    - step: 94
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    results:
+    - 93
+    - 94
+  - id: R18
+    requirement: The existing mfa utility entry opens mfa in utility.
+    actions:
+    - 95
+    - 96
+    - 98
+    checkpoints:
+    - step: 97
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"][data-active=\"true\"]"}'
+    - step: 99
+      expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
+    - step: 100
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    results:
+    - 97
+    - 99
+    - 100
+  - id: R19
+    requirement: Settings and a workspace open through their actual entries; Git promotion preserves the
+      Build default.
+    actions:
+    - 101
+    - 104
+    - 105
+    - 106
+    - 109
+    - 112
+    checkpoints:
+    - step: 102
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 103
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    - step: 107
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 108
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    - step: 110
+      expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
+    - step: 113
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"git\"][data-active=\"true\"]"}'
+    - step: 114
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    results:
+    - 102
+    - 103
+    - 107
+    - 108
+    - 110
+    - 113
+    - 114
+  - id: R20
+    requirement: Overview contains exactly all 21 TabKind values in their declared lanes; changing a database
+      display group preserves its type.
+    actions:
+    - 115
+    - 138
+    - 139
+    - 140
+    - 141
+    - 142
+    - 143
+    - 144
+    - 147
+    - 148
+    checkpoints:
+    - step: 116
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 21}}'
+    - step: 117
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"welcome\"][data-lane=\"home\"]",
+        "equal": 1}}'
+    - step: 118
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"terminal\"][data-lane=\"connect\"]",
+        "equal": 1}}'
+    - step: 119
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"sftp\"][data-lane=\"connect\"]",
+        "equal": 1}}'
+    - step: 120
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"rdp\"][data-lane=\"connect\"]",
+        "equal": 1}}'
+    - step: 121
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"vnc\"][data-lane=\"connect\"]",
+        "equal": 1}}'
+    - step: 122
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"file-browser\"][data-lane=\"connect\"]",
+        "equal": 1}}'
+    - step: 123
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"object-storage\"][data-lane=\"connect\"]",
+        "equal": 1}}'
+    - step: 124
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"database\"][data-lane=\"build\"]",
+        "equal": 1}}'
+    - step: 125
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"redis\"][data-lane=\"build\"]",
+        "equal": 1}}'
+    - step: 126
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"hbase-shell\"][data-lane=\"build\"]",
+        "equal": 1}}'
+    - step: 127
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"][data-lane=\"build\"]",
+        "equal": 1}}'
+    - step: 128
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"git\"][data-lane=\"build\"]",
+        "equal": 1}}'
+    - step: 129
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"mail\"][data-lane=\"communicate\"]",
+        "equal": 1}}'
+    - step: 130
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"mail-unified\"][data-lane=\"communicate\"]",
+        "equal": 1}}'
+    - step: 131
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"lan-chat\"][data-lane=\"communicate\"]",
+        "equal": 1}}'
+    - step: 132
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"settings\"][data-lane=\"utility\"]",
+        "equal": 1}}'
+    - step: 133
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"nettools\"][data-lane=\"utility\"]",
+        "equal": 1}}'
+    - step: 134
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"sockscap\"][data-lane=\"utility\"]",
+        "equal": 1}}'
+    - step: 135
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"proxy-test\"][data-lane=\"utility\"]",
+        "equal": 1}}'
+    - step: 136
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"mfa\"][data-lane=\"utility\"]",
+        "equal": 1}}'
+    - step: 137
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"placeholder\"][data-lane=\"utility\"]",
+        "equal": 1}}'
+    - step: 145
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "utility"}}'
+    - step: 146
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]",
+        "name": "data-tab-type", "equals": "database"}}'
+    - step: 149
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "build"}}'
+    results:
+    - 116
+    - 117
+    - 118
+    - 119
+    - 120
+    - 121
+    - 122
+    - 123
+    - 124
+    - 125
+    - 126
+    - 127
+    - 128
+    - 129
+    - 130
+    - 131
+    - 132
+    - 133
+    - 134
+    - 135
+    - 136
+    - 137
+    - 145
+    - 146
+    - 149
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

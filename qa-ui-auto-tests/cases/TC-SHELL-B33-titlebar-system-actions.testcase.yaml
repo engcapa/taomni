@@ -1,0 +1,291 @@
+id: TC-SHELL-B33
+title: Global View actions and exit cancellation preserve the current terminal
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b33.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.3
+- F1.8
+- F1.9
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="shell-menu-overview"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 2
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-overview"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="shell-menu-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: qa-alpha
+- assert_count:
+    selector: '[data-testid="shell-quick-option"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-quick-dialog"]'
+- assert_text_equals:
+    selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+    equals: qa-alpha
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-split-terminal"]'
+- wait_for: '[data-testid="terminal-split-toolbar"]'
+- assert_count:
+    selector: '[data-testid="terminal-split-pane"]'
+    equal: 1
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-split-terminal"]'
+- assert_not_visible: '[data-testid="terminal-split-toolbar"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-multiexec"]'
+- wait_for: '[data-testid="multiexec-bar"]'
+- fill:
+    selector: '[data-testid="multiexec-input"]'
+    value: pending broadcast 中文
+- assert_value:
+    selector: '[data-testid="multiexec-input"]'
+    equals: pending broadcast 中文
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-multiexec"]'
+- assert_not_visible: '[data-testid="multiexec-bar"]'
+- assert_visible: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="shell-menu-reset-layout"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_visible: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="app-main-menu"]'
+- click: '[data-testid="context-menu-item-exit"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_text_equals:
+    selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+    equals: qa-alpha
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo CHROME_CANCEL_READY
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^CHROME_CANCEL_READY\s*$
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="welcome-panel"]'
+    equal: 1
+- screenshot: tc-shell-b33.png
+- set_viewport:
+    width: 1280
+    height: 800
+- wait_for: '[data-testid="titlebar-tray"]'
+- click: '[data-testid="tab-split-view"]'
+- wait_for: '[data-testid="terminal-split-toolbar"]'
+- assert_count:
+    selector: '[data-testid="terminal-split-pane"]'
+    equal: 1
+- click: '[data-testid="tab-split-view"]'
+- assert_not_visible: '[data-testid="terminal-split-toolbar"]'
+- click: '[data-testid="tab-multiexec-toggle"]'
+- wait_for: '[data-testid="multiexec-bar"]'
+- fill:
+    selector: '[data-testid="multiexec-input"]'
+    value: tray retained draft
+- assert_value:
+    selector: '[data-testid="multiexec-input"]'
+    equals: tray retained draft
+- click: '[data-testid="tab-multiexec-toggle"]'
+- assert_not_visible: '[data-testid="multiexec-bar"]'
+- assert_visible: '[data-testid="terminal-pane"]:visible'
+- screenshot: tc-shell-b33-tray.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: View menu Overview and Quick Switch reach the same complete set; Escape closes the current
+      layer.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 17
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 2}}'
+    - step: 11
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-overview\"]"}'
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 18
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-quick-dialog\"]"}'
+    - step: 19
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]
+        [data-testid=\"tab-title\"]", "equals": "qa-alpha"}}'
+    results:
+    - 5
+    - 9
+    - 11
+    - 16
+    - 18
+    - 19
+  - id: R2
+    requirement: The retained split and multiexec actions now execute from View and leave the real primary
+      terminal mounted.
+    actions:
+    - 20
+    - 21
+    - 22
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
+    - 35
+    - 36
+    - 37
+    checkpoints:
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"terminal-split-toolbar\"]"}'
+    - step: 24
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 1}}'
+    - step: 28
+      expectation: '{"assert_not_visible": "[data-testid=\"terminal-split-toolbar\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 34
+      expectation: '{"assert_value": {"selector": "[data-testid=\"multiexec-input\"]", "equals": "pending
+        broadcast 中文"}}'
+    - step: 38
+      expectation: '{"assert_not_visible": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 39
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"]:visible"}'
+    results:
+    - 23
+    - 24
+    - 28
+    - 32
+    - 34
+    - 38
+    - 39
+  - id: R3
+    requirement: Layout reset cancellation preserves preferences and menu Exit cancellation keeps the
+      primary terminal available.
+    actions:
+    - 40
+    - 41
+    - 42
+    - 44
+    - 47
+    - 48
+    - 50
+    - 53
+    checkpoints:
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 45
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 46
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"]:visible"}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 51
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 52
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]
+        [data-testid=\"tab-title\"]", "equals": "qa-alpha"}}'
+    - step: 54
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
+        "regex": "(?m)^CHROME_CANCEL_READY\\s*$", "timeout_sec": 10}}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-panel\"]", "equal": 1}}'
+    results:
+    - 43
+    - 45
+    - 46
+    - 49
+    - 51
+    - 52
+    - 54
+    - 55
+  - id: R5
+    requirement: Wide titlebar tray Split and MultiExec entries toggle the real terminal surfaces and
+      leave the connected terminal usable.
+    actions:
+    - 57
+    - 59
+    - 62
+    - 64
+    - 66
+    - 68
+    checkpoints:
+    - step: 58
+      expectation: '{"wait_for": "[data-testid=\"titlebar-tray\"]"}'
+    - step: 60
+      expectation: '{"wait_for": "[data-testid=\"terminal-split-toolbar\"]"}'
+    - step: 61
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 1}}'
+    - step: 63
+      expectation: '{"assert_not_visible": "[data-testid=\"terminal-split-toolbar\"]"}'
+    - step: 65
+      expectation: '{"wait_for": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 67
+      expectation: '{"assert_value": {"selector": "[data-testid=\"multiexec-input\"]", "equals": "tray
+        retained draft"}}'
+    - step: 69
+      expectation: '{"assert_not_visible": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 70
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"]:visible"}'
+    results:
+    - 58
+    - 60
+    - 61
+    - 63
+    - 65
+    - 67
+    - 69
+    - 70
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

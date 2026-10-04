@@ -12823,11 +12823,20 @@ export function CodeWorkspaceTab({
     // shows Project (IDEA restores the last left window).
     const next = size.asPercentage > 2 && (pixels > 40 || size.inPixels === 0);
     const layout = toolWindowLayoutRef.current;
+    if (shellHosted) {
+      // This divider owns only the tools still inside the workspace. Project
+      // lives in Navigator, so collapsing the empty internal area must not
+      // hide its controller or freeze its portal's content updates.
+      const internal = [layout.visibleAt("left-top"), layout.visibleAt("left-bottom")]
+        .filter((id): id is string => !!id && !["project", "git", "problems", "terminal"].includes(id));
+      if (!next) internal.forEach((id) => layout.hide(id));
+      return;
+    }
     const areaOpen = layout.sideOpen("left");
     if (next === areaOpen) return;
     if (!next) layout.hideSide("left");
     else layout.show(layout.visibleAt("left-top") ?? "project");
-  }, []);
+  }, [shellHosted]);
 
   const [workspaceContainerHeight, setWorkspaceContainerHeight] = useState<number>(() => {
     return typeof window !== "undefined" ? window.innerHeight : 800;
@@ -12865,18 +12874,26 @@ export function CodeWorkspaceTab({
     setBottomDockHeightForTool(workspaceInstanceId, bottomDockTab, height);
   }, [bottomDockTab, setBottomDockHeightForTool, workspaceInstanceId]);
 
+  const toolWindowElement = useCallback((toolId: string) => {
+    if (toolId === "project") return treePaneRef.current;
+    if (shellHosted && ["git", "problems", "terminal"].includes(toolId)) {
+      return document.querySelector<HTMLElement>(`[data-testid="shell-host"][data-panel-id="workspace:${workspaceInstanceId}:${toolId}"]`);
+    }
+    return rootRef.current?.querySelector<HTMLElement>(`[data-testid="code-workspace-tool-window-${toolId}"]`) ?? null;
+  }, [shellHosted, workspaceInstanceId]);
+
   const focusToolWindowSoon = useCallback((toolId: string) => {
     requestAnimationFrame(() => {
       if (toolId === "project") {
         treePaneRef.current?.focus();
         return;
       }
-      const pane = document.querySelector(`[data-testid="code-workspace-tool-window-${toolId}"]`);
+      const pane = toolWindowElement(toolId);
       const target = pane?.querySelector<HTMLElement>('[data-tool-window-content] [tabindex="0"], [data-tool-window-content] button, [data-tool-window-content] input, [data-tool-window-content] textarea')
         ?? pane?.querySelector<HTMLElement>("button");
-      target?.focus();
+      (target ?? pane)?.focus();
     });
-  }, []);
+  }, [toolWindowElement]);
 
   /**
    * IDEA Activate<Tool>Window (Alt+N, stripe clicks): a hidden window is
@@ -12886,9 +12903,7 @@ export function CodeWorkspaceTab({
   const handleActivateToolWindow = useCallback((requestedId: string) => {
     const toolId = requestedId === "outline" ? "structure" : requestedId;
     const layout = toolWindowLayoutRef.current;
-    const pane = toolId === "project"
-      ? treePaneRef.current
-      : document.querySelector(`[data-testid="code-workspace-tool-window-${toolId}"]`);
+    const pane = toolWindowElement(toolId);
     const hasFocus = !!pane && pane.contains(document.activeElement);
     if (!layout.isVisible(toolId)) {
       if (toolId === "structure") rightPaneTabRef.current = "outline";
@@ -12901,7 +12916,7 @@ export function CodeWorkspaceTab({
     } else {
       focusToolWindowSoon(toolId);
     }
-  }, [focusToolWindowSoon, handleReturnToEditor]);
+  }, [focusToolWindowSoon, handleReturnToEditor, toolWindowElement]);
 
   const handleRestoreToolWindowLayout = useCallback(() => {
     // IDEA Window | Restore Default Layout: default anchors, Project only.
@@ -12930,16 +12945,27 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     if (rightPaneOpen && rightPaneTab === "outline") lastToolWindowIdRef.current = "structure";
   }, [rightPaneOpen, rightPaneTab]);
-  const hiddenToolWindowsRef = useRef<{ project: boolean; bottom: boolean; right: boolean } | null>(null);
+  const previouslyVisibleToolsRef = useRef<string[]>([]);
+  useEffect(() => {
+    const current = WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES.filter((entry) => toolWindowLayout.isVisible(entry.id)).map((entry) => entry.id);
+    const opened = current.filter((id) => !previouslyVisibleToolsRef.current.includes(id));
+    if (opened.length) lastToolWindowIdRef.current = opened.at(-1)!;
+    previouslyVisibleToolsRef.current = current;
+  }, [toolWindowLayout]);
+  const hiddenToolWindowsRef = useRef<string[] | null>(null);
 
-  const focusBottomDockSoon = useCallback(() => {
+  const focusBottomDockSoon = useCallback((toolId: string) => {
+    if (shellHosted && ["git", "problems", "terminal"].includes(toolId)) {
+      focusToolWindowSoon(toolId);
+      return;
+    }
     requestAnimationFrame(() => {
       const el = document.querySelector<HTMLElement>(
         '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input',
       );
       el?.focus();
     });
-  }, []);
+  }, [shellHosted, focusToolWindowSoon]);
 
   const jumpToLastToolWindow = useCallback(() => {
     const toolId = lastToolWindowIdRef.current ?? "project";
@@ -12956,16 +12982,19 @@ export function CodeWorkspaceTab({
     }
     setBottomDockTab(toolId as BottomDockTabId);
     setBottomDockOpen(true);
-    focusBottomDockSoon();
+    focusBottomDockSoon(toolId);
   }, [focusBottomDockSoon, setBottomDockOpen, setBottomDockTab, setLanguagePanelOpen, setRightPaneOpen, setRightPaneTab]);
 
   const hideActiveToolWindow = useCallback((): boolean => {
     const active = document.activeElement;
+    const hostedTool = shellHosted ? ["git", "problems", "terminal"].find((id) => active && toolWindowElement(id)?.contains(active)) : undefined;
     const bottomDock = document.querySelector('[data-testid="code-workspace-bottom-dock"]');
     const rightPane = document.querySelector('[data-testid="code-workspace-right-pane"]');
-    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
     let hid = false;
-    if (active && treePaneRef.current?.contains(active)) {
+    if (hostedTool) {
+      toolWindowLayoutRef.current.hide(hostedTool);
+      hid = true;
+    } else if (active && treePaneRef.current?.contains(active)) {
       setLanguagePanelOpen(false);
       hid = true;
     } else if (active && bottomDock?.contains(active)) {
@@ -12977,11 +13006,8 @@ export function CodeWorkspaceTab({
     } else {
       // Editor focus: hide the last active tool window when it is open.
       const last = lastToolWindowIdRef.current;
-      if (last === "structure" && ui.rightPaneOpen) {
-        setRightPaneOpen(false);
-        hid = true;
-      } else if (last && last !== "project" && last !== "structure" && ui.bottomDockOpen) {
-        setBottomDockOpen(false);
+      if (last && toolWindowLayoutRef.current.isVisible(last)) {
+        toolWindowLayoutRef.current.hide(last);
         hid = true;
       }
     }
@@ -12992,20 +13018,14 @@ export function CodeWorkspaceTab({
       requestAnimationFrame(() => handleReturnToEditor());
     }
     return hid;
-  }, [handleReturnToEditor, setBottomDockOpen, setLanguagePanelOpen, setRightPaneOpen, workspaceInstanceId]);
+  }, [handleReturnToEditor, setBottomDockOpen, setLanguagePanelOpen, setRightPaneOpen, workspaceInstanceId, shellHosted, toolWindowElement]);
 
   const toggleAllToolWindows = useCallback(() => {
-    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-    const anyOpen = ui.languagePanelOpen || ui.bottomDockOpen || ui.rightPaneOpen;
-    if (anyOpen) {
-      hiddenToolWindowsRef.current = {
-        project: ui.languagePanelOpen,
-        bottom: ui.bottomDockOpen,
-        right: ui.rightPaneOpen,
-      };
-      setLanguagePanelOpen(false);
-      setBottomDockOpen(false);
-      setRightPaneOpen(false);
+    const layout = toolWindowLayoutRef.current;
+    const visibleTools = WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES.filter((entry) => layout.isVisible(entry.id)).map((entry) => entry.id);
+    if (visibleTools.length) {
+      hiddenToolWindowsRef.current = visibleTools;
+      visibleTools.forEach((id) => layout.hide(id));
       handleReturnToEditor();
       requestAnimationFrame(() => handleReturnToEditor());
       return;
@@ -13013,10 +13033,8 @@ export function CodeWorkspaceTab({
     const restore = hiddenToolWindowsRef.current;
     hiddenToolWindowsRef.current = null;
     if (!restore) return;
-    if (restore.project) setLanguagePanelOpen(true);
-    if (restore.bottom) setBottomDockOpen(true);
-    if (restore.right) setRightPaneOpen(true);
-  }, [handleReturnToEditor, setBottomDockOpen, setLanguagePanelOpen, setRightPaneOpen, workspaceInstanceId]);
+    restore.forEach((id) => layout.show(id));
+  }, [handleReturnToEditor]);
 
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
@@ -16803,8 +16821,11 @@ export function CodeWorkspaceTab({
     const root = rootRef.current;
     if (!root) return undefined;
     const host = actionsController.host;
-    return registerShellKeyClaim(root, (event) => host.claimsSingleStroke(event));
-  }, [actionsController.host, visible]);
+    return registerShellKeyClaim(root, (event) => host.claimsSingleStroke(event), () => host.getSnapshot().flatMap((action) =>
+      (action.shortcuts ?? []).flatMap((shortcut) => shortcut.kind === "keyboard"
+        ? [{ scope: `Code · ${workspace.name ?? workspaceInstanceId}`, actionId: action.id, title: action.title, stroke: shortcut.strokes[0] }]
+        : [])));
+  }, [actionsController.host, visible, workspace.name, workspaceInstanceId]);
 
   // §8.19.2: one workspace-root mouse dispatcher; unbound gestures (text
   // selection, editing) pass through untouched. Re-attach only when the
@@ -23043,6 +23064,9 @@ export function CodeWorkspaceTab({
       {shellHosted && (["project", "git", "problems", "terminal"] as const).map((tool) => <WorkspaceToolSurface key={tool}
         tabId={tabId} workspaceInstanceId={workspaceInstanceId} tool={tool} nodes={toolWindowNodes} label={toolWindowLabel(tool)}
         gitPayload={tool === "git" ? gitManagerPayload : undefined}
+        hostEdge={toolWindowLayout.layout.anchors[tool] ? toolWindowLayout.anchorOf(tool).startsWith("bottom") ? "bottom" : "right" : undefined}
+        onHostMove={(edge) => toolWindowLayout.move(tool, edge === "bottom" ? "bottom-left" : "right-top")}
+        onHostHide={handleReturnToEditor}
         requested={toolWindowLayout.isVisible(tool)} setRequested={(open) => { if (open) toolWindowLayout.show(tool); else toolWindowLayout.hide(tool); }} />)}
       {toolWindowContents.map((entry) => (
         <ToolWindowPortal

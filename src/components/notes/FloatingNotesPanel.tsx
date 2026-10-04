@@ -5,7 +5,7 @@ import { notesFontSizeStyle, notesFontStyle, notesThemeStyle } from "../../lib/n
 import { useT } from "../../lib/i18n";
 import { NotesPanel } from "./NotesPanel";
 import { isTauriRuntime } from "../../lib/runtime";
-import { openDetachedWindow } from "../../lib/detachWindowing";
+import { detachNotesPanel, requestNotesReturn, useNotesWindowStore } from "../../lib/shell/notesPanelWindow";
 import { subscribeNotesDockSignal } from "../../lib/notes/notesWindowSync";
 import { SurfaceSlot } from "../shell/SurfaceSlot";
 
@@ -38,6 +38,7 @@ export function FloatingNotesPanel({ shellHosted = false }: { shellHosted?: bool
   const theme = useNotesStore((s) => s.theme);
   const font = useNotesStore((s) => s.font);
   const fontSize = useNotesStore((s) => s.fontSize);
+  const nativePhase = useNotesWindowStore((s) => s.phase);
 
   const [pos, setPos] = useState<NotesPanelPosition>(() => clampPosition(panelPosition));
   const posRef = useRef(pos);
@@ -52,6 +53,7 @@ export function FloatingNotesPanel({ shellHosted = false }: { shellHosted?: bool
 
   useEffect(() => {
     return subscribeNotesDockSignal(() => {
+      if (isTauriRuntime() && useNotesWindowStore.getState().phase === "detached") { requestNotesReturn(); return; }
       openedNativeRef.current = false;
       dragRef.current = null;
       if (isTauriRuntime()) {
@@ -73,21 +75,14 @@ export function FloatingNotesPanel({ shellHosted = false }: { shellHosted?: bool
       openedNativeRef.current = false;
       return;
     }
-    if (!isTauriRuntime() || openedNativeRef.current) return;
+    if (!isTauriRuntime() || nativePhase !== "docked" || openedNativeRef.current) return;
     openedNativeRef.current = true;
-    void openDetachedWindow({
-      kind: "notes",
-      sessionId: "panel",
-      title: t("notes.title"),
-      x: panelPosition.x,
-      y: panelPosition.y,
-      width: panelPosition.width,
-      height: panelPosition.height,
-    }).catch((err) => {
+    setPanelMode("hub");
+    void detachNotesPanel(t("notes.title")).catch((err) => {
       openedNativeRef.current = false;
       console.warn("notes: failed to open detached window", err);
     });
-  }, [panelMode, panelPosition.height, panelPosition.width, panelPosition.x, panelPosition.y, t]);
+  }, [panelMode, nativePhase, setPanelMode, t]);
 
   if (panelMode !== "floating") return null;
   if (isTauriRuntime()) return null;

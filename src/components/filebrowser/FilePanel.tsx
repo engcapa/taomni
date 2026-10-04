@@ -805,6 +805,7 @@ export function FilePanel({
               <tr
                 key={entry.path}
                 data-row
+                aria-selected={pane.selection.includes(entry.path)}
                 onPointerDown={(e) => handleRowPointerDown(entry, e)}
                 className="cursor-default select-none"
                 style={{

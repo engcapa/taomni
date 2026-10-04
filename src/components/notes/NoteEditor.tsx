@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,6 +19,7 @@ import { NoteDateTimeField } from "./NoteDateTimeField";
 import { extractNoteUrls, findNoteUrlAtIndex } from "../../lib/notes/noteLinks";
 import { isTauriRuntime } from "../../lib/runtime";
 import { renderLinkedNoteText } from "./NoteLinkText";
+import { notifyNotesViewChanged, registerNotesEditor, type NoteDraftSnapshot } from "../../lib/notes/notesViewState";
 
 const COLOR_SWATCHES = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
 const PRIORITIES = [0, 1, 2, 3] as const;
@@ -139,21 +141,47 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
   const [bodyCursor, setBodyCursor] = useState<TextCursor>("text");
   const noteIdRef = useRef(note.id);
   const bodyLinkOverlayRef = useRef<HTMLDivElement | null>(null);
-
-  // Resync the draft when a different note is selected.
-  useEffect(() => {
-    if (noteIdRef.current !== note.id) {
-      noteIdRef.current = note.id;
-      setTitle(note.title);
-      setBody(note.body);
-      setLocalSteps(
-        note.steps.map((s) => ({ id: s.id, title: s.title, completed_at: s.completed_at, sort_order: s.sort_order })),
-      );
-      setTagIds(note.tags.map((tg) => tg.id));
-      setNewStep("");
-      setNewTag("");
-    }
+  const editorRoot = useRef<HTMLDivElement>(null);
+  const draftRef = useRef({ note, title, body, steps, tagIds, newStep, newTag });
+  draftRef.current = { note, title, body, steps, tagIds, newStep, newTag };
+  // Reset before registering the new note's controller so a pending handoff
+  // cannot capture the previous note's text with the new note's identity.
+  useLayoutEffect(() => {
+    if (noteIdRef.current === note.id) return;
+    noteIdRef.current = note.id;
+    const nextSteps = note.steps.map((s) => ({ id: s.id, title: s.title, completed_at: s.completed_at, sort_order: s.sort_order }));
+    const nextTags = note.tags.map((tg) => tg.id);
+    draftRef.current = { note, title: note.title, body: note.body, steps: nextSteps, tagIds: nextTags, newStep: "", newTag: "" };
+    setTitle(note.title); setBody(note.body); setLocalSteps(nextSteps); setTagIds(nextTags); setNewStep(""); setNewTag("");
   }, [note]);
+  useLayoutEffect(() => registerNotesEditor({
+    snapshot: () => {
+      const s = draftRef.current, root = editorRoot.current;
+      const titleInput = root?.querySelector<HTMLInputElement>('[data-testid="note-editor-title"]');
+      const bodyInput = root?.querySelector<HTMLTextAreaElement>('[data-testid="note-editor-body"]');
+      return { noteId: s.note.id, title: s.title, body: s.body, steps: s.steps, tagIds: s.tagIds, newStep: s.newStep, newTag: s.newTag,
+        scrollTop: root?.querySelector<HTMLElement>('[data-testid="note-editor-scroll"]')?.scrollTop ?? 0,
+        titleSelection: [titleInput?.selectionStart ?? 0, titleInput?.selectionEnd ?? 0], bodySelection: [bodyInput?.selectionStart ?? 0, bodyInput?.selectionEnd ?? 0] };
+    },
+    restore: (s: NoteDraftSnapshot) => {
+      if (draftRef.current.note.id !== s.noteId) return;
+      setTitle(s.title); setBody(s.body); setLocalSteps(s.steps); setTagIds(s.tagIds); setNewStep(s.newStep); setNewTag(s.newTag);
+      draftRef.current = { ...draftRef.current, ...s };
+      requestAnimationFrame(() => {
+        const root = editorRoot.current;
+        root?.querySelector<HTMLInputElement>('[data-testid="note-editor-title"]')?.setSelectionRange(...s.titleSelection);
+        root?.querySelector<HTMLTextAreaElement>('[data-testid="note-editor-body"]')?.setSelectionRange(...s.bodySelection);
+        const scroll = root?.querySelector<HTMLElement>('[data-testid="note-editor-scroll"]'); if (scroll) scroll.scrollTop = s.scrollTop;
+      });
+    },
+    flush: async () => {
+      const s = draftRef.current, n = s.note;
+      const ok = await useNotesStore.getState().updateNote(n.id, { title: s.title, body: s.body, pinned: n.pinned, color: n.color, priority: n.priority, due_at: n.due_at,
+        reminder_at: n.reminder_at, repeat_rule: n.repeat_rule, source_tab_id: n.source_tab_id, source_session_id: n.source_session_id, source_title: n.source_title, source_uri: n.source_uri, tag_ids: s.tagIds });
+      if (!ok) throw new Error(useNotesStore.getState().saveError ?? "The note could not be saved. Retry before moving this view.");
+    },
+  }), [note.id]);
+  useEffect(() => { notifyNotesViewChanged(); }, [note.id, title, body, steps, tagIds, newStep, newTag]);
 
   const done = note.completed_at !== null;
   const archived = note.archived_at !== null;
@@ -258,7 +286,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col" data-testid="note-editor" data-note-id={note.id}>
+    <div ref={editorRoot} className="flex-1 min-h-0 flex flex-col" data-testid="note-editor" data-note-id={note.id}>
       {/* Editor header */}
       <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--taomni-divider)] shrink-0">
         <button
@@ -334,7 +362,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
       />
 
       {/* Editable fields */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
+      <div data-testid="note-editor-scroll" className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
         <div className="notes-link-field-shell" data-has-url={titleHasUrl || undefined}>
           {titleHasUrl && (
             <div

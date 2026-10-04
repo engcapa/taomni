@@ -1,11 +1,17 @@
 id: TC-IDE-PARITY-012-01
 title: Popups opened from the editor return focus to it on Escape
-description: 'ED-PARITY-012 A4 / DEC-012-01 (DEC-ALIGN-11): Go to File, Recent Files, Recent Locations, File Structure, Find Action and Go to Line each open from the editor and close with Escape; focus returns to the same CodeMirror content and the caret line is unchanged.
+description: 'ED-PARITY-012 A4 / DEC-012-01 (DEC-ALIGN-11): Go to File, Recent Files,
+  Recent Locations, File Structure, Find Action and Go to Line each open from the
+  editor and close with Escape; focus returns to the same CodeMirror content and the
+  caret line is unchanged.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -22,7 +28,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -122,18 +128,23 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A4/DEC-012-01：从编辑器打开 gotofile 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret 行不变。
+    requirement: A4/DEC-012-01：从编辑器打开 gotofile 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret
+      行不变。
     actions:
     - 16
     checkpoints:
     - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 20
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 21
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "3:"}}'
     results:
     - 20
     - 21
@@ -143,77 +154,101 @@ verification:
     - 22
     checkpoints:
     - step: 23
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]",
+        "timeout_sec": 30}}'
     - step: 25
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 26
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 27
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "3:"}}'
     results:
     - 26
     - 27
   - id: R3
-    requirement: A4/DEC-012-01：从编辑器打开 recentloc 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret 行不变。
+    requirement: A4/DEC-012-01：从编辑器打开 recentloc 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret
+      行不变。
     actions:
     - 28
     checkpoints:
     - step: 29
-      expectation: '{"wait_for": {"selector": "[data-testid=\"recent-locations-dialog\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"recent-locations-dialog\"]",
+        "timeout_sec": 30}}'
     - step: 31
-      expectation: '{"wait_for": {"selector": "[data-testid=\"recent-locations-dialog\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"recent-locations-dialog\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 32
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "3:"}}'
     results:
     - 32
     - 33
   - id: R4
-    requirement: A4/DEC-012-01：从编辑器打开 structure 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret 行不变。
+    requirement: A4/DEC-012-01：从编辑器打开 structure 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret
+      行不变。
     actions:
     - 34
     checkpoints:
     - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-structure-popup\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-structure-popup\"]",
+        "timeout_sec": 30}}'
     - step: 37
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-structure-popup\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-structure-popup\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 38
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 39
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "3:"}}'
     results:
     - 38
     - 39
   - id: R5
-    requirement: A4/DEC-012-01：从编辑器打开 findaction 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret 行不变。
+    requirement: A4/DEC-012-01：从编辑器打开 findaction 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret
+      行不变。
     actions:
     - 40
     checkpoints:
     - step: 41
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 43
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 44
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "3:"}}'
     results:
     - 44
     - 45
   - id: R6
-    requirement: A4/DEC-012-01：从编辑器打开 gotoline 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret 行不变。
+    requirement: A4/DEC-012-01：从编辑器打开 gotoline 弹层后 Esc，弹层关闭，焦点回原 .cm-content，caret
+      行不变。
     actions:
     - 46
     checkpoints:
     - step: 47
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]",
+        "timeout_sec": 30}}'
     - step: 49
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 50
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 51
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "3:"}}'
     results:
     - 50
     - 51

@@ -1,9 +1,14 @@
 id: TC-DB-EXEC-004-explain-native
 title: Native Explain runs EXPLAIN for the statement at the cursor
-description: |
-  DB-EXEC-004 V4. On a real MySQL/MariaDB session, Explain on a SELECT creates a
+description: 'DB-EXEC-004 V4. On a real MySQL/MariaDB session, Explain on a SELECT creates a
+
   result sheet titled Explain with the plan grid, and the execution log records
+
   one successful EXPLAIN statement.
+
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks;
+  Settings uses its permanent Rail button. Original business checks are retained.'
 covers:
 - F-DB-1
 tags:
@@ -26,8 +31,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-db-explain-password
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="side-tab-sessions"]'
+- shell_navigate: tools
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree"]'
 - wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
@@ -95,3 +100,93 @@ steps:
     selector: '[data-testid="db-execution-log-entry"]'
     contains: EXPLAIN SELECT
 - screenshot: db-exec-004-explain-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Use the Shell Rail/Navigator to create and reopen the saved MySQL session; its query
+      tab and schema tree load without a connection error.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec":
+        10}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-pw1\"]", "timeout_sec": 15}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-db-explain\"]"}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"schema-tree\"]", "timeout_sec": 30}}'
+    results:
+    - 28
+    - 29
+    - 30
+  - id: R2
+    requirement: Explain at the SQL cursor returns an Explain result sheet and one successful EXPLAIN
+      SELECT log entry.
+    actions:
+    - 31
+    - 32
+    - 33
+    - 34
+    - 37
+    checkpoints:
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"query-result-grid\"]", "timeout_sec": 60}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"result-sheet-tab\"]", "contains": "Explain"}}'
+    - step: 38
+      expectation: '{"assert_count": {"selector": "[data-testid=\"db-execution-log-entry\"][data-status=\"success\"]",
+        "equal": 1}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-entry\"]", "contains":
+        "EXPLAIN SELECT"}}'
+    results:
+    - 36
+    - 38
+    - 39
+  visual:
+  - check: Inspect the recorded result/dialog/log layout for clipping and readable content.
+    method: manual
+    reason: Screenshots alone do not establish a visual verdict.
+  native:
+  - check: Execute SQL through real Tauri IPC against the disposable hosted MySQL service.
+    method: automated
+    reason: Browser stubs cannot prove database execution and retained native wiring.
+  - check: Cross-client visibility and server connection teardown beyond the listed SELECT results.
+    method: external
+    reason: Those extra boundaries are covered by the paired Shell N12/N15 independent SQL/process cases,
+      not this UI log.

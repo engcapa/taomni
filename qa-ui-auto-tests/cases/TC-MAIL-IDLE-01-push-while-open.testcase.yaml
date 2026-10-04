@@ -16,10 +16,16 @@ description: 'TASK-12 (docs-feature/mail-thunderbird-parity-design.md AC-36/AC-3
 
   fake IMAP server started by the mail_server fixture.
 
-  '
+
+  Shell v2: hide the mail owner before delivery, then reveal the exact ready account from Tao before acknowledgement.
+  The original IDLE readiness, 15-second list sync and close-release assertions remain. Unread rows must
+  match the independent server after notification acknowledgement (ack does not mark messages read). Maps
+  V-B26/V-N13.'
 covers:
 - F-MAIL-10
 - F-MAIL-5
+- F-TAO-1
+- F-SHELL-1
 tags:
 - mail
 - p1
@@ -44,22 +50,51 @@ steps:
 - wait_for: '[data-testid="mail-client-tab"]'
 - mail_server_assert_list_matches:
     timeout_sec: 60
+    unread: true
 - wait_for:
     selector: '[data-testid="mail-idle-status"][data-active="true"]'
     timeout_sec: 30
 - mail_server_assert_idle_clients:
     equals: 1
     timeout_sec: 20
+- click: '[data-testid="shell-rail-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="mail-client-tab"]'
 - mail_server_deliver:
     count: 3
     prefix: Pushed
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- wait_for: '[data-testid="tao-alert-inbox-item"][data-target-kind="mail"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-target-kind="mail"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="tao-alert-inbox-item"][data-target-kind="mail"]'
+    name: data-alert-count
+    equals: '3'
+- mail_server_assert_idle_clients:
+    equals: 1
+    timeout_sec: 10
+- click: '[data-testid="tao-alert-inbox-item"][data-target-kind="mail"] [data-testid="tao-alert-jump"]'
+- wait_for: '[data-testid="mail-client-tab"][data-ready="true"]'
 - mail_server_assert_list_matches:
     timeout_sec: 15
+    unread: true
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
     contains: Pushed 0003
     timeout_sec: 10
 - screenshot: mail-idle-01-pushed.png
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-target-kind="mail"]'
+    equal: 0
+- click: '[data-testid="shell-rail-tao"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 15
+    unread: true
 - click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
 - wait_for:
     selector: '[data-testid="mail-client-tab"]'
@@ -71,44 +106,68 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 标签打开时，其他客户端投递的新邮件无需点击 Sync，15 秒内经 IDLE 推送出现在列表中，数量与服务器一致（AC-36）。
+    requirement: IDLE remains connected while the owner is hidden; exactly one aggregated count-3 alert
+      reveals the ready mail account before acknowledgement. The list and unread rows match the independent
+      server within 15 seconds, and close releases IDLE within 10 seconds.
     actions:
-    - 1
     - 2
     - 3
     - 5
     - 6
-    - 12
+    - 11
+    - 14
+    - 15
+    - 16
+    - 21
+    - 26
+    - 27
+    - 29
+    - 31
     checkpoints:
     - step: 8
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-idle-status\"][data-active=\"true\"]", "timeout_sec": 30}}'
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60, "unread": true}}'
     - step: 10
       expectation: '{"mail_server_assert_idle_clients": {"equals": 1, "timeout_sec": 20}}'
-    - step: 12
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 15}}'
     - step: 13
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Pushed 0003", "timeout_sec": 10}}'
-    results:
-    - 12
-    - 13
-  - id: R2
-    requirement: 关闭标签后 IDLE 连接在 10 秒内释放（AC-37，DEC-01 不做后台收信）。
-    actions:
-    - 15
-    checkpoints:
-    - step: 16
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
-    - step: 17
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-client-tab\"]"}'
+    - step: 18
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-target-kind=\"mail\"]",
+        "equal": 1}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-target-kind=\"mail\"]",
+        "name": "data-alert-count", "equals": "3"}}'
+    - step: 20
+      expectation: '{"mail_server_assert_idle_clients": {"equals": 1, "timeout_sec": 10}}'
+    - step: 23
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 15, "unread": true}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Pushed
+        0003", "timeout_sec": 10}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-target-kind=\"mail\"]",
+        "equal": 0}}'
+    - step: 30
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 15, "unread": true}}'
+    - step: 33
       expectation: '{"mail_server_assert_idle_clients": {"equals": 0, "timeout_sec": 10}}'
     results:
-    - 17
+    - 8
+    - 10
+    - 13
+    - 18
+    - 19
+    - 20
+    - 23
+    - 24
+    - 28
+    - 30
+    - 33
   visual:
-  - check: 截图中 Sync 旁显示 Push 状态，推送的邮件出现在列表顶部。
+  - check: Inspect unread counts, sync/IDLE status and the pushed subjects.
     method: manual
-    reason: 像素与布局需人工评审。
+    reason: Screenshots require a verdict; independent server assertions establish functional state.
   native:
-  - check: native 模式验证真实后端的 IDLE 线程、推送后的补齐以及关闭时断开连接；browser 仅验证渲染层编排；平台结果分别记录。
+  - check: Real IMAP IDLE watcher, pushed-message synchronization, unread preservation and close release.
     method: automated
-    reason: 按实际执行模式与平台解释证据。
+    reason: Native mode uses the real Tauri backend and local IMAP server; browser mode proves renderer
+      orchestration only.

@@ -1,5 +1,5 @@
 id: TC-SHELL-N05
-title: Real two-repository Git Host retains draft through a native window
+title: Real two-repository Git retains the latest child draft through destruction and normal OS close
 description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n05
   records the complete scenario and any remaining manual boundary.
 covers:
@@ -22,10 +22,9 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
     key: taomni.recentWorkspaces.v1
-    value: '[{"id": "shell-native", "name": "Shell Git", "roots": [{"id": "shell",
-      "name": "shell", "path": "${fixture.parity008_root}", "kind": "folder"}], "looseFiles":
-      [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind": "root",
-      "rootId": "shell", "path": "repo-a/same.txt"}}]'
+    value: '[{"id": "shell-native", "name": "Shell Git", "roots": [{"id": "shell", "name": "shell", "path":
+      "${fixture.parity008_root}", "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo":
+      false, "lastActiveFile": {"kind": "root", "rootId": "shell", "path": "repo-a/same.txt"}}]'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
@@ -42,34 +41,83 @@ steps:
 - wait_for:
     selector: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
     timeout_sec: 60
-- assert_items:
+- &id001
+  assert_items:
     selector: '[data-testid="workspace-change-row"]'
     attribute: aria-label
     equals:
     - repo-a same.txt Staged
     - repo-a untracked.txt Untracked
     - repo-b same.txt Modified
-- assert_file_sha256:
+- &id002
+  assert_file_sha256:
     path: ${fixture.parity008_repo_a}/.git/index
     equals: ${fixture.parity008_repo_a_index_sha256}
 - fill:
-    selector: textarea[placeholder*="Commit"]
+    selector: textarea[placeholder="Commit message"]
     value: SHELL-COMMIT
 - click: '[data-testid="shell-host-more"]'
 - click: '[data-testid="shell-panel-detach"]'
 - switch_window:
     route: '#git='
-- wait_for: '[data-testid="shell-git-window"]'
+- wait_for: '[data-testid="shell-git-window"][data-phase="ready"]'
+- assert_native_window_count:
+    equal: 2
 - assert_value:
-    selector: textarea[placeholder*="Commit"]
+    selector: textarea[placeholder="Commit message"]
     equals: SHELL-COMMIT
-- click: '[data-testid="shell-window-reattach"]'
+- fill:
+    selector: textarea[placeholder="Commit message"]
+    value: 'Child 中文 commit draft
+
+      Second paragraph'
+- assert_value:
+    selector: textarea[placeholder="Commit message"]
+    equals: 'Child 中文 commit draft
+
+      Second paragraph'
+- interrupt_detached_window: '#git='
 - switch_window:
     route: ''
 - wait_for: '[data-testid="shell-host"]'
+- assert_native_window_count:
+    equal: 1
+- assert_not_visible: '[data-testid="shell-detached-placeholder"]'
 - assert_value:
-    selector: textarea[placeholder*="Commit"]
-    equals: SHELL-COMMIT
+    selector: textarea[placeholder="Commit message"]
+    equals: 'Child 中文 commit draft
+
+      Second paragraph'
+- *id001
+- *id002
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-detach"]'
+- switch_window:
+    route: '#git='
+- wait_for: '[data-testid="shell-git-window"][data-phase="ready"]'
+- assert_native_window_count:
+    equal: 2
+- assert_value:
+    selector: textarea[placeholder="Commit message"]
+    equals: 'Child 中文 commit draft
+
+      Second paragraph'
+- fill:
+    selector: textarea[placeholder="Commit message"]
+    value: 'Normal return 中文
+
+      Final draft'
+- close_window: null
+- switch_window:
+    route: ''
+- wait_for: '[data-testid="shell-host"]'
+- assert_native_window_count:
+    equal: 1
+- assert_value:
+    selector: textarea[placeholder="Commit message"]
+    equals: 'Normal return 中文
+
+      Final draft'
 - assert_file_sha256:
     path: ${fixture.parity008_repo_a}/same.txt
     equals: ${fixture.parity008_repo_a_worktree_sha256}
@@ -81,8 +129,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Git Host reads both disposable repositories without modifying their
-      index or worktree.
+    requirement: Git Host reads both disposable repositories without modifying their index or worktree.
     actions:
     - 4
     - 5
@@ -93,23 +140,23 @@ verification:
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]
-        .cm-content", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
+        60}}'
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
     - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"]",
-        "name": "data-edge", "equals": "bottom"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"]", "name": "data-edge",
+        "equals": "bottom"}}'
     - step: 13
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-change-row\"][data-repo-root$=\"repo-b\"][data-path=\"same.txt\"]",
         "timeout_sec": 60}}'
     - step: 14
-      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-change-row\"]",
-        "attribute": "aria-label", "equals": ["repo-a same.txt Staged", "repo-a untracked.txt
-        Untracked", "repo-b same.txt Modified"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-change-row\"]", "attribute":
+        "aria-label", "equals": ["repo-a same.txt Staged", "repo-a untracked.txt Untracked", "repo-b same.txt
+        Modified"]}}'
     - step: 15
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/index",
-        "equals": "${fixture.parity008_repo_a_index_sha256}"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/index", "equals":
+        "${fixture.parity008_repo_a_index_sha256}"}}'
     results:
     - 6
     - 9
@@ -119,39 +166,93 @@ verification:
     - 14
     - 15
   - id: R2
-    requirement: Detaching and reattaching the real Git window returns the complete
-      commit draft.
+    requirement: Detaching creates one ready native child. Destroying it returns the full latest received
+      multiline draft and both repository rows to one source, with the original Git index unchanged.
     actions:
     - 16
     - 17
     - 18
     - 19
-    - 22
     - 23
+    - 25
+    - 26
     checkpoints:
     - step: 20
-      expectation: '{"wait_for": "[data-testid=\"shell-git-window\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-git-window\"][data-phase=\"ready\"]"}'
     - step: 21
-      expectation: '{"assert_value": {"selector": "textarea[placeholder*=\"Commit\"]",
-        "equals": "SHELL-COMMIT"}}'
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 22
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "SHELL-COMMIT"}}'
     - step: 24
-      expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
-    - step: 25
-      expectation: '{"assert_value": {"selector": "textarea[placeholder*=\"Commit\"]",
-        "equals": "SHELL-COMMIT"}}'
-    - step: 26
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/same.txt",
-        "equals": "${fixture.parity008_repo_a_worktree_sha256}"}}'
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "Child
+        中文 commit draft\nSecond paragraph"}}'
     - step: 27
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/same.txt",
-        "equals": "${fixture.parity008_repo_b_worktree_sha256}"}}'
+      expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
+    - step: 28
+      expectation: '{"assert_native_window_count": {"equal": 1}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-detached-placeholder\"]"}'
+    - step: 30
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "Child
+        中文 commit draft\nSecond paragraph"}}'
+    - step: 31
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-change-row\"]", "attribute":
+        "aria-label", "equals": ["repo-a same.txt Staged", "repo-a untracked.txt Untracked", "repo-b same.txt
+        Modified"]}}'
+    - step: 32
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/index", "equals":
+        "${fixture.parity008_repo_a_index_sha256}"}}'
     results:
     - 20
     - 21
+    - 22
     - 24
-    - 25
-    - 26
     - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+  - id: R3
+    requirement: A second detach receives the recovered draft; normal OS close returns its new multiline
+      edit to one source without modifying either worktree.
+    actions:
+    - 33
+    - 34
+    - 35
+    - 39
+    - 40
+    - 41
+    checkpoints:
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"shell-git-window\"][data-phase=\"ready\"]"}'
+    - step: 37
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 38
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "Child
+        中文 commit draft\nSecond paragraph"}}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
+    - step: 43
+      expectation: '{"assert_native_window_count": {"equal": 1}}'
+    - step: 44
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "Normal
+        return 中文\nFinal draft"}}'
+    - step: 45
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/same.txt", "equals":
+        "${fixture.parity008_repo_a_worktree_sha256}"}}'
+    - step: 46
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/same.txt", "equals":
+        "${fixture.parity008_repo_b_worktree_sha256}"}}'
+    results:
+    - 36
+    - 37
+    - 38
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
   visual:
   - check: Read final screenshot for clipped controls and retained content
     method: manual

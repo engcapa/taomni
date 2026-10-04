@@ -72,6 +72,7 @@ INTERACTIVE_VERBS = {
     "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "upload_file",
     "set_check", "send_text_via_label", "open_session", "click_menu",
     "quick_connect", "auth", "attach_sftp", "set_remote_path",
+    "shell_navigate", "choose_file", "download_file",
 }
 DISPLAY_VERBS = {
     "assert_text_equals", "assert_items",
@@ -161,6 +162,14 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
     rich form; the path key is a filename and must NOT be reported.
     """
     out: list[str] = []
+    if verb == "shell_navigate":
+        if args == "tools":
+            return ['[data-testid="shell-rail-workspaces"]', '[data-testid="shell-navigator-page"][data-page="tools"]']
+        if args == "sessions":
+            return ['[data-testid="shell-rail-sessions"]']
+        return out
+    if verb in {"choose_file", "download_file"} and isinstance(args, dict):
+        return [args["trigger"]] if isinstance(args.get("trigger"), str) else []
     # Short form: `click: '[data-testid="x"]'` → args is a string.
     if isinstance(args, str):
         # `type`/`send_keys`/`press` short-forms take a literal string that is

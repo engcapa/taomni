@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatDrawer, ChatDrawerRibbon } from "./ChatDrawer";
+import { AppDialogProvider } from "../../lib/appDialogs";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore, type ChatThread } from "../../stores/chatStore";
 import { useTaoHubStore } from "../../stores/taoHubStore";
@@ -637,8 +638,12 @@ describe("ChatDrawer layout resizing", () => {
     expect(useAppStore.getState().activeTabId).toBe("mail-1");
     expect(useTaoAlertStore.getState().mailNew).toHaveLength(2);
     const target = document.createElement("div"); target.dataset.testid = "mail-client-tab"; target.dataset.accountId = "acct-1";
+    target.dataset.ready = "false";
     vi.spyOn(target, "getBoundingClientRect").mockReturnValue({ width: 400, height: 300 } as DOMRect);
     document.body.appendChild(target);
+    await new Promise((resolve) => setTimeout(resolve, 75));
+    expect(useTaoAlertStore.getState().mailNew).toHaveLength(2);
+    target.dataset.ready = "true";
     await waitFor(() => expect(useTaoAlertStore.getState().mailNew.map((alert) => alert.mailTabId)).toEqual(["mail-2"]));
     target.remove();
   });
@@ -660,7 +665,7 @@ describe("ChatDrawer layout resizing", () => {
       ],
     });
 
-    render(<ChatDrawer />);
+    render(<AppDialogProvider><ChatDrawer /></AppDialogProvider>);
 
     expect(screen.getByTestId("tao-alert-inbox-item")).toBeInTheDocument();
     expect(screen.queryByTestId("tao-alert-history-result")).not.toBeInTheDocument();
@@ -673,7 +678,13 @@ describe("ChatDrawer layout resizing", () => {
     expect(screen.getByTestId("tao-alert-history-result")).toHaveTextContent("Work mail");
 
     fireEvent.click(screen.getByTestId("tao-alert-history-clear"));
-    expect(screen.queryByTestId("tao-alert-history-result")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("confirm-dialog-cancel"));
+    await waitFor(() => expect(screen.queryByTestId("confirm-dialog")).not.toBeInTheDocument());
+    expect(screen.getByTestId("tao-alert-history-result")).toHaveTextContent("Work mail");
+    expect(useTaoAlertStore.getState().history).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("tao-alert-history-clear"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(screen.queryByTestId("tao-alert-history-result")).not.toBeInTheDocument());
     expect(useTaoAlertStore.getState().history).toHaveLength(0);
   });
 });

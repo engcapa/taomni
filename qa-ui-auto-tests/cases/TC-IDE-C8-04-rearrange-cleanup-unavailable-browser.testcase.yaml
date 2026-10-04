@@ -1,6 +1,7 @@
 id: TC-IDE-C8-04-rearrange-cleanup-unavailable-browser
 title: Rearrange and Cleanup unavailable provider reports honest message in browser
-description: 'Browser gate case (ED-STYLE-002, ED-AUDIT-015/016). Opens an active file
+description: 'Browser gate case (ED-STYLE-002, ED-AUDIT-015/016). Opens an active
+  file
 
   in the code workspace, invokes Rearrange Code and Code Cleanup from Search
 
@@ -10,7 +11,10 @@ description: 'Browser gate case (ED-STYLE-002, ED-AUDIT-015/016). Opens an activ
 
   (zero commit, no fake success).
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -28,7 +32,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -45,7 +49,8 @@ steps:
     timeout_sec: 30
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
-    value: "public class Sample {\n    public void beta() {}\n    public void alpha() {}\n}"
+    value: "public class Sample {\n    public void beta() {}\n    public void alpha()
+      {}\n}"
 - click: '[data-testid="code-workspace-tab"]'
 - wait: 0.3
 - press: Control+Shift+N
@@ -53,7 +58,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Rearrange Code
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Rearrange Code'
 - assert_text:
@@ -73,7 +79,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Code Cleanup
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Code Cleanup'
 - assert_text:
@@ -102,14 +109,16 @@ verification:
     - 23
     checkpoints:
     - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "finish synchronizing
-        current editor buffers", "timeout_sec": 20}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]",
+        "contains": "finish synchronizing current editor buffers", "timeout_sec":
+        20}}'
     - step: 25
-      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
-        "equals": ["public class Sample {", "    public void beta() {}", "    public void alpha() {}", "}"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content .cm-line", "equals": ["public class Sample {", "    public void
+        beta() {}", "    public void alpha() {}", "}"]}}'
     results:
     - 24
     - 25
@@ -123,14 +132,16 @@ verification:
     - 32
     checkpoints:
     - step: 28
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "finish synchronizing
-        current editor buffers", "timeout_sec": 20}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]",
+        "contains": "finish synchronizing current editor buffers", "timeout_sec":
+        20}}'
     - step: 34
-      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
-        "equals": ["public class Sample {", "    public void beta() {}", "    public void alpha() {}", "}"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content .cm-line", "equals": ["public class Sample {", "    public void
+        beta() {}", "    public void alpha() {}", "}"]}}'
     results:
     - 33
     - 34

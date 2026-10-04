@@ -1,4 +1,4 @@
-export type ShellAction = "shell.home" | "shell.quickSwitch" | "shell.overview" | "shell.navigator.toggle" | "shell.panel.open" | "shell.tao.toggle" | "shell.layout.reset";
+export type ShellAction = "shell.home" | "shell.quickSwitch" | "shell.overview" | "shell.navigator.toggle" | "shell.panel.open" | "shell.panels.recent" | "shell.tao.toggle" | "shell.layout.reset";
 const handlers = new Map<ShellAction, () => void | Promise<void>>();
 export function registerShellActions(actions: Partial<Record<ShellAction, () => void | Promise<void>>>): () => void {
   for (const [id, handler] of Object.entries(actions)) handlers.set(id as ShellAction, handler);

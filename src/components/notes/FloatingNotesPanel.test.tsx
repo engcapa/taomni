@@ -127,6 +127,7 @@ describe("FloatingNotesPanel", () => {
     await waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith("open_detached_window", {
         kind: "notes",
+        operationId: expect.any(String),
         sessionId: "panel",
         title: "Notes",
         x: DEFAULT_NOTES_PANEL_POSITION.x,

@@ -1,0 +1,709 @@
+id: TC-SHELL-B26
+title: Notifications preserve failed jumps, cap history, count 101 notes and route terminal transfer events
+description: Workspace Shell v2 production workflow; docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b26.
+  Browser service fixtures do not establish native effects. Chat source is covered by TC-SHELL-B25; Mail
+  IDLE source and native mailbox effects by TC-MAIL-IDLE-01. This case supplies complementary Notes and
+  transfer failure/dedupe/history/badge assertions.
+covers:
+- F-TAO-1
+- F-SHELL-1
+- F7.4
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- wait_for: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-001:overdue"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 101
+- assert_text_equals:
+    selector: '[data-testid="tao-hub-notifications-badge"]'
+    equals: 99+
+- assert_attribute:
+    selector: '[data-testid="tao-hub-notifications-badge"]'
+    name: aria-label
+    matches: ^101[^0-9].*$
+- assert_count:
+    selector: '[data-testid="tao-alert-history-result"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="tao-alert-history-search"]'
+    value: SHELL
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.taoAlerts.history.v1')).length===300
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="tao-alert-history-result"]'
+    equal: 199
+- click: '[data-testid="tao-alert-history-limit-30"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.taoAlerts.history.v1')).length===30
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="tao-alert-history-result"]'
+    equal: 0
+- assert_attribute:
+    selector: '[data-testid="tao-alert-history-limit-30"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="tao-alert-history-limit-300"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.taoAlerts.history.v1')).length===30
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="tao-alert-history-result"]'
+    equal: 0
+- click: '[data-testid="tao-alert-history-clear"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.taoAlerts.history.v1')).length===30
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="tao-alert-history-result"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 101
+- click: '[data-testid="tao-alert-history-clear"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.taoAlerts.history.v1')).length===0
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="tao-alert-history-result"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 101
+- fill:
+    selector: '[data-testid="tao-alert-history-search"]'
+    value: ''
+- assert_count:
+    selector: '[data-testid="tao-alert-history-result"]'
+    equal: 0
+- shell_backend_scenario:
+    action: fail-next
+    command: notes_get
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-001:overdue"] [data-testid="tao-alert-jump"]'
+- wait_for: '[data-testid="shell-target-error"]'
+- assert_attribute:
+    selector: '[data-testid="shell-target-error"]'
+    name: role
+    equals: alert
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 101
+- assert_shell_backend:
+    command: notes_ack_alert
+    count: 0
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-001:overdue"] [data-testid="tao-alert-jump"]'
+- wait_for: '[data-testid="note-editor"][data-note-id="shell-note-001"]'
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'Note 1 中文 full body
+
+      Second paragraph'
+- assert_attribute:
+    selector: '[data-testid="note-editor-complete"]'
+    name: aria-pressed
+    equals: 'false'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 100
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-001:overdue"]'
+    equal: 0
+- assert_shell_backend:
+    command: notes_ack_alert
+    count: 1
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-002:overdue"] [data-testid="tao-alert-ack"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 99
+- assert_text_equals:
+    selector: '[data-testid="tao-hub-notifications-badge"]'
+    equals: '99'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-003:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-004:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-005:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-006:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-007:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-008:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-009:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-010:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-011:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-012:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-013:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-014:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-015:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-016:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-017:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-018:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-019:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-020:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-021:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-022:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-023:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-024:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-025:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-026:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-027:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-028:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-029:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-030:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-031:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-032:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-033:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-034:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-035:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-036:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-037:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-038:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-039:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-040:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-041:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-042:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-043:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-044:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-045:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-046:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-047:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-048:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-049:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-050:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-051:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-052:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-053:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-054:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-055:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-056:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-057:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-058:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-059:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-060:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-061:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-062:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-063:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-064:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-065:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-066:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-067:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-068:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-069:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-070:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-071:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-072:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-073:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-074:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-075:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-076:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-077:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-078:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-079:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-080:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-081:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-082:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-083:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-084:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-085:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-086:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-087:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-088:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-089:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-090:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-091:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-092:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-093:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-094:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-095:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-096:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-097:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-098:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-099:overdue"] [data-testid="tao-alert-ack"]'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-100:overdue"] [data-testid="tao-alert-ack"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-101:overdue"]'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="tao-hub-notifications-badge"]'
+    equals: '1'
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-id="note:shell-note-101:overdue"] [data-testid="tao-alert-ack"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 0
+- assert_not_visible: '[data-testid="tao-hub-notifications-badge"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="note-editor-back"]'
+- assert_count:
+    selector: '[data-testid="notes-list-item"]'
+    equal: 101
+- click: '[data-testid="shell-rail-tao"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- click: '[data-testid="sftp-remote-list"] tr[data-row][title="/home/qa/job.txt"]'
+- click: '[data-testid="sftp-remote-download-selected"]'
+- wait_for: '[data-testid="transfer-job"][data-session-id*="shell-a"][data-state="running"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-b"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- click: '[data-testid="sftp-remote-list"] tr[data-row][title="/home/qa/job.txt"]'
+- click: '[data-testid="sftp-remote-download-selected"]'
+- wait_for: '[data-testid="transfer-job"][data-session-id*="shell-b"][data-state="running"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 0
+- shell_transfer_scenario:
+    action: complete
+    owner: alpha.invalid
+- shell_transfer_scenario:
+    action: fail
+    owner: beta.invalid
+- wait_for: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_failed"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_done"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_failed"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 2
+- shell_transfer_scenario:
+    action: replay
+    owner: alpha.invalid
+- shell_transfer_scenario:
+    action: replay
+    owner: beta.invalid
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 2
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_failed"] [data-testid="tao-alert-jump"]'
+- wait_for: '[data-testid="transfer-job"][data-session-id*="shell-b"][data-state="error"]'
+- assert_text:
+    selector: '[data-testid="shell-host-owner"]'
+    contains: qa-beta
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_failed"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_done"]'
+    equal: 1
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_done"] [data-testid="tao-alert-jump"]'
+- wait_for: '[data-testid="transfer-job"][data-session-id*="shell-a"][data-state="done"]'
+- assert_text:
+    selector: '[data-testid="shell-host-owner"]'
+    contains: qa-alpha
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 0
+- shell_transfer_scenario:
+    action: replay
+    owner: alpha.invalid
+- shell_transfer_scenario:
+    action: replay
+    owner: beta.invalid
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="tao-alert-history-search"]'
+    value: job.txt
+- assert_count:
+    selector: '[data-testid="tao-alert-history-result"]'
+    equal: 2
+- screenshot: tc-shell-b26-notifications.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: History retains at most 300 occurrences including the 101 pending Notes; search excludes
+      those live occurrences (199 historical results). Reducing capacity to 30 persists exactly 30 and
+      does not resurrect trimmed entries when capacity returns to 300.
+    actions:
+    - 1
+    - 3
+    - 4
+    - 10
+    - 13
+    - 17
+    checkpoints:
+    - step: 6
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 101}}'
+    - step: 7
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"tao-hub-notifications-badge\"]",
+        "equals": "99+"}}'
+    - step: 8
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tao-hub-notifications-badge\"]",
+        "name": "aria-label", "matches": "^101[^0-9].*$"}}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-history-result\"]", "equal":
+        0}}'
+    - step: 11
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.taoAlerts.history.v1'')).length===300",
+        "expect_truthy": true}}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-history-result\"]", "equal":
+        199}}'
+    - step: 14
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.taoAlerts.history.v1'')).length===30",
+        "expect_truthy": true}}'
+    - step: 15
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-history-result\"]", "equal":
+        0}}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tao-alert-history-limit-30\"]",
+        "name": "aria-pressed", "equals": "true"}}'
+    - step: 18
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.taoAlerts.history.v1'')).length===30",
+        "expect_truthy": true}}'
+    - step: 19
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-history-result\"]", "equal":
+        0}}'
+    results:
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+  - id: R2
+    requirement: History clear cancellation preserves the 30 stored occurrences; confirmation removes
+      them while all 101 pending alerts remain.
+    actions:
+    - 20
+    - 22
+    - 27
+    - 29
+    - 34
+    checkpoints:
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 24
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.taoAlerts.history.v1'')).length===30",
+        "expect_truthy": true}}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-history-result\"]", "equal":
+        0}}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 101}}'
+    - step: 30
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.taoAlerts.history.v1'')).length===0",
+        "expect_truthy": true}}'
+    - step: 32
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-history-result\"]", "equal":
+        0}}'
+    - step: 33
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 101}}'
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-history-result\"]", "equal":
+        0}}'
+    results:
+    - 23
+    - 24
+    - 25
+    - 26
+    - 30
+    - 31
+    - 32
+    - 33
+    - 35
+  - id: R3
+    requirement: An unavailable Notes boundary keeps its alert pending and makes no acknowledgement; retry
+      reveals the exact incomplete note before acknowledgement.
+    actions:
+    - 36
+    - 37
+    - 42
+    - 46
+    - 50
+    checkpoints:
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-target-error\"]", "name":
+        "role", "equals": "alert"}}'
+    - step: 40
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 101}}'
+    - step: 41
+      expectation: '{"assert_shell_backend": {"command": "notes_ack_alert", "count": 0}}'
+    - step: 44
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Note
+        1 中文 full body\nSecond paragraph"}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"note-editor-complete\"]", "name":
+        "aria-pressed", "equals": "false"}}'
+    - step: 47
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 100}}'
+    - step: 48
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-id=\"note:shell-note-001:overdue\"]",
+        "equal": 0}}'
+    - step: 49
+      expectation: '{"assert_shell_backend": {"command": "notes_ack_alert", "count": 1}}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 99}}'
+    - step: 52
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"tao-hub-notifications-badge\"]",
+        "equals": "99"}}'
+    results:
+    - 39
+    - 40
+    - 41
+    - 44
+    - 45
+    - 47
+    - 48
+    - 49
+    - 51
+    - 52
+  - id: R4
+    requirement: Acknowledging each distinct overdue alert preserves the note records and reaches the
+      exact badge boundaries 1 and 0.
+    actions:
+    - 53
+    - 54
+    - 55
+    - 56
+    - 57
+    - 58
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 75
+    - 76
+    - 77
+    - 78
+    - 79
+    - 80
+    - 81
+    - 82
+    - 83
+    - 84
+    - 85
+    - 86
+    - 87
+    - 88
+    - 89
+    - 90
+    - 91
+    - 92
+    - 93
+    - 94
+    - 95
+    - 96
+    - 97
+    - 98
+    - 99
+    - 100
+    - 101
+    - 102
+    - 103
+    - 104
+    - 105
+    - 106
+    - 107
+    - 108
+    - 109
+    - 110
+    - 111
+    - 112
+    - 113
+    - 114
+    - 115
+    - 116
+    - 117
+    - 118
+    - 119
+    - 120
+    - 121
+    - 122
+    - 123
+    - 124
+    - 125
+    - 126
+    - 127
+    - 128
+    - 129
+    - 130
+    - 131
+    - 132
+    - 133
+    - 134
+    - 135
+    - 136
+    - 137
+    - 138
+    - 139
+    - 140
+    - 141
+    - 142
+    - 143
+    - 144
+    - 145
+    - 146
+    - 147
+    - 148
+    - 149
+    - 150
+    - 154
+    - 157
+    - 158
+    - 160
+    checkpoints:
+    - step: 151
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 1}}'
+    - step: 152
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-id=\"note:shell-note-101:overdue\"]",
+        "equal": 1}}'
+    - step: 153
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"tao-hub-notifications-badge\"]",
+        "equals": "1"}}'
+    - step: 155
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 0}}'
+    - step: 156
+      expectation: '{"assert_not_visible": "[data-testid=\"tao-hub-notifications-badge\"]"}'
+    - step: 159
+      expectation: '{"assert_count": {"selector": "[data-testid=\"notes-list-item\"]", "equal": 101}}'
+    - step: 161
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    results:
+    - 151
+    - 152
+    - 153
+    - 155
+    - 156
+    - 159
+    - 161
+  - id: R5
+    requirement: Separate owner jobs emit one completed and one failed notification; progress itself creates
+      no notification.
+    actions:
+    - 162
+    - 163
+    - 165
+    - 167
+    - 168
+    - 170
+    - 171
+    - 173
+    - 175
+    - 176
+    - 178
+    - 179
+    - 181
+    - 182
+    - 187
+    - 188
+    checkpoints:
+    - step: 180
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 0}}'
+    - step: 184
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-kind=\"transfer_done\"]",
+        "equal": 1}}'
+    - step: 185
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-kind=\"transfer_failed\"]",
+        "equal": 1}}'
+    - step: 186
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 2}}'
+    - step: 189
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 2}}'
+    results:
+    - 180
+    - 184
+    - 185
+    - 186
+    - 189
+  - id: R6
+    requirement: Each transfer notification reveals its own owner and exact final job; duplicate terminal
+      events cannot recreate an acknowledged notification.
+    actions:
+    - 190
+    - 193
+    - 194
+    - 197
+    - 200
+    - 201
+    - 203
+    - 204
+    - 206
+    checkpoints:
+    - step: 192
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host-owner\"]", "contains": "qa-beta"}}'
+    - step: 195
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-kind=\"transfer_failed\"]",
+        "equal": 0}}'
+    - step: 196
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-kind=\"transfer_done\"]",
+        "equal": 1}}'
+    - step: 199
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host-owner\"]", "contains": "qa-alpha"}}'
+    - step: 202
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 0}}'
+    - step: 205
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"]", "equal": 0}}'
+    - step: 207
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-history-result\"]", "equal":
+        2}}'
+    results:
+    - 192
+    - 195
+    - 196
+    - 199
+    - 202
+    - 205
+    - 207
+  visual:
+  - check: Inspect the retained screenshot for readable controls, job state and clipping.
+    method: manual
+    reason: A screenshot needs a visual verdict in addition to functional assertions.
+  native:
+  - check: Real transfer bytes, backend resource leases and window/OS behavior
+    method: external
+    reason: Browser fixtures prove renderer routing. Native boundaries are recorded separately under V-N03/N04.

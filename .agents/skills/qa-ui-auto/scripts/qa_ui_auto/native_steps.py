@@ -1595,6 +1595,21 @@ def _do_wait_for(ctx: NativeStepContext, args: Any) -> str:
     return _wait_for(ctx, args)
 
 
+@_verb("shell_navigate")
+def _do_shell_navigate(ctx: NativeStepContext, args: Any) -> str:
+    if args not in {"sessions", "tools"}:
+        raise StepError("shell_navigate: expected sessions or tools")
+    area = "sessions" if args == "sessions" else "workspaces"
+    target = '[data-testid="session-tree"]' if args == "sessions" else '[data-testid="shell-navigator-page"][data-page="tools"]'
+    if not _element_has_layout(ctx, target):
+        ctx.session.click(f'[data-testid="shell-rail-{area}"]')
+    _wait_for(ctx, target)
+    if args == "tools":
+        ctx.session.click(target)
+        _wait_for(ctx, '[data-testid="sidebar-tools-panel"]')
+    return f"opened {args} through Shell Rail"
+
+
 @_verb("wait")
 def _do_wait(ctx: NativeStepContext, args: Any) -> str:
     seconds = float(args if isinstance(args, (int, float)) else (args or {}).get("seconds", 1))
@@ -1832,6 +1847,12 @@ def _do_assert_file_receipt(ctx: NativeStepContext, args: Any) -> str:
 @_verb("assert_file_sha256")
 def _do_assert_file_sha256(ctx: NativeStepContext, args: Any) -> str:
     return _assert_file_sha256(ctx, args)
+
+
+@_verb("assert_file_progress")
+def _do_assert_file_progress(ctx, args):
+    from .file_progress import assert_file_progress
+    return assert_file_progress(ctx, args)
 
 
 @_verb("native_set_writable")
@@ -3206,8 +3227,57 @@ def _do_set_viewport(ctx, args):
 
 @_verb("close_window")
 def _do_close_window(ctx, args):
-    ctx.session.request("DELETE", ctx.session.endpoint("/window"))
-    return "requested native window close"
+    # Chromium's DELETE /window can close only the WebView target and skip the
+    # Tauri window lifecycle. Use the native window close request on every OS.
+    script = (
+        "const done = arguments[arguments.length - 1];"
+        "const selected = window.__TAURI__.window.getCurrentWindow();"
+        "done({scheduled: true});"
+        "setTimeout(() => selected.close(), 0);"
+    )
+    result = ctx.session.request("POST", ctx.session.endpoint("/execute/async"), {"script": script, "args": []})
+    if result != {"scheduled": True}:
+        raise StepError(f"close_window: native close request was not scheduled: {result!r}")
+    return "scheduled a real Tauri window close request; assert the product outcome in the surviving window"
+
+
+@_verb("interrupt_detached_window")
+def _do_interrupt_detached_window(ctx, args):
+    """Fault only the selected QA child, bypassing its cooperative close hook."""
+    from .window_routes import matches_window_route
+    route = str(args)
+    if route not in {"#notes=", "#git=", "#sftp="}:
+        raise StepError("interrupt_detached_window: expected a supported child route")
+    url = ctx.session.request("GET", ctx.session.endpoint("/url"))
+    if not matches_window_route(url, route):
+        raise StepError("interrupt_detached_window: selected window is not the requested QA child")
+    script = (
+        "const done = arguments[arguments.length - 1];"
+        "done({scheduled: true});"
+        "setTimeout(() => window.__TAURI__.core.invoke('close_current_detached_window'), 0);"
+    )
+    result = ctx.session.request("POST", ctx.session.endpoint("/execute/async"), {"script": script, "args": []})
+    if result != {"scheduled": True}:
+        raise StepError(f"interrupt_detached_window: fault was not scheduled: {result!r}")
+    return f"scheduled real destruction of the selected isolated QA child {route}; assert recovery in its parent"
+
+
+@_verb("assert_native_window_count")
+def _do_assert_native_window_count(ctx, args):
+    deadline = time.monotonic() + args.get("timeout_sec", 10)
+    observed = []
+    samples = []
+    while time.monotonic() < deadline:
+        observed = ctx.session.request("GET", ctx.session.endpoint("/window/handles"))
+        samples.append({"handles": observed, "count": len(observed)})
+        if len(observed) == args["equal"]:
+            with (ctx.case_dir / "native-window-counts.jsonl").open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps({"expected": args["equal"], "passed": True, "samples": samples}) + "\n")
+            return f"isolated QA native window count is {len(observed)}"
+        time.sleep(.1)
+    with (ctx.case_dir / "native-window-counts.jsonl").open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps({"expected": args["equal"], "passed": False, "samples": samples}) + "\n")
+    raise StepError(f"native window count {len(observed)} does not equal {args['equal']}; handles {observed!r}")
 
 
 @_verb("restart_native_app")
@@ -3216,13 +3286,28 @@ def _do_restart_native_app(ctx, args):
     return "restarted isolated QA process with the same profile"
 
 
+@_verb("mysql_assert_rows")
+def _do_mysql_assert_rows(ctx, args):
+    from .mysql_observation import assert_rows
+    assert_rows(ctx.cfg, args, ctx.case_dir)
+    return "independent read-only connection observed the expected committed rows"
+
+
+@_verb("native_app_process")
+def _do_native_app_process(ctx, args):
+    from .native_processes import observe
+    observe(ctx, args)
+    return "observed the exact run-owned QA application process " + args["state"]
+
+
 @_verb("assert_value")
 def _do_assert_value(ctx, args):
     deadline = time.monotonic() + args.get("timeout_sec", 10)
+    pattern = re.compile(args["regex"]) if "regex" in args else None
     value = None
     while time.monotonic() < deadline:
         value = ctx.session.execute("return document.querySelector(" + json.dumps(args["selector"]) + ")?.value ?? null;")
-        if value == args["equals"]:
-            return "input value equals expected content"
+        if value is not None and (pattern.search(value) is not None if pattern else value == args["equals"]):
+            return "input value matches expected content"
         time.sleep(.1)
-    raise StepError(f"{args['selector']}: input value {value!r} does not equal {args['equals']!r}")
+    raise StepError(f"{args['selector']}: input value {value!r} does not match {args.get('equals', args.get('regex'))!r}")

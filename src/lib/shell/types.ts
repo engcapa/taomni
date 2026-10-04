@@ -30,6 +30,7 @@ export interface PanelInstance {
 export type PanelVisibility = "visible" | "hidden" | "suppressed-by-tao" | "inactive-owner" | "detached-placeholder";
 export type ShellRestoreSource =
   | { kind: "run-entry"; identity: string }
+  | { kind: "unsupported"; identity: string; originalKind: string; title: string }
   | { kind: "workspace"; workspaceInstanceId: string; workspace: CodeWorkspaceTabInfo };
 export interface PanelPreference { edge: "right" | "bottom"; size: number; pinned: boolean }
 export interface PersistedShellLayoutV2 {
@@ -88,7 +89,7 @@ export interface PanelWindowEnvelope {
   panelId: string;
   generation: number;
   windowLabel: string;
-  event: "ready" | "failed" | "request-reattach" | "reattached" | "closed" | "commit" | "cancel" | "request-focus";
+  event: "ready" | "failed" | "request-reattach" | "reattached" | "closed" | "commit" | "committed" | "cancel" | "request-focus" | "snapshot";
   errorCode?: string;
   snapshotRef?: string;
 }

@@ -1,0 +1,515 @@
+id: TC-SHELL-N03
+title: Real SFTP bytes survive pause, hidden views and explicit background owner close
+description: 'V-N03: standalone SFTP owners use the real Tauri SSH/SFTP client against an isolated loopback
+  protocol endpoint. Independent service files, byte samples and hashes establish native effects. Interrupted
+  uploads deliberately retain the original product partial-file policy. No OS picker is required: upload
+  uses the real local pane selection.'
+covers:
+- F7.4
+- F-SHELL-1
+- F-TAO-1
+tags:
+- p1
+- workspace-shell
+modes:
+- native
+fixtures:
+- reset_db
+- shell_sftp_server
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-sftp-password
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- shell_navigate: sessions
+- click: '[data-testid="session-new"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    timeout_sec: 15
+- click: '[data-testid="session-proto-sftp"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.shell_sftp_port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: SHELL-SFTP-ALPHA
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="session-tree-item"][data-session-name="SHELL-SFTP-ALPHA"]'
+    timeout_sec: 15
+- dblclick: '[data-testid="session-tree-item"][data-session-name="SHELL-SFTP-ALPHA"]'
+- wait_for:
+    selector: '[data-testid="auth-prompt"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SHELL_SFTP_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="sftp-remote-list"]'
+    timeout_sec: 15
+- click: '[data-testid="sftp-local-path-edit"]'
+- fill:
+    selector: input[data-testid="sftp-local-path"]
+    value: ${fixture.shell_sftp_local}
+- press: Enter
+- wait_for:
+    selector: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+    timeout_sec: 15
+- click: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+- click: '[data-testid="sftp-local-upload-selected"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-remote-path$="/upload 中文.bin"][data-state="running"]'
+    timeout_sec: 15
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="transfer-job"][data-remote-path$="/upload 中文.bin"] [data-testid="transfer-job-pause"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-remote-path$="/upload 中文.bin"][data-state="paused"]'
+    timeout_sec: 15
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: stable
+    full_size: 16777216
+- click: '[data-testid="transfer-job"][data-remote-path$="/upload 中文.bin"] [data-testid="transfer-job-resume"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-remote-path$="/upload 中文.bin"][data-state="running"]'
+    timeout_sec: 15
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for:
+    selector: '[data-testid="ai-chat-drawer"]'
+    timeout_sec: 15
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="shell-rail-tao"]'
+- shell_navigate: sessions
+- click: '[data-testid="session-new"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    timeout_sec: 15
+- click: '[data-testid="session-proto-sftp"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.shell_sftp_port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: SHELL-SFTP-BETA
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="session-tree-item"][data-session-name="SHELL-SFTP-BETA"]'
+    timeout_sec: 15
+- dblclick: '[data-testid="session-tree-item"][data-session-name="SHELL-SFTP-BETA"]'
+- wait_for:
+    selector: '[data-testid="auth-prompt"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SHELL_SFTP_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="sftp-remote-list"]'
+    timeout_sec: 15
+- click: '[data-testid="sftp-local-path-edit"]'
+- fill:
+    selector: input[data-testid="sftp-local-path"]
+    value: ${fixture.shell_sftp_local}
+- press: Enter
+- wait_for:
+    selector: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+    timeout_sec: 15
+- click: '[data-testid="tab-item"][data-tab-title^="SHELL-SFTP-ALPHA"]'
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="shell-close-dialog"]'
+    timeout_sec: 15
+- assert_disabled: '[data-testid="shell-close-confirm"]'
+- click: '[data-testid="shell-close-cancel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-title^="SHELL-SFTP-ALPHA"]'
+    equal: 1
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="shell-close-background"]'
+    timeout_sec: 15
+- click: '[data-testid="shell-close-background"]'
+- click: '[data-testid="shell-close-confirm"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-title^="SHELL-SFTP-ALPHA"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-title^="SHELL-SFTP-BETA"]'
+    equal: 1
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="shell-transfers-trigger"]'
+- wait_for:
+    selector: '[data-testid="shell-transfers"]'
+    timeout_sec: 15
+- wait_for:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/upload
+      中文.bin"][data-state="done"]'
+    timeout_sec: 90
+- assert_file_sha256:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    equals: ${fixture.shell_sftp_sha256}
+    timeout_sec: 90
+- click: '[data-testid="shell-transfers-close"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- wait_for:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_done"]'
+    timeout_sec: 15
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_done"] [data-testid="tao-alert-jump"]'
+- wait_for:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/upload
+      中文.bin"][data-state="done"]'
+    timeout_sec: 15
+- click: '[data-testid="shell-transfers-close"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-kind="transfer_done"]'
+    equal: 0
+- click: '[data-testid="shell-rail-tao"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="tab-item"][data-tab-title^="SHELL-SFTP-BETA"]'
+- wait_for:
+    selector: '[data-testid="sftp-local-list"]'
+    timeout_sec: 15
+- click: '[data-testid="sftp-local-list"] tr[data-row][title$="cancel 中文.bin"]'
+- click: '[data-testid="sftp-local-upload-selected"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-remote-path$="/cancel 中文.bin"][data-state="running"]'
+    timeout_sec: 15
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/cancel 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="shell-close-cancel-job"]'
+    timeout_sec: 15
+- click: '[data-testid="shell-close-cancel-job"]'
+- click: '[data-testid="shell-close-confirm"]'
+- assert_not_visible: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-title^="SHELL-SFTP-BETA"]'
+    equal: 0
+- click: '[data-testid="shell-transfers-trigger"]'
+- wait_for:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel
+      中文.bin"][data-state="cancelled"]'
+    timeout_sec: 15
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/cancel 中文.bin
+    state: incomplete
+    full_size: 16777216
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/cancel 中文.bin
+    state: stable
+    full_size: 16777216
+- assert_file_sha256:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    equals: ${fixture.shell_sftp_sha256}
+    timeout_sec: 90
+- assert_count:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-state="running"]'
+    equal: 0
+- screenshot: tc-shell-n03-real-sftp.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real Tauri SFTP uploads Chinese-named 16MiB bytes; external host sampling proves growth,
+      paused stability and resumed growth.
+    actions:
+    - 1
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 18
+    - 19
+    - 21
+    - 22
+    - 23
+    - 25
+    - 26
+    - 29
+    - 32
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-panel\"]", "timeout_sec": 60}}'
+    - step: 6
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "timeout_sec": 15}}'
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL-SFTP-ALPHA\"]",
+        "timeout_sec": 15}}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "timeout_sec": 15}}'
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"]", "timeout_sec": 15}}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
+        中文.bin\"]", "timeout_sec": 15}}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload
+        中文.bin\"][data-state=\"running\"]", "timeout_sec": 15}}'
+    - step: 28
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload
+        中文.bin\"][data-state=\"paused\"]", "timeout_sec": 15}}'
+    - step: 31
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "stable", "full_size": 16777216}}'
+    - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload
+        中文.bin\"][data-state=\"running\"]", "timeout_sec": 15}}'
+    - step: 34
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    results:
+    - 3
+    - 6
+    - 15
+    - 17
+    - 20
+    - 24
+    - 27
+    - 28
+    - 30
+    - 31
+    - 33
+    - 34
+  - id: R2
+    requirement: Hidden views preserve transfer growth; cancelling owner close preserves Alpha, explicit
+      background handoff removes only Alpha while Beta survives.
+    actions:
+    - 35
+    - 36
+    - 39
+    - 40
+    - 41
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 52
+    - 54
+    - 55
+    - 57
+    - 58
+    - 59
+    - 61
+    - 62
+    - 65
+    - 67
+    - 69
+    - 70
+    checkpoints:
+    - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ai-chat-drawer\"]", "timeout_sec": 15}}'
+    - step: 38
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "timeout_sec": 15}}'
+    - step: 51
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL-SFTP-BETA\"]",
+        "timeout_sec": 15}}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "timeout_sec": 15}}'
+    - step: 56
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"]", "timeout_sec": 15}}'
+    - step: 60
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
+        中文.bin\"]", "timeout_sec": 15}}'
+    - step: 63
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-close-dialog\"]", "timeout_sec": 15}}'
+    - step: 64
+      expectation: '{"assert_disabled": "[data-testid=\"shell-close-confirm\"]"}'
+    - step: 66
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-title^=\"SHELL-SFTP-ALPHA\"]",
+        "equal": 1}}'
+    - step: 68
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-close-background\"]", "timeout_sec":
+        15}}'
+    - step: 71
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 72
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-title^=\"SHELL-SFTP-ALPHA\"]",
+        "equal": 0}}'
+    - step: 73
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-title^=\"SHELL-SFTP-BETA\"]",
+        "equal": 1}}'
+    - step: 74
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    results:
+    - 37
+    - 38
+    - 42
+    - 51
+    - 53
+    - 56
+    - 60
+    - 63
+    - 64
+    - 66
+    - 68
+    - 71
+    - 72
+    - 73
+    - 74
+  - id: R3
+    requirement: Completed background bytes have the independently expected SHA-256; Notifications reveals
+      the exact final job before acknowledgement.
+    actions:
+    - 75
+    - 79
+    - 80
+    - 81
+    - 83
+    - 85
+    - 86
+    - 87
+    - 89
+    checkpoints:
+    - step: 76
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-transfers\"]", "timeout_sec": 15}}'
+    - step: 77
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-remote-path$=\"/upload
+        中文.bin\"][data-state=\"done\"]", "timeout_sec": 90}}'
+    - step: 78
+      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "equals":
+        "${fixture.shell_sftp_sha256}", "timeout_sec": 90}}'
+    - step: 82
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-kind=\"transfer_done\"]",
+        "timeout_sec": 15}}'
+    - step: 84
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-remote-path$=\"/upload
+        中文.bin\"][data-state=\"done\"]", "timeout_sec": 15}}'
+    - step: 88
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-kind=\"transfer_done\"]",
+        "equal": 0}}'
+    - step: 90
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    results:
+    - 76
+    - 77
+    - 78
+    - 82
+    - 84
+    - 88
+    - 90
+  - id: R4
+    requirement: Explicit cancel-and-close waits for the real cancelled terminal state. Residual remote
+      bytes stay incomplete and stable; the completed Alpha file is unchanged.
+    actions:
+    - 91
+    - 93
+    - 94
+    - 97
+    - 99
+    - 100
+    - 103
+    checkpoints:
+    - step: 92
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"]", "timeout_sec": 15}}'
+    - step: 95
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/cancel
+        中文.bin\"][data-state=\"running\"]", "timeout_sec": 15}}'
+    - step: 96
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/cancel 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 98
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-close-cancel-job\"]", "timeout_sec":
+        15}}'
+    - step: 101
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 102
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-title^=\"SHELL-SFTP-BETA\"]",
+        "equal": 0}}'
+    - step: 104
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-remote-path$=\"/cancel
+        中文.bin\"][data-state=\"cancelled\"]", "timeout_sec": 15}}'
+    - step: 105
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/cancel 中文.bin", "state":
+        "incomplete", "full_size": 16777216}}'
+    - step: 106
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/cancel 中文.bin", "state":
+        "stable", "full_size": 16777216}}'
+    - step: 107
+      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "equals":
+        "${fixture.shell_sftp_sha256}", "timeout_sec": 90}}'
+    - step: 108
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-state=\"running\"]",
+        "equal": 0}}'
+    results:
+    - 92
+    - 95
+    - 96
+    - 98
+    - 101
+    - 102
+    - 104
+    - 105
+    - 106
+    - 107
+    - 108
+  visual:
+  - check: Review the retained transfer screenshot for readable state and controls
+    method: manual
+    reason: Pixel judgement is separate from byte and state assertions.
+  native:
+  - check: Physical SSH byte streams, cancellation and filesystem effects
+    method: external
+    reason: Actual loopback SSH authentication and native SFTP, with files and receipts owned by the QA
+      case; no IPC progress stubs.

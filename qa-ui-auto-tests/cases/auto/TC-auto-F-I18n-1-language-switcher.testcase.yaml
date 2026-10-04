@@ -12,7 +12,10 @@ description: 'F-I18n-1: tests the bilingual UI introduced in v0.1.32. Default lo
 
   same set of options for users who don''t notice the tray button.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F-I18n-1
 tags:
@@ -42,7 +45,7 @@ steps:
 - assert_localstorage:
     key: taomni.locale.v1
     contains: zh-CN
-- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-general"]'
 - assert_visible: '[data-testid="settings-language-section"]'
@@ -82,10 +85,11 @@ verification:
     - step: 7
       expectation: '{"assert_visible": "[data-testid=\"language-option-zh-CN\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "state": "detached", "timeout_sec":
-        5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "state":
+        "detached", "timeout_sec": 5}}'
     - step: 10
-      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains": "zh-CN"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains":
+        "zh-CN"}}'
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 14
@@ -95,9 +99,11 @@ verification:
     - step: 16
       expectation: '{"assert_visible": "[data-testid=\"settings-language-zh-CN\"]"}'
     - step: 18
-      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains": "zh-CN"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains":
+        "zh-CN"}}'
     - step: 20
-      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains": "en"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains":
+        "en"}}'
     results:
     - 20
   visual:

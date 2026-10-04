@@ -1,0 +1,533 @@
+id: TC-SHELL-B41
+title: Tao layout, legacy Ribbon and Notes share one persisted four-edge Hub
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b41.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F-TAO-1
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- remove_storage: taomni.shellLayout.v2
+- seed_storage:
+    key: taomni.chatDrawer.layout.v1
+    value: '{"position": "left", "pinned": true, "width": 380, "height": 320, "floatingOpacity": 0.8,
+      "ribbonOffsetRatio": 0.3}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- assert_count:
+    selector: '[data-testid="ai-chat-drawer"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-position
+    equals: left
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: Four-edge draft 中文
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: 'First line
+
+      Second line 中文'
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: Four-edge draft 中文
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      Second line 中文'
+- click: '[data-testid="ai-chat-drawer-position"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="Right"'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-position
+    equals: right
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).tao.edge === 'right'
+    expect_truthy: true
+    timeout_sec: 5
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"edge":"right"'
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer-hide"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      Second line 中文'
+- click: '[data-testid="ai-chat-drawer-position"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="Top"'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-position
+    equals: top
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).tao.edge === 'top'
+    expect_truthy: true
+    timeout_sec: 5
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"edge":"top"'
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer-hide"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      Second line 中文'
+- click: '[data-testid="ai-chat-drawer-position"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="Bottom"'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-position
+    equals: bottom
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).tao.edge === 'bottom'
+    expect_truthy: true
+    timeout_sec: 5
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"edge":"bottom"'
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer-hide"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      Second line 中文'
+- click: '[data-testid="ai-chat-drawer-position"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="Left"'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-position
+    equals: left
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).tao.edge === 'left'
+    expect_truthy: true
+    timeout_sec: 5
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"edge":"left"'
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer-hide"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      Second line 中文'
+- click: '[data-testid="ai-chat-drawer-position"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="Top"'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer-pin"]'
+    name: aria-pressed
+    equals: 'false'
+- click: '[data-testid="ai-chat-drawer-pin"]'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer-pin"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="ai-chat-drawer-pin"]'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer-pin"]'
+    name: aria-pressed
+    equals: 'false'
+- click: '[data-testid="ai-chat-drawer-opacity"]'
+- press:
+    selector: '[data-testid="ai-chat-drawer-opacity-slider"]'
+    key: Home
+- press:
+    selector: '[data-testid="ai-chat-drawer-opacity-slider"]'
+    key: ArrowRight
+- press:
+    selector: '[data-testid="ai-chat-drawer-opacity-slider"]'
+    key: ArrowRight
+- press:
+    selector: '[data-testid="ai-chat-drawer-opacity-slider"]'
+    key: ArrowRight
+- assert_value:
+    selector: '[data-testid="ai-chat-drawer-opacity-slider"]'
+    equals: '0.8'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"opacity":0.8'
+- click: '[data-testid="ai-chat-drawer-opacity"]'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="shell-rail-tao"]'
+- assert_count:
+    selector: '[data-testid="ai-chat-drawer"]'
+    equal: 1
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: Four-edge draft 中文
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      Second line 中文'
+- click: '[data-testid="ai-chat-drawer-pin"]'
+- set_viewport:
+    width: 959
+    height: 600
+- assert_element_geometry:
+    selector: '[data-testid="ai-chat-drawer-hide"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"pinned":true'
+- set_viewport:
+    width: 1440
+    height: 900
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer-pin"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="note-editor-back"]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-list-item"]'
+- wait_for: '[data-testid="note-editor"]'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-position
+    equals: top
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: Four-edge draft 中文
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      Second line 中文'
+- assert_localstorage:
+    key: taomni.shellLayout.v2
+    contains: '"opacity":0.8'
+- screenshot: tc-shell-b41.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The legacy left/pin/opacity preference opens the same single Hub from the Ribbon and
+      retains a real Notes draft.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 7
+    - 11
+    - 12
+    - 14
+    - 15
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer\"]", "equal": 1}}'
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-position",
+        "equals": "left"}}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 16
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]", "equals": "Four-edge
+        draft 中文"}}'
+    - step: 17
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "First
+        line\nSecond line 中文"}}'
+    results:
+    - 6
+    - 8
+    - 9
+    - 10
+    - 13
+    - 16
+    - 17
+  - id: R2
+    requirement: Right docking keeps the full Notes body and all Hub controls within the app content.
+    actions:
+    - 18
+    - 19
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-position",
+        "equals": "right"}}'
+    - step: 21
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).tao.edge
+        === ''right''", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 22
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"edge\":\"right\""}}'
+    - step: 23
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer\"]", "min_width":
+        1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 24
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer-hide\"]",
+        "min_width": 1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 25
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "First
+        line\nSecond line 中文"}}'
+    results:
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+  - id: R3
+    requirement: Top docking keeps the full Notes body and all Hub controls within the app content.
+    actions:
+    - 26
+    - 27
+    checkpoints:
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-position",
+        "equals": "top"}}'
+    - step: 29
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).tao.edge
+        === ''top''", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 30
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"edge\":\"top\""}}'
+    - step: 31
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer\"]", "min_width":
+        1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 32
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer-hide\"]",
+        "min_width": 1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 33
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "First
+        line\nSecond line 中文"}}'
+    results:
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+  - id: R4
+    requirement: Bottom docking keeps the full Notes body and all Hub controls within the app content.
+    actions:
+    - 34
+    - 35
+    checkpoints:
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-position",
+        "equals": "bottom"}}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).tao.edge
+        === ''bottom''", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 38
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"edge\":\"bottom\""}}'
+    - step: 39
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer\"]", "min_width":
+        1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 40
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer-hide\"]",
+        "min_width": 1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 41
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "First
+        line\nSecond line 中文"}}'
+    results:
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+  - id: R5
+    requirement: Left docking keeps the full Notes body and all Hub controls within the app content.
+    actions:
+    - 42
+    - 43
+    checkpoints:
+    - step: 44
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-position",
+        "equals": "left"}}'
+    - step: 45
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).tao.edge
+        === ''left''", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 46
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"edge\":\"left\""}}'
+    - step: 47
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer\"]", "min_width":
+        1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 48
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer-hide\"]",
+        "min_width": 1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 49
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "First
+        line\nSecond line 中文"}}'
+    results:
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+  - id: R6
+    requirement: Top floating opacity changes by actual range keys; hide/reopen through Rail retains the
+      same Notes editor.
+    actions:
+    - 50
+    - 51
+    - 53
+    - 55
+    - 57
+    - 58
+    - 59
+    - 60
+    - 61
+    - 64
+    - 65
+    - 67
+    checkpoints:
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-pin\"]", "name":
+        "aria-pressed", "equals": "false"}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-pin\"]", "name":
+        "aria-pressed", "equals": "true"}}'
+    - step: 56
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-pin\"]", "name":
+        "aria-pressed", "equals": "false"}}'
+    - step: 62
+      expectation: '{"assert_value": {"selector": "[data-testid=\"ai-chat-drawer-opacity-slider\"]", "equals":
+        "0.8"}}'
+    - step: 63
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"opacity\":0.8"}}'
+    - step: 66
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 68
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer\"]", "equal": 1}}'
+    - step: 69
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]", "equals": "Four-edge
+        draft 中文"}}'
+    - step: 70
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "First
+        line\nSecond line 中文"}}'
+    results:
+    - 52
+    - 54
+    - 56
+    - 62
+    - 63
+    - 66
+    - 68
+    - 69
+    - 70
+  - id: R7
+    requirement: Narrow fallback preserves the wide preference; reload restores the saved note, top edge
+      and opacity.
+    actions:
+    - 71
+    - 72
+    - 75
+    - 77
+    - 78
+    - 80
+    - 81
+    - 82
+    checkpoints:
+    - step: 73
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"ai-chat-drawer-hide\"]",
+        "min_width": 1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 74
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"pinned\":true"}}'
+    - step: 76
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-pin\"]", "name":
+        "aria-pressed", "equals": "true"}}'
+    - step: 79
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 83
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 84
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-position",
+        "equals": "top"}}'
+    - step: 85
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]", "equals": "Four-edge
+        draft 中文"}}'
+    - step: 86
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "First
+        line\nSecond line 中文"}}'
+    - step: 87
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"opacity\":0.8"}}'
+    results:
+    - 73
+    - 74
+    - 76
+    - 79
+    - 83
+    - 84
+    - 85
+    - 86
+    - 87
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

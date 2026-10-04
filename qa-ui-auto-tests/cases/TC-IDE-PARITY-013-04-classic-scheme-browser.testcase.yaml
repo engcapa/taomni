@@ -1,11 +1,18 @@
 id: TC-IDE-PARITY-013-04
-title: Taomni Classic keymap keeps F12 = Go to Definition; IDEA defaults restore Jump to Last Tool Window
-description: 'ED-PARITY-013 A2.5/DEC-013-06 browser case. The built-in read-only Taomni Classic scheme restores the pre-migration F12 binding and clears the new IDEA owner, persists only its id as the active scheme, and switching back to IDEA defaults makes F12 reopen the last tool window again.
+title: Taomni Classic keymap keeps F12 = Go to Definition; IDEA defaults restore Jump
+  to Last Tool Window
+description: 'ED-PARITY-013 A2.5/DEC-013-06 browser case. The built-in read-only Taomni
+  Classic scheme restores the pre-migration F12 binding and clears the new IDEA owner,
+  persists only its id as the active scheme, and switching back to IDEA defaults makes
+  F12 reopen the last tool window again.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -21,7 +28,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -33,13 +40,13 @@ steps:
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Alt+6
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"]'
     timeout_sec: 10
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Shift+Escape
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
-    state: detached
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"]'
+    state: hidden
     timeout_sec: 5
 - click: '[data-testid="code-workspace-tab"]'
 - press: Control+Shift+A
@@ -47,7 +54,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+      actions"]'
     text: Keymap Settings
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
 - wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
@@ -74,7 +82,7 @@ steps:
 - press: F12
 - wait: 1
 - assert_count:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"]'
     equal: 0
 - assert_localstorage:
     key: taomni.codeWorkspace.keymap.v3:active
@@ -85,7 +93,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+      actions"]'
     text: Keymap Settings
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
 - wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
@@ -101,18 +110,20 @@ steps:
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: F12
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"]'
     timeout_sec: 10
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A2.5：Taomni Classic 方案下 Go to Definition 显示 F12，Jump to Last Tool Window 无快捷键。
+    requirement: A2.5：Taomni Classic 方案下 Go to Definition 显示 F12，Jump to Last Tool
+      Window 无快捷键。
     actions:
     - 24
     checkpoints:
     - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-row-workspace.gotoDefinition\"]", "contains": "F12"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-row-workspace.gotoDefinition\"]",
+        "contains": "F12"}}'
     - step: 28
       expectation: '{"assert_visible": "[data-testid=\"keymap-no-shortcut-workspace.jumpToLastToolWindow\"]"}'
     results:
@@ -125,9 +136,11 @@ verification:
     - 33
     checkpoints:
     - step: 35
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]",
+        "equal": 0}}'
     - step: 36
-      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.keymap.v3:active", "equals": "builtin:taomni-classic"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.keymap.v3:active",
+        "equals": "builtin:taomni-classic"}}'
     results:
     - 35
     - 36
@@ -139,10 +152,13 @@ verification:
     - 48
     checkpoints:
     - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]",
+        "state": "hidden", "timeout_sec": 5}}'
     - step: 49
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]",
+        "timeout_sec": 10}}'
     results:
+    - 17
     - 49
   visual:
   - check: 方案下拉中 Taomni Classic 文案完整。

@@ -169,6 +169,7 @@ export function ControlBar({
         children: [
           { label: t("shell.overview"), testId: "shell-menu-overview", onClick: () => dispatchShellAction("shell.overview") },
           { label: t("shell.quickSwitch"), testId: "shell-menu-quick-switch", onClick: () => dispatchShellAction("shell.quickSwitch") },
+          { label: t("shell.recentPanels"), testId: "shell-menu-recent-panels", onClick: () => dispatchShellAction("shell.panels.recent") },
           { label: t("shell.reset"), testId: "shell-menu-reset-layout", onClick: () => dispatchShellAction("shell.layout.reset") },
           { label: t("sidebar.headerTitle"), testId: "context-menu-item-toggle-sidebar", icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebar },
           { label: t("menu.quickConnectToolbar"), testId: "context-menu-item-toggle-quick-connect", icon: <Search className="w-3 h-3" />, checked: quickConnectVisible, onClick: () => onCommand("toggle-quick-connect") },

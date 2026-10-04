@@ -1,11 +1,15 @@
 id: TC-IDE-PARITY-011-02
 title: Go to File opens formal tabs instead of replacing a preview
-description: 'ED-PARITY-011 A2/A4 browser case (DEC-ALIGN-10): three Go to File openings leave three formal tabs instead of one preview tab replacing the previous file.
+description: 'ED-PARITY-011 A2/A4 browser case (DEC-ALIGN-10): three Go to File openings
+  leave three formal tabs instead of one preview tab replacing the previous file.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -20,7 +24,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -72,7 +76,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go
+      to file"]'
     text: a011.txt
 - wait_for:
     selector: '[data-testid="code-workspace-search-everywhere"] button:has-text("a011.txt")'
@@ -87,7 +92,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go
+      to file"]'
     text: b011.txt
 - wait_for:
     selector: '[data-testid="code-workspace-search-everywhere"] button:has-text("b011.txt")'
@@ -102,7 +108,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go
+      to file"]'
     text: c011.txt
 - wait_for:
     selector: '[data-testid="code-workspace-search-everywhere"] button:has-text("c011.txt")'
@@ -128,11 +135,14 @@ verification:
     - 54
     checkpoints:
     - step: 34
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]
+        [data-editor-tab-key]", "equal": 1}}'
     - step: 56
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]", "equal": 4}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]
+        [data-editor-tab-key]", "equal": 4}}'
     - step: 57
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-preview=\"true\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]
+        [data-preview=\"true\"]", "equal": 0}}'
     results:
     - 56
     - 57

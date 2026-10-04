@@ -1,16 +1,12 @@
 id: TC-NOTES-005
 title: Tao Ribbon drags to an arbitrary edge and persists
-description: 'Verifies the unified Tao Ribbon placement (F-TAO-1, plan §7.1): dragging the
-
-  edge-docked ribbon toward the bottom of the window re-docks it to the bottom
-
-  edge and persists the placement (edge + offsetRatio) to localStorage so it
-
-  survives reload. The offset math + clamping are unit-tested in
-
-  src/lib/tao/ribbonPlacement.test.ts; this case exercises the live drag.
-
-  '
+description: "Verifies the unified Tao Ribbon placement (F-TAO-1, plan §7.1): dragging
+  the\nedge-docked ribbon toward the bottom of the window re-docks it to the bottom\nedge
+  and persists the placement (edge + offsetRatio) to localStorage so it\nsurvives
+  reload. The offset math + clamping are unit-tested in\nsrc/lib/tao/ribbonPlacement.test.ts;
+  this case exercises the live drag.\n Shell v2 retains the draggable Ribbon on wide
+  windows and stores its placement through the single Shell writer. Rail and titlebar
+  remain the narrow-window entrances."
 covers:
 - F-TAO-1
 tags:
@@ -36,7 +32,7 @@ steps:
     name: data-position
     equals: bottom
 - assert_localstorage:
-    key: taomni.chatDrawer.layout.v1
+    key: taomni.shellLayout.v2
     contains: bottom
 - hover: '[data-testid="welcome-panel"]'
 - reload: null
@@ -62,15 +58,16 @@ verification:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
     - step: 6
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "name": "data-position",
-        "equals": "bottom"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]",
+        "name": "data-position", "equals": "bottom"}}'
     - step: 7
-      expectation: '{"assert_localstorage": {"key": "taomni.chatDrawer.layout.v1", "contains": "bottom"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains":
+        "bottom"}}'
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
     - step: 11
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "name": "data-position",
-        "equals": "bottom"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]",
+        "name": "data-position", "equals": "bottom"}}'
     results:
     - 10
     - 11

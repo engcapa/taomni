@@ -1,10 +1,16 @@
 id: TC-DB-EDIT-001-grid-sql-preview-native
 title: Native grid save confirmation lists the SQL and warns without a primary key
-description: |
-  DB-EDIT-001 V3. On a real MySQL/MariaDB session, deleting a grid row of a
+description: 'DB-EDIT-001 V3. On a real MySQL/MariaDB session, deleting a grid row of a
+
   table with a primary key shows the DELETE statement matched on the key (no
+
   warning) and applying it removes the row; the same edit on a table without a
+
   primary key warns that every column is matched, and canceling runs nothing.
+
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks;
+  Settings uses its permanent Rail button. Original business checks are retained.'
 covers:
 - F-DB-1
 tags:
@@ -27,8 +33,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-db-edit-password
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="side-tab-sessions"]'
+- shell_navigate: tools
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree"]'
 - wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
@@ -80,7 +86,10 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "CREATE TABLE IF NOT EXISTS qa_db_edit001_pk (id INT PRIMARY KEY, v VARCHAR(10)); CREATE TABLE IF NOT EXISTS qa_db_edit001_nopk (id INT, v VARCHAR(10)); DELETE FROM qa_db_edit001_pk WHERE id >= 0; DELETE FROM qa_db_edit001_nopk WHERE id >= 0; INSERT INTO qa_db_edit001_pk VALUES (1, 'a'); INSERT INTO qa_db_edit001_nopk VALUES (1, 'a');"
+- type: CREATE TABLE IF NOT EXISTS qa_db_edit001_pk (id INT PRIMARY KEY, v VARCHAR(10)); CREATE TABLE
+    IF NOT EXISTS qa_db_edit001_nopk (id INT, v VARCHAR(10)); DELETE FROM qa_db_edit001_pk WHERE id >=
+    0; DELETE FROM qa_db_edit001_nopk WHERE id >= 0; INSERT INTO qa_db_edit001_pk VALUES (1, 'a'); INSERT
+    INTO qa_db_edit001_nopk VALUES (1, 'a');
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="result-log-tab"]'
@@ -92,7 +101,7 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "SELECT * FROM qa_db_edit001_pk;"
+- type: SELECT * FROM qa_db_edit001_pk;
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="query-result-grid"] button[title="Row 1"]'
@@ -106,12 +115,12 @@ steps:
     contains: 'SQL to execute (1):'
 - assert_pattern:
     selector: '[data-testid="confirm-dialog-message"]'
-    regex: '^(?![\s\S]*No primary key)[\s\S]*DELETE FROM (`[^`]+`\.)?`qa_db_edit001_pk` WHERE `id` = ''1'';'
+    regex: ^(?![\s\S]*No primary key)[\s\S]*DELETE FROM (`[^`]+`\.)?`qa_db_edit001_pk` WHERE `id` = '1';
 - click: '[data-testid="confirm-dialog-confirm"]'
 - assert_not_visible: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_edit001_pk;"
+- type: SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_edit001_pk;
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="query-result-grid"]'
@@ -119,7 +128,7 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "SELECT * FROM qa_db_edit001_nopk;"
+- type: SELECT * FROM qa_db_edit001_nopk;
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="query-result-grid"] button[title="Row 1"]'
@@ -133,15 +142,172 @@ steps:
     contains: No primary key found
 - assert_text:
     selector: '[data-testid="confirm-dialog-message"]'
-    contains: "WHERE `id` = '1' AND `v` = 'a'"
+    contains: WHERE `id` = '1' AND `v` = 'a'
 - click: '[data-testid="confirm-dialog-cancel"]'
 - assert_not_visible: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: "SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_edit001_nopk;"
+- type: SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_edit001_nopk;
 - click: '[data-testid="db-run-all"]'
 - assert_text:
     selector: '[data-testid="query-result-grid"]'
     contains: count-1
     timeout_sec: 60
 - screenshot: db-edit-001-grid-sql-preview-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Use the Shell Rail/Navigator to create and reopen the saved MySQL session; its query
+      tab and schema tree load without a connection error.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec":
+        10}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-pw1\"]", "timeout_sec": 15}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-db-edit\"]"}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"schema-tree\"]", "timeout_sec": 30}}'
+    results:
+    - 28
+    - 29
+    - 30
+  - id: R2
+    requirement: Create/reset both real test tables and confirm all six statements succeeded.
+    actions:
+    - 31
+    - 32
+    - 33
+    - 34
+    - 36
+    checkpoints:
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"result-log-tab\"]", "timeout_sec": 60}}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-run\"]:first-of-type
+        [data-testid=\"db-execution-log-summary\"]", "contains": "Success: 6", "timeout_sec": 60}}'
+    results:
+    - 37
+  - id: R3
+    requirement: A primary-key grid deletion previews the exact DELETE without a no-PK warning and confirmation
+      leaves zero rows.
+    actions:
+    - 38
+    - 39
+    - 40
+    - 41
+    - 43
+    - 44
+    - 45
+    - 49
+    - 51
+    - 52
+    - 53
+    - 54
+    checkpoints:
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"query-result-grid\"] button[title=\"Row
+        1\"]", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains":
+        "SQL to execute (1):"}}'
+    - step: 48
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"confirm-dialog-message\"]", "regex":
+        "^(?![\\s\\S]*No primary key)[\\s\\S]*DELETE FROM (`[^`]+`\\.)?`qa_db_edit001_pk` WHERE `id` =
+        ''1'';"}}'
+    - step: 50
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 55
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "count-0",
+        "timeout_sec": 60}}'
+    results:
+    - 47
+    - 48
+    - 55
+  - id: R4
+    requirement: A grid deletion without a primary key warns and previews all-column predicates; Cancel
+      keeps its original row.
+    actions:
+    - 56
+    - 57
+    - 58
+    - 59
+    - 61
+    - 62
+    - 63
+    - 67
+    - 69
+    - 70
+    - 71
+    - 72
+    checkpoints:
+    - step: 60
+      expectation: '{"wait_for": {"selector": "[data-testid=\"query-result-grid\"] button[title=\"Row
+        1\"]", "timeout_sec": 60}}'
+    - step: 64
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 65
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains":
+        "No primary key found"}}'
+    - step: 66
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains":
+        "WHERE `id` = ''1'' AND `v` = ''a''"}}'
+    - step: 68
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 73
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "count-1",
+        "timeout_sec": 60}}'
+    results:
+    - 65
+    - 66
+    - 73
+  visual:
+  - check: Inspect the recorded result/dialog/log layout for clipping and readable content.
+    method: manual
+    reason: Screenshots alone do not establish a visual verdict.
+  native:
+  - check: Execute SQL through real Tauri IPC against the disposable hosted MySQL service.
+    method: automated
+    reason: Browser stubs cannot prove database execution and retained native wiring.
+  - check: Cross-client visibility and server connection teardown beyond the listed SELECT results.
+    method: external
+    reason: Those extra boundaries are covered by the paired Shell N12/N15 independent SQL/process cases,
+      not this UI log.

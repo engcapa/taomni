@@ -18,7 +18,13 @@ description: '§8.19.10 / §ED-TABS-004: Split management and structured reopen 
 
   split/reopen.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.
+
+  Browser local terminal output uses an explicit IPC preview fixture; native mode
+  uses the real PTY backend.'
 covers:
 - F25.1
 - F25.5
@@ -33,11 +39,12 @@ modes:
 - browser
 fixtures:
 - reset_db
+- local_terminal_preview
 timeout_sec: 150
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -128,21 +135,26 @@ verification:
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
     - step: 16
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "min": 2}}'
     - step: 20
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 3}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "min": 3}}'
     - step: 23
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-split-equalize\"]"}'
     - step: 24
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-split-unsplit-all\"]"}'
     - step: 26
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 3}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "min": 3}}'
     - step: 31
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "equal": 1}}'
     - step: 35
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree\"]"}'
     - step: 36
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]", "max": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]",
+        "max": 0}}'
     - step: 39
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
     - step: 40
@@ -150,6 +162,23 @@ verification:
     - step: 45
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"][data-active=\"true\"]"}'
     results:
+    - 2
+    - 4
+    - 6
+    - 8
+    - 10
+    - 12
+    - 13
+    - 16
+    - 20
+    - 23
+    - 24
+    - 26
+    - 31
+    - 35
+    - 36
+    - 39
+    - 40
     - 45
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。

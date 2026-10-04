@@ -98,7 +98,9 @@
           "rdp_audio_required",
           "xrdp_server_required",
           "shell_browser_catalog",
-          "shell_native_files"
+          "local_terminal_preview",
+          "shell_native_files",
+          "shell_sftp_server"
         ]
       },
       "uniqueItems": true
@@ -306,6 +308,12 @@
       "maxProperties": 1,
       "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
       "properties": {
+        "shell_navigate": {
+          "enum": [
+            "sessions",
+            "tools"
+          ]
+        },
         "native_about": {
           "type": "null"
         },
@@ -394,6 +402,9 @@
         },
         "click": {
           "$ref": "#/$defs/click_arg"
+        },
+        "click_window_close": {
+          "$ref": "#/$defs/selector"
         },
         "dblclick": {
           "$ref": "#/$defs/click_arg"
@@ -487,6 +498,42 @@
         },
         "upload_file": {
           "$ref": "#/$defs/upload_arg"
+        },
+        "choose_file": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["trigger", "path"],
+          "properties": {
+            "trigger": { "$ref": "#/$defs/selector" },
+            "path": { "type": "string", "minLength": 1 }
+          }
+        },
+        "download_file": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["trigger", "path"],
+          "properties": {
+            "trigger": { "$ref": "#/$defs/selector" },
+            "path": { "type": "string", "minLength": 1 }
+          }
+        },
+        "mysql_assert_rows": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["query", "equals"],
+          "properties": {
+            "query": { "type": "string", "minLength": 1 },
+            "equals": { "type": "array", "items": { "type": "array" } }
+          }
+        },
+        "native_app_process": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": { "enum": ["running", "exited"] },
+            "timeout_sec": { "type": "number", "minimum": 0.1, "maximum": 60 }
+          }
         },
         "assert_visible": {
           "$ref": "#/$defs/selector"
@@ -644,6 +691,14 @@
               "minimum": 1
             },
             "min_height": {
+              "type": "number",
+              "minimum": 1
+            },
+            "max_width": {
+              "type": "number",
+              "minimum": 1
+            },
+            "max_height": {
               "type": "number",
               "minimum": 1
             },
@@ -1662,17 +1717,56 @@
                 "create_ssh_terminal",
                 "save_session",
                 "sftp_attach",
+                "sftp_cancel_transfer",
                 "workspace_list_dir",
                 "workspace_write_file",
                 "workspace_write_file_encoded",
                 "workspace_write_loose_file_encoded",
                 "db_save_query_workspace",
                 "open_detached_window",
-                "get_welcome_run_snapshot"
+                "get_welcome_run_snapshot",
+                "notes_list",
+                "notes_get",
+                "notes_update",
+                "notes_list_alerts",
+                "notes_ack_alert",
+                "chat_list_threads",
+                "chat_list_messages",
+                "mail_list_cached_folders",
+                "mail_list_cached_messages",
+                "chat_stream",
+                "test_proxy_connection"
               ]
             },
             "owner": {
               "type": "string"
+            },
+            "once": {
+              "type": "boolean"
+            }
+          }
+        },
+        "shell_transfer_scenario": {
+          "type": "object",
+          "required": [
+            "action",
+            "owner"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "enum": [
+                "advance",
+                "complete",
+                "fail",
+                "replay"
+              ]
+            },
+            "owner": {
+              "enum": [
+                "alpha.invalid",
+                "beta.invalid"
+              ]
             }
           }
         },
@@ -1698,7 +1792,8 @@
               "enum": [
                 "requested",
                 "failed",
-                "held"
+                "held",
+                "completed"
               ]
             }
           }
@@ -1722,11 +1817,83 @@
         "close_window": {
           "type": "null"
         },
+        "interrupt_detached_window": {
+          "enum": [
+            "#notes=",
+            "#git=",
+            "#sftp="
+          ]
+        },
+        "assert_native_window_count": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "equal"
+          ],
+          "properties": {
+            "equal": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
         "restart_native_app": {
           "type": "null"
         },
         "assert_value": {
-          "$ref": "#/$defs/assert_text_equals_arg"
+          "oneOf": [
+            { "$ref": "#/$defs/assert_text_equals_arg" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selector", "regex"],
+              "properties": {
+                "selector": { "type": "string", "minLength": 1 },
+                "regex": { "type": "string", "minLength": 1 },
+                "timeout_sec": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          ]
+        },
+        "assert_file_progress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "state",
+            "full_size"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "state": {
+              "enum": [
+                "growing",
+                "stable",
+                "incomplete"
+              ]
+            },
+            "full_size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "sample_sec": {
+              "type": "number",
+              "minimum": 0.2,
+              "maximum": 30
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
         }
       }
     },
@@ -3205,7 +3372,8 @@
             "set",
             "assert",
             "clear",
-            "quiet"
+            "quiet",
+            "capture"
           ]
         },
         "kind": {
@@ -3265,6 +3433,16 @@
           "type": "string",
           "minLength": 1,
           "description": "files assert: the clipboard entry named like this report-root tree has identical relative paths and SHA-256."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "text capture: a case-local name for an identified QA payload; requires contains."
+        },
+        "same_as": {
+          "type": "string",
+          "minLength": 1,
+          "description": "text assert: exact equality with a prior case-local capture."
         }
       }
     },

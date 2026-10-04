@@ -1,0 +1,294 @@
+id: TC-SHELL-N16
+title: Native WebView default and minimum layouts keep controls reachable
+description: V-N16 automated packaged WebView geometry at 1440x900 and 800x600 CSS client sizes. Actual
+  element dimensions, viewport containment and center hit testing are recorded. This does not claim OS
+  DPI changes, cross-monitor scaling, native traffic-light clicks or screen-reader output.
+covers:
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- shell_native_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell", "name": "shell",
+      "path": "${fixture.shell_root}", "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo":
+      false, "lastActiveFile": {"kind": "root", "rootId": "shell", "path": "README.md"}}]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - alpha
+    - beta
+    - gamma
+    - ''
+- set_viewport:
+    width: 1440
+    height: 900
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail-home"], [data-testid="shell-rail-workspaces"], [data-testid="shell-rail-tao"]'
+    min_count: 3
+    min_width: 28
+    min_height: 28
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview-trigger"], [data-testid="shell-quick-switch"]'
+    min_count: 2
+    min_width: 24
+    min_height: 24
+    within_viewport: true
+    hit_center: true
+- shell_navigate: tools
+- click: '[data-testid="shell-navigator-page"][data-page="project"]'
+- assert_visible: '[data-testid="code-workspace-tree-root"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-navigator-hide"]'
+    min_width: 16
+    min_height: 16
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="shell-navigator-hide"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_attribute:
+    selector: '[data-testid="shell-overview"]'
+    name: aria-modal
+    equals: 'true'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview"]'
+    min_width: 300
+    min_height: 160
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-tab-navigator-close"]'
+    min_width: 16
+    min_height: 16
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="shell-tab-navigator-close"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- assert_visible: '[data-testid="notes-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- assert_not_visible: '[data-testid="notes-panel"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - alpha
+    - beta
+    - gamma
+    - ''
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
+- screenshot: tc-shell-n16-1440x900.png
+- set_viewport:
+    width: 800
+    height: 600
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail-home"], [data-testid="shell-rail-workspaces"], [data-testid="shell-rail-tao"]'
+    min_count: 3
+    min_width: 28
+    min_height: 28
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview-trigger"], [data-testid="shell-quick-switch"]'
+    min_count: 2
+    min_width: 24
+    min_height: 24
+    within_viewport: true
+    hit_center: true
+- shell_navigate: tools
+- click: '[data-testid="shell-navigator-page"][data-page="project"]'
+- assert_visible: '[data-testid="code-workspace-tree-root"]'
+- assert_element_geometry:
+    selector: '[data-testid="shell-navigator-hide"]'
+    min_width: 16
+    min_height: 16
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="shell-navigator-hide"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_attribute:
+    selector: '[data-testid="shell-overview"]'
+    name: aria-modal
+    equals: 'true'
+- assert_element_geometry:
+    selector: '[data-testid="shell-overview"]'
+    min_width: 300
+    min_height: 160
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-tab-navigator-close"]'
+    min_width: 16
+    min_height: 16
+    within_viewport: true
+    hit_center: true
+- click: '[data-testid="shell-tab-navigator-close"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- assert_visible: '[data-testid="notes-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- assert_not_visible: '[data-testid="notes-panel"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - alpha
+    - beta
+    - gamma
+    - ''
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
+- screenshot: tc-shell-n16-800x600.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 'Actual 1440x900 packaged client: Rail, Project, Overview and Tao remain reachable, complete
+      editor text is retained and the page does not overflow horizontally.'
+    actions:
+    - 11
+    - 14
+    - 15
+    - 18
+    - 19
+    - 23
+    - 24
+    - 25
+    - 27
+    checkpoints:
+    - step: 12
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail-home\"], [data-testid=\"shell-rail-workspaces\"],
+        [data-testid=\"shell-rail-tao\"]", "min_count": 3, "min_width": 28, "min_height": 28, "within_viewport":
+        true, "hit_center": true}}'
+    - step: 13
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-overview-trigger\"],
+        [data-testid=\"shell-quick-switch\"]", "min_count": 2, "min_width": 24, "min_height": 24, "within_viewport":
+        true, "hit_center": true}}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-root\"]"}'
+    - step: 17
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-navigator-hide\"]",
+        "min_width": 16, "min_height": 16, "within_viewport": true, "hit_center": true}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-overview\"]", "name": "aria-modal",
+        "equals": "true"}}'
+    - step: 21
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-overview\"]", "min_width":
+        300, "min_height": 160, "within_viewport": true, "hit_center": true}}'
+    - step: 22
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-tab-navigator-close\"]",
+        "min_width": 16, "min_height": 16, "within_viewport": true, "hit_center": true}}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"notes-panel\"]"}'
+    - step: 28
+      expectation: '{"assert_not_visible": "[data-testid=\"notes-panel\"]"}'
+    - step: 29
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["alpha", "beta", "gamma", ""]}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "document.documentElement.scrollWidth <= innerWidth",
+        "expect_truthy": true}}'
+    results:
+    - 12
+    - 13
+    - 16
+    - 17
+    - 20
+    - 21
+    - 22
+    - 26
+    - 28
+    - 29
+    - 30
+  - id: R2
+    requirement: 'Actual 800x600 packaged client: Rail, Project, Overview and Tao remain reachable, complete
+      editor text is retained and the page does not overflow horizontally.'
+    actions:
+    - 32
+    - 35
+    - 36
+    - 39
+    - 40
+    - 44
+    - 45
+    - 46
+    - 48
+    checkpoints:
+    - step: 33
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail-home\"], [data-testid=\"shell-rail-workspaces\"],
+        [data-testid=\"shell-rail-tao\"]", "min_count": 3, "min_width": 28, "min_height": 28, "within_viewport":
+        true, "hit_center": true}}'
+    - step: 34
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-overview-trigger\"],
+        [data-testid=\"shell-quick-switch\"]", "min_count": 2, "min_width": 24, "min_height": 24, "within_viewport":
+        true, "hit_center": true}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-root\"]"}'
+    - step: 38
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-navigator-hide\"]",
+        "min_width": 16, "min_height": 16, "within_viewport": true, "hit_center": true}}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-overview\"]", "name": "aria-modal",
+        "equals": "true"}}'
+    - step: 42
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-overview\"]", "min_width":
+        300, "min_height": 160, "within_viewport": true, "hit_center": true}}'
+    - step: 43
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-tab-navigator-close\"]",
+        "min_width": 16, "min_height": 16, "within_viewport": true, "hit_center": true}}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"notes-panel\"]"}'
+    - step: 49
+      expectation: '{"assert_not_visible": "[data-testid=\"notes-panel\"]"}'
+    - step: 50
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line",
+        "equals": ["alpha", "beta", "gamma", ""]}}'
+    - step: 51
+      expectation: '{"eval_readonly": {"expression": "document.documentElement.scrollWidth <= innerWidth",
+        "expect_truthy": true}}'
+    results:
+    - 33
+    - 34
+    - 37
+    - 38
+    - 41
+    - 42
+    - 43
+    - 47
+    - 49
+    - 50
+    - 51
+  visual:
+  - check: Inspect native geometry artifacts and screenshots for clipped labels, title safety and focus
+      rings.
+    method: manual
+    reason: DOM geometry and screenshots do not establish an OS visual verdict.
+  native:
+  - check: Actual packaged WebView and native IPC on each selected platform.
+    method: automated
+    reason: Browser stubs cannot establish this boundary.
+  - check: OS DPI, cross-display movement, physical native controls and Narrator/VoiceOver/Orca
+    method: manual
+    reason: DOM geometry at two client sizes does not certify these OS behaviors; V-N16 remains the runbook.

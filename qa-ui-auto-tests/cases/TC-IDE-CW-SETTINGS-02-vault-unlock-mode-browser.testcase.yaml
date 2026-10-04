@@ -1,6 +1,7 @@
 id: TC-IDE-CW-SETTINGS-02-vault-unlock-mode-browser
 title: Vault unlock mode toggles, updates its hint, and persists
-description: 'Browser regression case for the VaultSettings unlock-prompt segmented control.
+description: 'Browser regression case for the VaultSettings unlock-prompt segmented
+  control.
 
   Verifies the startup default, switches to on-demand and checks the changed
 
@@ -10,7 +11,10 @@ description: 'Browser regression case for the VaultSettings unlock-prompt segmen
 
   boundaries are covered separately by native lifecycle cases.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F12.1
 tags:
@@ -27,8 +31,8 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-security"]'
 - wait_for: '[data-testid="vault-settings"]'
@@ -60,8 +64,8 @@ steps:
     key: taomni.vaultUnlockMode
     equals: on-demand
 - reload_window: null
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-security"]'
 - wait_for: '[data-testid="vault-settings"]'
@@ -100,7 +104,7 @@ verification:
     - 24
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 6
@@ -108,43 +112,47 @@ verification:
     - step: 7
       expectation: '{"assert_visible": "[data-testid=\"vault-unlock-mode-setting\"]"}'
     - step: 8
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]", "name": "aria-pressed",
-        "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 9
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]", "name": "aria-pressed",
-        "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]",
+        "name": "aria-pressed", "equals": "false"}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]", "contains": "Default."}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]",
+        "contains": "Default."}}'
     - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]", "name": "aria-pressed",
-        "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]", "name": "aria-pressed",
-        "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]",
+        "name": "aria-pressed", "equals": "false"}}'
     - step: 14
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]", "contains": "waits
-        until"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]",
+        "contains": "waits until"}}'
     - step: 15
-      expectation: '{"assert_localstorage": {"key": "taomni.vaultUnlockMode", "equals": "on-demand"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.vaultUnlockMode", "equals":
+        "on-demand"}}'
     - step: 17
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 19
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 21
       expectation: '{"wait_for": "[data-testid=\"vault-settings\"]"}'
     - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]", "name": "aria-pressed",
-        "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 23
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]", "contains": "waits
-        until"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]",
+        "contains": "waits until"}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]", "name": "aria-pressed",
-        "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]", "contains": "Default."}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]",
+        "contains": "Default."}}'
     - step: 27
-      expectation: '{"assert_localstorage": {"key": "taomni.vaultUnlockMode", "equals": "startup"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.vaultUnlockMode", "equals":
+        "startup"}}'
     results:
     - 25
     - 26

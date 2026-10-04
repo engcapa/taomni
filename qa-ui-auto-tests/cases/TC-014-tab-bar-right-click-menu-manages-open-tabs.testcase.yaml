@@ -1,5 +1,5 @@
 id: TC-014
-title: Tab bar right-click menu manages open tabs and tab-strip toolbar exposes split / multiexec / more
+title: Tab context menu and View split/multiexec actions retain tab management
 covers:
 - F1.5
 tags:
@@ -15,22 +15,34 @@ fixtures:
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="tab-bar"]'
-- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
-- right_click: '[data-testid="tab-item"]'
+- right_click: '[data-testid="tab-item"][data-tab-type="settings"]'
 - wait_for: '[data-testid="context-menu"]'
 - assert_visible: '[data-testid="context-menu"] >> text="Close"'
 - assert_visible: '[data-testid="context-menu"] >> text="Close others"'
 - assert_visible: '[data-testid="context-menu"] >> text="Close all"'
 - assert_visible: '[data-testid="context-menu"] >> text="Duplicate tab"'
 - press: Escape
-- assert_visible: '[data-testid="tab-split-view"]'
-- assert_enabled: '[data-testid="tab-split-view"]'
-- click: '[data-testid="tab-multiexec-toggle"]'
-- assert_visible: '[data-testid="tab-multiexec-toggle"][data-active="true"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- assert_visible: '[data-testid="context-menu-item-split-terminal"]'
+- assert_enabled: '[data-testid="context-menu-item-split-terminal"]'
+- press: Escape
+- press: Escape
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- wait_for: '[data-testid="context-menu-item-multiexec"]'
+- click: '[data-testid="context-menu-item-multiexec"]'
+- assert_visible: '[data-testid="multiexec-bar"]'
 - wait: 0.5
-- click: '[data-testid="tab-multiexec-toggle"]'
-- assert_not_visible: '[data-testid="tab-multiexec-toggle"][data-active="true"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- wait_for: '[data-testid="context-menu-item-multiexec"]'
+- click: '[data-testid="context-menu-item-multiexec"]'
+- assert_not_visible: '[data-testid="multiexec-bar"]'
 - wait: 0.5
 - click: '[data-testid="tab-more"]'
 - wait_for: '[data-testid="open-tabs-menu"]'
@@ -46,9 +58,17 @@ verification:
     - 3
     - 5
     - 11
-    - 14
+    - 12
+    - 13
+    - 16
     - 17
+    - 18
     - 20
+    - 22
+    - 25
+    - 27
+    - 29
+    - 32
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"tab-bar\"]"}'
@@ -59,26 +79,52 @@ verification:
     - step: 7
       expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Close\""}'
     - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Close others\""}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Close
+        others\""}'
     - step: 9
-      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Close all\""}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Close
+        all\""}'
     - step: 10
-      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Duplicate tab\""}'
-    - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"tab-split-view\"]"}'
-    - step: 13
-      expectation: '{"assert_enabled": "[data-testid=\"tab-split-view\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Duplicate
+        tab\""}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-split-terminal\"]"}'
     - step: 15
-      expectation: '{"assert_visible": "[data-testid=\"tab-multiexec-toggle\"][data-active=\"true\"]"}'
-    - step: 18
-      expectation: '{"assert_not_visible": "[data-testid=\"tab-multiexec-toggle\"][data-active=\"true\"]"}'
+      expectation: '{"assert_enabled": "[data-testid=\"context-menu-item-split-terminal\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 21
+      expectation: '{"wait_for": "[data-testid=\"context-menu-item-multiexec\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"context-menu-item-multiexec\"]"}'
+    - step: 30
+      expectation: '{"assert_not_visible": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 33
       expectation: '{"wait_for": "[data-testid=\"open-tabs-menu\"]"}'
-    - step: 22
+    - step: 34
       expectation: '{"assert_visible": "[data-testid=\"open-tabs-menu\"]"}'
     results:
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 14
+    - 15
+    - 19
     - 21
-    - 22
+    - 23
+    - 26
+    - 28
+    - 30
+    - 33
+    - 34
   visual:
   - check: 右键菜单和更多列表无截断，激活状态可区分。
     method: manual
@@ -87,3 +133,8 @@ verification:
   - check: 只证明菜单入口及本地状态，不证明系统窗口或向多个 PTY 分发输入。
     method: external
     reason: 按实际执行模式解释；其他平台不继承 Linux 证据。
+description: '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'

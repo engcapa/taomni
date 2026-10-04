@@ -1009,6 +1009,7 @@
 - `[data-testid="git-diff-discard"]` — interactive — F26.2.git-diff-discard
 - `[data-testid="git-diff-stage"]` — interactive [optional] — F26.2.git-diff-stage
 - `[data-testid="git-diff-unstage"]` — interactive [optional] — F26.2.git-diff-unstage
+- `textarea[placeholder="Commit message"]` — interactive — F26.2.commit-message
 
 ## mail/account (F-MAIL-16)
 
@@ -1297,7 +1298,7 @@
 
 - `[data-testid="context-menu-item-new-remote-session"]` — interactive — F1.9.command-session
 - `[data-testid="context-menu-item-new-sftp"]` — interactive — F1.9.command-sftp
-- `[data-testid="ribbon-settings"]` — interactive — F1.9.ribbon-settings
+- `[data-testid="shell-rail-settings"]` — interactive — F1.9.ribbon-settings
 - `[data-testid="context-menu-item-help"]` — interactive — F1.9.command-help
 - `[data-testid="context-menu-item-settings"]` — interactive [optional] — F1.9.command-settings-menu
 - `[data-testid="context-menu-item-servers"]` — interactive [optional] — F1.9.command-servers
@@ -1329,6 +1330,9 @@
 - `[data-testid="context-menu-item-sessions"]` — interactive [optional] — F1.8.context-menu-item-sessions
 - `[data-testid="context-menu-item-split-terminal"]` — interactive [optional] — F1.8.menu-split-terminal
 - `[data-testid="context-menu-item-toggle-sidebar"]` — interactive [optional] — F1.8.menu-toggle-sidebar
+- `[data-testid="context-menu-item-multiexec"]` — interactive — F1.8.context-menu-item-multiexec
+- `[data-testid="context-menu-item-lan-chat"]` — interactive — F1.8.context-menu-item-lan-chat
+- `[data-testid="context-menu-item-sockscap"]` — interactive — F1.8.context-menu-item-sockscap
 
 ## main/statusbar (F1.7)
 
@@ -1368,6 +1372,7 @@
 - `span[aria-label="New output"]` — display [optional] — F1.5.tab-new-output-dot
 - `[data-testid="context-menu-item-tools"]` — interactive [optional] — F1.5.context-menu-item-tools
 - `[data-testid="context-menu-item-tunneling"]` — interactive [optional] — F1.5.context-menu-item-tunneling
+- `[data-testid="tab-context-copy-session-info"]` — interactive — F1.5.tab-context-copy-session-info
 
 ## main/theme (F5.5)
 
@@ -1423,6 +1428,8 @@
 - `text="Tips"` — display — F1.6.tips-section
 - `[data-testid="welcome-version"]` — display — F1.6.version-header
 - `[data-testid="welcome-version-footer"]` — display — F1.6.version-footer
+- `[data-testid="shell-home-more"]` — interactive — F1.6.shell-home-more
+- `[data-testid="welcome-open-lanchat"]` — interactive — F1.6.welcome-open-lanchat
 
 ## main/window (F1.3)
 
@@ -1500,7 +1507,6 @@
 - `[data-testid="shell-rail"]` — display — F-SHELL-1.shell-rail
 - `[data-testid="shell-rail-home"]` — interactive — F-SHELL-1.shell-rail-home
 - `[data-testid="shell-rail-sessions"]` — interactive — F-SHELL-1.shell-rail-sessions
-- `[data-testid="shell-rail-settings"]` — interactive — F-SHELL-1.shell-rail-settings
 - `[data-testid="shell-rail-tao"]` — interactive — F-SHELL-1.shell-rail-tao
 - `[data-testid="shell-rail-workspaces"]` — interactive — F-SHELL-1.shell-rail-workspaces
 - `[data-testid="shell-recent-workspace"]` — interactive — F-SHELL-1.shell-recent-workspace
@@ -1546,10 +1552,46 @@
 - `[data-testid="shell-window-error"]` — display — F-SHELL-1.shell-window-error
 - `[data-testid="shell-window-reattach"]` — interactive — F-SHELL-1.shell-window-reattach
 - `[data-testid="shell-work-area"]` — display — F-SHELL-1.shell-work-area
+- `[data-testid="shell-unavailable-view"]` — display [optional] — F-SHELL-1.shell-unavailable-view
+- `[data-testid="shell-keymap-conflict-scope"]` — display [optional] — F-SHELL-1.shell-keymap-conflict-scope
+- `[data-testid="shell-navigator-workspace-error"]` — display [optional] — F-SHELL-1.shell-navigator-workspace-error
+- `[data-testid="shell-navigator-workspace-relocate"]` — interactive [optional] — F-SHELL-1.shell-navigator-workspace-relocate
+- `[data-testid="shell-recent-workspace-error"]` — display [optional] — F-SHELL-1.shell-recent-workspace-error
+- `[data-testid="shell-recent-workspace-relocate"]` — interactive [optional] — F-SHELL-1.shell-recent-workspace-relocate
+- `[data-testid="shell-close-discard"]` — interactive — F-SHELL-1.shell-close-discard
+- `[data-testid="shell-close-save"]` — interactive — F-SHELL-1.shell-close-save
+- `[data-testid="shell-tab-close"]` — interactive — F-SHELL-1.shell-tab-close
+- `[data-testid="lanchat-composer-textarea"]` — interactive — F-SHELL-1.retained-lanchat-composer
+- `[data-testid="lanchat-roster-panel"]` — interactive — F-SHELL-1.retained-lanchat-roster
+- `[data-testid="shell-close-background"]` — interactive — F-SHELL-1.shell-close-background
+- `[data-testid="shell-close-cancel-job"]` — interactive — F-SHELL-1.shell-close-cancel-job
+- `[data-testid="shell-close-commit"]` — interactive — F-SHELL-1.shell-close-commit
+- `[data-testid="shell-close-rollback"]` — interactive — F-SHELL-1.shell-close-rollback
+- `[data-testid="shell-menu-overview"]` — interactive — F-SHELL-1.shell-menu-overview
+- `[data-testid="shell-menu-quick-switch"]` — interactive — F-SHELL-1.shell-menu-quick-switch
+- `[data-testid="shell-menu-recent-panels"]` — interactive — F-SHELL-1.shell-menu-recent-panels
+- `[data-testid="shell-menu-reset-layout"]` — interactive — F-SHELL-1.shell-menu-reset-layout
+- `[data-testid="shell-notes-recovered"]` — display — F-SHELL-1.shell-notes-recovered
+- `[data-testid="shell-recent-panels"]` — display — F-SHELL-1.shell-recent-panels
+- `[data-testid="shell-recent-panels-close"]` — interactive — F-SHELL-1.shell-recent-panels-close
+- `[data-testid="shell-recent-panel"]` — interactive — F-SHELL-1.shell-recent-panel
+- `[data-testid="shell-recent-panel-empty"]` — display — F-SHELL-1.shell-recent-panel-empty
+- `[data-testid="shell-recent-panel-opening"]` — display — F-SHELL-1.shell-recent-panel-opening
+- `[data-testid="shell-recent-panel-error"]` — display — F-SHELL-1.shell-recent-panel-error
+- `[data-testid="shell-recent-panel-owner-choice"]` — display — F-SHELL-1.shell-recent-panel-owner-choice
+- `[data-testid="shell-recent-panel-owner"]` — interactive — F-SHELL-1.shell-recent-panel-owner
+- `[data-testid="shell-recent-panel-bind"]` — interactive — F-SHELL-1.shell-recent-panel-bind
+- `[data-testid="shell-recent-panel-cancel"]` — interactive — F-SHELL-1.shell-recent-panel-cancel
+- `[data-testid="shell-recent-panel-retry"]` — interactive — F-SHELL-1.shell-recent-panel-retry
+- `[data-testid="shell-recent-panel-show"]` — interactive — F-SHELL-1.shell-recent-panel-show
+- `[data-testid="shell-recent-panel-detach"]` — interactive — F-SHELL-1.shell-recent-panel-detach
+- `[data-testid="shell-tab-move-utility"]` — interactive — F-SHELL-1.shell-tab-move-utility
+- `[data-testid="shell-target-error"]` — display — F-SHELL-1.shell-target-error
+- `[data-testid="shell-transfers-trigger"]` — interactive — F-SHELL-1.shell-transfers-trigger
 
 ## network/sockscap (F-Sockscap-1)
 
-- `[data-testid="side-tab-tools"]` — interactive — F-Sockscap-1.tools-side-tab
+- `[data-testid="shell-navigator-page"][data-page="tools"]` — interactive — F-Sockscap-1.tools-side-tab
 - `[data-testid="sidebar-tools-panel"]` — display — F-Sockscap-1.tools-panel
 - `[data-testid="sidebar-tool-sockscap"]` — interactive — F-Sockscap-1.sidebar-entry
 - `[data-testid="sockscap-panel"]` — display — F-Sockscap-1.panel
@@ -1631,6 +1673,26 @@
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
 - `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
 - `[data-testid="tao-ribbon-badge"]` — display [optional] — F-TAO-1.tao-ribbon-badge
+- `[data-testid="shell-tao-context"]` — display [optional] — F-TAO-1.shell-tao-context
+- `[data-testid="shell-tao-context-pin"]` — interactive [optional] — F-TAO-1.shell-tao-context-pin
+- `[data-testid="shell-tao-error"]` — display [optional] — F-TAO-1.shell-tao-error
+- `[data-testid="shell-tao-retry"]` — interactive [optional] — F-TAO-1.shell-tao-retry
+- `[data-testid="shell-alert-error"]` — display [optional] — F-TAO-1.shell-alert-error
+- `[data-testid="shell-alert-retry"]` — interactive [optional] — F-TAO-1.shell-alert-retry
+- `[data-testid="shell-notes-error"]` — display [optional] — F-TAO-1.shell-notes-error
+- `[data-testid="shell-notes-retry"]` — interactive [optional] — F-TAO-1.shell-notes-retry
+- `[data-testid="shell-notes-window-error"]` — display [optional] — F-TAO-1.shell-notes-window-error
+- `[data-testid="note-editor-scroll"]` — display [optional] — F-TAO-1.note-editor-scroll
+- `[data-testid="ai-chat-send-button"]` — interactive — F-TAO-1.ai-chat-send-button
+- `[data-testid="note-editor-body"]` — interactive — F-TAO-1.note-editor-body
+- `[data-testid="note-editor-new-step"]` — interactive — F-TAO-1.note-editor-new-step
+- `[data-testid="note-editor-new-tag"]` — interactive — F-TAO-1.note-editor-new-tag
+- `[data-testid="notes-detached-dock"]` — interactive — F-TAO-1.notes-detached-dock
+- `[data-testid="notes-detached-window"]` — display — F-TAO-1.notes-detached-window
+- `[data-testid="shell-chat-content"]` — display — F-TAO-1.shell-chat-content
+- `[data-testid="shell-chat-disabled"]` — display — F-TAO-1.shell-chat-disabled
+- `[data-testid="note-editor-complete"]` — interactive — F-TAO-1.note-editor-complete
+- `[data-testid="tao-hub-notifications-badge"]` — display — F-TAO-1.tao-hub-notifications-badge
 
 ## rdp (F9.7)
 
@@ -1867,9 +1929,14 @@
 - `[data-testid="context-menu-item-copy-command-powershell-forwards"]` — interactive [optional] — F6.2.context-copy-command-powershell-forwards
 - `[data-testid="context-menu-item-copy-command-powershell-full"]` — interactive [optional] — F6.2.context-copy-command-powershell-full
 - `[data-testid^="session-terminal-theme-option-"]` — interactive [optional] — F6.2.context-terminal-theme-options
+- `[data-testid="menu-export-sessions"]` — interactive — F6.2.menu-export-sessions
 
 ## sessions (F6.3)
 
+- `[data-testid="proxy-test-panel"]` — display — F6.3.proxy-test-panel
+- `[data-testid="proxy-test-url"]` — interactive — F6.3.proxy-test-url
+- `[data-testid="proxy-test-run"]` — interactive — F6.3.proxy-test-run
+- `[data-testid="proxy-test-result"]` — display — F6.3.proxy-test-result
 - `[data-testid="session-editor"]` — display — F6.3.editor
 - `[data-testid="session-proto-ssh"]` — interactive — F6.3.proto-ssh
 - `[data-testid="session-proto-sftp"]` — interactive — F6.3.proto-sftp
@@ -1996,6 +2063,10 @@
 - `label:has-text("Auto-connect when Taomni starts") input[type="checkbox"]` — interactive — F6.3.startup-auto-connect
 - `label:has-text("Open in new window") input[type="checkbox"]` — interactive — F6.3.startup-open-new-window
 - `label:has-text("Reconnect on disconnection") input[type="checkbox"]` — interactive — F6.3.startup-reconnect
+- `[data-testid="sidebar-tool-lan-chat"]` — interactive — F6.3.sidebar-tool-lan-chat
+- `[data-testid="sidebar-tool-network-tools"]` — interactive — F6.3.sidebar-tool-network-tools
+- `[data-testid="sidebar-tool-servers"]` — interactive — F6.3.sidebar-tool-servers
+- `[data-testid="sidebar-tool-tunneling"]` — interactive — F6.3.sidebar-tool-tunneling
 
 ## sessions (F6.4)
 
@@ -2176,6 +2247,11 @@
 ## sftp (F7.3)
 
 - `[data-testid="sftp-transfer-queue"]` — display — F7.3.queue-root
+- `[data-testid="transfer-job"]` — display — F7.3.transfer-job
+- `[data-testid="transfer-job-pause"]` — interactive — F7.3.transfer-job-pause
+- `[data-testid="transfer-job-resume"]` — interactive — F7.3.transfer-job-resume
+- `[data-testid="transfer-job-retry"]` — interactive — F7.3.transfer-job-retry
+- `[data-testid="transfer-job-cancel"]` — interactive — F7.3.transfer-job-cancel
 
 ## sftp (F7.4)
 
@@ -2184,6 +2260,8 @@
 - `[data-testid="sftp-orientation-toggle"]` — interactive — F7.4.orientation-toggle
 - `[data-testid="sftp-local-detach"]` — interactive [optional] — F7.4.local-detach
 - `[data-testid="sftp-remote-detach"]` — interactive [optional] — F7.4.remote-detach
+- `[data-testid="sftp-transfer-queue-collapsed"]` — display — F7.4.sftp-transfer-queue-collapsed
+- `[data-testid="sftp-detached-window"]` — display — F7.4.sftp-detached-window
 
 ## sftp (F7.5)
 

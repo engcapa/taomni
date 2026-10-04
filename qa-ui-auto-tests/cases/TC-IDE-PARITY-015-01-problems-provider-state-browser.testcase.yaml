@@ -1,11 +1,17 @@
 id: TC-IDE-PARITY-015-01
 title: Problems names an unavailable language service instead of showing No problems
-description: 'ED-PARITY-015 A1/A3/A4 browser case: a Java file in browser preview has no JDT LS. The status pill and the Problems tool window give the same reason, Problems does not claim ''No problems'' and its Configure button opens Language Servers settings.
+description: 'ED-PARITY-015 A1/A3/A4 browser case: a Java file in browser preview
+  has no JDT LS. The status pill and the Problems tool window give the same reason,
+  Problems does not claim ''No problems'' and its Configure button opens Language
+  Servers settings.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -21,7 +27,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -75,26 +81,33 @@ verification:
     - 22
     checkpoints:
     - step: 21
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains": "not available", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]",
+        "contains": "not available", "timeout_sec": 30}}'
     - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]",
+        "timeout_sec": 10}}'
     - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"]", "contains": "not available"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"]",
+        "contains": "not available"}}'
     results:
     - 21
     - 25
   - id: R2
-    requirement: A3/A4/DEC-015-02：语言服务不可用时 Problems 不显示 “No problems”，而显示 typed 状态与 Configure；Configure 打开 Language Servers 设置。
+    requirement: A3/A4/DEC-015-02：语言服务不可用时 Problems 不显示 “No problems”，而显示 typed 状态与
+      Configure；Configure 打开 Language Servers 设置。
     actions:
     - 22
     - 28
     checkpoints:
     - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]",
+        "timeout_sec": 10}}'
     - step: 26
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "regex": "(?s)\\A(?!.*No problems)"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-problems-panel\"]",
+        "regex": "(?s)\\A(?!.*No problems)"}}'
     - step: 29
-      expectation: '{"wait_for": {"selector": "[data-testid=\"language-servers-settings\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"language-servers-settings\"]",
+        "timeout_sec": 15}}'
     results:
     - 26
     - 29

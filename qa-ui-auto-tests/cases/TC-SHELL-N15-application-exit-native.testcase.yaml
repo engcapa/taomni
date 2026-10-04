@@ -1,0 +1,533 @@
+id: TC-SHELL-N15
+title: Actual system/menu exit cancels safely then rolls back MySQL, cancels SFTP and ends the owned multiwindow
+  app
+description: Native automated boundaries for docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n15.
+  OS/manual gaps are recorded separately.
+covers:
+- F-DB-1
+- F7.4
+- F-TAO-1
+- F-Detach-1
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- mysql_required
+- shell_sftp_server
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-db-tx2-password
+- wait_for: '[data-testid="welcome-panel"]'
+- shell_navigate: tools
+- shell_navigate: sessions
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-tx2
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-db-tx2-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-db-tx2-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-tx2"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-tx2"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait_for:
+    selector: '[data-testid="schema-tree"]'
+    timeout_sec: 30
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: CREATE TABLE IF NOT EXISTS qa_shell_tx (id INT PRIMARY KEY, v VARCHAR(40)); DELETE FROM qa_shell_tx
+    WHERE id >= 0; INSERT INTO qa_shell_tx VALUES (1, 'before');
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="result-log-tab"]'
+    timeout_sec: 60
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Success: 3'
+    timeout_sec: 60
+- mysql_assert_rows:
+    query: SELECT id, v FROM qa_shell_tx ORDER BY id
+    equals:
+    - - 1
+      - before
+- click: '[data-testid="db-tx-mode"]'
+- wait_for: '[data-testid="db-tx-mode"][data-mode="manual"]'
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: UPDATE qa_shell_tx SET v = 'pending' WHERE id = 1;
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="db-tx-pending"]'
+    contains: 'Pending: 1'
+    timeout_sec: 60
+- mysql_assert_rows:
+    query: SELECT id, v FROM qa_shell_tx ORDER BY id
+    equals:
+    - - 1
+      - before
+- native_app_process:
+    state: running
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: SHELL EXIT NOTE
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: 'Exit cancellation retains this note
+
+      中文全文'
+- click: '[data-testid="notes-floating-toggle"]'
+- switch_window:
+    route: '#notes='
+- wait_for: '[data-testid="notes-detached-window"][data-phase="ready"]'
+- switch_window:
+    route: ''
+- assert_native_window_count:
+    equal: 2
+- shell_navigate: sessions
+- click: '[data-testid="session-new"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    timeout_sec: 15
+- click: '[data-testid="session-proto-sftp"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.shell_sftp_port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: SHELL-SFTP-ALPHA
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="session-tree-item"][data-session-name="SHELL-SFTP-ALPHA"]'
+    timeout_sec: 15
+- dblclick: '[data-testid="session-tree-item"][data-session-name="SHELL-SFTP-ALPHA"]'
+- wait_for:
+    selector: '[data-testid="auth-prompt"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SHELL_SFTP_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="sftp-remote-list"]'
+    timeout_sec: 15
+- click: '[data-testid="sftp-local-path-edit"]'
+- fill:
+    selector: input[data-testid="sftp-local-path"]
+    value: ${fixture.shell_sftp_local}
+- press: Enter
+- wait_for:
+    selector: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+    timeout_sec: 15
+- click: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+- click: '[data-testid="sftp-local-upload-selected"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-remote-path$="/upload 中文.bin"][data-state="running"]'
+    timeout_sec: 15
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="transfer-job"][data-remote-path$="/upload 中文.bin"] [data-testid="transfer-job-pause"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-remote-path$="/upload 中文.bin"][data-state="paused"]'
+    timeout_sec: 15
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: stable
+    full_size: 16777216
+- close_window: null
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- native_app_process:
+    state: running
+- assert_native_window_count:
+    equal: 2
+- mysql_assert_rows:
+    query: SELECT id, v FROM qa_shell_tx ORDER BY id
+    equals:
+    - - 1
+      - before
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: stable
+    full_size: 16777216
+- switch_window:
+    route: '#notes='
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'Exit cancellation retains this note
+
+      中文全文'
+- switch_window:
+    route: ''
+- click: '[data-testid="app-main-menu"]'
+- click: '[data-testid="context-menu-item-exit"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- assert_count:
+    selector: '[data-testid="shell-close-risk"][data-risk-kind="transaction"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-close-risk"][data-risk-kind="job"]'
+    equal: 1
+- assert_not_visible: '[data-testid="shell-close-background"]'
+- click: '[data-testid="shell-close-cancel"]'
+- native_app_process:
+    state: running
+- mysql_assert_rows:
+    query: SELECT id, v FROM qa_shell_tx ORDER BY id
+    equals:
+    - - 1
+      - before
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="database"]'
+    equal: 1
+- screenshot: tc-shell-n15-cancelled.png
+- click: '[data-testid="app-main-menu"]'
+- click: '[data-testid="context-menu-item-exit"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="shell-close-dialog"]'
+- click: '[data-testid="shell-close-cancel-job"]'
+- click: '[data-testid="shell-close-rollback"]'
+- click: '[data-testid="shell-close-confirm"]'
+- native_app_process:
+    state: exited
+    timeout_sec: 30
+- mysql_assert_rows:
+    query: SELECT id, v FROM qa_shell_tx ORDER BY id
+    equals:
+    - - 1
+      - before
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: incomplete
+    full_size: 16777216
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: stable
+    full_size: 16777216
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: System Close cancellation keeps both QA windows and the exact Notes body; the app PID,
+      paused partial upload and uncommitted MySQL state remain.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    - 31
+    - 32
+    - 33
+    - 34
+    - 39
+    - 41
+    - 42
+    - 43
+    - 44
+    - 48
+    - 49
+    - 50
+    - 52
+    - 53
+    - 54
+    - 55
+    - 57
+    - 59
+    - 60
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 71
+    - 73
+    - 74
+    - 76
+    - 77
+    - 78
+    - 80
+    - 81
+    - 84
+    - 87
+    - 89
+    - 94
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec":
+        10}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-pw1\"]", "timeout_sec": 15}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-db-tx2\"]"}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"schema-tree\"]", "timeout_sec": 30}}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-summary\"]", "contains":
+        "Success: 3", "timeout_sec": 60}}'
+    - step: 38
+      expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
+        [[1, "before"]]}}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"db-tx-mode\"][data-mode=\"manual\"]"}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
+        1", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
+        [[1, "before"]]}}'
+    - step: 47
+      expectation: '{"native_app_process": {"state": "running"}}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"notes-detached-window\"][data-phase=\"ready\"]"}'
+    - step: 58
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 61
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "timeout_sec": 15}}'
+    - step: 70
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL-SFTP-ALPHA\"]",
+        "timeout_sec": 15}}'
+    - step: 72
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "timeout_sec": 15}}'
+    - step: 75
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"]", "timeout_sec": 15}}'
+    - step: 79
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
+        中文.bin\"]", "timeout_sec": 15}}'
+    - step: 82
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload
+        中文.bin\"][data-state=\"running\"]", "timeout_sec": 15}}'
+    - step: 83
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 85
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload
+        中文.bin\"][data-state=\"paused\"]", "timeout_sec": 15}}'
+    - step: 86
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "stable", "full_size": 16777216}}'
+    - step: 88
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 90
+      expectation: '{"native_app_process": {"state": "running"}}'
+    - step: 91
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 92
+      expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
+        [[1, "before"]]}}'
+    - step: 93
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "stable", "full_size": 16777216}}'
+    - step: 95
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Exit
+        cancellation retains this note\n中文全文"}}'
+    results:
+    - 3
+    - 6
+    - 7
+    - 9
+    - 11
+    - 19
+    - 22
+    - 26
+    - 28
+    - 29
+    - 30
+    - 37
+    - 38
+    - 40
+    - 45
+    - 46
+    - 47
+    - 51
+    - 56
+    - 58
+    - 61
+    - 70
+    - 72
+    - 75
+    - 79
+    - 82
+    - 83
+    - 85
+    - 86
+    - 88
+    - 90
+    - 91
+    - 92
+    - 93
+    - 95
+  - id: R2
+    requirement: Menu Exit exposes both real job and transaction risks and forbids leaving a job behind;
+      cancelling the plan keeps the app and DB owner alive.
+    actions:
+    - 97
+    - 98
+    - 100
+    - 105
+    checkpoints:
+    - step: 99
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 101
+      expectation: '{"wait_for": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 102
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-close-risk\"][data-risk-kind=\"transaction\"]",
+        "equal": 1}}'
+    - step: 103
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-close-risk\"][data-risk-kind=\"job\"]",
+        "equal": 1}}'
+    - step: 104
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-close-background\"]"}'
+    - step: 106
+      expectation: '{"native_app_process": {"state": "running"}}'
+    - step: 107
+      expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
+        [[1, "before"]]}}'
+    - step: 108
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"database\"]",
+        "equal": 1}}'
+    results:
+    - 99
+    - 101
+    - 102
+    - 103
+    - 104
+    - 106
+    - 107
+    - 108
+  - id: R3
+    requirement: Explicit cancel-job and rollback precede actual app process exit; the independent client
+      sees the original committed row and the incomplete remote file remains stable.
+    actions:
+    - 110
+    - 111
+    - 113
+    - 115
+    - 116
+    - 117
+    checkpoints:
+    - step: 112
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 114
+      expectation: '{"wait_for": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 118
+      expectation: '{"native_app_process": {"state": "exited", "timeout_sec": 30}}'
+    - step: 119
+      expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
+        [[1, "before"]]}}'
+    - step: 120
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "incomplete", "full_size": 16777216}}'
+    - step: 121
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "stable", "full_size": 16777216}}'
+    results:
+    - 112
+    - 114
+    - 118
+    - 119
+    - 120
+    - 121
+  visual:
+  - check: Inspect the retained screenshot for readable controls and no clipping
+    method: manual
+    reason: Screenshot creation does not prove a visual verdict
+  native:
+  - check: Real IPC and independent process/service effects listed in this case
+    method: automated
+    reason: No browser stub is used; physical input and unsupported OS boundary steps remain separately
+      recorded

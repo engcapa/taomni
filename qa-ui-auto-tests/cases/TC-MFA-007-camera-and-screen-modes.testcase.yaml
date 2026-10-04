@@ -1,50 +1,86 @@
 id: TC-MFA-007
-title: Camera scan reports missing and denied cameras, imports a QR and releases the stream
-description: >-
-  V-16 (AC-06, AC-07). Browser stub with a controlled fake camera
-  (`browser_fake_camera`): no camera, then a refused permission, each show
-  their state with Try again; a camera streaming the RFC 4226 QR is decoded by
-  the live scan loop into the review step, after which every fake track is
-  stopped and the video is gone. Screen scan in the browser preview explains
-  that it needs the desktop app. Real cameras and OS prompts stay manual (V-25).
-covers: [F-MFA-1, F-MFA-2]
-tags: [mfa, camera, p1]
-modes: [browser]
-fixtures: [reset_db]
+title: Camera scan reports missing and denied cameras, imports a QR and releases the
+  stream
+description: 'V-16 (AC-06, AC-07). Browser stub with a controlled fake camera (`browser_fake_camera`):
+  no camera, then a refused permission, each show their state with Try again; a camera
+  streaming the RFC 4226 QR is decoded by the live scan loop into the review step,
+  after which every fake track is stopped and the video is gone. Screen scan in the
+  browser preview explains that it needs the desktop app. Real cameras and OS prompts
+  stay manual (V-25).
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
+covers:
+- F-MFA-1
+- F-MFA-2
+tags:
+- mfa
+- camera
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-007}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-007}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-master-007
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-master-007
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
-- browser_fake_camera: {mode: none}
+- browser_fake_camera:
+    mode: none
 - click: '[data-testid="mfa-add"]'
 - click: '[data-testid="mfa-add-mode-camera"]'
 - wait_for: '[data-testid="mfa-camera-state"][data-state="no-camera"]'
-- browser_fake_camera: {mode: denied}
+- browser_fake_camera:
+    mode: denied
 - click: '[data-testid="mfa-camera-retry"]'
 - wait_for: '[data-testid="mfa-camera-state"][data-state="denied"]'
-- browser_fake_camera: {mode: qr, image: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png}
+- browser_fake_camera:
+    mode: qr
+    image: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png
 - click: '[data-testid="mfa-camera-retry"]'
-- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 30}
-- assert_count: {selector: '[data-testid="mfa-camera-video"]', equal: 0}
-- eval_readonly: {expression: 'window.__taomniQaCamera.created > 0 && window.__taomniQaCamera.live === 0'}
-- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Bank]}
+- wait_for:
+    selector: '[data-testid="mfa-import-preview"]'
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mfa-camera-video"]'
+    equal: 0
+- eval_readonly:
+    expression: window.__taomniQaCamera.created > 0 && window.__taomniQaCamera.live
+      === 0
+- assert_items:
+    selector: '[data-testid="mfa-import-item"]'
+    attribute: data-issuer
+    equals:
+    - QA Bank
 - click: '[data-testid="mfa-import-confirm"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)', equals: 755 224}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)'
+    equals: 755 224
 - click: '[data-testid="mfa-add"]'
 - click: '[data-testid="mfa-add-mode-screen"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="screen"]'
 - click: '[data-testid="mfa-screen-scan"]'
-- assert_text: {selector: '[data-testid="mfa-screen-status"]', contains: only available in the desktop app}
-- assert_attribute: {selector: '[data-testid="mfa-screen-status"]', name: data-state, equals: error}
+- assert_text:
+    selector: '[data-testid="mfa-screen-status"]'
+    contains: only available in the desktop app
+- assert_attribute:
+    selector: '[data-testid="mfa-screen-status"]'
+    name: data-state
+    equals: error
 - press: Escape
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
 - screenshot: mfa-007-camera-import.png
@@ -52,37 +88,75 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The camera pane distinguishes no camera and refused access, and Try again restarts the scan (AC-07).
-    actions: [11, 12, 13, 15, 16]
+    requirement: The camera pane distinguishes no camera and refused access, and Try
+      again restarts the scan (AC-07).
+    actions:
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
     checkpoints:
-    - {step: 14, expectation: no-camera state}
-    - {step: 17, expectation: denied state after retry}
-    results: [17]
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"mfa-camera-state\"][data-state=\"no-camera\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"mfa-camera-state\"][data-state=\"denied\"]"}'
+    results:
+    - 17
   - id: R2
-    requirement: A camera showing an MFA QR code is decoded into the review step, the stream is released and the account is imported (AC-07).
-    actions: [18, 19, 24]
+    requirement: A camera showing an MFA QR code is decoded into the review step,
+      the stream is released and the account is imported (AC-07).
+    actions:
+    - 18
+    - 19
+    - 24
     checkpoints:
-    - {step: 20, expectation: review step from the live scan}
-    - {step: 21, expectation: video removed}
-    - {step: 22, expectation: every camera track stopped}
-    - {step: 23, expectation: QA Bank decoded}
-    - {step: 25, expectation: dialog closed}
-    - {step: 26, expectation: code 755 224}
-    results: [26]
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mfa-import-preview\"]",
+        "timeout_sec": 30}}'
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-camera-video\"]",
+        "equal": 0}}'
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "window.__taomniQaCamera.created
+        > 0 && window.__taomniQaCamera.live === 0"}}'
+    - step: 23
+      expectation: '{"assert_items": {"selector": "[data-testid=\"mfa-import-item\"]",
+        "attribute": "data-issuer", "equals": ["QA Bank"]}}'
+    - step: 25
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
+    - step: 26
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"mfa-account-code\"]:is([data-issuer=\"QA
+        Bank\"] *)", "equals": "755 224"}}'
+    results:
+    - 26
   - id: R3
-    requirement: Screen scan in the browser preview states that it needs the desktop app (AC-06).
-    actions: [27, 28, 30, 33]
+    requirement: Screen scan in the browser preview states that it needs the desktop
+      app (AC-06).
+    actions:
+    - 27
+    - 28
+    - 30
+    - 33
     checkpoints:
-    - {step: 29, expectation: screen mode}
-    - {step: 31, expectation: desktop-only message}
-    - {step: 32, expectation: status in error state}
-    - {step: 34, expectation: Escape closed the dialog}
-    results: [34]
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"mfa-add-dialog\"][data-mode=\"screen\"]"}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mfa-screen-status\"]",
+        "contains": "only available in the desktop app"}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mfa-screen-status\"]",
+        "name": "data-state", "equals": "error"}}'
+    - step: 34
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
+    results:
+    - 34
   visual:
   - check: Camera states and the screen-scan message are legible.
     method: manual
     reason: Screenshot needs human review.
   native:
-  - check: Real camera devices, OS permission prompts and the camera light are verified manually (V-25); real screen capture by TC-MFA-106.
+  - check: Real camera devices, OS permission prompts and the camera light are verified
+      manually (V-25); real screen capture by TC-MFA-106.
     method: manual
     reason: Hosted runners have no camera; the fake stream proves only the scan loop.

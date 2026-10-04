@@ -8,7 +8,10 @@ description: 'F-AI-2.1 closes the gap by exercising the two top-level AI privacy
 
   renders when AI is enabled, so we assert it as soft-optional.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F-AI-2.1
 tags:
@@ -24,8 +27,8 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-ai"]'
 - assert_visible: text="Disable AI completely"
@@ -53,7 +56,7 @@ verification:
     - 10
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 6
@@ -61,10 +64,11 @@ verification:
     - step: 7
       expectation: '{"assert_visible": "[data-testid=\"ai-master-switch\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "state": "detached", "timeout_sec":
-        10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "state":
+        "detached", "timeout_sec": 10}}'
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "timeout_sec":
+        10}}'
     results:
     - 11
   visual:

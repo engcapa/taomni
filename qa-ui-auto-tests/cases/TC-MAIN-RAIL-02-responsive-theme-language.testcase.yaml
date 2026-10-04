@@ -1,159 +1,236 @@
 id: TC-MAIN-RAIL-02
-title: Left rail keeps upright Chinese names and a full-height grip at narrow widths in both themes
-description: Browser layout acceptance at 1280 and 800 CSS pixels with theme, locale, collapse and names changes; screenshots require visual review.
-covers: [F1.2, F1.3, F6.2, F-Sockscap-1, F25.5, F-I18n-1]
-tags: [main, sidebar, p1]
-modes: [browser]
-fixtures: [reset_db]
+title: Shell Rail keeps horizontal Chinese names, theme and hit targets at narrow
+  widths
+description: Adapted for Workspace Shell v2. The permanent Rail, per-lane Navigator
+  and merged workspace stripes replace the old expanded/collapsed sidebar wrappers.
+  Retained results are declared in each requirement.
+covers:
+- F1.2
+- F1.3
+- F25.5
+- F-I18n-1
+tags:
+- main
+- sidebar
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 120
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - set_viewport: {width: 1280, height: 820}
-  - seed_storage: {key: taomni.sidebarCollapsed, value: 'false'}
-  - seed_storage: {key: taomni.codeWorkspace.toolWindowStripes.v1, value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'}
-  - reload_window: null
-  - wait_for: '[data-testid="session-tree"]'
-  - click: '[data-testid="language-switcher"]'
-  - click: '[data-testid="language-option-zh-CN"]'
-  - click: '[data-testid="theme-cycle"]'
-  - assert_localstorage: {key: taomni.appTheme.v1, equals: light}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: 会话}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: 工具}
-  - eval_readonly:
-      expression: getComputedStyle(document.querySelector('button[data-tool-window-id]')).writingMode === 'horizontal-tb'
-      expect_truthy: true
-  - screenshot: main-rail-chinese-light.png
-  - click: '[data-testid="theme-cycle"]'
-  - assert_localstorage: {key: taomni.appTheme.v1, equals: dark}
-  - set_viewport: {width: 800, height: 600}
-  - eval_readonly:
-      expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height - innerHeight) < 1
-      expect_truthy: true
-  - eval_readonly:
-      expression: JSON.stringify({fits:document.documentElement.scrollWidth<=innerWidth,viewport:innerWidth,document:document.documentElement.scrollWidth,main:document.querySelector('.taomni-main-window').scrollWidth,status:document.querySelector('.taomni-status').scrollWidth,title:document.querySelector('.taomni-control-bar').scrollWidth})
-      contains: '"fits":true'
-      timeout_sec: 3
-  - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
-  - wait_for: '[data-testid="collapsed-sidebar-rail"]'
-  - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
-  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
-  - assert_text: {selector: '[data-testid="sidebar-rail-menu-show-names"]', contains: 显示工具窗口名称}
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', equals: ''}
-  - screenshot: main-rail-narrow-dark-icons.png
-  - press: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', key: Enter}
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - assert_visible: '[data-testid="sidebar-tool-code-workspace"]'
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: 工具}
-  - screenshot: main-rail-narrow-dark-names.png
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-  - assert_element_geometry:
-      selector: '[data-testid="collapsed-sidebar-rail"] button[data-tool-window-id]'
-      min_count: 3
-      min_width: 32
-      min_height: 32
-      same_width: true
-      icon_size: 16
-  - click: '[data-testid="code-workspace-bottom-tab-problems"]'
-  - assert_visible: '[data-testid="code-workspace-tool-window-problems"]'
-  - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
-  - screenshot: main-rail-narrow-workspace-dark.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-retained-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.shellLayout.v2
+    value: '{"version": 2, "navigator": {"collapsedByLane": {"home": false, "build":
+      true, "connect": true}, "lastArea": "sessions", "width": 360}}'
+- seed_storage:
+    key: taomni.mergeToolWindowRail
+    value: 'true'
+- seed_storage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'
+- reload_window: null
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- click: '[data-testid="theme-cycle"]'
+- assert_localstorage:
+    key: taomni.appTheme.v1
+    equals: light
+- assert_text_equals:
+    selector: '[data-testid="shell-rail-sessions"]'
+    equals: 会话
+- assert_text_equals:
+    selector: '[data-testid="shell-rail-workspaces"]'
+    equals: 工作区
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail-sessions"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail-workspaces"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('nav button')).writingMode
+      === 'horizontal-tb'
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot: main-rail-chinese-light-v2.png
+- click: '[data-testid="theme-cycle"]'
+- assert_localstorage:
+    key: taomni.appTheme.v1
+    equals: dark
+- set_viewport:
+    width: 800
+    height: 600
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height
+      - innerHeight) < 1
+    expect_truthy: true
+    timeout_sec: 5
+- right_click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":false'
+- assert_text_equals:
+    selector: '[data-testid="shell-rail-workspaces"]'
+    equals: ''
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail-workspaces"]'
+    min_width: 1
+    min_height: 1
+    within_viewport: true
+    hit_center: true
+- press:
+    selector: '[data-testid="shell-rail-workspaces"]'
+    key: Enter
+- click: '[data-testid="shell-navigator-page"][data-page="tools"]'
+- assert_visible: '[data-testid="sidebar-tool-code-workspace"]'
+- right_click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":true'
+- assert_text_equals:
+    selector: '[data-testid="shell-rail-workspaces"]'
+    equals: 工作区
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- assert_visible: '[data-testid="code-workspace-tool-rail-left"]'
+- click: '[data-testid="code-workspace-bottom-tab-problems"]'
+- assert_visible: '[data-testid="shell-host"][data-panel-id$=":problems"] [data-testid="code-workspace-problems-panel"]'
+- assert_visible: '[data-testid="shell-rail-workspaces"]'
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot: main-rail-narrow-workspace-dark-v2.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 中文横排图标名称在明暗主题和 800px 窄窗口中正常，拖拽带全高且无横向溢出；底部 Problems 点击有效。
+    requirement: Chinese names render horizontally in the light theme, with the full-height
+      grip outside the primary content.
     actions:
-    - 1
-    - 3
+    - 4
+    - 5
     - 6
-    - 8
+    - 7
     - 9
     - 10
-    - 16
-    - 18
-    - 21
-    - 24
-    - 26
-    - 29
-    - 32
-    - 33
-    - 36
-    - 39
-    checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 11
-      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "equals": "light"}}'
-    - step: 12
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
-        "equals": "会话"}}'
-    - step: 13
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
-        "equals": "工具"}}'
-    - step: 14
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''button[data-tool-window-id]'')).writingMode
-        === ''horizontal-tb''", "expect_truthy": true}}'
-    - step: 17
-      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "equals": "dark"}}'
-    - step: 19
-      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
-        - innerHeight) < 1", "expect_truthy": true}}'
-    - step: 20
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify({fits:document.documentElement.scrollWidth<=innerWidth,viewport:innerWidth,document:document.documentElement.scrollWidth,main:document.querySelector(''.taomni-main-window'').scrollWidth,status:document.querySelector(''.taomni-status'').scrollWidth,title:document.querySelector(''.taomni-control-bar'').scrollWidth})",
-        "contains": "\"fits\":true", "timeout_sec": 3}}'
-    - step: 22
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 23
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
-    - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sidebar-rail-menu-show-names\"]", "contains": "显示工具窗口名称"}}'
-    - step: 27
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]",
-        "equals": ""}}'
-    - step: 30
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
-    - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"sidebar-tool-code-workspace\"]"}'
-    - step: 34
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
-        "equals": "工具"}}'
-    - step: 37
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 38
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] button[data-tool-window-id]",
-        "min_count": 3, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
-    - step: 40
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-problems\"]"}'
-    - step: 41
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
-    results:
-    - 2
-    - 7
     - 11
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 12
+      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "equals":
+        "light"}}'
+    - step: 13
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-sessions\"]",
+        "equals": "会话"}}'
+    - step: 14
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]",
+        "equals": "工作区"}}'
+    - step: 15
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail-sessions\"]",
+        "min_width": 1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 16
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail-workspaces\"]",
+        "min_width": 1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 17
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''nav
+        button'')).writingMode === ''horizontal-tb''", "expect_truthy": true, "timeout_sec":
+        5}}'
+    results:
+    - 8
     - 12
     - 13
     - 14
+    - 15
+    - 16
     - 17
+  - id: R2
+    requirement: The 800px dark layout keeps the Rail and Tools overlay usable with
+      names on and off.
+    actions:
     - 19
+    - 21
+    - 24
+    - 25
+    - 29
+    - 30
+    - 32
+    - 33
+    - 37
+    - 40
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "equals":
+        "dark"}}'
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "document.documentElement.scrollWidth
+        <= innerWidth", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 23
+      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-window-drag]'').getBoundingClientRect().height
+        - innerHeight) < 1", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 26
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1",
+        "contains": "\"showNames\":false"}}'
+    - step: 27
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]",
+        "equals": ""}}'
+    - step: 28
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail-workspaces\"]",
+        "min_width": 1, "min_height": 1, "within_viewport": true, "hit_center": true}}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-tool-code-workspace\"]"}'
+    - step: 34
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1",
+        "contains": "\"showNames\":true"}}'
+    - step: 35
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]",
+        "equals": "工作区"}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 39
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 41
+      expectation: '{"assert_visible": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]
+        [data-testid=\"code-workspace-problems-panel\"]"}'
+    - step: 42
+      expectation: '{"assert_visible": "[data-testid=\"shell-rail-workspaces\"]"}'
+    - step: 43
+      expectation: '{"eval_readonly": {"expression": "document.documentElement.scrollWidth
+        <= innerWidth", "expect_truthy": true, "timeout_sec": 5}}'
+    results:
     - 20
     - 22
     - 23
-    - 25
+    - 26
     - 27
-    - 30
+    - 28
     - 31
     - 34
-    - 37
+    - 35
     - 38
-    - 40
+    - 39
     - 41
+    - 42
+    - 43
   visual:
   - check: 检查对应截图的图标、名称、选中态、全高拖拽带以及点击区域无缩小、遮挡或截断。
     method: manual

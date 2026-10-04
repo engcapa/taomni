@@ -4,8 +4,10 @@
 [data-testid="shell-host"] header button { min-width: 28px; min-height: 28px; }
 [data-testid="shell-host"] [role="menuitem"] { text-align: left; padding: 6px 12px; }
 [data-testid="shell-host"] [role="menuitem"]:hover { background: var(--taomni-hover); }
+.shell-legacy-tao-ribbon [data-testid="ai-chat-drawer-ribbon"] { pointer-events: auto; }
 @media (max-width: 1199px) {
   .shell-titlebar-secondary { display: none; }
+  .shell-legacy-tao-ribbon { display: none; }
 }
 @media (max-width: 719px) {
   .shell-titlebar-tabs { max-width: 90px; }

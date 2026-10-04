@@ -156,7 +156,7 @@ export function TaoAlertInbox({
                   : "text-[var(--taomni-accent)]";
             return (
               <li key={alert.id} className="border-b border-[var(--taomni-divider)] last:border-b-0">
-                <div className="flex items-center gap-1.5 px-2 py-1.5" data-testid="tao-alert-inbox-item">
+                <div className="flex items-center gap-1.5 px-2 py-1.5" data-testid="tao-alert-inbox-item" data-alert-id={alert.id} data-alert-kind={alert.kind} data-alert-count={alert.count ?? 1} data-target-kind={alert.source}>
                   <Icon className={`w-3.5 h-3.5 shrink-0 ${color}`} />
                   <button
                     type="button"

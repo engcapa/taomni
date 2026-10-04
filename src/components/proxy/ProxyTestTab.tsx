@@ -34,7 +34,7 @@ export default function ProxyTestTab({ info }: { info: ProxyTestTabInfo }) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
+    <div data-testid="proxy-test-panel" className="flex flex-col items-center justify-center h-full gap-6 p-8">
       <div className="flex items-center gap-3">
         <Network className="w-8 h-8 text-[var(--taomni-text-muted)]" />
         <div>
@@ -49,16 +49,19 @@ export default function ProxyTestTab({ info }: { info: ProxyTestTabInfo }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-xs text-[var(--taomni-text-muted)]">
+        <label htmlFor="proxy-test-url" className="text-xs text-[var(--taomni-text-muted)]">
           {t("sessionEditor2.proxyTestUrl")}:
         </label>
         <input
+          id="proxy-test-url"
+          data-testid="proxy-test-url"
           className="taomni-input w-48 text-xs"
           value={testUrl}
           placeholder={t("sessionEditor2.proxyTestUrlPlaceholder")}
           onChange={(e) => setTestUrl(e.target.value)}
         />
         <button
+          data-testid="proxy-test-run"
           className="taomni-btn flex items-center gap-1.5 px-3 py-1.5"
           onClick={() => void handleTest()}
           disabled={testing}
@@ -70,7 +73,7 @@ export default function ProxyTestTab({ info }: { info: ProxyTestTabInfo }) {
       </div>
 
       {result && (
-        <div className={`flex items-center gap-2 text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
+        <div data-testid="proxy-test-result" role="status" data-success={result.ok} className={`flex items-center gap-2 text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
           {result.ok
             ? <CheckCircle2 className="w-5 h-5" />
             : <XCircle className="w-5 h-5" />}

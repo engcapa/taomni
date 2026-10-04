@@ -1,11 +1,16 @@
 id: TC-IDE-PARITY-011-03
 title: Default import folding and user-selection-only AI toolbar
-description: 'ED-PARITY-011 A4 browser case: a reopened Java file shows its import block folded (IDEA default), a Find match selection does not raise the AI selection toolbar, and a Shift+Arrow extend does.
+description: 'ED-PARITY-011 A4 browser case: a reopened Java file shows its import
+  block folded (IDEA default), a Find match selection does not raise the AI selection
+  toolbar, and a Shift+Arrow extend does.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -20,7 +25,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -64,7 +69,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go
+      to file"]'
     text: Demo011.java
 - wait_for:
     selector: '[data-testid="code-workspace-search-everywhere"] button:has-text("Demo011.java")'
@@ -110,9 +116,11 @@ verification:
     - 30
     checkpoints:
     - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-foldPlaceholder", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-foldPlaceholder", "timeout_sec": 10}}'
     - step: 33
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:has-text(\"import\")", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-line:has-text(\"import\")", "equal": 1}}'
     results:
     - 32
     - 33
@@ -122,7 +130,8 @@ verification:
     - 38
     checkpoints:
     - step: 41
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-ai-selection-toolbar\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-ai-selection-toolbar\"]",
+        "equal": 0}}'
     - step: 47
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-ai-selection-toolbar\"]"}'
     results:

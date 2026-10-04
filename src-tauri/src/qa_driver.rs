@@ -6,7 +6,7 @@
 //! started for normal application launches.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     process::Command,
     sync::{
         Arc,
@@ -24,6 +24,7 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use serde_json::{Value, json};
+use std::sync::LazyLock;
 use std::sync::Mutex as StdMutex;
 
 use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
@@ -31,6 +32,21 @@ use tokio::sync::{Mutex, oneshot};
 
 const SESSION_ID: &str = "taomni-qa-macos";
 static BRIDGE_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static LOADED_WINDOWS: LazyLock<StdMutex<HashSet<String>>> =
+    LazyLock::new(|| StdMutex::new(HashSet::new()));
+
+pub(crate) fn mark_page_load(label: &str, event: tauri::webview::PageLoadEvent) {
+    if let Ok(mut loaded) = LOADED_WINDOWS.lock() {
+        match event {
+            tauri::webview::PageLoadEvent::Started => {
+                loaded.remove(label);
+            }
+            tauri::webview::PageLoadEvent::Finished => {
+                loaded.insert(label.to_string());
+            }
+        }
+    }
+}
 
 #[derive(Clone)]
 struct ElementRef {
@@ -151,6 +167,26 @@ fn element_id_of(value: &Value) -> Option<&str> {
 }
 
 async fn eval_js<R: Runtime>(state: &DriverState<R>, body: String) -> Result<Value, String> {
+    let window = state.current_window()?;
+    // Wry queues scripts before WKWebView navigation commits, dropping their
+    // callbacks. Wait for this view's load event before sending any script.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+    loop {
+        if LOADED_WINDOWS
+            .lock()
+            .map_err(|_| "page-load lock poisoned")?
+            .contains(window.label())
+        {
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(format!(
+                "window {} has not finished loading",
+                window.label()
+            ));
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
     let script = format!(
         r#"(() => {{
           try {{
@@ -163,8 +199,7 @@ async fn eval_js<R: Runtime>(state: &DriverState<R>, body: String) -> Result<Val
     let (sender, receiver) = oneshot::channel::<String>();
     let sender = Arc::new(StdMutex::new(Some(sender)));
     let callback_sender = sender.clone();
-    state
-        .current_window()?
+    window
         .eval_with_callback(script, move |result| {
             if let Ok(mut sender) = callback_sender.lock() {
                 if let Some(sender) = sender.take() {

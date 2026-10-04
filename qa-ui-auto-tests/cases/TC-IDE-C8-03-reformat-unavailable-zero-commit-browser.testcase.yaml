@@ -14,7 +14,10 @@ description: 'Browser gate case (ED-STYLE-001). Fills the preview README with a
 
   is covered by mounted unit tests and the live JDT LS provider fixture.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -31,7 +34,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -44,8 +47,8 @@ steps:
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
-    value: "public class ReformatProbe {\n    // @formatter:off\n       badly_indented();\n    // @formatter:on\n\
-      \        also_bad();\n}"
+    value: "public class ReformatProbe {\n    // @formatter:off\n       badly_indented();\n
+      \   // @formatter:on\n        also_bad();\n}"
 - press: Control+Alt+l
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
@@ -71,12 +74,13 @@ verification:
     - 15
     checkpoints:
     - step: 16
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "No formatter
-        provider", "timeout_sec": 20}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]",
+        "contains": "No formatter provider", "timeout_sec": 20}}'
     - step: 17
-      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
-        "equals": ["public class ReformatProbe {", "    // @formatter:off", "       badly_indented();", "    //
-        @formatter:on", "        also_bad();", "}"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content .cm-line", "equals": ["public class ReformatProbe {", "    //
+        @formatter:off", "       badly_indented();", "    // @formatter:on", "        also_bad();",
+        "}"]}}'
     results:
     - 16
     - 17

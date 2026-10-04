@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { consumeDetachedHandoff, clearDetachedHandoff, subscribePanelWindow } from "../../lib/detachedSession";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import { matchesPanelWindow, signalPanelWindow, waitPanelWindow } from "../../lib/shell/panelWindowTransaction";
-import { getGitShellController, validateGitShellSnapshot, type GitShellSnapshot } from "../../lib/shell/gitShellState";
+import { getGitShellController, subscribeGitShellView, validateGitShellSnapshot, type GitShellSnapshot } from "../../lib/shell/gitShellState";
 import type { PanelWindowEnvelope } from "../../lib/shell/types";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { WorkspaceGitManager } from "../git/WorkspaceGitManager";
@@ -22,6 +22,13 @@ export function GitDetachedWindow({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null), [committed, setCommitted] = useState(false);
   const closing = useRef(false), t = useT(), theme = useAppTheme();
   const scopeId = payload ? `${payload.envelope.panelId}:window:${id}` : id;
+  useEffect(() => {
+    if (!payload || !committed) return;
+    const publish = () => signalPanelWindow(payload.envelope, "snapshot", getGitShellController(scopeId)?.snapshot());
+    signalPanelWindow(payload.envelope, "committed");
+    publish();
+    return subscribeGitShellView(scopeId, publish);
+  }, [payload, committed, scopeId]);
   useEffect(() => { document.documentElement.dataset.appTheme = theme.resolvedTheme; }, [theme.resolvedTheme]);
   const reattach = useCallback(async () => {
     if (!payload || closing.current) return;
@@ -47,9 +54,9 @@ export function GitDetachedWindow({ id }: { id: string }) {
   useEffect(() => {
     if (!isTauriRuntime()) return;
     let off: (() => void) | undefined, disposed = false;
-    void getCurrentWindow().onCloseRequested((event) => { event.preventDefault(); void reattach(); }).then((fn) => { if (disposed) fn(); else off = fn; });
+    void getCurrentWindow().onCloseRequested((event) => { event.preventDefault(); if (committed) void reattach(); else void closeCurrentDetachedWindow(); }).then((fn) => { if (disposed) fn(); else off = fn; });
     return () => { disposed = true; off?.(); };
-  }, [reattach]);
+  }, [reattach, committed]);
   const ready = useCallback((failure?: string) => {
     if (!payload) return;
     if (failure) { setError(failure); signalPanelWindow({ ...payload.envelope, errorCode: failure }, "failed"); }
@@ -59,6 +66,6 @@ export function GitDetachedWindow({ id }: { id: string }) {
   return <div data-testid="shell-git-window" data-phase={committed ? "ready" : "initializing"} className="h-screen w-screen flex flex-col" style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)" }}>
     <header className="flex items-center gap-2 p-2 border-b"><strong className="flex-1 truncate">{payload.title}</strong><button data-testid="shell-window-reattach" onClick={() => void reattach()}>{t("shell.reattach")}</button></header>
     {error && <p role="alert" data-testid="shell-window-error">{error}</p>}
-    <div className="flex-1 min-h-0">{payload.singleRepository ? <GitPanel repoRoot={payload.activeRepoRoot ?? payload.roots[0].repoRoot} shellScopeId={scopeId} initialShellSnapshot={payload.snapshot} onReady={ready} /> : <WorkspaceGitManager roots={payload.roots} workspaceName={payload.title} activeRepoRoot={payload.activeRepoRoot} shellScopeId={scopeId} initialShellSnapshot={payload.snapshot} onReady={ready} />}</div>
+    <div className="flex-1 min-h-0" inert={!committed}>{payload.singleRepository ? <GitPanel repoRoot={payload.activeRepoRoot ?? payload.roots[0].repoRoot} shellScopeId={scopeId} initialShellSnapshot={payload.snapshot} onReady={ready} /> : <WorkspaceGitManager roots={payload.roots} workspaceName={payload.title} activeRepoRoot={payload.activeRepoRoot} shellScopeId={scopeId} initialShellSnapshot={payload.snapshot} onReady={ready} />}</div>
   </div>;
 }

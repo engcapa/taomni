@@ -6,7 +6,10 @@ description: 'Browser smoke for the capability-driven Code Workspace Build, Run,
 
   navigation, and persistence of all runtime/build/debug tool overrides.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.1
 - F25.2
@@ -23,7 +26,7 @@ timeout_sec: 60
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - assert_visible: '[data-testid="code-workspace-tab"]'
@@ -282,8 +285,9 @@ verification:
     - step: 19
       expectation: '{"assert_visible": "[data-testid=\"workspace-build-run-tools-dialog\"]"}'
     - step: 46
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify(localStorage).includes(''cargo-custom'') &&
-        JSON.stringify(localStorage).includes(''netcoredbg-custom'')", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify(localStorage).includes(''cargo-custom'')
+        && JSON.stringify(localStorage).includes(''netcoredbg-custom'')", "expect_truthy":
+        true}}'
     - step: 48
       expectation: '{"assert_visible": "[data-testid=\"workspace-build-run-tools-dialog\"]"}'
     - step: 56
@@ -319,13 +323,14 @@ verification:
     - step: 84
       expectation: '{"assert_visible": "[data-testid=\"debug-function-breakpoint-row\"][data-function-name=\"Service.run\"]"}'
     - step: 92
-      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "contains":
-        "if ready"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]",
+        "contains": "if ready"}}'
     - step: 93
-      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "contains":
-        "hit 3"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]",
+        "contains": "hit 3"}}'
     - step: 95
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]",
+        "equal": 0}}'
     results:
     - 95
   visual:

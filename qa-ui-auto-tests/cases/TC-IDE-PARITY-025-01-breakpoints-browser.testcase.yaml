@@ -1,11 +1,21 @@
 id: TC-IDE-PARITY-025-01
 title: IDEA breakpoint gutter, balloon and Breakpoints dialog
-description: 'ED-PARITY-025 A1/A2/A3 browser case: IDEA''s gutter mouse model (click toggles, middle-click disables, Alt+click adds a temporary and Shift+click a non-suspending logging breakpoint with the expanded balloon), the right-click balloon (Enabled/Suspend/Condition, Enter commits and closes, More opens the dialog), the empty-line Add Breakpoint menu, Ctrl+Shift+F8 (balloon on a breakpoint line, View Breakpoints dialog elsewhere) with Space/Delete keyboard editing, and Ctrl+Alt+Shift+F8 temporary breakpoints. Breakpoints persist without a debug adapter, so browser mode covers the editor and dialog surfaces; hit semantics are covered natively by TC-IDE-PARITY-025-02.
+description: 'ED-PARITY-025 A1/A2/A3 browser case: IDEA''s gutter mouse model (click
+  toggles, middle-click disables, Alt+click adds a temporary and Shift+click a non-suspending
+  logging breakpoint with the expanded balloon), the right-click balloon (Enabled/Suspend/Condition,
+  Enter commits and closes, More opens the dialog), the empty-line Add Breakpoint
+  menu, Ctrl+Shift+F8 (balloon on a breakpoint line, View Breakpoints dialog elsewhere)
+  with Space/Delete keyboard editing, and Ctrl+Alt+Shift+F8 temporary breakpoints.
+  Breakpoints persist without a debug adapter, so browser mode covers the editor and
+  dialog surfaces; hit semantics are covered natively by TC-IDE-PARITY-025-02.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.1
 - F25.5
@@ -22,7 +32,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -140,7 +150,8 @@ steps:
     selector: '[data-testid="debug-breakpoints-dialog-condition"]'
     equal: 1
 - eval_readonly:
-    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"debug-breakpoints-dialog-condition\"]").value === "a > 0"
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) +
+      "\"debug-breakpoints-dialog-condition\"]").value === "a > 0"
     expect_truthy: true
 - press:
     key: Space
@@ -188,7 +199,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A1：IDEA 断点槽鼠标模型——单击切换、中键启用/禁用、Alt+单击临时断点、Shift+单击非挂起日志断点并展开气泡（勾选“Breakpoint hit” message），Done 关闭。
+    requirement: A1：IDEA 断点槽鼠标模型——单击切换、中键启用/禁用、Alt+单击临时断点、Shift+单击非挂起日志断点并展开气泡（勾选“Breakpoint
+      hit” message），Done 关闭。
     actions:
     - 18
     - 21
@@ -198,21 +210,33 @@ verification:
     - 31
     checkpoints:
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"2\"] .taomni-bp", "name": "data-bp-state", "equals": "enabled"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"2\"] .taomni-bp", "name": "data-bp-state", "equals":
+        "enabled"}}'
     - step: 20
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .taomni-debug-breakpoint-line", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .taomni-debug-breakpoint-line", "equal": 1}}'
     - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"2\"] .taomni-bp", "name": "data-bp-state", "equals": "disabled"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"2\"] .taomni-bp", "name": "data-bp-state", "equals":
+        "disabled"}}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"2\"] .taomni-bp", "name": "data-bp-state", "equals": "enabled"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"2\"] .taomni-bp", "name": "data-bp-state", "equals":
+        "enabled"}}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"3\"] .taomni-bp", "name": "data-bp-temporary", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"3\"] .taomni-bp", "name": "data-bp-temporary", "equals":
+        "true"}}'
     - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"4\"] .taomni-bp", "name": "data-bp-kind", "equals": "no-suspend"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"4\"] .taomni-bp", "name": "data-bp-kind", "equals":
+        "no-suspend"}}'
     - step: 29
       expectation: '{"assert_visible": "[data-testid=\"debug-breakpoint-popup-log-stack\"]"}'
     - step: 30
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoint-popup-log-message\"]:checked", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoint-popup-log-message\"]:checked",
+        "equal": 1}}'
     - step: 32
       expectation: '{"assert_not_visible": "[data-testid=\"debug-breakpoint-popup\"]"}'
     results:
@@ -226,7 +250,9 @@ verification:
     - 30
     - 32
   - id: R2
-    requirement: A2：右键断点弹出 IDEA 精简气泡（标题 App.java:2、仅 Enabled/Suspend/Condition，条件框获焦，Enter 提交并关闭，槽图标显示条件标记）；右键空行出现 Add Breakpoint / Conditional / Logging 菜单，Conditional 新建断点并打开气泡，Esc 关闭。
+    requirement: A2：右键断点弹出 IDEA 精简气泡（标题 App.java:2、仅 Enabled/Suspend/Condition，条件框获焦，Enter
+      提交并关闭，槽图标显示条件标记）；右键空行出现 Add Breakpoint / Conditional / Logging 菜单，Conditional
+      新建断点并打开气泡，Esc 关闭。
     actions:
     - 33
     - 37
@@ -236,21 +262,30 @@ verification:
     - 46
     checkpoints:
     - step: 34
-      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-breakpoint-popup-title\"]", "contains": "App.java:2"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-breakpoint-popup-title\"]",
+        "contains": "App.java:2"}}'
     - step: 35
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoint-popup-log-stack\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoint-popup-log-stack\"]",
+        "equal": 0}}'
     - step: 36
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoint-popup-condition\"]:focus", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoint-popup-condition\"]:focus",
+        "equal": 1}}'
     - step: 39
       expectation: '{"assert_not_visible": "[data-testid=\"debug-breakpoint-popup\"]"}'
     - step: 40
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"2\"] .taomni-bp", "name": "data-bp-conditional", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"2\"] .taomni-bp", "name": "data-bp-conditional", "equals":
+        "true"}}'
     - step: 42
-      expectation: '{"assert_menu_items": ["Add Breakpoint", "Add Conditional Breakpoint…", "Add Logging Breakpoint…"]}'
+      expectation: '{"assert_menu_items": ["Add Breakpoint", "Add Conditional Breakpoint…",
+        "Add Logging Breakpoint…"]}'
     - step: 44
-      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-breakpoint-popup-title\"]", "contains": "App.java:6"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-breakpoint-popup-title\"]",
+        "contains": "App.java:6"}}'
     - step: 45
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"6\"] .taomni-bp", "name": "data-bp-kind", "equals": "suspend"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"6\"] .taomni-bp", "name": "data-bp-kind", "equals":
+        "suspend"}}'
     - step: 47
       expectation: '{"assert_not_visible": "[data-testid=\"debug-breakpoint-popup\"]"}'
     results:
@@ -264,7 +299,9 @@ verification:
     - 45
     - 47
   - id: R3
-    requirement: A3：Ctrl+Shift+F8 在无断点行打开 Breakpoints 对话框（列出 4 个行断点，首项属性含条件），Space 禁用、Delete 删除；在断点行打开气泡，More 打开对话框且显示 Remove once hit；Esc 关闭；Ctrl+Alt+Shift+F8 添加临时断点。
+    requirement: A3：Ctrl+Shift+F8 在无断点行打开 Breakpoints 对话框（列出 4 个行断点，首项属性含条件），Space
+      禁用、Delete 删除；在断点行打开气泡，More 打开对话框且显示 Remove once hit；Esc 关闭；Ctrl+Alt+Shift+F8
+      添加临时断点。
     actions:
     - 48
     - 49
@@ -286,29 +323,40 @@ verification:
     - step: 51
       expectation: '{"wait_for": "[data-testid=\"debug-breakpoints-dialog\"]"}'
     - step: 52
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-line\"]", "equal": 4}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-line\"]",
+        "equal": 4}}'
     - step: 53
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-condition\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-condition\"]",
+        "equal": 1}}'
     - step: 54
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"debug-breakpoints-dialog-condition\\\"]\").value === \"a > 0\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"debug-breakpoints-dialog-condition\\\"]\").value
+        === \"a > 0\"", "expect_truthy": true}}'
     - step: 56
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-enabled-2\"]:checked", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-enabled-2\"]:checked",
+        "equal": 0}}'
     - step: 58
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-line\"]", "equal": 3}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-line\"]",
+        "equal": 3}}'
     - step: 60
       expectation: '{"assert_not_visible": "[data-testid=\"debug-breakpoints-dialog\"]"}'
     - step: 61
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"2\"] .taomni-bp", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"2\"] .taomni-bp", "equal": 0}}'
     - step: 67
-      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-breakpoint-popup-title\"]", "contains": "App.java:3"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-breakpoint-popup-title\"]",
+        "contains": "App.java:3"}}'
     - step: 69
       expectation: '{"wait_for": "[data-testid=\"debug-breakpoints-dialog\"]"}'
     - step: 70
-      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-remove-once-hit\"]:checked", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-breakpoints-dialog-remove-once-hit\"]:checked",
+        "equal": 1}}'
     - step: 72
       expectation: '{"assert_not_visible": "[data-testid=\"debug-breakpoints-dialog\"]"}'
     - step: 76
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"7\"] .taomni-bp", "name": "data-bp-temporary", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"]
+        [data-bp-gutter-line=\"7\"] .taomni-bp", "name": "data-bp-temporary", "equals":
+        "true"}}'
     results:
     - 51
     - 52

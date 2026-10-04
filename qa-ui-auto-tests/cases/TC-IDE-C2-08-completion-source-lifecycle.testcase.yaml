@@ -1,10 +1,14 @@
 id: TC-IDE-C2-08-completion-source-lifecycle
 title: Completion source lifecycle, stability, and cancellation
-description: 'Browser verification for completion cancellation via Escape, popup dismissal upon
+description: 'Browser verification for completion cancellation via Escape, popup dismissal
+  upon
 
   typing comment/non-prefix text, and reliably re-triggering completion on a new line.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -22,7 +26,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -104,17 +108,23 @@ verification:
     - step: 15
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
     - step: 18
-      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec":
+        10}}'
     - step: 21
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\") === null", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\")
+        === null", "expect_truthy": true}}'
     - step: 24
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\") === null", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\")
+        === null", "expect_truthy": true}}'
     - step: 27
-      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec":
+        10}}'
     - step: 30
-      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"]", "contains": "soutm"}}'
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"]",
+        "contains": "soutm"}}'
     - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "System.out.println("}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "contains": "System.out.println("}}'
     results:
     - 32
   visual:

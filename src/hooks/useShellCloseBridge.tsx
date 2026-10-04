@@ -46,7 +46,7 @@ export function useShellCloseBridge() {
       const adapter = getCloseAdapter(id);
       if (!tab || !adapter) return Promise.resolve({ status: tab ? "closed" : "failed", closed: [], failed: [] });
       return coordinator.request([{ id: `move:${id}`, title: tab.title, adapter, commit: () => undefined }]);
-    });
+    }, (targets, exit) => coordinator.request(targets, exit));
     return () => { uninstall(); dialogRef.current?.resolve(null); };
   }, []);
   const finish = (choices: Record<string, CloseChoice> | null) => { const pending = dialog; setDialog(null); pending?.resolve(choices); };

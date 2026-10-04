@@ -296,6 +296,8 @@ async function resolveActiveChatTabId(): Promise<string | null> {
 interface ChatStore {
   threads: ChatThread[];
   threadsLoaded: boolean;
+  threadsError: string | null;
+  messageErrors: Record<string, string | null>;
   activeThreadId: string | null;
   messages: Record<string, ChatMessage[]>;
   /// Currently-streaming assistant message id per thread (for cursor display).
@@ -321,6 +323,8 @@ interface ChatStore {
   drawerScope: DrawerScope;
   /// The terminal tab currently driving a tab-bound drawer, if any.
   drawerTabId: string | null;
+  shellContextFollowsActive: boolean;
+  contextPinned: boolean;
   /// Mirrors attached SFTP state: each terminal tab remembers whether its
   /// bound chat drawer should be visible when that tab is active.
   tabDrawerOpenByTabId: Record<string, boolean>;
@@ -538,6 +542,8 @@ const initialDrawerLayoutPrefs = readDrawerLayoutPrefs();
 export const useChatStore = create<ChatStore>((set, get) => ({
   threads: [],
   threadsLoaded: false,
+  threadsError: null,
+  messageErrors: {},
   activeThreadId: null,
   messages: {},
   streamingId: {},
@@ -549,6 +555,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   drawerOpen: false,
   drawerScope: null,
   drawerTabId: null,
+  shellContextFollowsActive: false,
+  contextPinned: false,
   tabDrawerOpenByTabId: {},
   activeThreadIdByTabId: {},
   drawerWidth: initialDrawerLayoutPrefs.width,
@@ -563,10 +571,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   loadThreads: async () => {
     try {
       const threads = await invoke<ChatThread[]>("chat_list_threads", { limit: 50 });
-      set({ threads, threadsLoaded: true });
+      set({ threads, threadsLoaded: true, threadsError: null });
+      if (get().shellContextFollowsActive && !get().contextPinned) {
+        await get().syncTabChatWithActiveTab(get().drawerTabId);
+      }
     } catch (e) {
       console.error("chat_list_threads failed:", e);
-      set({ threadsLoaded: true });
+      set({ threadsLoaded: true, threadsError: String(e) });
     }
   },
 
@@ -662,10 +673,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   loadMessages: async (threadId: string) => {
     try {
       const msgs = await invoke<ChatMessage[]>("chat_list_messages", { threadId });
-      set((s) => ({ messages: { ...s.messages, [threadId]: msgs } }));
+      set((s) => ({ messages: { ...s.messages, [threadId]: s.streamingId[threadId] ? s.messages[threadId] ?? msgs : msgs }, messageErrors: { ...s.messageErrors, [threadId]: null } }));
       return true;
     } catch (e) {
       console.error("chat_list_messages failed:", e);
+      set((s) => ({ messageErrors: { ...s.messageErrors, [threadId]: String(e) } }));
       return false;
     }
   },
@@ -1133,10 +1145,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: true },
       activeThreadIdByTabId: { ...s.activeThreadIdByTabId, [tabId]: thread.id },
     }));
-    // Opening the thread clears any pending "AI reply ready" ribbon alert.
-    void import("./taoAlertStore")
-      .then((m) => m.useTaoAlertStore.getState().clearThread(thread.id))
-      .catch(() => {});
   },
 
   toggleTabChat: async (tabId: string) => {
@@ -1154,6 +1162,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   syncTabChatWithActiveTab: async (tabId: string | null) => {
     const s = get();
+    if (s.shellContextFollowsActive) {
+      if (s.contextPinned) return;
+      const thread = tabId ? rememberedTabThread(s.threads, s.activeThreadIdByTabId, tabId) ?? latestTabThread(s.threads, tabId) : null;
+      set({ drawerScope: tabId ? "tab" : null, drawerTabId: tabId, activeThreadId: thread?.id ?? null });
+      return;
+    }
 
     if (!tabId) {
       if (s.drawerOpen) {

@@ -42,14 +42,14 @@ steps:
     - repo-a untracked.txt Untracked
     - repo-b same.txt Modified
 - fill:
-    selector: textarea[placeholder*="Commit"]:visible
+    selector: textarea[placeholder="Commit message"]:visible
     value: SHELL-GIT-DRAFT
 - click: '[data-testid="shell-host-hide"]'
 - assert_not_visible: '[data-testid="shell-host"]'
 - click: '[data-testid="code-workspace-git-panel-toggle"]'
 - wait_for: '[data-testid="shell-host"]'
 - assert_value:
-    selector: textarea[placeholder*="Commit"]:visible
+    selector: textarea[placeholder="Commit message"]:visible
     equals: SHELL-GIT-DRAFT
 - click: '[data-testid="shell-overview-trigger"]'
 - assert_count:

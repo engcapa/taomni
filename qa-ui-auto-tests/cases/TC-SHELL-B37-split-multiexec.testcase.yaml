@@ -1,0 +1,278 @@
+id: TC-SHELL-B37
+title: Split broadcast targets survive lane changes and exclude locked or closed terminals
+description: Workspace Shell renderer and retained workflow evidence. See docs-feature/workspace-shell-ux-redesign-test-cases.md;
+  native effects require the paired native cases.
+covers:
+- F-Split-1
+- F4.11
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-b"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- right_click: '[data-testid="tab-item"][data-active="true"]'
+- click: '[data-testid="shell-tab-rename"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: qa-gamma
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Enter
+- wait_for: '[data-testid="tab-item"][data-tab-title="qa-gamma"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-split-terminal"]'
+- wait_for: '[data-testid="terminal-split-toolbar"]'
+- assert_count:
+    selector: '[data-testid="terminal-split-pane"]'
+    equal: 3
+- click: '[data-testid="terminal-split-pane"]:has(button[title="qa-gamma"]) [data-testid^="terminal-split-lock-"]'
+- assert_count:
+    selector: '[data-testid="terminal-split-pane"][data-input-locked="true"]'
+    equal: 1
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-multiexec"]'
+- wait_for: '[data-testid="multiexec-bar"]'
+- click: '[data-testid="multiexec-bar"] button[title="Select all terminals"]'
+- assert_text:
+    selector: '[data-testid="multiexec-bar"]'
+    contains: 2 / 3
+- fill:
+    selector: '[data-testid="multiexec-input"]'
+    value: echo SHELL_BROADCAST_1
+- press:
+    selector: '[data-testid="multiexec-input"]'
+    key: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-split-pane"]:has(button[title="qa-alpha"]) [data-testid="terminal-pane"]'
+    regex: (?ms)\A(?!(?:.*?^SHELL_BROADCAST_1[ \t]*$){2}).*?^SHELL_BROADCAST_1[ \t]*$
+    timeout_sec: 10
+- assert_pattern:
+    selector: '[data-testid="terminal-split-pane"]:has(button[title="qa-beta"]) [data-testid="terminal-pane"]'
+    regex: (?ms)\A(?!(?:.*?^SHELL_BROADCAST_1[ \t]*$){2}).*?^SHELL_BROADCAST_1[ \t]*$
+    timeout_sec: 10
+- assert_pattern:
+    selector: '[data-testid="terminal-split-pane"][data-input-locked="true"] [data-testid="terminal-pane"]'
+    regex: ^(?![\s\S]*SHELL_BROADCAST_1)[\s\S]*$
+    timeout_sec: 10
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- select_option:
+    selector: '[data-testid="shell-lane-select"]'
+    value: connect
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-split-terminal"]'
+- assert_count:
+    selector: '[data-testid="terminal-split-pane"][data-input-locked="true"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="multiexec-bar"]'
+    contains: 2 / 3
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
+- fill:
+    selector: '[data-testid="multiexec-input"]'
+    value: echo SHELL_BROADCAST_2
+- press:
+    selector: '[data-testid="multiexec-input"]'
+    key: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-split-pane"]:has(button[title="qa-alpha"]) [data-testid="terminal-pane"]'
+    regex: (?ms)\A(?!(?:.*?^SHELL_BROADCAST_2[ \t]*$){2}).*?^SHELL_BROADCAST_2[ \t]*$
+    timeout_sec: 10
+- assert_pattern:
+    selector: '[data-testid="terminal-split-pane"]:has(button[title="qa-beta"]) [data-testid="terminal-pane"]'
+    regex: (?ms)\A(?!(?:.*?^SHELL_BROADCAST_2[ \t]*$){2}).*?^SHELL_BROADCAST_2[ \t]*$
+    timeout_sec: 10
+- click: '[data-testid="tab-item"][data-tab-title="qa-beta"] [data-testid="tab-close"]'
+- assert_count:
+    selector: '[data-testid="terminal-split-pane"]'
+    equal: 2
+- assert_text:
+    selector: '[data-testid="multiexec-bar"]'
+    contains: 1 / 2
+- assert_count:
+    selector: '[data-testid="terminal-split-pane"][data-input-locked="true"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="multiexec-input"]'
+    value: echo SHELL_BROADCAST_3
+- press:
+    selector: '[data-testid="multiexec-input"]'
+    key: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-split-pane"]:has(button[title="qa-alpha"]) [data-testid="terminal-pane"]'
+    regex: (?ms)\A(?!(?:.*?^SHELL_BROADCAST_3[ \t]*$){2}).*?^SHELL_BROADCAST_3[ \t]*$
+    timeout_sec: 10
+- assert_pattern:
+    selector: '[data-testid="terminal-split-pane"][data-input-locked="true"] [data-testid="terminal-pane"]'
+    regex: ^(?![\s\S]*SHELL_BROADCAST_)[\s\S]*$
+    timeout_sec: 10
+- screenshot: tc-shell-b37.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Three real UI-opened terminals share split geometry and exactly one input lock.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 18
+    - 21
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-title=\"qa-gamma\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"terminal-split-toolbar\"]"}'
+    - step: 20
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 3}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]",
+        "equal": 1}}'
+    results:
+    - 2
+    - 4
+    - 7
+    - 15
+    - 19
+    - 20
+    - 22
+  - id: R2
+    requirement: Broadcast reaches Alpha and Beta exactly once while the locked Gamma pane receives no
+      nonce.
+    actions:
+    - 23
+    - 24
+    - 25
+    - 27
+    - 29
+    - 30
+    checkpoints:
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-bar\"]", "contains": "2 / 3"}}'
+    - step: 31
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-alpha\"])
+        [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_1[ \\t]*$){2}).*?^SHELL_BROADCAST_1[
+        \\t]*$", "timeout_sec": 10}}'
+    - step: 32
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-beta\"])
+        [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_1[ \\t]*$){2}).*?^SHELL_BROADCAST_1[
+        \\t]*$", "timeout_sec": 10}}'
+    - step: 33
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]
+        [data-testid=\"terminal-pane\"]", "regex": "^(?![\\s\\S]*SHELL_BROADCAST_1)[\\s\\S]*$", "timeout_sec":
+        10}}'
+    results:
+    - 26
+    - 28
+    - 31
+    - 32
+    - 33
+  - id: R3
+    requirement: Build/Connect and Tao changes preserve the target set. Closing Beta leaves Alpha and
+      the locked pane; the next broadcast reaches Alpha exactly once.
+    actions:
+    - 34
+    - 35
+    - 36
+    - 38
+    - 39
+    - 40
+    - 41
+    - 44
+    - 45
+    - 46
+    - 47
+    - 50
+    - 54
+    - 55
+    checkpoints:
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]",
+        "equal": 1}}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-bar\"]", "contains": "2 / 3"}}'
+    - step: 48
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-alpha\"])
+        [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_2[ \\t]*$){2}).*?^SHELL_BROADCAST_2[
+        \\t]*$", "timeout_sec": 10}}'
+    - step: 49
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-beta\"])
+        [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_2[ \\t]*$){2}).*?^SHELL_BROADCAST_2[
+        \\t]*$", "timeout_sec": 10}}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 2}}'
+    - step: 52
+      expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-bar\"]", "contains": "1 / 2"}}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]",
+        "equal": 1}}'
+    - step: 56
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-alpha\"])
+        [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_3[ \\t]*$){2}).*?^SHELL_BROADCAST_3[
+        \\t]*$", "timeout_sec": 10}}'
+    - step: 57
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]
+        [data-testid=\"terminal-pane\"]", "regex": "^(?![\\s\\S]*SHELL_BROADCAST_)[\\s\\S]*$", "timeout_sec":
+        10}}'
+    results:
+    - 37
+    - 42
+    - 43
+    - 48
+    - 49
+    - 51
+    - 52
+    - 53
+    - 56
+    - 57
+  visual:
+  - check: Inspect retained controls and content in the final screenshot
+    method: manual
+    reason: A screenshot alone does not prove visual correctness.
+  native:
+  - check: Real processes, services and OS input
+    method: not-applicable
+    reason: This case runs the renderer against declared external IPC fixtures; paired native cases establish
+      real effects.

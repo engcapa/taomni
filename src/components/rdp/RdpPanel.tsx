@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Bot,
@@ -142,6 +143,12 @@ export default function RdpPanel({
 
   const store = useRdpStore();
   const conn = store.connections[tabId];
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root || !visible || conn?.status !== "connected") return;
+    return registerShellKeyClaim(root, (event) => event.target === root || event.target === canvasRef.current || event.target === imeInputRef.current);
+  }, [visible, conn?.status]);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimerRef.current !== null) {

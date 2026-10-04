@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useCallback, useState } from "react";
+import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import {
   vncConnect,
   vncCancelConnect,
@@ -1381,6 +1382,8 @@ export default function VncPanel({
       sendWsBinary(encodeWsKey(false, keysym));
     };
 
+    const releaseShellClaim = containerRef.current ? registerShellKeyClaim(containerRef.current, (event) =>
+      !isEditableTarget(event.target, document.activeElement) && isTerminalFocused(containerRef.current, document.activeElement)) : undefined;
     window.addEventListener("keydown", handleKey);
     window.addEventListener("keyup", handleKey);
     window.addEventListener("keypress", handleKeyPress);
@@ -1407,6 +1410,7 @@ export default function VncPanel({
     document.addEventListener("visibilitychange", releaseAllInput);
 
     return () => {
+      releaseShellClaim?.();
       window.removeEventListener("keydown", handleKey);
       window.removeEventListener("keyup", handleKey);
       window.removeEventListener("keypress", handleKeyPress);

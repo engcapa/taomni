@@ -1109,6 +1109,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingFolders, setLoadingFolders] = useState(false);
+  const [foldersReady, setFoldersReady] = useState(false), [headersReady, setHeadersReady] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [bodyCache, setBodyCache] = useState<Map<string, MailMessageBody>>(() => new Map());
@@ -1784,6 +1785,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       }
       foldersRef.current = cached;
       setFolders(cached);
+      setFoldersReady(true);
       updateSelectedFolder((current) =>
         cached.length > 0 && !cached.some((folder) => folder.name === current)
           ? cached[0].name
@@ -1833,6 +1835,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       const next = append ? mergeMessagePages(messagesRef.current, page) : sortMessages(page);
       messagesRef.current = next;
       setMessages(next);
+      setHeadersReady(true);
       if (!quiet) {
         setStatus(
           append
@@ -2536,6 +2539,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     bodyLoadSeqRef.current += 1;
     bodyCacheRef.current = new Map();
     bodyRequestsRef.current.clear();
+    setFoldersReady(false); setHeadersReady(false);
     setFolders([]);
     setMessages([]);
     setSelectedMessageKey(null);
@@ -4997,6 +5001,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       style={mailAppearance}
       data-testid="mail-client-tab"
       data-account-id={info.sessionId}
+      data-ready={foldersReady && headersReady && !loadingFolders && !loadingMessages && !error ? "true" : "false"}
     >
       <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
         <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5" data-testid="mail-compose-open" onClick={() => openCompose()}>

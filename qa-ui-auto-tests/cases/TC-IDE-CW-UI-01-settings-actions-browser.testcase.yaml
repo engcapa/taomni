@@ -1,6 +1,7 @@
 id: TC-IDE-CW-UI-01-settings-actions-browser
 title: Code Workspace editor settings, keymap reference, and context actions
-description: 'Browser regression gate for the renderer-owned Code Workspace surfaces. It
+description: 'Browser regression gate for the renderer-owned Code Workspace surfaces.
+  It
 
   exercises every editor appearance and intelligence control, applies and
 
@@ -10,7 +11,10 @@ description: 'Browser regression gate for the renderer-owned Code Workspace surf
 
   action routing only; clipboard, LSP and disk effects remain native concerns.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.3
 - F25.5
@@ -29,7 +33,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -43,9 +47,11 @@ steps:
 - press: Control+Shift+N
 - wait_for: '[data-testid="code-workspace-search-everywhere"]'
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Editor Appearance Settings
-- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance
+    Settings'
 - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
 - fill:
     selector: '[data-testid="workspace-editor-appearance-font-family"]'
@@ -104,9 +110,11 @@ steps:
 - press: Control+Shift+N
 - wait_for: '[data-testid="code-workspace-search-everywhere"]'
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Editor Appearance Settings
-- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance
+    Settings'
 - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
 - assert_attribute:
     selector: '[data-testid="workspace-editor-appearance-font-size-px"]'
@@ -119,9 +127,11 @@ steps:
 - press: Control+Shift+N
 - wait_for: '[data-testid="code-workspace-search-everywhere"]'
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Editor Intelligence Settings
-- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Intelligence Settings'
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Intelligence
+    Settings'
 - wait_for: '[data-testid="workspace-intelligence-settings-dialog"]'
 - click: '[data-testid="workspace-quick-doc-hover-enabled"]'
 - fill:
@@ -144,9 +154,11 @@ steps:
 - press: Control+Shift+N
 - wait_for: '[data-testid="code-workspace-search-everywhere"]'
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Editor Intelligence Settings
-- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Intelligence Settings'
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Intelligence
+    Settings'
 - wait_for: '[data-testid="workspace-intelligence-settings-dialog"]'
 - click: '[data-testid="workspace-intelligence-settings-cancel"]'
 - wait_for:
@@ -277,8 +289,8 @@ verification:
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
     - step: 44
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
-        "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]",
+        "state": "detached"}}'
     - step: 46
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
     - step: 51
@@ -287,28 +299,29 @@ verification:
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-editor-appearance-font-size-px\"]",
         "name": "value", "equals": "15"}}'
     - step: 54
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
-        "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]",
+        "state": "detached"}}'
     - step: 56
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
     - step: 61
       expectation: '{"wait_for": "[data-testid=\"workspace-intelligence-settings-dialog\"]"}'
     - step: 71
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-intelligence-settings-dialog\"]", "state":
-        "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-intelligence-settings-dialog\"]",
+        "state": "detached"}}'
     - step: 73
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
     - step: 78
       expectation: '{"wait_for": "[data-testid=\"workspace-intelligence-settings-dialog\"]"}'
     - step: 80
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-intelligence-settings-dialog\"]", "state":
-        "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-intelligence-settings-dialog\"]",
+        "state": "detached"}}'
     - step: 82
       expectation: '{"wait_for": "[data-testid=\"keymap-cheatsheet-dialog\"]"}'
     - step: 84
       expectation: '{"wait_for": "[data-testid=\"keymap-item-workspace.renameSymbol\"]"}'
     - step: 87
-      expectation: '{"wait_for": {"selector": "[data-testid=\"keymap-cheatsheet-dialog\"]", "state": "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"keymap-cheatsheet-dialog\"]",
+        "state": "detached"}}'
     - step: 91
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 92

@@ -87,6 +87,12 @@ pub(crate) fn configure_qa_webview<'a>(
     mut builder: WebviewWindowBuilder<'a, tauri::Wry, AppHandle>,
 ) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
     if cfg!(debug_assertions) {
+        #[cfg(target_os = "macos")]
+        if std::env::var("TAOMNI_QA_WEBDRIVER_PORT").is_ok() {
+            builder = builder.on_page_load(|window, payload| {
+                qa_driver::mark_page_load(window.label(), payload.event());
+            });
+        }
         if let Ok(raw) = std::env::var("NEWMOB_DATA_DIR") {
             if let Some(data_dir) = qa_override_path(&raw) {
                 let webview_dir = data_dir.join("webview");
@@ -411,6 +417,7 @@ pub fn run() {
                                 .unwrap_or_else(|_| "127.0.0.1".to_string());
                             let app_handle = app.handle().clone();
                             builder = builder.on_page_load(move |window, payload| {
+                                qa_driver::mark_page_load(window.label(), payload.event());
                                 if payload.event() == tauri::webview::PageLoadEvent::Finished {
                                     qa_driver::start(
                                         app_handle.clone(),

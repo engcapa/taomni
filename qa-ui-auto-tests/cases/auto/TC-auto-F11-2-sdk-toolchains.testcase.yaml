@@ -8,7 +8,10 @@ description: 'Exercises the browser-backed SDK registry from Settings. The case 
 
   verifies persistence, then removes it to leave the registry clean.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F11.2
 tags:
@@ -25,8 +28,8 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -125,42 +128,52 @@ verification:
     - 35
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 6
       expectation: '{"assert_visible": "[data-testid=\"sdk-settings\"]"}'
     - step: 7
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-java\"]", "contains": "Java / JDK"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-java\"]",
+        "contains": "Java / JDK"}}'
     - step: 8
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-kotlin\"]", "contains": "Kotlin"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-kotlin\"]",
+        "contains": "Kotlin"}}'
     - step: 9
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-scala\"]", "contains": "Scala"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-scala\"]",
+        "contains": "Scala"}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-python\"]", "contains": "Python"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-python\"]",
+        "contains": "Python"}}'
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"sdk-discovery-results\"]"}'
     - step: 13
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-discovery-results\"]", "contains": "No new
-        ready installations were found."}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-discovery-results\"]",
+        "contains": "No new ready installations were found."}}'
     - step: 16
       expectation: '{"wait_for": "[data-testid=\"sdk-editor\"]"}'
     - step: 21
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-editor-probe\"]", "contains": "2.1.20"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-editor-probe\"]",
+        "contains": "2.1.20"}}'
     - step: 23
       expectation: '{"wait_for": "[data-testid^=\"sdk-row-\"]"}'
     - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid^=\"sdk-row-\"]", "contains": "QA Kotlin 2.1"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid^=\"sdk-row-\"]", "contains":
+        "QA Kotlin 2.1"}}'
     - step: 26
-      expectation: '{"assert_localstorage": {"key": "taomni.stub.sdkRegistry.v1", "contains": "\"defaults\":[{\"kind\":\"kotlin\""}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.stub.sdkRegistry.v1",
+        "contains": "\"defaults\":[{\"kind\":\"kotlin\""}}'
     - step: 30
       expectation: '{"wait_for": "[data-testid=\"sdk-editor\"]"}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid^=\"sdk-row-\"]", "contains": "QA Kotlin 2.1 updated"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid^=\"sdk-row-\"]", "contains":
+        "QA Kotlin 2.1 updated"}}'
     - step: 36
-      expectation: '{"wait_for": {"selector": "[data-testid^=\"sdk-row-\"]", "state": "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid^=\"sdk-row-\"]", "state":
+        "detached"}}'
     - step: 37
-      expectation: '{"assert_localstorage": {"key": "taomni.stub.sdkRegistry.v1", "contains": "\"installations\":[]"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.stub.sdkRegistry.v1",
+        "contains": "\"installations\":[]"}}'
     results:
     - 36
     - 37

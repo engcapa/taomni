@@ -6,6 +6,14 @@ type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } 
 
 export const zhCN: DeepPartial<typeof en> = {
   shell: {
+    notesWindowRecovered: "便签窗口意外关闭，已在此恢复最近收到的草稿。",
+    panelWindowRecovered: "独立窗口意外关闭，已在此恢复最近收到的状态。",
+    missingPanelOwner: "原连接或工作区已不可用，请选择所属连接或工作区来重新打开面板。",
+    noRecentPanels: "暂无最近面板", openingPanel: "正在打开面板…", reopenPanelOwner: "重新打开连接或工作区",
+    detachedIntent: "上次在独立窗口中打开", chooseConnection: "选择连接", chooseWorkspace: "选择工作区", chooseOwner: "请选择…",
+    showPanel: "显示面板", detachAgain: "再次在独立窗口中打开",
+    panelLabels: { sftp: "SFTP", git: "Git", problems: "问题", "workspace-terminal": "终端" },
+    pinContext: "将当前对话固定到此工作面",
     details: "详情", dirty: "未保存更改", attentionStates: { none: "无提醒", unread: "新动态", busy: "正在运行", error: "错误" },
     closeCount: "将关闭 {count} 个所选项目", closeIncludingPinned: "关闭全部（包含固定标签）", ownerUnavailable: "原所属标签已关闭，请保留此标签或关闭实例。",
     fallback: "工作台布局暂时无法显示。", reload: "重新加载窗口",
@@ -26,7 +34,7 @@ export const zhCN: DeepPartial<typeof en> = {
     owner: "所属：{name}", detached: "已在窗口中打开", focusWindow: "聚焦窗口", reset: "重置布局", resetConfirm: "重置工作台布局偏好？",
     layoutWarning: "布局偏好未能恢复或保存。", closeTitle: "关闭前确认", closeConfirm: "关闭所选标签",
     close: { save: "保存", discard: "放弃更改", commit: "提交事务", rollback: "回滚事务", background: "继续后台任务", "cancel-job": "取消任务", retry: "重试", dock: "回到面板", "close-instance": "关闭实例" },
-    keymap: "工作台快捷键", keymapConflict: "此按键已分配", record: "录入快捷键", recentPanels: "最近面板", launchStatus: "正在打开工作区…",
+    keymap: "工作台快捷键", keymapConflict: "此按键已分配", record: "录入快捷键", recentPanels: "最近面板", relocateWorkspace: "重新定位目录", unsupportedView: "当前版本暂不支持此视图（{kind}）。可关闭此项并继续使用其它工作面。", launchStatus: "正在打开工作区…",
     launchFailed: "工作区未能打开：{error}", restoreWorkspaces: "恢复工作区", noPreview: "暂无预览",
   },
   app: {
@@ -2283,6 +2291,7 @@ export const zhCN: DeepPartial<typeof en> = {
     alertHistorySearchPlaceholder: "搜索历史",
     alertHistorySearchAria: "搜索通知历史",
     alertHistoryClear: "清空通知历史",
+    alertHistoryClearConfirm: "清空通知历史？待处理通知仍会保留。",
     alertHistoryLimit: "历史保留上限",
     alertHistoryLimitTitle: "保留最近 {limit} 条通知",
     alertHistoryHiddenHint: "历史默认隐藏，搜索后显示。已保留 {count}/{limit} 条。",

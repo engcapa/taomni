@@ -1,9 +1,13 @@
 id: TC-auto-F1-9
-title: Control bar core commands dispatch Session / SFTP / Settings / Help to the right surface
-description: "Coverage for F1.9 (core command dispatch via ControlBar). Exercises the\nfour primary commands dispatched\
-  \ from the unified app menu:\n  - new-remote-session → SessionEditor opens with SSH proto preselected\n  - new-sftp\
-  \           → SessionEditor opens with SFTP proto preselected\n  - settings           → settings tab mounts\n\
-  \  - help               → About dialog opens\n"
+title: Control bar core commands dispatch Session / SFTP / Settings / Help to the
+  right surface
+description: "Coverage for F1.9 (core command dispatch via ControlBar). Exercises\
+  \ the\nfour primary commands dispatched from the unified app menu:\n  - new-remote-session\
+  \ → SessionEditor opens with SSH proto preselected\n  - new-sftp           → SessionEditor\
+  \ opens with SFTP proto preselected\n  - settings           → settings tab mounts\n\
+  \  - help               → About dialog opens\n\nShell v2 entry adaptation: Tools\
+  \ and Sessions use the permanent Rail with visibility-aware user clicks; Settings\
+  \ uses its permanent Rail button. Original business checks are retained."
 covers:
 - F1.9
 tags:
@@ -31,7 +35,7 @@ steps:
 - press: Escape
 - wait_for:
     selector: '[data-testid="session-editor"]'
-    state: detached
+    state: hidden
     timeout_sec: 5
 - click: '[data-testid="app-main-menu"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -42,11 +46,11 @@ steps:
 - press: Escape
 - wait_for:
     selector: '[data-testid="session-editor"]'
-    state: detached
+    state: hidden
     timeout_sec: 5
-- wait_for: '[data-testid="ribbon-settings"]'
-- assert_visible: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- assert_visible: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - assert_visible: '[data-testid="settings-panel"]'
 - click: '[data-testid="app-main-menu"]'
@@ -65,7 +69,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Control bar core commands dispatch Session / SFTP / Settings / Help to the right surface：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Control bar core commands dispatch Session / SFTP / Settings / Help
+      to the right surface：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 4
@@ -92,8 +97,8 @@ verification:
     - step: 9
       expectation: '{"assert_visible": "[data-testid=\"session-proto-ssh\"]"}'
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
-        5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]",
+        "state": "hidden", "timeout_sec": 5}}'
     - step: 13
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 14
@@ -103,12 +108,12 @@ verification:
     - step: 17
       expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
     - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
-        5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]",
+        "state": "hidden", "timeout_sec": 5}}'
     - step: 20
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 23
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 24
@@ -122,9 +127,29 @@ verification:
     - step: 30
       expectation: '{"assert_visible": "[data-testid=\"about-dialog\"]"}'
     - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"about-dialog\"]", "state": "detached", "timeout_sec":
-        5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"about-dialog\"]", "state":
+        "detached", "timeout_sec": 5}}'
     results:
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 11
+    - 13
+    - 14
+    - 16
+    - 17
+    - 19
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 27
+    - 29
+    - 30
     - 32
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。

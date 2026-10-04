@@ -1,11 +1,18 @@
 id: TC-IDE-PARITY-010-01
 title: 'IDEA tool window rails: stripe buttons, side + bottom windows, hide and Alt+number'
-description: 'ED-PARITY-010 A2/A4 browser case: the workspace edges carry IDEA tool window stripes. Bottom tools (Problems, Terminal, Run, …) are rail buttons that show/hide the bottom window, whose header shows the tool title and a hide (—) button returning focus to the editor. Project stays open next to a bottom window; Structure toggles on the right rail; More tool windows lists every bottom tool.
+description: 'ED-PARITY-010 A2/A4 browser case: the workspace edges carry IDEA tool
+  window stripes. Bottom tools (Problems, Terminal, Run, …) are rail buttons that
+  show/hide the bottom window, whose header shows the tool title and a hide (—) button
+  returning focus to the editor. Project stays open next to a bottom window; Structure
+  toggles on the right rail; More tool windows lists every bottom tool.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -20,7 +27,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -37,18 +44,21 @@ steps:
     name: aria-pressed
     equals: 'true'
 - eval_readonly:
-    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-tool-rail-left\"]")?.contains(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-bottom-tab-problems\"]")) === true
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) +
+      "\"code-workspace-tool-rail-left\"]")?.contains(document.querySelector("[data-testid"
+      + String.fromCharCode(61) + "\"code-workspace-bottom-tab-problems\"]")) ===
+      true
     expect_truthy: true
 - click: '[data-testid="code-workspace-bottom-tab-problems"]'
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"]'
     timeout_sec: 10
 - assert_attribute:
     selector: '[data-testid="code-workspace-bottom-tab-problems"]'
     name: aria-pressed
     equals: 'true'
 - assert_text:
-    selector: '[data-testid="code-workspace-tool-window-title"]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"] [data-testid="shell-host-tab"][aria-selected="true"]'
     contains: Problems
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
@@ -56,16 +66,16 @@ steps:
     equals: 'true'
 - click: '[data-testid="code-workspace-bottom-tab-terminal"]'
 - assert_text:
-    selector: '[data-testid="code-workspace-tool-window-title"]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":terminal"] [data-testid="shell-host-tab"][aria-selected="true"]'
     contains: Terminal
 - assert_attribute:
     selector: '[data-testid="code-workspace-bottom-tab-problems"]'
     name: aria-pressed
     equals: 'false'
-- click: '[data-testid="code-workspace-tool-window-hide"]'
+- click: '[data-testid="shell-host"][data-panel-id$=":terminal"] [data-testid="shell-host-hide"]'
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
-    state: detached
+    selector: '[data-testid="shell-host"][data-panel-id$=":terminal"]'
+    state: hidden
     timeout_sec: 5
 - eval_readonly:
     expression: document.activeElement?.classList?.contains("cm-content") === true
@@ -102,10 +112,10 @@ steps:
 - assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
 - click: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"]'
     timeout_sec: 10
 - assert_text:
-    selector: '[data-testid="code-workspace-tool-window-title"]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"] [data-testid="shell-host-tab"][aria-selected="true"]'
     contains: Problems
 - screenshot: tc-ide-parity-010-01-rails.png
 verification:
@@ -121,12 +131,17 @@ verification:
     - step: 14
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-right\"]"}'
     - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 16
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\")?.contains(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-bottom-tab-problems\\\"]\")) === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\")?.contains(document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"code-workspace-bottom-tab-problems\\\"]\"))
+        === true", "expect_truthy": true}}'
     results:
     - 13
     - 14
+    - 15
     - 16
   - id: R2
     requirement: A2/A4：rail 打开 Problems，工具窗头显示标题；Project 与底部工具窗同时打开；切换 Terminal 后选中态转移。
@@ -135,19 +150,27 @@ verification:
     - 22
     checkpoints:
     - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]",
+        "timeout_sec": 10}}'
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 20
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Problems"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]
+        [data-testid=\"shell-host-tab\"][aria-selected=\"true\"]", "contains": "Problems"}}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 23
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Terminal"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":terminal\"]
+        [data-testid=\"shell-host-tab\"][aria-selected=\"true\"]", "contains": "Terminal"}}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name": "aria-pressed", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]",
+        "name": "aria-pressed", "equals": "false"}}'
     results:
+    - 18
     - 19
+    - 20
     - 21
     - 23
     - 24
@@ -159,19 +182,25 @@ verification:
     - 31
     checkpoints:
     - step: 26
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":terminal\"]",
+        "state": "hidden", "timeout_sec": 5}}'
     - step: 27
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\") === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\")
+        === true", "expect_truthy": true}}'
     - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]",
+        "state": "detached", "timeout_sec": 5}}'
     results:
+    - 26
     - 27
     - 30
     - 32
   - id: R4
-    requirement: A4：Structure（IDEA 默认 Left Bottom，Project 下方分屏）与 Project 按 IDEA 切换显隐；More tool windows 列出全部工具窗。
+    requirement: A4：Structure（IDEA 默认 Left Bottom，Project 下方分屏）与 Project 按 IDEA 切换显隐；More
+      tool windows 列出全部工具窗。
     actions:
     - 33
     - 38
@@ -180,20 +209,25 @@ verification:
     - 44
     checkpoints:
     - step: 34
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-left-tool-area\"] [data-testid=\"code-workspace-tool-window-structure\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-left-tool-area\"]
+        [data-testid=\"code-workspace-tool-window-structure\"]"}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-structure\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-structure\"]",
+        "name": "aria-pressed", "equals": "true"}}'
     - step: 37
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tool-window-structure\"]"}'
     - step: 39
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]",
+        "name": "aria-pressed", "equals": "false"}}'
     - step: 41
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new\"]"}'
     - step: 43
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-problems\"]"}'
     - step: 46
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Problems"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]
+        [data-testid=\"shell-host-tab\"][aria-selected=\"true\"]", "contains": "Problems"}}'
     results:
+    - 34
     - 35
     - 37
     - 39

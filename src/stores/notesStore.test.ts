@@ -2,6 +2,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { pendingAlertCounts, useNotesStore } from "./notesStore";
 import type { NoteAlert } from "../lib/notes";
 
+it("reports a failed save without changing the note, then accepts a retry", async () => {
+  const note = await useNotesStore.getState().createNote({ title: "Original" });
+  const real = invokeMock.getMockImplementation()!;
+  let fail = true;
+  invokeMock.mockImplementation(async (...args) => {
+    if (args[0] === "notes_update" && fail) { fail = false; throw new Error("Disk denied"); }
+    return real(...args);
+  });
+  expect(await useNotesStore.getState().updateNote(note!.id, { title: "Draft", body: "body" })).toBe(false);
+  expect(useNotesStore.getState().saveError).toContain("Disk denied");
+  expect(useNotesStore.getState().notes.find((n) => n.id === note!.id)?.title).toBe("Original");
+  invokeMock.mockImplementation(real);
+  expect(await useNotesStore.getState().updateNote(note!.id, { title: "Draft", body: "body" })).toBe(true);
+  expect(useNotesStore.getState().saveError).toBeNull();
+  expect(useNotesStore.getState().notes.find((n) => n.id === note!.id)?.title).toBe("Draft");
+});
+
 const invokeMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/api/core", () => ({

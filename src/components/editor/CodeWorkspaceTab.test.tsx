@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import mermaid from "mermaid";
 import { StrictMode, useCallback, useRef, useState, type ComponentProps } from "react";
 import { useAppStore } from "../../stores/appStore";
+import { useShellLayoutStore } from "../../stores/shellLayoutStore";
+import { ShellSurfaceRegistry, SurfaceSlot } from "../shell/SurfaceSlot";
+import { ShellFrame } from "../shell/WorkspaceShell";
+import { defaultShellLayout } from "../../lib/shell/shellLayoutPersistence";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../stores/codeWorkspaceStore";
 import { useCodeWorkspaceStatusStore } from "../../stores/codeWorkspaceStatusStore";
 import { DEFAULT_CODE_VIEW_PROFILE, saveCodeViewProfile } from "../../lib/codeViewProfile";
@@ -607,8 +611,12 @@ describe("debugCurrentLineForFile", () => {
 });
 
 describe("CodeWorkspaceTab", () => {
+  const originalStorageDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage")!;
   beforeEach(() => {
+    // A failed storage-fault test must not leave its fake in later scenarios.
+    Object.defineProperty(window, "localStorage", originalStorageDescriptor);
     window.localStorage.clear();
+    setKeymapPlatformOverride(null);
     workspaceActionRegistry.clear();
     globalEditorConfigResolver.clearAll();
     clearGitSnapshotCache();
@@ -887,6 +895,8 @@ describe("CodeWorkspaceTab", () => {
 
   afterEach(() => {
     cleanup();
+    Object.defineProperty(window, "localStorage", originalStorageDescriptor);
+    setKeymapPlatformOverride(null);
     workspaceActionRegistry.clear();
     globalEditorConfigResolver.clearAll();
     clearGitSnapshotCache();
@@ -7518,6 +7528,82 @@ describe("CodeWorkspaceTab", () => {
     expect(secondaryView!.state.selection.ranges).toHaveLength(2);
   });
 
+  it("keeps the hosted Project live and hides the same tree through its stripe", async () => {
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("notes.txt", "notes.txt")]);
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-hosted-tree", workspaceInstanceId: "instance-hosted-tree",
+      name: "Hosted Tree", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }], looseFiles: [],
+    };
+    const previousApp = useAppStore.getState();
+    const previousShell = useShellLayoutStore.getState();
+    useAppStore.setState({ activeTabId: "tab-code", tabs: [{ id: "tab-code", type: "code-workspace", title: "Hosted Tree", closable: true, codeWorkspace: workspace }] });
+    useShellLayoutStore.setState({ navigatorPage: "project", layout: { ...previousShell.layout, navigator: { ...previousShell.layout.navigator, lastArea: "workspaces" } } });
+    try {
+      render(<ShellSurfaceRegistry><SurfaceSlot id="navigator-project" /><SurfaceSlot id="parking" />
+        <CodeWorkspaceTab tabId="tab-code" workspace={workspace} visible shellHosted />
+      </ShellSurfaceRegistry>);
+      const tree = await screen.findByTestId("code-workspace-tree-pane");
+      await screen.findAllByTestId("code-workspace-tree-file");
+      expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-hosted-tree").languagePanelOpen).toBe(true);
+      fireEvent.click(screen.getByTestId("code-workspace-tool-rail-project"));
+      await waitFor(() => expect(tree.closest("[data-surface-id]")).toHaveAttribute("aria-hidden", "true"));
+      fireEvent.click(screen.getByTestId("code-workspace-tool-rail-project"));
+      await waitFor(() => expect(tree.closest("[data-surface-id]")).toHaveAttribute("aria-hidden", "false"));
+      expect(screen.getByTestId("code-workspace-tree-pane")).toBe(tree);
+    } finally {
+      cleanup();
+      useAppStore.setState({ activeTabId: previousApp.activeTabId, tabs: previousApp.tabs });
+      useShellLayoutStore.setState(previousShell);
+    }
+  });
+
+  it("focuses the hosted Problems surface and restores it with F12 after Shift+Escape", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-hosted-focus", workspaceInstanceId: "instance-hosted-focus",
+      name: "Hosted Focus", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }], looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "notes.txt" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("notes.txt", "retained editor text"));
+    const previousApp = useAppStore.getState(), previousShell = useShellLayoutStore.getState();
+    useAppStore.setState({ activeTabId: "tab-code", tabs: [{ id: "tab-code", type: "code-workspace", title: "Hosted Focus", closable: true, codeWorkspace: workspace }] });
+    useShellLayoutStore.setState({ layout: defaultShellLayout(), panels: {}, laneSelection: null, overlay: null, taoOpen: false });
+    try {
+      render(<ShellSurfaceRegistry><ShellFrame navigator={<SurfaceSlot id="navigator-project" />}>
+        <CodeWorkspaceTab tabId="tab-code" workspace={workspace} visible shellHosted />
+      </ShellFrame></ShellSurfaceRegistry>);
+      await screen.findByTitle("app / notes.txt");
+      const editor = screen.getByTestId("code-workspace-editor").querySelector<HTMLElement>(".cm-content")!;
+      editor.focus();
+      fireEvent.keyDown(editor, { key: "6", code: "Digit6", altKey: true });
+      const host = await screen.findByTestId("shell-host");
+      await waitFor(() => expect(host.contains(document.activeElement)).toBe(true));
+      const content = screen.getByTestId("code-workspace-problems-panel");
+      fireEvent.keyDown(document.activeElement!, { key: "Escape", code: "Escape", shiftKey: true });
+      await waitFor(() => expect(screen.queryByTestId("shell-host")).not.toBeInTheDocument());
+      await waitFor(() => expect(document.activeElement).toBe(editor));
+      fireEvent.keyDown(editor, { key: "F12", code: "F12" });
+      const restored = await screen.findByTestId("shell-host");
+      await waitFor(() => expect(restored.contains(document.activeElement)).toBe(true));
+      expect(screen.getByTestId("code-workspace-problems-panel")).toBe(content);
+      fireEvent.click(screen.getByTestId("shell-host-more"));
+      fireEvent.click(screen.getByTestId("shell-panel-move-right"));
+      await waitFor(() => expect(screen.getByTestId("shell-host")).toHaveAttribute("data-edge", "right"));
+      expect(screen.getByTestId("code-workspace-tool-rail-right").contains(screen.getByTestId("code-workspace-bottom-tab-problems"))).toBe(true);
+      fireEvent.click(screen.getByTestId("shell-host-more"));
+      fireEvent.click(screen.getByTestId("shell-panel-move-bottom"));
+      await waitFor(() => expect(screen.getByTestId("shell-host")).toHaveAttribute("data-edge", "bottom"));
+      expect(screen.getByTestId("code-workspace-tool-rail-left").contains(screen.getByTestId("code-workspace-bottom-tab-problems"))).toBe(true);
+      expect(screen.getByTestId("code-workspace-problems-panel")).toBe(content);
+      fireEvent.click(screen.getByTestId("shell-host-hide"));
+      await waitFor(() => expect(document.activeElement).toBe(editor));
+      expect(editor.textContent).toBe("retained editor text");
+    } finally {
+      cleanup();
+      useAppStore.setState({ activeTabId: previousApp.activeTabId, tabs: previousApp.tabs });
+      useShellLayoutStore.setState(previousShell);
+    }
+  });
+
   it("toggles the project tree from the panel-local collapse control and collapsed rail", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
@@ -8330,15 +8416,13 @@ describe("CodeWorkspaceTab", () => {
       });
       await waitFor(() => expect(changeCalls).toBe(blockedCall), { timeout: 2_000 });
 
-      await act(async () => {
+      act(() => {
         registrationRef.current?.executeAction(commandId);
-        await Promise.resolve();
       });
       expect(provider).not.toHaveBeenCalled();
 
-      await act(async () => {
+      act(() => {
         releaseBlocked?.();
-        await Promise.resolve();
       });
       await waitFor(() => expect(changeCalls).toBe(blockedCall + 1));
       await waitFor(() => expect(provider, commandId).toHaveBeenCalled(), { timeout: 3_000 });
@@ -10820,7 +10904,8 @@ end_of_record
       const popup = await screen.findByTestId("code-workspace-search-everywhere");
       fireEvent.click(within(popup).getByRole("tab", { name: "Actions" }));
       fireEvent.change(within(popup).getByLabelText("Search actions"), { target: { value: "Undo Replace in files" } });
-      fireEvent.click(await within(popup).findByText("Undo Replace in files"));
+      const undo = await within(popup).findByText("Undo Replace in files");
+      await act(async () => { fireEvent.click(undo); });
       expect(await screen.findByTestId("code-workspace-undo-confirm")).toHaveTextContent("Undo Replace in files?");
       expect(disk["src/a.txt"]).toBe("alpha coin\n");
       fireEvent.click(screen.getByTestId("code-workspace-undo-confirm-ok"));
@@ -13038,7 +13123,9 @@ end_of_record
       vi.mocked(confirmAppDialog).mockClear();
       vi.mocked(confirmAppDialog).mockResolvedValue(true);
 
-      const reviewPromise = registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      await waitFor(() => expect(screen.queryByTestId("refactoring-preview-dialog")).not.toBeInTheDocument());
+      let reviewPromise: ReturnType<WorkspaceCommandRegistration["executeAction"]> | undefined;
+      act(() => { reviewPromise = registrationRef.current?.executeAction("workspace.reviewRefactorRecovery"); });
       const review = await screen.findByTestId("refactor-recovery-review");
       const restoreButton = within(review).getByTestId("refactor-recovery-restore");
       await waitFor(() => expect(restoreButton).toBeEnabled());
@@ -14395,15 +14482,19 @@ end_of_record
       return view!;
     }
 
-    function pressExtractChord(pane: HTMLElement) {
-      fireEvent.keyDown(pane, { key: "m", code: "KeyM", ctrlKey: true, altKey: true });
+    async function pressExtractChord(pane: HTMLElement) {
+      // Flush the action's promise-driven React updates before observing the
+      // naming dialog. The provider/disk mocks still exercise the real flow.
+      await act(async () => {
+        fireEvent.keyDown(pane, { key: "m", code: "KeyM", ctrlKey: true, altKey: true });
+      });
     }
 
     it("Ctrl+Alt+M runs the only method candidate without a menu and prompts for a name", async () => {
       const fixture = setupExtract(EXTRACT_INSTANCE);
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
 
       await waitFor(() => expect(lspMocks.lspCodeActionResolve).toHaveBeenCalledTimes(1));
       await waitFor(() => expect(lspMocks.lspCodeActions).toHaveBeenCalled());
@@ -14428,7 +14519,7 @@ end_of_record
       const fixture = setupExtract("instance-extract-enter");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
       const input = await screen.findByTestId("text-input-dialog-input");
       await waitFor(() => expect(fixture.text()).toBe(B1));
 
@@ -14453,7 +14544,7 @@ end_of_record
       const echoed = setupExtract("instance-extract-echo");
       const echo = await mountExtract(echoed);
       selectExtractRange(echo.content);
-      pressExtractChord(echo.pane);
+      await pressExtractChord(echo.pane);
       const echoInput = await screen.findByTestId("text-input-dialog-input");
       await waitFor(() => expect(echoed.disk[EXTRACT_PATH]).toBe(B1));
       await act(async () => {
@@ -14471,7 +14562,7 @@ end_of_record
       const escaped = setupExtract("instance-extract-escape");
       const second = await mountExtract(escaped);
       selectExtractRange(second.content);
-      pressExtractChord(second.pane);
+      await pressExtractChord(second.pane);
       const escapeInput = await screen.findByTestId("text-input-dialog-input");
       await waitFor(() => expect(escaped.text()).toBe(B1));
       const renamesBeforeEscape = lspMocks.lspRename.mock.calls.length;
@@ -14485,7 +14576,7 @@ end_of_record
       const fixture = setupExtract("instance-extract-undo");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
       const input = await screen.findByTestId("text-input-dialog-input");
       await waitFor(() => expect(fixture.text()).toBe(B1));
       fireEvent.change(input, { target: { value: "sumOf" } });
@@ -14512,7 +14603,7 @@ end_of_record
       const fixture = setupExtract("instance-extract-multi", "multi");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
 
       const menu = await screen.findByTestId("context-menu");
       expect(menu).toBeInTheDocument();
@@ -14546,7 +14637,7 @@ end_of_record
         view.dispatch({ selection: EditorSelection.cursor(view.state.doc.line(5).from) });
       });
       first.content.focus();
-      pressExtractChord(first.pane);
+      await pressExtractChord(first.pane);
       // The provider still offers a method extraction for the caret statement.
       await waitFor(() => expect(available.text()).toBe(B1));
       const input = await screen.findByTestId("text-input-dialog-input");
@@ -14562,7 +14653,7 @@ end_of_record
         secondView.dispatch({ selection: EditorSelection.cursor(secondView.state.doc.line(5).from) });
       });
       second.content.focus();
-      pressExtractChord(second.pane);
+      await pressExtractChord(second.pane);
       await waitFor(() => expect(useAppStore.getState().statusMessage).toBe(
         "Extract Method: select the statements or expression to extract",
       ));
@@ -14573,28 +14664,24 @@ end_of_record
       expect(lspMocks.lspCodeActionResolve).toHaveBeenCalledTimes(1);
     });
 
-    it("provider errors remain distinct from empty actions", async () => {
-      const cases: Array<{ mode: ExtractMode; expect: string }> = [
-        { mode: "timeout", expect: "Code action request timed out before the provider answered; try again" },
-        { mode: "changed", expect: "Refactor actions were cancelled because the document changed; try again" },
-        { mode: "boom", expect: "B-007 controlled provider error" },
-        { mode: "resolve-error", expect: "Code action resolve failed" },
-        { mode: "malformed", expect: "malformed" },
-        { mode: "command-only", expect: "Code action rejected" },
-        { mode: "disabled", expect: "The selected block has several outputs" },
-        { mode: "none", expect: "Extract Method is not available for this selection" },
-      ];
-      for (const entryCase of cases) {
-        const fixture = setupExtract("instance-extract-" + entryCase.mode, entryCase.mode);
-        const { pane, content } = await mountExtract(fixture);
-        selectExtractRange(content);
-        pressExtractChord(pane);
-        await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(entryCase.expect));
-        expect(fixture.disk[EXTRACT_PATH]).toBe(B0);
-        expect(fixture.text()).toBe(B0);
-        expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
-        await cleanup();
-      }
+    it.each<{ mode: ExtractMode; expect: string }>([
+      { mode: "timeout", expect: "Code action request timed out before the provider answered; try again" },
+      { mode: "changed", expect: "Refactor actions were cancelled because the document changed; try again" },
+      { mode: "boom", expect: "B-007 controlled provider error" },
+      { mode: "resolve-error", expect: "Code action resolve failed" },
+      { mode: "malformed", expect: "malformed" },
+      { mode: "command-only", expect: "Code action rejected" },
+      { mode: "disabled", expect: "The selected block has several outputs" },
+      { mode: "none", expect: "Extract Method is not available for this selection" },
+    ])("provider errors remain distinct from empty actions: $mode", async (entryCase) => {
+      const fixture = setupExtract("instance-extract-" + entryCase.mode, entryCase.mode);
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      await pressExtractChord(pane);
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(entryCase.expect));
+      expect(fixture.disk[EXTRACT_PATH]).toBe(B0);
+      expect(fixture.text()).toBe(B0);
+      expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
     });
 
     it("dirty buffer extracts without saving or prompting", async () => {
@@ -14606,7 +14693,7 @@ end_of_record
       });
       await waitFor(() => expect(fixture.text()).toContain("// pending"));
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
 
       await waitFor(() => expect(fixture.text()).toContain("extracted(values)"));
       expect(fixture.text()).toContain("// pending");
@@ -14620,7 +14707,7 @@ end_of_record
         const fixture = setupExtract("instance-extract-" + mode, mode);
         const { pane, content } = await mountExtract(fixture);
         selectExtractRange(content);
-        pressExtractChord(pane);
+        await pressExtractChord(pane);
         // DEC-03 re-reads a damaged outline once, so the naming chain settles
         // after two provider samples per side.
         await waitFor(() => expect(useAppStore.getState().statusMessage).toBe(
@@ -14637,7 +14724,7 @@ end_of_record
       const fixture = setupExtract("instance-extract-retry");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
       const input = await screen.findByTestId("text-input-dialog-input");
       await waitFor(() => expect(fixture.text()).toBe(B1));
       fireEvent.change(input, { target: { value: "1bad" } });
@@ -14672,7 +14759,7 @@ end_of_record
         return result;
       });
 
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
       await waitFor(() => expect(releaseSymbols).not.toBeNull());
       const view = EditorView.findFromDOM(content)!;
       act(() => {
@@ -14691,7 +14778,7 @@ end_of_record
       const fixture = setupExtract("instance-extract-cancel-retry", "rename-error");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
       const input = await screen.findByTestId("text-input-dialog-input");
       await waitFor(() => expect(fixture.text()).toBe(B1));
 
@@ -14720,7 +14807,7 @@ end_of_record
       const fixture = setupExtract("instance-extract-preview-required", "multi-file");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
 
       const dialog = await screen.findByTestId("refactoring-preview-dialog");
       const usageInputs = () => Array.from(
@@ -14753,7 +14840,7 @@ end_of_record
       const fixture = setupExtract("instance-extract-owner-guard", "rename-multi-file");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
 
       const input = await screen.findByTestId("text-input-dialog-input");
       await waitFor(() => expect(fixture.text()).toBe(B1));
@@ -14780,7 +14867,7 @@ end_of_record
       const fixture = setupExtract("instance-extract-mixed-menu", "multi-mixed");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
-      pressExtractChord(pane);
+      await pressExtractChord(pane);
 
       const menu = await screen.findByTestId("context-menu");
       const candidates = Array.from(

@@ -285,7 +285,7 @@ function ensurePanelNativeChannel() {
 }
 function deliverPanelWindow(message: PanelWindowMessage) {
   const env = message?.envelope;
-  if (message?.type !== "panel-window" || message.from === senderId || env?.version !== 1 || typeof env.operationId !== "string" || typeof env.panelId !== "string" || typeof env.windowLabel !== "string" || !Number.isInteger(env.generation) || !Number.isInteger(message.seq) || !["ready", "failed", "request-reattach", "reattached", "closed", "commit", "cancel", "request-focus"].includes(env.event)) return;
+  if (message?.type !== "panel-window" || message.from === senderId || env?.version !== 1 || typeof env.operationId !== "string" || typeof env.panelId !== "string" || typeof env.windowLabel !== "string" || !Number.isInteger(env.generation) || !Number.isInteger(message.seq) || !["ready", "failed", "request-reattach", "reattached", "closed", "commit", "committed", "cancel", "request-focus", "snapshot"].includes(env.event)) return;
   const key = `${message.from}:${message.seq}`;
   if (panelWindowSeen.has(key)) return;
   panelWindowSeen.add(key); if (panelWindowSeen.size > 1000) panelWindowSeen.delete(panelWindowSeen.values().next().value!);

@@ -1,0 +1,247 @@
+id: TC-SHELL-N07
+title: Notes handoff preserves full draft and persists through a real process restart
+description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n07
+  records the complete scenario and any remaining manual boundary.
+covers:
+- F-TAO-1
+- F-Detach-1
+tags:
+- p1
+- workspace-shell
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: SHELL-NOTE 中文
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: 'First line
+
+      第二行'
+- fill:
+    selector: '[data-testid="note-editor-new-step"]'
+    value: Unsubmitted step
+- fill:
+    selector: '[data-testid="note-editor-new-tag"]'
+    value: Unsubmitted tag
+- click: '[data-testid="notes-floating-toggle"]'
+- switch_window:
+    route: '#notes='
+- wait_for: '[data-testid="notes-detached-window"][data-phase="ready"]'
+- assert_attribute:
+    selector: '[data-testid="notes-detached-window"]'
+    name: data-phase
+    equals: ready
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: SHELL-NOTE 中文
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      第二行'
+- assert_value:
+    selector: '[data-testid="note-editor-new-step"]'
+    equals: Unsubmitted step
+- assert_value:
+    selector: '[data-testid="note-editor-new-tag"]'
+    equals: Unsubmitted tag
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: 'First line
+
+      第二行
+
+      Child edit'
+- click: '[data-testid="notes-detached-dock"]'
+- switch_window:
+    route: ''
+- wait_for: '[data-testid="note-editor"]'
+- assert_count:
+    selector: '[data-testid="note-editor"]'
+    equal: 1
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: SHELL-NOTE 中文
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      第二行
+
+      Child edit'
+- assert_value:
+    selector: '[data-testid="note-editor-new-step"]'
+    equals: Unsubmitted step
+- assert_value:
+    selector: '[data-testid="note-editor-new-tag"]'
+    equals: Unsubmitted tag
+- click: '[data-testid="note-editor-back"]'
+- assert_count:
+    selector: '[data-testid="notes-list-item"]'
+    equal: 1
+- restart_native_app: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- wait_for: '[data-testid="notes-list-item"]'
+- assert_count:
+    selector: '[data-testid="notes-list-item"]'
+    equal: 1
+- click: '[data-testid="notes-list-item"]'
+- wait_for: '[data-testid="note-editor"]'
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: SHELL-NOTE 中文
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'First line
+
+      第二行
+
+      Child edit'
+- assert_attribute:
+    selector: '[data-testid="note-editor-complete"]'
+    name: aria-pressed
+    equals: 'false'
+- screenshot: tc-shell-n07.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Create one real note and retain incomplete step/tag input before
+      detaching.
+    actions:
+    - 4
+    - 5
+    - 6
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"notes-detached-window\"][data-phase=\"ready\"]"}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"notes-detached-window\"]",
+        "name": "data-phase", "equals": "ready"}}'
+    - step: 16
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]",
+        "equals": "SHELL-NOTE 中文"}}'
+    - step: 17
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]",
+        "equals": "First line\n第二行"}}'
+    - step: 18
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-step\"]",
+        "equals": "Unsubmitted step"}}'
+    - step: 19
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-tag\"]",
+        "equals": "Unsubmitted tag"}}'
+    results:
+    - 7
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+  - id: R2
+    requirement: Editing and docking returns the full latest UI draft after the Hub
+      receives it.
+    actions:
+    - 20
+    - 21
+    - 22
+    - 29
+    checkpoints:
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 24
+      expectation: '{"assert_count": {"selector": "[data-testid=\"note-editor\"]",
+        "equal": 1}}'
+    - step: 25
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]",
+        "equals": "SHELL-NOTE 中文"}}'
+    - step: 26
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]",
+        "equals": "First line\n第二行\nChild edit"}}'
+    - step: 27
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-step\"]",
+        "equals": "Unsubmitted step"}}'
+    - step: 28
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-tag\"]",
+        "equals": "Unsubmitted tag"}}'
+    - step: 30
+      expectation: '{"assert_count": {"selector": "[data-testid=\"notes-list-item\"]",
+        "equal": 1}}'
+    results:
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 30
+  - id: R3
+    requirement: A new QA process using the same real SQLite profile reads exactly
+      one note and the complete committed text.
+    actions:
+    - 31
+    - 33
+    - 34
+    - 37
+    checkpoints:
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"notes-list-item\"]"}'
+    - step: 36
+      expectation: '{"assert_count": {"selector": "[data-testid=\"notes-list-item\"]",
+        "equal": 1}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 39
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]",
+        "equals": "SHELL-NOTE 中文"}}'
+    - step: 40
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]",
+        "equals": "First line\n第二行\nChild edit"}}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"note-editor-complete\"]",
+        "name": "aria-pressed", "equals": "false"}}'
+    results:
+    - 32
+    - 35
+    - 36
+    - 38
+    - 39
+    - 40
+    - 41
+  visual:
+  - check: Read final screenshot for clipped controls and retained content
+    method: manual
+    reason: Screenshot generation is not a visual verdict.
+  native:
+  - check: Real Tauri IPC, packaged WebView and declared disk/process/window results
+    method: automated
+    reason: Uses the isolated QA binary; no browser backend stubs.
+  - check: Window-manager always-on-top and OS permission-denied save require the
+      linked V-N07 manual boundary.
+    method: manual
+    reason: See linked native case; this YAML alone does not establish this boundary.

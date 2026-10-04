@@ -23,6 +23,36 @@ use tokio::sync::Mutex;
 
 const CHUNK_SIZE: usize = 64 * 1024;
 
+async fn upload_checkpoint<W: tokio::io::AsyncWrite + Unpin>(
+    writer: &mut W,
+    handle: &TransferHandle,
+    remote: &str,
+    on_paused: impl FnOnce(),
+) -> Result<(), String> {
+    if handle.is_paused() && !handle.is_cancelled() {
+        // russh-sftp queues writes before their server acknowledgements arrive.
+        // Publish paused only after those writes have reached the remote file.
+        writer
+            .flush()
+            .await
+            .map_err(|error| format!("flush {}: {}", remote, error))?;
+        if handle.is_paused() && !handle.is_cancelled() {
+            on_paused();
+            handle.wait_while_paused().await;
+        }
+    }
+    if handle.is_cancelled() {
+        // Closing drains queued writes as well. The completion event must not
+        // release the session while the server is still changing its file.
+        writer
+            .shutdown()
+            .await
+            .map_err(|error| format!("close cancelled upload {}: {}", remote, error))?;
+        return Err("transfer cancelled".to_string());
+    }
+    Ok(())
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct FileEntryDto {
     pub name: String,
@@ -487,16 +517,10 @@ impl ActiveSftp {
         let mut written: u64 = 0;
         let started = Instant::now();
         loop {
-            if handle.is_cancelled() {
-                return Err("transfer cancelled".to_string());
-            }
-            if handle.is_paused() {
+            upload_checkpoint(&mut remote_file, &handle, remote, || {
                 emit_paused(&app, &transfer_id, written, total);
-                handle.wait_while_paused().await;
-                if handle.is_cancelled() {
-                    return Err("transfer cancelled".to_string());
-                }
-            }
+            })
+            .await?;
             let n = file
                 .read(&mut buf)
                 .await
@@ -682,16 +706,10 @@ impl ActiveSftp {
 
         let mut buf = vec![0u8; CHUNK_SIZE];
         loop {
-            if handle.is_cancelled() {
-                return Err("transfer cancelled".to_string());
-            }
-            if handle.is_paused() {
+            upload_checkpoint(&mut remote_file, handle, remote, || {
                 emit_paused(app, transfer_id, completed.load(Ordering::SeqCst), total);
-                handle.wait_while_paused().await;
-                if handle.is_cancelled() {
-                    return Err("transfer cancelled".to_string());
-                }
-            }
+            })
+            .await?;
             let n = file
                 .read(&mut buf)
                 .await
@@ -1011,6 +1029,136 @@ fn remote_basename(path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::future::{Future, poll_fn};
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use tokio::io::AsyncWrite;
+
+    #[derive(Default)]
+    struct PendingWrites {
+        acknowledged: bool,
+        closed: bool,
+        failed: bool,
+    }
+
+    struct BufferedUpload(Arc<std::sync::Mutex<PendingWrites>>);
+
+    impl AsyncWrite for BufferedUpload {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+            data: &[u8],
+        ) -> Poll<std::io::Result<usize>> {
+            Poll::Ready(Ok(data.len()))
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            let state = self.0.lock().unwrap();
+            if state.failed {
+                Poll::Ready(Err(std::io::Error::other("server rejected write")))
+            } else if state.acknowledged {
+                Poll::Ready(Ok(()))
+            } else {
+                Poll::Pending
+            }
+        }
+
+        fn poll_shutdown(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            match self.as_mut().poll_flush(cx) {
+                Poll::Ready(Ok(())) => {
+                    self.0.lock().unwrap().closed = true;
+                    Poll::Ready(Ok(()))
+                }
+                result => result,
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn pause_waits_for_remote_acknowledgements_then_resume_continues() {
+        let state = Arc::new(std::sync::Mutex::new(PendingWrites::default()));
+        let mut writer = BufferedUpload(state.clone());
+        let handle = TransferHandle::new();
+        handle.pause();
+        let paused = std::sync::atomic::AtomicBool::new(false);
+        let checkpoint = upload_checkpoint(&mut writer, &handle, "/upload", || {
+            paused.store(true, Ordering::SeqCst);
+        });
+        tokio::pin!(checkpoint);
+        poll_fn(|cx| {
+            assert!(checkpoint.as_mut().poll(cx).is_pending());
+            assert!(!paused.load(Ordering::SeqCst));
+            state.lock().unwrap().acknowledged = true;
+            assert!(checkpoint.as_mut().poll(cx).is_pending());
+            assert!(paused.load(Ordering::SeqCst));
+            Poll::Ready(())
+        })
+        .await;
+        handle.resume();
+        checkpoint.await.unwrap();
+        assert!(!state.lock().unwrap().closed);
+    }
+
+    #[tokio::test]
+    async fn cancellation_waits_for_remote_writes_and_closes_before_completion() {
+        let state = Arc::new(std::sync::Mutex::new(PendingWrites::default()));
+        let mut writer = BufferedUpload(state.clone());
+        let handle = TransferHandle::new();
+        handle.cancel();
+        let checkpoint = upload_checkpoint(&mut writer, &handle, "/upload", || {
+            panic!("cancelled upload cannot report paused")
+        });
+        tokio::pin!(checkpoint);
+        poll_fn(|cx| {
+            assert!(checkpoint.as_mut().poll(cx).is_pending());
+            assert!(!state.lock().unwrap().closed);
+            state.lock().unwrap().acknowledged = true;
+            Poll::Ready(())
+        })
+        .await;
+        assert_eq!(checkpoint.await.unwrap_err(), "transfer cancelled");
+        assert!(state.lock().unwrap().closed);
+    }
+
+    #[tokio::test]
+    async fn resume_during_drain_does_not_publish_a_stale_pause() {
+        let state = Arc::new(std::sync::Mutex::new(PendingWrites::default()));
+        let mut writer = BufferedUpload(state.clone());
+        let handle = TransferHandle::new();
+        handle.pause();
+        let checkpoint = upload_checkpoint(&mut writer, &handle, "/upload", || {
+            panic!("already resumed")
+        });
+        tokio::pin!(checkpoint);
+        poll_fn(|cx| {
+            assert!(checkpoint.as_mut().poll(cx).is_pending());
+            handle.resume();
+            state.lock().unwrap().acknowledged = true;
+            Poll::Ready(())
+        })
+        .await;
+        checkpoint.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn rejected_remote_write_fails_instead_of_acknowledging_pause() {
+        let state = Arc::new(std::sync::Mutex::new(PendingWrites {
+            failed: true,
+            ..Default::default()
+        }));
+        let mut writer = BufferedUpload(state);
+        let handle = TransferHandle::new();
+        handle.pause();
+        let error = upload_checkpoint(&mut writer, &handle, "/upload", || {
+            panic!("unacknowledged pause")
+        })
+        .await
+        .unwrap_err();
+        assert!(error.contains("server rejected write"));
+    }
 
     #[test]
     fn disconnect_errors_are_classified_for_retry() {

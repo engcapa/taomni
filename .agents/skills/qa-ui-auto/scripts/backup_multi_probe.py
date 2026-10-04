@@ -111,7 +111,7 @@ def run(cfg: dict, report: Path) -> None:
                 os.kill(primary_pid, 0)
                 assertions.append("simultaneous due checks generate exactly one archive")
 
-                session.click('[data-testid="ribbon-settings"]')
+                session.click('[data-testid="shell-rail-settings"]')
                 session.find('[data-testid="settings-panel"]', timeout=30)
                 session.click('[data-testid="settings-group-toggle-backup"]')
                 session.find('[data-testid="backup-history-row"]', timeout=30)

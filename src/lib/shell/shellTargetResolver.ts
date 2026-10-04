@@ -34,7 +34,15 @@ export function targetForAlert(alert: TaoAlert): ShellTarget | null {
   if (alert.source === "transfer" && alert.jobId) return { kind: "transfer", jobId: alert.jobId, panelId: alert.panelId };
   return null;
 }
-export async function revealShellTarget(target: ShellTarget, signal = new AbortController().signal): Promise<RevealResult> {
+export async function revealShellTarget(target: ShellTarget, requestSignal = new AbortController().signal): Promise<RevealResult> {
+  const navigation = new AbortController(), signal = navigation.signal;
+  const cancel = () => navigation.abort();
+  requestSignal.addEventListener("abort", cancel, { once: true });
+  if (requestSignal.aborted) cancel();
+  const userNavigate = (event: Event) => {
+    if (event.target instanceof Element && event.target.closest('[data-testid="tab-item"],[data-testid="shell-tab-card-open"],[data-testid="shell-rail-home"],[data-testid="shell-lane-select"],[data-testid="tao-hub-tab-chat"],[data-testid="tao-hub-tab-notes"],[data-testid="tao-hub-tab-notifications"]')) cancel();
+  };
+  document.addEventListener("click", userNavigate, true); document.addEventListener("keydown", userNavigate, true);
   const missing = (message: string): RevealResult => ({ status: "failed", code: "missing", message });
   const revealTab = (id: string | undefined) => {
     if (!id || !useAppStore.getState().tabs.some((tab) => tab.id === id)) return false;
@@ -63,6 +71,7 @@ export async function revealShellTarget(target: ShellTarget, signal = new AbortC
         if (!thread) return missing("This conversation is unavailable.");
         const tab = useAppStore.getState().tabs.find((tab) => tab.id === thread.linked_session_id || tab.chatTabId === thread.linked_session_id);
         if (tab) revealTab(tab.id);
+        useChatStore.setState({ contextPinned: true });
         useChatStore.getState().setActiveThread(thread.id);
         if (!(await useChatStore.getState().loadMessages(thread.id))) throw new Error("Conversation messages could not be loaded. Retry this notification.");
         if (signal.aborted) return { status: "cancelled" };
@@ -86,12 +95,18 @@ export async function revealShellTarget(target: ShellTarget, signal = new AbortC
         const tab = findMail() ?? await waitShellReady(findMail, signal);
         if (!tab || !revealTab(tab.id)) return missing("Reopen the mail account to view this alert.");
         useShellLayoutStore.getState().setTaoOpen(false);
-        await waitVisible(`[data-testid="mail-client-tab"][data-account-id="${CSS.escape(target.accountId)}"]`, signal);
+        await waitVisible(`[data-testid="mail-client-tab"][data-account-id="${CSS.escape(target.accountId)}"][data-ready="true"]`, signal);
         targetKey = `mail:${target.accountId}`; break;
       }
       case "transfer": {
         const job = useTransferStore.getState().byId(target.jobId);
         if (!job) return missing("This transfer is no longer available.");
+        if (job.originWindowLabel) {
+          useShellLayoutStore.getState().revealTransfers(job.id);
+          await waitVisible(`[data-testid="shell-transfers"] [data-job-id="${CSS.escape(job.id)}"]`, signal);
+          targetKey = `transfer:${job.id}`;
+          break;
+        }
         const shell = useShellLayoutStore.getState(), panel = target.panelId ? shell.panels[target.panelId] : Object.values(shell.panels).find((p) => p.kind === "sftp" && (`attached-${p.owner.kind !== "background" ? p.owner.tabId : ""}` === job.sessionId || (p.owner.kind === "background" && p.owner.resourceKey === `sftp:${job.sessionId}`)));
         if (!panel) {
           shell.revealTransfers(job.id);
@@ -106,10 +121,11 @@ export async function revealShellTarget(target: ShellTarget, signal = new AbortC
         await waitVisible(`[data-surface-id="${CSS.escape(panel.id)}"]`, signal);
         const expand = document.querySelector<HTMLButtonElement>(`[data-surface-id="${CSS.escape(panel.id)}"] [data-testid="sftp-transfer-queue-expand-btn"]`);
         expand?.click();
-        await waitVisible(`[data-surface-id="${CSS.escape(panel.id)}"] [data-testid="sftp-transfer-queue"]`, signal);
+        await waitVisible(`[data-surface-id="${CSS.escape(panel.id)}"] [data-testid="transfer-job"][data-job-id="${CSS.escape(job.id)}"]`, signal);
         targetKey = `transfer:${job.id}`; break;
       }
     }
-    return { status: "revealed", targetKey };
-  } catch (error) { return { status: "failed", code: "unavailable", message: String(error) }; }
+    return signal.aborted ? { status: "cancelled" } : { status: "revealed", targetKey };
+  } catch (error) { return signal.aborted ? { status: "cancelled" } : { status: "failed", code: "unavailable", message: String(error) }; }
+  finally { requestSignal.removeEventListener("abort", cancel); document.removeEventListener("click", userNavigate, true); document.removeEventListener("keydown", userNavigate, true); }
 }

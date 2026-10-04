@@ -8,6 +8,7 @@ import { safeWorkspace } from "../lib/shell/shellLayoutPersistence";
 
 export function useShellLayoutBridge() {
   useLayoutEffect(() => {
+    useChatStore.setState({ shellContextFollowsActive: true });
     const shell = useShellLayoutStore.getState(); shell.initialize();
     const lane = () => { const app = useAppStore.getState(), s = useShellLayoutStore.getState(); const tab = app.tabs.find((t) => t.id === app.activeTabId); return s.laneSelection ?? (tab ? tabLane(tab, s.laneOverrides[tab.id]) : "home"); };
     const sync = () => {
@@ -41,6 +42,6 @@ export function useShellLayoutBridge() {
     const offChat = useChatStore.subscribe((state, previous) => { if (state.drawerOpen !== previous.drawerOpen && state.drawerOpen !== useShellLayoutStore.getState().taoOpen) useShellLayoutStore.getState().setTaoOpen(state.drawerOpen); });
     sync();
     const flush = () => useShellLayoutStore.getState().flush(); window.addEventListener("pagehide", flush);
-    return () => { offApp(); offShell(); offChat(); offSidebar(); offTao(); window.removeEventListener("pagehide", flush); flush(); };
+    return () => { offApp(); offShell(); offChat(); offSidebar(); offTao(); useChatStore.setState({ shellContextFollowsActive: false }); window.removeEventListener("pagehide", flush); flush(); };
   }, []);
 }

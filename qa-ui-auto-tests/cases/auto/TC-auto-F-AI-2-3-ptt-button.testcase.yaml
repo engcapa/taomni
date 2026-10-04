@@ -10,7 +10,10 @@ description: 'F-AI-2.3: only assert the mic button surface, since real audio cap
 
   Settings unmounts the button entirely.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F-AI-2.3
 tags:
@@ -28,7 +31,7 @@ steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="ptt-button"]'
 - assert_visible: '[data-testid="ptt-button"]'
-- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-ai"]'
 - click: '[data-testid="ai-master-switch"]'
@@ -45,7 +48,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: PTT mic button mounts in title bar tray and disappears when AI is disabled：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: PTT mic button mounts in title bar tray and disappears when AI is
+      disabled：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 4
@@ -60,10 +64,11 @@ verification:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 8
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "state": "detached", "timeout_sec":
-        10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "state":
+        "detached", "timeout_sec": 10}}'
     - step: 10
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "timeout_sec":
+        10}}'
     results:
     - 10
   visual:

@@ -1,11 +1,17 @@
 id: TC-IDE-PARITY-020-01
 title: Code insight answers with a caret popup when the language service is unavailable
-description: 'ED-PARITY-020 A2/A3 browser case (no JDT LS in browser preview): member completion no longer offers buffer words, and Quick Doc, Parameter Info and Alt+Enter each show a caret popup naming the unavailable service. Escape closes it without moving focus or the caret; Configure opens Language Servers settings.
+description: 'ED-PARITY-020 A2/A3 browser case (no JDT LS in browser preview): member
+  completion no longer offers buffer words, and Quick Doc, Parameter Info and Alt+Enter
+  each show a caret popup naming the unavailable service. Escape closes it without
+  moving focus or the caret; Configure opens Language Servers settings.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -21,7 +27,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -126,81 +132,106 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A2/DEC-020-04：服务不可用时成员位置 calculator.le 不出现缓冲区单词列表，而弹出原因 notice；Esc 关闭后焦点与 caret 不变。
+    requirement: A2/DEC-020-04：服务不可用时成员位置 calculator.le 不出现缓冲区单词列表，而弹出原因 notice；Esc
+      关闭后焦点与 caret 不变。
     actions:
     - 22
     - 26
     checkpoints:
     - step: 23
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "timeout_sec": 10}}'
     - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Member completion unavailable"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "contains": "Member completion unavailable"}}'
     - step: 25
-      expectation: '{"assert_count": {"selector": ".cm-tooltip-autocomplete", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": ".cm-tooltip-autocomplete", "equal":
+        0}}'
     - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 28
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "1:60"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "1:60"}}'
     results:
     - 24
     - 25
     - 28
     - 29
   - id: R2
-    requirement: A2/DEC-020-02/03：Quick Doc (Ctrl+Q) 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc 后焦点与 caret 不变。
+    requirement: A2/DEC-020-02/03：Quick Doc (Ctrl+Q) 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc
+      后焦点与 caret 不变。
     actions:
     - 30
     checkpoints:
     - step: 31
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "timeout_sec": 10}}'
     - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Documentation unavailable"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "contains": "Documentation unavailable"}}'
     - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 35
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "1:60"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "1:60"}}'
     results:
     - 32
     - 35
     - 36
   - id: R3
-    requirement: A2/DEC-020-02/03：Parameter Info (Ctrl+P) 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc 后焦点与 caret 不变。
+    requirement: A2/DEC-020-02/03：Parameter Info (Ctrl+P) 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc
+      后焦点与 caret 不变。
     actions:
     - 37
     checkpoints:
     - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "timeout_sec": 10}}'
     - step: 39
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Parameter info unavailable"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "contains": "Parameter info unavailable"}}'
     - step: 41
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 42
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 43
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "1:60"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "1:60"}}'
     results:
     - 39
     - 42
     - 43
   - id: R4
-    requirement: A2/DEC-020-02/03：Alt+Enter 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc 后焦点与 caret 不变。
+    requirement: A2/DEC-020-02/03：Alt+Enter 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc 后焦点与
+      caret 不变。
     actions:
     - 44
     checkpoints:
     - step: 45
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "timeout_sec": 10}}'
     - step: 46
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Context actions unavailable"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "contains": "Context actions unavailable"}}'
     - step: 48
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 49
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
+        === true", "expect_truthy": true}}'
     - step: 50
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "1:60"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "contains": "1:60"}}'
     results:
     - 46
     - 49
@@ -211,7 +242,8 @@ verification:
     - 53
     checkpoints:
     - step: 54
-      expectation: '{"wait_for": {"selector": "[data-testid=\"language-servers-settings\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"language-servers-settings\"]",
+        "timeout_sec": 15}}'
     results:
     - 54
   visual:

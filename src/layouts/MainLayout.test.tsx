@@ -703,6 +703,9 @@ describe("MainLayout attached SFTP sidebar", () => {
   });
 
   it("derives the code workspace instance id from the workspace identity on recents re-entry", async () => {
+    const previousInvoke = vi.mocked(tauriInvoke).getMockImplementation();
+    vi.mocked(tauriInvoke).mockImplementation(async (command, args) =>
+      command === "workspace_list_dir" ? [] : previousInvoke?.(command, args));
     // ED-AUDIT-009 A3: the layout v2 snapshot and bounded recovery copies are
     // keyed by the workspace instance id, so re-entering a recents workspace
     // must reuse the deterministic identity instead of minting a fresh uuid
@@ -739,6 +742,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(tab.codeWorkspace?.workspaceInstanceId).toBe(
       recentWorkspaceIdFromParts(tab.codeWorkspace?.roots ?? [], tab.codeWorkspace?.looseFiles ?? []),
     );
+    if (previousInvoke) vi.mocked(tauriInvoke).mockImplementation(previousInvoke);
   });
 
   it("passes a Git rail action to the sidebar for the active local terminal", () => {

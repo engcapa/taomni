@@ -1,12 +1,18 @@
 id: TC-IDE-C8-05-auto-import-preferences-browser
-title: Auto Import Settings dialog manages independent on-the-fly and paste preferences in browser
-description: 'Browser gate case (ED-IMPORT-001). Opens the code workspace, invokes Auto Import Settings
+title: Auto Import Settings dialog manages independent on-the-fly and paste preferences
+  in browser
+description: 'Browser gate case (ED-IMPORT-001). Opens the code workspace, invokes
+  Auto Import Settings
 
-  from Search Everywhere Actions, verifies presence of independent on-the-fly and paste
+  from Search Everywhere Actions, verifies presence of independent on-the-fly and
+  paste
 
   preference controls, toggles preferences, saves, and closes the modal cleanly.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -24,7 +30,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -35,7 +41,8 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Auto Import Settings
 - click: '[data-testid="code-workspace-search-everywhere"] >> text=Auto Import Settings'
 - wait_for:
@@ -54,9 +61,10 @@ steps:
     equals: all
 - click: '[data-testid="auto-import-reset-button"]'
 - eval_readonly:
-    expression: '!document.querySelector("[data-testid" + String.fromCharCode(61) + "\"auto-import-optimize-on-the-fly-checkbox\"]")?.checked
-      && document.querySelector("[data-testid" + String.fromCharCode(61) + "\"auto-import-paste-mode-select\"]")?.value
-      === "ask"'
+    expression: '!document.querySelector("[data-testid" + String.fromCharCode(61)
+      + "\"auto-import-optimize-on-the-fly-checkbox\"]")?.checked && document.querySelector("[data-testid"
+      + String.fromCharCode(61) + "\"auto-import-paste-mode-select\"]")?.value ===
+      "ask"'
     expect_truthy: true
 - click: '[data-testid="auto-import-save-button"]'
 - assert_text:
@@ -69,7 +77,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Auto Import Settings dialog manages independent on-the-fly and paste preferences in browser：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Auto Import Settings dialog manages independent on-the-fly and paste
+      preferences in browser：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 3
@@ -93,25 +102,26 @@ verification:
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 10
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"auto-import-settings-dialog\"]", "timeout_sec": 20}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auto-import-settings-dialog\"]",
+        "timeout_sec": 20}}'
     - step: 16
       expectation: '{"wait_for": "[data-testid=\"auto-import-on-the-fly-checkbox\"]"}'
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"auto-import-paste-mode-select\"]"}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"auto-import-paste-mode-select\"]", "name":
-        "value", "equals": "all"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"auto-import-paste-mode-select\"]",
+        "name": "value", "equals": "all"}}'
     - step: 23
-      expectation: '{"eval_readonly": {"expression": "!document.querySelector(\"[data-testid\" + String.fromCharCode(61)
-        + \"\\\"auto-import-optimize-on-the-fly-checkbox\\\"]\")?.checked && document.querySelector(\"[data-testid\"
-        + String.fromCharCode(61) + \"\\\"auto-import-paste-mode-select\\\"]\")?.value === \"ask\"", "expect_truthy":
-        true}}'
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"auto-import-optimize-on-the-fly-checkbox\\\"]\")?.checked
+        && document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"auto-import-paste-mode-select\\\"]\")?.value
+        === \"ask\"", "expect_truthy": true}}'
     - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"auto-import-settings-dialog\"]", "contains": "Settings
-        saved!"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"auto-import-settings-dialog\"]",
+        "contains": "Settings saved!"}}'
     results:
     - 25
   visual:

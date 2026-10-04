@@ -1,10 +1,14 @@
 id: TC-IDE-C2-09-live-template-settings-retained
 title: Live template settings and language isolation retained
-description: 'Browser verification for Java postfix template expansion (`list.for` -> Tab)
+description: 'Browser verification for Java postfix template expansion (`list.for`
+  -> Tab)
 
   and suppression of live template autocomplete popups within comments.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -23,7 +27,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -89,11 +93,14 @@ verification:
     - step: 15
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
     - step: 18
-      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec":
+        10}}'
     - step: 20
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "for ("}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-content", "contains": "for ("}}'
     - step: 25
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\") === null", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\")
+        === null", "expect_truthy": true}}'
     results:
     - 25
   visual:

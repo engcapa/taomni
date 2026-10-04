@@ -20,7 +20,10 @@ description: '§8.20.2 W1 gate case C5. Capability ids: editor.quick-doc /
 
   guessing from text. Highest claim on green: L1 unavailable-contract only.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -39,7 +42,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -69,9 +72,11 @@ steps:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+    actions"]'
 - type: Expression Static Data
-- click: '[data-testid="code-workspace-search-everywhere"] >> text=Expression Static Data'
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Expression Static
+    Data'
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
     contains: Expression Static Data
@@ -90,7 +95,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Reference information V3 unavailable contracts (QuickDoc/Parameter/Static Data)：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Reference information V3 unavailable contracts (QuickDoc/Parameter/Static
+      Data)：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 3
@@ -132,18 +138,18 @@ verification:
     - step: 24
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-quick-doc\"]"}'
     - step: 29
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 34
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Expression
-        Static Data", "timeout_sec": 15}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]",
+        "contains": "Expression Static Data", "timeout_sec": 15}}'
     - step: 37
       expectation: '{"wait_for": "[data-testid=\"code-workspace-problems-panel\"]"}'
     - step: 39
       expectation: '{"assert_visible": "[data-testid=\"problems-full-project-note\"]"}'
     - step: 40
-      expectation: '{"assert_text": {"selector": "[data-testid=\"problems-full-project-note\"]", "contains": "On-the-fly
-        diagnostics only", "timeout_sec": 10}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"problems-full-project-note\"]",
+        "contains": "On-the-fly diagnostics only", "timeout_sec": 10}}'
     results:
     - 39
     - 40

@@ -16,7 +16,10 @@ description: 'Browser regression case for the shared TerminalAppearanceSettings 
 
   evidence gaps.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F5.2
 tags:
@@ -33,8 +36,8 @@ fixtures:
 timeout_sec: 60
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="ribbon-settings"]'
-- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-terminal"]'
 - wait_for: '[data-testid="terminal-appearance-settings"]'
@@ -158,7 +161,7 @@ verification:
     - 42
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 6
@@ -172,37 +175,52 @@ verification:
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"terminal-theme-option-kanagawa-wave\"]"}'
     - step: 13
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"theme\":\"kanagawa-wave\""}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"theme\":\"kanagawa-wave\""}}'
     - step: 15
       expectation: '{"wait_for": "[role=\"listbox\"] button[role=\"option\"]"}'
     - step: 16
-      expectation: '{"assert_count": {"selector": "[role=\"listbox\"] button[role=\"option\"]", "min": 1}}'
+      expectation: '{"assert_count": {"selector": "[role=\"listbox\"] button[role=\"option\"]",
+        "min": 1}}'
     - step: 18
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"fontFamily\""}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"fontFamily\""}}'
     - step: 21
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"fontSize\":16"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"fontSize\":16"}}'
     - step: 23
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"fontSize\":15"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"fontSize\":15"}}'
     - step: 25
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"fontSize\":16"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"fontSize\":16"}}'
     - step: 27
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"fontLigatures\":true"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"fontLigatures\":true"}}'
     - step: 30
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"scrollback\":12000"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"scrollback\":12000"}}'
     - step: 32
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"cursorStyle\":\"bar\""}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"cursorStyle\":\"bar\""}}'
     - step: 33
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"cursorBlink\":false"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"cursorBlink\":false"}}'
     - step: 35
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"rightClickBehavior\":\"paste\""}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"rightClickBehavior\":\"paste\""}}'
     - step: 38
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"theme\":\"custom:#112233:#ddeeff\""}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"theme\":\"custom:#112233:#ddeeff\""}}'
     - step: 41
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"inlineSuggestionsMax\":2500"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"inlineSuggestionsMax\":2500"}}'
     - step: 43
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"theme\":\"classic\""}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"theme\":\"classic\""}}'
     - step: 44
-      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1", "contains": "\"fontSize\":14"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.terminalDefaultProfile.v1",
+        "contains": "\"fontSize\":14"}}'
     results:
     - 43
     - 44

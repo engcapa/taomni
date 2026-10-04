@@ -15,7 +15,7 @@ interface ShellState {
   mru: string[];
   mruCycling: boolean;
   overlayTarget: string | null;
-  overlay: "overview" | "quick" | null;
+  overlay: "overview" | "quick" | "panels" | null;
   navigatorOverlay: boolean;
   navigatorPage: "recent" | "project" | "tools";
   taoOpen: boolean;
@@ -55,7 +55,7 @@ export const useShellLayoutStore = create<ShellState>((set, get) => ({
   mruCycling: false, overlayTarget: null, navigatorOverlay: false, navigatorPage: "recent", taoOpen: false, transfersOpen: false, transferTarget: null, panels: {}, activePanelByEdge: {}, restoreRefByTab: {},
   bindRestoreSource: (tabId, source, order) => {
     if (get().exiting) return;
-    const ref = source.kind === "workspace" ? `workspace:${source.workspaceInstanceId}` : `run-entry:${source.identity}`;
+    const ref = source.kind === "workspace" ? `workspace:${source.workspaceInstanceId}` : `${source.kind === "run-entry" ? "run-entry" : "unsupported"}:${source.identity}`;
     const s = get(), first = !s.restoreRefByTab[tabId], pref = s.layout.restoredTabs[ref];
     if (first) set({ restoreRefByTab: { ...s.restoreRefByTab, [tabId]: ref },
       ...(pref ? { pinnedTabs: { ...s.pinnedTabs, [tabId]: pref.pinned }, laneOverrides: { ...s.laneOverrides, ...(pref.laneOverride ? { [tabId]: pref.laneOverride } : {}) } } : {}) });
@@ -140,7 +140,9 @@ export const useShellLayoutStore = create<ShellState>((set, get) => ({
       const edge = panel.placement.edge;
       set((s) => ({ activePanelByEdge: { ...s.activePanelByEdge, [edge]: id } }));
     }
-    if (panel.placement.kind === "dock" && get().layout.tao.edge === panel.placement.edge) get().setTaoOpen(false);
+    // Opening a destination must preserve the recent-panel dialog while its
+    // asynchronous request is still waiting for readiness or showing an error.
+    if (panel.placement.kind === "dock" && get().layout.tao.edge === panel.placement.edge) set({ taoOpen: false });
     set({ overlayTarget: id, navigatorOverlay: false });
   },
   hidePanel: (id) => get().patchPanel(id, { requestedOpen: false }),

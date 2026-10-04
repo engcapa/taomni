@@ -1,5 +1,5 @@
 id: TC-SHELL-B04
-title: Reload and explicit restore recreate one workspace instance
+title: Workset restore preserves successful owners through partial failure, cancel and retry
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b04.
   Browser IPC fixtures prove renderer outcomes only.'
 covers:
@@ -13,7 +13,8 @@ modes:
 fixtures:
 - reset_db
 - parity008_git
-timeout_sec: 150
+- shell_browser_catalog
+timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
@@ -39,6 +40,93 @@ steps:
     selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
     equal: 1
 - screenshot: tc-shell-b04.png
+- seed_storage:
+    key: taomni.shellLayout.v2
+    value: '{"version": 2, "restoreSources": {"workspace:mixed-A": {"kind": "workspace", "workspaceInstanceId":
+      "mixed-A", "workspace": {"repoRoot": "/preview/parity008", "workspaceId": "mixed-A", "name": "mixed-A",
+      "roots": [{"id": "mixed-A", "name": "mixed-A", "path": "/preview/parity008", "kind": "folder"}],
+      "looseFiles": []}}, "workspace:mixed-B": {"kind": "workspace", "workspaceInstanceId": "mixed-B",
+      "workspace": {"repoRoot": "/preview/parity008/repo-b", "workspaceId": "mixed-B", "name": "mixed-B",
+      "roots": [{"id": "mixed-B", "name": "mixed-B", "path": "/preview/parity008/repo-b", "kind": "folder"}],
+      "looseFiles": []}}}, "restoredTabs": {"workspace:mixed-A": {"order": 0}, "workspace:mixed-B": {"order":
+      1}}}'
+- seed_storage:
+    key: taomni.welcome.sessionResumeCleared.v1
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- shell_backend_scenario:
+    action: fail-next
+    command: workspace_list_dir
+    owner: /preview/parity008/repo-b
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- click: '[data-testid="shell-rail-home"]'
+- wait_for: '[data-testid="welcome-restore-status"][data-state="partial"]'
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"][data-status="ready"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"][data-status="failed"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="shell-restore-entry"][data-entry-id="workspace:mixed-B"]'
+    contains: QA fixture rejected workspace_list_dir
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 1
+- click: '[data-testid="shell-tab-navigator-close"]'
+- shell_backend_scenario:
+    action: hold
+    command: workspace_list_dir
+    owner: /preview/parity008/repo-b
+    once: true
+- click: '[data-testid="welcome-restore-retry"]'
+- assert_shell_backend:
+    command: workspace_list_dir
+    owner: /preview/parity008/repo-b
+    status: held
+    count: 1
+- click: '[data-testid="welcome-restore-cancel"]'
+- shell_backend_scenario:
+    action: release
+- wait_for: '[data-testid="welcome-restore-status"][data-state="partial"]'
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"][data-status="ready"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"][data-status="cancelled"]'
+    equal: 1
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 1
+- click: '[data-testid="shell-tab-navigator-close"]'
+- click: '[data-testid="welcome-restore-retry"]'
+- click: '[data-testid="shell-rail-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="welcome-restore-status"][data-state="succeeded"]'
+- assert_items:
+    selector: '[data-testid="shell-restore-entry"]'
+    attribute: data-entry-id
+    equals:
+    - workspace:mixed-A
+    - workspace:mixed-B
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"][data-status="ready"]'
+    equal: 2
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]:has-text("mixed-A")'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]:has-text("mixed-B")'
+    equal: 1
+- screenshot: tc-shell-b04-mixed-retry.png
 verification:
   review: reviewed
   requirements:
@@ -61,38 +149,129 @@ verification:
     - 8
     - 9
   - id: R2
-    requirement: Restoring a persisted workspace reaches ready with one primary instance
-      and no renderer failure.
+    requirement: Restoring a persisted workspace reaches ready with one primary instance and no renderer
+      failure.
     actions:
     - 10
     - 12
     - 15
     checkpoints:
     - step: 11
-      expectation: Restoring a persisted workspace reaches ready with one primary
-        instance and no renderer failure.
+      expectation: Restoring a persisted workspace reaches ready with one primary instance and no renderer
+        failure.
     - step: 13
-      expectation: Restoring a persisted workspace reaches ready with one primary
-        instance and no renderer failure.
+      expectation: Restoring a persisted workspace reaches ready with one primary instance and no renderer
+        failure.
     - step: 14
-      expectation: Restoring a persisted workspace reaches ready with one primary
-        instance and no renderer failure.
+      expectation: Restoring a persisted workspace reaches ready with one primary instance and no renderer
+        failure.
     - step: 16
-      expectation: Restoring a persisted workspace reaches ready with one primary
-        instance and no renderer failure.
+      expectation: Restoring a persisted workspace reaches ready with one primary instance and no renderer
+        failure.
     results:
     - 11
     - 13
     - 14
     - 16
+  - id: R3
+    requirement: A failed second workspace preserves the successful first owner. Cancelling its held retry
+      then releasing the late response creates no extra owner. Retry resolves only the cancelled identity,
+      preserves saved order and finishes with exactly two workspaces.
+    actions:
+    - 18
+    - 19
+    - 20
+    - 22
+    - 23
+    - 25
+    - 30
+    - 32
+    - 33
+    - 34
+    - 36
+    - 37
+    - 41
+    - 43
+    - 44
+    - 45
+    - 50
+    checkpoints:
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"welcome-restore-status\"][data-state=\"partial\"]"}'
+    - step: 27
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"][data-status=\"ready\"]",
+        "equal": 1}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"][data-status=\"failed\"]",
+        "equal": 1}}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-restore-entry\"][data-entry-id=\"workspace:mixed-B\"]",
+        "contains": "QA fixture rejected workspace_list_dir"}}'
+    - step: 31
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
+        "equal": 1}}'
+    - step: 35
+      expectation: '{"assert_shell_backend": {"command": "workspace_list_dir", "owner": "/preview/parity008/repo-b",
+        "status": "held", "count": 1}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"welcome-restore-status\"][data-state=\"partial\"]"}'
+    - step: 39
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"][data-status=\"ready\"]",
+        "equal": 1}}'
+    - step: 40
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"][data-status=\"cancelled\"]",
+        "equal": 1}}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
+        "equal": 1}}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"welcome-restore-status\"][data-state=\"succeeded\"]"}'
+    - step: 48
+      expectation: '{"assert_items": {"selector": "[data-testid=\"shell-restore-entry\"]", "attribute":
+        "data-entry-id", "equals": ["workspace:mixed-A", "workspace:mixed-B"]}}'
+    - step: 49
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"][data-status=\"ready\"]",
+        "equal": 2}}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
+        "equal": 2}}'
+    - step: 52
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]:has-text(\"mixed-A\")",
+        "equal": 1}}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]:has-text(\"mixed-B\")",
+        "equal": 1}}'
+    results:
+    - 21
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 31
+    - 35
+    - 38
+    - 39
+    - 40
+    - 42
+    - 46
+    - 47
+    - 48
+    - 49
+    - 51
+    - 52
+    - 53
   visual:
-  - check: Inspect the final screenshot for readable controls, clipping and overlay
-      placement.
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual
-    reason: Screenshots require a visual verdict; geometry assertions are recorded
-      separately.
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
   native:
   - check: Tauri, OS window, physical input and real service effects
     method: not-applicable
-    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
-      native boundaries.
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

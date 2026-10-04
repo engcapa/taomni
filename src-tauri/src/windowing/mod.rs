@@ -13,7 +13,8 @@
 //! servers. Anything else lands in the catch-all error branch below.
 
 use tauri::{
-    AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, utils::config::Color,
+    AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    utils::config::Color,
 };
 
 /// Default size for a detached window, picked per kind. RDP/VNC need
@@ -65,6 +66,7 @@ pub async fn open_detached_window(
     kind: String,
     session_id: String,
     title: Option<String>,
+    operation_id: Option<String>,
     x: Option<f64>,
     y: Option<f64>,
     width: Option<f64>,
@@ -141,9 +143,18 @@ pub async fn open_detached_window(
     #[cfg(windows)]
     let builder = builder.disable_drag_drop_handler();
 
-    builder
+    let window = builder
         .build()
         .map_err(|e| format!("failed to open detached window: {}", e))?;
+    let destroyed_app = app_handle.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            let _ = destroyed_app.emit(
+                "shell-detached-window-destroyed",
+                serde_json::json!({ "windowLabel": label, "operationId": operation_id }),
+            );
+        }
+    });
     Ok(())
 }
 

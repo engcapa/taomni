@@ -1,11 +1,19 @@
 id: TC-IDE-PARITY-010-02
-title: IDEA main toolbar, ⋮ overflow, status bar navigation/selection and empty-editor tips
-description: 'ED-PARITY-010 A1/A4 browser case: the workspace toolbar keeps IDEA''s project/VCS/run/search/settings groups with secondary editor controls behind ⋮; the status bar shows the navigation bar and `line:col (N chars)` while hiding app-level segments; an empty editor lists IDEA quick tips with live bindings; the Settings gear opens Settings.
+title: IDEA main toolbar, ⋮ overflow, status bar navigation/selection and empty-editor
+  tips
+description: 'ED-PARITY-010 A1/A4 browser case: the workspace toolbar keeps IDEA''s
+  project/VCS/run/search/settings groups with secondary editor controls behind ⋮;
+  the status bar shows the navigation bar and `line:col (N chars)` while hiding app-level
+  segments; an empty editor lists IDEA quick tips with live bindings; the Settings
+  gear opens Settings.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -20,7 +28,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -62,7 +70,8 @@ steps:
     selector: '[data-testid="status-bar-workspace-cursor"]'
     regex: ^1:6 \(5 chars\)$
 - eval_readonly:
-    expression: '!document.querySelector("[data-testid" + String.fromCharCode(61) + "\"status-bar\"]").textContent.includes("X11:")'
+    expression: '!document.querySelector("[data-testid" + String.fromCharCode(61)
+      + "\"status-bar\"]").textContent.includes("X11:")'
     expect_truthy: true
 - press: Control+F4
 - wait_for:
@@ -77,7 +86,8 @@ steps:
 - press: Shift
 - press: Shift
 - wait_for:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search everywhere"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search
+      everywhere"]'
     timeout_sec: 30
 - press: Escape
 - wait_for:
@@ -99,15 +109,19 @@ verification:
     - 22
     checkpoints:
     - step: 13
-      expectation: '{"assert_count": {"selector": "header [data-testid=\"code-workspace-split-right\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "header [data-testid=\"code-workspace-split-right\"]",
+        "equal": 0}}'
     - step: 14
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-search\"]"}'
     - step: 16
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 20
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"] [data-testid=\"code-workspace-split-right\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"]
+        [data-testid=\"code-workspace-split-right\"]"}'
     - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"] [data-testid=\"code-workspace-zoom-reset\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"]
+        [data-testid=\"code-workspace-zoom-reset\"]"}'
     - step: 23
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"]"}'
     results:
@@ -117,16 +131,21 @@ verification:
     - 21
     - 23
   - id: R2
-    requirement: A4：状态栏导航栏显示当前文件，选区 5 字符时光标段为 `1:6 (5 chars)`，应用级 X11 等段在 workspace 激活时隐藏。
+    requirement: A4：状态栏导航栏显示当前文件，选区 5 字符时光标段为 `1:6 (5 chars)`，应用级 X11 等段在 workspace
+      激活时隐藏。
     actions:
     - 13
     checkpoints:
     - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-navbar-host\"]", "contains": "README.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-navbar-host\"]",
+        "contains": "README.txt"}}'
     - step: 32
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "regex": "^1:6 \\(5 chars\\)$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]",
+        "regex": "^1:6 \\(5 chars\\)$"}}'
     - step: 33
-      expectation: '{"eval_readonly": {"expression": "!document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"status-bar\\\"]\").textContent.includes(\"X11:\")", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"status-bar\\\"]\").textContent.includes(\"X11:\")",
+        "expect_truthy": true}}'
     results:
     - 24
     - 32
@@ -137,11 +156,14 @@ verification:
     - 34
     checkpoints:
     - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-empty-editor\"]",
+        "timeout_sec": 10}}'
     - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "contains": "Double Shift"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-empty-editor\"]",
+        "contains": "Double Shift"}}'
     - step: 37
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "regex": "Go to File\\s*(Ctrl[+]Shift|Shift[+]Cmd)[+]N"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-empty-editor\"]",
+        "regex": "Go to File\\s*(Ctrl[+]Shift|Shift[+]Cmd)[+]N"}}'
     results:
     - 36
     - 37
@@ -151,7 +173,8 @@ verification:
     - 43
     checkpoints:
     - step: 44
-      expectation: '{"wait_for": {"selector": "[data-testid=\"settings-panel\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"settings-panel\"]",
+        "timeout_sec": 10}}'
     results:
     - 44
   - id: R5
@@ -161,9 +184,11 @@ verification:
     - 39
     checkpoints:
     - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search everywhere\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]
+        input[aria-label=\"Search everywhere\"]", "timeout_sec": 30}}'
     - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "state": "detached", "timeout_sec": 10}}'
     results:
     - 40
     - 42

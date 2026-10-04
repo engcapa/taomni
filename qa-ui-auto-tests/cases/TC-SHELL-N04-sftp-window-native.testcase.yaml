@@ -1,0 +1,435 @@
+id: TC-SHELL-N04
+title: Native SFTP independent channels, hidden jobs and interrupted child recover without a ghost view
+description: V-N04 and SFTP portion of V-N18. The real original channel uploads while the detached channel
+  downloads. OS close preserves a running child; the parent Transfers shows both actual jobs. Hard destruction
+  returns the source and adopts live bytes before an explicit cancel. Final normal detach/OS-close restores
+  path and selection once. Physical focus, IME and complete process crashes remain separate manual boundaries.
+covers:
+- F7.4
+- F-SHELL-1
+- F-Detach-1
+tags:
+- p1
+- workspace-shell
+modes:
+- native
+fixtures:
+- reset_db
+- shell_sftp_server
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-sftp-password
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- shell_navigate: sessions
+- click: '[data-testid="session-new"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    timeout_sec: 15
+- click: '[data-testid="session-proto-sftp"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.shell_sftp_port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: SHELL-SFTP-ALPHA
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="session-tree-item"][data-session-name="SHELL-SFTP-ALPHA"]'
+    timeout_sec: 15
+- dblclick: '[data-testid="session-tree-item"][data-session-name="SHELL-SFTP-ALPHA"]'
+- wait_for:
+    selector: '[data-testid="auth-prompt"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SHELL_SFTP_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="sftp-remote-list"]'
+    timeout_sec: 15
+- click: '[data-testid="sftp-local-path-edit"]'
+- fill:
+    selector: input[data-testid="sftp-local-path"]
+    value: ${fixture.shell_sftp_local}
+- press: Enter
+- wait_for:
+    selector: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+    timeout_sec: 15
+- click: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+- click: '[data-testid="sftp-local-upload-selected"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-state="running"]'
+    timeout_sec: 20
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="tab-more"]'
+- click: '[data-testid="open-tabs-detach-active"]'
+- switch_window:
+    route: '#sftp='
+- wait_for:
+    selector: '[data-testid="sftp-detached-window"][data-phase="ready"]'
+    timeout_sec: 20
+- assert_native_window_count:
+    equal: 2
+- wait_for:
+    selector: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+    timeout_sec: 20
+- wait_for:
+    selector: '[data-testid="sftp-remote-list"] tr[data-row][title="/download 中文.bin"]'
+    timeout_sec: 20
+- click: '[data-testid="sftp-remote-list"] tr[data-row][title="/download 中文.bin"]'
+- click: '[data-testid="sftp-remote-download-selected"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-state="running"]'
+    timeout_sec: 20
+- assert_file_progress:
+    path: ${fixture.shell_sftp_local}/download 中文.bin
+    state: growing
+    full_size: 16777216
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: growing
+    full_size: 16777216
+- close_window: null
+- switch_window:
+    route: ''
+- wait_for:
+    selector: '[data-testid="shell-detached-placeholder"]'
+    timeout_sec: 20
+- assert_native_window_count:
+    equal: 2
+- click: '[data-testid="shell-transfers-trigger"]'
+- wait_for:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/download
+      中文.bin"]'
+    timeout_sec: 20
+- assert_count:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"]'
+    equal: 2
+- assert_file_progress:
+    path: ${fixture.shell_sftp_local}/download 中文.bin
+    state: growing
+    full_size: 16777216
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="shell-transfers-close"]'
+- click: '[data-testid="shell-detached-focus"]'
+- switch_window:
+    route: '#sftp='
+- wait_for:
+    selector: '[data-testid="sftp-detached-window"][data-phase="ready"]'
+    timeout_sec: 20
+- assert_native_window_count:
+    equal: 2
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-state="done"]'
+    timeout_sec: 90
+    state: attached
+- assert_file_sha256:
+    path: ${fixture.shell_sftp_local}/download 中文.bin
+    equals: ${fixture.shell_sftp_sha256}
+- click: '[data-testid="sftp-local-list"] tr[data-row][title$="cancel 中文.bin"]'
+- click: '[data-testid="sftp-local-upload-selected"]'
+- wait_for:
+    selector: '[data-testid="transfer-job"][data-state="running"]'
+    timeout_sec: 20
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/cancel 中文.bin
+    state: growing
+    full_size: 16777216
+- interrupt_detached_window: '#sftp='
+- switch_window:
+    route: ''
+- assert_native_window_count:
+    equal: 1
+- assert_not_visible: '[data-testid="shell-detached-placeholder"]'
+- wait_for:
+    selector: '[data-testid="sftp-browser"]'
+    timeout_sec: 20
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/cancel 中文.bin
+    state: growing
+    full_size: 16777216
+- click: '[data-testid="shell-transfers-trigger"]'
+- wait_for:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel
+      中文.bin"]'
+    timeout_sec: 20
+- assert_count:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-state="running"]'
+    equal: 1
+- click: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel 中文.bin"]
+    [data-testid="transfer-job-cancel"]'
+- wait_for:
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel
+      中文.bin"][data-state="cancelled"]'
+    timeout_sec: 20
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/cancel 中文.bin
+    state: incomplete
+    full_size: 16777216
+- assert_file_progress:
+    path: ${fixture.shell_sftp_remote}/cancel 中文.bin
+    state: stable
+    full_size: 16777216
+- assert_file_sha256:
+    path: ${fixture.shell_sftp_remote}/upload 中文.bin
+    equals: ${fixture.shell_sftp_sha256}
+    timeout_sec: 90
+- click: '[data-testid="shell-transfers-close"]'
+- click: '[data-testid="tab-more"]'
+- click: '[data-testid="open-tabs-detach-active"]'
+- switch_window:
+    route: '#sftp='
+- wait_for:
+    selector: '[data-testid="sftp-detached-window"][data-phase="ready"]'
+    timeout_sec: 20
+- close_window: null
+- switch_window:
+    route: ''
+- assert_native_window_count:
+    equal: 1
+- wait_for:
+    selector: '[data-testid="sftp-browser"]'
+    timeout_sec: 20
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="sftp-remote-list"] tr[aria-selected="true"][title="/download 中文.bin"]'
+    equal: 1
+- screenshot: tc-shell-n04-native-channels.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real independent SFTP channels preserve original and child byte streams through hidden
+      OS windows, maintain the global job result, adopt an interrupted live transfer and restore exactly
+      one interactive view and selected remote file.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 18
+    - 19
+    - 21
+    - 22
+    - 23
+    - 25
+    - 26
+    - 29
+    - 30
+    - 31
+    - 36
+    - 37
+    - 41
+    - 42
+    - 45
+    - 50
+    - 51
+    - 52
+    - 57
+    - 58
+    - 61
+    - 62
+    - 67
+    - 70
+    - 75
+    - 76
+    - 77
+    - 78
+    - 80
+    - 81
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-panel\"]", "timeout_sec": 60}}'
+    - step: 6
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "timeout_sec": 15}}'
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL-SFTP-ALPHA\"]",
+        "timeout_sec": 15}}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "timeout_sec": 15}}'
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"]", "timeout_sec": 15}}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
+        中文.bin\"]", "timeout_sec": 15}}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"running\"]",
+        "timeout_sec": 20}}'
+    - step: 28
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-detached-window\"][data-phase=\"ready\"]",
+        "timeout_sec": 20}}'
+    - step: 33
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 34
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
+        中文.bin\"]", "timeout_sec": 20}}'
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tr[data-row][title=\"/download
+        中文.bin\"]", "timeout_sec": 20}}'
+    - step: 38
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"running\"]",
+        "timeout_sec": 20}}'
+    - step: 39
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_local}/download 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 40
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 43
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-detached-placeholder\"]", "timeout_sec":
+        20}}'
+    - step: 44
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 46
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-remote-path$=\"/download
+        中文.bin\"]", "timeout_sec": 20}}'
+    - step: 47
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"]",
+        "equal": 2}}'
+    - step: 48
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_local}/download 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 49
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-detached-window\"][data-phase=\"ready\"]",
+        "timeout_sec": 20}}'
+    - step: 54
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 55
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"done\"]", "timeout_sec":
+        90, "state": "attached"}}'
+    - step: 56
+      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_sftp_local}/download 中文.bin", "equals":
+        "${fixture.shell_sftp_sha256}"}}'
+    - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"running\"]",
+        "timeout_sec": 20}}'
+    - step: 60
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/cancel 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 63
+      expectation: '{"assert_native_window_count": {"equal": 1}}'
+    - step: 64
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-detached-placeholder\"]"}'
+    - step: 65
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 20}}'
+    - step: 66
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/cancel 中文.bin", "state":
+        "growing", "full_size": 16777216}}'
+    - step: 68
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-remote-path$=\"/cancel
+        中文.bin\"]", "timeout_sec": 20}}'
+    - step: 69
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-state=\"running\"]",
+        "equal": 1}}'
+    - step: 71
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-remote-path$=\"/cancel
+        中文.bin\"][data-state=\"cancelled\"]", "timeout_sec": 20}}'
+    - step: 72
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/cancel 中文.bin", "state":
+        "incomplete", "full_size": 16777216}}'
+    - step: 73
+      expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/cancel 中文.bin", "state":
+        "stable", "full_size": 16777216}}'
+    - step: 74
+      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "equals":
+        "${fixture.shell_sftp_sha256}", "timeout_sec": 90}}'
+    - step: 79
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-detached-window\"][data-phase=\"ready\"]",
+        "timeout_sec": 20}}'
+    - step: 82
+      expectation: '{"assert_native_window_count": {"equal": 1}}'
+    - step: 83
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 20}}'
+    - step: 84
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]", "equal": 1}}'
+    - step: 85
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-remote-list\"] tr[aria-selected=\"true\"][title=\"/download
+        中文.bin\"]", "equal": 1}}'
+    results:
+    - 3
+    - 6
+    - 15
+    - 17
+    - 20
+    - 24
+    - 27
+    - 28
+    - 32
+    - 33
+    - 34
+    - 35
+    - 38
+    - 39
+    - 40
+    - 43
+    - 44
+    - 46
+    - 47
+    - 48
+    - 49
+    - 53
+    - 54
+    - 55
+    - 56
+    - 59
+    - 60
+    - 63
+    - 64
+    - 65
+    - 66
+    - 68
+    - 69
+    - 71
+    - 72
+    - 73
+    - 74
+    - 79
+    - 82
+    - 83
+    - 84
+    - 85
+  native:
+  - check: Real W3C native window handles, independent native SFTP upload/download and host byte/hash
+      observations
+    method: external
+    reason: Browser service stubs cannot establish these native channels or filesystem effects.
+  visual:
+  - check: Inspect the native channels screenshot for readable controls and unclipped local/remote panes
+    method: manual
+    reason: Functional assertions alone do not establish pixel quality.

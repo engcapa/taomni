@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../stores/appStore";
 import type { GitRemote, GitSnapshot } from "../../lib/git";
 import { WorkspaceGitManager } from "./WorkspaceGitManager";
+import { getGitShellController, subscribeGitShellView } from "../../lib/shell/gitShellState";
 
 const gitMocks = vi.hoisted(() => ({
   GIT_REF_WORKTREE: ":WORKTREE",
@@ -207,6 +208,26 @@ describe("WorkspaceGitManager", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("publishes the complete multi-repository draft and scope for interrupted window recovery", async () => {
+    const roots = [
+      { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+      { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+    ];
+    const received: string[] = [];
+    const off = subscribeGitShellView("recovery", () => received.push(getGitShellController("recovery")!.snapshot().commitMessage));
+    const first = render(<WorkspaceGitManager roots={roots} shellScopeId="recovery" />);
+    fireEvent.change(await screen.findByPlaceholderText("Commit message"), { target: { value: "Child 中文\nSecond paragraph" } });
+    fireEvent.click(screen.getByTestId("workspace-repo-selector"));
+    fireEvent.click(within(screen.getByTestId("workspace-repo-selector-menu")).getByTitle("/repo/app"));
+    const latest = getGitShellController("recovery")!.snapshot();
+    expect(received).toContain("Child 中文\nSecond paragraph");
+    expect(latest.workspace).toMatchObject({ selectedRepoRoot: "/repo/app", repoScope: { mode: "single", repoRoot: "/repo/app" } });
+    first.unmount(); off();
+    render(<WorkspaceGitManager roots={roots} shellScopeId="restored" initialShellSnapshot={latest} />);
+    expect(await screen.findByPlaceholderText("Commit message")).toHaveValue("Child 中文\nSecond paragraph");
+    expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("app");
   });
 
   it("uses the full single-repository Git panel without the multi-repo sidebar", () => {

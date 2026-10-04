@@ -1,127 +1,269 @@
 id: TC-MFA-009
 title: An MFA account is edited from its context menu and deleted only after confirmation
-description: >-
-  V-18 (AC-13). Browser stub. Right-clicking a row lists Edit, Pin, Move up,
-  Move down and Delete. Edit refuses an empty name, saves issuer, account,
-  group and a searchable note without changing the code, and Cancel or Escape
-  discard changes. Delete asks first: cancelling keeps the account,
-  confirming removes it and announces the deletion.
-covers: [F-MFA-1]
-tags: [mfa, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: 'V-18 (AC-13). Browser stub. Right-clicking a row lists Edit, Pin, Move
+  up, Move down and Delete. Edit refuses an empty name, saves issuer, account, group
+  and a searchable note without changing the code, and Cancel or Escape discard changes.
+  Delete asks first: cancelling keeps the account, confirming removes it and announces
+  the deletion.
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
+covers:
+- F-MFA-1
+tags:
+- mfa
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-009}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-009}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-master-009
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-master-009
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
 - click: '[data-testid="mfa-add"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
-- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA Edit}
-- fill: {selector: '[data-testid="mfa-add-account"]', value: edit@example.com}
-- fill: {selector: '[data-testid="mfa-add-secret"]', value: JBSWY3DPEHPK3PXP}
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA Edit
+- fill:
+    selector: '[data-testid="mfa-add-account"]'
+    value: edit@example.com
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: JBSWY3DPEHPK3PXP
 - click: '[data-testid="mfa-add-submit"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
 - right_click: '[data-testid="mfa-account-row"][data-issuer="QA Edit"]'
-- assert_menu_items: [Edit, Pin to top, Move up, Move down, Delete]
+- assert_menu_items:
+  - Edit
+  - Pin to top
+  - Move up
+  - Move down
+  - Delete
 - click: '[data-testid="mfa-menu-edit"]'
 - wait_for: '[data-testid="mfa-edit-dialog"]'
-- assert_attribute: {selector: '[data-testid="mfa-edit-issuer"]', name: value, equals: QA Edit}
-- fill: {selector: '[data-testid="mfa-edit-issuer"]', value: ''}
-- fill: {selector: '[data-testid="mfa-edit-account"]', value: ''}
+- assert_attribute:
+    selector: '[data-testid="mfa-edit-issuer"]'
+    name: value
+    equals: QA Edit
+- fill:
+    selector: '[data-testid="mfa-edit-issuer"]'
+    value: ''
+- fill:
+    selector: '[data-testid="mfa-edit-account"]'
+    value: ''
 - click: '[data-testid="mfa-edit-save"]'
-- assert_text: {selector: '[data-testid="mfa-edit-error"]', contains: Enter an issuer or an account name}
-- fill: {selector: '[data-testid="mfa-edit-issuer"]', value: QA Renamed}
-- fill: {selector: '[data-testid="mfa-edit-account"]', value: renamed@example.com}
-- fill: {selector: '[data-testid="mfa-edit-group"]', value: Ops}
-- fill: {selector: '[data-testid="mfa-edit-note"]', value: rotate yearly}
+- assert_text:
+    selector: '[data-testid="mfa-edit-error"]'
+    contains: Enter an issuer or an account name
+- fill:
+    selector: '[data-testid="mfa-edit-issuer"]'
+    value: QA Renamed
+- fill:
+    selector: '[data-testid="mfa-edit-account"]'
+    value: renamed@example.com
+- fill:
+    selector: '[data-testid="mfa-edit-group"]'
+    value: Ops
+- fill:
+    selector: '[data-testid="mfa-edit-note"]'
+    value: rotate yearly
 - click: '[data-testid="mfa-edit-save"]'
 - assert_not_visible: '[data-testid="mfa-edit-dialog"]'
-- assert_attribute: {selector: '[data-testid="mfa-account-row"][data-issuer="QA Renamed"]', name: data-account, equals: renamed@example.com}
-- assert_text_equals: {selector: '[data-testid="mfa-account-group"]', equals: Ops}
-- assert_text: {selector: '[data-testid="mfa-status"]', contains: Saved QA Renamed}
-- assert_totp_code: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Renamed"] *)', secret: JBSWY3DPEHPK3PXP}
-- fill: {selector: '[data-testid="mfa-search"]', value: rotate}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [QA Renamed]}
-- fill: {selector: '[data-testid="mfa-search"]', value: ''}
+- assert_attribute:
+    selector: '[data-testid="mfa-account-row"][data-issuer="QA Renamed"]'
+    name: data-account
+    equals: renamed@example.com
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-group"]'
+    equals: Ops
+- assert_text:
+    selector: '[data-testid="mfa-status"]'
+    contains: Saved QA Renamed
+- assert_totp_code:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Renamed"] *)'
+    secret: JBSWY3DPEHPK3PXP
+- fill:
+    selector: '[data-testid="mfa-search"]'
+    value: rotate
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - QA Renamed
+- fill:
+    selector: '[data-testid="mfa-search"]'
+    value: ''
 - click: '[data-testid="mfa-account-menu"]:is([data-issuer="QA Renamed"] *)'
 - click: '[data-testid="mfa-menu-edit"]'
 - wait_for: '[data-testid="mfa-edit-dialog"]'
-- fill: {selector: '[data-testid="mfa-edit-issuer"]', value: Should Not Save}
+- fill:
+    selector: '[data-testid="mfa-edit-issuer"]'
+    value: Should Not Save
 - click: '[data-testid="mfa-edit-cancel"]'
 - assert_not_visible: '[data-testid="mfa-edit-dialog"]'
 - click: '[data-testid="mfa-account-menu"]:is([data-issuer="QA Renamed"] *)'
 - click: '[data-testid="mfa-menu-edit"]'
 - wait_for: '[data-testid="mfa-edit-dialog"]'
-- fill: {selector: '[data-testid="mfa-edit-issuer"]', value: Should Not Save Either}
+- fill:
+    selector: '[data-testid="mfa-edit-issuer"]'
+    value: Should Not Save Either
 - press: Escape
 - assert_not_visible: '[data-testid="mfa-edit-dialog"]'
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [QA Renamed]}
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - QA Renamed
 - click: '[data-testid="mfa-account-menu"]:is([data-issuer="QA Renamed"] *)'
 - click: '[data-testid="mfa-menu-delete"]'
 - wait_for: '[data-testid="confirm-dialog"]'
-- assert_text: {selector: '[data-testid="confirm-dialog-message"]', contains: Delete QA Renamed}
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Delete QA Renamed
 - click: '[data-testid="confirm-dialog-cancel"]'
 - assert_not_visible: '[data-testid="confirm-dialog"]'
-- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
 - click: '[data-testid="mfa-account-menu"]:is([data-issuer="QA Renamed"] *)'
 - click: '[data-testid="mfa-menu-delete"]'
 - wait_for: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
-- assert_text: {selector: '[data-testid="mfa-status"]', contains: Deleted QA Renamed}
+- assert_text:
+    selector: '[data-testid="mfa-status"]'
+    contains: Deleted QA Renamed
 - screenshot: mfa-009-after-delete.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The row context menu lists the account actions and Edit validates and saves issuer, account, group and note (AC-13).
-    actions: [11, 13, 14, 15, 16, 18, 20, 23, 24, 25, 27, 28, 29, 30, 31, 37]
+    requirement: The row context menu lists the account actions and Edit validates
+      and saves issuer, account, group and note (AC-13).
+    actions:
+    - 11
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 20
+    - 23
+    - 24
+    - 25
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 37
     checkpoints:
-    - {step: 19, expectation: 'menu lists Edit, Pin, Move up, Move down and Delete'}
-    - {step: 22, expectation: edit form prefilled}
-    - {step: 26, expectation: empty name refused}
-    - {step: 32, expectation: dialog closed after saving}
-    - {step: 33, expectation: account name saved}
-    - {step: 34, expectation: group saved}
-    - {step: 35, expectation: save announced}
-    - {step: 36, expectation: code unchanged and RFC 6238 correct}
-    - {step: 38, expectation: the note is searchable}
-    results: [38]
+    - step: 19
+      expectation: '{"assert_menu_items": ["Edit", "Pin to top", "Move up", "Move
+        down", "Delete"]}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mfa-edit-issuer\"]",
+        "name": "value", "equals": "QA Edit"}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mfa-edit-error\"]",
+        "contains": "Enter an issuer or an account name"}}'
+    - step: 32
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-edit-dialog\"]"}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mfa-account-row\"][data-issuer=\"QA
+        Renamed\"]", "name": "data-account", "equals": "renamed@example.com"}}'
+    - step: 34
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"mfa-account-group\"]",
+        "equals": "Ops"}}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mfa-status\"]", "contains":
+        "Saved QA Renamed"}}'
+    - step: 36
+      expectation: '{"assert_totp_code": {"selector": "[data-testid=\"mfa-account-code\"]:is([data-issuer=\"QA
+        Renamed\"] *)", "secret": "JBSWY3DPEHPK3PXP"}}'
+    - step: 38
+      expectation: '{"assert_items": {"selector": "[data-testid=\"mfa-account-row\"]",
+        "attribute": "data-issuer", "equals": ["QA Renamed"]}}'
+    results:
+    - 38
   - id: R2
     requirement: Cancel and Escape discard edits (AC-13, AC-17).
-    actions: [39, 40, 41, 43, 44, 46, 47, 49, 50]
+    actions:
+    - 39
+    - 40
+    - 41
+    - 43
+    - 44
+    - 46
+    - 47
+    - 49
+    - 50
     checkpoints:
-    - {step: 42, expectation: edit dialog open}
-    - {step: 45, expectation: cancel closed it}
-    - {step: 48, expectation: edit dialog open again}
-    - {step: 51, expectation: Escape closed it}
-    - {step: 52, expectation: issuer unchanged}
-    results: [52]
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"mfa-edit-dialog\"]"}'
+    - step: 45
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-edit-dialog\"]"}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"mfa-edit-dialog\"]"}'
+    - step: 51
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-edit-dialog\"]"}'
+    - step: 52
+      expectation: '{"assert_items": {"selector": "[data-testid=\"mfa-account-row\"]",
+        "attribute": "data-issuer", "equals": ["QA Renamed"]}}'
+    results:
+    - 52
   - id: R3
-    requirement: Delete asks for confirmation; cancel keeps the account and confirm removes it (AC-13).
-    actions: [53, 54, 57, 60, 61, 63]
+    requirement: Delete asks for confirmation; cancel keeps the account and confirm
+      removes it (AC-13).
+    actions:
+    - 53
+    - 54
+    - 57
+    - 60
+    - 61
+    - 63
     checkpoints:
-    - {step: 55, expectation: confirmation shown}
-    - {step: 56, expectation: message names the account}
-    - {step: 58, expectation: dialog closed on cancel}
-    - {step: 59, expectation: account kept}
-    - {step: 62, expectation: confirmation shown again}
-    - {step: 64, expectation: list empty after confirming}
-    - {step: 65, expectation: deletion announced}
-    results: [64, 65]
+    - step: 55
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 56
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]",
+        "contains": "Delete QA Renamed"}}'
+    - step: 58
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 59
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"]",
+        "equal": 1}}'
+    - step: 62
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 64
+      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
+    - step: 65
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mfa-status\"]", "contains":
+        "Deleted QA Renamed"}}'
+    results:
+    - 64
+    - 65
   visual:
   - check: Edit dialog and confirmation dialog are legible.
     method: manual
     reason: Screenshot needs human review.
   native:
-  - check: Rust update/delete in mfa.db are covered by Rust unit tests and TC-MFA-101 persistence.
+  - check: Rust update/delete in mfa.db are covered by Rust unit tests and TC-MFA-101
+      persistence.
     method: external
     reason: Browser stub evidence is not native.

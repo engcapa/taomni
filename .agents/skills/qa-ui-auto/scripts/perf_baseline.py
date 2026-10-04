@@ -130,7 +130,8 @@ def main(argv=None) -> int:
 
         # Enter the workspace with the browser-VFS preview root (in-app prompt
         # is prefilled with /preview in stub mode).
-        page.click("[data-testid='side-tab-tools']")
+        page.click("[data-testid='shell-rail-workspaces']")
+        page.click("[data-testid='shell-navigator-page'][data-page='tools']")
         page.wait_for_selector("[data-testid='sidebar-tools-panel']")
         page.click("[data-testid='sidebar-tool-code-workspace']")
         page.wait_for_selector("[data-testid='code-workspace-tab']")

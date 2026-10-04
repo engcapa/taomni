@@ -1,0 +1,267 @@
+id: TC-SHELL-N18
+title: Destroyed Notes child restores its latest received draft without a ghost window
+description: Isolated QA native window interruption; V-N18. Faults only the selected real Notes child.
+  This proves live-parent recovery, with process-crash durability bounded by already persisted note data.
+covers:
+- F-TAO-1
+- F-SHELL-1
+- F-Detach-1
+tags:
+- p1
+- workspace-shell
+modes:
+- native
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-interruption-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: SHELL-RECOVER 中文
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: 'Persisted source
+
+      Original paragraph'
+- click: '[data-testid="notes-floating-toggle"]'
+- switch_window:
+    route: '#notes='
+- wait_for: '[data-testid="notes-detached-window"][data-phase="ready"]'
+- assert_native_window_count:
+    equal: 2
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: SHELL-RECOVER 中文
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'Persisted source
+
+      Original paragraph'
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: 'Persisted source
+
+      Child 中文 edit
+
+      Final paragraph'
+- fill:
+    selector: '[data-testid="note-editor-new-step"]'
+    value: Child unsent step
+- fill:
+    selector: '[data-testid="note-editor-new-tag"]'
+    value: Child unsent tag
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'Persisted source
+
+      Child 中文 edit
+
+      Final paragraph'
+- interrupt_detached_window: '#notes='
+- switch_window:
+    route: ''
+- wait_for: '[data-testid="shell-notes-recovered"]'
+- wait_for: '[data-testid="notes-panel"][data-window-phase="docked"]'
+- assert_native_window_count:
+    equal: 1
+- assert_count:
+    selector: '[data-testid="note-editor"]'
+    equal: 1
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: SHELL-RECOVER 中文
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'Persisted source
+
+      Child 中文 edit
+
+      Final paragraph'
+- assert_value:
+    selector: '[data-testid="note-editor-new-step"]'
+    equals: Child unsent step
+- assert_value:
+    selector: '[data-testid="note-editor-new-tag"]'
+    equals: Child unsent tag
+- click: '[data-testid="notes-floating-toggle"]'
+- switch_window:
+    route: '#notes='
+- wait_for: '[data-testid="notes-detached-window"][data-phase="ready"]'
+- assert_native_window_count:
+    equal: 2
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'Persisted source
+
+      Child 中文 edit
+
+      Final paragraph'
+- close_window: null
+- switch_window:
+    route: ''
+- wait_for: '[data-testid="notes-panel"][data-window-phase="docked"]'
+- assert_native_window_count:
+    equal: 1
+- assert_value:
+    selector: '[data-testid="note-editor-new-step"]'
+    equals: Child unsent step
+- assert_value:
+    selector: '[data-testid="note-editor-new-tag"]'
+    equals: Child unsent tag
+- click: '[data-testid="note-editor-back"]'
+- assert_count:
+    selector: '[data-testid="notes-list-item"]'
+    equal: 1
+- restart_native_app: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- wait_for: '[data-testid="notes-list-item"]'
+- assert_count:
+    selector: '[data-testid="notes-list-item"]'
+    equal: 1
+- click: '[data-testid="notes-list-item"]'
+- wait_for: '[data-testid="note-editor"]'
+- assert_value:
+    selector: '[data-testid="note-editor-body"]'
+    equals: 'Persisted source
+
+      Child 中文 edit
+
+      Final paragraph'
+- assert_attribute:
+    selector: '[data-testid="note-editor-complete"]'
+    name: aria-pressed
+    equals: 'false'
+- screenshot: tc-shell-n18-recovered.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Create one note, detach into exactly one ready native child and keep the original note
+      identity.
+    actions:
+    - 1
+    - 4
+    - 5
+    - 6
+    - 8
+    - 9
+    - 10
+    - 11
+    checkpoints:
+    - step: 13
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 14
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]", "equals": "SHELL-RECOVER
+        中文"}}'
+    - step: 15
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Persisted
+        source\nOriginal paragraph"}}'
+    results:
+    - 13
+    - 14
+    - 15
+  - id: R2
+    requirement: Interrupt the native child after editing; the parent restores the full latest received
+      draft and leaves one interactive view.
+    actions:
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    checkpoints:
+    - step: 19
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Persisted
+        source\nChild 中文 edit\nFinal paragraph"}}'
+    - step: 24
+      expectation: '{"assert_native_window_count": {"equal": 1}}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"note-editor\"]", "equal": 1}}'
+    - step: 26
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]", "equals": "SHELL-RECOVER
+        中文"}}'
+    - step: 27
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Persisted
+        source\nChild 中文 edit\nFinal paragraph"}}'
+    - step: 28
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-step\"]", "equals":
+        "Child unsent step"}}'
+    - step: 29
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-tag\"]", "equals": "Child
+        unsent tag"}}'
+    results:
+    - 19
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+  - id: R3
+    requirement: Explicitly detaching the recovered note creates a new valid child; ordinary close reattaches
+      once and persisted text survives restart.
+    actions:
+    - 30
+    - 31
+    - 35
+    - 36
+    - 41
+    - 43
+    - 45
+    - 46
+    - 49
+    checkpoints:
+    - step: 33
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 34
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Persisted
+        source\nChild 中文 edit\nFinal paragraph"}}'
+    - step: 38
+      expectation: '{"assert_native_window_count": {"equal": 1}}'
+    - step: 39
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-step\"]", "equals":
+        "Child unsent step"}}'
+    - step: 40
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-tag\"]", "equals": "Child
+        unsent tag"}}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"notes-list-item\"]", "equal": 1}}'
+    - step: 48
+      expectation: '{"assert_count": {"selector": "[data-testid=\"notes-list-item\"]", "equal": 1}}'
+    - step: 51
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Persisted
+        source\nChild 中文 edit\nFinal paragraph"}}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"note-editor-complete\"]", "name":
+        "aria-pressed", "equals": "false"}}'
+    results:
+    - 33
+    - 34
+    - 38
+    - 39
+    - 40
+    - 42
+    - 48
+    - 51
+    - 52
+  visual:
+  - check: Inspect the retained screenshot for readable controls, job state and clipping.
+    method: manual
+    reason: A screenshot needs a visual verdict in addition to functional assertions.
+  native:
+  - check: Real Tauri child destruction, parent draft recovery, native window counts and same-profile
+      process restart
+    method: automated
+    reason: Uses real isolated QA IPC and windows; no browser service stubs.
+  - check: Abrupt termination of the whole QA process and OS IME/always-on-top
+    method: manual
+    reason: Separate V-N18/N07/N10 boundary; this fault destroys only a child window.

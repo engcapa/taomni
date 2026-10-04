@@ -51,6 +51,7 @@ import { buildSessionTerminalThemeMenuItem } from "./session/SessionTerminalThem
 import { buildSessionConnectionCommandMenuItem } from "./session/SessionConnectionCommandMenu";
 import { ShellResumeRow } from "./shell/ShellResumeRow";
 import type { ShellResumeState } from "../hooks/useShellResumeComposer";
+import type { RecentWorkspaceLaunch } from "../hooks/useRecentWorkspaceLaunch";
 
 export interface WelcomeRestoreProp {
   view: RestoreViewState;
@@ -88,6 +89,8 @@ interface WelcomePanelProps {
   onEditRecentSession?: (session: SessionConfig) => void;
   onRevealRecentSession?: (session: SessionConfig) => void;
   onOpenRecentWorkspace?: (workspace: RecentWorkspace) => void;
+  recentWorkspaceLaunches?: Record<string, RecentWorkspaceLaunch>;
+  onRelocateRecentWorkspace?: (workspace: RecentWorkspace) => void;
   onRemoveRecentWorkspace?: (workspace: RecentWorkspace) => void;
   onClearRecentWorkspaces?: () => void;
   onRevealRecentWorkspace?: (workspace: RecentWorkspace) => void;
@@ -130,6 +133,8 @@ export function WelcomePanel({
   onEditRecentSession,
   onRevealRecentSession,
   onOpenRecentWorkspace,
+  recentWorkspaceLaunches,
+  onRelocateRecentWorkspace,
   onRemoveRecentWorkspace,
   onClearRecentWorkspaces,
   onRevealRecentWorkspace,
@@ -481,6 +486,8 @@ export function WelcomePanel({
               onQueryChange={setWorkspaceQuery}
               onClearFilter={() => setWorkspaceQuery("")}
               onOpenWorkspace={onOpenRecentWorkspace}
+              launches={recentWorkspaceLaunches}
+              onRelocateWorkspace={onRelocateRecentWorkspace}
               onRemoveWorkspace={onRemoveRecentWorkspace}
               onClearWorkspaces={onClearRecentWorkspaces}
               onRevealWorkspace={onRevealRecentWorkspace}
@@ -1056,6 +1063,8 @@ function RecentWorkspacesPanel({
   onQueryChange,
   onClearFilter,
   onOpenWorkspace,
+  launches,
+  onRelocateWorkspace,
   onRemoveWorkspace,
   onClearWorkspaces,
   onRevealWorkspace,
@@ -1068,6 +1077,8 @@ function RecentWorkspacesPanel({
   onQueryChange: (value: string) => void;
   onClearFilter: () => void;
   onOpenWorkspace?: (workspace: RecentWorkspace) => void;
+  launches?: Record<string, RecentWorkspaceLaunch>;
+  onRelocateWorkspace?: (workspace: RecentWorkspace) => void;
   onRemoveWorkspace?: (workspace: RecentWorkspace) => void;
   onClearWorkspaces?: () => void;
   onRevealWorkspace?: (workspace: RecentWorkspace) => void;
@@ -1183,10 +1194,11 @@ function RecentWorkspacesPanel({
                     background: "var(--taomni-input-bg)",
                   }}
                   role={onOpenWorkspace ? "button" : undefined}
+                  aria-busy={launches?.[workspace.id]?.state === "opening"}
                   tabIndex={onOpenWorkspace ? 0 : undefined}
                   onClick={() => onOpenWorkspace?.(workspace)}
                   onKeyDown={(event) => {
-                    if (!onOpenWorkspace) return;
+                    if (!onOpenWorkspace || event.target !== event.currentTarget) return;
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       onOpenWorkspace(workspace);
@@ -1204,6 +1216,11 @@ function RecentWorkspacesPanel({
                   }}
                 >
                   <div className="min-w-0 text-left">
+                    {launches?.[workspace.id]?.state === "failed" && <div data-testid="shell-recent-workspace-error" role="alert" className="mb-2 text-xs text-red-500">
+                      <p>{launches[workspace.id].error}</p>
+                      <button type="button" data-testid="shell-recent-workspace-retry" className="taomni-button mr-2" onClick={(e) => { e.stopPropagation(); onOpenWorkspace?.(workspace); }}>{t("shell.retry")}</button>
+                      {onRelocateWorkspace && <button type="button" data-testid="shell-recent-workspace-relocate" className="taomni-button" onClick={(e) => { e.stopPropagation(); onRelocateWorkspace(workspace); }}>{t("shell.relocateWorkspace")}</button>}
+                    </div>}
                     <div className="min-w-0 flex items-center gap-2">
                       <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
                       <span className="min-w-0 truncate text-[12px] font-medium text-[var(--taomni-accent)]">

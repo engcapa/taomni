@@ -8,6 +8,8 @@ import { NoteEditor } from "./NoteEditor";
 import { NoteThemeSettings } from "./NoteThemeSettings";
 import { notesFontSizeStyle, notesFontStyle, notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { emitNotesDockSignal } from "../../lib/notes/notesWindowSync";
+import { isTauriRuntime } from "../../lib/runtime";
+import { detachNotesPanel, requestNotesReturn, useNotesWindowStore } from "../../lib/shell/notesPanelWindow";
 
 interface NotesPanelProps {
   showPanelModeToggle?: boolean;
@@ -42,6 +44,8 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
   const fontSize = useNotesStore((s) => s.fontSize);
   const panelMode = useNotesStore((s) => s.panelMode);
   const setPanelMode = useNotesStore((s) => s.setPanelMode);
+  const loadError = useNotesStore((s) => s.loadError), saveError = useNotesStore((s) => s.saveError);
+  const move = useNotesWindowStore();
   const [showSettings, setShowSettings] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
   const creatingNoteRef = useRef(false);
@@ -62,6 +66,11 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
   const floatingActive = panelMode === "floating";
 
   const toggleFloatingPanel = () => {
+    if (isTauriRuntime()) {
+      if (move.phase === "detached") requestNotesReturn();
+      else void detachNotesPanel(t("notes.title")).catch(() => undefined);
+      return;
+    }
     if (floatingActive) {
       setPanelMode("hub");
       emitNotesDockSignal();
@@ -89,8 +98,16 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
       data-testid="notes-panel"
       data-notes-theme={theme}
       data-density={density}
+      data-window-phase={move.phase}
+      inert={move.phase === "committing" || move.phase === "returning"}
       style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)", ...themeStyle, ...fontStyle, ...fontSizeStyle }}
     >
+      {move.recovery && <p role="status" data-testid="shell-notes-recovered" className="p-2 text-xs shrink-0">{move.recovery}</p>}
+      {(loadError || saveError || move.error) && <div role="alert" data-testid="shell-notes-error" className="p-2 text-xs shrink-0"><p>{move.error ?? saveError ?? loadError}</p><button data-testid="shell-notes-retry" onClick={() => {
+        if (move.error) void detachNotesPanel(t("notes.title")).catch(() => undefined);
+        else if (saveError) { const draft = import("../../lib/notes/notesViewState"); void draft.then(({ flushNotesEditor }) => flushNotesEditor()).catch(() => undefined); }
+        else void useNotesStore.getState().loadNotes();
+      }}>{t("common.retry")}</button></div>}
       {activeNote ? (
         <>
         {showPanelModeToggle && <button type="button" data-testid="notes-floating-toggle" className="taomni-btn shrink-0 self-end m-1 h-6 w-6 p-0 inline-flex items-center justify-center"

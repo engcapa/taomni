@@ -1,11 +1,19 @@
 id: TC-IDE-PARITY-024-02
-title: 'IDEA popup keys: Search Everywhere Tab/Shift+Tab tabs, Recent Files Left/Right columns'
-description: 'ED-PARITY-024 A4 browser case: in Search Everywhere Tab and Shift+Tab switch the category tab (IDEA SearchEverywhere.NextTab/PrevTab) while the query keeps focus, and Left/Right still move the caret (IDEA does not switch tabs on arrows). In Recent Files Left moves the keyboard selection into the tool-window column, Up/Down walk it, Right returns to the files, and Enter on a tool window activates it.
+title: 'IDEA popup keys: Search Everywhere Tab/Shift+Tab tabs, Recent Files Left/Right
+  columns'
+description: 'ED-PARITY-024 A4 browser case: in Search Everywhere Tab and Shift+Tab
+  switch the category tab (IDEA SearchEverywhere.NextTab/PrevTab) while the query
+  keeps focus, and Left/Right still move the caret (IDEA does not switch tabs on arrows).
+  In Recent Files Left moves the keyboard selection into the tool-window column, Up/Down
+  walk it, Right returns to the files, and Enter on a tool window activates it.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -20,7 +28,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -70,7 +78,8 @@ steps:
     timeout_sec: 5
 - press: Control+e
 - wait_for: '[data-testid="code-workspace-recent-files"]'
-- wait_for: '[data-testid="code-workspace-recent-files"] input[aria-label="Recent files"]:focus'
+- wait_for: '[data-testid="code-workspace-recent-files"] input[aria-label="Recent
+    files"]:focus'
 - press: ArrowLeft
 - assert_attribute:
     selector: '[data-testid="code-workspace-recent-files-tool-window-project"]'
@@ -93,17 +102,18 @@ steps:
     state: detached
     timeout_sec: 5
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"]'
     timeout_sec: 10
 - assert_text:
-    selector: '[data-testid="code-workspace-tool-window-title"]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":problems"] [data-testid="shell-host-tab"][aria-selected="true"]'
     contains: Problems
 - screenshot: tc-ide-parity-024-02-popup-keys.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A4：Search Everywhere 中 Tab/Shift+Tab 切换分类 tab 且焦点留在查询框；方向键不切换 tab；鼠标点 tab 切换后焦点仍在查询框。
+    requirement: A4：Search Everywhere 中 Tab/Shift+Tab 切换分类 tab 且焦点留在查询框；方向键不切换 tab；鼠标点
+      tab 切换后焦点仍在查询框。
     actions:
     - 13
     - 16
@@ -113,19 +123,26 @@ verification:
     - 24
     checkpoints:
     - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]",
+        "name": "aria-selected", "equals": "true"}}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"]",
+        "name": "aria-selected", "equals": "true"}}'
     - step: 18
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"aria-label\") === \"Go to symbol\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"aria-label\")
+        === \"Go to symbol\"", "expect_truthy": true}}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-classes\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-classes\"]",
+        "name": "aria-selected", "equals": "true"}}'
     - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-classes\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-classes\"]",
+        "name": "aria-selected", "equals": "true"}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]",
+        "name": "aria-selected", "equals": "true"}}'
     - step: 26
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"aria-label\") === \"Go to file\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"aria-label\")
+        === \"Go to file\"", "expect_truthy": true}}'
     results:
     - 15
     - 17
@@ -146,19 +163,26 @@ verification:
     - 40
     checkpoints:
     - step: 31
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-recent-files\"] input[aria-label=\"Recent files\"]:focus"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-recent-files\"] input[aria-label=\"Recent
+        files\"]:focus"}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-tool-window-project\"]", "name": "data-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-tool-window-project\"]",
+        "name": "data-selected", "equals": "true"}}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-tool-window-problems\"]", "name": "data-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-tool-window-problems\"]",
+        "name": "data-selected", "equals": "true"}}'
     - step: 37
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-recent-files-tool-windows\"] [data-selected=\"true\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-recent-files-tool-windows\"]
+        [data-selected=\"true\"]", "equal": 0}}'
     - step: 41
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]",
+        "state": "detached", "timeout_sec": 5}}'
     - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]",
+        "timeout_sec": 10}}'
     - step: 43
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Problems"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]
+        [data-testid=\"shell-host-tab\"][aria-selected=\"true\"]", "contains": "Problems"}}'
     results:
     - 31
     - 33

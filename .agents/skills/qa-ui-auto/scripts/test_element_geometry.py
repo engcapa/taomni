@@ -47,6 +47,17 @@ class ElementGeometryTest(TestCase):
         with self.assertRaisesRegex(StepError, "blocked or inert"):
             assert_geometry(args, [dict(item, hit_center=False)])
 
+    def test_checks_upper_bounds_including_exact_boundary(self):
+        args = dict(self.args, max_width=34, max_height=32)
+        assert_geometry(args, self.samples)
+        self.samples[-1]["width"] = 34.01
+        with self.assertRaisesRegex(StepError, "project width 34.01 > 34"):
+            assert_geometry(args, self.samples)
+        self.samples[-1]["width"] = 34
+        self.samples[-1]["height"] = 32.01
+        with self.assertRaisesRegex(StepError, "project height 32.01 > 32"):
+            assert_geometry(args, self.samples)
+
     def test_keeps_actual_measurements_when_an_assertion_fails(self):
         self.samples[-1]["height"] = 24
         with TemporaryDirectory() as directory:

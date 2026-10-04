@@ -1,9 +1,7 @@
+import { trackSftpTransfer } from "./sftpTransferTracking";
 import { useCallback } from "react";
 import {
   joinPath,
-  listenSftpComplete,
-  listenSftpPaused,
-  listenSftpProgress,
   sftpCancelTransfer,
   sftpChmod,
   sftpDownload,
@@ -44,54 +42,7 @@ export function useSftpController(sessionId: string) {
 
   const startTransferTracking = useCallback(
     async (transferId: string, refreshSide: PaneSide) => {
-      // We must await listener registration BEFORE returning, otherwise a
-      // backend (or stub) that emits the completion event synchronously can
-      // race past the listeners and leave the queue row stuck as "queued".
-      let unlistenProgress: (() => void) | null = null;
-      let unlistenComplete: (() => void) | null = null;
-      let unlistenPaused: (() => void) | null = null;
-
-      const [progressUnlisten, pausedUnlisten, completeUnlisten] = await Promise.all([
-        listenSftpProgress(transferId, (payload) => {
-          patchTransfer(transferId, {
-            bytes: payload.bytes,
-            size: payload.total || undefined,
-            rate: payload.rate,
-            eta: payload.eta,
-            state: "running",
-          });
-        }),
-        listenSftpPaused(transferId, (payload) => {
-          // Backend pinged us that the worker is now suspended; mirror that
-          // into the UI so the badge flips from "running" to "paused".
-          patchTransfer(transferId, {
-            bytes: payload.bytes,
-            rate: 0,
-            eta: 0,
-            state: "paused",
-          });
-        }),
-        listenSftpComplete(transferId, (payload) => {
-          if (payload.success) {
-            setTransferState(transferId, "done");
-            setStatus(`Transfer complete: ${transferId}`);
-            void refreshPane(sessionId, refreshSide);
-          } else {
-            const isCancel = (payload.error || "").toLowerCase().includes("cancel");
-            setTransferState(
-              transferId,
-              isCancel ? "cancelled" : "error",
-              payload.error ?? "transfer failed",
-            );
-          }
-          unlistenProgress?.();
-          unlistenComplete?.();
-          unlistenPaused?.();
-        }),
-      ]);
-      unlistenProgress = progressUnlisten;
-      unlistenPaused = pausedUnlisten;
-      unlistenComplete = completeUnlisten;
+      await trackSftpTransfer(transferId, sessionId, refreshSide);
     },
     [patchTransfer, refreshPane, sessionId, setStatus, setTransferState],
   );
@@ -294,22 +245,20 @@ export function useSftpController(sessionId: string) {
   const cancelTransfer = useCallback(async (transferId: string) => {
     try {
       await sftpCancelTransfer(transferId);
-      setTransferState(transferId, "cancelled");
+      // The completion listener owns the terminal state and resource release.
     } catch (err) {
       setStatus(`Cancel failed: ${err instanceof Error ? err.message : err}`);
     }
-  }, [setStatus, setTransferState]);
+  }, [setStatus]);
 
   const pauseTransfer = useCallback(async (transferId: string) => {
     try {
       await sftpPauseTransfer(transferId);
-      // Reflect the pause optimistically so the UI updates even if the backend
-      // chunk loop hasn't observed the flag yet.
-      patchTransfer(transferId, { state: "paused", rate: 0, eta: 0 });
+      // Paused is published only when the worker acknowledges its pause flag.
     } catch (err) {
       setStatus(`Pause failed: ${err instanceof Error ? err.message : err}`);
     }
-  }, [patchTransfer, setStatus]);
+  }, [setStatus]);
 
   const resumeTransfer = useCallback(async (transferId: string) => {
     try {

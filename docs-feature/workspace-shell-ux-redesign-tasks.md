@@ -8,24 +8,30 @@
 
 | 任务 | 状态 | 依赖 | 交付 / 验证证据 |
 |---|---|---|---|
-| TASK-01 契约与纯模型 | in_progress | 无 | 已领取；类型、身份、尺寸策略、Shell store |
-| TASK-02 壳层布局集成 | in_progress | 01 | Rail / Navigator / MainLayout / ControlBar |
-| TASK-03 标签与 action 路由 | in_progress | 01,04 | lane、总览、快速切换、快捷键 |
-| TASK-04 实例与关闭事务 | in_progress | 01 | stable surface、close coordinator、DB adapter |
-| TASK-05 SFTP 与任务 ownership | in_progress | 01,04 | view/job lease、后台、promotion |
-| TASK-06 Workspace / Git | in_progress | 01,04 | Project、tools、Git Host |
-| TASK-07 Tao / 通知 | in_progress | 01,04,05 | Hub、目标解析、成功后确认 |
-| TASK-08 Home / 恢复 | in_progress | 01,03,10 | 三主动作、最近项、组合恢复 |
-| TASK-09 原生窗口 | in_progress | 04,05,06,07 | Git、detach 事务、回停靠 |
-| TASK-10 持久化与回退 | in_progress | 01,04,07 | v2 migration、恢复 identity |
-| TASK-11 用例与自动化支持 | in_progress | 随相关实现 | 已领取；62 用例及受影响回归、catalog/policy |
-| TASK-12 集成与验收 | in_progress | 02–11 | 单元测试、三平台 browser/native、结果分析与修复 |
+| TASK-01 契约与纯模型 | verification | 无 | 已领取；类型、身份、尺寸策略、Shell store |
+| TASK-02 壳层布局集成 | verification | 01 | Rail / Navigator / MainLayout / ControlBar |
+| TASK-03 标签与 action 路由 | verification | 01,04 | lane、总览、快速切换、快捷键 |
+| TASK-04 实例与关闭事务 | verification | 01 | stable surface、close coordinator、DB adapter |
+| TASK-05 SFTP 与任务 ownership | verification | 01,04 | view/job lease、后台、promotion |
+| TASK-06 Workspace / Git | verification | 01,04 | Project、tools、Git Host |
+| TASK-07 Tao / 通知 | verification | 01,04,05 | Hub、目标解析、成功后确认 |
+| TASK-08 Home / 恢复 | verification | 01,03,10 | 三主动作、最近项、组合恢复 |
+| TASK-09 原生窗口 | verification | 04,05,06,07 | Git、detach 事务、回停靠 |
+| TASK-10 持久化与回退 | verification | 01,04,07 | v2 migration、恢复 identity |
+| TASK-11 用例与自动化支持 | verification | 随相关实现 | 已领取；62 用例及受影响回归、catalog/policy |
+| TASK-12 集成与验收 | verification | 02–11 | 单元测试、三平台 browser/native、结果分析与修复 |
 
 ## 本轮实施进度
 
-TASK-01～10 已领取并集成初版，正在补齐异常路径和保留行为；TASK-11 正在实现可执行 YAML 与 runner 支持。尚无任务满足完整验收，未标记 done。已完成首轮 GitHub 三平台验证并保留失败证据；当前补齐第二批用例与修复。
+TASK-01～10 已领取并集成初版，正在补齐异常路径和保留行为；TASK-11 正在实现可执行 YAML 与 runner 支持。尚无任务满足完整验收，未标记 done。已完成两轮 GitHub 三平台验证并保留失败证据；当前同时补齐 Shell 用例和适配原有 browser/native 回归。
+
+最新开发批次已集成稳定主工作面、SFTP 后台/跨窗口任务、Git/Notes 窗口恢复、workspace 并行恢复与取消，以及退出/数据库事务边界。当前有 44 browser + 13 native Shell YAML；135 个既有 YAML 已适配，连同额外保留边界共选择 198 个独立 ID（三端 browser 各 156，native Linux 50 / Windows 44 / macOS 43）。数量以最终 selection 为准。用户要求本地尽量只做 unit test，因此本批次不启动本地 browser/native；下一轮统一推送到 GitHub 验证。
+
+新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。这些缺口未记为 pass 或 done。
 
 ## 验证记录
+
+以下按批次保留当时的输入、结果和失败；早期计数与状态是历史记录，当前状态以上面的进度及后续最新验收为准。
 
 设计阶段只有静态文档检查通过，产品与运行时改前基线尚未执行。
 实现阶段复用现有 Welcome / TabBar / ControlBar / sidebar / Tao / detach 的回归测试；新增纯逻辑覆盖尺寸降级、迁移损坏、实例幂等、关闭失败。
@@ -49,3 +55,27 @@ TASK-01～10 已领取并集成初版，正在补齐异常路径和保留行为�
 - 当前 focused Extract 回归 14 项通过，runner 窗口/尺寸契约 11 项通过。完整 CodeWorkspace/Terminal 上轮 311 项通过、3 项失败：splitter 预期已更新并通过，两个 Extract 失败在 focused 整组重跑通过；后续完整收尾仍需稳定输入检查。
 - 未执行的范围仍包括：12 条 browser、14 条 native 设计用例及已登记用例的未实现分支、OS/IME/读屏手工边界、匹配性能基线。不能以当前 36 条 YAML 代替 62 条设计场景，TASK-01～12 保持 in_progress。
 - 第二批收尾：QA build-4、TypeScript/前端构建成功；Windows N02/N05/N06/N08 全部通过，源码身份稳定，报告 `qa-ui-auto-report/workspace-shell/native/run-20261004-052341-161431600/`。Shell/Main/Welcome 聚焦单测 91 项通过；case/catalog audit gate 通过（静态检查，仍列出未触达控件）。检查 N05/N06 截图：1280×800 下标题与状态栏无遮挡，Git 底 Host 与正文可读；不代表所有视觉/读屏/DPI分支通过。
+
+### 第二轮 GitHub 与旧用例适配（2026-10-04）
+
+- 第二轮：[run 37155160043](https://github.com/engcapa/taomni/actions/runs/37155160043)。32 browser 三端全部通过；Linux/Windows native 各 4/4，macOS native 2/4。macOS N05 的子窗口脚本等待超时、N08 受桌面尺寸限制（1280×684）；已补 page-load 跟踪和测试桌面分辨率设置，尚待第三轮远程验证。完整原始报告在 `qa-ui-auto-report/workspace-shell/github/run-37155160043/`。
+- 对当前 HEAD 的旧用例 diff 逐步骤检查：121 条入口迁移用例的 modes、步骤数量与非入口业务步骤完全保留；只把旧 Sessions/Tools/Settings 控件切换到 v2 Rail/Navigator。另行更新 Main Rail、IDE merged rail、SFTP 独立主标签、终端 gutter 和 Notes 的布局/持久化契约。当前总计 131 个既有 YAML 有修改，具体 ID 和审查结果在 `qa-ui-auto-report/_local/retained-case-ids.json`、`shell-retained-inventory.json`。
+- browser 实际发现并修复两个 Project 问题：Shell 中隐藏 Project 后树仍可见；内部旧 Panel collapse 冻结已移动到 Navigator 的树。真实 mounted 回归验证文件节点、隐藏/重开及相同 DOM。新增 `shell_navigate` 只读取可见性并点击真实 Rail/Page，避免重复入口把 Navigator 关闭；runner 契约 4 项通过。
+- 恢复原有宽屏 Tao Ribbon，其点击/拖动委托同一 Hub 和 Shell 布局 owner。旧 TC-NOTES-005/006 与 TC-MAIN-RAIL-01/02 browser 全部通过，报告 `qa-ui-auto-report/workspace-shell/browser/run-20261004-072934-545485400/`；同一运行 B41 失败，保留失败证据。
+- B41 暴露 Top→Bottom 移动后覆盖层仍引用旧宿主导致内部点击关闭 Hub。已修复 listener 的宿主依赖，并以真实 ShellFrame/StableSurface mounted 回归验证移动后的输入保留与外部点击关闭。B41 完整四边、pin、opacity、Notes 全文、窄屏返回与 reload 流程通过，报告 `qa-ui-auto-report/workspace-shell/browser/run-20261004-073818-199830900/`。此前持久化尚未完成的断言失败也保留，现改为观察实际写入就绪后检查。
+- 当前可执行 Shell YAML：37 browser + 5 native。数量不代表全部设计分支完成。新 B06/B25/B27/B32/B41/N07 与各自 native/manual 边界在用例文档中继续细分；没有把 missing 分支或手工检查标为通过。
+- 本地 Shell/Main/Welcome/ControlBar/Terminal/Chat/Notes/RecentWorkspace 聚焦单测 18 files / 264 tests 通过（`shell-product-unit-10.log`）；Project 新 mounted 回归 1 项通过（`shell-hosted-project-unit-11.log`）；覆盖层移动回归 1 项通过（`shell-overlay-unit-13.log`）。完整 CodeWorkspace 单测仍在检查，`shell-codeworkspace-unit-12` 中止且无完整结果，不能记通过。
+- Catalog/schema/control audit-10 全部静态 gate 通过：required 917，covered_required 876，orphans 6；没有降低 baseline。103 条受影响旧 browser 用例已启动，报告 `qa-ui-auto-report/workspace-shell/browser/run-20261004-074027-635498200/`；完成后逐失败分析。Windows QA build-8 已启动，构建/运行期间固定产品输入。
+
+### 当前统一开发批次（2026-10-04；待 GitHub 验收）
+
+- 真实 SFTP paused/cancelled 边界先 drain WRITE ACK 再发布状态，避免 pause 后远端继续增长；`shell-sftp-rust-unit-47` 的 7 项 Rust 单测通过。历史 UI 失败保留，最终原生效果由下一轮 N03/N15 验证。
+- workspace composer 以 saved identity/order 恢复，最多并行 4 项，部分失败保留成功 owner；取消/迟到回复和用户主动导航不抢焦点。`shell-restore-unit-51` 5 项单测通过，B04/B42 已补独立分支。
+- `RetainedPrimaryView` 保留 LAN、MFA、SocksCap、Proxy 和 network tools 的 DOM/草稿并暂停隐藏 effects；`shell-retained-utility-unit-53` 66 项通过，B38/B43 保留真实业务操作。
+- 首次全量前端单测 `shell-product-unit-all-57`：5192 项中 5185 通过、7 失败。SftpPolish 补齐 jsdom ResizeObserver，FloatingNotesPanel 更新 operationId 契约；两文件 23 项通过。CodeWorkspace 的 5 个异步失败保持原产品与断言，聚焦 16 项和完整文件 241 项均通过；最终组合以 `shell-product-unit-all-68.json` 的全量结果为准，尚未完成前不记全量通过。
+- runner 最终本地单测 `shell-runner-unit-71` 53 项通过，覆盖 CI selection、导航、clipboard/SQL/process/file picker 的外部边界、几何、窗口和 SFTP fixture。TypeScript `shell-types-58` exit 0。
+- 静态 audit-70 暴露新增控件归属及 F1.3 Split/MultiExec 托盘入口漏测，已补 catalog 与 B33 实际操作；不降低 coverage baseline。最终 audit/契约结果及 GitHub commit/run 随验收回填。
+
+- 单测收尾：全量 `shell-product-unit-all-68` 的 521 个文件 / 4951 项全部通过，仅编辑器文件 3 项失败。修复测试异步 dispatch 与拆分 8 个独立故障场景后，完整 `shell-editor-final-unit-77` 248/248 通过；两份原始结果共同覆盖当前 5199 项，不改写失败 JSON，也不将 unit-68 标为通过。仅测试编排改变，产品代码自 unit-68 后未改变。`shell-types-final-78` exit 0。
+- 最终静态 `shell-final-static-gate-76` 通过：required 967、covered_required 922、shallow 41、orphans 4；原 baseline 619/614/46/9 保持不变。57 条 Shell schema/reviewed contract 通过；7 条既有 DB 用例的缺失契约已按实际 SQL/UI 动作与结果补齐并通过静态检查。`shell-final-ci-plan-80` exit 0，精确规划 198 ID，无 capability gaps。20 条既有 case 的 needs-review/legacy-imported 标签仍在 selection 中明确列出，不从 schema 或入口迁移推断全面验收。
+- TASK-01～12 进入 verification，下一步以统一提交的 SHA 执行 GitHub browser/native。手工/外部及性能缺口仍保持未验证。

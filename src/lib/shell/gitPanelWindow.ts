@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { consumeDetachedHandoff, writeDetachedHandoff, clearDetachedHandoff, subscribePanelWindow, type PanelWindowMessage } from "../detachedSession";
 import { openDetachedWindow } from "../detachWindowing";
 import { useShellLayoutStore } from "../../stores/shellLayoutStore";
@@ -8,11 +9,14 @@ import type { PanelPlacement, PanelWindowEnvelope } from "./types";
 import type { GitWorkspaceRootInfo } from "../../types";
 import type { GitDetachedPayload } from "../../components/detached/GitDetachedWindow";
 import { visibleShellNode, waitShellReady } from "./readiness";
+import { installPanelWindowLifecycle } from "./panelWindowLifecycle";
+import type { GitShellSnapshot } from "./gitShellState";
 
-interface WindowRecord { id: string; envelope: PanelWindowEnvelope; source: PanelPlacement; title: string }
+interface WindowRecord { id: string; envelope: PanelWindowEnvelope; source: PanelPlacement; title: string; snapshot: GitShellSnapshot | null; seq: number }
 const windows = new Map<string, WindowRecord>(), pending = new Map<string, Promise<void>>();
 const returning = new Map<string, Promise<void>>();
 const completed = new Map<string, PanelWindowEnvelope>();
+const preparing = new Map<string, { envelope: PanelWindowEnvelope; controller: AbortController; snapshot?: GitShellSnapshot; seq: number }>();
 export function focusGitPanelWindow(panelId: string) { const record = windows.get(panelId); if (record) signalPanelWindow(record.envelope, "request-focus"); }
 export function detachGitPanel(panelId: string, title: string, roots: GitWorkspaceRootInfo[], activeRepoRoot?: string, singleRepository = false): Promise<void> {
   if (windows.has(panelId)) { focusGitPanelWindow(panelId); return Promise.resolve(); }
@@ -21,6 +25,7 @@ export function detachGitPanel(panelId: string, title: string, roots: GitWorkspa
   if (!panel || !roots.length) return Promise.reject(new Error("No Git repository is available to detach"));
   const id = panelId, envelope: PanelWindowEnvelope = { version: 1, operationId: crypto.randomUUID(), panelId, generation: panel.generation, windowLabel: detachedWindowLabel("git", id), event: "ready" };
   const source = panel.placement, controller = new AbortController();
+  preparing.set(panelId, { envelope, controller, seq: -1 });
   const off = useShellLayoutStore.subscribe((state) => { if (!state.panels[panelId] || state.panels[panelId].generation !== panel.generation) controller.abort(); });
   shell.patchPanel(panelId, { operation: { id: envelope.operationId, type: "detach" }, error: null });
   const run = (async () => {
@@ -30,18 +35,22 @@ export function detachGitPanel(panelId: string, title: string, roots: GitWorkspa
       void ready.catch(() => undefined);
       writeDetachedHandoff<GitDetachedPayload>("git", id, { title, roots, activeRepoRoot, singleRepository, envelope, snapshot: getGitShellController(panelId)?.snapshot() ?? null });
       if (!consumeDetachedHandoff("git", id)) throw new Error("Could not write the Git window handoff");
-      await openDetachedWindow({ kind: "git", sessionId: id, title, width: 1100, height: 720 });
+      await openDetachedWindow({ kind: "git", sessionId: id, title, width: 1100, height: 720, operationId: envelope.operationId });
       await ready;
       const current = useShellLayoutStore.getState().panels[panelId];
       if (!current || current.generation !== panel.generation) throw new Error("The panel owner changed");
-      windows.set(panelId, { id, envelope, source, title });
-      useShellLayoutStore.getState().patchPanel(panelId, { placement: { kind: "detached", windowLabel: envelope.windowLabel }, operation: null });
+      const committed = waitPanelWindow(envelope, "committed", controller.signal); void committed.catch(() => undefined);
       signalPanelWindow(envelope, "commit", getGitShellController(panelId)?.snapshot());
+      await committed;
+      if (controller.signal.aborted) throw new Error("The Git window closed during preparation");
+      const prepared = preparing.get(panelId);
+      windows.set(panelId, { id, envelope, source, title, snapshot: prepared?.snapshot ?? getGitShellController(panelId)?.snapshot() ?? null, seq: prepared?.seq ?? -1 });
+      useShellLayoutStore.getState().patchPanel(panelId, { placement: { kind: "detached", windowLabel: envelope.windowLabel }, operation: null });
     } catch (failure) {
       controller.abort(); clearDetachedHandoff("git", id); signalPanelWindow(envelope, "cancel");
       useShellLayoutStore.getState().patchPanel(panelId, { operation: null, error: { code: "detach", message: String(failure), retryable: true } }, panel.generation);
       throw failure;
-    } finally { off(); pending.delete(panelId); }
+    } finally { off(); pending.delete(panelId); preparing.delete(panelId); }
   })();
   pending.set(panelId, run); return run;
 }
@@ -84,13 +93,40 @@ export function reattachGitPanel(panelId: string, message?: PanelWindowMessage):
   returning.set(record.envelope.operationId, run); return run;
 }
 export function installGitPanelWindowReceiver() {
-  return subscribePanelWindow((message) => {
+  const off = subscribePanelWindow((message) => {
     const acknowledged = completed.get(message.envelope.operationId);
     if (acknowledged && message.envelope.event === "request-reattach" && matchesPanelWindow(acknowledged, message.envelope)) { signalPanelWindow(acknowledged, "reattached"); return; }
     const record = windows.get(message.envelope.panelId);
+    const prepared = preparing.get(message.envelope.panelId);
+    if (prepared && message.envelope.event === "snapshot" && matchesPanelWindow(prepared.envelope, message.envelope)) {
+      const snapshot = validateGitShellSnapshot(message.data);
+      if (snapshot && message.seq > prepared.seq) { prepared.snapshot = snapshot; prepared.seq = message.seq; }
+      return;
+    }
     if (!record || !matchesPanelWindow(record.envelope, message.envelope)) return;
+    if (message.envelope.event === "snapshot") {
+      const snapshot = validateGitShellSnapshot(message.data);
+      if (snapshot && message.seq > record.seq) { record.snapshot = snapshot; record.seq = message.seq; }
+      return;
+    }
     if (message.envelope.event === "request-reattach") void reattachGitPanel(message.envelope.panelId, message).catch((error) => signalPanelWindow({ ...record.envelope, errorCode: String(error) }, "failed"));
   });
+  const offDestroyed = installPanelWindowLifecycle((window) => {
+    const pendingWindow = [...preparing.values()].find((item) => item.envelope.windowLabel === window.windowLabel && item.envelope.operationId === window.operationId);
+    if (pendingWindow) { pendingWindow.controller.abort(); return; }
+    const record = [...windows.values()].find((item) => item.envelope.windowLabel === window.windowLabel && item.envelope.operationId === window.operationId);
+    if (!record || returning.has(record.envelope.operationId)) return;
+    const snapshot = record.snapshot ?? getGitShellController(record.id)?.snapshot();
+    if (!snapshot) return;
+    const message: PanelWindowMessage = { type: "panel-window", from: "native-window-lifecycle", seq: record.seq + 1, envelope: record.envelope, data: snapshot };
+    void reattachGitPanel(record.id, message).then(() => {
+      useShellLayoutStore.getState().patchPanel(record.id, { error: { code: "window-recovered", message: t("shell.panelWindowRecovered"), retryable: false } });
+    }).catch((error) => {
+      windows.delete(record.id);
+      useShellLayoutStore.getState().patchPanel(record.id, { placement: record.source, operation: null, requestedOpen: true, error: { code: "window-recovery", message: String(error), retryable: true } });
+    });
+  }, (error) => useAppStore.getState().setStatusMessage(String(error)));
+  return () => { off(); offDestroyed(); };
 }
 export async function returnGitWindowsBeforeExit() {
   for (const record of [...windows.values()]) {

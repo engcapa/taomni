@@ -1,0 +1,246 @@
+id: TC-SHELL-B32
+title: Shell keymap rejects business and reserved keys and dispatches only unclaimed
+  shortcuts
+description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b32.
+  Browser IPC fixtures prove renderer outcomes only.'
+covers:
+- F1.5
+- F25.5
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
+- wait_for: '[data-testid="terminal-pane"]:visible'
+- press:
+    selector: '[data-testid="terminal-pane"]'
+    key: Control+k
+- assert_not_visible: '[data-testid="shell-quick-dialog"]'
+- press:
+    selector: '[data-testid="shell-overview-trigger"]'
+    key: Mod+k
+- wait_for: '[data-testid="shell-quick-dialog"]'
+- press:
+    selector: '[data-testid="shell-quick-input"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-quick-dialog"]'
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- wait_for: '[data-testid="shell-keymap"]'
+- click: '[data-testid="shell-keymap-row"][data-action-id="shell.overview"] [data-testid="shell-keymap-record"]'
+- press:
+    selector: '[data-testid="shell-keymap-capture"]'
+    key: Mod+k
+- assert_visible: '[data-testid="shell-keymap-conflict"]'
+- assert_disabled: '[data-testid="shell-keymap-save"]'
+- press:
+    selector: '[data-testid="shell-keymap-capture"]'
+    key: Control+Tab
+- assert_visible: '[data-testid="shell-keymap-conflict"]'
+- assert_disabled: '[data-testid="shell-keymap-save"]'
+- press:
+    selector: '[data-testid="shell-keymap-capture"]'
+    key: Control+Shift+t
+- assert_visible: '[data-testid="shell-keymap-conflict-scope"]'
+- assert_disabled: '[data-testid="shell-keymap-save"]'
+- click: '[data-testid="shell-keymap-cancel"]'
+- assert_not_visible: '[data-testid="shell-keymap-dialog"]'
+- assert_localstorage:
+    key: taomni.shellKeymap.v1
+    exists: false
+- click: '[data-testid="shell-keymap-row"][data-action-id="shell.overview"] [data-testid="shell-keymap-record"]'
+- press:
+    selector: '[data-testid="shell-keymap-capture"]'
+    key: Control+Alt+F9
+- assert_not_visible: '[data-testid="shell-keymap-conflict"]'
+- assert_enabled: '[data-testid="shell-keymap-save"]'
+- click: '[data-testid="shell-keymap-save"]'
+- assert_localstorage:
+    key: taomni.shellKeymap.v1
+    contains: Control+Alt+F9
+- press:
+    selector: '[data-testid="shell-overview-trigger"]'
+    key: Control+Alt+F9
+- wait_for: '[data-testid="shell-overview"]'
+- assert_count:
+    selector: '[data-testid="shell-overview"]'
+    equal: 1
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- click: '[data-testid="shell-keymap-row"][data-action-id="shell.home"] [data-testid="shell-keymap-record"]'
+- press:
+    selector: '[data-testid="shell-keymap-capture"]'
+    key: Shift+Tab
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'shell-keymap-cancel'
+    expect_truthy: true
+- press:
+    selector: '[data-testid="shell-keymap-cancel"]'
+    key: Escape
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'shell-keymap-record'
+      && document.activeElement?.parentElement?.getAttribute('data-action-id') ===
+      'shell.home'
+    expect_truthy: true
+- eval_readonly:
+    expression: '!localStorage.getItem(''taomni.shellKeymap.v1'')?.includes(''shell.home'')'
+    expect_truthy: true
+- screenshot: tc-shell-b32.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Terminal Control+K is claimed, while a chrome Mod+K opens one Shell
+      switcher.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 8
+    - 10
+    checkpoints:
+    - step: 5
+      expectation: Terminal Control+K is claimed, while a chrome Mod+K opens one Shell
+        switcher.
+    - step: 7
+      expectation: Terminal Control+K is claimed, while a chrome Mod+K opens one Shell
+        switcher.
+    - step: 9
+      expectation: Terminal Control+K is claimed, while a chrome Mod+K opens one Shell
+        switcher.
+    - step: 11
+      expectation: Terminal Control+K is claimed, while a chrome Mod+K opens one Shell
+        switcher.
+    results:
+    - 5
+    - 7
+    - 9
+    - 11
+  - id: R2
+    requirement: A mounted workspace declares key conflicts even when its surface
+      is hidden.
+    actions:
+    - 12
+    - 13
+    - 14
+    - 16
+    - 19
+    - 20
+    - 23
+    - 26
+    - 29
+    - 17
+    checkpoints:
+    - step: 15
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 18
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 21
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 22
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 24
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 25
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 27
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 28
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 30
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    - step: 31
+      expectation: A mounted workspace declares key conflicts even when its surface
+        is hidden.
+    results:
+    - 15
+    - 18
+    - 21
+    - 22
+    - 24
+    - 25
+    - 27
+    - 28
+    - 30
+    - 31
+  - id: R3
+    requirement: Saving an unclaimed shortcut dispatches once; cancellation returns
+      focus without persisting another binding.
+    actions:
+    - 32
+    - 33
+    - 36
+    - 38
+    - 41
+    - 42
+    - 43
+    - 45
+    checkpoints:
+    - step: 34
+      expectation: Saving an unclaimed shortcut dispatches once; cancellation returns
+        focus without persisting another binding.
+    - step: 35
+      expectation: Saving an unclaimed shortcut dispatches once; cancellation returns
+        focus without persisting another binding.
+    - step: 37
+      expectation: Saving an unclaimed shortcut dispatches once; cancellation returns
+        focus without persisting another binding.
+    - step: 39
+      expectation: Saving an unclaimed shortcut dispatches once; cancellation returns
+        focus without persisting another binding.
+    - step: 40
+      expectation: Saving an unclaimed shortcut dispatches once; cancellation returns
+        focus without persisting another binding.
+    - step: 44
+      expectation: Saving an unclaimed shortcut dispatches once; cancellation returns
+        focus without persisting another binding.
+    - step: 46
+      expectation: Saving an unclaimed shortcut dispatches once; cancellation returns
+        focus without persisting another binding.
+    - step: 47
+      expectation: Saving an unclaimed shortcut dispatches once; cancellation returns
+        focus without persisting another binding.
+    results:
+    - 34
+    - 35
+    - 37
+    - 39
+    - 40
+    - 44
+    - 46
+    - 47
+  visual:
+  - check: Inspect the final screenshot for readable controls, clipping and overlay
+      placement.
+    method: manual
+    reason: Screenshots require a visual verdict; geometry assertions are recorded
+      separately.
+  native:
+  - check: Tauri, OS window, physical input and real service effects
+    method: not-applicable
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
+      native boundaries.

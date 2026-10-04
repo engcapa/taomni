@@ -131,6 +131,8 @@ const noopHandlers = {
 };
 
 beforeEach(() => {
+  // Toolbar tests use jsdom; responsive sizing is covered by the Shell browser cases.
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   useSftpStore.setState({ sessions: {} });
 });
 
@@ -140,6 +142,7 @@ afterEach(() => {
   setLocale("en");
   localStorage.removeItem(SFTP_PREFERENCES_STORAGE_KEY);
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function renderRemote(extra: Record<string, unknown> = {}) {

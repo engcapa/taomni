@@ -9,10 +9,13 @@ import { detachGitPanel, focusGitPanelWindow, reattachGitPanel } from "../../lib
 import type { CodeWorkspaceGitManagerPayload } from "../editor/CodeWorkspaceTab";
 
 /** Adopts the workspace's existing node; it never renders a second tree or Git controller. */
-export function WorkspaceToolSurface({ tabId, workspaceInstanceId, tool, nodes, label, requested, setRequested, gitPayload }: {
+export function WorkspaceToolSurface({ tabId, workspaceInstanceId, tool, nodes, label, requested, setRequested, gitPayload, hostEdge, onHostMove, onHostHide }: {
   tabId: string; workspaceInstanceId: string; tool: "project" | "git" | "problems" | "terminal";
   nodes: ToolWindowNodes; label: string; requested: boolean; setRequested(open: boolean): void;
   gitPayload?: CodeWorkspaceGitManagerPayload;
+  hostEdge?: "right" | "bottom";
+  onHostMove?(edge: "right" | "bottom"): void;
+  onHostHide?(): void;
 }) {
   const shell = useShellLayoutStore(), activeTabId = useAppStore((s) => s.activeTabId);
   const kind = tool === "terminal" ? "workspace-terminal" : tool === "project" ? "git" : tool;
@@ -20,6 +23,8 @@ export function WorkspaceToolSurface({ tabId, workspaceInstanceId, tool, nodes, 
   const callback = useRef(setRequested); callback.current = setRequested;
   const labelRef = useRef(label); labelRef.current = label;
   const gitRef = useRef(gitPayload); gitRef.current = gitPayload;
+  const moveRef = useRef(onHostMove); moveRef.current = onHostMove;
+  const hideRef = useRef(onHostHide); hideRef.current = onHostHide;
   const lastRequested = useRef(false);
   useEffect(() => {
     const s = useShellLayoutStore.getState();
@@ -31,11 +36,18 @@ export function WorkspaceToolSurface({ tabId, workspaceInstanceId, tool, nodes, 
       }
     } else if (requested) {
       if (!s.panels[id]) s.registerPanel({ id, kind, owner: { kind: "workspace", tabId, workspaceInstanceId, restoreRef: `workspace:${workspaceInstanceId}` }, generation: 1,
-        phase: "ready", requestedOpen: true, pinned: s.layout.panelDefaults[kind].pinned, placement: { kind: "dock", edge: s.layout.panelDefaults[kind].edge }, operation: null, error: null });
+        phase: "ready", requestedOpen: true, pinned: s.layout.panelDefaults[kind].pinned, placement: { kind: "dock", edge: hostEdge ?? s.layout.panelDefaults[kind].edge }, operation: null, error: null });
       if (!lastRequested.current || !s.panels[id]?.requestedOpen) s.openPanel(id);
     } else if (lastRequested.current && s.panels[id]) s.hidePanel(id);
     lastRequested.current = requested;
   }, [requested, tool, kind, id, tabId, workspaceInstanceId, activeTabId]);
+  useEffect(() => {
+    const state = useShellLayoutStore.getState(), panel = state.panels[id];
+    if (hostEdge && panel?.placement.kind === "dock" && panel.placement.edge !== hostEdge) {
+      state.patchPanel(id, { placement: { kind: "dock", edge: hostEdge } });
+      if (panel.requestedOpen) state.openPanel(id);
+    }
+  }, [id, hostEdge]);
   useEffect(() => {
     if (tool === "project") return registerPanelActions(id, { focus: () => {
       callback.current(true);
@@ -44,6 +56,14 @@ export function WorkspaceToolSurface({ tabId, workspaceInstanceId, tool, nodes, 
       s.setNavigatorPage("project");
     } });
     const off = registerPanelActions(id, {
+      open: () => callback.current(true),
+      move: (edge) => {
+        moveRef.current?.(edge);
+        const s = useShellLayoutStore.getState();
+        s.patchPanel(id, { placement: { kind: "dock", edge }, requestedOpen: true });
+        s.openPanel(id);
+      },
+      hide: () => { useShellLayoutStore.getState().hidePanel(id); hideRef.current?.(); },
       ...(tool === "git" ? { promote: () => {
         const s = useShellLayoutStore.getState(), panel = s.panels[id]; if (!panel) return;
         const promotedId = `shell-primary:${id}`;
@@ -64,7 +84,7 @@ export function WorkspaceToolSurface({ tabId, workspaceInstanceId, tool, nodes, 
     return () => { off(); offTarget(); unsubscribe(); useShellLayoutStore.getState().removePanel(id); };
   }, [id, tool]);
   if (tool === "project") {
-    const visible = activeTabId === tabId && shell.layout.navigator.lastArea === "workspaces" && shell.navigatorPage === "project";
+    const visible = requested && activeTabId === tabId && shell.layout.navigator.lastArea === "workspaces" && shell.navigatorPage === "project";
     return <StableSurface id={id} slot={visible ? "navigator-project" : "parking"} visible={visible}><ToolWindowSlot nodes={nodes} id="project" label={label} /></StableSurface>;
   }
   const panel = shell.panels[id];

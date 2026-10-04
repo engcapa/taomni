@@ -76,7 +76,7 @@ import {
 } from "../../lib/gitRefList";
 import { useAppStore } from "../../stores/appStore";
 import { registerCloseAdapter } from "../../lib/shell/closeCoordinator";
-import { registerGitShellController, type GitShellSnapshot } from "../../lib/shell/gitShellState";
+import { notifyGitShellViewChanged, registerGitShellController, type GitShellSnapshot, type GitShellView } from "../../lib/shell/gitShellState";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { GitPanel } from "./GitPanel";
@@ -154,6 +154,7 @@ export function WorkspaceGitManager({
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [panelVersion, setPanelVersion] = useState(0);
   const [commitMessage, setCommitMessage] = useState("");
+  const [shellView, setShellView] = useState<GitShellView>(initialShellSnapshot?.view ?? "changes");
   const [targetBranch, setTargetBranch] = useState("");
   const [uncheckedChangeKeys, setUncheckedChangeKeys] = useState<Set<string>>(() => new Set());
   const [selectedChangeKeys, setSelectedChangeKeys] = useState<Set<string>>(() => new Set());
@@ -174,8 +175,12 @@ export function WorkspaceGitManager({
   /** Repo paths that failed with missing-cwd style errors; skip further snapshots. */
   const [deadRepoRoots, setDeadRepoRoots] = useState<Set<string>>(() => new Set());
   const shellSnapshotRef = useRef<GitShellSnapshot>(null!);
-  shellSnapshotRef.current = { commitMessage, targetBranch, selectedChangeKeys: [...selectedChangeKeys], uncheckedChangeKeys: [...uncheckedChangeKeys], focusedChangeKey, treeMode };
-  const restoreShell = useCallback((snapshot: GitShellSnapshot) => { setCommitMessage(snapshot.commitMessage); setTargetBranch(snapshot.targetBranch); setSelectedChangeKeys(new Set(snapshot.selectedChangeKeys)); setUncheckedChangeKeys(new Set(snapshot.uncheckedChangeKeys)); setFocusedChangeKey(snapshot.focusedChangeKey); setTreeMode(snapshot.treeMode); }, []);
+  shellSnapshotRef.current = { commitMessage, targetBranch, selectedChangeKeys: [...selectedChangeKeys], uncheckedChangeKeys: [...uncheckedChangeKeys], focusedChangeKey, treeMode, view: shellView, workspace: { selectedRepoRoot, repoScope, repoRemoteNames } };
+  const restoreShell = useCallback((snapshot: GitShellSnapshot) => {
+    setCommitMessage(snapshot.commitMessage); setTargetBranch(snapshot.targetBranch); setSelectedChangeKeys(new Set(snapshot.selectedChangeKeys)); setUncheckedChangeKeys(new Set(snapshot.uncheckedChangeKeys)); setFocusedChangeKey(snapshot.focusedChangeKey); setTreeMode(snapshot.treeMode);
+    setShellView(snapshot.view ?? "changes");
+    if (snapshot.workspace) { setSelectedRepoRoot(snapshot.workspace.selectedRepoRoot); setRepoScope(snapshot.workspace.repoScope); setRepoRemoteNames(snapshot.workspace.repoRemoteNames); }
+  }, []);
   const savedMessageRef = useRef("");
   useEffect(() => {
     if (initialShellSnapshot) restoreShell(initialShellSnapshot);
@@ -184,7 +189,7 @@ export function WorkspaceGitManager({
     }
   }, [shellScopeId, initialShellSnapshot, restoreShell]);
   useEffect(() => {
-    if (!shellScopeId) return;
+    if (!shellScopeId || normalizedRoots.length === 1) return;
     const offController = registerGitShellController(shellScopeId, { snapshot: () => shellSnapshotRef.current, restore: restoreShell });
     const offClose = registerCloseAdapter(shellScopeId, {
       getRisks: async () => shellSnapshotRef.current.commitMessage !== savedMessageRef.current ? [{ kind: "dirty", id: `${shellScopeId}:commit-draft`, ownerId: shellScopeId, revision: shellSnapshotRef.current.commitMessage, detail: "Unsaved Git commit message", choices: ["save", "discard", "cancel"] }] : [],
@@ -194,7 +199,10 @@ export function WorkspaceGitManager({
       flush: async () => undefined,
     });
     return () => { offClose(); offController(); };
-  }, [shellScopeId, restoreShell]);
+  }, [shellScopeId, restoreShell, normalizedRoots.length]);
+  useEffect(() => {
+    if (shellScopeId && normalizedRoots.length !== 1) notifyGitShellViewChanged(shellScopeId);
+  }, [shellScopeId, normalizedRoots.length, commitMessage, targetBranch, selectedChangeKeys, uncheckedChangeKeys, focusedChangeKey, treeMode, shellView, selectedRepoRoot, repoScope, repoRemoteNames]);
   const readyRef = useRef(false);
   useEffect(() => {
     if (!onReady || readyRef.current || !normalizedRoots.length) return;
@@ -998,6 +1006,9 @@ export function WorkspaceGitManager({
   if (singleRepoMode && selectedRoot) {
     return (
       <GitPanel
+        shellScopeId={shellScopeId}
+        initialShellSnapshot={initialShellSnapshot}
+        onReady={onReady}
         repoRoot={selectedRoot.repoRoot}
         visible={visible}
         onOpenWorkspace={onOpenWorkspace}
@@ -1013,6 +1024,8 @@ export function WorkspaceGitManager({
       <main className="flex-1 min-w-0 min-h-0">
         {selectedRoot ? (
           <GitPanel
+            shellView={shellView}
+            onShellViewChange={setShellView}
             repoRoot={selectedRoot.repoRoot}
             visible={visible}
             onOpenWorkspace={onOpenWorkspace}

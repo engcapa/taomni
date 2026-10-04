@@ -1,5 +1,6 @@
 id: TC-IDE-C3-01
-title: Cross-leaf clipboard paste, history ring, undo, and lease cleanup; rectangle and denial stay native
+title: Cross-leaf clipboard paste, history ring, undo, and lease cleanup; rectangle
+  and denial stay native
 description: '§8.19.10 gate case C3 (browser portion) / ED-CLIP-004.
 
   Capability ids: workspace.clipboard-single-slot / clipboard.history-paste.
@@ -16,7 +17,10 @@ description: '§8.19.10 gate case C3 (browser portion) / ED-CLIP-004.
 
   cross-view/history/undo behavior without an OS-boundary claim.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -33,7 +37,7 @@ timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]'
+- shell_navigate: tools
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -68,45 +72,54 @@ steps:
     expression: document.querySelector("[data-clipboard-consumer-count]")?.getAttribute("data-clipboard-consumer-count")
       === "2"
     expect_truthy: true
-- click: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+    .cm-content'
 - press:
     key: Mod+End
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
 - press:
     key: Mod+v
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
 - wait: 1
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent === "Browser
-      preview uses an in-memory virtual local filesystem."
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent
+      === "Browser preview uses an in-memory virtual local filesystem."
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[4]?.textContent === "Drop
-      OS files here or download remote files to persist them in IndexedDB."
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[4]?.textContent
+      === "Drop OS files here or download remote files to persist them in IndexedDB."
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[5]?.textContent === "The
-      real Tauri build uses your actual OS filesystem."
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[5]?.textContent
+      === "The real Tauri build uses your actual OS filesystem."
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line").length === 7
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line").length
+      === 7
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[6]?.textContent === ""
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[6]?.textContent
+      === ""
     expect_truthy: true
 - screenshot: tc-ide-c3-cross-leaf.png
 - press:
     key: Mod+z
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent === ""
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent
+      === ""
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line").length === 4
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line").length
+      === 4
     expect_truthy: true
 - press:
     key: Mod+Shift+v
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
 - wait_for: '[data-testid="clipboard-history-popup"]'
 - assert_visible: '[data-testid="clipboard-history-popup"]'
 - assert_visible: '[data-testid="clipboard-history-entry-0"]'
@@ -130,45 +143,52 @@ steps:
     selector: '[data-testid="clipboard-history-search"]'
 - press:
     key: ArrowRight
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
 - press:
     key: Mod+Shift+v
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
 - wait_for: '[data-testid="clipboard-history-popup"]'
 - click: '[data-testid="clipboard-history-close"]'
 - assert_not_visible: '[data-testid="clipboard-history-popup"]'
 - press:
     key: Mod+Shift+v
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
 - wait_for: '[data-testid="clipboard-history-popup"]'
 - screenshot: tc-ide-c3-history.png
 - click: '[data-testid="clipboard-history-entry-0"]'
 - assert_not_visible: '[data-testid="clipboard-history-popup"]'
 - wait_for: '[data-testid="code-workspace-tab"][data-clipboard-revision="2"]'
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent === "Browser
-      preview uses an in-memory virtual local filesystem."
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent
+      === "Browser preview uses an in-memory virtual local filesystem."
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[4]?.textContent === "Drop
-      OS files here or download remote files to persist them in IndexedDB."
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[4]?.textContent
+      === "Drop OS files here or download remote files to persist them in IndexedDB."
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[5]?.textContent === "The
-      real Tauri build uses your actual OS filesystem."
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[5]?.textContent
+      === "The real Tauri build uses your actual OS filesystem."
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line").length === 7
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line").length
+      === 7
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[6]?.textContent === ""
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[6]?.textContent
+      === ""
     expect_truthy: true
 - assert_attribute:
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
     name: role
     equals: textbox
 - assert_attribute:
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
     name: aria-multiline
     equals: 'true'
 - eval_readonly:
@@ -176,12 +196,15 @@ steps:
     expect_truthy: true
 - press:
     key: Mod+z
-    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+    selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"]
+      .cm-content'
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent === ""
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent
+      === ""
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line").length === 4
+    expression: document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line").length
+      === 4
     expect_truthy: true
 - click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-split-close"]'
@@ -196,7 +219,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Cross-leaf clipboard paste, history ring, undo, and lease cleanup; rectangle and denial stay native：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Cross-leaf clipboard paste, history ring, undo, and lease cleanup;
+      rectangle and denial stay native：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 3
@@ -246,19 +270,23 @@ verification:
     - step: 19
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-clipboard-revision=\"1\"]"}'
     - step: 22
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "min": 2}}'
     - step: 23
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-clipboard-consumer-count]\")?.getAttribute(\"data-clipboard-consumer-count\")
         === \"2\"", "expect_truthy": true}}'
     - step: 28
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\")[3]?.textContent
-        === \"Browser preview uses an in-memory virtual local filesystem.\"", "expect_truthy": true}}'
+        === \"Browser preview uses an in-memory virtual local filesystem.\"", "expect_truthy":
+        true}}'
     - step: 29
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\")[4]?.textContent
-        === \"Drop OS files here or download remote files to persist them in IndexedDB.\"", "expect_truthy": true}}'
+        === \"Drop OS files here or download remote files to persist them in IndexedDB.\"",
+        "expect_truthy": true}}'
     - step: 30
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\")[5]?.textContent
-        === \"The real Tauri build uses your actual OS filesystem.\"", "expect_truthy": true}}'
+        === \"The real Tauri build uses your actual OS filesystem.\"", "expect_truthy":
+        true}}'
     - step: 31
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\").length
         === 7", "expect_truthy": true}}'
@@ -278,8 +306,8 @@ verification:
     - step: 40
       expectation: '{"assert_visible": "[data-testid=\"clipboard-history-entry-0\"]"}'
     - step: 41
-      expectation: '{"assert_text": {"selector": "[data-testid=\"clipboard-history-entry-0\"]", "contains": "Browser
-        preview uses an in-memory virtual local filesystem."}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"clipboard-history-entry-0\"]",
+        "contains": "Browser preview uses an in-memory virtual local filesystem."}}'
     - step: 43
       expectation: '{"wait_for": "[data-testid=\"clipboard-history-entry-0\"]"}'
     - step: 45
@@ -298,13 +326,16 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-clipboard-revision=\"2\"]"}'
     - step: 60
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\")[3]?.textContent
-        === \"Browser preview uses an in-memory virtual local filesystem.\"", "expect_truthy": true}}'
+        === \"Browser preview uses an in-memory virtual local filesystem.\"", "expect_truthy":
+        true}}'
     - step: 61
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\")[4]?.textContent
-        === \"Drop OS files here or download remote files to persist them in IndexedDB.\"", "expect_truthy": true}}'
+        === \"Drop OS files here or download remote files to persist them in IndexedDB.\"",
+        "expect_truthy": true}}'
     - step: 62
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\")[5]?.textContent
-        === \"The real Tauri build uses your actual OS filesystem.\"", "expect_truthy": true}}'
+        === \"The real Tauri build uses your actual OS filesystem.\"", "expect_truthy":
+        true}}'
     - step: 63
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\").length
         === 7", "expect_truthy": true}}'
@@ -312,11 +343,13 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\")[6]?.textContent
         === \"\"", "expect_truthy": true}}'
     - step: 65
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-pane\"] >> nth=1 >>
-        [data-testid=\"code-workspace-editor\"] .cm-content", "name": "role", "equals": "textbox"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-pane\"]
+        >> nth=1 >> [data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "role", "equals": "textbox"}}'
     - step: 66
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-pane\"] >> nth=1 >>
-        [data-testid=\"code-workspace-editor\"] .cm-content", "name": "aria-multiline", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-pane\"]
+        >> nth=1 >> [data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "aria-multiline", "equals": "true"}}'
     - step: 67
       expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelectorAll(\".cm-content\")[1]",
         "expect_truthy": true}}'
@@ -327,7 +360,8 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-content\")[1]?.querySelectorAll(\".cm-line\").length
         === 4", "expect_truthy": true}}'
     - step: 73
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "max": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
+        "max": 1}}'
     - step: 74
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-clipboard-consumer-count]\")?.getAttribute(\"data-clipboard-consumer-count\")
         === \"1\"", "expect_truthy": true}}'

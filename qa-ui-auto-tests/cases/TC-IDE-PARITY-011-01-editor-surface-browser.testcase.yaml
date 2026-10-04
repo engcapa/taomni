@@ -1,11 +1,18 @@
 id: TC-IDE-PARITY-011-01
-title: 'IDEA editor surface: floating inspection widget, status-bar navigation bar, typed tab icon'
-description: 'ED-PARITY-011 A1/A4 browser case: the permanent file-status row became a floating IDEA inspection widget inside the editor, the breadcrumbs render as the status-bar navigation bar (Alt+Home still focuses it) and editor tabs carry a file type badge.
+title: 'IDEA editor surface: floating inspection widget, status-bar navigation bar,
+  typed tab icon'
+description: 'ED-PARITY-011 A1/A4 browser case: the permanent file-status row became
+  a floating IDEA inspection widget inside the editor, the breadcrumbs render as the
+  status-bar navigation bar (Alt+Home still focuses it) and editor tabs carry a file
+  type badge.
 
 
   Mode: browser.
 
-  '
+
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
+  user clicks; Settings uses its permanent Rail button. Original business checks are
+  retained.'
 covers:
 - F25.5
 tags:
@@ -20,7 +27,7 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-tools"]:visible'
+- shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
@@ -31,10 +38,14 @@ steps:
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - eval_readonly:
-    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-editor\"]").contains(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-file-status\"]"))
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) +
+      "\"code-workspace-editor\"]").contains(document.querySelector("[data-testid"
+      + String.fromCharCode(61) + "\"code-workspace-file-status\"]"))
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"status-bar\"]")?.contains(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-breadcrumbs\"]")) === true
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) +
+      "\"status-bar\"]")?.contains(document.querySelector("[data-testid" + String.fromCharCode(61)
+      + "\"code-workspace-breadcrumbs\"]")) === true
     expect_truthy: true
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"]'
@@ -49,7 +60,8 @@ steps:
     expect_truthy: true
 - press: Escape
 - assert_attribute:
-    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"] [data-file-type]'
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"]
+      [data-file-type]'
     name: data-file-type
     equals: generic
 - screenshot: tc-ide-parity-011-01-surface.png
@@ -62,7 +74,10 @@ verification:
     - 11
     checkpoints:
     - step: 13
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-editor\\\"]\").contains(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-file-status\\\"]\"))", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"code-workspace-editor\\\"]\").contains(document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"code-workspace-file-status\\\"]\"))", "expect_truthy":
+        true}}'
     results:
     - 13
   - id: R2
@@ -71,13 +86,19 @@ verification:
     - 18
     checkpoints:
     - step: 14
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"status-bar\\\"]\")?.contains(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-breadcrumbs\\\"]\")) === true", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"status-bar\\\"]\")?.contains(document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"code-workspace-breadcrumbs\\\"]\")) ===
+        true", "expect_truthy": true}}'
     - step: 15
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]
+        [data-testid=\"code-workspace-breadcrumbs\"]", "equal": 0}}'
     - step: 16
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]", "contains": "README.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]",
+        "contains": "README.txt"}}'
     - step: 19
-      expectation: '{"eval_readonly": {"expression": "!!document.activeElement?.closest(\"[data-testid\"+String.fromCharCode(61)+\"\\\"code-workspace-breadcrumbs\\\"]\")", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!!document.activeElement?.closest(\"[data-testid\"+String.fromCharCode(61)+\"\\\"code-workspace-breadcrumbs\\\"]\")",
+        "expect_truthy": true}}'
     results:
     - 14
     - 15
@@ -88,7 +109,9 @@ verification:
     - 11
     checkpoints:
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-active=\"true\"] [data-file-type]", "name": "data-file-type", "equals": "generic"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]
+        [data-active=\"true\"] [data-file-type]", "name": "data-file-type", "equals":
+        "generic"}}'
     results:
     - 21
   visual:

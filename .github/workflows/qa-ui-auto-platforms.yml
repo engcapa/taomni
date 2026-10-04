@@ -158,6 +158,11 @@ jobs:
       - uses: ./.github/actions/qa-runtime
         with:
           mode: ${{ matrix.mode }}
+      - name: Owned SFTP service contracts
+        if: contains(matrix.capabilities, 'sftp-fixture')
+        run: python -m unittest test_shell_sftp_service test_file_progress test_shell_windows
+      - name: Shell navigation and external boundary contracts
+        run: python -m unittest test_shell_navigation test_shell_external_boundaries
       - name: Updater unit contracts
         if: contains(matrix.capabilities, 'updater')
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
@@ -246,6 +251,11 @@ jobs:
       - name: Verify OCR executable and pinned English/Chinese data
         if: matrix.mode == 'native'
         run: python .agents/skills/qa-ui-auto/scripts/setup_screenshot_ocr.py
+      - name: Configure macOS native desktop size
+        if: runner.os == 'macOS' && matrix.mode == 'native'
+        run: |
+          mkdir -p 'qa-ui-auto-report/${{ matrix.id }}'
+          swift .agents/skills/qa-ui-auto/scripts/setup_macos_display.swift | tee 'qa-ui-auto-report/${{ matrix.id }}/desktop-size.json'
       - name: Native adapter
         if: matrix.mode == 'native' && runner.os != 'macOS'
         run: cargo install tauri-driver --locked
