@@ -129,3 +129,12 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - 核对停止逻辑的改前源码：失败/停止不持久化 assistant 回答是既有契约，不能把它误记为工具 SSE 重构引入的数据丢失。本轮保留该语义、用户消息与发送队列，补充实际停止验收。
 - B25 增加声明的 browser IPC hold→Stop→排队发送完成一次；N19 增加真实 SSE 部分回答→排队→Stop→实际连接取消→下一请求完成→重启历史。独立 provider receipt 要求 5 次真实 stream/tools 请求、3 次完成、1 次取消；重启只恢复 3 个完整 assistant 回答，不重发。没有提高原 150/180 秒预算或放宽既有断言。这些新增分支不在第五轮冻结输入中，待下一候选远程执行。
 - 本地 `shell-ai-stop-unit-161` 4 files / 80 tests、`shell-ai-provider-unit-162` 6 tests 通过；后者用真实 stdlib HTTP 客户端关闭测试连接验证服务端取消记录，未启动 browser/native app。`shell-ai-stop-types-163` exit 0；两个修改 case 的 schema/reviewed contract、`shell-ai-stop-static-164` audit gate 与 Git diff check 通过。静态 coverage baseline 未变，任务仍为 verification。
+
+### 第五轮 browser 与 AI 定位结果及修复
+
+- 第五轮三份 browser 报告均为 180 pass / 3 fail / 0 skip（每端 183）；selection、source/case identity、summary receipt 与 ZIP hashes 均匹配。三端失败相同：B01 Rail 按钮高度 36px 低于 40px，B43 返回 Sessions 后折叠状态丢失导致导入组不可见，IDE-PARITY-024-01 仍断言旧 Rail 宽度 59px。native 三端尚在运行，不能从 browser 结果推断通过。
+- Rail 按钮改用设计要求的 48/40px；应用根字号 12px 导致原 Tailwind rem 高度实际只有 36/30px。IDE 的名称模式宽度按已经确定的设计下限 68px 适配，保留 compact 52px、键盘 resize、Move/Remove、焦点及快捷键全部业务断言。
+- Navigator Sessions/Tools 保持挂载并隐藏非活动页面；改前新增 mounted 回归确实失败（`shell-navigator-baseline-unit-167`），修复后同一树/行 DOM、展开、选择与 scrollTop 均保留。B43 新增返回 Sessions 后展开组及子行仍可见的验收，保留 import/export 的完整数量及取消检查。
+- AI 定位 [run 37194738007](https://github.com/engcapa/taomni/actions/runs/37194738007)，输入 `67d73c154abe6a32f2f06d211a04ded98123eac8`，六份 receipt/identity/hash 均匹配。browser 三端各 1/1；native 三端各 0/1，在 N19 step 40 因 fixture 导出相对路径被再次拼接 case dir 而失败。此前真实部分 SSE、排队、Stop 与停止状态均已执行；恢复及重启后的全部检查未执行，不能记通过。独立 Linux provider receipt 记录 5 次 stream/tools、1 次取消、3 次完成。fixture 现导出绝对且归属 run-root 的 receipt 路径，并新增相对 case dir 回归。
+- 本地修后 `shell-navigator-final-unit-170` 5 files / 30 tests、`shell-ai-path-unit-171` 7/7 通过；TypeScript `shell-navigator-types-172` exit 0；B43 与 IDE-024 的 schema/reviewed contract 通过。`shell-navigator-static-173` gate 通过（required 971 / covered 926 / shallow 41 / orphans 5）；随后为真实 queue badge 补 control 归属，baseline 保持不变。仍需最终候选 GitHub 执行，TASK-01～12 保持 verification。
+- queue badge 归属及 catalog 同步后，最终 `shell-queue-catalog-static-174` audit gate 通过：required 972 / covered 927 / shallow 41 / orphans 4；45 个 required 未触达控件仍在静态报告中明确列出，不能把 gate 通过表述成全覆盖。

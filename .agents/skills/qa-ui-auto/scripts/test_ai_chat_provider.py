@@ -61,6 +61,22 @@ class AiChatProviderTest(unittest.TestCase):
                     fixture.setup(ctx)
             self.assertFalse(hasattr(ctx, "_ai_chat_provider"))
 
+    def test_relative_native_case_directory_exports_an_absolute_owned_receipt(self):
+        with TemporaryDirectory(prefix="qa-ai-relative-", dir=Path.cwd()) as directory:
+            root = Path(directory).resolve()
+            ctx = SimpleNamespace(cfg={"app": {"mode": "native"}}, report_root=root,
+                                  case_dir=(root / "case").relative_to(Path.cwd()), values={})
+            expected = {"XDG_CONFIG_HOME": str(root / "config")}
+            with patch.object(fixture, "native_isolation_env", return_value=expected), patch.dict(os.environ, expected):
+                fixture.setup(ctx)
+                try:
+                    receipt = Path(ctx.values["ai_provider_requests"])
+                    self.assertTrue(receipt.is_absolute())
+                    self.assertTrue(receipt.is_relative_to(root))
+                    self.assertEqual(json.loads(receipt.read_text(encoding="utf-8"))["requests"], 0)
+                finally:
+                    fixture.teardown(ctx)
+
     def test_sse_with_production_tool_catalog_records_tools_without_secret_payload(self):
         with TemporaryDirectory() as directory:
             server = fixture.ProviderServer(Path(directory) / "requests.json")

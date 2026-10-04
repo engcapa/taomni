@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Sidebar } from "./Sidebar";
 import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import { useAppStore } from "../../stores/appStore";
+import { useSessionStore } from "../../stores/sessionStore";
 import { useToolWindowStripeStore } from "../editor/workspace/toolWindowStripeStore";
 import { defaultStripeSettings } from "../editor/workspace/toolWindowLayout";
 
 beforeEach(() => {
   useAppStore.setState({ activeSideTab: "sessions", sidebarCollapsed: false });
   useToolWindowStripeStore.setState({ settings: defaultStripeSettings() });
+  useSessionStore.setState({ sessions: [], groups: [], selectedSessionId: null, selectedSessionIds: [], searchQuery: "" });
 });
 
 afterEach(() => {
@@ -17,6 +19,31 @@ afterEach(() => {
 });
 
 describe("Sidebar rail (ED-PARITY-027)", () => {
+  it("keeps the same expanded session tree, selection and scroll position across Navigator pages", () => {
+    useSessionStore.setState({ sessions: [{
+      id: "retained-tree-session", name: "Retained SSH", session_type: "SSH", group_path: "User sessions / Shell / 甲",
+      host: "example.test", port: 22, username: "qa", auth_method: "Agent", options_json: "{}",
+      created_at: 1, updated_at: 1, last_connected_at: null, sort_order: 0,
+    }] });
+    render(<Sidebar navigatorOnly />);
+    const tree = screen.getByTestId("session-tree");
+    const folder = (path: string) => tree.querySelector(`[data-testid="session-tree-folder"][data-folder-path="${path}"]`)!;
+    fireEvent.click(folder("Shell"));
+    fireEvent.click(folder("Shell / 甲"));
+    const row = screen.getByTestId("session-tree-item");
+    fireEvent.click(row);
+    tree.scrollTop = 35;
+    act(() => useAppStore.getState().setActiveSideTab("tools"));
+    expect(tree).not.toBeVisible();
+    expect(screen.getByTestId("sidebar-tools-panel")).toBeVisible();
+    act(() => useAppStore.getState().setActiveSideTab("sessions"));
+    expect(screen.getByTestId("session-tree")).toBe(tree);
+    expect(screen.getByTestId("session-tree-item")).toBe(row);
+    expect(row).toBeVisible();
+    expect(row).toHaveAttribute("aria-selected", "true");
+    expect(tree.scrollTop).toBe(35);
+  });
+
   it("publishes the tool window host only in the collapsed rail", () => {
     const { unmount } = render(<Sidebar compact />);
     const host = screen.getByTestId("sidebar-tool-window-rail");

@@ -215,8 +215,7 @@ export function Sidebar({
       {compact && null}
       {!compact && (
       <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--taomni-sidebar-bg)", borderRight: "1px solid var(--taomni-sidebar-border)" }}>
-        {activeSideTab === "sessions" ? (
-          <>
+        <div className="flex-1 flex flex-col min-h-0" style={{ display: activeSideTab === "sessions" ? "flex" : "none" }} inert={activeSideTab !== "sessions"}>
             <div className="h-7 flex items-center gap-1 px-1.5 border-b shrink-0" style={{ borderColor: "var(--taomni-divider)" }}>
               <IconBtn testId="session-new" title={t("sidebar.newSessionTitle")} icon={<Plus className="w-3.5 h-3.5" />} onClick={() => onNewSession?.()} />
               <IconBtn testId="session-edit" title={t("sidebar.editTitle")} icon={<Edit3 className="w-3.5 h-3.5" />} onClick={() => selectionCount === 1 && onEditSession?.(selectedSessions[0])} disabled={selectionCount !== 1} />
@@ -241,10 +240,10 @@ export function Sidebar({
               </div>
             </div>
             <SessionTree onNewSession={onNewSession} onConnectSession={onConnectSession} onEditSession={onEditSession} />
-          </>
-        ) : (
+        </div>
+        <div className="flex-1 flex flex-col min-h-0" style={{ display: activeSideTab === "tools" ? "flex" : "none" }} inert={activeSideTab !== "tools"}>
           <ToolsPanel onCommand={onCommand} />
-        )}
+        </div>
       </div>
       )}
     </div>

@@ -1,21 +1,20 @@
 id: TC-IDE-PARITY-024-01
-title: 'IDEA tool window stripes: names, resizable width, Move between anchors, Remove
-  from Sidebar'
-description: 'ED-PARITY-024 A1/A2/A3 browser case: the stripes show tool window names
-  at IDEA''s 59 px default, resize from their inner edge (40–100 px) and switch to
-  40 px icon-only via Show Tool Window Names. A stripe button''s context menu moves
-  Problems to Right Top (its button and window follow; the bottom dock closes), Alt+6
-  toggles it there, the window''s ⋮ Move to returns it to Bottom Left. Structure opens
-  below Project (IDEA Left Bottom). Remove from Sidebar drops Run''s button and More
-  tool windows restores and shows it. The Project window header adds IDEA''s Expand
-  All, Collapse All and Select Opened File.
+title: 'IDEA tool window stripes: names, resizable width, Move between anchors, Remove from Sidebar'
+description: 'ED-PARITY-024 A1/A2/A3 browser case adapted to Shell v2: the merged Rail shows tool window
+  names at a 68 px minimum, resizes from its inner edge, and switches to 52 px icon-only via Show Tool Window
+  Names. A stripe button''s context menu moves Problems to Right Top (its button and window follow; the
+  bottom dock closes), Alt+6 toggles it there, the window''s ⋮ Move to returns it to Bottom Left. Structure
+  opens below Project (IDEA Left Bottom). Remove from Sidebar drops Run''s button and More tool windows
+  restores and shows it. The Project window header adds IDEA''s Expand All, Collapse All and Select Opened
+  File.
 
 
   Mode: browser.
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks;
+  Settings uses its permanent Rail button. Original business checks are retained. Shell v2 names mode
+  renders a 68 px minimum so full global labels fit; resizing still preserves the stored stripe preference
+  and reaches the existing 79 px target.'
 covers:
 - F25.5
 tags:
@@ -50,8 +49,8 @@ steps:
     name: data-show-names
     equals: 'true'
 - eval_readonly:
-    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61)
-      + "\"shell-rail\"]").getBoundingClientRect().width) === 59
+    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"shell-rail\"]").getBoundingClientRect().width)
+      === 68
     expect_truthy: true
 - right_click: '[data-testid="code-workspace-bottom-tab-problems"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-move"]'
@@ -100,8 +99,8 @@ steps:
 - right_click: '[data-testid="code-workspace-bottom-tab-terminal"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
 - eval_readonly:
-    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61)
-      + "\"shell-rail\"]").getBoundingClientRect().width) === 52
+    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"shell-rail\"]").getBoundingClientRect().width)
+      === 52
     expect_truthy: true
 - assert_count:
     selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
@@ -115,8 +114,8 @@ steps:
 - press: ArrowRight
 - press: ArrowRight
 - eval_readonly:
-    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61)
-      + "\"shell-rail\"]").getBoundingClientRect().width) === 79
+    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"shell-rail\"]").getBoundingClientRect().width)
+      === 79
     expect_truthy: true
 - right_click: '[data-testid="code-workspace-bottom-tab-run"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-remove"]'
@@ -164,7 +163,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A1：左 stripe 显示工具窗名称，默认宽度 59 px（IDEA ResizeStripeManager 默认）。
+    requirement: A1：左 stripe 显示工具窗名称，Shell 合并 Rail 的名称模式最小宽度 68 px（既有更宽偏好保持）。
     actions:
     - 15
     checkpoints:
@@ -173,14 +172,14 @@ verification:
         "name": "data-show-names", "equals": "true"}}'
     - step: 17
       expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\"
-        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width)
-        === 59", "expect_truthy": true}}'
+        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width) === 68", "expect_truthy":
+        true}}'
     results:
     - 16
     - 17
   - id: R2
-    requirement: A2：stripe 按钮右键 Move → Right Top 后按钮移到右 stripe（隐藏态不自动打开，同 IDEA）；点击后
-      Problems 在右侧打开且底部 dock 关闭；再点隐藏并把焦点交回编辑器；Alt+6 在右侧重新打开。
+    requirement: A2：stripe 按钮右键 Move → Right Top 后按钮移到右 stripe（隐藏态不自动打开，同 IDEA）；点击后 Problems 在右侧打开且底部
+      dock 关闭；再点隐藏并把焦点交回编辑器；Alt+6 在右侧重新打开。
     actions:
     - 18
     - 19
@@ -190,8 +189,7 @@ verification:
     - 30
     checkpoints:
     - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-right\"]
-        [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-right\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
     - step: 22
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]",
         "name": "aria-pressed", "equals": "false"}}'
@@ -222,8 +220,8 @@ verification:
     - 29
     - 31
   - id: R3
-    requirement: A2：工具窗头 ⋮ → Move to → Bottom Left 把 Problems 送回底部 dock，按钮回到左 stripe
-      下组；Structure 在 Project 下方（Left Bottom）打开。
+    requirement: A2：工具窗头 ⋮ → Move to → Bottom Left 把 Problems 送回底部 dock，按钮回到左 stripe 下组；Structure 在 Project
+      下方（Left Bottom）打开。
     actions:
     - 32
     - 34
@@ -235,14 +233,13 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"][data-edge=\"bottom\"]",
         "timeout_sec": 10}}'
     - step: 36
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-left\"]
-        [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-left\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
     - step: 37
       expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]
         [data-testid=\"shell-host-tab\"][aria-selected=\"true\"]", "contains": "Problems"}}'
     - step: 39
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-left-tool-area\"]
-        [data-testid=\"code-workspace-tool-window-structure\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-left-tool-area\"] [data-testid=\"code-workspace-tool-window-structure\"]",
+        "timeout_sec": 10}}'
     - step: 40
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new\"]"}'
     results:
@@ -253,8 +250,7 @@ verification:
     - 39
     - 40
   - id: R4
-    requirement: A1：Show Tool Window Names 关闭后 stripe 为 40 px 图标栏且不可拉伸；重新打开后内侧边缘可用键盘拉伸（每步
-      4 px）。
+    requirement: A1：Show Tool Window Names 关闭后 Shell 合并 Rail 为 52 px 图标栏且不可拉伸；重新打开后内侧边缘可用键盘拉伸（每步 4 px）。
     actions:
     - 41
     - 42
@@ -264,22 +260,21 @@ verification:
     checkpoints:
     - step: 43
       expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\"
-        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width)
-        === 52", "expect_truthy": true}}'
+        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width) === 52", "expect_truthy":
+        true}}'
     - step: 44
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-left-resize\"]",
         "equal": 0}}'
     - step: 53
       expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\"
-        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width)
-        === 79", "expect_truthy": true}}'
+        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width) === 79", "expect_truthy":
+        true}}'
     results:
     - 43
     - 44
     - 53
   - id: R5
-    requirement: A3：Remove from Sidebar 移除 Run 按钮；More tool windows 选择 Run 恢复按钮并在底部打开
-      Run。
+    requirement: A3：Remove from Sidebar 移除 Run 按钮；More tool windows 选择 Run 恢复按钮并在底部打开 Run。
     actions:
     - 54
     - 55
@@ -287,8 +282,8 @@ verification:
     - 58
     checkpoints:
     - step: 56
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]",
-        "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]", "equal":
+        0}}'
     - step: 59
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"][aria-pressed=\"true\"]",
         "timeout_sec": 10}}'
@@ -300,8 +295,8 @@ verification:
     - 59
     - 60
   - id: R6
-    requirement: A6：Project 工具窗口头部提供 IDEA 的 Expand All / Collapse All / Select Opened
-      File——展开后出现展开目录、折叠后全部收起、选中其他节点后 Select Opened File 重新选中活动文件。
+    requirement: A6：Project 工具窗口头部提供 IDEA 的 Expand All / Collapse All / Select Opened File——展开后出现展开目录、折叠后全部收起、选中其他节点后
+      Select Opened File 重新选中活动文件。
     actions:
     - 62
     - 64
@@ -320,8 +315,8 @@ verification:
     - 65
     - 68
   - id: R7
-    requirement: A2：工具窗口内容经 portal 重新挂载后，Esc 仍按 IDEA 把焦点还给编辑器——Alt+4 打开 Run 并获焦后 Esc
-      回到编辑器；Alt+7 打开 Structure 后在其中按 Esc 同样回到编辑器。
+    requirement: A2：工具窗口内容经 portal 重新挂载后，Esc 仍按 IDEA 把焦点还给编辑器——Alt+4 打开 Run 并获焦后 Esc 回到编辑器；Alt+7 打开 Structure
+      后在其中按 Esc 同样回到编辑器。
     actions:
     - 69
     - 70
@@ -354,7 +349,6 @@ verification:
     method: manual
     reason: 像素级外观按 DEC-ALIGN-06 profile 另行比较。
   native:
-  - check: 打包 WebView 中移动 Terminal 保留会话由 TC-IDE-PARITY-024-03-tool-window-move-native
-      覆盖。
+  - check: 打包 WebView 中移动 Terminal 保留会话由 TC-IDE-PARITY-024-03-tool-window-move-native 覆盖。
     method: external
     reason: browser 不经过打包 WebView，也没有真实 PTY。

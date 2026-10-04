@@ -18,7 +18,7 @@ export function GlobalRail({ gitAction, width }: { gitAction?: RailGitAction; wi
   const stripe = useToolWindowStripeStore((s) => s.settings);
   const toggleNames = useToolWindowStripeStore((s) => s.toggleShowNames);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const buttonLayout = stripe.showNames ? "h-12 flex-col gap-0.5" : "h-10 gap-1";
+  const buttonLayout = stripe.showNames ? "h-[48px] flex-col gap-0.5" : "h-[40px] gap-1";
   const entries = [{ id: "home", icon: Home, onClick: () => dispatchShellAction("shell.home"), active: lane === "home" },
     { id: "sessions", icon: Server, onClick: () => shell.toggleNavigator("sessions", lane), active: shell.layout.navigator.lastArea === "sessions" && !shell.layout.navigator.collapsedByLane[lane] },
     { id: "workspaces", icon: FolderTree, onClick: () => shell.toggleNavigator("workspaces", lane), active: shell.layout.navigator.lastArea === "workspaces" && !shell.layout.navigator.collapsedByLane[lane] },
@@ -34,7 +34,7 @@ export function GlobalRail({ gitAction, width }: { gitAction?: RailGitAction; wi
       <GitBranch className="w-[18px] h-[18px] shrink-0" />{stripe.showNames && <span className="text-[10px] leading-3 max-w-full truncate">{gitAction.label}</span>}
     </button>}
     <div ref={setHost} data-testid="sidebar-tool-window-rail" className="flex flex-1 min-h-0 flex-col border-t border-[var(--taomni-divider)] mt-1 overflow-auto" />
-    <button type="button" data-testid="shell-rail-settings" aria-label={t("shell.settings")} title={t("shell.settings")} className="mx-1 h-10 rounded flex items-center justify-center hover:bg-[var(--taomni-hover)]"
+    <button type="button" data-testid="shell-rail-settings" aria-label={t("shell.settings")} title={t("shell.settings")} className="mx-1 h-[40px] rounded flex items-center justify-center hover:bg-[var(--taomni-hover)]"
       onClick={() => { const app = useAppStore.getState(); const existing = app.tabs.find((t) => t.type === "settings"); if (existing) app.setActiveTab(existing.id); else app.addTab({ id: "settings", type: "settings", title: t("menu.settings"), closable: true }); }}><Settings className="w-[18px] h-[18px]" /></button>
     {menu && <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={[{ label: t("sidebar.showToolWindowNames"), testId: "sidebar-rail-menu-show-names", checked: stripe.showNames, onClick: toggleNames }]} />}
   </nav>;

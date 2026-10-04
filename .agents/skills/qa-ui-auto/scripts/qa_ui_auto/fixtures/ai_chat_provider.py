@@ -34,7 +34,7 @@ def config(base_url: str) -> dict:
 
 class ProviderServer:
     def __init__(self, receipt: Path):
-        self.receipt = receipt
+        self.receipt = receipt.resolve()
         self.lock = threading.Lock()
         self.requests = []
         self.stopping = threading.Event()

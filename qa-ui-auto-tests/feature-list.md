@@ -5583,6 +5583,9 @@ controls:
 - id: ai-chat-stop-button
   selector: '[data-testid="ai-chat-stop-button"]'
   kind: interactive
+- id: ai-chat-queue-badge
+  selector: '[data-testid="ai-chat-queue-badge"]'
+  kind: display
 - id: note-editor-body
   selector: '[data-testid="note-editor-body"]'
   kind: interactive
