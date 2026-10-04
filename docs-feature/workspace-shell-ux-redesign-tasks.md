@@ -152,3 +152,8 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - 本地：`shell-runner-contract-unit-180` 52/52，`shell-native-repairs-unit-181` 4 files / 80 tests，`shell-window-load-rust-unit-177` 1/1，`shell-native-repairs-types-182` exit 0。180 中 taskkill OEM 文本解码的后台异常已修为读取 bytes，随后 `shell-runner-unit-187` 56/56 无该异常。受影响 Rust 格式与 Git diff 检查通过，全仓既有 Rust 格式差异仍未计为通过。
 - 最终 `shell-static-191` audit gate 通过：required 975 / covered 930 / shallow 41 / orphans 4，baseline 未改；45 个未触达控件继续明确列出。`shell-plan-192` 六端 selection 为 242 个 ID、737 次执行（browser 各 183，native 67/61/60），gaps/unreviewed 均为空。早期 viewport 断言使用不支持的参数已被静态检查拒绝，修正为已有 wait_for 契约后上述检查通过。
 - 以上为候选实现与本地 unit/static 结果，尚不是第六轮 runtime 通过。TASK-01～12 保持 verification；远程先验证精确失败集及新 Git case，再用最终固定输入执行统一三端集合。
+
+### 第六轮工具契约修复
+
+- [run 37199342505](https://github.com/engcapa/taomni/actions/runs/37199342505)，输入 `26efb101875ebce46ebe517206ccde60f3d1bbd5`，在 plan 的 QA tools 单测阶段被两条旧 taskkill 测试拦下，未执行任何 browser/native case。旧 mock 仍返回字符串并要求 `text=True`，与修复后的 bytes 输出不符；该运行不是产品用例结果。
+- 修正旧 mock/参数预期，并加入中文 OEM 错误 bytes 下仍报告失败、保留 owned PID、下一次清理能成功的回归。新增测试第一次在重试成功路径缺少 profile-owner mock，局部单测明确失败；补上外部过程 mock 后，相关 isolation/transport 单测 40 项，38 pass / 2 平台限定 skip，exit 0。没有启动实际 browser/native app。继续以新 runner 输入触发同一精确失败集。
