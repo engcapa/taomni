@@ -27,6 +27,20 @@ steps:
     selector: '[data-testid="shell-work-area"]'
     name: inert
     equals: ''
+- eval_readonly:
+    expression: JSON.stringify(JSON.parse(localStorage.getItem('taomni.shellLayout.v2') ?? 'null')?.lastActiveRestoreRef
+      ?? null)
+    contains: '"run-entry:saved:shell-a"'
+    expect_truthy: true
+    timeout_sec: 5
+- assert_attribute:
+    selector: '[data-testid="shell-lane-select"]'
+    name: data-lane
+    equals: communicate
+- assert_attribute:
+    selector: '[data-testid="shell-work-area"]'
+    name: inert
+    equals: ''
 - click: '[data-testid="shell-lane-empty-home"]'
 - assert_visible: '[data-testid="welcome-panel"]'
 - select_option:
@@ -42,48 +56,55 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Connect resolves the same terminal; an empty Communicate lane has
-      its own inert surface and Home return.
+    requirement: Connect resolves the same terminal; an empty Communicate lane has its own inert surface
+      and Home return. Delayed restore binding preserves the explicit empty lane and Home action while
+      the retained terminal finishes connecting.
     actions:
     - 3
     - 4
     - 6
-    - 9
-    - 11
+    - 12
+    - 14
     checkpoints:
     - step: 5
-      expectation: Connect resolves the same terminal; an empty Communicate lane has
-        its own inert surface and Home return.
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
     - step: 7
-      expectation: Connect resolves the same terminal; an empty Communicate lane has
-        its own inert surface and Home return.
+      expectation: '{"assert_visible": "[data-testid=\"shell-lane-empty\"]"}'
     - step: 8
-      expectation: Connect resolves the same terminal; an empty Communicate lane has
-        its own inert surface and Home return.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-work-area\"]", "name": "inert",
+        "equals": ""}}'
+    - step: 9
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify(JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')
+        ?? ''null'')?.lastActiveRestoreRef ?? null)", "contains": "\"run-entry:saved:shell-a\"", "expect_truthy":
+        true, "timeout_sec": 5}}'
     - step: 10
-      expectation: Connect resolves the same terminal; an empty Communicate lane has
-        its own inert surface and Home return.
-    - step: 12
-      expectation: Connect resolves the same terminal; an empty Communicate lane has
-        its own inert surface and Home return.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "communicate"}}'
+    - step: 11
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-work-area\"]", "name": "inert",
+        "equals": ""}}'
     - step: 13
-      expectation: Connect resolves the same terminal; an empty Communicate lane has
-        its own inert surface and Home return.
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"]:visible"}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
+        "equals": "connect"}}'
     results:
     - 5
     - 7
     - 8
+    - 9
     - 10
-    - 12
+    - 11
     - 13
+    - 15
+    - 16
   visual:
-  - check: Inspect the final screenshot for readable controls, clipping and overlay
-      placement.
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual
-    reason: Screenshots require a visual verdict; geometry assertions are recorded
-      separately.
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
   native:
   - check: Tauri, OS window, physical input and real service effects
     method: not-applicable
-    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
-      native boundaries.
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

@@ -32,6 +32,9 @@ steps:
     equals: failed
 - click: '[data-testid="shell-host-retry"]'
 - wait_for: '[data-testid="sftp-remote-list"]'
+- wait_for:
+    selector: '[data-testid="shell-host"][data-phase="ready"]'
+    timeout_sec: 5
 - assert_attribute:
     selector: '[data-testid="shell-host"]'
     name: data-phase
@@ -69,8 +72,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: An external attach rejection preserves a retryable host; retry succeeds
-      with one logical surface.
+    requirement: An external attach rejection preserves a retryable host; retry succeeds with one logical
+      surface. Await the observable ready host before reading its exact phase.
     actions:
     - 3
     - 4
@@ -79,26 +82,24 @@ verification:
     - 10
     checkpoints:
     - step: 5
-      expectation: An external attach rejection preserves a retryable host; retry
-        succeeds with one logical surface.
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
     - step: 8
-      expectation: An external attach rejection preserves a retryable host; retry
-        succeeds with one logical surface.
+      expectation: '{"wait_for": "[data-testid=\"shell-host-retry\"]"}'
     - step: 9
-      expectation: An external attach rejection preserves a retryable host; retry
-        succeeds with one logical surface.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"]", "name": "data-phase",
+        "equals": "failed"}}'
     - step: 11
-      expectation: An external attach rejection preserves a retryable host; retry
-        succeeds with one logical surface.
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-list\"]"}'
     - step: 12
-      expectation: An external attach rejection preserves a retryable host; retry
-        succeeds with one logical surface.
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-phase=\"ready\"]", "timeout_sec":
+        5}}'
     - step: 13
-      expectation: An external attach rejection preserves a retryable host; retry
-        succeeds with one logical surface.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"]", "name": "data-phase",
+        "equals": "ready"}}'
     - step: 14
-      expectation: An external attach rejection preserves a retryable host; retry
-        succeeds with one logical surface.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]", "equal": 1}}'
+    - step: 15
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "count": 2, "status": "requested"}}'
     results:
     - 5
     - 8
@@ -107,52 +108,43 @@ verification:
     - 12
     - 13
     - 14
-  - id: R2
-    requirement: Beta attaches independently; switching owners cannot expose both
-      retained browsers at once.
-    actions:
     - 15
+  - id: R2
+    requirement: Beta attaches independently; switching owners cannot expose both retained browsers at
+      once.
+    actions:
     - 16
-    - 18
-    - 22
-    checkpoints:
-    - step: 17
-      expectation: Beta attaches independently; switching owners cannot expose both
-        retained browsers at once.
-    - step: 19
-      expectation: Beta attaches independently; switching owners cannot expose both
-        retained browsers at once.
-    - step: 20
-      expectation: Beta attaches independently; switching owners cannot expose both
-        retained browsers at once.
-    - step: 21
-      expectation: Beta attaches independently; switching owners cannot expose both
-        retained browsers at once.
-    - step: 23
-      expectation: Beta attaches independently; switching owners cannot expose both
-        retained browsers at once.
-    - step: 24
-      expectation: Beta attaches independently; switching owners cannot expose both
-        retained browsers at once.
-    - step: 25
-      expectation: Beta attaches independently; switching owners cannot expose both
-        retained browsers at once.
-    results:
     - 17
     - 19
+    - 23
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-list\"]"}'
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]:visible", "equal": 1}}'
+    - step: 22
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "count": 3, "status": "requested"}}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-list\"]"}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]:visible", "equal": 1}}'
+    - step: 26
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "count": 3, "status": "requested"}}'
+    results:
+    - 18
     - 20
     - 21
-    - 23
+    - 22
     - 24
     - 25
+    - 26
   visual:
-  - check: Inspect the final screenshot for readable controls, clipping and overlay
-      placement.
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual
-    reason: Screenshots require a visual verdict; geometry assertions are recorded
-      separately.
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
   native:
   - check: Tauri, OS window, physical input and real service effects
     method: not-applicable
-    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
-      native boundaries.
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

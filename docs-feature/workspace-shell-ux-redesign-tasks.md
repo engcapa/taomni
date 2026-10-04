@@ -23,7 +23,7 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。Windows SSH、三端退出重启、Host 往返、N15 与 B18 已精准复验通过；完整 249 ID 的六份报告已收齐，756 pass / 2 fail / 0 skip。macOS RDP loopback 的 AppKit 目标修正也已精准复验通过。最终统一验收 [run 37227772151](https://github.com/engcapa/taomni/actions/runs/37227772151) 正在运行，固定输入为 `63ce4708c26d559b79276caccec3d23767d32bce`；在六份原始报告收齐、逐 case 与身份核对通过前不宣布全量通过。历史失败证据完整保留。
+TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。统一 [run 37227772151](https://github.com/engcapa/taomni/actions/runs/37227772151) 的六份原始报告已收齐并核对：759 pass / 2 fail / 0 skip。Linux D2 已在三端精准复验通过，macOS N08 的 232px 重启恢复仍在诊断。后续 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098) 的 Linux browser 190/0/0、macOS browser 188/2/0；B07 延迟绑定导航回归已本地修复，B17 已补实际 ready 状态等待，均待修正输入远程复验。三端 [N08 诊断 run 37233544174](https://github.com/engcapa/taomni/actions/runs/37233544174) 正在运行。历史失败完整保留，不以 workflow job success 代替逐 case 通过。
 
 最终完整范围为 250 个独立 ID：browser 三端各 190，native Linux 68 / Windows 62 / macOS 61，共 761 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-307.txt`；269 的旧 249 ID 列表保留。新增一个既有 RDP Server 用例保护本轮共享 host_helper 修改，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
@@ -258,3 +258,14 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - 该 case 在 CodeMirror 输入前新增定向 `Mod+a`，使全选经过编辑器的实际平台键盘绑定；fill 后立即检查完整三行输入。所有原 40 个步骤、两个取消分支的全文断言、覆盖归属、fixture、mode 与 180 秒预算完整保留，现为 42 步；requirements/checkpoints/results 随新增步骤同步。只修改用例，不修改产品或通用 fill runner。实际输入效果仍待 GitHub 三端精准复验。
 - 本地 CodeMirrorHost 314 为 1 file / 75 tests 全通过；315 静态 audit gate 通过且 coverage baseline 未改；316 精准计划为三端 browser 各 1 条，gaps/unreviewed 为空。YAML schema、reviewed contract、每个 checkpoint 与实际步骤的精确匹配及原步骤保留检查均通过。
 - 本轮 Linux/macOS browser 的 22 张实际画面已逐页检查：Home、SFTP、Code/Git、Tao、Notes 的已捕获状态没有明显遮挡或裁切。索引为 `shell-visual-review-37227772151/screenshot-index.json`；审阅只涵盖当前两端捕获状态，不代替其余端、DPI/读屏或像素基线。
+
+
+### 延迟恢复绑定与 N08 原生诊断（2026-10-05）
+
+- run 37227772151 的 Windows native 62/0/0 已收齐；最终 250 ID / 761 次为 759 pass / 2 fail / 0 skip。六份 source/runner/case/selection/receipt/config/native build 与原始 ZIP hashes 均匹配。D2 精准 [run 37230541532](https://github.com/engcapa/taomni/actions/runs/37230541532)，固定输入 `359e9b2816277f29d1d61792ee00b118f08b73ad`，三端 browser 各 1/0/0，原断言及新增输入检查共 42 步全部通过，三份身份与原始 ZIP hashes 匹配。
+- 同输入的 run 37231369098 尚未收齐六端：Linux browser 190/0/0、macOS browser 188/2/0，当前两份身份、receipt/config 与原始 ZIP hashes 匹配。B07 trace 已先观察到 Communicate empty 和 inert，随后 Home action 消失，失败 HTML/截图为 Connect。延迟 restore bind 调用 visitTab 会清除用户的显式 Lane；现在只记录 lastActiveRestoreRef，实际标签导航仍负责清除临时 Lane 和更新 MRU。
+- 新增两种 restore source 的 store 回归与真实 ShellFrame Home/retained input 挂载回归；改前 335 为 3 fail / 9 pass，修复后 336 为 12/12 pass。共享 Shell/恢复/关闭/ControlBar 单测 339 为 18 files / 72 tests 全通过；TypeScript 337 exit 0；338 audit gate 通过且 baseline 未调整。B07 保留原 14 步和 150 秒，增加实际持久化 identity 就绪后的精确 Communicate/inert 检查，现 17 步；B17 原 26 步和 150 秒保留，增加 ready selector 等待，现 27 步。两条 schema/reviewed contract、精确 checkpoint 映射及原步骤保留检查通过，尚未用本地 browser 代替远程执行。
+- B17 原即时 assert 读到 initializing；约 0.4 秒后捕获的原始 HTML 已为 ready。新增等待目标为真实 Host data-phase=ready，随后仍执行原 exact ready、attach 次数、单实例和 owner 往返结果；没有加固定 sleep、扩大 case 预算或删减业务断言。
+- N08 原失败前的 232px handle、实际 localStorage 写入、真实 Exit 与独立 PID 退出均通过；重启后即时 handle 为 248。新增只读 stored/rendered 双字段检查，要求两者精确为 232，随后保留原 exact width 与 workspace restore；35 个原步骤、300 秒预算保留，现 36 步。327 的布局/store/Shell 单测 14/14 pass；初始 expression 触发 schema 的 CSS 等号误判，328/329 无效日志保留。改用等价只读转义后，330 audit 与 331 三端 native 精准 plan 通过。固定输入 `9ad0a3ea928647bd7f06387e73de9fe651124b77` 的 run 37233544174 已启动，尚不确定是存储丢失还是恢复时序。
+- 本轮已查看 run 37227772151 的 macOS native 12 张成功原图，未见捕获状态的明显遮挡/裁切；审阅记录 `shell-visual-reviewed-macos-native-341.json`。该结果不代替最终输入的画面、DPI/读屏或像素基线。
+- 全量前端 unit 342 已启动，结果尚待收齐；原始旧失败报告保留。本批没有本地 browser/native 启动或 native build。所有修正需统一输入通过六端逐 case 验收后更新当前任务状态。

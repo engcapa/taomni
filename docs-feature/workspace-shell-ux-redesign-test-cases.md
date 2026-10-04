@@ -1253,8 +1253,8 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 
 | 产物 / 范围 | 当前结果 | 实施完成时回填 |
 |---|---|---|
-| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；B18 修正已精准三端通过。250 ID 的 run 37227772151 已收齐 Linux 189/1/0、macOS 190/0/0；Windows 报告待收齐。Linux D2 的 fill 已在预览之前保留默认内容，现新增编辑器全选与输入全文前置检查，待三端精准复验 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
-| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用；上一完整运行 Linux 67/0、Windows 61/0、macOS 59/1，RDP AppKit 目标已精准通过。当前统一输入新增三端 RDP Server 既有回归；N11/N17 及额外 OS 分支仍为独立手册 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
+| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；D2 精准 run 37230541532 三端各 1/0/0。最新全量 run 37231369098 的 Linux 190/0/0、macOS 188/2/0，其余报告待收齐；B07 延迟绑定回归已修复、B17 实际 ready 等待已补，待修正输入复验 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
+| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用。完整 run 37227772151 为 Linux 68/0/0、Windows 62/0/0、macOS 60/1/0；macOS N08 重启 width=248 仍需诊断。新增 stored/rendered 精确 232 检查的三端 native run 37233544174 运行中 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
 | fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
 | 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
 | 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸已有自动化断言；历史部分画面已检查 | 当前 SHA 画面、读屏、OS DPI/跨屏与系统控件仍按平台单列 |
@@ -1314,3 +1314,10 @@ Windows N15 的新 oracle 已在固定输入 `dadb395d374a49524bc652bea351b987ae
 B18 已在固定输入 `62b668c50ce09ba7e39f2b7cd624bf6b95007ff8` 的 [run 37221675568](https://github.com/engcapa/taomni/actions/runs/37221675568) 三端 browser 全部通过，95 步完整执行，身份与 ZIP hashes 匹配。完整 run 37218987069 的 Linux native 67 条通过、macOS native 59 通过/1 失败；macOS 的 TC-RDPJ-01 宿主 flip 目标出现 Python 本地网络权限弹窗。flip fixture 改为独立 AppKit 小窗口，真实 RDP 输入及外部 JSON 结果、59 步和所有预算保持；其它平台和 animation/photo 源不变。工具单测通过后，仍需 GitHub 原生精准复验和最终同输入全量运行。
 
 完整 run 37218987069 的 Windows native 61 条也已通过，六份原始证据身份均匹配。本轮改动共享 host_helper 的 macOS flip 源，最终并集追加既有 [TC-RDPS-NAT-01](../qa-ui-auto-tests/cases/TC-RDPS-NAT-01-start-connect-display.testcase.yaml) 的三端 native：独立 RDP client 的两组 codec/framebuffer、10 次真实点击和像素变化、错误密码与停止后拒绝连接。原 28 步、420 秒及所有阈值保持，不作为 Shell 原生性能基线。最终选择为 250 ID / 761 次，列表 `qa-ui-auto-report/_local/shell-ci-case-ids-final-307.txt`，仍需统一输入实际运行；旧 249 ID 报告不改写。
+
+
+B07 延迟绑定回归：在原 empty lane/inert 检查后，读取实际持久化 lastActiveRestoreRef，等待本例保存会话绑定完成，再要求 Communicate 和 inert 仍成立，并执行原 Home 返回及 Connect 恢复。它与两种 restore source 的 unit、实际 ShellFrame Home action 回归共同保护异步连接完成后不抢导航；原 14 步与 150 秒保留，现 17 步。
+
+B17 ready 前置条件：原 list 可见不等于 React Host 的 phase effect 已提交。失败 HTML 随后为 ready，所以在原 exact phase 检查前增加对真实 `[data-testid="shell-host"][data-phase="ready"]` 的有界等待；原 26 步、150 秒、attach 次数/唯一实例/owner 切换检查完整保留。
+
+N08 诊断补充：真退出、独立 PID 消失、同 profile 重启后，在原 exact 232px handle 之前检查完整 JSON `{"storedWidth":232,"renderedWidth":"232"}`；失败显示实际二字段值以区分持久化与渲染恢复。原 35 步、300 秒保留，现 36 步。精准 run 37233544174 在固定输入 9ad0a3ea928647bd7f06387e73de9fe651124b77 上运行中，当前不把根因或修复效果记为已证明。

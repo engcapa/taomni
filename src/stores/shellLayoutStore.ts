@@ -71,8 +71,10 @@ export const useShellLayoutStore = create<ShellState>((set, get) => ({
       && (JSON.stringify(current.layout.restoreSources[ref]) !== JSON.stringify(source) || JSON.stringify(current.layout.restoredTabs[ref]) !== JSON.stringify(tabs))) {
       current.updateLayout((layout) => ({ ...layout, restoreSources: { ...layout.restoreSources, [ref]: source }, restoredTabs: { ...layout.restoredTabs, [ref]: tabs } }));
     }
-    // The view model can bind after addTab has already activated the tab.
-    if (active && get().layout.lastActiveRestoreRef !== ref) get().visitTab(tabId);
+    // A delayed model bind records the restore identity without navigating.
+    // The user may already have selected an empty lane while the tab connects.
+    if (active && !get().mruCycling && get().layout.lastActiveRestoreRef !== ref)
+      get().updateLayout((layout) => ({ ...layout, lastActiveRestoreRef: ref }));
   },
   initialize: () => {
     if (get().initialized) return;

@@ -7,7 +7,8 @@ describe("Shell layout ownership and temporary navigation", () => {
     localStorage.clear();
     useShellLayoutStore.setState({ layout: defaultShellLayout(), initialized: false, writable: true, warning: null,
       navigatorOverlay: false, overlayTarget: null, taoOpen: false, overlay: null, panels: {}, activePanelByEdge: {},
-      restoreRefByTab: {}, pinnedTabs: {}, laneOverrides: {}, mru: [], mruCycling: false });
+      restoreRefByTab: {}, pinnedTabs: {}, laneOverrides: {}, mru: [], mruCycling: false,
+      laneSelection: null, exiting: false });
     useShellLayoutStore.getState().initialize();
   });
   it("opens a temporarily hidden navigator and preserves the expanded preference on dismissal", () => {
@@ -54,6 +55,24 @@ describe("Shell layout ownership and temporary navigation", () => {
     shell.bindRestoreSource("background", { kind: "run-entry", identity: "saved:alpha" }, 2, false);
     shell.flush();
     expect(JSON.parse(localStorage.getItem(SHELL_LAYOUT_KEY)!).lastActiveRestoreRef).toBe("workspace:w1");
+  });
+  it.each([
+    ["session", { kind: "run-entry", identity: "saved:alpha" }],
+    ["workspace", { kind: "workspace", workspaceInstanceId: "w1", workspace: { repoRoot: "/repo" } }],
+  ] as const)("keeps an explicitly selected empty lane when the active %s binds later", (_kind, source) => {
+    const shell = useShellLayoutStore.getState();
+    shell.visitTab("previous");
+    shell.visitTab("pending");
+    shell.selectLane("communicate");
+    shell.bindRestoreSource("pending", source, 1, true);
+    const state = useShellLayoutStore.getState();
+    expect(state.laneSelection).toBe("communicate");
+    expect(state.mru).toEqual(["pending", "previous"]);
+    expect(state.layout.lastActiveRestoreRef).toBe(state.restoreRefByTab.pending);
+    shell.flush();
+    expect(JSON.parse(localStorage.getItem(SHELL_LAYOUT_KEY)!).lastActiveRestoreRef).toBe(state.restoreRefByTab.pending);
+    shell.visitTab("previous");
+    expect(useShellLayoutStore.getState().laneSelection).toBeNull();
   });
   it("restores a separate panel width for each owner without persisting a transient clamp", () => {
     const shell = useShellLayoutStore.getState();

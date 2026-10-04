@@ -203,6 +203,7 @@ attention 优先 error > busy > unread > none，dirty 和 active 单独表达；
 - 点击 lane：激活该 lane 最近使用且仍存活的主标签；空 lane 展示空工作面及对应“新建连接/打开工作区/打开邮件/工具”动作，不捏造业务 tab。activeTabId 保持最后真实 tab，Shell 的 `laneSelection` 显式标识空组浏览。
 - 空组浏览时有效主工作面是空态，原 activeTab 对应业务视图仅保活且 inert；上下文 Action/键位不继续暴露原 tab 能力。用户点返回/选择存活 tab 后才恢复该业务焦点。能力解析必须使用有效工作面，不能只读 activeTabId。
 - 激活真实 tab 时原子清除空组浏览并同步 lane；浏览总览筛选不改变 activeTabId。后台新输出只更新 attention，不激活 tab。
+- 连接 ready、工作区模型晚绑定及 restoreRef 补齐只更新元数据。即使对应 tab 仍是 activeTabId，也不能清除用户已选择的空组、重复提交激活或重排 MRU；lastActiveRestoreRef 的补记与实际导航分开。B07 的持久化就绪后 Lane/inert/Home 检查和 ShellFrame 挂载回归保护这一边界。
 - 当活动 tab 被关闭：优先同 lane 最近使用的存活项，其次全局 MRU，再 Home。非活动 tab 关闭不改变活动项。
 - 保留 rename（Enter 提交 / Esc 放弃）、manual terminal title、duplicate 的 cwd/profile、拖拽顺序、前后/首尾移动、连接信息复制、详情与中键关闭。Home 不可被移动越过；被折叠项在总览仍可定位。
 - 固定 tab 在本 lane 的普通项之前；隐藏关闭图标，右键“取消固定”可恢复。显式关闭固定项仍走保护；批量关闭默认排除固定项，并显示将关闭数量；Home 永远排除。
