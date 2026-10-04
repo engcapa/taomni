@@ -56,6 +56,7 @@
 | DEC-08 | 把现有 SFTP 弹出当成同一物理连接会产生错误生命周期假设 | 保留独立弹窗连接，统一逻辑面板身份；原传输继续在原通道，窗口回停靠按事务执行 | agent 自决；openDetachedSftp 现有独立 sessionId | AC-03、09、18；TASK-05、09；V-03、07 |
 | DEC-09 | 完整 Hub 主标签 / Hub 原生弹窗并非原型已展示的主流程，也无现成 TabKind/窗口支持 | 本批交付 Hub 停靠/覆盖层与 Notes 现有弹出；初稿的“如果在标签打开 Tao”保留为扩展点，不显示空入口。Git 弹出纳入本批 | agent 自决；按已有能力与原型范围收敛 | AC-05、18；TASK-07、09；V-04、07 |
 | DEC-10 | 仅修改视觉会绕过根标签 dirty、事务和传输检查；原代码不是统一的关闭事务 | 所有用户关闭入口先经过统一 close coordinator，业务 adapter 提供风险与提交 | agent 自决；removeTab/removeTabs 及退出路径 | AC-09、17；TASK-04、10；V-03、07 |
+| DEC-11 | 六端自动化不能完整证明真实 OS 对话框、部分 OS 输入与物理设备/性能边界 | 本轮 done 以实现完成和最终输入六端自动化全部通过为准；其余明确边界单列后续验收，保留完整规格与未验证状态 | 用户 2026-10-05 明确确认“单列后续验收；本轮以实现和六端自动化通过为 done 条件” | TASK-01～12；§14 与用例当前结果 |
 
 没有需要新增用户选择才能继续设计的实质分歧。各任务可按 §12 依赖开展；原型和文档的实施细节仍可在后续产品反馈中按稳定 ID 修订。
 
@@ -551,7 +552,7 @@ reattach：子窗口请求、主窗口校验 owner → 准备 slot/接收最新 
 | macOS / WKWebView | 原生交通灯 overlay safe area 用现有平台布局/实际 metrics；至少容纳现有交通灯区域，不硬塞 Windows 控件；原生菜单 action 同 dispatcher | Cmd/Control 分别路由，Cmd+Tab 留 OS，交通灯/窗口/IME； bridge 不能证明物理按键 |
 | Linux / WebKitGTK | CSS/inert/resize 后测量与字体差异；Wayland/X11 明确 | X11 native_window_drag 可复用；Wayland 不标 N/A，使用对应桌面手工验证 |
 
-本机是 Windows；实施收尾必须有 Windows 所选 native 证据。macOS/Linux 无设备可保持未验证并写后续步骤，不阻塞本轮 Windows 交付；任何已知三端代码不兼容必须解决。Shell 支持三个 WebView 的构建和运行，不能把缺机器当平台代码错误的豁免。
+本机是 Windows；按用户最新要求，本轮实施收尾必须有 Windows、Linux、macOS 三端所选 browser/native 的实际通过证据。原生构建和用例在 GitHub 执行；未自动化的 OS/设备边界按 DEC-11 单列后续验收。Shell 支持三个 WebView 的构建和运行，已知三端不兼容必须解决。
 
 ## 10. 验收条件
 
@@ -692,7 +693,11 @@ TASK-11 的 fixture/用例设计可先做，具体生产入口 case 必须跟随
 
 设计交接阶段只检查了文档链接、ID、映射、路径、命令参数与源码事实，该阶段未执行产品验证。随后用户已授权领取全部任务、实现、单测、推送及 GitHub 三平台循环验证。当前代码、用例、历史失败与最新结果统一登记在 [实施任务](./workspace-shell-ux-redesign-tasks.md)，具体规格与自动化/人工边界见 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。本节的设计阶段记录不作为实现阶段的通过证据。
 
-实现完成条件：对应 AC 的新目标及受影响保留结果都得到实际证据；所有关闭/恢复/失败分支无未解释回归；已知三端不兼容为零；当前 Windows 所选 native 完成；未执行平台和手工边界如实记录。设计“可实施”不等于产品或验证“完成”。
+固定输入 `79ab1d6b46a4d65fe7026b3d8b7da3e799f0ea0b` 的 [完整六端验收 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943) 已结束，250 ID / 761 次执行为 759 pass / 2 fail / 0 skip，覆盖用户指定模块及受影响保留回归。三端 browser 及 Linux/Windows native 全通过；macOS native 的 RDP 回环和 GIF 时间轴失败正在收敛。B07/B17 三端精准复验已通过全部 132 步。本地前端 unit 526 文件 / 5244 项和 TypeScript 已通过，Rust unit 1590 pass / 16 既有 ignored。最终 runtime、当前画面和任务状态仍待验收回填；OS picker/IME/DPI/读屏及 AC-20 匹配性能证据按用例文档单列，不由自动化绿色推定通过。
+
+本次 native 失败诊断保留原始证据：RDP 服务端在客户端 UI 已显示断开后，仍记录 single-client busy 拒绝，因此用例必须等待真实服务端释放日志，再由独立协议探针检验继续服务。GIF 所有已编码帧与原图像素一致，但 960 ms 帧间隔的时间轴检查未通过；QA 构建增加有界的原生采集与编码排队记录，用于区分采集停顿、呈现停顿和队列覆盖，不改变帧供给、原有 oracle 或预算。保留用例 TC-SHOT-N5～N8 继续保护真实 GIF/MP4 录制与预览；该诊断支持本身不新增用户行为。
+
+本轮实现完成条件依 DEC-11：实现已集成；对应 AC 的自动化目标及受影响保留结果在同一最终输入的六端全部通过，零 fail/skip；源码、用例、runner、配置、receipt 和 native build 身份匹配，实际画面审阅完成，已知本轮回归已处理。用户已明确将真实 OS 对话框、Windows/macOS 真 IME、DPI/跨屏/读屏和 AC-20/N17 匹配性能基线单列后续验收。这些项保留完整规格和未验证状态，本轮 done 不表示这些边界已通过，也不声明性能无退化。
 
 ### 14.1 实施风险与处理责任
 

@@ -1253,15 +1253,17 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 
 | 产物 / 范围 | 当前结果 | 实施完成时回填 |
 |---|---|---|
-| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；D2 精准 run 37230541532 三端各 1/0/0。最新全量 run 37231369098 的 Linux 190/0/0、macOS 188/2/0，其余报告待收齐；B07 延迟绑定回归已修复、B17 实际 ready 等待已补，待修正输入复验 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
-| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用。完整 run 37227772151 为 Linux 68/0/0、Windows 62/0/0、macOS 60/1/0；macOS 旧 N08 的 width=248 失败保留。新增 stored/rendered 精确 232 检查的 run 37233544174 三端各 1/0/0，36 步全执行；同产品源码的完整 run 37231369098 Linux 68/0/0、macOS 61/0/0，Windows native 待收齐 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
+| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；完整 run 37237715943 三端各 190/0/0。B07/B17 在固定输入 79ab1d6b 的 run 37236895398 三端各 2/0/0，共 132 步全通过；新输入仍需最终复验 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
+| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用。完整 run 37237715943 Linux 68/0/0、Windows 62/0/0、macOS 59/2/0；失败为 TC-RDPJ-01-client-server-loopback 和 TC-SHOT-N7。新增 stored/rendered 精确 232 检查的 run 37233544174 三端各 1/0/0，36 步全执行。旧 N08 width=248 失败保留，根因未确定 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
 | fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
 | 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
-| 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸已有自动化断言；历史部分画面已检查 | 当前 SHA 画面、读屏、OS DPI/跨屏与系统控件仍按平台单列 |
+| 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸已有自动化断言；run 37227772151 的 71 张六端成功画面已实际检查；当前输入画面待收齐 | 当前 SHA 画面、读屏、OS DPI/跨屏与系统控件仍按平台单列 |
 | 性能 | 指标、负载、样本和比较方法已定；没有实测结论 | 原始baseline/candidate、噪声、p50/p95与资源，不宣称理论提速 |
-| 产品构建/协议服务 | 历史两轮 GitHub 和 Windows QA 构建证据保留；当前重构输入需 GitHub 重新构建 | selection、实际执行数、服务就绪、receipt 与源码/二进制身份 |
+| 产品构建/协议服务 | 上一完整 run 37231369098 六份 selection/source/runner/case/receipt/config/native build 与 ZIP hashes 均匹配；当前输入的构建与执行证据待收齐 | selection、实际执行数、服务就绪、receipt 与源码/二进制身份 |
 
 责任任务均在主设计 TASK-01～12；其中 TASK-11 将本稿转成规范 YAML 并维护目录，TASK-12 汇总三平台实际结果和真实缺口。下表链接当前可执行自动化，不把整个设计条目的每个分支都视为已覆盖。
+
+用户于 2026-10-05 明确确认：真实 OS 文件对话框、Windows/macOS 真 IME、DPI/跨屏/读屏及匹配性能基线单列后续验收，本轮以实现完成和六端自动化全部通过为 done 条件。下表的未验证边界仍保留，既不转换为自动化 pass，也不继续阻塞已满足本轮条件的开发任务。
 
 | V / 规格 | 实际 case | 自动化边界 / 尚未建立的证据 |
 |---|---|---|
@@ -1278,10 +1280,10 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 | V-N16 | [原生 WebView 布局](../qa-ui-auto-tests/cases/TC-SHELL-N16-webview-layout-native.testcase.yaml) | 1440×900/800×600 客户区的几何、命中、Project/Tao 内容；OS DPI、跨屏、交通灯、读屏仍需独立执行 |
 | V-N17 | 本文 V-N17 性能测量步骤 | 匹配硬件/WebView/profile 的 baseline/candidate、原始样本和资源数据未完成；不声称性能无退化 |
 | V-N18 | [窗口中断恢复](../qa-ui-auto-tests/cases/TC-SHELL-N18-window-interruption-recovery-native.testcase.yaml) | 真实子窗口生命周期与 Notes 草稿恢复；权限/系统窗口故障的其余组合不由单一路径替代 |
-| B25 / B45 / N19（AI 强制保留范围） | [browser context/Stop](../qa-ui-auto-tests/cases/TC-SHELL-B25-tao-context-lifecycle.testcase.yaml)、[browser stream/history](../qa-ui-auto-tests/cases/TC-SHELL-B45-ai-stream-history.testcase.yaml)、[native stream/history](../qa-ui-auto-tests/cases/TC-SHELL-N19-ai-stream-history-native.testcase.yaml) | Home 无绑定会话发起对话；发送、隐藏完成通知、精确 thread 跳转、未发送多行草稿、历史重载。B25 通过声明的 IPC hold 验证 Stop 与排队发送只完成一次。N19 另有真实 OpenAI loopback 协议/Rust stream/SQLite、503、部分 SSE 后 Stop、排队恢复和真实 QA 进程重启；独立 provider receipt 要求 5 次 stream 请求均带生产 tools、3 次正常完成、1 次真实连接取消，重启只保留完整回答且不重发。browser 的 stream 是明示 IPC preview。新增分支在 run 37194738007 的 browser 三端通过，native 三端均在 step 40 的相对 receipt 路径检查失败；实际 SSE/Stop 已执行，恢复及重启检查仍待修复输入复验。第五轮冻结的上一输入仍为 4 次请求 |
-| N20（LAN 轻量范围） | [native LAN entry](../qa-ui-auto-tests/cases/TC-SHELL-N20-lan-entry-native.testcase.yaml)、B38 的 browser 草稿保留分支 | 原生 read-only history、拒绝开启、Home/quick-switch 回同一 owner；不声称真实 peer/multicast 收发。待 GitHub 三端实测 |
-| 截图强制保留范围 | `TC-SHOT-001…027` 与 `TC-SHOT-N1…N13` | 全部加入当前远程选择；native 使用实际捕获、OCR、clipboard、置顶、快捷键、scroll/recording 场景，依各 YAML 和 platform contract 验收。browser stub 与 native 结果分别记录；新远程输入尚未执行 |
-| 原生 Git 保留操作 | [N21 多仓库](../qa-ui-auto-tests/cases/TC-SHELL-N21-git-actions-native.testcase.yaml)、[N22 单仓库](../qa-ui-auto-tests/cases/TC-SHELL-N22-single-git-actions-native.testcase.yaml) | 实际 stage/unstage、取消提交/建分支、选定文件提交、Log 文件集、discard 取消/确认；独立 Git 进程核对全部分支、精确 porcelain 集合与 HEAD/index 全文，aux 仓库保持不变。三端待本次输入远程运行；N05 的窗口与草稿验收继续保留 |
+| B25 / B45 / N19（AI 强制保留范围） | [browser context/Stop](../qa-ui-auto-tests/cases/TC-SHELL-B25-tao-context-lifecycle.testcase.yaml)、[browser stream/history](../qa-ui-auto-tests/cases/TC-SHELL-B45-ai-stream-history.testcase.yaml)、[native stream/history](../qa-ui-auto-tests/cases/TC-SHELL-N19-ai-stream-history-native.testcase.yaml) | Home 无绑定会话发起对话；发送、隐藏完成通知、精确 thread 跳转、未发送多行草稿、历史重载。B25 通过声明的 IPC hold 验证 Stop 与排队发送只完成一次。N19 另有真实 OpenAI loopback 协议/Rust stream/SQLite、503、部分 SSE 后 Stop、排队恢复和真实 QA 进程重启；独立 provider receipt 要求 5 次 stream 请求均带生产 tools、3 次正常完成、1 次真实连接取消，重启只保留完整回答且不重发。browser 的 stream 是明示 IPC preview。上一完整 run 37231369098 六端相应用例通过，三份 native 独立 provider receipt 的上述字段已直接核对；早期相对 receipt 路径失败保留于任务历史。当前固定输入完整结果待收齐 |
+| N20（LAN 轻量范围） | [native LAN entry](../qa-ui-auto-tests/cases/TC-SHELL-N20-lan-entry-native.testcase.yaml)、B38 的 browser 草稿保留分支 | 原生 read-only history、拒绝开启、Home/quick-switch 回同一 owner；browser 保留草稿。上一完整 run 37231369098 相应用例六端通过，当前固定输入结果待收齐；不声称真实 peer/multicast 收发 |
+| 截图强制保留范围 | `TC-SHOT-001…027` 与 `TC-SHOT-N1…N13` | 每端 27 条 browser、13 条 native 全部纳入最终选择；native 使用实际捕获、OCR、clipboard、置顶、快捷键、scroll/recording 场景，依各 YAML 和 platform contract 验收。上一完整 run 37231369098 的这 120 次执行全部通过；当前固定输入结果待收齐。browser stub 与 native 结果分别记录 |
+| 原生 Git 保留操作 | [N21 多仓库](../qa-ui-auto-tests/cases/TC-SHELL-N21-git-actions-native.testcase.yaml)、[N22 单仓库](../qa-ui-auto-tests/cases/TC-SHELL-N22-single-git-actions-native.testcase.yaml) | 实际 stage/unstage、取消提交/建分支、选定文件提交、Log 文件集、discard 取消/确认；独立 Git 进程核对全部分支、精确 porcelain 集合与 HEAD/index 全文，aux 仓库保持不变。上一完整 run 37231369098 三端 N05/N21/N22 通过；当前固定输入结果待收齐 |
 
 用户已授权实现、单测、推送及 GitHub browser/native 验证；当前任务状态与结果持续更新在 [实施任务](./workspace-shell-ux-redesign-tasks.md)。本稿的设计步骤保持完整，自动化数量、静态检查和单测通过均不代表全部三端桌面及人工边界已验收。
 
@@ -1326,3 +1328,21 @@ N08 诊断补充：真退出、独立 PID 消失、同 profile 重启后，在�
 N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、native build 与原始 ZIP hashes 匹配；macOS 首次读取即为精确 stored/rendered 232/232，同产品源码的完整 run 37231369098 原 N08 的即时 width 也通过。旧失败未改写，旧 248 原因未在该精准输入复现；新增二字段检查继续保留以防后续失效被忽略。
 
 本地单测收尾：全量 342 的其它 525 文件 / 4994 项通过；修正编辑器测试的 provider 暂停时钟和 WebView reset 模拟时机后，完整 352 的 250 项全通过。当前 526 文件 / 5244 项的原始报告、名称集合及哈希核对见 `shell-unit-review-353.json`；原失败保留，不称 342 为全通过。两处为 unit fixture 调整，原生产逻辑、期限和业务断言保持。
+
+完整 run 37237715943 的 macOS native 留有两项失败，已逐项查看原始截图、日志和步骤。RDP 回环用例在原探针之前补充最新服务端 `disconnected after` 日志检查，保留原 59 个动作/结果与 480 秒预算，现 63 步；录屏 QA app 保留额外采集/排队时间轴，TC-SHOT-N7 的逐帧像素、顺序、nonce、时间轴和生命周期断言完整保留。诊断 unit 为 screenshot 52/52；真实行为需要 GitHub 精准复验与最终统一输入六端验证。
+
+## 7. 后续独立验收
+
+<a id="follow-up-acceptance"></a>
+
+按用户 2026-10-05 的明确确认，以下为本轮 done 之后的独立验收范围。状态均为未验证；保留原详细步骤，不用本轮六端自动化通过替代这些结论。
+
+| 验收范围 | 平台 / 原规格 | 必须取得的实际结果与证据 | 当前状态 |
+|---|---|---|---|
+| 系统文件对话框与路径 | 三端；V-N11 / MN-1 | 真 OS picker 选择/取消、权限拒绝、只读/Unicode/UNC 路径及失败后恢复；外部磁盘结果与窗口证据 | 未验证 |
+| 系统输入、窗口控制与剪贴板扩展 | Windows/macOS 真 IME；V-N01/09/10，Linux 非 X11 路径按实际桌面补验 | 真候选 commit/cancel、系统切换与焦点返回、交通灯/系统移动及缩放、写入拒绝与非文本剪贴板恢复；实际 OS 操作和外部观察 | 未验证；Linux X11 自动化 IME 结果单独登记 |
+| DPI、跨屏与读屏 | 三端；V-N16 / AC-07/08/11 | OS DPI/200% 与跨屏后的命中、布局和焦点；读屏语义与顺序，记录设备、DPI/WebView、截图/录屏及读屏输出 | 未验证 |
+| 匹配性能与资源回收 | 三端；V-N17 / AC-20 | 同机同 WebView/profile/数据集的 baseline 两轮和 candidate，5 次预热、30 次原始样本、p50/p95/噪声及稳定后进程/资源；区分 DOM 与真实输入到屏幕，不删除慢样本或抬预算 | 未验证；本轮不声明性能无退化 |
+| 扩展故障组合 | 依 V-N13～N15/18 与 §6 的明确边界 | 尚未由当前 YAML 覆盖的邮件草稿/断线、系统权限/窗口中断和清理重试等组合；沿原 owner、关闭保护、取消/恢复要求逐项保存证据 | 未验证；已执行的有序分支仍按原 case 结果登记 |
+
+后续执行继续使用隔离 QA binary、可追溯的 source/build/config 和原始报告；新发现的产品回归进入修复闭环。没有实测结果时保留未验证状态，不给本轮已通过的自动化用例追加假 manual/performance pass。

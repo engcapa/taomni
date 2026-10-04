@@ -85,6 +85,40 @@ struct TimedFrame {
     at_ms: u64,
 }
 
+/// Retained only in the isolated QA build to distinguish native sampling gaps
+/// from frames superseded while the encoder queue is full. It never supplies
+/// pixels or changes the recording's acceptance criteria.
+#[cfg(debug_assertions)]
+#[derive(Default)]
+struct CaptureTrace {
+    samples: Vec<serde_json::Value>,
+    truncated: bool,
+}
+
+#[cfg(debug_assertions)]
+impl CaptureTrace {
+    fn push(&mut self, sample: serde_json::Value) {
+        if self.samples.len() < 1800 {
+            self.samples.push(sample);
+        } else {
+            self.truncated = true;
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+impl Drop for CaptureTrace {
+    fn drop(&mut self) {
+        match super::qa::keep_json(
+            &serde_json::json!({"samples": self.samples, "truncated": self.truncated}),
+            "record-capture-timeline.json",
+        ) {
+            Ok(path) => log::info!("screenshot recording capture diagnostics: {path}"),
+            Err(error) => log::warn!("could not retain recording capture diagnostics: {error:#}"),
+        }
+    }
+}
+
 #[derive(Default)]
 struct FrameQueue {
     previous: Option<Vec<u8>>,
@@ -389,6 +423,8 @@ fn capture_loop(
     tx: SyncSender<TimedFrame>,
     ready: std::sync::mpsc::Sender<anyhow::Result<()>>,
 ) -> anyhow::Result<()> {
+    #[cfg(debug_assertions)]
+    let scale = display.scale_factor;
     let mut source = FrameSource::for_region(app, display, region);
     // Reuse the readiness frame; a second read can block on a static screen.
     let mut initial = match source.grab() {
@@ -406,9 +442,13 @@ fn capture_loop(
     let (out_w, out_h) = output_dims(region.2, region.3, format.max_width());
     let mut queue = FrameQueue::default();
     let mut failures = 0u32;
+    #[cfg(debug_assertions)]
+    let mut trace = (app.config().identifier == crate::QA_APP_ID).then(CaptureTrace::default);
 
     while !stop.load(Ordering::SeqCst) && Instant::now() < deadline {
         let tick = Instant::now();
+        #[cfg(debug_assertions)]
+        let mut captured_sample = None;
         let polled = if let Some(image) = initial.take() {
             Ok(Some(image))
         } else {
@@ -434,6 +474,18 @@ fn capture_loop(
                         .saturating_duration_since(start)
                         .as_millis() as u64
                 };
+                #[cfg(debug_assertions)]
+                {
+                    if trace.is_some() {
+                        captured_sample = Some(serde_json::json!({
+                            "atMs": at_ms,
+                            "frameCode": super::qa_oracle::decode_code(
+                                &image, (region.2 as f64 / scale, region.3 as f64 / scale), 12, 64.0,
+                            ),
+                            "pixels": [image.width(), image.height()],
+                        }));
+                    }
+                }
                 queue.update(image, at_ms);
             }
             Ok(None) => {}
@@ -445,8 +497,20 @@ fn capture_loop(
                 }
             }
         }
+        #[cfg(debug_assertions)]
+        let pending_before_flush = queue.pending.as_ref().map(|frame| frame.at_ms);
         queue.try_flush(&tx)?;
         let elapsed = tick.elapsed();
+        #[cfg(debug_assertions)]
+        if let Some(trace) = &mut trace {
+            trace.push(serde_json::json!({
+                "pollStartedMs": tick.saturating_duration_since(start).as_millis() as u64,
+                "pollMs": elapsed.as_millis() as u64,
+                "captured": captured_sample,
+                "pendingBeforeFlushMs": pending_before_flush,
+                "pendingAfterFlushMs": queue.pending.as_ref().map(|frame| frame.at_ms),
+            }));
+        }
         if elapsed < interval {
             thread::sleep(interval - elapsed);
         }

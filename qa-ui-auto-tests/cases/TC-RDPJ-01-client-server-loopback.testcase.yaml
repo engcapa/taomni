@@ -181,6 +181,13 @@ steps:
     selector: '[data-testid="rdp-status"]'
     contains: Disconnected
     timeout_sec: 20
+- open_route: ?servers=main
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-rdp"]'
+- assert_text:
+    selector: '[data-testid="server-log"] > div:last-child'
+    contains: disconnected after
+    timeout_sec: 20
 - rdp_probe:
     scenario: connect
     artifact: still-serving
@@ -228,7 +235,8 @@ verification:
     - 45
   - id: R3
     requirement: In OS full screen the connection bar shows the server-measured connection quality, comes
-      back from the top edge, restores the window and disconnects the session.
+      back from the top edge, restores the window and disconnects the session. The server confirms release
+      before an independent client verifies that it still serves the desktop.
     actions:
     - 46
     - 49
@@ -236,6 +244,8 @@ verification:
     - 53
     - 54
     - 56
+    - 59
+    - 61
     checkpoints:
     - step: 47
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]",
@@ -258,14 +268,19 @@ verification:
     - step: 58
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected",
         "timeout_sec": 20}}'
-    - step: 59
+    - step: 60
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 62
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"] > div:last-child", "contains": "disconnected after", "timeout_sec": 20}}'
+    - step: 63
       expectation: '{"rdp_probe": {"scenario": "connect", "artifact": "still-serving", "args": {"seconds":
         2}, "expect": {"first_graphics_ms": {"exists": true}}}}'
     results:
     - 48
     - 52
     - 58
-    - 59
+    - 62
+    - 63
   native:
   - check: Real desktop session on the runner with the product RDP client and server in one QA build,
       OS-level input injection and OS full screen.

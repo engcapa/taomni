@@ -4,7 +4,7 @@
 
 领取者：Codex。基线：`5fb098474f072f4e0c7e99407ab0d072b7d49c53`，分支 `feat/ui-layout-refactor`。
 用户已授权实现、本地单元测试、推送及 `qa-ui-auto-platforms` browser/native 循环验证。
-状态：`todo` → `in_progress` → `verification` → `done`；只有最终输入对应的实际验证满足验收后才标记 done。
+状态：`todo` → `in_progress` → `verification` → `done`。用户于 2026-10-05 明确确认：本轮以实现完成和同一最终输入的六端自动化全部通过为 done 条件；真实 OS 文件对话框、Windows/macOS 真 IME、DPI/跨屏/读屏及匹配性能基线单列后续验收。未自动化项保留完整规格与未验证状态，不计为自动化 pass。
 
 | 任务 | 状态 | 依赖 | 交付 / 验证证据 |
 |---|---|---|---|
@@ -23,13 +23,15 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。统一 [run 37227772151](https://github.com/engcapa/taomni/actions/runs/37227772151) 的六份原始报告已收齐并核对：759 pass / 2 fail / 0 skip。Linux D2 已在三端精准复验通过，macOS N08 的 232px 重启恢复仍在诊断。后续 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098) 的 Linux browser 190/0/0、macOS browser 188/2/0；B07 延迟绑定导航回归已本地修复，B17 已补实际 ready 状态等待，均待修正输入远程复验。三端 [N08 诊断 run 37233544174](https://github.com/engcapa/taomni/actions/runs/37233544174) 各 1/0/0，36 步全部通过；本地前端 526 文件 / 5244 项已按原始报告和完整编辑器重跑核对通过。历史失败完整保留，不以 workflow job success 代替逐 case 通过。
+TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification。固定输入 `79ab1d6b46a4d65fe7026b3d8b7da3e799f0ea0b` 的 [完整六端 run 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943) 已结束：759 pass / 2 fail / 0 skip；三个 browser 端各 190/0/0，native Linux 68/0/0、Windows 62/0/0、macOS 59/2/0。尚未建立最终通过结论。本地前端 526 文件 / 5244 项已按原始全量报告和完整编辑器重跑核对通过；Rust unit 为 1590 pass / 0 fail / 16 既有 ignored，TypeScript 通过。历史失败完整保留，不以 workflow job success 代替逐 case 通过。
+
+上一完整 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098) 已收齐六份原始报告：759 pass / 2 fail / 0 skip；browser Linux/Windows 各 190/0/0、macOS 188/2/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。失败为 macOS B07 延迟身份绑定抢导航与 B17 在 ready 前读取状态。两条已在当前输入的 [三端 browser 复验 37236895398](https://github.com/engcapa/taomni/actions/runs/37236895398) 各 2/0/0，17+27 步完整执行，共 132 步通过；身份、配置、receipt 与原始 ZIP hashes 匹配。N08 的 stored/rendered 精确 232 检查在三端精准 run 37233544174 通过，旧 248px 未复现，根因未确定；未据此声称完成了产品持久化修复。
 
 最终完整范围为 250 个独立 ID：browser 三端各 190，native Linux 68 / Windows 62 / macOS 61，共 761 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-307.txt`；269 的旧 249 ID 列表保留。新增一个既有 RDP Server 用例保护本轮共享 host_helper 修改，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
-新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。这些缺口未记为 pass 或 done。
+新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。按用户明确确认，这些项单列后续验收，不阻塞本轮实现和六端自动化范围的 done；其自身未记为 pass 或已验收。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。
 
-N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既有 DB browser 用例补足离线 renderer 工作流。当前以统一 SHA 执行上述 250 ID 六端验收，随后核对逐 case 结果、receipt、源码/构建身份和原始截图。
+N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既有 DB browser 用例补足离线 renderer 工作流。上述 250 ID 六端报告的 receipt、源码/runner/用例/配置和 native build 身份及 ZIP hashes 均匹配。macOS 的两项失败为 RDP 回环断开后的探针遇到尚未释放的旧连接，以及 GIF 录屏的时间轴缺帧；实际失败截图和逐步记录已检查。RDP 用例补充服务端连接释放日志检查后再执行原探针；录屏先补 QA 独立采集/排队时间轴诊断，像素和时间预算保持，尚不声称录屏缺帧已修复。
 
 ## 验证记录
 
@@ -279,3 +281,17 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - 编辑器完整 349 的 barrier 已通过，但另一个 focus-reset fixture 在 await menu disappearance 后才 blur，可能晚于两个真实焦点恢复回调。现在在菜单卸载的同一同步提交模拟 WebView reset，再保留原精确 row focus 等待；没有改变产品焦点恢复。351 两项聚焦 unit 通过；排除的 248 项仅为 filter，不当 UI skip 或完整回归通过。
 - 最终完整编辑器 352 为 250/250 pass，TypeScript 350 exit 0。342 的另外 525 文件 / 4994 项与 352 的全部 250 项共同覆盖当前前端 526 文件 / 5244 项；完整 assertion 名称集合相同，原 342/349 失败报告未改写，核对记录 `shell-unit-review-353.json`。本批 unit fixture 修改没有新的用户行为或 executable case；原 tree focus 边界继续由 TC-IDE-TREEOPEN-01 保护，同步屏障由原 unit 成功/失败分支保护。产品代码在 342 后未改变。
 - 345 的精确并集仍为 250 ID / 761 次，gaps/unreviewed 为空；346 提交后的 development contract 通过。下一输入先通过 GitHub 三端 browser 复验 B07/B17，再执行稳定输入的完整六端验收。没有本地 browser/native 启动或 native build。
+
+### B07/B17 三端复验与完整六端候选
+
+- 上一完整 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098)，固定输入 `359e9b2816277f29d1d61792ee00b118f08b73ad`，已收齐六份原始证据：browser Linux/Windows 各 190/0/0、macOS 188/2/0；native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0，共 759 pass / 2 fail / 0 skip。六份 selection/source/runner/case/receipt/config/native build 与原始 ZIP hashes 均匹配；B07/B17 的原失败保留。
+- 固定输入 `79ab1d6b46a4d65fe7026b3d8b7da3e799f0ea0b` 的 [browser 精准 run 37236895398](https://github.com/engcapa/taomni/actions/runs/37236895398) 三端各 2 pass / 0 fail / 0 skip。B07 的 17 步与 B17 的 27 步均完整通过，共 132 步；不仅核对 case 状态，也核对原始 step_timings 与冻结 YAML 的数量、逐项动作和顺序。三份身份、配置、receipt 与 ZIP hashes 均匹配，原失败报告未覆盖。
+- 本地前端核对记录 `shell-unit-review-353.json` 绑定 342/352 原始 JSON hashes，当前 526 文件 / 5244 项通过；原 342/349 失败原件保留。提交后的 development contract 356 exit 0。此阶段没有再次运行本地 browser/native 或构建原生 app。
+- 同一稳定输入启动 [完整 run 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943)，精确 selection 为 250 ID / 761 次：browser 三端各 190，native Linux 68 / Windows 62 / macOS 61，gaps/unreviewed 均为空。dispatch 记录 `shell-ci-dispatch-final-357.json`；监控自动保留各端原始 ZIP/receipt。运行中，TASK-01～12 保持 verification，待收齐全部逐 case 结果、独立 oracle 和当前画面后回填。
+
+### macOS native 回环与录屏诊断
+
+- 完整 run 37237715943 已结束，六份原始报告为 759 pass / 2 fail / 0 skip，身份、配置、receipt、构建与 ZIP hashes 匹配。33 张 browser 和 39 张 native 代表性 Shell 截图已实际审阅，共 72 张；当前捕获状态未见明显主要控件遮挡/裁切，记录在 `shell-visual-review-37237715943/reviewed-*.json`。这不是 DPI、读屏、像素基线或性能通过证据。
+- macOS TC-RDPJ-01 在原第 59 步失败；客户端 UI 已断开，服务端仍记录旧 session active 并拒绝新连接。用例保留原 59 步、独立协议/首帧结果和 480 秒预算，补 4 步打开 Local servers 并等待最新一条日志确认释放，现 63 步；避免用证书确认阶段的旧断开日志作为当前释放证据。
+- macOS TC-SHOT-N7 的 13 帧像素/顺序/nonce 均匹配，但 960 ms 间隔导致时间轴失败。QA app 增加有界采集/排队记录，保留 sampled marker、native timestamp、poll 耗时和 pending 发送状态，帮助区分 OS 画面、采集与编码队列；生产录制流程及原 oracle/预算未调整。精准 GitHub 验证尚待启动，不能声称根因已确定或产品缺帧已修复。
+- 本地 screenshot Rust unit 362 为 52 pass / 0 fail，包含真实 GIF/MP4 编解码和丢失原图帧的拒绝检查；TypeScript/前端输入未改变，复用 353 核对的 5244 项。catalog audit 和 development contract 通过；改动两份 Rust 文件的 rustfmt 检查通过，全仓 rustfmt 显示既有文件格式差异，不把它记为全仓通过。本批没有本地 browser/native 启动或 native build。

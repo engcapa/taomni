@@ -329,7 +329,7 @@ fn source_png(data_url: &str) -> anyhow::Result<RgbaImage> {
     Ok(image::load_from_memory_with_format(&bytes, image::ImageFormat::Png)?.to_rgba8())
 }
 
-fn keep_json(value: &Value, name: &str) -> anyhow::Result<String> {
+pub(super) fn keep_json(value: &Value, name: &str) -> anyhow::Result<String> {
     let path = evidence_path(name);
     std::fs::create_dir_all(artifact_dir())?;
     std::fs::write(&path, serde_json::to_vec_pretty(value)?)?;
