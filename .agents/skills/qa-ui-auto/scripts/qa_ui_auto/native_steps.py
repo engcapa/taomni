@@ -1623,8 +1623,10 @@ def _do_shell_navigate(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("shell_navigate: expected sessions or tools")
     area = "sessions" if args == "sessions" else "workspaces"
     target = '[data-testid="session-tree"]' if args == "sessions" else '[data-testid="shell-navigator-page"][data-page="tools"]'
+    rail = f'[data-testid="shell-rail-{area}"]'
+    _wait_for(ctx, rail)
     if not _element_has_layout(ctx, target):
-        ctx.session.click(f'[data-testid="shell-rail-{area}"]')
+        ctx.session.click(rail)
     _wait_for(ctx, target)
     if args == "tools":
         ctx.session.click(target)
@@ -1869,6 +1871,12 @@ def _do_assert_file_receipt(ctx: NativeStepContext, args: Any) -> str:
 @_verb("assert_file_sha256")
 def _do_assert_file_sha256(ctx: NativeStepContext, args: Any) -> str:
     return _assert_file_sha256(ctx, args)
+
+
+@_verb("git_assert_state")
+def _do_git_assert_state(ctx: NativeStepContext, args: Any) -> str:
+    from .git_observation import assert_state
+    return assert_state(ctx, args)
 
 
 @_verb("assert_file_progress")

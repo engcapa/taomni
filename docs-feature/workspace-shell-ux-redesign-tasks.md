@@ -18,14 +18,14 @@
 | TASK-08 Home / 恢复 | verification | 01,03,10 | 三主动作、最近项、组合恢复 |
 | TASK-09 原生窗口 | verification | 04,05,06,07 | Git、detach 事务、回停靠 |
 | TASK-10 持久化与回退 | verification | 01,04,07 | v2 migration、恢复 identity |
-| TASK-11 用例与自动化支持 | verification | 随相关实现 | 已领取；62 用例及受影响回归、catalog/policy |
+| TASK-11 用例与自动化支持 | verification | 随相关实现 | 已领取；61 条 Shell YAML（45 browser / 16 native）及受影响回归、catalog/policy |
 | TASK-12 集成与验收 | verification | 02–11 | 单元测试、三平台 browser/native、结果分析与修复 |
 
 ## 本轮实施进度
 
-TASK-01～10 已领取并集成初版，正在补齐异常路径和保留行为；TASK-11 正在实现可执行 YAML 与 runner 支持。尚无任务满足完整验收，未标记 done。已完成两轮 GitHub 三平台验证并保留失败证据；当前同时补齐 Shell 用例和适配原有 browser/native 回归。
+TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。前三轮 GitHub 的实际失败证据完整保留，第四轮三端 browser 已完成，native 仍在运行；继续按逐 case 结果修复。
 
-最新开发批次已集成稳定主工作面、SFTP 后台/跨窗口任务、Git/Notes 窗口恢复、workspace 并行恢复与取消，以及退出/数据库事务边界。当前有 44 browser + 13 native Shell YAML；135 个既有 YAML 已适配，连同额外保留边界共选择 198 个独立 ID（三端 browser 各 156，native Linux 50 / Windows 44 / macOS 43）。数量以最终 selection 为准。用户要求本地尽量只做 unit test，因此本批次不启动本地 browser/native；下一轮统一推送到 GitHub 验证。
+最新开发批次已集成稳定主工作面、SFTP 后台/跨窗口任务、Git/Notes 窗口恢复、workspace 并行恢复与取消，以及退出/数据库事务边界。第四轮 selection 为 240 个独立 ID（三端 browser 各 183，native Linux 65 / Windows 59 / macOS 58），包括全部截图回归和 AI streaming/history；补充的 Git N21 待下一轮一并提交，届时为 241 ID。数量以具体运行的 selection 为准。按用户要求，本地仅运行单元测试和静态检查，browser/native 与原生构建交给 GitHub。
 
 新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。这些缺口未记为 pass 或 done。
 
@@ -97,3 +97,13 @@ TASK-01～10 已领取并集成初版，正在补齐异常路径和保留行为�
 - `shell-static-final-112` audit gate 通过：required 967、covered_required 922、shallow 41、orphans 4；baseline 未调整。`shell-dev-contract-114` exit 0，正常 Git `diff --check` 无错误。以上均为静态或单元测试证据。
 - `shell-ci-plan-108` 精确选择 240 个独立 ID，无 capability gaps：browser 三端各 183（45 Shell、27 Screenshot、111 其他保留），native Linux 65 / Windows 59 / macOS 58（分别含 15 / 14 / 14 Shell，三端各 13 Screenshot）。共 731 次平台/模式执行，尚未记为 runtime pass。
 - 本轮继续要求最终 SHA 的 selection、逐 case 结果、receipt、source identity 与 artifact hash 全部相符；TASK-01～12 保持 verification，未补齐的 OS/IME/读屏及匹配性能证据仍显式保留。
+
+- 第四轮远程验证已启动：[run 37186026272](https://github.com/engcapa/taomni/actions/runs/37186026272)，输入 `986c2016d5361f22e609fc4601193956ef6d7bfa`。已下载 selection，身份和 6 个 entry 数量与上述计划一致；运行中，尚未作通过结论。
+- 等待远程构建期间补充 N21 原生 Git 操作：stage/unstage、Commit Cancel、选定文件提交到新分支、真实 Log 与 Discard Cancel/Confirm。独立 Git oracle 只读本例仓库，禁用 optional locks，记录 exact branch/HEAD/status/blob；不以 UI 成功提示代替磁盘结果。`shell-git-unit-119` 21/21 通过；最终 `shell-git-product-final-123` Git Panel / Workspace Git 回归 33/33 通过，`shell-git-types-124` exit 0；N21 schema/reviewed contract 与三端 native CI plan 通过。该补充尚未包含在第四轮已冻结的输入中，下一轮选择增加到 241 ID。
+
+### 第四轮 browser 结果与候选修复
+
+- 已核对 3/3 browser 报告的 selection、源码身份、receipt 和 ZIP 内的 artifact hashes；全部匹配，无 hash errors。Linux / macOS 各 175 pass / 8 fail，Windows 176 / 7，三端各 183 条且无 skip。native 报告尚未返回，不能据此完成桌面验收。
+- 修复同一保存会话的重复标签继承原标签 pin/lane 偏好；保存连接的首个 live owner 持有恢复偏好，新副本保持独立，原 owner 关闭后剩余实例接管。修复活动工作区模型晚绑定时漏记 last-active restore identity。
+- `shell_navigate` 先等实际 Rail 挂载再读取可见性，避免 React 初始挂载期间把默认展开的 Navigator 关闭。B37 保留 anchored/exactly-once output，用目标标题前缀兼容 cwd 自动后缀；B43 使用生产规范 folder path。旧 Settings 用例先改为 35 并核对保存，再改回 20；B04 显式清除 legacy session candidate，仅恢复其明确打开的工作区。
+- 本地 `shell-browser-repairs-unit-130` 120/120、`shell-browser-runner-repairs-131` 27/27 通过；TypeScript `shell-browser-final-types-132` exit 0；静态 `shell-browser-final-static-133` gate 通过（required 970 / covered_required 925 / shallow 41 / orphans 4），baseline 未改。61 条 Shell YAML 及上述 Settings case 的 schema/reviewed contract 均通过。下一候选先远程验证这 8 个失败 ID，再合入 native 实际结果的修复批次。

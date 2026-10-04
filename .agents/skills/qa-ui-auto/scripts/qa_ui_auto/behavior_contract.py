@@ -53,7 +53,7 @@ def is_check(step: dict) -> bool:
         return args.get("action") == "capture" and bool(args.get("expect_pattern"))
     if verb == "host_clipboard":
         return args.get("action") in {"assert", "quiet"}
-    if verb in {"mysql_assert_rows", "native_app_process"}:
+    if verb in {"mysql_assert_rows", "git_assert_state", "native_app_process"}:
         return True
     return False
 

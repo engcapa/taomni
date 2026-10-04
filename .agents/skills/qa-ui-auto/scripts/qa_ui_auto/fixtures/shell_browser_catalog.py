@@ -52,7 +52,7 @@ def setup(ctx):
         recents = []
     seed = {"taomni.qa.shell.enabled": "true", "taomni.codeWorkspace.toolWindowStripes.v1": '{"showNames":false,"leftWidth":59,"rightWidth":59}', "taomni.sessions.v1": json.dumps(sessions, ensure_ascii=False),
             "taomni.recentWorkspaces.v1": json.dumps(recents, ensure_ascii=False), "taomni.welcomeRecentSessionLimit": "100"}
-    if case == "TC-SHELL-B42":
+    if case in {"TC-SHELL-B04", "TC-SHELL-B42"}:
         # This scenario restores only its two workspace descriptors. Saved
         # sessions remain available for the later explicit orphan-owner choice.
         seed["taomni.welcome.sessionResumeCleared.v1"] = "true"

@@ -1,7 +1,8 @@
 id: TC-SHELL-B43
 title: Navigator retains sessions, JSON import/export, Quick Connect and utility menu routes
 description: Workspace Shell renderer and retained workflow evidence. See docs-feature/workspace-shell-ux-redesign-test-cases.md;
-  native effects require the paired native cases.
+  native effects require the paired native cases. Folder selectors use the production canonical display path
+  with spaced separators; import inputs retain their portable raw paths.
 covers:
 - F1.9
 - F8.1
@@ -110,8 +111,8 @@ steps:
 - click: '[data-testid="folder-name-dialog-confirm"]'
 - wait_for: '[data-testid="session-tree-folder"][data-folder-path="SHELL group"]'
 - click: '[data-testid="session-tree-folder"][data-folder-path="Shell"]'
-- wait_for: '[data-testid="session-tree-folder"][data-folder-path="Shell/甲"]'
-- click: '[data-testid="session-tree-folder"][data-folder-path="Shell/甲"]'
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="Shell / 甲"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="Shell / 甲"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-id="shell-a"]'
 - right_click: '[data-testid="session-tree-item"][data-session-id="shell-a"]'
 - hover: '[data-testid="context-menu"] >> text="Move to folder"'
@@ -183,9 +184,9 @@ steps:
     contains: 1 of 2
 - click: '[data-testid="session-import-preview-confirm"]'
 - assert_not_visible: '[data-testid="session-import-preview"]'
-- wait_for: '[data-testid="session-tree-folder"][data-folder-path="Shell/导入"]'
-- click: '[data-testid="session-tree-folder"][data-folder-path="Shell/导入"]'
-- click: '[data-testid="session-tree-folder"][data-folder-path="Shell/乙"]'
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="Shell / 导入"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="Shell / 导入"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="Shell / 乙"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-id="shell-b"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="SHELL imported"]'
 - click: '[data-testid="app-main-menu"]'
@@ -241,8 +242,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: servers remains accessible from Navigator Tools and the application Tools menu; repeated
-      entry preserves its existing view.
+    requirement: servers remains accessible from Navigator Tools and the application Tools menu; repeated entry
+      preserves its existing view.
     actions:
     - 4
     - 5
@@ -322,8 +323,8 @@ verification:
     - 35
     - 36
   - id: R4
-    requirement: mfa remains accessible from Navigator Tools and the application Tools menu; repeated
-      entry preserves its existing view.
+    requirement: mfa remains accessible from Navigator Tools and the application Tools menu; repeated entry
+      preserves its existing view.
     actions:
     - 37
     - 38
@@ -336,8 +337,8 @@ verification:
     - step: 45
       expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
     - step: 46
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]",
-        "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "equal":
+        1}}'
     - step: 47
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
@@ -393,7 +394,7 @@ verification:
     - step: 59
       expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"SHELL group\"]"}'
     - step: 61
-      expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"Shell/甲\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"Shell / 甲\"]"}'
     - step: 63
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-id=\"shell-a\"]"}'
     - step: 68
@@ -428,8 +429,8 @@ verification:
     - 82
     - 83
   - id: R7
-    requirement: The actual menu file chooser and import preview cancel safely, import only the selected
-      row, and export seven portable sessions with excluded secrets.
+    requirement: The actual menu file chooser and import preview cancel safely, import only the selected row,
+      and export seven portable sessions with excluded secrets.
     actions:
     - 84
     - 85
@@ -456,36 +457,35 @@ verification:
     - step: 89
       expectation: '{"wait_for": "[data-testid=\"session-import-preview\"]"}'
     - step: 90
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody
-        tr", "equal": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody tr",
+        "equal": 2}}'
     - step: 93
       expectation: '{"assert_text": {"selector": "[data-testid=\"session-import-preview-summary\"]", "contains":
         "1 of 2"}}'
     - step: 95
       expectation: '{"assert_not_visible": "[data-testid=\"session-import-preview\"]"}'
     - step: 96
-      expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL
-        imported\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL imported\"]"}'
     - step: 101
       expectation: '{"wait_for": "[data-testid=\"session-import-preview\"]"}'
     - step: 102
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody
-        tr", "equal": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody tr",
+        "equal": 2}}'
     - step: 105
       expectation: '{"assert_text": {"selector": "[data-testid=\"session-import-preview-summary\"]", "contains":
         "1 of 2"}}'
     - step: 107
       expectation: '{"assert_not_visible": "[data-testid=\"session-import-preview\"]"}'
     - step: 108
-      expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"Shell/导入\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"Shell / 导入\"]"}'
     - step: 111
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-id=\"shell-b\"]"}'
     - step: 112
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL imported\"]"}'
     - step: 117
       expectation: '{"assert_json_file": {"path": "${fixture.shell_export}", "expect": {"format": "taomni.sessions",
-        "schema_version": 1, "security.secrets": "excluded", "sessions": {"length_min": 7, "contains":
-        "SHELL imported", "excludes": "password"}, "sessions.7": {"exists": false}}}}'
+        "schema_version": 1, "security.secrets": "excluded", "sessions": {"length_min": 7, "contains": "SHELL
+        imported", "excludes": "password"}, "sessions.7": {"exists": false}}}}'
     - step: 118
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-tree-item\"]", "equal": 7}}'
     results:
@@ -504,8 +504,8 @@ verification:
     - 117
     - 118
   - id: R8
-    requirement: View Quick Connect rejects an empty SSH URL, authenticates the valid URL through the
-      real opener and executes exactly one anchored output marker in Connect.
+    requirement: View Quick Connect rejects an empty SSH URL, authenticates the valid URL through the real
+      opener and executes exactly one anchored output marker in Connect.
     actions:
     - 119
     - 120

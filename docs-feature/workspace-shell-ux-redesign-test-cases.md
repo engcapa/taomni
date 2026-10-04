@@ -6,7 +6,7 @@
 >
 > 规范：[qa-ui-auto authoring](../.agents/skills/qa-ui-auto/references/authoring.md#design-to-implementation-handoff)、[verb catalog](../.agents/skills/qa-ui-auto/references/verb-catalog.md)、[native testing](../.agents/skills/qa-ui-auto/references/native-testing.md)。
 >
-> 44 条 browser + 18 条 native，稳定 ID 为 `TC-SHELL-B01…B44` / `TC-SHELL-N01…N18`。当前已登记 44 browser + 13 native Shell YAML；N01/N13/N14 的自动化部分复用既有用例，N11 与 N17 的必要边界仍单列。数量与 schema/contract 通过不代表完整规格已验收，实际范围以 YAML requirements 和当前平台报告为准。
+> 初稿为 44 条 browser + 18 条 native，稳定 ID 为 `TC-SHELL-B01…B44` / `TC-SHELL-N01…N18`；保留范围现补充 B45、N19～N21。当前已登记 45 browser + 16 native Shell YAML；N01/N13/N14 的自动化部分复用既有用例，N11 与 N17 的必要边界仍单列。数量与 schema/contract 通过不代表完整规格已验收，实际范围以 YAML requirements 和当前平台报告为准。
 
 导航：[browser 用例](#browser-cases) · [native 用例](#native-cases) · [运行与交接](#execution-handoff)。单条用例有稳定 `#v-b01` / `#v-n01` 形式的锚点，YAML checklist 可直接引用。
 
@@ -1247,5 +1247,6 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 | B45 / N19（AI 强制保留范围） | [browser stream/history](../qa-ui-auto-tests/cases/TC-SHELL-B45-ai-stream-history.testcase.yaml)、[native stream/history](../qa-ui-auto-tests/cases/TC-SHELL-N19-ai-stream-history-native.testcase.yaml) | Home 无绑定会话发起对话；两次发送、隐藏完成通知、精确 thread 跳转、未发送多行草稿、历史重载。N19 另有真实 OpenAI loopback 协议/Rust stream/SQLite、503 后恢复和真实 QA 进程重启；独立 provider receipt 证明重载没有重新发送。browser 的 stream 是明示 IPC preview。待 GitHub 三端实测 |
 | N20（LAN 轻量范围） | [native LAN entry](../qa-ui-auto-tests/cases/TC-SHELL-N20-lan-entry-native.testcase.yaml)、B38 的 browser 草稿保留分支 | 原生 read-only history、拒绝开启、Home/quick-switch 回同一 owner；不声称真实 peer/multicast 收发。待 GitHub 三端实测 |
 | 截图强制保留范围 | `TC-SHOT-001…027` 与 `TC-SHOT-N1…N13` | 全部加入当前远程选择；native 使用实际捕获、OCR、clipboard、置顶、快捷键、scroll/recording 场景，依各 YAML 和 platform contract 验收。browser stub 与 native 结果分别记录；新远程输入尚未执行 |
+| 原生 Git 保留操作 | [N21](../qa-ui-auto-tests/cases/TC-SHELL-N21-git-actions-native.testcase.yaml) | 实际 stage/unstage、取消提交、选定文件提交到新分支、Log 文件集、discard 取消/确认。通过独立只读 Git 进程核对全部 porcelain 状态与 HEAD/index blob；三端同一用例，待远程运行。N05 的窗口与草稿验收继续保留 |
 
 用户已授权实现、单测、推送及 GitHub browser/native 验证；当前任务状态与结果持续更新在 [实施任务](./workspace-shell-ux-redesign-tasks.md)。本稿的设计步骤保持完整，自动化数量、静态检查和单测通过均不代表全部三端桌面及人工边界已验收。

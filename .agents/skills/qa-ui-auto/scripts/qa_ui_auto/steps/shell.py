@@ -26,8 +26,12 @@ def navigate(ctx, args):
         return
     area = "sessions" if args == "sessions" else "workspaces"
     target = '[data-testid="session-tree"]' if args == "sessions" else '[data-testid="shell-navigator-page"][data-page="tools"]'
+    rail = ctx.page.locator(f'[data-testid="shell-rail-{area}"]')
+    # Navigation can start before React mounts. Wait for the real control before
+    # observing the page, otherwise a default-open navigator is toggled closed.
+    rail.wait_for(state="visible")
     if not ctx.page.locator(target).first.is_visible():
-        ctx.page.locator(f'[data-testid="shell-rail-{area}"]').click()
+        rail.click()
     ctx.page.locator(target).first.wait_for(state="visible")
     if args == "tools":
         ctx.page.locator(target).click()

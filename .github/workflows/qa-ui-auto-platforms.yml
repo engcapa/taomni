@@ -162,7 +162,7 @@ jobs:
         if: contains(matrix.capabilities, 'sftp-fixture')
         run: python -m unittest test_shell_sftp_service test_file_progress test_shell_windows
       - name: Shell navigation and external boundary contracts
-        run: python -m unittest test_shell_navigation test_shell_external_boundaries
+        run: python -m unittest test_shell_navigation test_shell_external_boundaries test_git_observation
       - name: Updater unit contracts
         if: contains(matrix.capabilities, 'updater')
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx

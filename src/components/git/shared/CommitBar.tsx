@@ -79,6 +79,7 @@ export function CommitBar({
           <div className="flex-1" />
         )}
         <button
+          data-testid="git-commit-submit"
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1"
           type="button"
           disabled={!canCommit}

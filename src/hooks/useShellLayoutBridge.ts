@@ -33,7 +33,7 @@ export function useShellLayoutBridge() {
       if (state.tabs !== previous.tabs || state.codeWorkspaceByTab !== previous.codeWorkspaceByTab) state.tabs.forEach((tab, order) => {
         if (tab.codeWorkspace && state.codeWorkspaceByTab[tab.id]) {
           const workspace = safeWorkspace(tab.codeWorkspace), workspaceInstanceId = tab.codeWorkspace.workspaceInstanceId;
-          if (workspace && workspaceInstanceId) useShellLayoutStore.getState().bindRestoreSource(tab.id, { kind: "workspace", workspaceInstanceId, workspace }, order);
+          if (workspace && workspaceInstanceId) useShellLayoutStore.getState().bindRestoreSource(tab.id, { kind: "workspace", workspaceInstanceId, workspace }, order, state.activeTabId === tab.id);
         }
       });
       sync();

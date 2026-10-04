@@ -6,7 +6,8 @@ describe("Shell layout ownership and temporary navigation", () => {
   beforeEach(() => {
     localStorage.clear();
     useShellLayoutStore.setState({ layout: defaultShellLayout(), initialized: false, writable: true, warning: null,
-      navigatorOverlay: false, overlayTarget: null, taoOpen: false, overlay: null, panels: {}, activePanelByEdge: {} });
+      navigatorOverlay: false, overlayTarget: null, taoOpen: false, overlay: null, panels: {}, activePanelByEdge: {},
+      restoreRefByTab: {}, pinnedTabs: {}, laneOverrides: {}, mru: [], mruCycling: false });
     useShellLayoutStore.getState().initialize();
   });
   it("opens a temporarily hidden navigator and preserves the expanded preference on dismissal", () => {
@@ -28,6 +29,31 @@ describe("Shell layout ownership and temporary navigation", () => {
     expect(useShellLayoutStore.getState().writable).toBe(false);
     useShellLayoutStore.getState().resetLayout();
     expect(JSON.parse(localStorage.getItem(SHELL_LAYOUT_KEY)!)).toMatchObject({ version: 2 });
+  });
+  it("keeps duplicate saved-session tabs independent from the original pin and lane preference", () => {
+    const shell = useShellLayoutStore.getState(), source = { kind: "run-entry" as const, identity: "saved:alpha" };
+    shell.bindRestoreSource("original", source, 1);
+    shell.pinTab("original", true);
+    shell.moveTab("original", "utility");
+    shell.bindRestoreSource("copy", source, 2);
+    expect(useShellLayoutStore.getState().pinnedTabs.copy).toBeUndefined();
+    expect(useShellLayoutStore.getState().laneOverrides.copy).toBeUndefined();
+    shell.pinTab("copy", false);
+    shell.moveTab("copy", "build");
+    expect(useShellLayoutStore.getState().layout.restoredTabs["run-entry:saved:alpha"]).toEqual({ pinned: true, laneOverride: "utility", order: 1 });
+    expect(useShellLayoutStore.getState().pinnedTabs.original).toBe(true);
+    expect(useShellLayoutStore.getState().laneOverrides.original).toBe("utility");
+    shell.pruneTabs(["copy"]);
+    shell.bindRestoreSource("copy", source, 1);
+    expect(useShellLayoutStore.getState().layout.restoredTabs["run-entry:saved:alpha"]).toEqual({ pinned: false, laneOverride: "build", order: 1 });
+  });
+  it("records last-active identity when the active workspace model binds after activation", () => {
+    const shell = useShellLayoutStore.getState();
+    shell.visitTab("workspace-tab");
+    shell.bindRestoreSource("workspace-tab", { kind: "workspace", workspaceInstanceId: "w1", workspace: { repoRoot: "/repo" } }, 1, true);
+    shell.bindRestoreSource("background", { kind: "run-entry", identity: "saved:alpha" }, 2, false);
+    shell.flush();
+    expect(JSON.parse(localStorage.getItem(SHELL_LAYOUT_KEY)!).lastActiveRestoreRef).toBe("workspace:w1");
   });
   it("restores a separate panel width for each owner without persisting a transient clamp", () => {
     const shell = useShellLayoutStore.getState();

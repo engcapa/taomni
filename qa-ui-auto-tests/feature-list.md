@@ -9936,6 +9936,15 @@ controls:
   - id: workspace-git-manager
     selector: '[data-testid="workspace-git-manager"]'
     kind: display
+  - id: git-commit-submit
+    selector: '[data-testid="git-commit-submit"]'
+    kind: interactive
+  - id: git-changes-tab
+    selector: '[data-testid="git-changes-tab"]'
+    kind: interactive
+  - id: git-commit-target-branch
+    selector: '[aria-label="Commit target branch"]'
+    kind: interactive
   - id: workspace-change-row
     selector: '[data-testid="workspace-change-row"]'
     kind: interactive

@@ -3009,7 +3009,7 @@ export function MainLayout() {
       if (entry && !welcomeRestoreInstanceRef.current.isIdentitySuppressed(entry.identity)) {
         entries.push(entry);
         identityByTab.set(tab.id, entry.identity);
-        useShellLayoutStore.getState().bindRestoreSource(tab.id, { kind: "run-entry", identity: entry.identity }, tabs.indexOf(tab));
+        useShellLayoutStore.getState().bindRestoreSource(tab.id, { kind: "run-entry", identity: entry.identity }, tabs.indexOf(tab), activeTabId === tab.id);
       }
     }
     const activeIdentity = identityByTab.get(activeTabId ?? "") ?? null;

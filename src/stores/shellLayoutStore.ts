@@ -24,7 +24,7 @@ interface ShellState {
   panels: Record<string, PanelInstance>;
   activePanelByEdge: Partial<Record<"right" | "bottom", string>>;
   restoreRefByTab: Record<string, string>;
-  bindRestoreSource(tabId: string, source: ShellRestoreSource, order: number): void;
+  bindRestoreSource(tabId: string, source: ShellRestoreSource, order: number, active?: boolean): void;
   initialize(): void;
   updateLayout(update: (layout: PersistedShellLayoutV2) => PersistedShellLayoutV2): void;
   resetLayout(): void;
@@ -49,19 +49,30 @@ interface ShellState {
 }
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let lastStoredLayout: string | null = null;
+function ownsRestorePreference(refs: Record<string, string>, tabId: string, ref: string): boolean {
+  return Object.entries(refs).find(([, value]) => value === ref)?.[0] === tabId;
+}
 export const useShellLayoutStore = create<ShellState>((set, get) => ({
   layout: defaultShellLayout(), initialized: false, writable: true, exiting: false, warning: null,
   laneSelection: null, laneOverrides: {}, pinnedTabs: {}, mru: [], overlay: null,
   mruCycling: false, overlayTarget: null, navigatorOverlay: false, navigatorPage: "recent", taoOpen: false, transfersOpen: false, transferTarget: null, panels: {}, activePanelByEdge: {}, restoreRefByTab: {},
-  bindRestoreSource: (tabId, source, order) => {
+  bindRestoreSource: (tabId, source, order, active = false) => {
     if (get().exiting) return;
     const ref = source.kind === "workspace" ? `workspace:${source.workspaceInstanceId}` : `${source.kind === "run-entry" ? "run-entry" : "unsupported"}:${source.identity}`;
     const s = get(), first = !s.restoreRefByTab[tabId], pref = s.layout.restoredTabs[ref];
+    // A saved connection has one legacy resume entry, but may have several live
+    // tabs. Its first live owner restores the preference; new duplicates keep
+    // independent pin/lane state and must not overwrite that owner's preference.
+    const existingOwner = Object.values(s.restoreRefByTab).includes(ref);
     if (first) set({ restoreRefByTab: { ...s.restoreRefByTab, [tabId]: ref },
-      ...(pref ? { pinnedTabs: { ...s.pinnedTabs, [tabId]: pref.pinned }, laneOverrides: { ...s.laneOverrides, ...(pref.laneOverride ? { [tabId]: pref.laneOverride } : {}) } } : {}) });
+      ...(pref && !existingOwner ? { pinnedTabs: { ...s.pinnedTabs, [tabId]: pref.pinned }, laneOverrides: { ...s.laneOverrides, ...(pref.laneOverride ? { [tabId]: pref.laneOverride } : {}) } } : {}) });
     const current = get(), tabs = { pinned: !!current.pinnedTabs[tabId], order, ...(current.laneOverrides[tabId] ? { laneOverride: current.laneOverrides[tabId] } : {}) };
-    if (JSON.stringify(current.layout.restoreSources[ref]) === JSON.stringify(source) && JSON.stringify(current.layout.restoredTabs[ref]) === JSON.stringify(tabs)) return;
-    current.updateLayout((layout) => ({ ...layout, restoreSources: { ...layout.restoreSources, [ref]: source }, restoredTabs: { ...layout.restoredTabs, [ref]: tabs } }));
+    if (ownsRestorePreference(current.restoreRefByTab, tabId, ref)
+      && (JSON.stringify(current.layout.restoreSources[ref]) !== JSON.stringify(source) || JSON.stringify(current.layout.restoredTabs[ref]) !== JSON.stringify(tabs))) {
+      current.updateLayout((layout) => ({ ...layout, restoreSources: { ...layout.restoreSources, [ref]: source }, restoredTabs: { ...layout.restoredTabs, [ref]: tabs } }));
+    }
+    // The view model can bind after addTab has already activated the tab.
+    if (active && get().layout.lastActiveRestoreRef !== ref) get().visitTab(tabId);
   },
   initialize: () => {
     if (get().initialized) return;
@@ -104,8 +115,8 @@ export const useShellLayoutStore = create<ShellState>((set, get) => ({
       restoreSources: Object.fromEntries(Object.entries(layout.restoreSources).filter(([ref]) => !removed.includes(ref) || Object.values(get().restoreRefByTab).includes(ref))),
       restoredTabs: Object.fromEntries(Object.entries(layout.restoredTabs).filter(([ref]) => !removed.includes(ref) || Object.values(get().restoreRefByTab).includes(ref))) })); },
   selectLane: (laneSelection) => set({ laneSelection }),
-  moveTab: (id, lane) => { if (id === "welcome") return; set((s) => { const laneOverrides = { ...s.laneOverrides }; if (lane) laneOverrides[id] = lane; else delete laneOverrides[id]; return { laneOverrides }; }); const s = get(), ref = s.restoreRefByTab[id]; if (ref && s.layout.restoreSources[ref]) s.updateLayout((layout) => { const pref = { ...layout.restoredTabs[ref] }; delete pref.laneOverride; return { ...layout, restoredTabs: { ...layout.restoredTabs, [ref]: { ...pref, ...(lane ? { laneOverride: lane } : {}) } } }; }); },
-  pinTab: (id, pinned) => { if (id === "welcome") return; set((s) => ({ pinnedTabs: { ...s.pinnedTabs, [id]: pinned } })); const s = get(), ref = s.restoreRefByTab[id]; if (ref && s.layout.restoreSources[ref]) s.updateLayout((layout) => ({ ...layout, restoredTabs: { ...layout.restoredTabs, [ref]: { ...layout.restoredTabs[ref], pinned } } })); },
+  moveTab: (id, lane) => { if (id === "welcome") return; set((s) => { const laneOverrides = { ...s.laneOverrides }; if (lane) laneOverrides[id] = lane; else delete laneOverrides[id]; return { laneOverrides }; }); const s = get(), ref = s.restoreRefByTab[id]; if (ref && s.layout.restoreSources[ref] && ownsRestorePreference(s.restoreRefByTab, id, ref)) s.updateLayout((layout) => { const pref = { ...layout.restoredTabs[ref] }; delete pref.laneOverride; return { ...layout, restoredTabs: { ...layout.restoredTabs, [ref]: { ...pref, ...(lane ? { laneOverride: lane } : {}) } } }; }); },
+  pinTab: (id, pinned) => { if (id === "welcome") return; set((s) => ({ pinnedTabs: { ...s.pinnedTabs, [id]: pinned } })); const s = get(), ref = s.restoreRefByTab[id]; if (ref && s.layout.restoreSources[ref] && ownsRestorePreference(s.restoreRefByTab, id, ref)) s.updateLayout((layout) => ({ ...layout, restoredTabs: { ...layout.restoredTabs, [ref]: { ...layout.restoredTabs[ref], pinned } } })); },
   setOverlay: (overlay) => set({ overlay, navigatorOverlay: false }),
   setNavigatorPage: (navigatorPage) => set({ navigatorPage }),
   toggleNavigator: (area, lane) => {

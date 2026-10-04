@@ -1,7 +1,9 @@
 id: TC-SHELL-B04
 title: Workset restore preserves successful owners through partial failure, cancel and retry
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b04.
-  Browser IPC fixtures prove renderer outcomes only.'
+  Browser IPC fixtures prove renderer outcomes only. Initial session-resume storage is explicitly cleared by
+  the fixture, so the first working set contains exactly the user-opened workspace rather than a legacy saved-session
+  candidate.'
 covers:
 - F1.6
 - F-SHELL-1
@@ -44,12 +46,11 @@ steps:
     key: taomni.shellLayout.v2
     value: '{"version": 2, "restoreSources": {"workspace:mixed-A": {"kind": "workspace", "workspaceInstanceId":
       "mixed-A", "workspace": {"repoRoot": "/preview/parity008", "workspaceId": "mixed-A", "name": "mixed-A",
-      "roots": [{"id": "mixed-A", "name": "mixed-A", "path": "/preview/parity008", "kind": "folder"}],
-      "looseFiles": []}}, "workspace:mixed-B": {"kind": "workspace", "workspaceInstanceId": "mixed-B",
-      "workspace": {"repoRoot": "/preview/parity008/repo-b", "workspaceId": "mixed-B", "name": "mixed-B",
-      "roots": [{"id": "mixed-B", "name": "mixed-B", "path": "/preview/parity008/repo-b", "kind": "folder"}],
-      "looseFiles": []}}}, "restoredTabs": {"workspace:mixed-A": {"order": 0}, "workspace:mixed-B": {"order":
-      1}}}'
+      "roots": [{"id": "mixed-A", "name": "mixed-A", "path": "/preview/parity008", "kind": "folder"}], "looseFiles":
+      []}}, "workspace:mixed-B": {"kind": "workspace", "workspaceInstanceId": "mixed-B", "workspace": {"repoRoot":
+      "/preview/parity008/repo-b", "workspaceId": "mixed-B", "name": "mixed-B", "roots": [{"id": "mixed-B",
+      "name": "mixed-B", "path": "/preview/parity008/repo-b", "kind": "folder"}], "looseFiles": []}}}, "restoredTabs":
+      {"workspace:mixed-A": {"order": 0}, "workspace:mixed-B": {"order": 1}}}'
 - seed_storage:
     key: taomni.welcome.sessionResumeCleared.v1
     value: 'true'
@@ -149,8 +150,7 @@ verification:
     - 8
     - 9
   - id: R2
-    requirement: Restoring a persisted workspace reaches ready with one primary instance and no renderer
-      failure.
+    requirement: Restoring a persisted workspace reaches ready with one primary instance and no renderer failure.
     actions:
     - 10
     - 12
@@ -159,8 +159,8 @@ verification:
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
     - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name":
-        "data-state", "equals": "succeeded"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state",
+        "equals": "succeeded"}}'
     - step: 14
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 1}}'
     - step: 16
@@ -231,8 +231,8 @@ verification:
     - step: 47
       expectation: '{"wait_for": "[data-testid=\"welcome-restore-status\"][data-state=\"succeeded\"]"}'
     - step: 48
-      expectation: '{"assert_items": {"selector": "[data-testid=\"shell-restore-entry\"]", "attribute":
-        "data-entry-id", "equals": ["workspace:mixed-A", "workspace:mixed-B"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"shell-restore-entry\"]", "attribute": "data-entry-id",
+        "equals": ["workspace:mixed-A", "workspace:mixed-B"]}}'
     - step: 49
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"][data-status=\"ready\"]",
         "equal": 2}}'

@@ -1001,6 +1001,9 @@
 ## git/workspace-changes (F26.2)
 
 - `[data-testid="workspace-git-manager"]` — display — F26.2.workspace-git-manager
+- `[data-testid="git-commit-submit"]` — interactive — F26.2.git-commit-submit
+- `[data-testid="git-changes-tab"]` — interactive — F26.2.git-changes-tab
+- `[aria-label="Commit target branch"]` — interactive — F26.2.git-commit-target-branch
 - `[data-testid="workspace-change-row"]` — interactive — F26.2.workspace-change-row
 - `[data-testid="workspace-flat-repo-header"]` — display — F26.2.workspace-flat-repo-header
 - `[data-testid="workspace-diff-title"]` — display — F26.2.workspace-diff-title

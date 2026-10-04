@@ -149,6 +149,7 @@ def setup(ctx: Any) -> None:
     values["git_diff_repo"] = repo.as_posix()
     values["git_diff_commit_a"] = str(json.loads(manifest.read_text(encoding="utf-8"))["commitA"])
     values["git_diff_commit_b"] = str(json.loads(manifest.read_text(encoding="utf-8"))["commitB"])
+    values["git_diff_branch"] = _run(repo, "branch", "--show-current")
     values["git_diff_manifest"] = manifest.as_posix()
 
 

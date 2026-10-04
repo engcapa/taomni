@@ -924,6 +924,26 @@
           },
           "description": "Native-only: independently hashes host file bytes and compares the digest with an exact expected SHA-256."
         },
+        "git_assert_state": {
+          "type": "object",
+          "required": ["repo"],
+          "additionalProperties": false,
+          "anyOf": [
+            {"required": ["branch"]}, {"required": ["head"]}, {"required": ["head_subject"]},
+            {"required": ["status"]}, {"required": ["head_files"]}, {"required": ["index_files"]}
+          ],
+          "properties": {
+            "repo": {"type": "string", "minLength": 1},
+            "branch": {"type": "string", "minLength": 1},
+            "head": {"type": "string", "minLength": 1},
+            "head_subject": {"type": "string"},
+            "status": {"type": "object", "additionalProperties": {"type": "string", "minLength": 2, "maxLength": 2}},
+            "head_files": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "null"]}},
+            "index_files": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "null"]}},
+            "timeout_sec": {"type": "number", "minimum": 1, "maximum": 120}
+          },
+          "description": "Native-only: an independent read-only Git process checks exact status, branch, HEAD and selected committed/index blobs in a report-owned fixture repository."
+        },
         "seed_storage": {
           "type": "object",
           "required": [

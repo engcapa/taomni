@@ -57,6 +57,17 @@ class ShellNavigationTest(TestCase):
         ctx.page.locator.return_value.click.assert_not_called()
         ctx.page.locator.return_value.first.wait_for.assert_called_once_with(state="visible")
 
+    def test_browser_observes_visibility_only_after_the_rail_has_mounted(self):
+        ctx = Mock(dry_run=False)
+        rail, target = Mock(), Mock()
+        mounted = []
+        rail.wait_for.side_effect = lambda **kwargs: mounted.append(True)
+        target.first.is_visible.side_effect = lambda: bool(mounted)
+        ctx.page.locator.side_effect = lambda selector: rail if selector == '[data-testid="shell-rail-sessions"]' else target
+        navigate(ctx, "sessions")
+        rail.wait_for.assert_called_once_with(state="visible")
+        rail.click.assert_not_called()
+
     def test_browser_opens_tools_by_rail_and_page_clicks(self):
         ctx = Mock(dry_run=False)
         ctx.page.locator.return_value.first.is_visible.return_value = False
