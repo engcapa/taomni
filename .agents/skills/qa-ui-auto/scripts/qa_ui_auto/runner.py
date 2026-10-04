@@ -117,11 +117,11 @@ def _run_browser_case_inner(payload: dict) -> dict:
     case_dict = payload["case"]
     cfg = payload["cfg"]
     env = payload["env"]
-    report_root = Path(payload["report_root"])
+    report_root = Path(payload["report_root"]).resolve()
     worker_id = payload["worker_id"]
     dry_run = bool(payload.get("dry_run", False))
 
-    case_dir = report_root / case_dict["id"]
+    case_dir = (report_root / case_dict["id"]).resolve()
     case_dir.mkdir(parents=True, exist_ok=True)
 
     result: dict[str, Any] = {
@@ -401,9 +401,10 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
             })
         return results
 
+    report_root = report_root.resolve()
     with NativeHarness(cfg, report_root) as harness:
         for c in cases:
-            case_dir = report_root / c.id
+            case_dir = (report_root / c.id).resolve()
             case_dir.mkdir(parents=True, exist_ok=True)
             started = time.time()
             r: dict[str, Any] = {

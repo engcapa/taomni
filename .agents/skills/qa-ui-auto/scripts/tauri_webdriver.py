@@ -390,10 +390,10 @@ class TauriDriverProcess:
         if platform.system() == "Windows" and self.proc.poll() is None:
             result = subprocess.run(
                 ["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
-                capture_output=True, text=True, timeout=20,
+                capture_output=True, timeout=20,
             )
             if result.returncode and self.proc.poll() is None:
-                raise WebDriverError(f"Could not stop owned native driver tree: {result.stderr}")
+                raise WebDriverError(f"Could not stop owned native driver tree: {result.stderr.decode(errors='replace')}")
             self.proc.wait(timeout=5)
             self.proc = None
             return

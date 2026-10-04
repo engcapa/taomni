@@ -1,10 +1,10 @@
 id: TC-SHELL-N21
-title: Native Git Host stages, cancels, commits a checked file to a new branch and discards only confirmed
-  changes
-description: Shell retained Git workflow across Windows/Linux/macOS. Uses the real QA app, a disposable Git
-  repository and independent read-only Git processes. No external remote or user repository is modified. The
-  CLI oracle preserves the index and records its observed branch, HEAD, status and blobs for every decisive
-  result.
+title: Native Git Host stages, cancels, commits a checked file to a new branch and discards only confirmed changes
+description: Shell retained Git workflow across Windows/Linux/macOS. Uses the real QA app, a disposable Git repository
+  and independent read-only Git processes. No external remote or user repository is modified. The CLI oracle preserves
+  the index and records its observed branch, HEAD, status and blobs for every decisive result. Uses the actual multi-repository
+  Workspace Git UI with an independent clean companion. Every Git oracle also proves the companion retains its original
+  branch/HEAD and zero changes, including after commit/discard and cancellation.
 covers:
 - F25.5
 - F26.2
@@ -26,12 +26,14 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
     key: taomni.recentWorkspaces.v1
-    value: '[{"id": "shell-git-actions", "name": "Shell Git actions", "roots": [{"id": "git-actions", "name":
-      "git-actions", "path": "${fixture.git_diff_repo}", "kind": "folder"}], "looseFiles": [], "lastOpenedAt":
-      3000, "isGitRepo": true, "lastActiveFile": {"kind": "root", "rootId": "git-actions", "path": "short.txt"}}]'
+    value: '[{"id": "shell-git-actions", "name": "Shell Git actions", "roots": [{"id": "git-actions", "name": "git-actions",
+      "path": "${fixture.git_diff_repo}", "kind": "folder"}, {"id": "git-companion", "name": "unchanged", "path":
+      "${fixture.git_diff_aux_repo}", "kind": "git"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo": true,
+      "lastActiveFile": {"kind": "root", "rootId": "git-actions", "path": "short.txt"}}]'
 - seed_storage:
     key: taomni.git.workspace.changes.tree
-    value: '"flat"'
+    value: flat
+    raw: true
 - reload_window: null
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"]'
@@ -70,6 +72,15 @@ steps:
         short-staged
 
         '
+    branches:
+    - ${fixture.git_diff_branch}
+- git_assert_state:
+    repo: ${fixture.git_diff_aux_repo}
+    branch: main
+    head: ${fixture.git_diff_aux_head}
+    status: {}
+    branches:
+    - main
 - click: '[data-testid="workspace-change-row"][data-path="short.txt"]'
 - click: '[data-testid="git-diff-unstage"]'
 - git_assert_state:
@@ -86,6 +97,15 @@ steps:
         short-003
 
         '
+    branches:
+    - ${fixture.git_diff_branch}
+- git_assert_state:
+    repo: ${fixture.git_diff_aux_repo}
+    branch: main
+    head: ${fixture.git_diff_aux_head}
+    status: {}
+    branches:
+    - main
 - wait_for: '[data-testid="workspace-change-row"][data-path="short.txt"][aria-label$=" Modified"]'
 - click: '[data-testid="git-diff-stage"]'
 - git_assert_state:
@@ -99,6 +119,15 @@ steps:
         short-staged
 
         '
+    branches:
+    - ${fixture.git_diff_branch}
+- git_assert_state:
+    repo: ${fixture.git_diff_aux_repo}
+    branch: main
+    head: ${fixture.git_diff_aux_head}
+    status: {}
+    branches:
+    - main
 - wait_for: '[data-testid="workspace-change-row"][data-path="short.txt"][aria-label$=" Staged"]'
 - set_check:
     selector: '[data-testid="workspace-change-row"][data-path="long-lines.txt"] input[type="checkbox"]'
@@ -137,6 +166,15 @@ steps:
         short-staged
 
         '
+    branches:
+    - ${fixture.git_diff_branch}
+- git_assert_state:
+    repo: ${fixture.git_diff_aux_repo}
+    branch: main
+    head: ${fixture.git_diff_aux_head}
+    status: {}
+    branches:
+    - main
 - assert_value:
     selector: textarea[placeholder="Commit message"]
     equals: 'SHELL Git commit 中文
@@ -169,6 +207,16 @@ steps:
 
         '
     timeout_sec: 30
+    branches:
+    - ${fixture.git_diff_branch}
+    - shell-qa
+- git_assert_state:
+    repo: ${fixture.git_diff_aux_repo}
+    branch: main
+    head: ${fixture.git_diff_aux_head}
+    status: {}
+    branches:
+    - main
 - assert_value:
     selector: textarea[placeholder="Commit message"]
     equals: ''
@@ -197,6 +245,16 @@ steps:
     repo: ${fixture.git_diff_repo}
     branch: shell-qa
     status: *id002
+    branches:
+    - ${fixture.git_diff_branch}
+    - shell-qa
+- git_assert_state:
+    repo: ${fixture.git_diff_aux_repo}
+    branch: main
+    head: ${fixture.git_diff_aux_head}
+    status: {}
+    branches:
+    - main
 - click: '[data-testid="git-diff-discard"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
 - git_assert_state:
@@ -206,6 +264,16 @@ steps:
     status:
       git-diff-fixture-manifest.json: ??
     timeout_sec: 30
+    branches:
+    - ${fixture.git_diff_branch}
+    - shell-qa
+- git_assert_state:
+    repo: ${fixture.git_diff_aux_repo}
+    branch: main
+    head: ${fixture.git_diff_aux_head}
+    status: {}
+    branches:
+    - main
 - wait_for:
     selector: '[data-testid="workspace-change-row"][data-path="long-lines.txt"]'
     state: detached
@@ -214,8 +282,8 @@ verification:
   review: reviewed
   requirements:
   - id: GIT-R1
-    requirement: Opening the repository through Home and the workspace Git action presents the bottom Host
-      and reads the real initial branch, HEAD, index and worktree without changing them.
+    requirement: Opening the repository through Home and the workspace Git action presents the bottom Host and reads
+      the real initial branch, HEAD, index and worktree without changing them.
     actions:
     - 1
     - 2
@@ -233,143 +301,173 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-change-row\"][data-path=\"short.txt\"]",
         "timeout_sec": 60}}'
     - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"]", "name": "data-edge",
-        "equals": "bottom"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"]", "name": "data-edge", "equals":
+        "bottom"}}'
     - step: 13
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "${fixture.git_diff_branch}",
         "head": "${fixture.git_diff_commit_b}", "status": {"long-lines.txt": " M", "short.txt": "M ", "git-diff-fixture-manifest.json":
-        "??"}, "head_files": {"short.txt": "short-001\nshort-002\nshort-003\n"}, "index_files": {"short.txt":
-        "short-001\nshort-002\nshort-staged\n"}}}'
+        "??"}, "head_files": {"short.txt": "short-001\nshort-002\nshort-003\n"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"},
+        "branches": ["${fixture.git_diff_branch}"]}}'
+    - step: 14
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branch": "main", "head": "${fixture.git_diff_aux_head}",
+        "status": {}, "branches": ["main"]}}'
     results:
     - 9
     - 11
     - 12
     - 13
+    - 14
   - id: GIT-R2
     requirement: Unstage restores the tracked index blob; Stage adds the exact worktree blob again. Independent
       porcelain and UI labels agree after each operation.
     actions:
-    - 14
     - 15
-    - 18
+    - 16
+    - 20
     checkpoints:
-    - step: 16
-      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt":
-        " M", "short.txt": " M", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-003\n"}}}'
     - step: 17
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt": " M",
+        "short.txt": " M", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-003\n"},
+        "branches": ["${fixture.git_diff_branch}"]}}'
+    - step: 18
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branch": "main", "head": "${fixture.git_diff_aux_head}",
+        "status": {}, "branches": ["main"]}}'
+    - step: 19
       expectation: '{"wait_for": "[data-testid=\"workspace-change-row\"][data-path=\"short.txt\"][aria-label$=\"
         Modified\"]"}'
-    - step: 19
-      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt":
-        " M", "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
-    - step: 20
+    - step: 21
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt": " M",
+        "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"},
+        "branches": ["${fixture.git_diff_branch}"]}}'
+    - step: 22
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branch": "main", "head": "${fixture.git_diff_aux_head}",
+        "status": {}, "branches": ["main"]}}'
+    - step: 23
       expectation: '{"wait_for": "[data-testid=\"workspace-change-row\"][data-path=\"short.txt\"][aria-label$=\"
         Staged\"]"}'
     results:
-    - 16
     - 17
+    - 18
     - 19
-    - 20
-  - id: GIT-R3
-    requirement: Commit confirmation names the new branch and one checked file. Cancel preserves the original
-      branch and HEAD, index, unchecked changes and the full multiline draft.
-    actions:
     - 21
     - 22
     - 23
+  - id: GIT-R3
+    requirement: Commit confirmation names the new branch and one checked file. Cancel preserves the original branch
+      and HEAD, index, unchecked changes and the full multiline draft.
+    actions:
     - 24
     - 25
-    - 29
-    checkpoints:
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 27
-      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "shell-qa"}}'
-    - step: 28
-      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "1
-        file(s)"}}'
-    - step: 30
-      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "${fixture.git_diff_branch}",
-        "head": "${fixture.git_diff_commit_b}", "status": {"long-lines.txt": " M", "short.txt": "M ", "git-diff-fixture-manifest.json":
-        "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
-    - step: 31
-      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "SHELL
-        Git commit 中文\n\nOnly checked short.txt"}}'
-    results:
     - 26
     - 27
     - 28
+    - 32
+    checkpoints:
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "shell-qa"}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "1 file(s)"}}'
+    - step: 33
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "${fixture.git_diff_branch}",
+        "head": "${fixture.git_diff_commit_b}", "status": {"long-lines.txt": " M", "short.txt": "M ", "git-diff-fixture-manifest.json":
+        "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}, "branches": ["${fixture.git_diff_branch}"]}}'
+    - step: 34
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branch": "main", "head": "${fixture.git_diff_aux_head}",
+        "status": {}, "branches": ["main"]}}'
+    - step: 35
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "SHELL Git
+        commit 中文\n\nOnly checked short.txt"}}'
+    results:
+    - 29
     - 30
     - 31
+    - 33
+    - 34
+    - 35
   - id: GIT-R4
     requirement: Confirm creates the target branch and commits only short.txt with exact bytes. Unchecked changes
       remain, the draft clears, and the real commit log lists exactly that file.
     actions:
-    - 32
-    - 33
+    - 36
     - 37
-    - 39
+    - 42
+    - 44
     checkpoints:
-    - step: 34
+    - step: 38
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-qa", "head_subject":
-        "SHELL Git commit 中文", "status": {"long-lines.txt": " M", "git-diff-fixture-manifest.json": "??"},
-        "head_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"},
-        "timeout_sec": 30}}'
-    - step: 35
+        "SHELL Git commit 中文", "status": {"long-lines.txt": " M", "git-diff-fixture-manifest.json": "??"}, "head_files":
+        {"short.txt": "short-001\nshort-002\nshort-staged\n"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"},
+        "timeout_sec": 30, "branches": ["${fixture.git_diff_branch}", "shell-qa"]}}'
+    - step: 39
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branch": "main", "head": "${fixture.git_diff_aux_head}",
+        "status": {}, "branches": ["main"]}}'
+    - step: 40
       expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": ""}}'
-    - step: 36
+    - step: 41
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-change-row\"][data-path=\"short.txt\"]",
         "state": "detached"}}'
-    - step: 38
-      expectation: '{"assert_text": {"selector": "[data-testid=\"git-log-commit\"]", "contains": "SHELL Git
-        commit 中文", "timeout_sec": 30}}'
-    - step: 40
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"git-log-commit\"]", "contains": "SHELL Git commit
+        中文", "timeout_sec": 30}}'
+    - step: 45
       expectation: '{"wait_for": {"selector": "[data-testid=\"git-log-file\"][data-path=\"short.txt\"]", "timeout_sec":
         30}}'
-    - step: 41
+    - step: 46
       expectation: '{"assert_count": {"selector": "[data-testid=\"git-log-file\"]", "equal": 1}}'
     results:
-    - 34
-    - 35
-    - 36
     - 38
+    - 39
     - 40
     - 41
-  - id: GIT-R5
-    requirement: Discard Cancel leaves the tracked worktree edit unchanged. Confirm restores it to HEAD and
-      removes its change row while keeping the unrelated untracked manifest.
-    actions:
     - 43
-    - 44
     - 45
-    - 47
+    - 46
+  - id: GIT-R5
+    requirement: Discard Cancel leaves the tracked worktree edit unchanged. Confirm restores it to HEAD and removes
+      its change row while keeping the unrelated untracked manifest.
+    actions:
+    - 48
     - 49
     - 50
+    - 52
+    - 55
+    - 56
     checkpoints:
-    - step: 46
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 48
-      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-qa", "status":
-        {"long-lines.txt": " M", "git-diff-fixture-manifest.json": "??"}}}'
     - step: 51
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 53
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-qa", "status": {"long-lines.txt":
+        " M", "git-diff-fixture-manifest.json": "??"}, "branches": ["${fixture.git_diff_branch}", "shell-qa"]}}'
+    - step: 54
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branch": "main", "head": "${fixture.git_diff_aux_head}",
+        "status": {}, "branches": ["main"]}}'
+    - step: 57
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-qa", "head_subject":
-        "SHELL Git commit 中文", "status": {"git-diff-fixture-manifest.json": "??"}, "timeout_sec": 30}}'
-    - step: 52
+        "SHELL Git commit 中文", "status": {"git-diff-fixture-manifest.json": "??"}, "timeout_sec": 30, "branches":
+        ["${fixture.git_diff_branch}", "shell-qa"]}}'
+    - step: 58
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branch": "main", "head": "${fixture.git_diff_aux_head}",
+        "status": {}, "branches": ["main"]}}'
+    - step: 59
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-change-row\"][data-path=\"long-lines.txt\"]",
         "state": "detached"}}'
     results:
-    - 46
-    - 48
     - 51
-    - 52
+    - 53
+    - 54
+    - 57
+    - 58
+    - 59
   visual:
   - check: Git controls, checked file count, confirmation branch and log remain readable in the bottom Host.
     method: manual
-    reason: Retained screenshots require a visual verdict; functional correctness is established separately
-      by UI and independent Git assertions.
+    reason: Retained screenshots require a visual verdict; functional correctness is established separately by UI
+      and independent Git assertions.
   native:
-  - check: Real index, branch creation, committed bytes, cancel safety, selected commit and tracked discard
-      through Rust Git IPC.
+  - check: Real index, branch creation, committed bytes, cancel safety, selected commit and tracked discard through
+      Rust Git IPC.
     method: automated
-    reason: The packaged QA WebView uses real IPC; the independent Git process checks exact disk state and
-      never issues a mutation.
+    reason: The packaged QA WebView uses real IPC; the independent Git process checks exact disk state and never
+      issues a mutation.

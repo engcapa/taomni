@@ -47,6 +47,13 @@ class FakeMailServerTest(unittest.TestCase):
         client.uid("STORE", "4", "+FLAGS.SILENT", "(\\Seen)")
         typ, data = client.uid("SEARCH", "UNSEEN")
         self.assertEqual(data, [b"1 2 3 5"])
+        from qa_ui_auto.fixtures.mail_server import protocol_observation
+        events = protocol_observation(self.server.state)["events"]
+        fetched = next(row for row in events if row["command"] == "UID FETCH")
+        self.assertEqual(fetched["uids"], [4, 5])
+        self.assertTrue(fetched["headers"])
+        self.assertTrue(all(row["elapsed_sec"] >= 0 for row in events))
+        self.assertNotIn("anything", str(events))
         client.logout()
 
     def test_condstore_changedsince_and_expunge(self) -> None:

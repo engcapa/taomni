@@ -1003,6 +1003,9 @@
 - `[data-testid="workspace-git-manager"]` — display — F26.2.workspace-git-manager
 - `[data-testid="git-commit-submit"]` — interactive — F26.2.git-commit-submit
 - `[data-testid="git-changes-tab"]` — interactive — F26.2.git-changes-tab
+- `[data-testid="git-branches-tab"]` — interactive — F26.2.git-branches-tab
+- `[data-testid="git-branches-view"] button[title="New"]` — interactive — F26.2.git-branch-new
+- `[data-testid="git-change-row"]` — interactive — F26.2.git-change-row
 - `[aria-label="Commit target branch"]` — interactive — F26.2.git-commit-target-branch
 - `[data-testid="workspace-change-row"]` — interactive — F26.2.workspace-change-row
 - `[data-testid="workspace-flat-repo-header"]` — display — F26.2.workspace-flat-repo-header

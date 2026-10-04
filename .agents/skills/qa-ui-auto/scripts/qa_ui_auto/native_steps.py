@@ -1597,14 +1597,21 @@ def _do_wait_for(ctx: NativeStepContext, args: Any) -> str:
 
 @_verb("app_menu_action")
 def _do_app_menu_action(ctx, args):
-    if args not in {"split", "multiexec"}:
-        raise StepError("app_menu_action: expected split or multiexec")
+    if args not in {"split", "multiexec", "exit"}:
+        raise StepError("app_menu_action: expected split, multiexec or exit")
     if platform.system() == "Darwin":
-        result = ctx.session.request("POST", ctx.session.endpoint("/qa/native-view-menu"), {"action": args})
-        if result != {"activated": args, "transport": "AppKit NSMenu"}:
-            raise StepError("Native View menu action was not activated")
-        return "activated installed AppKit View menu " + args
+        endpoint = "/qa/native-app-menu" if args == "exit" else "/qa/native-view-menu"
+        result = ctx.session.request("POST", ctx.session.endpoint(endpoint), {"action": args})
+        item_id = "quit" if args == "exit" else args
+        if result != {"activated": item_id, "transport": "AppKit NSMenu"}:
+            raise StepError("Native application menu action was not activated")
+        return "activated installed AppKit menu " + args
     ctx.session.click('[data-testid="app-main-menu"]')
+    if args == "exit":
+        selector = '[data-testid="context-menu-item-exit"]'
+        _wait_for(ctx, selector)
+        ctx.session.click(selector)
+        return "clicked the renderer application Exit menu"
     _wait_for(ctx, '[data-testid="context-menu-item-view"]')
     # A reopened portal can appear under the previous hover position. Enter
     # it from the visible menu opener so WebKit delivers a new mouseenter.

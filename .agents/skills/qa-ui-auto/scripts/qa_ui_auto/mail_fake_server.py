@@ -114,6 +114,8 @@ class FakeMailState:
         }
         self.highest_modseq = 1
         self.log: list[str] = []
+        self.protocol_events: list[dict[str, Any]] = []
+        self.started = time.monotonic()
         self.smtp_messages: list[dict] = []
         self.idle_waiters: list[threading.Event] = []
         # Folders missing from LSUB; everything else is subscribed.
@@ -154,6 +156,8 @@ class FakeMailState:
                 ancestry.append(message_id)
                 entry.messages[uid] = FakeMessage(raw=raw, internal_ts=int(time.time()) + index, modseq=modseq)
                 uids.append(uid)
+            self.protocol_events.append({"elapsed_sec": time.monotonic() - self.started,
+                "command": "DELIVER", "folder": folder, "uids": uids})
             return uids
 
     def caldav_contains(self, text: str) -> bool:
@@ -367,6 +371,7 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                 state.log.append(rest)
             ok = f"{tag} OK done\r\n"
             out: list[bytes] = []
+            observation = None
             with state.lock:
                 if upper.startswith(("LOGIN", "NOOP", "AUTHENTICATE", "ENABLE")):
                     pass
@@ -426,6 +431,10 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     else:
                         hits = _search_keys(folder, re.sub(r"^(UID )?SEARCH\s*", "", rest, flags=re.I))
                     out.append(("* SEARCH" + "".join(f" {uid}" for uid in hits) + "\r\n").encode())
+                    observation = {"command": "UID SEARCH" if upper.startswith("UID ") else "SEARCH",
+                        "folder": selected or "INBOX", "uids": hits}
+                    if re.fullmatch(r"UID [0-9:*,]+", criteria):
+                        observation["uid_range"] = criteria[4:]
                 elif upper.startswith("UID FETCH"):
                     folder = state.folders[selected or "INBOX"]
                     args = rest[10:].strip()
@@ -435,9 +444,11 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     since = int(since_match.group(1)) if since_match else None
                     peek = re.search(r"BODY\.PEEK\[\]<0\.(\d+)>", items_upper)
                     ranges = _uid_ranges(uid_spec, max(folder.messages, default=0))
+                    fetched_uids = []
                     for seq, (uid, message) in enumerate(sorted(folder.messages.items()), start=1):
                         if not _in(uid, ranges) or (since is not None and message.modseq <= since):
                             continue
+                        fetched_uids.append(uid)
                         parts = [f"UID {uid}", f"FLAGS ({' '.join(message.flags)})"]
                         if since is not None:
                             parts.append(f"MODSEQ ({message.modseq})")
@@ -456,6 +467,8 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                         elif "BODY.PEEK[]" in items_upper or "RFC822)" in items_upper:
                             chunk += f" BODY[] {{{len(message.raw)}}}\r\n".encode() + message.raw
                         out.append(chunk + b")\r\n")
+                    observation = {"command": "UID FETCH", "folder": selected or "INBOX", "uids": fetched_uids,
+                        "headers": "BODY.PEEK[HEADER]" in items_upper, "changed_since": since}
                 elif upper.startswith("UID STORE"):
                     folder = state.folders[selected or "INBOX"]
                     uid_spec, _, spec = rest[10:].strip().partition(" ")
@@ -524,6 +537,8 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     state.idle_waiters.append(waiter)
                 else:
                     ok = f"{tag} BAD unsupported\r\n"
+                if observation is not None:
+                    state.protocol_events.append({"elapsed_sec": time.monotonic() - state.started, **observation})
             if upper.startswith("IDLE"):
                 self.send("+ idling\r\n")
                 self._idle(waiter, tag)
@@ -541,6 +556,8 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     waiter.clear()
                     with state.lock:
                         count = len(state.folders["INBOX"].messages)
+                        state.protocol_events.append({"elapsed_sec": time.monotonic() - state.started,
+                            "command": "IDLE EXISTS", "total": count})
                     self.send(f"* {count} EXISTS\r\n")
                 readable, _, _ = select.select([self.connection], [], [], 0.2)
                 if not readable:

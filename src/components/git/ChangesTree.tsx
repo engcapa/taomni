@@ -111,6 +111,9 @@ export function ChangesTree({
         key={`${sectionKey}-${change.status}-${change.path}`}
         role="button"
         tabIndex={0}
+        data-testid="git-change-row"
+        data-path={change.path}
+        data-staged={change.staged ? "true" : "false"}
         style={{ paddingLeft: 8 + depth * 14 }}
         className={`w-full pr-2 py-1 flex items-center gap-2 text-left cursor-pointer border-b border-[var(--taomni-divider)] ${
           isActive ? "bg-[var(--taomni-hover)]" : isSelected ? "bg-[var(--taomni-accent)]/10" : "hover:bg-[var(--taomni-hover)]"

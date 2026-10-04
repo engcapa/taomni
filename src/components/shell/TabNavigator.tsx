@@ -106,7 +106,7 @@ export function TabNavigator({ onNewSession }: { onNewSession(): void }) {
           aria-activedescendant={quick && results[index] ? `shell-result-${index}` : undefined} aria-label={t("shell.search")} placeholder={t("shell.search")} value={query}
           onChange={(e) => { setQuery(e.target.value); setIndex(0); }} className="taomni-input flex-1 min-w-0" />
           {quick && <button data-testid="shell-quick-overview" onClick={() => shell.setOverlay("overview")}>{t("shell.overview")}</button>}
-          <button type="button" data-testid="shell-tab-navigator-close" aria-label={t("common.close")} onClick={() => shell.setOverlay(null)}><X className="w-5 h-5" /></button></div>
+          <button type="button" data-testid="shell-tab-navigator-close" aria-label={t("common.close")} className="w-[28px] h-[28px] shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => shell.setOverlay(null)}><X className="w-5 h-5" /></button></div>
         {!quick && <div className="flex flex-wrap gap-2 mt-2 text-xs">
           <select data-testid="shell-tab-lane-filter" aria-label={t("shell.lane")} value={lane} onChange={(e) => setLane(e.target.value as TabLane | "all")} className="taomni-input"><option value="all">{t("shell.all")}</option>{TAB_LANES.map((l) => <option key={l} value={l}>{t(`shell.lanes.${l}`)}</option>)}</select>
           <label><input data-testid="shell-tab-attention-filter" type="checkbox" checked={attention} onChange={(e) => setAttention(e.target.checked)} /> {t("shell.attention")}</label>

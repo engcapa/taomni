@@ -80,4 +80,5 @@ def protocol_observation(state: Any) -> dict:
             elif tokens and tokens[0] in allowed:
                 commands.append(tokens[0])
         folders = {name: {"total": len(folder.messages), "unread": sum("\\Seen" not in m.flags for m in folder.messages.values()), "uidNext": folder.uid_next} for name, folder in state.folders.items()}
-        return {"commands": commands, "folders": folders, "idleClients": len(state.idle_waiters)}
+        return {"commands": commands, "events": list(state.protocol_events), "folders": folders,
+                "idleClients": len(state.idle_waiters), "idleClientsObservedAt": "fixture teardown"}

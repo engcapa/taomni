@@ -349,6 +349,7 @@ jobs:
         if: always()
         with:
           name: qa-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
+          include-hidden-files: true
           path: |
             qa-ui-auto-report/${{ matrix.id }}/
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**

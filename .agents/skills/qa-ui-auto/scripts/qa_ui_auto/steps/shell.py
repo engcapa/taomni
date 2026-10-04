@@ -6,11 +6,14 @@ COMMANDS = {"create_local_terminal", "create_ssh_terminal", "save_session", "sft
 
 @verb("app_menu_action")
 def menu_action(ctx, args):
-    if args not in {"split", "multiexec"}:
-        raise StepError("app_menu_action: expected split or multiexec")
+    if args not in {"split", "multiexec", "exit"}:
+        raise StepError("app_menu_action: expected split, multiexec or exit")
     if ctx.dry_run:
         return
     ctx.page.locator('[data-testid="app-main-menu"]').click()
+    if args == "exit":
+        ctx.page.locator('[data-testid="context-menu-item-exit"]').click()
+        return
     view = ctx.page.locator('[data-testid="context-menu-item-view"]')
     view.wait_for(state="visible")
     view.hover()

@@ -1,0 +1,416 @@
+id: TC-SHELL-N22
+title: Native single-repository GitPanel stages, cancels branch creation, commits and discards
+description: 'V-N22: real single-root GitPanel workflow on Windows/Linux/macOS. Owns an isolated repository under
+  the report root and uses independent read-only Git oracles for HEAD, all branches, exact porcelain status and
+  full index/HEAD blobs. The multi-repository commit confirmation is covered independently by N21.'
+covers:
+- F25.5
+- F26.2
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+- git
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- git_diff_repo
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-git-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "shell-git-single", "name": "Shell single Git", "roots": [{"id": "git-single", "name": "git-single",
+      "path": "${fixture.git_diff_repo}", "kind": "git"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo":
+      true, "lastActiveFile": {"kind": "root", "rootId": "git-single", "path": "short.txt"}}]'
+- seed_storage:
+    key: taomni.git.changes.tree
+    value: flat
+    raw: true
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- wait_for:
+    selector: '[data-testid="git-change-row"][data-path="short.txt"][data-staged="true"]'
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="workspace-change-row"]'
+    equal: 0
+- assert_attribute:
+    selector: '[data-testid="shell-host"]'
+    name: data-edge
+    equals: bottom
+- git_assert_state:
+    repo: ${fixture.git_diff_repo}
+    branch: ${fixture.git_diff_branch}
+    branches:
+    - ${fixture.git_diff_branch}
+    head: ${fixture.git_diff_commit_b}
+    status: &id001
+      long-lines.txt: ' M'
+      short.txt: 'M '
+      git-diff-fixture-manifest.json: ??
+    head_files:
+      short.txt: 'short-001
+
+        short-002
+
+        short-003
+
+        '
+    index_files:
+      short.txt: 'short-001
+
+        short-002
+
+        short-staged
+
+        '
+- click: '[data-testid="git-change-row"][data-path="short.txt"]'
+- click: '[data-testid="git-diff-unstage"]'
+- git_assert_state:
+    repo: ${fixture.git_diff_repo}
+    status:
+      long-lines.txt: ' M'
+      short.txt: ' M'
+      git-diff-fixture-manifest.json: ??
+    index_files:
+      short.txt: 'short-001
+
+        short-002
+
+        short-003
+
+        '
+- wait_for: '[data-testid="git-change-row"][data-path="short.txt"][data-staged="false"]'
+- click: '[data-testid="git-diff-stage"]'
+- git_assert_state:
+    repo: ${fixture.git_diff_repo}
+    status: *id001
+    index_files:
+      short.txt: 'short-001
+
+        short-002
+
+        short-staged
+
+        '
+- wait_for: '[data-testid="git-change-row"][data-path="short.txt"][data-staged="true"]'
+- fill:
+    selector: textarea[placeholder="Commit message"]
+    value: 'SHELL single Git 中文
+
+
+      Only checked short.txt'
+- click: '[data-testid="git-branches-tab"]'
+- click: '[data-testid="git-branches-view"] button[title="New"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: shell-single-qa
+- click: '[data-testid="text-input-dialog-cancel"]'
+- git_assert_state:
+    repo: ${fixture.git_diff_repo}
+    branch: ${fixture.git_diff_branch}
+    branches:
+    - ${fixture.git_diff_branch}
+    head: ${fixture.git_diff_commit_b}
+    status: *id001
+    index_files:
+      short.txt: 'short-001
+
+        short-002
+
+        short-staged
+
+        '
+- click: '[data-testid="git-changes-tab"]'
+- assert_value:
+    selector: textarea[placeholder="Commit message"]
+    equals: 'SHELL single Git 中文
+
+
+      Only checked short.txt'
+- click: '[data-testid="git-branches-tab"]'
+- click: '[data-testid="git-branches-view"] button[title="New"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: shell-single-qa
+- click: '[data-testid="text-input-dialog-confirm"]'
+- git_assert_state:
+    repo: ${fixture.git_diff_repo}
+    branch: shell-single-qa
+    branches:
+    - ${fixture.git_diff_branch}
+    - shell-single-qa
+    head: ${fixture.git_diff_commit_b}
+    status: *id001
+    index_files:
+      short.txt: 'short-001
+
+        short-002
+
+        short-staged
+
+        '
+- click: '[data-testid="git-changes-tab"]'
+- assert_value:
+    selector: textarea[placeholder="Commit message"]
+    equals: 'SHELL single Git 中文
+
+
+      Only checked short.txt'
+- set_check:
+    selector: '[data-testid="git-change-row"][data-path="long-lines.txt"] input[type="checkbox"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="git-change-row"][data-path="git-diff-fixture-manifest.json"] input[type="checkbox"]'
+    checked: false
+- click: '[data-testid="git-commit-submit"]'
+- git_assert_state:
+    repo: ${fixture.git_diff_repo}
+    branch: shell-single-qa
+    branches:
+    - ${fixture.git_diff_branch}
+    - shell-single-qa
+    head_subject: SHELL single Git 中文
+    status: &id002
+      long-lines.txt: ' M'
+      git-diff-fixture-manifest.json: ??
+    head_files:
+      short.txt: 'short-001
+
+        short-002
+
+        short-staged
+
+        '
+    index_files:
+      short.txt: 'short-001
+
+        short-002
+
+        short-staged
+
+        '
+    timeout_sec: 30
+- assert_value:
+    selector: textarea[placeholder="Commit message"]
+    equals: ''
+- wait_for:
+    selector: '[data-testid="git-change-row"][data-path="short.txt"]'
+    state: detached
+- click: '[data-testid="git-log-tab"]'
+- assert_text:
+    selector: '[data-testid="git-log-commit"]'
+    contains: SHELL single Git 中文
+    timeout_sec: 30
+- click: '[data-testid="git-log-commit"]'
+- wait_for:
+    selector: '[data-testid="git-log-file"][data-path="short.txt"]'
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="git-log-file"]'
+    equal: 1
+- screenshot: shell-single-git-log.png
+- click: '[data-testid="git-changes-tab"]'
+- click: '[data-testid="git-change-row"][data-path="long-lines.txt"]'
+- click: '[data-testid="git-diff-discard"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- git_assert_state:
+    repo: ${fixture.git_diff_repo}
+    branch: shell-single-qa
+    head_subject: SHELL single Git 中文
+    status: *id002
+- click: '[data-testid="git-diff-discard"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- git_assert_state:
+    repo: ${fixture.git_diff_repo}
+    branch: shell-single-qa
+    head_subject: SHELL single Git 中文
+    status:
+      git-diff-fixture-manifest.json: ??
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="git-change-row"][data-path="long-lines.txt"]'
+    state: detached
+- screenshot: shell-single-git-discarded.png
+verification:
+  review: reviewed
+  requirements:
+  - id: SINGLE-R1
+    requirement: A single-root workspace opens the actual single-repository GitPanel in the bottom Host and preserves
+      the exact initial HEAD/index/worktree.
+    actions:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 10
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
+        60}}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"git-change-row\"][data-path=\"short.txt\"][data-staged=\"true\"]",
+        "timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-change-row\"]", "equal": 0}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-host\"]", "name": "data-edge", "equals":
+        "bottom"}}'
+    - step: 14
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "${fixture.git_diff_branch}",
+        "branches": ["${fixture.git_diff_branch}"], "head": "${fixture.git_diff_commit_b}", "status": {"long-lines.txt":
+        " M", "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "head_files": {"short.txt": "short-001\nshort-002\nshort-003\n"},
+        "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
+    results:
+    - 3
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+  - id: SINGLE-R2
+    requirement: Unstage and Stage change only the selected file in the real index; unchanged HEAD and remaining
+      worktree content are independently checked.
+    actions:
+    - 15
+    - 16
+    - 19
+    checkpoints:
+    - step: 17
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt": " M",
+        "short.txt": " M", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-003\n"}}}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"git-change-row\"][data-path=\"short.txt\"][data-staged=\"false\"]"}'
+    - step: 20
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt": " M",
+        "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"git-change-row\"][data-path=\"short.txt\"][data-staged=\"true\"]"}'
+    results:
+    - 17
+    - 18
+    - 20
+    - 21
+  - id: SINGLE-R3
+    requirement: New Branch Cancel creates no branch and preserves the commit draft/index; Confirm creates and checks
+      out exactly one new branch without a commit.
+    actions:
+    - 22
+    - 23
+    - 24
+    - 26
+    - 27
+    - 29
+    - 31
+    - 32
+    - 33
+    - 34
+    - 36
+    checkpoints:
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 28
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "${fixture.git_diff_branch}",
+        "branches": ["${fixture.git_diff_branch}"], "head": "${fixture.git_diff_commit_b}", "status": {"long-lines.txt":
+        " M", "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
+    - step: 30
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "SHELL single
+        Git 中文\n\nOnly checked short.txt"}}'
+    - step: 35
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "branches":
+        ["${fixture.git_diff_branch}", "shell-single-qa"], "head": "${fixture.git_diff_commit_b}", "status": {"long-lines.txt":
+        " M", "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
+    - step: 37
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "SHELL single
+        Git 中文\n\nOnly checked short.txt"}}'
+    results:
+    - 25
+    - 28
+    - 30
+    - 35
+    - 37
+  - id: SINGLE-R4
+    requirement: The real single-repository Commit writes only checked short.txt, clears its draft, and Log shows
+      exactly the committed file; unchecked changes remain.
+    actions:
+    - 38
+    - 39
+    - 40
+    - 44
+    - 46
+    checkpoints:
+    - step: 41
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "branches":
+        ["${fixture.git_diff_branch}", "shell-single-qa"], "head_subject": "SHELL single Git 中文", "status": {"long-lines.txt":
+        " M", "git-diff-fixture-manifest.json": "??"}, "head_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"},
+        "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}, "timeout_sec": 30}}'
+    - step: 42
+      expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": ""}}'
+    - step: 43
+      expectation: '{"wait_for": {"selector": "[data-testid=\"git-change-row\"][data-path=\"short.txt\"]", "state":
+        "detached"}}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"git-log-commit\"]", "contains": "SHELL single Git
+        中文", "timeout_sec": 30}}'
+    - step: 47
+      expectation: '{"wait_for": {"selector": "[data-testid=\"git-log-file\"][data-path=\"short.txt\"]", "timeout_sec":
+        30}}'
+    - step: 48
+      expectation: '{"assert_count": {"selector": "[data-testid=\"git-log-file\"]", "equal": 1}}'
+    results:
+    - 41
+    - 42
+    - 43
+    - 45
+    - 47
+    - 48
+  - id: SINGLE-R5
+    requirement: Discard Cancel preserves the exact remaining status; Confirm discards only long-lines.txt and retains
+      the committed short.txt plus untracked manifest.
+    actions:
+    - 50
+    - 51
+    - 52
+    - 54
+    - 56
+    - 57
+    checkpoints:
+    - step: 53
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 55
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "head_subject":
+        "SHELL single Git 中文", "status": {"long-lines.txt": " M", "git-diff-fixture-manifest.json": "??"}}}'
+    - step: 58
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "head_subject":
+        "SHELL single Git 中文", "status": {"git-diff-fixture-manifest.json": "??"}, "timeout_sec": 30}}'
+    - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"git-change-row\"][data-path=\"long-lines.txt\"]",
+        "state": "detached"}}'
+    results:
+    - 53
+    - 55
+    - 58
+    - 59
+  visual:
+  - check: Read the final Git Log and Changes screenshots for readable content and unobstructed Host controls.
+    method: manual
+    reason: Screenshots record the actual single-repository UI; capture alone is not a visual verdict.
+  native:
+  - check: Real Git IPC, local branch creation/cancellation, commit and discard effects.
+    method: automated
+    reason: Uses the isolated packaged QA app and independent Git processes; no browser Git stubs.

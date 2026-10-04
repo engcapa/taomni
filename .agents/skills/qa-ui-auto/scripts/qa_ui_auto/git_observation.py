@@ -23,7 +23,7 @@ def parse_status(value: str) -> dict[str, str]:
 
 
 def assert_state(ctx, args: dict) -> str:
-    allowed = {"repo", "branch", "head", "head_subject", "status", "head_files", "index_files", "timeout_sec"}
+    allowed = {"repo", "branch", "branches", "head", "head_subject", "status", "head_files", "index_files", "timeout_sec"}
     if not isinstance(args, dict) or set(args) - allowed or "repo" not in args:
         raise StepError("git_assert_state: expected a repo and explicit read-only expectations")
     expected = {key: value for key, value in args.items() if key not in {"repo", "timeout_sec"}}
@@ -57,6 +57,8 @@ def assert_state(ctx, args: dict) -> str:
                 actual[field] = parse_status(git("status", "--porcelain=v1", "-z", "--untracked-files=all"))
             elif field == "branch":
                 actual[field] = git("rev-parse", "--abbrev-ref", "HEAD").strip()
+            elif field == "branches":
+                actual[field] = sorted(git("for-each-ref", "--format=%(refname:short)", "refs/heads/").splitlines())
             elif field == "head":
                 actual[field] = git("rev-parse", "HEAD").strip()
             elif field == "head_subject":

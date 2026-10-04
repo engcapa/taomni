@@ -6,7 +6,7 @@
 >
 > 规范：[qa-ui-auto authoring](../.agents/skills/qa-ui-auto/references/authoring.md#design-to-implementation-handoff)、[verb catalog](../.agents/skills/qa-ui-auto/references/verb-catalog.md)、[native testing](../.agents/skills/qa-ui-auto/references/native-testing.md)。
 >
-> 初稿为 44 条 browser + 18 条 native，稳定 ID 为 `TC-SHELL-B01…B44` / `TC-SHELL-N01…N18`；保留范围现补充 B45、N19～N21。当前已登记 45 browser + 16 native Shell YAML；N01/N13/N14 的自动化部分复用既有用例，N11 与 N17 的必要边界仍单列。数量与 schema/contract 通过不代表完整规格已验收，实际范围以 YAML requirements 和当前平台报告为准。
+> 初稿为 44 条 browser + 18 条 native，稳定 ID 为 `TC-SHELL-B01…B44` / `TC-SHELL-N01…N18`；保留范围现补充 B45、N19～N22。当前已登记 45 browser + 17 native Shell YAML；N01/N13/N14 的自动化部分复用既有用例，N11 与 N17 的必要边界仍单列。数量与 schema/contract 通过不代表完整规格已验收，实际范围以 YAML requirements 和当前平台报告为准。
 
 导航：[browser 用例](#browser-cases) · [native 用例](#native-cases) · [运行与交接](#execution-handoff)。单条用例有稳定 `#v-b01` / `#v-n01` 形式的锚点，YAML checklist 可直接引用。
 
@@ -1129,6 +1129,39 @@
 
 <a id="execution-handoff"></a>
 
+<a id="v-n21"></a>
+
+### V-N21 / TC-SHELL-N21 — 多仓库 Git 提交及仓库隔离
+
+- **归属**：AC-04、AC-13；V-07；TASK-06/11/12；covers: [F25.5、F26.2、F-SHELL-1]。
+- **实际文件**：[N21 YAML](../qa-ui-auto-tests/cases/TC-SHELL-N21-git-actions-native.testcase.yaml)。Windows/WebView2、Linux/WebKitGTK、macOS/WKWebView，`modes: [native]`；使用实际 Git IPC 与独立只读 Git 进程，browser Git stub 不建立这些磁盘结果。
+- **前置**：`reset_db`、`git_diff_repo`；primary 仓库固定 main、两次基线提交，short.txt 已暂存、long-lines.txt 未暂存；aux 是独立干净仓库及固定 HEAD。两仓库均在 run-root，Git user 配置只写 fixture 仓库。打开包含这两个 root 的真实工作区，选择 flat Changes。
+- **控件与动作**：实际 WorkspaceGitManager 的 `workspace-change-row`、diff Stage/Unstage、Commit 面板、Commit target branch、确认/取消、Log 和 Discard。不能对单 root 使用这些多仓库控件。
+
+1. 打开 Git Host，选择 primary short.txt：Unstage 后 index 等于基线全文；Stage 后 index 等于预设 staged 全文；HEAD 不变，完整 porcelain 集合精确匹配。每次同时验证 aux 的 HEAD、全部分支和空 status。
+2. 输入含中文的多行提交草稿，选择新分支 shell-qa 并打开提交确认后取消：primary 全部分支仍只有 main，HEAD/index/status 不变，提交草稿完整；aux 完全不变。
+3. 只勾选 short.txt，再确认提交到 shell-qa：primary 当前分支及全部分支精确匹配，HEAD/index short.txt 等于 staged 全文，long-lines.txt 和未追踪 manifest 仍保留；aux 未产生任何分支或提交。
+4. Log 最新提交只含 short.txt。Discard long-lines.txt 先取消，保持精确状态；再确认，只移除该文件的修改，保留已提交 short.txt 与未追踪 manifest。
+
+**证据与清理**：reviewed requirements、原生 UI 截图、独立 Git oracle、fixture 最终状态与 receipt hashes；截图另写视觉结论。runner 结束 QA 进程并清理 fixture，不执行远端 push。第五轮旧输入因 single/multi 控件不匹配而失败；本次实际双 root 版本尚待三端远程复验。
+
+<a id="v-n22"></a>
+
+### V-N22 / TC-SHELL-N22 — 单仓库 Git 与取消建分支
+
+- **归属**：AC-04、AC-13；V-07；TASK-06/11/12；covers: [F25.5、F26.2、F-SHELL-1]。
+- **实际文件**：[N22 YAML](../qa-ui-auto-tests/cases/TC-SHELL-N22-single-git-actions-native.testcase.yaml)，60 步、五条 reviewed requirements。Windows/WebView2、Linux/WebKitGTK、macOS/WKWebView，`modes: [native]`，240 秒原预算。
+- **前置**：`reset_db`、`git_diff_repo`；与 N21 相同的 primary 基线文件及精确 HEAD/index 内容，工作区只含一个 root，flat Changes。必须看到 `git-change-row` 且 `workspace-change-row` 数量为零，以证明走真实单仓库 GitPanel。
+- **控件与支持**：GitPanel 的 Changes/Branches/Log，`git-branches-view` New、实际 TextInputDialog Cancel/Confirm、diff Stage/Unstage、`git-commit-submit`、Discard。`git_assert_state.branches` 由独立 Git 进程读取全部 local refs，再做精确集合比较；不只检查当前分支。
+
+1. Git 默认在底部 Host；Unstage short.txt 验证完整 index 回到基线且 HEAD 不变；再 Stage 验证完整 index staged 内容和精确 status。
+2. 输入完整多行中文提交草稿，Branches → New → 输入 shell-single-qa → Cancel：全部分支仍只有 main，HEAD、index、status 不变；回 Changes，草稿逐字相同。
+3. 再次 New → Confirm：只新增 shell-single-qa 并 checkout，全部分支精确为 main 与 shell-single-qa，HEAD 与 index 不变，草稿仍完整。
+4. Changes 只勾 short.txt 并通过单仓库直接 Commit：该 UI 没有多仓库的提交确认层。独立 Git 验证当前分支、完整 HEAD/index 文件及最新提交标题；余下 status 精确为 long-lines.txt 修改与未追踪 manifest。Log 最新提交仅有一个 short.txt。
+5. Discard long-lines.txt：Cancel 保留精确状态；Confirm 后该行消失，独立 status 只剩未追踪 manifest，已提交 short.txt 保留。
+
+**证据与清理**：原生截图、reviewed requirement checkpoints、独立 Git oracle 与 artifact hashes；截图不能自动充当视觉结论。只操作 run-root 仓库并由 runner 清理。静态契约/单测通过不等于本例运行通过；首次三端执行仍待 GitHub。
+
 ## 5. 实施后的运行命令与三端手册
 
 当前批次按用户要求，本地只完成单元测试与静态检查，browser/native 在 GitHub 的 `qa-ui-auto-platforms.yml` 执行。下列本地 CMD-B/CMD-N 保留为维护和手工边界的操作手册，不是本批次已运行或计划启动的本地回归。CI 的精确范围、SHA 与报告以 [实施任务](./workspace-shell-ux-redesign-tasks.md) 最新记录为准。
@@ -1247,6 +1280,6 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 | B25 / B45 / N19（AI 强制保留范围） | [browser context/Stop](../qa-ui-auto-tests/cases/TC-SHELL-B25-tao-context-lifecycle.testcase.yaml)、[browser stream/history](../qa-ui-auto-tests/cases/TC-SHELL-B45-ai-stream-history.testcase.yaml)、[native stream/history](../qa-ui-auto-tests/cases/TC-SHELL-N19-ai-stream-history-native.testcase.yaml) | Home 无绑定会话发起对话；发送、隐藏完成通知、精确 thread 跳转、未发送多行草稿、历史重载。B25 通过声明的 IPC hold 验证 Stop 与排队发送只完成一次。N19 另有真实 OpenAI loopback 协议/Rust stream/SQLite、503、部分 SSE 后 Stop、排队恢复和真实 QA 进程重启；独立 provider receipt 要求 5 次 stream 请求均带生产 tools、3 次正常完成、1 次真实连接取消，重启只保留完整回答且不重发。browser 的 stream 是明示 IPC preview。新增分支在 run 37194738007 的 browser 三端通过，native 三端均在 step 40 的相对 receipt 路径检查失败；实际 SSE/Stop 已执行，恢复及重启检查仍待修复输入复验。第五轮冻结的上一输入仍为 4 次请求 |
 | N20（LAN 轻量范围） | [native LAN entry](../qa-ui-auto-tests/cases/TC-SHELL-N20-lan-entry-native.testcase.yaml)、B38 的 browser 草稿保留分支 | 原生 read-only history、拒绝开启、Home/quick-switch 回同一 owner；不声称真实 peer/multicast 收发。待 GitHub 三端实测 |
 | 截图强制保留范围 | `TC-SHOT-001…027` 与 `TC-SHOT-N1…N13` | 全部加入当前远程选择；native 使用实际捕获、OCR、clipboard、置顶、快捷键、scroll/recording 场景，依各 YAML 和 platform contract 验收。browser stub 与 native 结果分别记录；新远程输入尚未执行 |
-| 原生 Git 保留操作 | [N21](../qa-ui-auto-tests/cases/TC-SHELL-N21-git-actions-native.testcase.yaml) | 实际 stage/unstage、取消提交、选定文件提交到新分支、Log 文件集、discard 取消/确认。通过独立只读 Git 进程核对全部 porcelain 状态与 HEAD/index blob；三端同一用例，待远程运行。N05 的窗口与草稿验收继续保留 |
+| 原生 Git 保留操作 | [N21 多仓库](../qa-ui-auto-tests/cases/TC-SHELL-N21-git-actions-native.testcase.yaml)、[N22 单仓库](../qa-ui-auto-tests/cases/TC-SHELL-N22-single-git-actions-native.testcase.yaml) | 实际 stage/unstage、取消提交/建分支、选定文件提交、Log 文件集、discard 取消/确认；独立 Git 进程核对全部分支、精确 porcelain 集合与 HEAD/index 全文，aux 仓库保持不变。三端待本次输入远程运行；N05 的窗口与草稿验收继续保留 |
 
 用户已授权实现、单测、推送及 GitHub browser/native 验证；当前任务状态与结果持续更新在 [实施任务](./workspace-shell-ux-redesign-tasks.md)。本稿的设计步骤保持完整，自动化数量、静态检查和单测通过均不代表全部三端桌面及人工边界已验收。

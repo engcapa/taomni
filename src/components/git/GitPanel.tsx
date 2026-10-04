@@ -720,7 +720,7 @@ export function GitPanel({
           <button
             key={item}
             type="button"
-            data-testid={item === "log" ? "git-log-tab" : item === "changes" ? "git-changes-tab" : undefined}
+            data-testid={item === "log" ? "git-log-tab" : item === "changes" ? "git-changes-tab" : item === "branches" ? "git-branches-tab" : undefined}
             className={`h-7 px-3 rounded text-[12px] capitalize ${view === item ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
             onClick={() => switchView(item)}
           >

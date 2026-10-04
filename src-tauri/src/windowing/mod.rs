@@ -149,6 +149,8 @@ pub async fn open_detached_window(
     let destroyed_app = app_handle.clone();
     window.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {
+            #[cfg(all(debug_assertions, target_os = "macos"))]
+            crate::qa_driver::forget_window(&label);
             let _ = destroyed_app.emit(
                 "shell-detached-window-destroyed",
                 serde_json::json!({ "windowLabel": label, "operationId": operation_id }),

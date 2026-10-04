@@ -310,7 +310,7 @@
       "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
       "properties": {
         "app_menu_action": {
-          "enum": ["split", "multiexec"]
+          "enum": ["split", "multiexec", "exit"]
         },
         "shell_navigate": {
           "enum": [
@@ -929,12 +929,13 @@
           "required": ["repo"],
           "additionalProperties": false,
           "anyOf": [
-            {"required": ["branch"]}, {"required": ["head"]}, {"required": ["head_subject"]},
+            {"required": ["branch"]}, {"required": ["branches"]}, {"required": ["head"]}, {"required": ["head_subject"]},
             {"required": ["status"]}, {"required": ["head_files"]}, {"required": ["index_files"]}
           ],
           "properties": {
             "repo": {"type": "string", "minLength": 1},
             "branch": {"type": "string", "minLength": 1},
+            "branches": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
             "head": {"type": "string", "minLength": 1},
             "head_subject": {"type": "string"},
             "status": {"type": "object", "additionalProperties": {"type": "string", "minLength": 2, "maxLength": 2}},

@@ -162,6 +162,8 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
     rich form; the path key is a filename and must NOT be reported.
     """
     out: list[str] = []
+    if verb == "app_menu_action" and args == "exit":
+        return ['[data-testid="app-main-menu"]', '[data-testid="context-menu-item-exit"]']
     if verb == "app_menu_action" and args in {"split", "multiexec"}:
         item = "split-terminal" if args == "split" else "multiexec"
         return ['[data-testid="app-main-menu"]', '[data-testid="context-menu-item-view"]',

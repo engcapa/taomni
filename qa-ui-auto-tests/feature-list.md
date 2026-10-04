@@ -9936,6 +9936,7 @@ files:
   - src/components/git/shared/DiffPane.tsx
   - src/components/git/DiffViewer.tsx
   - src/components/git/GitPanel.tsx
+  - src/components/git/ChangesTree.tsx
   - src/stubs/parity008Git.ts
   - src-tauri/src/git.rs
 controls:
@@ -9947,6 +9948,15 @@ controls:
     kind: interactive
   - id: git-changes-tab
     selector: '[data-testid="git-changes-tab"]'
+    kind: interactive
+  - id: git-branches-tab
+    selector: '[data-testid="git-branches-tab"]'
+    kind: interactive
+  - id: git-branch-new
+    selector: '[data-testid="git-branches-view"] button[title="New"]'
+    kind: interactive
+  - id: git-change-row
+    selector: '[data-testid="git-change-row"]'
     kind: interactive
   - id: git-commit-target-branch
     selector: '[aria-label="Commit target branch"]'

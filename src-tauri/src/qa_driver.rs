@@ -48,6 +48,12 @@ pub(crate) fn mark_page_load(label: &str, event: tauri::webview::PageLoadEvent) 
     }
 }
 
+pub(crate) fn forget_window(label: &str) {
+    if let Ok(mut loaded) = LOADED_WINDOWS.lock() {
+        loaded.remove(label);
+    }
+}
+
 #[derive(Clone)]
 struct ElementRef {
     using: String,
@@ -980,6 +986,17 @@ async fn native_view_menu<R: Runtime>(
     activate_native_menu_item(state, session_id, "view", action).await
 }
 
+async fn native_app_menu<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+    Json(payload): Json<Value>,
+) -> Response {
+    if payload.get("action").and_then(Value::as_str) != Some("exit") {
+        return error("unsupported native application menu action");
+    }
+    activate_native_menu_item(state, session_id, "app", "quit").await
+}
+
 async fn activate_native_menu_item<R: Runtime>(
     state: DriverState<R>,
     session_id: String,
@@ -990,7 +1007,7 @@ async fn activate_native_menu_item<R: Runtime>(
         || !cfg!(debug_assertions)
         || state.app.config().identifier != crate::QA_APP_ID
     {
-        return error("native About activation requires the isolated QA session");
+        return error("native menu activation requires the isolated QA session");
     }
     #[cfg(target_os = "macos")]
     {
@@ -1140,6 +1157,10 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
                 "/session/{session_id}/qa/native-view-menu",
                 post(native_view_menu::<R>),
             )
+            .route(
+                "/session/{session_id}/qa/native-app-menu",
+                post(native_app_menu::<R>),
+            )
             .route("/session/{session_id}/refresh", post(refresh::<R>))
             .route("/session/{session_id}/url", get(current_url::<R>))
             .route(
@@ -1157,4 +1178,23 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             log::error!("qa webdriver bridge stopped: {error}");
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recreated_window_must_finish_its_own_navigation_before_scripts_are_sent() {
+        let label = "qa-recreated-window-load-test";
+        mark_page_load(label, tauri::webview::PageLoadEvent::Finished);
+        assert!(LOADED_WINDOWS.lock().unwrap().contains(label));
+        forget_window(label);
+        assert!(!LOADED_WINDOWS.lock().unwrap().contains(label));
+        mark_page_load(label, tauri::webview::PageLoadEvent::Started);
+        assert!(!LOADED_WINDOWS.lock().unwrap().contains(label));
+        mark_page_load(label, tauri::webview::PageLoadEvent::Finished);
+        assert!(LOADED_WINDOWS.lock().unwrap().contains(label));
+        forget_window(label);
+    }
 }

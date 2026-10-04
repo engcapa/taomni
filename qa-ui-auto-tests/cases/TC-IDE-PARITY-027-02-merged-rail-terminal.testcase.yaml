@@ -1,8 +1,8 @@
 id: TC-IDE-PARITY-027-02
 title: SSH tools retain a single merged Rail and live Files view across Navigator toggles
-description: Shell v2 retained SSH/SFTP workflow. Merged terminal tools stay on the permanent Rail when
-  Navigator is expanded; Files hides without destroying its view. Disabling merge returns tools to the
-  toolbar. Connection/authentication, paths and transfer controls remain required in browser and native.
+description: Shell v2 retained SSH/SFTP workflow. Merged terminal tools stay on the permanent Rail when Navigator
+  is expanded; Files hides without destroying its view. Disabling merge returns tools to the toolbar. Connection/authentication,
+  paths and transfer controls remain required in browser and native.
 covers:
 - F1.2
 - F7.1
@@ -22,14 +22,20 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- set_viewport:
+    width: 1280
+    height: 800
+- wait_for:
+    selector: '[data-testid="shell-root"][data-mode="wide"]'
+    timeout_sec: 10
 - vault_first_run: qa-rail-ssh-password
 - seed_storage:
     key: taomni.mergeToolWindowRail
     value: 'true'
 - seed_storage:
     key: taomni.shellLayout.v2
-    value: '{"version": 2, "navigator": {"collapsedByLane": {"home": false, "build": true, "connect":
-      true}, "lastArea": "sessions"}}'
+    value: '{"version": 2, "navigator": {"collapsedByLane": {"home": false, "build": true, "connect": true},
+      "lastArea": "sessions"}}'
 - reload_window: null
 - shell_navigate: sessions
 - wait_for: '[data-testid="sidebar"]'
@@ -156,148 +162,153 @@ verification:
     actions:
     - 1
     - 2
-    - 3
     - 4
     - 5
     - 6
+    - 7
     - 8
     - 10
-    - 11
     - 12
     - 13
     - 14
+    - 15
     - 16
-    - 17
     - 18
+    - 19
     - 20
     - 22
-    - 23
+    - 24
+    - 25
     checkpoints:
-    - step: 24
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-root\"][data-mode=\"wide\"]", "timeout_sec":
+        10}}'
+    - step: 26
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
         "timeout_sec": 60}}'
     results:
-    - 24
+    - 3
+    - 26
   - id: R2
-    requirement: There is one merged Files toggle, one terminal detach action and no duplicated toolbar
-      Files control.
+    requirement: There is one merged Files toggle, one terminal detach action and no duplicated toolbar Files
+      control.
     actions:
-    - 29
-    - 32
-    - 35
+    - 31
+    - 34
+    - 37
     checkpoints:
-    - step: 25
+    - step: 27
       expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 26
+    - step: 28
       expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"attached-sftp-toggle\"]",
         "equal": 1}}'
-    - step: 27
+    - step: 29
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]",
         "equal": 0}}'
-    - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
     - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
+    - step: 32
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 30}}'
-    - step: 31
-      expectation: '{"wait_for": "[data-testid=\"sftp-remote-list\"]"}'
     - step: 33
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-list\"]"}'
+    - step: 35
       expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue-collapsed\"]"}'
-    - step: 34
+    - step: 36
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"attached-sftp-toggle\"]",
         "name": "aria-pressed", "equals": "true"}}'
-    - step: 36
-      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"]"}'
-    - step: 37
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]", "equal": 1}}'
     - step: 38
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"]"}'
+    - step: 39
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]", "equal": 1}}'
+    - step: 40
       expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
     results:
-    - 25
-    - 26
     - 27
     - 28
+    - 29
     - 30
-    - 31
+    - 32
     - 33
-    - 34
+    - 35
     - 36
-    - 37
     - 38
-  - id: R3
-    requirement: Navigator expansion preserves the same Files view and the Connect preference without
-      changing the Build preference.
-    actions:
     - 39
-    - 41
-    - 46
-    - 47
-    - 48
-    checkpoints:
-    - step: 40
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"attached-sftp-toggle\"]",
-        "equal": 1}}'
-    - step: 42
-      expectation: '{"assert_visible": "[data-testid=\"sftp-browser\"]"}'
-    - step: 43
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"sftp-transfer-queue-collapsed\"]",
-        "min_width": 100, "min_height": 10, "within_viewport": true, "hit_center": true}}'
-    - step: 44
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]", "equal": 1}}'
-    - step: 45
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-list\"]"}'
-    - step: 49
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 50
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.shellLayout.v2'')?.includes(\"\\\"connect\\\":false\")",
-        "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 51
-      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"connect\":false"}}'
-    - step: 52
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.shellLayout.v2'')?.includes(\"\\\"build\\\":true\")",
-        "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 53
-      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"build\":true"}}'
-    results:
     - 40
-    - 42
+  - id: R3
+    requirement: Navigator expansion preserves the same Files view and the Connect preference without changing
+      the Build preference.
+    actions:
+    - 41
     - 43
-    - 44
-    - 45
+    - 48
     - 49
     - 50
+    checkpoints:
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"attached-sftp-toggle\"]",
+        "equal": 1}}'
+    - step: 44
+      expectation: '{"assert_visible": "[data-testid=\"sftp-browser\"]"}'
+    - step: 45
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"sftp-transfer-queue-collapsed\"]",
+        "min_width": 100, "min_height": 10, "within_viewport": true, "hit_center": true}}'
+    - step: 46
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]", "equal": 1}}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-list\"]"}'
+    - step: 51
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 52
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.shellLayout.v2'')?.includes(\"\\\"connect\\\":false\")",
+        "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 53
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"connect\":false"}}'
+    - step: 54
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.shellLayout.v2'')?.includes(\"\\\"build\\\":true\")",
+        "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 55
+      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"build\":true"}}'
+    results:
+    - 42
+    - 44
+    - 45
+    - 46
+    - 47
     - 51
     - 52
     - 53
+    - 54
+    - 55
   - id: R4
     requirement: Merge opt-out moves Files back to the terminal toolbar and opt-in restores the same single
       Rail control.
     actions:
-    - 54
-    - 55
     - 56
     - 57
     - 58
-    - 61
-    - 62
-    - 63
-    - 64
-    checkpoints:
-    - step: 59
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]",
-        "equal": 1}}'
-    - step: 60
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"attached-sftp-toggle\"]",
-        "equal": 0}}'
-    - step: 65
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"attached-sftp-toggle\"]",
-        "equal": 1}}'
-    - step: 66
-      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
-    results:
     - 59
     - 60
+    - 63
+    - 64
     - 65
     - 66
+    checkpoints:
+    - step: 61
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]",
+        "equal": 1}}'
+    - step: 62
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"attached-sftp-toggle\"]",
+        "equal": 0}}'
+    - step: 67
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"attached-sftp-toggle\"]",
+        "equal": 1}}'
+    - step: 68
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
+    results:
+    - 61
+    - 62
+    - 67
+    - 68
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

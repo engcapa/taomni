@@ -18,7 +18,7 @@
 | TASK-08 Home / 恢复 | verification | 01,03,10 | 三主动作、最近项、组合恢复 |
 | TASK-09 原生窗口 | verification | 04,05,06,07 | Git、detach 事务、回停靠 |
 | TASK-10 持久化与回退 | verification | 01,04,07 | v2 migration、恢复 identity |
-| TASK-11 用例与自动化支持 | verification | 随相关实现 | 已领取；61 条 Shell YAML（45 browser / 16 native）及受影响回归、catalog/policy |
+| TASK-11 用例与自动化支持 | verification | 随相关实现 | 已领取；62 条 Shell YAML（45 browser / 17 native）及受影响回归、catalog/policy |
 | TASK-12 集成与验收 | verification | 02–11 | 单元测试、三平台 browser/native、结果分析与修复 |
 
 ## 本轮实施进度
@@ -28,6 +28,8 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 最新开发批次已集成稳定主工作面、SFTP 后台/跨窗口任务、Git/Notes 窗口恢复、workspace 并行恢复与取消，以及退出/数据库事务边界。第五轮已提交 Git N21，selection 为 241 个独立 ID（三端 browser 各 183，native Linux 66 / Windows 60 / macOS 59），共 734 次执行，包括全部截图回归和 AI streaming/history。数量以具体运行的 selection 为准。按用户要求，本地仅运行单元测试和静态检查，browser/native 与原生构建交给 GitHub。
 
 新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。这些缺口未记为 pass 或 done。
+
+最新候选新增 N22 的单仓库 Git 真操作，与 N21 的真实双 root 提交分开验收。远程统一选择增至 242 个 ID；预期 browser 三端各 183，native Linux 67 / Windows 61 / macOS 60，共 737 次执行，以最终 selection 核对。本批先定位已知失败与新的 Git case，取得邮件协议诊断后再回到最终输入的统一验收。
 
 ## 验证记录
 
@@ -138,3 +140,15 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - AI 定位 [run 37194738007](https://github.com/engcapa/taomni/actions/runs/37194738007)，输入 `67d73c154abe6a32f2f06d211a04ded98123eac8`，六份 receipt/identity/hash 均匹配。browser 三端各 1/1；native 三端各 0/1，在 N19 step 40 因 fixture 导出相对路径被再次拼接 case dir 而失败。此前真实部分 SSE、排队、Stop 与停止状态均已执行；恢复及重启后的全部检查未执行，不能记通过。独立 Linux provider receipt 记录 5 次 stream/tools、1 次取消、3 次完成。fixture 现导出绝对且归属 run-root 的 receipt 路径，并新增相对 case dir 回归。
 - 本地修后 `shell-navigator-final-unit-170` 5 files / 30 tests、`shell-ai-path-unit-171` 7/7 通过；TypeScript `shell-navigator-types-172` exit 0；B43 与 IDE-024 的 schema/reviewed contract 通过。`shell-navigator-static-173` gate 通过（required 971 / covered 926 / shallow 41 / orphans 5）；随后为真实 queue badge 补 control 归属，baseline 保持不变。仍需最终候选 GitHub 执行，TASK-01～12 保持 verification。
 - queue badge 归属及 catalog 同步后，最终 `shell-queue-catalog-static-174` audit gate 通过：required 972 / covered 927 / shallow 41 / orphans 4；45 个 required 未触达控件仍在静态报告中明确列出，不能把 gate 通过表述成全覆盖。
+
+### 第五轮 native 结果与第六轮候选
+
+- 第五轮六份报告已收齐：browser 三端各 180 pass / 3 fail；Linux native 61 / 5，Windows native 51 / 9，macOS native 50 / 9，均为 pass/fail 且零 skip。source/runner/case/selection/receipt 与 native build 匹配。每份 native archive 的 36 个缺失 hash 都是 fixture `.git` 默认被 artifact upload 排除；本次启用 `include-hidden-files`，保留 profile/cache 排除和全部 hash 验证，待新运行核对。
+- browser 定位 [run 37196090363](https://github.com/engcapa/taomni/actions/runs/37196090363)，输入 `0fb69b44d1dae1d9c62aa5c408219d105d50a2f1`，每端 B01/B05/IDE-024 通过，B43 在 export 文件验证因相对 fixture 路径重复拼接失败，各 3 pass / 1 fail / 0 skip。身份、执行配置、receipt 和 archive hashes 匹配。本次 runner 在创建 fixture/harness 前统一绝对化 report/case 根，并用三个单测保护文件读取及 failure trace 相对链接。
+- N16 Close 控件使用真实 28×28px 点击区。macOS N04/N05 重建同 label 子窗口时清除旧 page-load readiness，并等待本次 navigation 完成；N15 使用已安装的 AppKit Quit 菜单，其余端仍点真实 renderer Exit。N08 先点正常 Exit、确认、独立 PID 已退出，再重启原 profile，继续精确 232px Navigator 与工作区恢复断言。
+- N20 在实际 LAN 入口激活 VaultGate 后设置密码，保留拒绝 enable/read-only history 与同 owner 返回。N21 改为真实两个 root，以独立 aux 仓库验证隔离，并验证完整 local branch 集合；N22 单独覆盖真正 single GitPanel 的分支 Cancel/Confirm、stage/unstage、直接 Commit、Log 精确文件集与 Discard Cancel/Confirm。用例契约见 [N21](./workspace-shell-ux-redesign-test-cases.md#v-n21) / [N22](./workspace-shell-ux-redesign-test-cases.md#v-n22)。
+- Windows IDE-027-02/03 旧用例默认窗口处于 medium，却要求宽屏常驻 Navigator/Project。本次固定 1280×800、等待实际 wide 模式，保留原尺寸、Files 单实例、合并与偏好断言。N15 保存 SFTP 后重新导航 Sessions，再等待并操作可见目标，保留真实传输、事务、取消和退出效果。
+- MAIL-IDLE-01 原生三端仍缺通知：新增计数/阶段及 UID 协议观察以区分事件、sync、filters 和通知路径，不记录邮件正文/认证。Windows TC-155 SSH 真实输出出现 `bash: cho: command not found`，仍需区分输入/ConPTY；没有增加原超时、尝试数或放宽 first-column clipboard 断言。
+- 本地：`shell-runner-contract-unit-180` 52/52，`shell-native-repairs-unit-181` 4 files / 80 tests，`shell-window-load-rust-unit-177` 1/1，`shell-native-repairs-types-182` exit 0。180 中 taskkill OEM 文本解码的后台异常已修为读取 bytes，随后 `shell-runner-unit-187` 56/56 无该异常。受影响 Rust 格式与 Git diff 检查通过，全仓既有 Rust 格式差异仍未计为通过。
+- 最终 `shell-static-191` audit gate 通过：required 975 / covered 930 / shallow 41 / orphans 4，baseline 未改；45 个未触达控件继续明确列出。`shell-plan-192` 六端 selection 为 242 个 ID、737 次执行（browser 各 183，native 67/61/60），gaps/unreviewed 均为空。早期 viewport 断言使用不支持的参数已被静态检查拒绝，修正为已有 wait_for 契约后上述检查通过。
+- 以上为候选实现与本地 unit/static 结果，尚不是第六轮 runtime 通过。TASK-01～12 保持 verification；远程先验证精确失败集及新 Git case，再用最终固定输入执行统一三端集合。

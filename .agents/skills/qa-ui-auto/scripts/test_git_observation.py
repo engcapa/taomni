@@ -12,6 +12,24 @@ from qa_ui_auto.steps import StepError
 
 
 class GitObservationTest(TestCase):
+    def test_workspace_companion_is_owned_clean_and_independent_from_the_changed_repository(self):
+        from qa_ui_auto.fixtures import git_diff_repo
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            ctx = SimpleNamespace(cfg={"app": {"mode": "native"}}, report_root=root,
+                                  case_dir=root / "case", step_index=1, values={})
+            git_diff_repo.setup(ctx)
+            primary = Path(ctx.values["git_diff_repo"])
+            auxiliary = Path(ctx.values["git_diff_aux_repo"])
+            self.assertNotEqual(primary, auxiliary)
+            self.assertTrue(primary.is_relative_to(root))
+            self.assertTrue(auxiliary.is_relative_to(root))
+            assert_state(ctx, {"repo": str(auxiliary), "branch": "main", "status": {},
+                               "head": ctx.values["git_diff_aux_head"]})
+            ctx.step_index = 2
+            assert_state(ctx, {"repo": str(primary), "head": ctx.values["git_diff_commit_b"],
+                               "status": {"short.txt": "M ", "long-lines.txt": " M", "git-diff-fixture-manifest.json": "??"}})
+
     def test_porcelain_preserves_status_columns_unicode_and_rename_destination(self):
         self.assertEqual(parse_status(" M edit 中文.txt\0R  renamed.txt\0old.txt\0?? new.txt\0"),
             {"edit 中文.txt": " M", "renamed.txt": "R ", "new.txt": "??"})
@@ -36,7 +54,7 @@ class GitObservationTest(TestCase):
             git("add", ".")
             target.write_bytes(b"WORKTREE\n")
             ctx = SimpleNamespace(case_dir=root / "case", step_index=1)
-            args = {"repo": str(repo), "branch": "main", "head_subject": "baseline",
+            args = {"repo": str(repo), "branch": "main", "branches": ["main"], "head_subject": "baseline",
                 "status": {"edit 中文.txt": "MM"}, "head_files": {"edit 中文.txt": "HEAD\n", "absent.txt": None},
                 "index_files": {"edit 中文.txt": "INDEX\n"}}
             before = hashlib.sha256((repo / ".git/index").read_bytes()).hexdigest()
@@ -47,6 +65,11 @@ class GitObservationTest(TestCase):
             with self.assertRaisesRegex(StepError, "independent Git state differs"):
                 assert_state(ctx, {**args, "branch": "wrong", "timeout_sec": 0})
             self.assertFalse(json.loads((ctx.case_dir / "git-state-2.json").read_text())['passed'])
+            git("branch", "unexpected")
+            ctx.step_index = 3
+            with self.assertRaisesRegex(StepError, "independent Git state differs"):
+                assert_state(ctx, {**args, "timeout_sec": 0})
+            self.assertEqual(json.loads((ctx.case_dir / "git-state-3.json").read_text())['samples'][0]['actual']['branches'], ["main", "unexpected"])
 
     def test_rejects_other_repositories_mutations_and_traversal(self):
         with TemporaryDirectory() as directory:

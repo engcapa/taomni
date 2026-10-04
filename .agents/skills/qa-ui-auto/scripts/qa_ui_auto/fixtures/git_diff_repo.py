@@ -151,6 +151,18 @@ def setup(ctx: Any) -> None:
     values["git_diff_commit_b"] = str(json.loads(manifest.read_text(encoding="utf-8"))["commitB"])
     values["git_diff_branch"] = _run(repo, "branch", "--show-current")
     values["git_diff_manifest"] = manifest.as_posix()
+    # A clean, independent companion lets workspace cases exercise the real
+    # aggregate UI while proving a commit affects only checked repositories.
+    auxiliary = Path(tempfile.mkdtemp(prefix="git-aux-", dir=str(repo.parent))).resolve()
+    _run(auxiliary, "init", "--initial-branch=main")
+    _run(auxiliary, "config", "user.name", "Taomni QA")
+    _run(auxiliary, "config", "user.email", "taomni-qa@example.invalid")
+    _run(auxiliary, "config", "commit.gpgsign", "false")
+    _run(auxiliary, "config", "core.hooksPath", ".qa-hooks")
+    (auxiliary / ".qa-hooks").mkdir()
+    _run(auxiliary, "commit", "--no-gpg-sign", "--allow-empty", "-m", "qa unchanged companion")
+    values["git_diff_aux_repo"] = auxiliary.as_posix()
+    values["git_diff_aux_head"] = _run(auxiliary, "rev-parse", "HEAD")
 
 
 def teardown(ctx: Any) -> None:

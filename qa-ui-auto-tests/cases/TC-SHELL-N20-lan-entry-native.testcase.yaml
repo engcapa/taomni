@@ -1,8 +1,9 @@
 id: TC-SHELL-N20
 title: LAN history entry retains one owner and declined enable state
-description: 'Light LAN regression: the real native history entry opens, declining service enable leaves the
-  read-only roster usable, and Home/quick-switch reopens the same owner without another enable prompt. No peer
-  or multicast delivery claim.'
+description: 'Light LAN regression: the real native history entry opens, declining service enable leaves the read-only
+  roster usable, and Home/quick-switch reopens the same owner without another enable prompt. No peer or multicast
+  delivery claim. The initially empty isolated vault is set up through the real LAN vault gate before declining
+  service enable.'
 covers:
 - F-SHELL-1
 tags:
@@ -15,10 +16,10 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
-- vault_first_run: qa-shell-lan-password
 - wait_for: '[data-testid="welcome-panel"]'
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-lan-chat"]'
+- vault_first_run: qa-shell-lan-password
 - wait_for: '[data-testid="lanchat-enable-prompt"]'
 - click: '[data-testid="lanchat-enable-prompt"] button:nth-of-type(1)'
 - wait_for: '[data-testid="lanchat-roster-panel"]'
@@ -34,19 +35,19 @@ steps:
 - wait_for: '[data-testid="lanchat-roster-panel"]'
 - assert_not_visible: '[data-testid="lanchat-enable-prompt"]'
 - assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="lanchat"]'
+    selector: '[data-testid="tab-item"][data-tab-type="lan-chat"]'
     equal: 1
 - screenshot: tc-shell-n20-lan.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 'Light LAN regression: the real native history entry opens, declining service enable leaves
-      the read-only roster usable, and Home/quick-switch reopens the same owner without another enable prompt.
-      No peer or multicast delivery claim.'
+    requirement: 'Light LAN regression: the real native history entry opens, declining service enable leaves the
+      read-only roster usable, and Home/quick-switch reopens the same owner without another enable prompt. No peer
+      or multicast delivery claim.'
     actions:
     - 1
-    - 2
+    - 3
     - 4
     - 5
     - 7
@@ -55,7 +56,7 @@ verification:
     - 14
     - 15
     checkpoints:
-    - step: 3
+    - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"lanchat-enable-prompt\"]"}'
@@ -72,10 +73,10 @@ verification:
     - step: 17
       expectation: '{"assert_not_visible": "[data-testid=\"lanchat-enable-prompt\"]"}'
     - step: 18
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"lanchat\"]",
-        "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"lan-chat\"]", "equal":
+        1}}'
     results:
-    - 3
+    - 2
     - 6
     - 8
     - 9
@@ -91,8 +92,8 @@ verification:
   native:
   - check: Real LAN history owner and declined service-enable state survive Home and quick switch.
     method: automated
-    reason: Runs the packaged native LAN entry and its actual vault/service state. Peer discovery and delivery
-      remain outside this lightweight case.
+    reason: Runs the packaged native LAN entry and its actual vault/service state. Peer discovery and delivery remain
+      outside this lightweight case.
 native_platforms:
 - Linux
 - Windows

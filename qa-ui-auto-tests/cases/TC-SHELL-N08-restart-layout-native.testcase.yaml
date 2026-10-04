@@ -1,7 +1,9 @@
 id: TC-SHELL-N08
 title: Real QA process restart keeps layout and explicit workspace restore
-description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n08
-  records the complete scenario and any remaining manual boundary.
+description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n08 records
+  the complete scenario and any remaining manual boundary. Exit through the real platform menu, confirm close, independently
+  observe the owned PID exit, then reopen the same profile. This is a normal close/reopen contract; corrupt-profile
+  recovery is separately unverified.
 covers:
 - F1.6
 - F-SHELL-1
@@ -25,9 +27,9 @@ steps:
 - wait_for: '[data-testid="shell-root"][data-mode="wide"]'
 - seed_storage:
     key: taomni.recentWorkspaces.v1
-    value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell", "name": "shell",
-      "path": "${fixture.shell_root}", "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo":
-      false, "lastActiveFile": {"kind": "root", "rootId": "shell", "path": "README.md"}}]'
+    value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell", "name": "shell", "path": "${fixture.shell_root}",
+      "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind":
+      "root", "rootId": "shell", "path": "README.md"}}]'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
@@ -53,6 +55,14 @@ steps:
 - assert_localstorage:
     key: taomni.shellLayout.v2
     contains: '"width":232'
+- native_app_process:
+    state: running
+- app_menu_action: exit
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- native_app_process:
+    state: exited
+    timeout_sec: 30
 - restart_native_app: null
 - wait_for: '[data-testid="welcome-panel"]'
 - set_viewport:
@@ -103,8 +113,8 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
         60}}'
     - step: 14
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
-        "name": "aria-valuenow", "equals": "232"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]", "name": "aria-valuenow",
+        "equals": "232"}}'
     - step: 16
       expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.shellLayout.v2'')?.includes(\"\\\"width\\\":232\")",
         "expect_truthy": true, "timeout_sec": 5}}'
@@ -117,41 +127,56 @@ verification:
     - 14
     - 16
     - 17
-  - id: R2
-    requirement: A new QA process using the same isolated profile starts at Home with saved preferences
-      and restores exactly one workspace.
+  - id: R-EXIT
+    requirement: A real UI Exit confirms the clean workspace close and ends the previously observed owned QA process
+      before restart.
     actions:
-    - 18
-    - 20
+    - 19
+    - 21
+    checkpoints:
+    - step: 18
+      expectation: '{"native_app_process": {"state": "running"}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 22
+      expectation: '{"native_app_process": {"state": "exited", "timeout_sec": 30}}'
+    results:
+    - 22
+  - id: R2
+    requirement: A new QA process using the same isolated profile starts at Home with saved preferences and restores
+      exactly one workspace.
+    actions:
     - 23
     - 25
     - 28
+    - 30
+    - 33
     checkpoints:
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"shell-root\"][data-mode=\"wide\"]"}'
-    - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]",
-        "name": "aria-valuenow", "equals": "232"}}'
     - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name":
-        "data-state", "equals": "succeeded"}}'
+      expectation: '{"wait_for": "[data-testid=\"shell-root\"][data-mode=\"wide\"]"}'
     - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 1}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]", "name": "aria-valuenow",
+        "equals": "232"}}'
     - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]", "timeout_sec": 60}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state",
+        "equals": "succeeded"}}'
+    - step: 32
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 1}}'
+    - step: 34
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
         "equal": 1}}'
     results:
-    - 19
-    - 21
-    - 22
     - 24
     - 26
     - 27
     - 29
+    - 31
+    - 32
+    - 34
   visual:
   - check: Read final screenshot for clipped controls and retained content
     method: manual
@@ -160,6 +185,6 @@ verification:
   - check: Real Tauri IPC, packaged WebView and declared disk/process/window results
     method: automated
     reason: Uses the isolated QA binary; no browser backend stubs.
-  - check: Graceful UI exit and corrupt-profile restart branches in V-N08.
+  - check: Corrupt-profile restart branches in V-N08.
     method: manual
-    reason: See linked native case; this YAML alone does not establish this boundary.
+    reason: The real graceful UI exit/reopen is automated above; this YAML does not inject a corrupt profile.
