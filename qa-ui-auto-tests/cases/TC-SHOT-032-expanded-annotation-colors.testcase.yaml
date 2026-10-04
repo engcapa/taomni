@@ -1,0 +1,288 @@
+id: TC-SHOT-032
+title: Expanded presets and HEX colors paint real strokes and support selected-mark undo
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport:
+    width: 1000
+    height: 750
+- wait_for: '[data-testid="screenshot-hint"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- click: '[data-testid="screenshot-tool-line"]'
+- click: '[data-testid="screenshot-line-width-4"]'
+- click: '[data-testid="screenshot-color-orange"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-orange"]'
+    name: aria-pressed
+    equals: 'true'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 140
+      y: 180
+    to_position:
+      x: 360
+      y: 180
+- wait_for: '[data-testid="screenshot-annotation-canvas"]'
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 180 * devicePixelRatio,
+      1, 1).data).join(',') === '250,140,22,255'
+- click: '[data-testid="screenshot-color-cyan"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-cyan"]'
+    name: aria-pressed
+    equals: 'true'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 140
+      y: 212
+    to_position:
+      x: 360
+      y: 212
+- wait_for: '[data-testid="screenshot-annotation-canvas"]'
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 212 * devicePixelRatio,
+      1, 1).data).join(',') === '19,194,194,255'
+- click: '[data-testid="screenshot-color-purple"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-purple"]'
+    name: aria-pressed
+    equals: 'true'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 140
+      y: 244
+    to_position:
+      x: 360
+      y: 244
+- wait_for: '[data-testid="screenshot-annotation-canvas"]'
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 244 * devicePixelRatio,
+      1, 1).data).join(',') === '114,46,209,255'
+- click: '[data-testid="screenshot-color-pink"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-pink"]'
+    name: aria-pressed
+    equals: 'true'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 140
+      y: 276
+    to_position:
+      x: 360
+      y: 276
+- wait_for: '[data-testid="screenshot-annotation-canvas"]'
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 276 * devicePixelRatio,
+      1, 1).data).join(',') === '235,47,150,255'
+- click: '[data-testid="screenshot-color-gray"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-gray"]'
+    name: aria-pressed
+    equals: 'true'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 140
+      y: 308
+    to_position:
+      x: 360
+      y: 308
+- wait_for: '[data-testid="screenshot-annotation-canvas"]'
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 308 * devicePixelRatio,
+      1, 1).data).join(',') === '140,140,140,255'
+- click: '[data-testid="screenshot-color-black"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-black"]'
+    name: aria-pressed
+    equals: 'true'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 140
+      y: 340
+    to_position:
+      x: 360
+      y: 340
+- wait_for: '[data-testid="screenshot-annotation-canvas"]'
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 340 * devicePixelRatio,
+      1, 1).data).join(',') === '0,0,0,255'
+- fill:
+    selector: '[data-testid="screenshot-color-custom"]'
+    value: '#123456'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-custom"]'
+    name: value
+    equals: '#123456'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 140
+      y: 380
+    to_position:
+      x: 360
+      y: 380
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 380 * devicePixelRatio,
+      1, 1).data).join(',') === '18,52,86,255'
+- click: '[data-testid="screenshot-tool-move"]'
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position:
+      x: 200
+      y: 380
+- fill:
+    selector: '[data-testid="screenshot-color-hex"]'
+    value: '#654321'
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 380 * devicePixelRatio,
+      1, 1).data).join(',') === '101,67,33,255'
+- click: '[data-testid="screenshot-undo"]'
+- eval_readonly:
+    expression: Array.from(document.querySelector('canvas').getContext('2d').getImageData(200 * devicePixelRatio, 380 * devicePixelRatio,
+      1, 1).data).join(',') === '18,52,86,255'
+- fill:
+    selector: '[data-testid="screenshot-color-hex"]'
+    value: '#xyz'
+- click: '[data-testid="screenshot-tool-line"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-hex"]'
+    name: value
+    equals: '#123456'
+- screenshot: expanded-colors.png
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: workflow
+    requirement: Every new preset and a custom HEX value paints its actual RGB color. Updating a selected mark is undoable; invalid
+      HEX does not replace the valid drawing color.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 12
+    - 14
+    - 17
+    - 19
+    - 22
+    - 24
+    - 27
+    - 29
+    - 32
+    - 34
+    - 37
+    - 39
+    - 41
+    - 42
+    - 43
+    - 45
+    - 47
+    - 48
+    - 51
+    checkpoints:
+    - step: 8
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-orange"]'', ''name'': ''aria-pressed'', ''equals'':
+        ''true''}'
+    - step: 11
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 180 * devicePixelRatio, 1, 1).data).join('','') === ''250,140,22,255''"}'
+    - step: 13
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-cyan"]'', ''name'': ''aria-pressed'', ''equals'':
+        ''true''}'
+    - step: 16
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 212 * devicePixelRatio, 1, 1).data).join('','') === ''19,194,194,255''"}'
+    - step: 18
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-purple"]'', ''name'': ''aria-pressed'', ''equals'':
+        ''true''}'
+    - step: 21
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 244 * devicePixelRatio, 1, 1).data).join('','') === ''114,46,209,255''"}'
+    - step: 23
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-pink"]'', ''name'': ''aria-pressed'', ''equals'':
+        ''true''}'
+    - step: 26
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 276 * devicePixelRatio, 1, 1).data).join('','') === ''235,47,150,255''"}'
+    - step: 28
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-gray"]'', ''name'': ''aria-pressed'', ''equals'':
+        ''true''}'
+    - step: 31
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 308 * devicePixelRatio, 1, 1).data).join('','') === ''140,140,140,255''"}'
+    - step: 33
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-black"]'', ''name'': ''aria-pressed'', ''equals'':
+        ''true''}'
+    - step: 36
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 340 * devicePixelRatio, 1, 1).data).join('','') === ''0,0,0,255''"}'
+    - step: 38
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-custom"]'', ''name'': ''value'', ''equals'': ''#123456''}'
+    - step: 40
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 380 * devicePixelRatio, 1, 1).data).join('','') === ''18,52,86,255''"}'
+    - step: 44
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 380 * devicePixelRatio, 1, 1).data).join('','') === ''101,67,33,255''"}'
+    - step: 46
+      expectation: 'eval_readonly: {''expression'': "Array.from(document.querySelector(''canvas'').getContext(''2d'').getImageData(200
+        * devicePixelRatio, 380 * devicePixelRatio, 1, 1).data).join('','') === ''18,52,86,255''"}'
+    - step: 49
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-color-hex"]'', ''name'': ''value'', ''equals'': ''#123456''}'
+    - step: 53
+      expectation: 'assert_visible: [data-testid="system-screenshot"]'
+    results:
+    - 8
+    - 11
+    - 13
+    - 16
+    - 18
+    - 21
+    - 23
+    - 26
+    - 28
+    - 31
+    - 33
+    - 36
+    - 38
+    - 40
+    - 44
+    - 46
+    - 49
+    - 53
+  visual:
+  - check: Visible controls, state and image dimensions
+    method: automated
+    reason: Assertions check actual renderer state and output; screenshots are retained.
+  native:
+  - check: OS input, clipboard, windows and persistent files
+    method: external
+    reason: Browser uses IPC stubs; matching SHOT-N scenarios own actual desktop and disk assertions.

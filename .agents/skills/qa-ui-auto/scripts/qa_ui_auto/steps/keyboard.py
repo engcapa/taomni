@@ -20,6 +20,18 @@ def step_fill(ctx: StepContext, args: Any) -> None:
     loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
     if ctx.dry_run:
         return
+    if loc.get_attribute("type") == "color":
+        if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            raise StepError("fill: color input requires a six-digit HEX value")
+        # Playwright cannot type into a color well. Apply the selected value
+        # through its native setter and normal input/change events; this is
+        # renderer input, not evidence of operating the OS color chooser.
+        loc.evaluate("""(el, value) => {
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, value);
+          el.dispatchEvent(new Event('input', {bubbles: true}));
+          el.dispatchEvent(new Event('change', {bubbles: true}));
+        }""", value)
+        return
     loc.fill(value)
 
 

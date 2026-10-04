@@ -1,0 +1,50 @@
+id: TC-SHOT-N17
+title: The real pin remains above other windows and moves with OS drag. Zoom changes actual dimensions, opacity reveals desktop pixels,
+  64px collapse restores geometry and opacity, public Copy/Save retain original pixels, and a persistent favorite reopens after temporary
+  artifacts are deleted.
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: pin-tools
+- assert_visible: '[data-testid="system-screenshot"]'
+native_platforms:
+- Linux
+- Windows
+- macOS
+verification:
+  review: reviewed
+  requirements:
+  - id: workflow
+    requirement: The real pin remains above other windows and moves with OS drag. Zoom changes actual dimensions, opacity reveals desktop
+      pixels, 64px collapse restores geometry and opacity, public Copy/Save retain original pixels, and a persistent favorite reopens
+      after temporary artifacts are deleted.
+    actions:
+    - 1
+    - 3
+    checkpoints:
+    - step: 3
+      expectation: 'native_screenshot_scenario: {''scenario'': ''pin-tools''}'
+    - step: 4
+      expectation: 'assert_visible: [data-testid="system-screenshot"]'
+    results:
+    - 3
+    - 4
+  visual:
+  - check: Visible controls, state and image dimensions
+    method: automated
+    reason: Assertions check actual renderer state and output; screenshots are retained.
+  native:
+  - check: OS input, clipboard, windows and persistent files
+    method: automated
+    reason: Native fixed scenarios verify actual OS geometry including the 64x64 logical compact window, real desktop opacity matching the original-image/background blend without extra shadow darkening, and independent original pixels. Save uses the OS dialog and exact destination, with US physical shortcut keycodes on hosted macOS; no dialog mock substitutes for the native save.

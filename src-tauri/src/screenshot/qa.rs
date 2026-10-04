@@ -22,6 +22,9 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow};
 
 use super::capture::{self, DisplayInfo};
 use super::qa_oracle;
+pub mod colors;
+pub mod pin_tools;
+pub mod scroll_manual;
 
 /// Window label of the QA content fixture (scrollable page / animation).
 pub const QA_WINDOW_LABEL: &str = "screenshot-qa-fixture";
@@ -334,6 +337,34 @@ fn keep_json(value: &Value, name: &str) -> anyhow::Result<String> {
     std::fs::create_dir_all(artifact_dir())?;
     std::fs::write(&path, serde_json::to_vec_pretty(value)?)?;
     Ok(path.to_string_lossy().into_owned())
+}
+
+/// Incremental evidence survives a scenario timeout or a native process crash.
+struct ScenarioTrace {
+    path: std::path::PathBuf,
+    started: Instant,
+    events: Vec<Value>,
+}
+
+impl ScenarioTrace {
+    fn new(name: &str) -> Self {
+        Self {
+            path: evidence_path(name),
+            started: Instant::now(),
+            events: Vec::new(),
+        }
+    }
+
+    fn mark(&mut self, phase: &str, details: Value) {
+        self.events.push(
+            json!({"phase":phase,"elapsedMs":self.started.elapsed().as_millis(),"details":details}),
+        );
+        if std::fs::create_dir_all(artifact_dir()).is_ok() {
+            if let Ok(bytes) = serde_json::to_vec_pretty(&self.events) {
+                let _ = std::fs::write(&self.path, bytes);
+            }
+        }
+    }
 }
 
 fn source_crop_size(source: &SourceEvidence) -> anyhow::Result<(u32, u32)> {
@@ -765,17 +796,48 @@ pub async fn screenshot_qa_ocr_redact(app: AppHandle) -> Result<String, String> 
 pub async fn screenshot_qa_scroll(app: AppHandle) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
+    let mut trace = ScenarioTrace::new("scroll-auto-phases.json");
     let (window, display, region) = open_fixture(&app, "scroll")
         .await
         .map_err(|e| format!("{e:#}"))?;
     let scale = window.scale_factor().unwrap_or(1.0);
     let source = read_source(&window).await.map_err(|e| format!("{e:#}"))?;
+    park_pointer(input_point((display.x + 16, display.y + 16), source.scale))
+        .await
+        .map_err(|e| e.to_string())?;
+    let control = std::sync::Arc::new(super::scroll::ScrollControl::default());
+    let worker_control = control.clone();
+    let worker_display = display.clone();
     let worker = app.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        super::scroll::scroll_capture_with(&worker, &display, region, 40)
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    let task = tokio::task::spawn_blocking(move || {
+        super::scroll::scroll_capture_controlled(
+            &worker,
+            &worker_display,
+            region,
+            40,
+            &worker_control,
+        )
+    });
+    let deadline = Instant::now() + Duration::from_secs(45);
+    let mut interrupted = false;
+    while !task.is_finished() {
+        trace.mark("capture", control.status());
+        if control.mode() == super::scroll::ScrollMode::Manual || Instant::now() >= deadline {
+            interrupted = true;
+            trace.mark("automatic-interrupted", control.status());
+            if let Ok(last) = capture::capture_display(&app, &display) {
+                keep_image(&last, "scroll-auto-interrupted-desktop.png");
+            }
+            control.request_stop(false);
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    let result = task.await.map_err(|e| e.to_string())?;
+    trace.mark(
+        "finished",
+        json!({"status":control.status(),"interrupted":interrupted}),
+    );
     close_fixture(&app);
     let result = result.map_err(|e| format!("{e:#}"))?;
     let image = image::open(&result.path)
@@ -799,7 +861,8 @@ pub async fn screenshot_qa_scroll(app: AppHandle) -> Result<String, String> {
         .filter(|(_, len)| (*len as f64 - expected).abs() > 3.0 * scale.max(1.0))
         .map(|(_, len)| *len)
         .collect();
-    let ok = result.frames >= 3
+    let ok = !interrupted
+        && result.frames >= 3
         && result.height as f64 >= region.3 as f64 * 1.8
         && consecutive
         && indices.len() >= 10
@@ -810,6 +873,7 @@ pub async fn screenshot_qa_scroll(app: AppHandle) -> Result<String, String> {
         ok,
         json!({
             "frames": result.frames,
+            "interrupted": interrupted,
             "width": result.width,
             "height": result.height,
             "regionHeight": region.3,
@@ -1409,6 +1473,9 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?;
     let source = read_source(&fixture).await.map_err(|e| e.to_string())?;
+    park_pointer(input_point((display.x + 16, display.y + 16), source.scale))
+        .await
+        .map_err(|e| e.to_string())?;
     let overlay = begin_scroll_ui(&app, &display, region, false, true).await?;
     let bar = wait_window(&app, super::surfaces::SCROLL_LABEL, Duration::from_secs(10))
         .await
@@ -1427,17 +1494,28 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     )
     .await
     .map_err(|e| format!("scroll controls readiness: {e}"))?;
+    // A frame count alone does not establish a scrollable 100% preview:
+    // native wheel displacement differs across the three platforms.
+    let preview_height = run_js(&overlay, "return innerHeight;", Duration::from_secs(5))
+        .await
+        .map_err(|e| e.to_string())?
+        .as_f64()
+        .ok_or("preview height missing")?;
     let progress = run_js(
-        &bar,
-        r#"
-      for (let i = 0; i < 100; i++) {
+        &fixture,
+        &format!(r#"
+      const page = document.querySelector('[data-testid="screenshot-qa-fixture-ready"]');
+      for (let i = 0; i < 150; i++) {{
         const status = await window.__TAURI_INTERNALS__.invoke('screenshot_scroll_status');
-        if (status?.frames >= 4) return status;
+        if (status?.frames >= 4 && page.scrollTop * {scale} + {region_height} > {preview_height} + 160) {{
+          await new Promise(r => setTimeout(r, 700));
+          return {{...status, sourceTop:page.scrollTop, sourceEnd:page.scrollHeight-page.clientHeight}};
+        }}
         await new Promise(r => setTimeout(r, 100));
-      }
-      throw new Error('scroll did not capture a second frame');
-    "#,
-        Duration::from_secs(15),
+      }}
+      throw new Error('scroll did not capture enough original content for a long preview');
+    "#, scale=source.scale, region_height=region.3),
+        Duration::from_secs(20),
     )
     .await
     .map_err(|e| format!("scroll progress: {e}"))?;
@@ -1522,10 +1600,18 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     let mut green = 0;
     if clipboard.dimensions() == output.dimensions() {
         for x in 45..135 {
-            let a = clipboard.get_pixel(x, 80);
-            red += usize::from(a[0] > 220 && a[1] < 120 && a[2] < 120);
-            let b = clipboard.get_pixel(x, output.height() - 100);
-            green += usize::from(b[0] < 120 && b[1] > 160 && b[2] < 100);
+            // MouseEvent coordinates are integer CSS pixels in WebKit.
+            // At fit scale one pixel can span multiple original pixels;
+            // inspect the intended stroke band rather than its antialiased
+            // outermost row. Content outside these locations cannot pass.
+            red += usize::from((76..=84).any(|y| {
+                let a = clipboard.get_pixel(x, y);
+                a[0] > 220 && a[1] < 120 && a[2] < 120
+            }));
+            green += usize::from((output.height() - 104..=output.height() - 96).any(|y| {
+                let b = clipboard.get_pixel(x, y);
+                b[0] < 120 && b[1] > 160 && b[2] < 100
+            }));
         }
     }
     let marked_clipboard = done_closed

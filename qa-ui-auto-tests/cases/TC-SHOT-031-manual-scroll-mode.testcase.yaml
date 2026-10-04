@@ -1,0 +1,89 @@
+id: TC-SHOT-031
+title: Manual scroll mode is explained and dispatched from the selected region
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport:
+    width: 1000
+    height: 750
+- wait_for: '[data-testid="screenshot-hint"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- click: '[data-testid="screenshot-scroll-capture"]'
+- click: '[data-testid="screenshot-scroll-mode-auto"]'
+- eval_readonly:
+    expression: document.getElementsByName('scroll-mode')[0].checked === true
+- click: '[data-testid="screenshot-scroll-mode-manual"]'
+- assert_text:
+    selector: '[data-testid="screenshot-scroll-mode-description"]'
+    contains: Pauses are allowed
+- press: Escape
+- assert_not_visible: '[data-testid="screenshot-scroll-confirm"]'
+- click: '[data-testid="screenshot-scroll-capture"]'
+- click: '[data-testid="screenshot-scroll-mode-manual"]'
+- click: '[data-testid="screenshot-scroll-start"]'
+- wait_for: '[data-testid="screenshot-scroll-result"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_scroll_capture" && window.__taomniStubScreenshotCalls.at(-2).args.mode
+      === "manual"
+- assert_text:
+    selector: '[data-testid="screenshot-scroll-result-meta"]'
+    contains: "400 \xD7 1800"
+- click: '[data-testid="screenshot-scroll-result-close"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: workflow
+    requirement: Manual mode has clear instructions, cancelling confirmation preserves the selection, and starting dispatches manual
+      mode before showing a full-size preview.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 18
+    checkpoints:
+    - step: 7
+      expectation: 'eval_readonly: {''expression'': "document.getElementsByName(''scroll-mode'')[0].checked === true"}'
+    - step: 9
+      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-scroll-mode-description"]'', ''contains'': ''Pauses are allowed''}'
+    - step: 11
+      expectation: 'assert_not_visible: [data-testid="screenshot-scroll-confirm"]'
+    - step: 16
+      expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_scroll_capture"
+        && window.__taomniStubScreenshotCalls.at(-2).args.mode === "manual"''}'
+    - step: 17
+      expectation: "assert_text: {'selector': '[data-testid=\"screenshot-scroll-result-meta\"]', 'contains': '400 \xD7 1800'}"
+    - step: 20
+      expectation: 'assert_visible: [data-testid="system-screenshot"]'
+    results:
+    - 7
+    - 9
+    - 11
+    - 16
+    - 17
+    - 20
+  visual:
+  - check: Visible controls, state and image dimensions
+    method: automated
+    reason: Assertions check actual renderer state and output; screenshots are retained.
+  native:
+  - check: OS input, clipboard, windows and persistent files
+    method: external
+    reason: Browser uses IPC stubs; matching SHOT-N scenarios own actual desktop and disk assertions.

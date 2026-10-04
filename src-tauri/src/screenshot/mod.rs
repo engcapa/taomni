@@ -12,6 +12,7 @@
 //! [`screenshot_read_file`] and deleted when the capture session ends.
 
 pub mod capture;
+pub mod favorites;
 pub mod ocr;
 pub mod qa;
 mod qa_oracle;
@@ -72,6 +73,7 @@ pub struct PinInit {
     pub path: String,
     pub width: u32,
     pub height: u32,
+    pub favorite_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -261,15 +263,19 @@ pub async fn screenshot_scroll_capture(
     y: u32,
     width: u32,
     height: u32,
+    mode: Option<scroll::ScrollMode>,
 ) -> Result<ScrollCaptureResult, String> {
     // Fail while the selection UI can still show the instructions, before
     // hiding it or creating topmost controls. Never prompt from the worker.
-    scroll::ensure_control_permission().map_err(internal_error)?;
+    let mode = mode.unwrap_or_default();
+    if mode == scroll::ScrollMode::Auto {
+        scroll::ensure_control_permission().map_err(internal_error)?;
+    }
     let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
     let region = capture::clamp_region(display.width, display.height, (x, y, width, height));
     let rect = surfaces::region_rect(&display, region);
     let position = capture_control_position(&app, &display, rect)?;
-    let control = Arc::new(scroll::ScrollControl::default());
+    let control = Arc::new(scroll::ScrollControl::new(mode));
     {
         let mut state = tool_state();
         if state.scroll.is_some() || state.recorder_open {
@@ -298,7 +304,7 @@ pub async fn screenshot_scroll_capture(
     let worker = app.clone();
     let worker_control = control.clone();
     let result = blocking("scroll capture", move || {
-        scroll::scroll_capture_controlled(&worker, &display, region, 40, &worker_control)
+        scroll::scroll_capture_controlled(&worker, &display, region, u32::MAX, &worker_control)
     })
     .await;
     if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
@@ -318,10 +324,18 @@ pub async fn screenshot_scroll_capture(
 
 #[tauri::command]
 pub async fn screenshot_scroll_status() -> Result<Option<serde_json::Value>, String> {
-    Ok(tool_state()
-        .scroll
-        .as_ref()
-        .map(|control| serde_json::json!({ "frames": control.frames.load(Ordering::SeqCst) })))
+    Ok(tool_state().scroll.as_ref().map(|control| control.status()))
+}
+
+#[tauri::command]
+pub async fn screenshot_set_scroll_mode(mode: scroll::ScrollMode) -> Result<(), String> {
+    if mode == scroll::ScrollMode::Auto {
+        scroll::ensure_control_permission().map_err(internal_error)?;
+    }
+    if let Some(control) = &tool_state().scroll {
+        control.set_mode(mode);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -824,7 +838,16 @@ pub async fn screenshot_pin_to_screen(app: AppHandle, path: String) -> Result<St
         Ok((dest, width, height))
     })
     .await?;
+    open_pin(&app, pinned, width, height, None)
+}
 
+fn open_pin(
+    app: &AppHandle,
+    pinned: PathBuf,
+    width: u32,
+    height: u32,
+    favorite_id: Option<String>,
+) -> Result<String, String> {
     let scale = tool_state()
         .overlay
         .as_ref()
@@ -851,14 +874,18 @@ pub async fn screenshot_pin_to_screen(app: AppHandle, path: String) -> Result<St
             path: pinned.to_string_lossy().into_owned(),
             width,
             height,
+            favorite_id,
         },
     );
 
     let url = WebviewUrl::App("index.html#screenshot-pin".into());
-    let window = window_builder(&app, &label, url)
+    let window = window_builder(app, &label, url)
         .title("Pinned Screenshot")
-        .inner_size((lw * fit).round().max(48.0), (lh * fit).round().max(48.0))
+        .inner_size((lw * fit).round().max(240.0), (lh * fit).round().max(160.0))
+        .transparent(true)
         .decorations(false)
+        // A native shadow darkens the desktop through translucent pin pixels on macOS.
+        .shadow(false)
         .resizable(true)
         .always_on_top(true)
         .skip_taskbar(true)
@@ -890,6 +917,48 @@ pub async fn screenshot_pin_init(window: WebviewWindow) -> Result<PinInit, Strin
         .get(window.label())
         .cloned()
         .ok_or_else(|| "no pinned screenshot for this window".to_string())
+}
+
+/// GTK otherwise raises a non-resizable window to its 200px natural size.
+/// Set the compact request on the UI thread and clear it before restoring.
+#[tauri::command]
+pub async fn screenshot_set_pin_compact(
+    window: WebviewWindow,
+    compact: bool,
+) -> Result<(), String> {
+    if !window.label().starts_with(PIN_LABEL_PREFIX) {
+        return Err("not a pin window".into());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let pin = window.clone();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        window
+            .run_on_main_thread(move || {
+                use webkit2gtk::glib::prelude::ObjectExt;
+                let result = pin
+                    .gtk_window()
+                    .map(|gtk| {
+                        let size = if compact { 64 } else { -1 };
+                        gtk.set_property("width-request", size);
+                        gtk.set_property("height-request", size);
+                        if compact {
+                            gtk.set_property("default-width", 64);
+                            gtk.set_property("default-height", 64);
+                        }
+                    })
+                    .map_err(|e| e.to_string());
+                let _ = tx.send(result);
+            })
+            .map_err(|e| e.to_string())?;
+        tokio::time::timeout(Duration::from_secs(5), rx)
+            .await
+            .map_err(|_| "configure compact pin timed out".to_string())?
+            .map_err(|e| e.to_string())??;
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = compact;
+    Ok(())
 }
 
 /// Close a pinned screenshot window by label.

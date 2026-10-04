@@ -64,7 +64,7 @@ steps:
     selector: '[data-testid="screenshot-pin-image"]'
     crop: {x: 60, y: 60, width: 160, height: 120}
     polygon: [{x: 0, y: 0}, {x: 160, y: 120}, {x: 0, y: 120}, {x: 160, y: 0}]
-- right_click: '[data-testid="screenshot-pin-window"]'
+- click: '[data-testid="screenshot-pin-close"]'
 - wait_for: '[data-testid="system-screenshot"]'
 - assert_not_visible: '[data-testid="screenshot-pin-window"]'
 verification:
@@ -87,7 +87,7 @@ verification:
     - {step: 28, expectation: A crossed contour is accepted and auto-closed rather than rejected by cancelling signed area.}
     - {step: 31, expectation: Second public Pin decodes to the correct natural dimensions.}
     - {step: 32, expectation: Every interior RGB tile matches the original and exterior alpha is zero under the independent even-odd polygon.}
-    - {step: 35, expectation: Right-click closes the second retained pin.}
+    - {step: 35, expectation: The close button closes the second retained pin.}
     results: [28, 31, 32, 35]
   visual:
   - {check: Real exported PNG content and alpha, method: automated, reason: 'Pillow compares retained original bytes against actual browser canvas exports using independent fixed shapes, including a crossed contour; artifacts are retained even on failure.'}

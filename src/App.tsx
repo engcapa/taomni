@@ -210,7 +210,7 @@ function App() {
     isScreenshotPinWindow() ||
     overlayHash.startsWith("#screenshot-pin")
   ) {
-    return <PinnedImage />;
+    return <AppDialogProvider><PinnedImage /></AppDialogProvider>;
   }
   if (isScreenshotQaFixtureWindow() || overlayHash.startsWith("#screenshot-qa-")) {
     return <ScreenshotQaFixture route={overlayHash.replace("#screenshot-qa-", "")} />;

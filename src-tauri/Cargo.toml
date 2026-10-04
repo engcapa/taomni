@@ -49,7 +49,7 @@ cc = "1"
 
 [dependencies]
 # Plain native windows keep capture range borders lightweight and out of the crop.
-tauri = { version = "2", features = ["protocol-asset", "unstable"] }
+tauri = { version = "2", features = ["protocol-asset", "unstable", "macos-private-api"] }
 tauri-plugin-log = "2"
 # In-app auto-update: pull signed bundles from GitHub Releases (see
 # claudedocs/auto-update-plan.md). `process` provides relaunch() after install.

@@ -77,15 +77,41 @@ export interface PinInit {
   path: string;
   width: number;
   height: number;
+  favoriteId?: string | null;
+}
+
+export interface ScreenshotFavorite { id: string; width: number; height: number; createdAt: number; }
+
+export async function listScreenshotFavorites(): Promise<ScreenshotFavorite[]> {
+  return invoke<ScreenshotFavorite[]>("screenshot_list_favorites");
+}
+
+export async function addScreenshotFavorite(path: string): Promise<ScreenshotFavorite> {
+  return invoke<ScreenshotFavorite>("screenshot_add_favorite", { path });
+}
+
+export async function removeScreenshotFavorite(id: string): Promise<void> {
+  return invoke<void>("screenshot_remove_favorite", { id });
+}
+
+export async function pinScreenshotFavorite(id: string): Promise<string> {
+  return invoke<string>("screenshot_pin_favorite", { id });
+}
+
+export async function loadFavoriteThumbnail(id: string): Promise<string> {
+  const bytes = await invoke<number[] | ArrayBuffer | string>("screenshot_favorite_thumbnail", { id });
+  if (typeof bytes === "string") return bytes;
+  return URL.createObjectURL(new Blob([bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes)], { type: "image/png" }));
 }
 
 export type RecordFormat = "gif" | "mp4";
+export type ScrollMode = "auto" | "manual";
 
 /** Event the backend emits when a recording stops on its own. */
 export const RECORDING_ENDED_EVENT = "screenshot://recording-ended";
 export const SCROLL_PROGRESS_EVENT = "screenshot://scroll-progress";
 
-export interface ScrollStatus { frames: number; }
+export interface ScrollStatus { frames: number; mode: ScrollMode; needsOverlap: boolean; }
 
 export async function scrollStatus(): Promise<ScrollStatus | null> {
   return invoke<ScrollStatus | null>("screenshot_scroll_status");
@@ -93,6 +119,10 @@ export async function scrollStatus(): Promise<ScrollStatus | null> {
 
 export async function stopScrollCapture(cancel = false): Promise<void> {
   return invoke<void>("screenshot_stop_scroll_capture", { cancel });
+}
+
+export async function setScrollMode(mode: ScrollMode): Promise<void> {
+  return invoke<void>("screenshot_set_scroll_mode", { mode });
 }
 
 export async function listDisplays(): Promise<ScreenshotDisplay[]> {
@@ -112,10 +142,12 @@ export async function captureFull(displayId?: string): Promise<ScreenshotFile> {
 export async function scrollCapture(
   displayId: string | undefined,
   region: PhysicalRect,
+  mode: ScrollMode = "auto",
 ): Promise<ScrollCaptureResult> {
   return invoke<ScrollCaptureResult>("screenshot_scroll_capture", {
     displayId: displayId ?? null,
     ...region,
+    mode,
   });
 }
 
@@ -172,6 +204,10 @@ export async function pinToScreen(path: string): Promise<string> {
 
 export async function fetchPinInit(): Promise<PinInit> {
   return invoke<PinInit>("screenshot_pin_init");
+}
+
+export async function setPinCompact(compact: boolean): Promise<void> {
+  return invoke<void>("screenshot_set_pin_compact", { compact });
 }
 
 export async function closePin(label: string): Promise<void> {

@@ -57,6 +57,7 @@ import {
   type OverlayInit,
   type RecordFormat,
   type ScreenshotPoint,
+  type ScrollMode,
 } from "../../lib/screenshot";
 import { contourBounds, contourPath, maskContour, pointInContour, transformContour, validContour } from "../../lib/screenshotSelection";
 import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
@@ -77,9 +78,15 @@ const HANDLE = 8;
 
 const COLORS: { value: string; testid: string; titleKey: string }[] = [
   { value: "#ff4d4f", testid: "screenshot-color-red", titleKey: "screenshot.colorRed" },
+  { value: "#fa8c16", testid: "screenshot-color-orange", titleKey: "screenshot.colorOrange" },
   { value: "#faad14", testid: "screenshot-color-yellow", titleKey: "screenshot.colorYellow" },
   { value: "#52c41a", testid: "screenshot-color-green", titleKey: "screenshot.colorGreen" },
+  { value: "#13c2c2", testid: "screenshot-color-cyan", titleKey: "screenshot.colorCyan" },
   { value: "#1677ff", testid: "screenshot-color-blue", titleKey: "screenshot.colorBlue" },
+  { value: "#722ed1", testid: "screenshot-color-purple", titleKey: "screenshot.colorPurple" },
+  { value: "#eb2f96", testid: "screenshot-color-pink", titleKey: "screenshot.colorPink" },
+  { value: "#8c8c8c", testid: "screenshot-color-gray", titleKey: "screenshot.colorGray" },
+  { value: "#000000", testid: "screenshot-color-black", titleKey: "screenshot.colorBlack" },
   { value: "#ffffff", testid: "screenshot-color-white", titleKey: "screenshot.colorWhite" },
 ];
 
@@ -331,6 +338,8 @@ export function ScreenshotOverlay() {
   const [contour, setContour] = useState<ScreenshotPoint[] | null>(null);
   const [tool, setTool] = useState<AnnotationTool>("select");
   const [color, setColor] = useState(COLORS[0].value);
+  const [colorDraft, setColorDraft] = useState(COLORS[0].value);
+  useEffect(() => setColorDraft(color), [color]);
   const [lineWidth, setLineWidth] = useState(4);
   const [fontFamily, setFontFamily] = useState(FONT_STACK);
   const [fontSize, setFontSize] = useState(18);
@@ -341,6 +350,7 @@ export function ScreenshotOverlay() {
   const [canRedo, setCanRedo] = useState(false);
   const [annotationSelected, setAnnotationSelected] = useState(false);
   const [scrollConfirm, setScrollConfirm] = useState(false);
+  const [scrollMode, setScrollMode] = useState<ScrollMode>("auto");
   const onAnnotationSelection = useCallback((shape: Shape | null) => {
     setAnnotationSelected(!!shape);
     setTextSelected(shape?.kind === "text");
@@ -769,7 +779,7 @@ export function ScreenshotOverlay() {
       setScrollConfirm(false);
       try {
         // The backend hides this window while it scrolls, then shows it.
-        const res = await scrollCapture(init.displayId || undefined, toPhysical(sel));
+        const res = await scrollCapture(init.displayId || undefined, toPhysical(sel), scrollMode);
         const loaded = await loadArtifact(res.path);
         await updateOverlayImage(res).catch(() => undefined);
         canvasRef.current?.clear();
@@ -1036,6 +1046,13 @@ export function ScreenshotOverlay() {
             }}
           />
         ))}
+        <input type="color" data-testid="screenshot-color-custom" aria-label={t("screenshot.colorCustom")} title={t("screenshot.colorCustom")}
+          value={color} className="w-7 h-7 mx-1 shrink-0 cursor-pointer rounded border border-[var(--taomni-divider)] p-0.5"
+          onChange={(e) => { setColor(e.target.value); if (tool === "move") canvasRef.current?.updateSelectedStyle({ color: e.target.value }); }} />
+        <input type="text" data-testid="screenshot-color-hex" aria-label={t("screenshot.colorHex")} title={t("screenshot.colorHex")} value={colorDraft} maxLength={7}
+          className="taomni-input h-7 w-20 px-1 text-[11px] font-mono" spellCheck={false}
+          onChange={(e) => { const value = e.target.value; setColorDraft(value); if (/^#[0-9a-fA-F]{6}$/.test(value)) { setColor(value.toLowerCase()); if (tool === "move") canvasRef.current?.updateSelectedStyle({ color: value.toLowerCase() }); } }}
+          onBlur={() => setColorDraft(color)} />
         {LINE_WIDTHS.map((w) => (
           <button
             key={w}
@@ -1076,7 +1093,7 @@ export function ScreenshotOverlay() {
         {!scrollResult && <ToolButton testid="screenshot-recrop" title={t("screenshot.recrop")} active={tool === "select"} onClick={() => setTool("select")}>
           <Crop size={16} />
         </ToolButton>}
-        <ToolButton testid="screenshot-pin" title={t("screenshot.pin")} onClick={() => void handlePin()}>
+        <ToolButton testid="screenshot-pin" title={t("screenshot.pinDescription")} onClick={() => void handlePin()}>
           <Pin size={16} />
         </ToolButton>
         <ToolButton testid="screenshot-ocr" title={t("screenshot.ocr")} onClick={() => void handleOcr()}>
@@ -1369,6 +1386,14 @@ export function ScreenshotOverlay() {
         className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 80, background: "rgba(0,0,0,0.25)" }}>
         <div className="rounded-xl shadow-2xl p-5 w-96 text-[13px]" style={panelStyle}>
           <p className="font-medium mb-2">{t("screenshot.scrollCapture")}</p>
+          <fieldset className="flex gap-4 mb-3">
+            <legend className="sr-only">{t("screenshot.scrollMode")}</legend>
+            {(["auto", "manual"] as const).map((mode) => <label key={mode} className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="scroll-mode" data-testid={`screenshot-scroll-mode-${mode}`} checked={scrollMode === mode} onChange={() => setScrollMode(mode)} />
+              {t(mode === "auto" ? "screenshot.scrollAuto" : "screenshot.scrollManual")}
+            </label>)}
+          </fieldset>
+          <p data-testid="screenshot-scroll-mode-description" className="mb-3">{t(scrollMode === "auto" ? "screenshot.scrollRunningHint" : "screenshot.scrollManualHint")}</p>
           <p data-testid="screenshot-scroll-instructions" className="mb-4">{t("screenshot.scrollInstructions", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
           <div className="flex justify-end gap-2">
             <button data-testid="screenshot-scroll-confirm-cancel" type="button" className="px-3 py-2 rounded-lg" onClick={() => setScrollConfirm(false)}>{t("screenshot.cancel")}</button>

@@ -1688,6 +1688,46 @@
 - `[data-testid="screenshot-annotation-resize-ne"]` — interactive — F27.1.screenshot-annotation-resize-ne
 - `[data-testid="screenshot-annotation-resize-sw"]` — interactive — F27.1.screenshot-annotation-resize-sw
 - `[data-testid="screenshot-annotation-resize-se"]` — interactive — F27.1.screenshot-annotation-resize-se
+- `[data-testid="screenshot-scroll-mode-auto"]` — interactive — F27.1.screenshot-scroll-mode-auto
+- `[data-testid="screenshot-scroll-mode-manual"]` — interactive — F27.1.screenshot-scroll-mode-manual
+- `[data-testid="screenshot-scroll-switch-mode"]` — interactive — F27.1.screenshot-scroll-switch-mode
+- `[data-testid="screenshot-color-orange"]` — interactive — F27.1.screenshot-color-orange
+- `[data-testid="screenshot-color-cyan"]` — interactive — F27.1.screenshot-color-cyan
+- `[data-testid="screenshot-color-purple"]` — interactive — F27.1.screenshot-color-purple
+- `[data-testid="screenshot-color-pink"]` — interactive — F27.1.screenshot-color-pink
+- `[data-testid="screenshot-color-gray"]` — interactive — F27.1.screenshot-color-gray
+- `[data-testid="screenshot-color-black"]` — interactive — F27.1.screenshot-color-black
+- `[data-testid="screenshot-color-custom"]` — interactive — F27.1.screenshot-color-custom
+- `[data-testid="screenshot-color-hex"]` — interactive — F27.1.screenshot-color-hex
+- `[data-testid="screenshot-pin-copy"]` — interactive — F27.1.screenshot-pin-copy
+- `[data-testid="screenshot-pin-save"]` — interactive — F27.1.screenshot-pin-save
+- `[data-testid="screenshot-pin-favorite"]` — interactive — F27.1.screenshot-pin-favorite
+- `[data-testid="screenshot-pin-collapse"]` — interactive — F27.1.screenshot-pin-collapse
+- `[data-testid="screenshot-pin-expand"]` — interactive — F27.1.screenshot-pin-expand
+- `[data-testid="screenshot-pin-menu-toggle"]` — interactive — F27.1.screenshot-pin-menu-toggle
+- `[data-testid="screenshot-pin-close"]` — interactive — F27.1.screenshot-pin-close
+- `[data-testid="screenshot-pin-zoom-out"]` — interactive — F27.1.screenshot-pin-zoom-out
+- `[data-testid="screenshot-pin-zoom-in"]` — interactive — F27.1.screenshot-pin-zoom-in
+- `[data-testid="screenshot-pin-reset"]` — interactive — F27.1.screenshot-pin-reset
+- `[data-testid="screenshot-pin-opacity"]` — interactive — F27.1.screenshot-pin-opacity
+- `[data-testid="system-screenshot-favorites"]` — interactive — F27.1.system-screenshot-favorites
+- `[data-testid="screenshot-favorites-refresh"]` — interactive — F27.1.screenshot-favorites-refresh
+- `[data-testid="screenshot-favorites-close"]` — interactive — F27.1.screenshot-favorites-close
+- `[data-testid="screenshot-favorite-open"]` — interactive — F27.1.screenshot-favorite-open
+- `[data-testid="screenshot-favorite-remove"]` — interactive — F27.1.screenshot-favorite-remove
+- `[data-testid="screenshot-scroll-mode-description"]` — display — F27.1.screenshot-scroll-mode-description
+- `[data-testid="screenshot-scroll-mode-hint"]` — display — F27.1.screenshot-scroll-mode-hint
+- `[data-testid="screenshot-pin-surface"]` — display — F27.1.screenshot-pin-surface
+- `[data-testid="screenshot-pin-toolbar"]` — display — F27.1.screenshot-pin-toolbar
+- `[data-testid="screenshot-pin-menu"]` — display — F27.1.screenshot-pin-menu
+- `[data-testid="screenshot-pin-zoom"]` — display — F27.1.screenshot-pin-zoom
+- `[data-testid="screenshot-pin-help"]` — display — F27.1.screenshot-pin-help
+- `[data-testid="screenshot-pin-notice"]` — display — F27.1.screenshot-pin-notice
+- `[data-testid="screenshot-favorites"]` — display — F27.1.screenshot-favorites
+- `[data-testid="screenshot-favorites-empty"]` — display — F27.1.screenshot-favorites-empty
+- `[data-testid="screenshot-favorite-item"]` — display — F27.1.screenshot-favorite-item
+- `[data-testid="screenshot-favorite-thumbnail"]` — display — F27.1.screenshot-favorite-thumbnail
+- `[data-testid="screenshot-favorites-error"]` — display — F27.1.screenshot-favorites-error
 
 ## screenshot/settings (F27.2)
 
