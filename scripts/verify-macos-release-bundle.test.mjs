@@ -45,7 +45,9 @@ if (name === "codesign") {
   const updater = args.at(-1).includes("/updater/");
   if (args.includes("--verify") && process.env.TEST_INVALID_SIGNATURE) process.exit(1);
   if (args.includes("--verbose=4")) console.error("Identifier=com.taomni.app\\nTeamIdentifier=TEAM123456\\nflags=" + (process.env.MACOS_SIGNING_MODE === "developer-id" || process.env.TEST_HARDENED_RUNTIME ? "0x10000(runtime)" : "0x0(none)"));
-  if (args.includes("--extract-certificates")) fs.writeFileSync(args[args.indexOf("--extract-certificates") + 1] + "0", updater && process.env.TEST_DIFFERENT_CERTIFICATE ? "different certificate" : "fixed certificate");
+  if (args.includes("--extract-certificates")) { console.error("certificate prefix was parsed as a filename"); process.exit(1); }
+  const extract = args.find((arg) => arg.startsWith("--extract-certificates="));
+  if (extract) fs.writeFileSync(extract.slice("--extract-certificates=".length) + "0", updater && process.env.TEST_DIFFERENT_CERTIFICATE ? "different certificate" : "fixed certificate");
   if (args.includes("-r-")) console.error('designated => identifier "com.taomni.app" and ' + (process.env.TEST_CDHASH ? 'cdhash H"binary-hash"' : 'anchor H"' + (updater && process.env.TEST_DIFFERENT_REQUIREMENT ? "changed-anchor" : "fixed-anchor") + '"'));
 }
 if (name === "spctl") console.error(process.env.TEST_UNNOTARIZED ? "source=Developer ID" : "source=Notarized Developer ID");

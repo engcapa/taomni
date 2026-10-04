@@ -73,7 +73,7 @@ CoreGraphics 的 `CGWindowListCreateImage` 在屏幕录制权限缺失时仍可�
 
 实际流程与检查：
 
-1. `configure-release-signing.mjs` 在临时钥匙串导入 `.p12`，核对证书名称、有效期、指纹和可用私钥。自签名证书只在一次性的 GitHub 托管 runner 中以 `codeSign` 策略配置管理员信任，通过非交互 sudo 避免弹窗；`always()` 清理步骤移除信任和钥匙串。脚本不会把 `.p12` 和其密码写入后续步骤的环境文件。
+1. `configure-release-signing.mjs` 在临时钥匙串导入 `.p12`，核对证书名称、有效期、指纹和可用私钥。自签名证书只在一次性的 GitHub 托管 runner 中以 `codeSign` 策略配置管理员信任，通过非交互 sudo 避免弹窗；`always()` 清理步骤删除私钥钥匙串和临时文件，并尝试移除证书信任。GitHub 托管 macOS runner 上的信任移除可能阻塞授权 UI，所有钥匙串命令设置 60 秒硬超时；只在一次性托管 runner 上允许将公开证书信任移除超时降为警告，信任项随 runner 销毁。私钥钥匙串删除失败仍使构建失败，本机或自托管 runner 不允许降级此错误。脚本不会把 `.p12` 和其密码写入后续步骤的环境文件。
 2. 传给 Tauri 的 `APPLE_SIGNING_IDENTITY` 使用已核对的证书指纹，同时用于 arm64 和 x86_64。加载路径修补、资源打包完成后由 Tauri 签名，再生成 `.app.tar.gz` 和升级 `.sig`；没有在归档生成后重新签名。自签名通过临时配置覆盖将 `bundle.macOS.hardenedRuntime` 设为 `false`：自签名没有 Apple Team ID，默认库验证会阻止加载捆绑的 krb5 动态库。Developer ID 构建启用 hardened runtime；基础配置和正式 Entitlements 不改写。
 3. `verify-macos-release-bundle.sh` 对最终 `.app` 和解压后的升级 `.app` 执行严格签名校验，核对固定证书、`com.taomni.app`、对应签名模式的 runtime 配置、稳定的指定要求、相同的主程序及指定要求。公证启用时另查 Gatekeeper 和 stapler。原有 Xray 架构检查和上游 Redirector 原始归档字节检查继续执行。
 4. 构建步骤只保存 workflow artifacts，汇总作业要求全部平台完成，且两种 macOS 架构都有 DMG 安装包。它为两个架构生成不同的升级 URL，复制时保留安装包、归档和 `.sig` 的原始字节。`verify-updater-signatures.mjs` 按 Tauri 的 Minisign 格式用内置公钥验证所有升级包及 trusted comment；全部通过后才创建或复用 GitHub release、上传安装包与升级资源，最后上传完整的 `latest.json`。已有 release 的标题和说明保留，新建 release 自动生成说明并按版本判断 prerelease，先保持 draft，所有文件上传成功后才公开，避免空发行版成为最新版本。
@@ -89,7 +89,7 @@ Intel Mac 可使用空 tag、`platforms=macos`、`macos_arch=x86_64`，分别构
 
 先安装第一个版本、实际完成系统屏幕录制授权并截图另一个应用，再安装第二个版本。记录两次安装包的版本、证书指纹、指定要求和 cdhash：证书与指定要求应相同，而版本与 cdhash 应不同。只有第二个版本实际截图成功且没有重新授权，才能确认这台机器上的授权保留。
 
-验证范围：Node.js 22 下 55 项脚本测试通过，覆盖签名配置、模拟钥匙串导入/失败与清理、应用与升级归档验收分支、升级清单/签名校验。升级验签包含上游 Minisign 的已知测试向量、正确签名、错误密钥、篡改包和篡改 trusted comment；macOS 验收分支使用模拟系统命令，不等同于真实证书签包。`release-workflow.test.mjs` 读取当前工作流的汇总步骤，用临时升级签名包与模拟 gh 执行已有发行版、新建正式版/prerelease、草稿重跑和失败路径，确认签名校验失败时无 GitHub 调用、资源在清单之前上传、上传失败不公开草稿。工作流通过 actionlint、24 个 Bash run block 的语法检查和 YAML 解析。
+验证范围：Node.js 22 下 55 项基础脚本测试通过，覆盖签名配置、模拟钥匙串导入/失败与清理、应用与升级归档验收分支、升级清单/签名校验。升级验签包含上游 Minisign 的已知测试向量、正确签名、错误密钥、篡改包和篡改 trusted comment；macOS 验收分支使用模拟系统命令，不等同于真实证书签包。`release-workflow.test.mjs` 读取当前工作流的汇总步骤，用临时升级签名包与模拟 gh 执行已有发行版、新建正式版/prerelease、草稿重跑和失败路径，确认签名校验失败时无 GitHub 调用、资源在清单之前上传、上传失败不公开草稿。工作流通过 actionlint、24 个 Bash run block 的语法检查和 YAML 解析。
 
 本地证据：`qa-ui-auto-report/macos-screenshot-permission/_local/release-signing-tests.log`。尚未使用真实发行证书运行 GitHub 发布，也没有实际安装两个版本来验证跨升级 TCC 授权保留；配置完成后的第一轮发布仍需这些验收。
 
@@ -103,3 +103,11 @@ Intel Mac 可使用空 tag、`platforms=macos`、`macos_arch=x86_64`，分别构
 - 保留像素采集场景为 `TC-SHOT-N10`。实际授予 Apple 系统权限、全局快捷键物理输入、自签名跨升级授权及 Windows/Linux 运行结果需要各自的证据，不能从拒绝场景或编译成功推断。
 
 本次不增加新的可交互控件，复用已有 `alert-dialog-message` / `alert-dialog-ok`。新增用例已注册任务范围对应的 CI policy，无新的用例依赖。
+
+## 真实 GitHub 构建发现并修复的问题
+
+2026-10-04 的 artifact-only Intel 构建 `37182632460` 编译和打包成功，实际应用通过严格签名验证，Identifier 为 `com.taomni.app`，自签名模式没有 hardened runtime。后续失败来自验收脚本而非应用签名：`codesign --extract-certificates` 的可选前缀必须写成 `--extract-certificates=前缀`；空格写法会将前缀当作待处理文件，报不存在。修复脚本及模拟命令，后者现在拒绝旧写法。
+
+该 runner 的 `sudo security remove-trusted-cert -d` 也在授权处理中超时，而私钥钥匙串删除成功。清理保留硬超时及私钥删除要求，仅在一次性 GitHub 托管 runner 上将公开信任项清理失败报告为警告。签名后验收失败时先保存 DMG/升级归档为 7 天诊断工件，再清理钥匙串；macOS Rust 依赖缓存允许在失败时保存，减少签名流水线修复重跑的重复编译。实际安装/跨升级授权结论继续以本机两版本测试为准。
+
+下载该次诊断 DMG 后，在 macOS 14.8.7 Intel 上使用修正后的完整 bundle 验收通过：DMG 内应用与升级归档使用同一证书 `27208EA12720F93C293D310EBC51D6F843E094E5`，指定要求为 `identifier "com.taomni.app" and certificate root = H"27208ea12720f93c293d310ebc51d6f843e094e5"`，不是 cdhash；架构、捆绑 Xray 和 Redirector 原始字节也通过。升级归档已按仓库内置公钥完成真实 Minisign 验签。第一版本为 `0.4.31-permission.1`，主程序 cdhash 为 `6b015220911229b96d7db461487b0eb3e6c12d96`。修正脚本及清理策略后的 24 项相关 Node.js 22 测试通过；跨升级授权尚待实际两次安装验收。

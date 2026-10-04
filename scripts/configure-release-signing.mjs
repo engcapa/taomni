@@ -172,7 +172,15 @@ export function cleanupMacosCertificate(env, runSecurity = security) {
   try {
     if (existsSync(certificatePath)) runSecurity(["remove-trusted-cert", "-d", certificatePath], "remove CI certificate trust");
   } catch (error) {
-    failure = error;
+    // macOS hosted runners can block in the trust-removal authorization UI
+    // even under sudo. The public trust entry expires with this disposable
+    // runner; deleting the private-key keychain/files below remains mandatory.
+    // security() rejects trust mutations on persistent/self-hosted machines.
+    if (env.GITHUB_ACTIONS === "true" && env.RUNNER_ENVIRONMENT === "github-hosted") {
+      console.warn("::warning::Could not remove the temporary code-signing trust entry; it will be discarded with this GitHub-hosted runner. Private-key cleanup continues.");
+    } else {
+      failure = error;
+    }
   } finally {
     try { runSecurity(["delete-keychain", join(workDir, "signing.keychain-db")], "delete signing keychain"); } catch (error) { failure ??= error; }
     rmSync(workDir, { recursive: true, force: true });

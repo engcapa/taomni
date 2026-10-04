@@ -73,7 +73,7 @@ verify_certificate_signature() {
     echo "Self-signed bundles must disable hardened runtime to load krb5 libraries without an Apple Team ID." >&2
     return 1
   fi
-  codesign -d --extract-certificates "$certificate_prefix" "$signed_app"
+  codesign -d --extract-certificates="$certificate_prefix" "$signed_app"
   actual_certificate="$(shasum -a 1 "${certificate_prefix}0" | awk '{print toupper($1)}')"
   printf 'Signing certificate SHA-1: %s\n' "$actual_certificate"
   test "$actual_certificate" = "$expected_certificate" || {

@@ -166,3 +166,22 @@ test("cleanup removes the temporary keychain/files even when removing CI trust f
   assert.throws(() => cleanupMacosCertificate({ RUNNER_TEMP: root, MACOS_SIGNING_WORK_DIR: root }), /unexpected signing directory/);
   assert(existsSync(root));
 });
+
+test("hosted cleanup tolerates a public trust-removal timeout but still fails private-key deletion", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "taomni-hosted-cleanup-unit-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const privateKeyFailure of [false, true]) {
+    const workDir = mkdtempSync(join(root, "taomni-signing-"));
+    writeFileSync(join(workDir, "certificate.pem"), "public certificate");
+    const calls = [];
+    const cleanup = () => cleanupMacosCertificate({ RUNNER_TEMP: root, MACOS_SIGNING_WORK_DIR: workDir, GITHUB_ACTIONS: "true", RUNNER_ENVIRONMENT: "github-hosted" }, (args) => {
+      calls.push(args[0]);
+      if (args[0] === "remove-trusted-cert") throw new Error("trust-removal timeout");
+      if (privateKeyFailure) throw new Error("private key deletion failed");
+    });
+    if (privateKeyFailure) assert.throws(cleanup, /private key deletion failed/);
+    else cleanup();
+    assert.deepEqual(calls, ["remove-trusted-cert", "delete-keychain"]);
+    assert(!existsSync(workDir));
+  }
+});
