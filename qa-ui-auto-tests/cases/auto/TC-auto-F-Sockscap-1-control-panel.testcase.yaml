@@ -1,7 +1,6 @@
 id: TC-auto-F-Sockscap-1
 title: SocksCap panel opens and browser-preview controls transition safely
-description: 'F-Sockscap-1 browser smoke coverage. The browser runtime deliberately
-  has no
+description: 'F-Sockscap-1 browser smoke coverage. The browser runtime deliberately has no
 
   OS packet capture, so Start must enter its degraded preview state rather than
 
@@ -14,15 +13,16 @@ description: 'F-Sockscap-1 browser smoke coverage. The browser runtime deliberat
   separately by Rust/Vitest tests and native desktop validation.
 
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained.
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'
 covers:
 - F-Sockscap-1
 tags:
 - auto-generated
 - smoke
-- needs-review
 - network
 - sockscap
 modes:
@@ -45,42 +45,94 @@ steps:
     name: aria-expanded
     equals: 'false'
 - click: '[data-testid="sockscap-section-profile-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-profile-toggle"]'
+    name: aria-expanded
+    equals: 'true'
 - click: '[data-testid="sockscap-section-profile-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-profile-toggle"]'
+    name: aria-expanded
+    equals: 'false'
 - assert_attribute:
     selector: '[data-testid="sockscap-section-scope-toggle"]'
     name: aria-expanded
     equals: 'false'
 - click: '[data-testid="sockscap-section-scope-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-scope-toggle"]'
+    name: aria-expanded
+    equals: 'true'
 - click: '[data-testid="sockscap-section-scope-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-scope-toggle"]'
+    name: aria-expanded
+    equals: 'false'
 - assert_attribute:
     selector: '[data-testid="sockscap-section-upstream-toggle"]'
     name: aria-expanded
     equals: 'false'
 - click: '[data-testid="sockscap-section-upstream-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-upstream-toggle"]'
+    name: aria-expanded
+    equals: 'true'
 - click: '[data-testid="sockscap-section-upstream-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-upstream-toggle"]'
+    name: aria-expanded
+    equals: 'false'
 - assert_attribute:
     selector: '[data-testid="sockscap-section-rules-toggle"]'
     name: aria-expanded
     equals: 'false'
 - click: '[data-testid="sockscap-section-rules-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-rules-toggle"]'
+    name: aria-expanded
+    equals: 'true'
 - click: '[data-testid="sockscap-section-rules-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-rules-toggle"]'
+    name: aria-expanded
+    equals: 'false'
 - assert_attribute:
     selector: '[data-testid="sockscap-section-gfwlist-toggle"]'
     name: aria-expanded
     equals: 'false'
 - click: '[data-testid="sockscap-section-gfwlist-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-gfwlist-toggle"]'
+    name: aria-expanded
+    equals: 'true'
 - click: '[data-testid="sockscap-section-gfwlist-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-gfwlist-toggle"]'
+    name: aria-expanded
+    equals: 'false'
 - assert_attribute:
     selector: '[data-testid="sockscap-domains-toggle"]'
     name: aria-expanded
     equals: 'false'
 - click: '[data-testid="sockscap-domains-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-domains-toggle"]'
+    name: aria-expanded
+    equals: 'true'
 - click: '[data-testid="sockscap-domains-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-domains-toggle"]'
+    name: aria-expanded
+    equals: 'false'
 - assert_attribute:
     selector: '[data-testid="sockscap-section-test-toggle"]'
     name: aria-expanded
     equals: 'false'
 - click: '[data-testid="sockscap-section-test-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-test-toggle"]'
+    name: aria-expanded
+    equals: 'true'
 - fill:
     selector: '[data-testid="sockscap-test-host"]'
     value: www.google.com
@@ -106,96 +158,138 @@ steps:
 - click: '[data-testid="sockscap-stop"]'
 - wait_for: '[data-testid="sockscap-start"]'
 - click: '[data-testid="sockscap-recover"]'
+- wait_for: '[data-testid="sockscap-start"]'
+- assert_enabled: '[data-testid="sockscap-add-profile"]'
+- assert_not_visible: '[data-testid="sockscap-locked-banner"]'
 - screenshot: sockscap-control-panel.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SocksCap panel opens and browser-preview controls transition safely：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Workspaces/Tools 入口打开 SocksCap；六个折叠分组的展开和收起都更新 aria-expanded。
     actions:
-    - 1
     - 3
     - 4
     - 9
     - 11
-    - 12
-    - 14
-    - 15
-    - 17
+    - 13
+    - 16
     - 18
-    - 20
     - 21
     - 23
-    - 24
     - 26
-    - 27
-    - 29
-    - 30
+    - 28
     - 31
     - 33
-    - 34
     - 36
     - 38
-    - 42
-    - 44
-    - 48
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 5
-      expectation: '{"wait_for": "[data-testid=\"sockscap-panel\"]"}'
     - step: 6
-      expectation: '{"assert_visible": "[data-testid=\"sockscap-start\"]"}'
+      expectation: 开始入口可见。
     - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"sockscap-refresh-status\"]"}'
+      expectation: 状态刷新入口可见。
     - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"sockscap-recover\"]"}'
-    - step: 10
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-profile-toggle\"]",
-        "name": "aria-expanded", "equals": "false"}}'
-    - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-scope-toggle\"]",
-        "name": "aria-expanded", "equals": "false"}}'
-    - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-upstream-toggle\"]",
-        "name": "aria-expanded", "equals": "false"}}'
+      expectation: 恢复入口可见。
+    - step: 12
+      expectation: 第 11 步所属分组 expand 状态正确。
+    - step: 14
+      expectation: 第 11 步所属分组 collapse 状态正确。
+    - step: 17
+      expectation: 第 14 步所属分组 expand 状态正确。
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-rules-toggle\"]",
-        "name": "aria-expanded", "equals": "false"}}'
+      expectation: 第 14 步所属分组 collapse 状态正确。
     - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-gfwlist-toggle\"]",
-        "name": "aria-expanded", "equals": "false"}}'
-    - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-domains-toggle\"]",
-        "name": "aria-expanded", "equals": "false"}}'
-    - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-test-toggle\"]",
-        "name": "aria-expanded", "equals": "false"}}'
+      expectation: 第 17 步所属分组 expand 状态正确。
+    - step: 24
+      expectation: 第 17 步所属分组 collapse 状态正确。
+    - step: 27
+      expectation: 第 20 步所属分组 expand 状态正确。
+    - step: 29
+      expectation: 第 20 步所属分组 collapse 状态正确。
     - step: 32
-      expectation: '{"assert_visible": "[data-testid=\"sockscap-test-detail\"]"}'
-    - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sockscap-panel\"]",
-        "contains": "方案 2"}}'
+      expectation: 第 23 步所属分组 expand 状态正确。
+    - step: 34
+      expectation: 第 23 步所属分组 collapse 状态正确。
     - step: 37
-      expectation: '{"wait_for": "[data-testid=\"sockscap-probe-fail-dialog\"]"}'
+      expectation: 第 26 步所属分组 expand 状态正确。
     - step: 39
-      expectation: '{"wait_for": "[data-testid=\"sockscap-stop\"]"}'
-    - step: 40
-      expectation: '{"assert_visible": "[data-testid=\"sockscap-locked-banner\"]"}'
-    - step: 41
-      expectation: '{"assert_disabled": "[data-testid=\"sockscap-add-profile\"]"}'
-    - step: 43
-      expectation: '{"assert_disabled": "[data-testid=\"sockscap-rules-editor\"]"}'
-    - step: 45
-      expectation: '{"assert_disabled": "[data-testid=\"sockscap-refresh-gfw\"]"}'
-    - step: 46
-      expectation: '{"assert_disabled": "[data-testid=\"sockscap-import-gfw\"]"}'
-    - step: 47
-      expectation: '{"assert_disabled": "[data-testid=\"sockscap-block-quic\"]"}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"sockscap-start\"]"}'
+      expectation: 第 26 步所属分组 collapse 状态正确。
     results:
+    - 6
+    - 7
+    - 8
+    - 12
+    - 14
+    - 17
+    - 19
+    - 22
+    - 24
+    - 27
+    - 29
+    - 32
+    - 34
+    - 37
+    - 39
+  - id: R2
+    requirement: test 分组展开后可检查目标细节并返回，新增 profile 的名称出现在面板。
+    actions:
+    - 41
+    - 43
+    - 44
+    - 46
+    - 47
+    checkpoints:
+    - step: 42
+      expectation: test 分组已展开。
+    - step: 45
+      expectation: 目标测试详情可见。
+    - step: 48
+      expectation: 新增方案 2 可见。
+    results:
+    - 42
+    - 45
+    - 48
+  - id: R3
+    requirement: browser preview 的 probe 失败可显式 force start；运行期间配置锁定，停止/恢复后解除。
+    actions:
     - 49
+    - 51
+    - 55
+    - 57
+    - 61
+    - 63
+    checkpoints:
+    - step: 52
+      expectation: force start 后停止按钮可见。
+    - step: 53
+      expectation: 运行期间锁定 banner 可见。
+    - step: 54
+      expectation: 运行期间新增方案禁用。
+    - step: 56
+      expectation: 运行期间规则编辑禁用。
+    - step: 58
+      expectation: 运行期间 GFW 刷新禁用。
+    - step: 59
+      expectation: 运行期间 GFW 导入禁用。
+    - step: 60
+      expectation: 运行期间 QUIC 配置禁用。
+    - step: 64
+      expectation: 停止恢复后开始按钮可见。
+    - step: 65
+      expectation: 停止恢复后新增方案可用。
+    - step: 66
+      expectation: 停止恢复后锁定 banner 消失。
+    results:
+    - 52
+    - 53
+    - 54
+    - 56
+    - 58
+    - 59
+    - 60
+    - 64
+    - 65
+    - 66
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -3209,7 +3209,6 @@ export function TerminalPanel({
       };
       if (ssh && !adopted) {
         if (mode === "reconnect") {
-          term.write(`\r\n\x1b[32m[Reconnected to ${ssh.username}@${ssh.host}:${ssh.port}]\x1b[0m\r\n`);
           setStatusMessage("SSH reconnected");
           window.setTimeout(focusTerminal, 0);
           window.dispatchEvent(
@@ -3217,8 +3216,6 @@ export function TerminalPanel({
               detail: { tabId },
             }),
           );
-        } else {
-          term.write(formatSshInfoBanner(ssh));
         }
         // Install continuous OSC 7 cwd reporting on the remote shell so the tab
         // always knows its working directory — used by SFTP "Sync" and, crucially,
@@ -3343,6 +3340,9 @@ export function TerminalPanel({
         setStatusMessage("Reconnecting SSH terminal");
       } else {
         term.write(`\x1b[33mConnecting to ${ssh.username}@${ssh.host}:${ssh.port}...\x1b[0m\r\n`);
+        // Output can arrive before createSshTerminal resolves. Keep app banners
+        // ahead of the server output so its first prompt remains the last line.
+        term.write(formatSshInfoBanner(ssh));
       }
 
       fitVisibleTerminal();

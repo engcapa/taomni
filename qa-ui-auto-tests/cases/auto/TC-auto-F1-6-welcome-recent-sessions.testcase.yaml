@@ -1,7 +1,6 @@
 id: TC-auto-F1-6-welcome-recent-sessions
 title: Welcome recent sessions restore and filter controls
-description: 'Creates a saved LocalShell session, opens it once so last_connected_at
-  is set,
+description: 'Creates a saved LocalShell session, opens it once so last_connected_at is set,
 
   then verifies the Welcome recent-session history supports filtering, type
 
@@ -12,12 +11,13 @@ description: 'Creates a saved LocalShell session, opens it once so last_connecte
   history settings shortcut.
 
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained.
 
-  Browser local terminal output uses an explicit IPC preview fixture; native mode
-  uses the real PTY backend.'
+  Browser local terminal output uses an explicit IPC preview fixture; native mode uses the real PTY backend.
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'
 covers:
 - F1.6
 - F11.1
@@ -26,7 +26,6 @@ tags:
 - smoke
 - p1
 - welcome
-- needs-review
 modes:
 - browser
 fixtures:
@@ -126,14 +125,19 @@ steps:
 - fill:
     selector: '[data-testid="settings-welcome-recent-session-limit"]'
     value: '20'
+- assert_localstorage:
+    key: taomni.welcomeRecentSessionLimit
+    equals: '20'
+- assert_value:
+    selector: '[data-testid="settings-welcome-recent-session-limit"]'
+    equals: '20'
 - screenshot: F1.6-welcome-recent-sessions.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Welcome recent sessions restore and filter controls：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: 新建并打开 LocalShell 后 Home 最近会话出现；名称/类型/排序、选择/清除和批量打开有效。
     actions:
-    - 1
     - 5
     - 7
     - 8
@@ -148,12 +152,49 @@ verification:
     - 23
     - 24
     - 25
+    checkpoints:
+    - step: 4
+      expectation: 初始最近会话为空。
+    - step: 20
+      expectation: 筛选后目标最近会话可见。
+    - step: 22
+      expectation: 选择全部后清除选择入口可见。
+    - step: 26
+      expectation: 打开选中后活动终端可见。
+    results:
+    - 4
+    - 20
+    - 22
+    - 26
+  - id: R2
+    requirement: 最近会话 reveal 定位真实 SessionTree；Tools/Sessions 导航和右键 Connect 都保留会话。
+    actions:
     - 27
     - 29
     - 32
     - 33
     - 36
     - 38
+    checkpoints:
+    - step: 30
+      expectation: reveal 后目标树项可见。
+    - step: 31
+      expectation: reveal 后目标树项 data-selected=true。
+    - step: 35
+      expectation: 导航返回后树项仍可见。
+    - step: 37
+      expectation: 既有五种右键动作保留。
+    - step: 39
+      expectation: 右键 Connect 后活动终端可见。
+    results:
+    - 30
+    - 31
+    - 35
+    - 37
+    - 39
+  - id: R3
+    requirement: 最近会话 filtered/all/单项打开都进入终端，无匹配过滤显示空状态；Settings 保存 recent limit。
+    actions:
     - 40
     - 41
     - 43
@@ -166,88 +207,27 @@ verification:
     - 53
     - 54
     - 56
+    - 58
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 3
-      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-sessions\"]"}'
-    - step: 4
-      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-empty\"]"}'
-    - step: 6
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
-    - step: 14
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec":
-        10}}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"welcome-recent-session-row\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
-    - step: 20
-      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-session-row\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
-    - step: 22
-      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-clear-selection\"]"}'
-    - step: 26
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"]
-        [data-testid=\"terminal-pane\"]", "timeout_sec": 10}}'
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"welcome-recent-session-row\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
-    - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
-    - step: 31
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-welcome-recent\"]",
-        "name": "data-selected", "equals": "true"}}'
-    - step: 34
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 35
-      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
-    - step: 37
-      expectation: '{"assert_menu_items": ["Connect", "Edit...", "Duplicate", "Move
-        to folder", "Delete"]}'
-    - step: 39
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"]
-        [data-testid=\"terminal-pane\"]", "timeout_sec": 10}}'
     - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"]
-        [data-testid=\"terminal-pane\"]", "timeout_sec": 10}}'
+      expectation: 打开 filtered 后活动终端可见。
     - step: 46
-      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-no-matches\"]"}'
+      expectation: 无匹配时 no-matches 可见。
     - step: 49
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"]
-        [data-testid=\"terminal-pane\"]", "timeout_sec": 10}}'
+      expectation: 打开 all 后活动终端可见。
     - step: 52
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"]
-        [data-testid=\"terminal-pane\"]", "timeout_sec": 10}}'
-    - step: 55
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 57
-      expectation: '{"wait_for": "[data-testid=\"settings-welcome-recent-session-limit\"]"}'
+      expectation: 单项打开后活动终端可见。
+    - step: 59
+      expectation: recent limit 持久化为 20。
+    - step: 60
+      expectation: recent limit 输入精确为 20。
     results:
-    - 2
-    - 3
-    - 4
-    - 6
-    - 9
-    - 12
-    - 14
-    - 16
-    - 20
-    - 22
-    - 26
-    - 28
-    - 30
-    - 31
-    - 34
-    - 35
-    - 37
-    - 39
     - 42
     - 46
     - 49
     - 52
-    - 55
-    - 57
+    - 59
+    - 60
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -1,4 +1,6 @@
 .taomni-main-window .taomni-control-bar { height: 42px; }
+[data-testid="shell-rail"] > button { min-height: 32px; flex-shrink: 0; }
+[data-testid="shell-overview-trigger"], [data-testid="shell-quick-switch"] { min-width: 32px; min-height: 32px; flex-shrink: 0; }
 .shell-tab-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
 [data-testid="shell-root"] button:focus-visible, [data-testid="control-bar"] button:focus-visible { outline: 2px solid var(--taomni-accent); outline-offset: -2px; }
 [data-testid="shell-host"] header button { min-width: 28px; min-height: 28px; }

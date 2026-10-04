@@ -13,9 +13,11 @@ description: 'F-I18n-1: tests the bilingual UI introduced in v0.1.32. Default lo
   same set of options for users who don''t notice the tray button.
 
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained.
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'
 covers:
 - F-I18n-1
 tags:
@@ -23,7 +25,6 @@ tags:
 - i18n
 - ui
 - p1
-- needs-review
 modes:
 - browser
 fixtures:
@@ -64,47 +65,44 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Language switcher cycles between English and Simplified Chinese：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: 状态栏语言菜单可选择简体中文并持久化，同时两个选项保留。
     actions:
-    - 1
     - 4
     - 8
+    checkpoints:
+    - step: 6
+      expectation: English 菜单项可见。
+    - step: 7
+      expectation: 简体中文菜单项可见。
+    - step: 10
+      expectation: locale 保存为 zh-CN。
+    results:
+    - 6
+    - 7
+    - 10
+  - id: R2
+    requirement: Settings Rail 的 general 分组保留语言选择，重复中文和切回英文均保存正确值。
+    actions:
     - 11
     - 13
     - 17
     - 19
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
-    - step: 3
-      expectation: '{"assert_visible": "[data-testid=\"language-switcher\"]"}'
-    - step: 5
-      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 6
-      expectation: '{"assert_visible": "[data-testid=\"language-option-en\"]"}'
-    - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"language-option-zh-CN\"]"}'
-    - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "state":
-        "detached", "timeout_sec": 5}}'
-    - step: 10
-      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains":
-        "zh-CN"}}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"settings-language-section\"]"}'
+      expectation: 语言设置分组可见。
     - step: 15
-      expectation: '{"assert_visible": "[data-testid=\"settings-language-en\"]"}'
+      expectation: 英文设置按钮可见。
     - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"settings-language-zh-CN\"]"}'
+      expectation: 中文设置按钮可见。
     - step: 18
-      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains":
-        "zh-CN"}}'
+      expectation: 重复中文保存 zh-CN。
     - step: 20
-      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "contains":
-        "en"}}'
+      expectation: 切回英文保存 en。
     results:
+    - 14
+    - 15
+    - 16
+    - 18
     - 20
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。

@@ -38,6 +38,11 @@ const baseParams = {
 };
 
 describe("buildAppMenuSpec", () => {
+  it("routes native View split and MultiExec through the same terminal commands", () => {
+    const view = submenu(buildAppMenuSpec(baseParams), "view");
+    expect(actions(view.items)).toContain("split");
+    expect(actions(view.items)).toContain("multiexec");
+  });
   it("exposes the expected top-level menus in order", () => {
     const spec = buildAppMenuSpec(baseParams);
     expect(spec.submenus.map((s) => s.id)).toEqual([

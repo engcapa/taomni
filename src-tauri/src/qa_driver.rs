@@ -965,6 +965,27 @@ async fn native_about<R: Runtime>(
     State(state): State<DriverState<R>>,
     Path(session_id): Path<String>,
 ) -> Response {
+    activate_native_menu_item(state, session_id, "app", "about").await
+}
+
+async fn native_view_menu<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+    Json(payload): Json<Value>,
+) -> Response {
+    let Some(action @ ("split" | "multiexec")) = payload.get("action").and_then(Value::as_str)
+    else {
+        return error("unsupported native View menu action");
+    };
+    activate_native_menu_item(state, session_id, "view", action).await
+}
+
+async fn activate_native_menu_item<R: Runtime>(
+    state: DriverState<R>,
+    session_id: String,
+    submenu_id: &str,
+    item_id: &str,
+) -> Response {
     if !session_is_valid(&session_id)
         || !cfg!(debug_assertions)
         || state.app.config().identifier != crate::QA_APP_ID
@@ -974,6 +995,8 @@ async fn native_about<R: Runtime>(
     #[cfg(target_os = "macos")]
     {
         let app = state.app.clone();
+        let submenu_id = submenu_id.to_string();
+        let selected_item_id = item_id.to_string();
         let (tx, rx) = oneshot::channel();
         if let Err(err) = state.app.run_on_main_thread(move || {
             let result = (|| -> Result<(), String> {
@@ -981,14 +1004,14 @@ async fn native_about<R: Runtime>(
                 use objc2_foundation::NSString;
                 use tauri::menu::MenuItemKind;
                 let menu = app.menu().ok_or("application menu is not installed yet")?;
-                let Some(MenuItemKind::Submenu(submenu)) = menu.get("app") else {
+                let Some(MenuItemKind::Submenu(submenu)) = menu.get(&submenu_id) else {
                     return Err("application submenu is not installed yet".into());
                 };
-                let Some(MenuItemKind::MenuItem(item)) = submenu.get("about") else {
-                    return Err("About item is not installed yet".into());
+                let Some(MenuItemKind::MenuItem(item)) = submenu.get(&selected_item_id) else {
+                    return Err("requested native menu item is not installed yet".into());
                 };
                 if !item.is_enabled().map_err(|e| e.to_string())? {
-                    return Err("About item is disabled".into());
+                    return Err("requested native menu item is disabled".into());
                 }
                 let title = item.text().map_err(|e| e.to_string())?;
                 // SAFETY: AppKit access occurs on the main thread. Objects
@@ -1022,7 +1045,7 @@ async fn native_about<R: Runtime>(
                         msg_send![class!(NSApplication), sharedApplication];
                     let menu: Option<Retained<AnyObject>> = msg_send![&*application, mainMenu];
                     if !menu.is_some_and(|menu| activate(&menu, &title)) {
-                        return Err("installed AppKit About item was not found".into());
+                        return Err("installed AppKit menu item was not found".into());
                     }
                 }
                 Ok(())
@@ -1032,13 +1055,16 @@ async fn native_about<R: Runtime>(
             return error(err.to_string());
         }
         return match tokio::time::timeout(Duration::from_secs(10), rx).await {
-            Ok(Ok(Ok(()))) => ok(json!({"activated": "about", "transport": "AppKit NSMenu"})),
+            Ok(Ok(Ok(()))) => ok(json!({"activated": item_id, "transport": "AppKit NSMenu"})),
             Ok(Ok(Err(message))) => error(message),
-            _ => error("native About activation timed out"),
+            _ => error("native menu activation timed out"),
         };
     }
     #[cfg(not(target_os = "macos"))]
-    error("native About activation requires macOS")
+    {
+        let _ = (state, submenu_id, item_id);
+        error("native menu activation requires macOS")
+    }
 }
 
 /// Start the opt-in bridge and return immediately so Tauri can finish setup.
@@ -1109,6 +1135,10 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             .route(
                 "/session/{session_id}/qa/native-about",
                 post(native_about::<R>),
+            )
+            .route(
+                "/session/{session_id}/qa/native-view-menu",
+                post(native_view_menu::<R>),
             )
             .route("/session/{session_id}/refresh", post(refresh::<R>))
             .route("/session/{session_id}/url", get(current_url::<R>))

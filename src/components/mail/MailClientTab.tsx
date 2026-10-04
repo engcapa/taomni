@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type UIEvent } from "react";
+import { useMountedRef } from "../../hooks/useMountedRef";
 import {
   Group as PanelGroup,
   Panel,
@@ -2680,6 +2681,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   }, [messageTabs, messages, selectedMessageKey]);
 
   const autoReadKeyRef = useRef<string | null>(null);
+  const mountedRef = useMountedRef();
   const remoteImagesMessageKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!visible) return;
@@ -2703,7 +2705,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     void (async () => {
       try {
         const result = await mailMarkRead(info, selectedMessage.folder, [selectedMessage.uid], false);
-        if (!cancelled && result.marked > 0) {
+        // The server completed this read even when selection/body changed
+        // during the request. Keep local flags in step with that real effect.
+        if (mountedRef.current && result.marked > 0) {
           markMessagesReadLocally(selectedMessage.folder, [selectedMessage.uid], result.marked);
         }
       } catch (e) {
@@ -2713,7 +2717,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     return () => {
       cancelled = true;
     };
-  }, [info, loadBody, markMessagesReadLocally, selectedBody, selectedMessage, visible]);
+  }, [info, loadBody, markMessagesReadLocally, mountedRef, selectedBody, selectedMessage, visible]);
 
   useEffect(() => {
     setCheckedMessageKeys((current) => {

@@ -1,7 +1,6 @@
 id: TC-auto-F-DB-1-schema-tree-double-click-qualified-native
 title: Native schema-tree double-click inserts the database-qualified name
-description: 'Connects a real MySQL/MariaDB session whose default database is `test`,
-  filters
+description: 'Connects a real MySQL/MariaDB session whose default database is `test`, filters
 
   the schema tree for a table that lives in `information_schema`, double-clicks
 
@@ -11,13 +10,14 @@ description: 'Connects a real MySQL/MariaDB session whose default database is `t
 
   is then executed and the result grid must appear, proving the inserted
 
-  reference resolves in a real connection. Cross-platform native target (Linux, macOS,
-  Windows).
+  reference resolves in a real connection. Cross-platform native target (Linux, macOS, Windows).
 
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained.
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'
 covers:
 - F-DB-1
 tags:
@@ -26,7 +26,6 @@ tags:
 - schema-tree
 - qualified-name
 - native-boundary
-- needs-review
 modes:
 - native
 native_platforms:
@@ -119,12 +118,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Native schema-tree double-click inserts the database-qualified name：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: 真实 MySQL schema tree 筛选 TABLES 后，双击对应对象将数据库限定名插入 SQL 编辑器。
     actions:
-    - 1
-    - 2
-    - 4
-    - 5
     - 8
     - 10
     - 12
@@ -143,48 +138,23 @@ verification:
     - 32
     - 33
     - 35
+    checkpoints:
+    - step: 29
+      expectation: 真实连接无错误 banner。
+    - step: 37
+      expectation: 编辑器含 `information_schema`.`TABLES`。
+    results:
+    - 29
+    - 37
+  - id: R2
+    requirement: 插入限定名后通过 SQL 编辑器执行该限定对象的查询，真实结果网格可见。
+    actions:
     - 39
     - 40
     - 41
     checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 6
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]",
-        "timeout_sec": 10}}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-pw1\"]",
-        "timeout_sec": 15}}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-qualified\"]"}'
-    - step: 28
-      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec":
-        60}}'
-    - step: 29
-      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
-    - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"schema-tree\"]", "timeout_sec":
-        30}}'
-    - step: 31
-      expectation: '{"wait_for": {"selector": "[data-testid=\"schema-tree-filter\"]",
-        "timeout_sec": 30}}'
-    - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"schema-tree-object\"][data-schema=\"information_schema\"][data-object-name=\"TABLES\"]",
-        "timeout_sec": 30}}'
-    - step: 37
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-content'').textContent",
-        "contains": "`information_schema`.`TABLES`"}}'
     - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"query-result-grid\"]",
-        "timeout_sec": 60}}'
+      expectation: 真实 SQL 执行后网格可见。
     results:
     - 42
   visual:

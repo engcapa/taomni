@@ -32,7 +32,7 @@ export function GlobalRail({ gitAction }: { gitAction?: RailGitAction }) {
       onClick={entry.onClick}><entry.icon className="w-[18px] h-[18px] shrink-0" />{stripe.showNames && <span className="text-[11px] truncate">{t(`shell.${entry.id}`)}</span>}</button>)}
     {gitAction && <button type="button" data-testid="ribbon-git" aria-label={gitAction.label} title={gitAction.title} disabled={gitAction.disabled}
       className="mx-1 h-10 rounded inline-flex items-center justify-center gap-1 hover:bg-[var(--taomni-hover)] disabled:opacity-40" onClick={gitAction.onOpen}>
-      <GitBranch className="w-4 h-4 shrink-0" />{stripe.showNames && <span className="text-[11px] truncate">{gitAction.label}</span>}
+      <GitBranch className="w-[18px] h-[18px] shrink-0" />{stripe.showNames && <span className="text-[11px] truncate">{gitAction.label}</span>}
     </button>}
     <div ref={setHost} data-testid="sidebar-tool-window-rail" className="flex flex-1 min-h-0 flex-col border-t border-[var(--taomni-divider)] mt-1 overflow-auto" />
     <button type="button" data-testid="shell-rail-settings" aria-label={t("shell.settings")} title={t("shell.settings")} className="mx-1 h-10 rounded flex items-center justify-center hover:bg-[var(--taomni-hover)]"

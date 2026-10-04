@@ -2173,9 +2173,15 @@ controls:
   - id: local-list
     selector: '[data-testid="sftp-local-list"]'
     kind: display
+    aliases:
+      - "[data-tab-id]:not([inert]) [data-testid=\"sftp-local-list\"]"
+
   - id: remote-list
     selector: '[data-testid="sftp-remote-list"]'
     kind: display
+    aliases:
+      - "[data-tab-id]:not([inert]) [data-testid=\"sftp-remote-list\"]"
+
   - id: col-header-name
     selector: '[data-testid="col-header-name"]'
     kind: interactive       # click to sort
@@ -2304,6 +2310,10 @@ controls:
 - id: sftp-detached-window
   selector: '[data-testid="sftp-detached-window"]'
   kind: display
+- id: sftp-transfer-queue-close
+  selector: '[data-testid="sftp-transfer-queue-close"]'
+  kind: interactive
+  optional: true
 -->
 
 - **附加侧边栏**：每个 SSH 终端右上角 `attached-sftp-toggle`，与终端共用凭证；远程面板首次跟随 OSC 7 跳转一次，工具条 Sync 按钮可手动重跳
@@ -2334,6 +2344,7 @@ controls:
     selector: '[data-testid="sftp-local-path"]'
     kind: interactive       # click to edit, Enter to navigate
     aliases:
+      - "[data-tab-id]:not([inert]) input[data-testid=\"sftp-local-path\"]"
       - 'input[data-testid="sftp-local-path"]'
   - id: remote-path
     selector: '[data-testid="sftp-remote-path"]'
@@ -2343,6 +2354,9 @@ controls:
   - id: local-path-edit
     selector: '[data-testid="sftp-local-path-edit"]'
     kind: interactive
+    aliases:
+      - "[data-tab-id]:not([inert]) [data-testid=\"sftp-local-path-edit\"]"
+
   - id: remote-path-edit
     selector: '[data-testid="sftp-remote-path-edit"]'
     kind: interactive
@@ -2387,6 +2401,9 @@ controls:
     selector: '[data-testid="sftp-local-upload-selected"]'
     kind: interactive
     optional: true       # only when host wires onUploadSelected
+    aliases:
+      - "[data-tab-id]:not([inert]) [data-testid=\"sftp-local-upload-selected\"]"
+
   - id: local-open-selected
     selector: '[data-testid="sftp-local-open-selected"]'
     kind: interactive
@@ -3794,6 +3811,18 @@ controls:
     selector: '[data-testid="attachment-chip"]'
     kind: display
     optional: true       # only when composer text contains a parseable @ref
+  - id: ai-message-assistant
+    selector: '[data-chat-role="assistant"]'
+    kind: display
+    optional: true
+  - id: ai-message-user
+    selector: '[data-chat-role="user"]'
+    kind: display
+    optional: true
+  - id: ai-thread-row
+    selector: '[data-chat-thread-id]'
+    kind: interactive
+    optional: true
 -->
 
 - 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope/tabId` + `drawerPosition` 控制状态机；线程始终绑定到 tab
@@ -11346,6 +11375,18 @@ controls:
 - id: shell-transfers-trigger
   selector: '[data-testid="shell-transfers-trigger"]'
   kind: interactive
+- id: shell-lan-entry
+  selector: '[data-testid="sidebar-tool-lanchat"]'
+  kind: interactive
+  optional: true
+- id: shell-lan-enable-prompt
+  selector: '[data-testid="lanchat-enable-prompt"]'
+  kind: display
+  optional: true
+- id: shell-lan-enable-decline
+  selector: '[data-testid="lanchat-enable-prompt"] button:nth-of-type(1)'
+  kind: interactive
+  optional: true
 -->
 
 - 统一 Rail/Navigator、五个意图 lane、总览/快速切换、Context Host、Tao 和 Notes 稳定实例。

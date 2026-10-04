@@ -5,7 +5,6 @@ covers:
 tags:
 - auto-generated
 - smoke
-- needs-review
 - vault
 - validation
 modes:
@@ -43,9 +42,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Vault setup dialog validates password requirements：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: 原生 setup 拒绝过短/不一致密码，取消后 vault 保持 empty。
     actions:
-    - 1
     - 3
     - 5
     - 8
@@ -54,24 +52,15 @@ verification:
     - 13
     - 15
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"tab-bar\"]"}'
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 6
-      expectation: '{"wait_for": "[data-testid=\"vault-settings\"]"}'
-    - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"vault-settings\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"vault-setup-dialog\"]"}'
     - step: 11
-      expectation: '{"assert_visible": "[data-testid=\"vault-setup-too-short\"]"}'
+      expectation: 短密码错误可见。
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"vault-setup-mismatch\"]"}'
+      expectation: 确认密码不一致错误可见。
     - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]",
-        "contains": "empty"}}'
+      expectation: 取消后 vault 保持 empty。
     results:
+    - 11
+    - 14
     - 17
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
@@ -83,6 +72,8 @@ verification:
     reason: 明确记录执行边界和未验证平台。
 description: '
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained.
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'

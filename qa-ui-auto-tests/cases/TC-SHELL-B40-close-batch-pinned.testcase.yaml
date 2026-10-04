@@ -53,6 +53,9 @@ steps:
     equals: 'true'
 - click: '[data-testid="shell-tab-card"][data-pinned="true"]:has-text("qa-alpha") [data-testid="shell-tab-card-more"]'
 - click: '[data-testid="shell-tab-rename"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'tab-title-input'
+    expect_truthy: true
 - fill:
     selector: '[data-testid="tab-title-input"]'
     value: SHELL action
@@ -152,12 +155,11 @@ verification:
     - 21
     - 23
     - 24
-    - 25
     - 26
-    - 28
+    - 27
     - 29
     - 30
-    - 33
+    - 31
     - 34
     - 35
     - 36
@@ -165,7 +167,8 @@ verification:
     - 38
     - 39
     - 40
-    - 44
+    - 41
+    - 45
     checkpoints:
     - step: 19
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-tab-card\"]:has-text(\"qa-alpha\")",
@@ -173,43 +176,47 @@ verification:
     - step: 22
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-tab-card\"]:has-text(\"qa-alpha\")",
         "name": "data-pinned", "equals": "true"}}'
-    - step: 27
+    - step: 25
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'')
+        === ''tab-title-input''", "expect_truthy": true}}'
+    - step: 28
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]
         [data-testid=\"tab-title\"]", "equals": "SHELL action"}}'
-    - step: 31
+    - step: 32
       expectation: '{"wait_for": "[data-testid=\"shell-tab-card\"][data-pinned=\"false\"]:has-text(\"SHELL
         action\")"}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 3}}'
-    - step: 41
+    - step: 42
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"]:text-is(\"SHELL
         action copy\"))", "name": "data-lane", "equals": "utility"}}'
-    - step: 42
+    - step: 43
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-pinned=\"true\"][data-lane=\"connect\"]",
         "equal": 1}}'
-    - step: 43
+    - step: 44
       expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "status": "requested",
         "count": 3}}'
-    - step: 45
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 2}}'
     - step: 46
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 2}}'
+    - step: 47
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-pinned=\"true\"][data-lane=\"connect\"]",
         "equal": 1}}'
-    - step: 47
+    - step: 48
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"welcome\"]",
         "equal": 1}}'
     results:
     - 19
     - 22
-    - 27
-    - 31
+    - 25
+    - 28
     - 32
-    - 41
+    - 33
     - 42
     - 43
-    - 45
+    - 44
     - 46
     - 47
+    - 48
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual

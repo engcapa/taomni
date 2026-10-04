@@ -22,6 +22,9 @@ steps:
     key: taomni.shellLayout.v2
     value: '{"version": 2, "restoreSources": {"unsupported:future": {"kind": "future-protocol", "identity":
       "future", "title": "Future view", "password": "DISCARD-ME", "payload": {"token": "DISCARD-ME"}}}}'
+- seed_storage:
+    key: taomni.welcome.sessionResumeCleared.v1
+    value: 'true'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-restore-last-session"]'
@@ -312,434 +315,434 @@ verification:
     actions:
     - 3
     - 4
-    - 6
+    - 5
     - 7
     - 8
     - 9
+    - 10
     checkpoints:
-    - step: 5
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"shell-unavailable-view\"]"}'
     - step: 11
+      expectation: '{"wait_for": "[data-testid=\"shell-unavailable-view\"]"}'
+    - step: 12
       expectation: '{"assert_text": {"selector": "[data-testid=\"shell-unavailable-view\"]", "contains":
         "future-protocol"}}'
-    - step: 12
+    - step: 13
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
     results:
-    - 5
-    - 10
+    - 6
     - 11
     - 12
+    - 13
   - id: R2
     requirement: Closing the unknown view removes only it and sanitizes arbitrary secrets; Connect remains
       operational.
     actions:
-    - 13
-    - 15
-    - 17
+    - 14
+    - 16
     - 18
-    - 20
+    - 19
+    - 21
     checkpoints:
-    - step: 14
+    - step: 15
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"placeholder\"][data-lane=\"utility\"]",
         "equal": 1}}'
-    - step: 16
+    - step: 17
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"placeholder\"]",
         "equal": 0}}'
-    - step: 19
+    - step: 20
       expectation: '{"eval_readonly": {"expression": "!localStorage.getItem(''taomni.shellLayout.v2'')?.includes(''DISCARD-ME'')",
         "expect_truthy": true}}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
     - step: 22
-      expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-panel\"]", "equal": 1}}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
     - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-panel\"]", "equal": 1}}'
+    - step: 24
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "connect"}}'
     results:
-    - 14
-    - 16
-    - 19
-    - 21
+    - 15
+    - 17
+    - 20
     - 22
     - 23
+    - 24
   - id: R3
     requirement: The saved sftp UI opener creates its primary view in connect; this is renderer routing
       evidence.
     actions:
-    - 25
     - 26
     - 27
+    - 28
     checkpoints:
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"sftp\"][data-active=\"true\"]"}'
     - step: 29
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"sftp\"][data-active=\"true\"]"}'
+    - step: 30
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "connect"}}'
     results:
-    - 28
     - 29
+    - 30
   - id: R4
     requirement: The saved file-browser UI opener creates its primary view in connect; this is renderer
       routing evidence.
     actions:
-    - 30
     - 31
     - 32
+    - 33
     checkpoints:
-    - step: 33
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"][data-active=\"true\"]"}'
     - step: 34
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"][data-active=\"true\"]"}'
+    - step: 35
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "connect"}}'
     results:
-    - 33
     - 34
+    - 35
   - id: R5
     requirement: The saved rdp UI opener creates its primary view in connect; this is renderer routing
       evidence.
     actions:
-    - 35
     - 36
     - 37
+    - 38
     checkpoints:
-    - step: 38
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"rdp\"][data-active=\"true\"]"}'
     - step: 39
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"rdp\"][data-active=\"true\"]"}'
+    - step: 40
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "connect"}}'
     results:
-    - 38
     - 39
+    - 40
   - id: R6
     requirement: The saved vnc UI opener creates its primary view in connect; this is renderer routing
       evidence.
     actions:
-    - 40
     - 41
     - 42
+    - 43
     checkpoints:
-    - step: 43
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"vnc\"][data-active=\"true\"]"}'
     - step: 44
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"vnc\"][data-active=\"true\"]"}'
+    - step: 45
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "connect"}}'
     results:
-    - 43
     - 44
+    - 45
   - id: R7
     requirement: The saved object-storage UI opener creates its primary view in connect; this is renderer
       routing evidence.
     actions:
-    - 45
     - 46
     - 47
+    - 48
     checkpoints:
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"object-storage\"][data-active=\"true\"]"}'
     - step: 49
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"object-storage\"][data-active=\"true\"]"}'
+    - step: 50
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "connect"}}'
     results:
-    - 48
     - 49
+    - 50
   - id: R8
     requirement: The saved database UI opener creates its primary view in build; this is renderer routing
       evidence.
     actions:
-    - 50
     - 51
     - 52
+    - 53
     checkpoints:
-    - step: 53
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"database\"][data-active=\"true\"]"}'
     - step: 54
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"database\"][data-active=\"true\"]"}'
+    - step: 55
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "build"}}'
     results:
-    - 53
     - 54
+    - 55
   - id: R9
     requirement: The saved redis UI opener creates its primary view in build; this is renderer routing
       evidence.
     actions:
-    - 55
     - 56
     - 57
+    - 58
     checkpoints:
-    - step: 58
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"redis\"][data-active=\"true\"]"}'
     - step: 59
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"redis\"][data-active=\"true\"]"}'
+    - step: 60
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "build"}}'
     results:
-    - 58
     - 59
+    - 60
   - id: R10
     requirement: The saved hbase-shell UI opener creates its primary view in build; this is renderer routing
       evidence.
     actions:
-    - 60
     - 61
     - 62
+    - 63
     checkpoints:
-    - step: 63
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"hbase-shell\"][data-active=\"true\"]"}'
     - step: 64
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"hbase-shell\"][data-active=\"true\"]"}'
+    - step: 65
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "build"}}'
     results:
-    - 63
     - 64
+    - 65
   - id: R11
     requirement: The saved mail UI opener creates its primary view in communicate; this is renderer routing
       evidence.
     actions:
-    - 65
     - 66
     - 67
+    - 68
     checkpoints:
-    - step: 68
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mail\"][data-active=\"true\"]"}'
     - step: 69
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mail\"][data-active=\"true\"]"}'
+    - step: 70
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "communicate"}}'
     results:
-    - 68
     - 69
+    - 70
   - id: R12
     requirement: The saved proxy-test UI opener creates its primary view in utility; this is renderer
       routing evidence.
     actions:
-    - 70
     - 71
     - 72
+    - 73
     checkpoints:
-    - step: 73
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"proxy-test\"][data-active=\"true\"]"}'
     - step: 74
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"proxy-test\"][data-active=\"true\"]"}'
+    - step: 75
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
     results:
-    - 73
     - 74
+    - 75
   - id: R13
     requirement: The existing tunneling utility entry opens nettools in utility.
     actions:
-    - 75
     - 76
+    - 77
     checkpoints:
-    - step: 77
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"nettools\"][data-active=\"true\"]"}'
     - step: 78
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"nettools\"][data-active=\"true\"]"}'
+    - step: 79
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
     results:
-    - 77
     - 78
+    - 79
   - id: R14
     requirement: The existing sockscap utility entry opens sockscap in utility.
     actions:
-    - 79
     - 80
+    - 81
     checkpoints:
-    - step: 81
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"sockscap\"][data-active=\"true\"]"}'
     - step: 82
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"sockscap\"][data-active=\"true\"]"}'
+    - step: 83
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
     results:
-    - 81
     - 82
+    - 83
   - id: R15
     requirement: The existing mail-unified utility entry opens mail-unified in communicate.
     actions:
-    - 83
     - 84
+    - 85
     checkpoints:
-    - step: 85
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mail-unified\"][data-active=\"true\"]"}'
     - step: 86
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mail-unified\"][data-active=\"true\"]"}'
+    - step: 87
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "communicate"}}'
     results:
-    - 85
     - 86
+    - 87
   - id: R16
     requirement: The existing lan-chat utility entry opens lan-chat in communicate.
     actions:
-    - 87
     - 88
+    - 89
     checkpoints:
-    - step: 89
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"lan-chat\"][data-active=\"true\"]"}'
     - step: 90
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"lan-chat\"][data-active=\"true\"]"}'
+    - step: 91
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "communicate"}}'
     results:
-    - 89
     - 90
+    - 91
   - id: R17
     requirement: The existing network-tools utility entry opens placeholder in utility.
     actions:
-    - 91
     - 92
+    - 93
     checkpoints:
-    - step: 93
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"placeholder\"][data-active=\"true\"]"}'
     - step: 94
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"placeholder\"][data-active=\"true\"]"}'
+    - step: 95
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
     results:
-    - 93
     - 94
+    - 95
   - id: R18
     requirement: The existing mfa utility entry opens mfa in utility.
     actions:
-    - 95
     - 96
-    - 98
+    - 97
+    - 99
     checkpoints:
-    - step: 97
+    - step: 98
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"][data-active=\"true\"]"}'
-    - step: 99
-      expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
     - step: 100
+      expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
+    - step: 101
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
     results:
-    - 97
-    - 99
+    - 98
     - 100
+    - 101
   - id: R19
     requirement: Settings and a workspace open through their actual entries; Git promotion preserves the
       Build default.
     actions:
-    - 101
-    - 104
+    - 102
     - 105
     - 106
-    - 109
-    - 112
+    - 107
+    - 110
+    - 113
     checkpoints:
-    - step: 102
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 103
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 104
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
-    - step: 107
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 108
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 109
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "build"}}'
-    - step: 110
+    - step: 111
       expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
-    - step: 113
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"git\"][data-active=\"true\"]"}'
     - step: 114
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"git\"][data-active=\"true\"]"}'
+    - step: 115
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "build"}}'
     results:
-    - 102
     - 103
-    - 107
+    - 104
     - 108
-    - 110
-    - 113
+    - 109
+    - 111
     - 114
+    - 115
   - id: R20
     requirement: Overview contains exactly all 21 TabKind values in their declared lanes; changing a database
       display group preserves its type.
     actions:
-    - 115
-    - 138
+    - 116
     - 139
     - 140
     - 141
     - 142
     - 143
     - 144
-    - 147
+    - 145
     - 148
+    - 149
     checkpoints:
-    - step: 116
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 21}}'
     - step: 117
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 21}}'
+    - step: 118
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"welcome\"][data-lane=\"home\"]",
         "equal": 1}}'
-    - step: 118
+    - step: 119
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"terminal\"][data-lane=\"connect\"]",
         "equal": 1}}'
-    - step: 119
+    - step: 120
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"sftp\"][data-lane=\"connect\"]",
         "equal": 1}}'
-    - step: 120
+    - step: 121
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"rdp\"][data-lane=\"connect\"]",
         "equal": 1}}'
-    - step: 121
+    - step: 122
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"vnc\"][data-lane=\"connect\"]",
         "equal": 1}}'
-    - step: 122
+    - step: 123
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"file-browser\"][data-lane=\"connect\"]",
         "equal": 1}}'
-    - step: 123
+    - step: 124
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"object-storage\"][data-lane=\"connect\"]",
         "equal": 1}}'
-    - step: 124
+    - step: 125
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"database\"][data-lane=\"build\"]",
         "equal": 1}}'
-    - step: 125
+    - step: 126
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"redis\"][data-lane=\"build\"]",
         "equal": 1}}'
-    - step: 126
+    - step: 127
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"hbase-shell\"][data-lane=\"build\"]",
         "equal": 1}}'
-    - step: 127
+    - step: 128
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"][data-lane=\"build\"]",
         "equal": 1}}'
-    - step: 128
+    - step: 129
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"git\"][data-lane=\"build\"]",
         "equal": 1}}'
-    - step: 129
+    - step: 130
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"mail\"][data-lane=\"communicate\"]",
         "equal": 1}}'
-    - step: 130
+    - step: 131
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"mail-unified\"][data-lane=\"communicate\"]",
         "equal": 1}}'
-    - step: 131
+    - step: 132
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"lan-chat\"][data-lane=\"communicate\"]",
         "equal": 1}}'
-    - step: 132
+    - step: 133
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"settings\"][data-lane=\"utility\"]",
         "equal": 1}}'
-    - step: 133
+    - step: 134
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"nettools\"][data-lane=\"utility\"]",
         "equal": 1}}'
-    - step: 134
+    - step: 135
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"sockscap\"][data-lane=\"utility\"]",
         "equal": 1}}'
-    - step: 135
+    - step: 136
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"proxy-test\"][data-lane=\"utility\"]",
         "equal": 1}}'
-    - step: 136
+    - step: 137
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"mfa\"][data-lane=\"utility\"]",
         "equal": 1}}'
-    - step: 137
+    - step: 138
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"placeholder\"][data-lane=\"utility\"]",
         "equal": 1}}'
-    - step: 145
+    - step: 146
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
-    - step: 146
+    - step: 147
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]",
         "name": "data-tab-type", "equals": "database"}}'
-    - step: 149
+    - step: 150
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "build"}}'
     results:
-    - 116
     - 117
     - 118
     - 119
@@ -761,9 +764,10 @@ verification:
     - 135
     - 136
     - 137
-    - 145
+    - 138
     - 146
-    - 149
+    - 147
+    - 150
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual

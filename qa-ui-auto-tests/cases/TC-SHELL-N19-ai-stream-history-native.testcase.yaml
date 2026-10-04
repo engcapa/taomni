@@ -1,0 +1,276 @@
+id: TC-SHELL-N19
+title: AI stream, hidden completion, drafts and retained conversation
+description: The active qa-loopback provider receives the sent user content. Both replies finish, hidden
+  completion raises one Tao alert and reveals the exact ready thread, hide/reopen preserves the unsent
+  multiline draft, and history reloads one conversation without resending. Native additionally observes
+  four actual protocol requests including provider failure/recovery and restarts the real isolated QA
+  process; browser uses the explicitly labelled IPC preview stream.
+covers:
+- F-AI-2.4
+- F-SHELL-1
+- F-TAO-1
+tags:
+- p1
+- workspace-shell
+modes:
+- native
+fixtures:
+- reset_db
+- ai_chat_provider
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-ai-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-chat"]'
+- wait_for: '[data-testid="ai-chat-composer"]'
+- assert_value:
+    selector: '[data-testid="ai-chat-drawer"] select[aria-label="Thread LLM provider"]'
+    equals: qa-loopback
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: SHELL AI 第一条
+- click: '[data-testid="ai-chat-send-button"]'
+- assert_text:
+    selector: '[data-chat-role="assistant"]'
+    contains: 'SHELL AI response 中文
+
+      Second paragraph'
+    timeout_sec: 20
+- assert_text_equals:
+    selector: '[data-chat-role="user"]'
+    equals: SHELL AI 第一条
+- assert_value:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    equals: ''
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: SHELL AI background
+- click: '[data-testid="ai-chat-send-button"]'
+- click: '[data-testid="shell-rail-tao"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-notifications"]'
+- wait_for: '[data-testid="tao-alert-inbox-item"][data-alert-kind="ai_done"]'
+- assert_count:
+    selector: '[data-testid="tao-alert-inbox-item"][data-alert-kind="ai_done"]'
+    equal: 1
+- click: '[data-testid="tao-alert-inbox-item"][data-alert-kind="ai_done"] [data-testid="tao-alert-jump"]'
+- wait_for: '[data-testid="shell-chat-content"][data-ready="true"]'
+- assert_count:
+    selector: '[data-chat-role="assistant"]'
+    equal: 2
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: SHELL AI background
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: 'SHELL AI unsent 中文
+
+      Second draft line'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
+- assert_value:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    equals: 'SHELL AI unsent 中文
+
+      Second draft line'
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: SHELL AI error
+- click: '[data-testid="ai-chat-send-button"]'
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: QA provider unavailable
+    timeout_sec: 20
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: SHELL AI recovery
+- click: '[data-testid="ai-chat-send-button"]'
+- eval_readonly:
+    expression: document.querySelector('[data-thread-id][data-ready]').textContent.split('SHELL AI response
+      中文').length === 4 && document.querySelector('[data-thread-id][data-ready]').textContent.split('Second
+      paragraph').length === 4
+    expect_truthy: true
+    timeout_sec: 20
+- assert_json_file:
+    path: ${fixture.ai_provider_requests}
+    expect:
+      requests: 4
+      streamRequests: 4
+      lastUserMessage: SHELL AI recovery
+      model: qa-model
+- restart_native_app: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="tao-hub-tab-chat"]'
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- wait_for: '[data-chat-thread-id]'
+- assert_count:
+    selector: '[data-chat-thread-id]'
+    equal: 1
+- click: '[data-chat-thread-id]'
+- wait_for: '[data-testid="shell-chat-content"][data-ready="true"]'
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: SHELL AI 第一条
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: SHELL AI background
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: 'SHELL AI response 中文
+
+      Second paragraph'
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: SHELL AI recovery
+- assert_json_file:
+    path: ${fixture.ai_provider_requests}
+    expect:
+      requests: 4
+      streamRequests: 4
+      lastUserMessage: SHELL AI recovery
+      model: qa-model
+- screenshot: tc-shell-ai-stream-history.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The active qa-loopback provider receives the sent user content. Both replies finish,
+      hidden completion raises one Tao alert and reveals the exact ready thread, hide/reopen preserves
+      the unsent multiline draft, and history reloads one conversation without resending. Native additionally
+      observes four actual protocol requests including provider failure/recovery and restarts the real
+      isolated QA process; browser uses the explicitly labelled IPC preview stream.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 8
+    - 9
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 21
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 32
+    - 33
+    - 36
+    - 38
+    - 39
+    - 40
+    - 43
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-composer\"]"}'
+    - step: 7
+      expectation: '{"assert_value": {"selector": "[data-testid=\"ai-chat-drawer\"] select[aria-label=\"Thread
+        LLM provider\"]", "equals": "qa-loopback"}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-chat-role=\"assistant\"]", "contains": "SHELL
+        AI response 中文\nSecond paragraph", "timeout_sec": 20}}'
+    - step: 11
+      expectation: '{"assert_text_equals": {"selector": "[data-chat-role=\"user\"]", "equals": "SHELL
+        AI 第一条"}}'
+    - step: 12
+      expectation: '{"assert_value": {"selector": "[data-testid=\"ai-chat-composer\"] textarea", "equals":
+        ""}}'
+    - step: 16
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"tao-alert-inbox-item\"][data-alert-kind=\"ai_done\"]"}'
+    - step: 20
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tao-alert-inbox-item\"][data-alert-kind=\"ai_done\"]",
+        "equal": 1}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"shell-chat-content\"][data-ready=\"true\"]"}'
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-chat-role=\"assistant\"]", "equal": 2}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "SHELL
+        AI background"}}'
+    - step: 28
+      expectation: '{"assert_value": {"selector": "[data-testid=\"ai-chat-composer\"] textarea", "equals":
+        "SHELL AI unsent 中文\nSecond draft line"}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "QA
+        provider unavailable", "timeout_sec": 20}}'
+    - step: 34
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-thread-id][data-ready]'').textContent.split(''SHELL
+        AI response 中文'').length === 4 && document.querySelector(''[data-thread-id][data-ready]'').textContent.split(''Second
+        paragraph'').length === 4", "expect_truthy": true, "timeout_sec": 20}}'
+    - step: 35
+      expectation: '{"assert_json_file": {"path": "${fixture.ai_provider_requests}", "expect": {"requests":
+        4, "streamRequests": 4, "lastUserMessage": "SHELL AI recovery", "model": "qa-model"}}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 41
+      expectation: '{"wait_for": "[data-chat-thread-id]"}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-chat-thread-id]", "equal": 1}}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"shell-chat-content\"][data-ready=\"true\"]"}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "SHELL
+        AI 第一条"}}'
+    - step: 46
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "SHELL
+        AI background"}}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "SHELL
+        AI response 中文\nSecond paragraph"}}'
+    - step: 48
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "SHELL
+        AI recovery"}}'
+    - step: 49
+      expectation: '{"assert_json_file": {"path": "${fixture.ai_provider_requests}", "expect": {"requests":
+        4, "streamRequests": 4, "lastUserMessage": "SHELL AI recovery", "model": "qa-model"}}}'
+    results:
+    - 3
+    - 6
+    - 7
+    - 10
+    - 11
+    - 12
+    - 16
+    - 19
+    - 20
+    - 22
+    - 23
+    - 24
+    - 28
+    - 31
+    - 34
+    - 35
+    - 37
+    - 41
+    - 42
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+  visual:
+  - check: Review the final readable conversation and Shell controls.
+    method: manual
+    reason: Screenshots require visual review.
+  native:
+  - check: Real Tauri stream and persisted history after QA process restart.
+    method: automated
+    reason: Native uses the loopback OpenAI protocol, actual Rust IPC and SQLite; the provider receipt
+      is independent of UI. Browser uses the explicitly labelled IPC preview reply.
+native_platforms:
+- Linux
+- Windows
+- macOS

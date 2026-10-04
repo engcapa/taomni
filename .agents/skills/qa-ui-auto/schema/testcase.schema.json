@@ -90,6 +90,7 @@
           "parity009_ssr",
           "parity007_extract",
           "mail_server",
+          "ai_chat_provider",
           "macos_updater",
           "rdp_server_required",
           "system_rdp_running",
@@ -308,6 +309,9 @@
       "maxProperties": 1,
       "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
       "properties": {
+        "app_menu_action": {
+          "enum": ["split", "multiexec"]
+        },
         "shell_navigate": {
           "enum": [
             "sessions",

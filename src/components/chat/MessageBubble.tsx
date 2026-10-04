@@ -258,7 +258,7 @@ export function MessageBubble({
   };
 
   return (
-    <div className={`flex flex-col gap-0.5 group ${isUser ? "items-end" : "items-start"}`}>
+    <div data-chat-role={message.role} data-chat-message-id={message.id} className={`flex flex-col gap-0.5 group ${isUser ? "items-end" : "items-start"}`}>
       <div
         className={`relative max-w-[90%] rounded-lg px-3 py-2 text-[12px] leading-relaxed break-words ${
           isUser

@@ -10,6 +10,7 @@ from qa_ui_auto.steps.windows import switch_window, click_window_close
 from qa_ui_auto.steps.assertions import step_assert_value
 from qa_ui_auto.steps.persistence import step_seed_storage
 from qa_ui_auto.window_routes import matches_window_route
+from tauri_webdriver import WebDriverError
 
 
 class FakeSession:
@@ -46,10 +47,10 @@ class ShellWindowsTest(TestCase):
             ctx = NativeStepContext(session, Path(directory), {})
             VERBS["interrupt_detached_window"](ctx, "#notes=")
             method, endpoint, payload = session.request.call_args.args
-            self.assertEqual((method, endpoint), ("POST", "/execute/async"))
+            self.assertEqual((method, endpoint), ("POST", "/execute/sync"))
             self.assertEqual(payload["args"], [])
             self.assertIn("close_current_detached_window", payload["script"])
-            self.assertLess(payload["script"].index("done("), payload["script"].index("setTimeout("))
+            self.assertIn("return {scheduled: true}", payload["script"])
 
     def test_normal_close_requests_tauri_lifecycle_instead_of_deleting_webview_target(self):
         with TemporaryDirectory() as directory:
@@ -58,7 +59,7 @@ class ShellWindowsTest(TestCase):
             ctx = NativeStepContext(session, Path(directory), {})
             VERBS["close_window"](ctx, None)
             method, endpoint, payload = session.request.call_args.args
-            self.assertEqual((method, endpoint), ("POST", "/execute/async"))
+            self.assertEqual((method, endpoint), ("POST", "/execute/sync"))
             self.assertIn("getCurrentWindow()", payload["script"])
             self.assertIn("selected.close()", payload["script"])
             session.request.return_value = None
@@ -126,6 +127,19 @@ class ShellWindowsTest(TestCase):
             ctx = NativeStepContext(session, Path(directory), {})
             VERBS["switch_window"](ctx, {"route": ""})
             self.assertEqual(session.selected, "main")
+
+    def test_main_selection_tolerates_only_a_retired_window_handle(self):
+        with TemporaryDirectory() as directory:
+            session = FakeSession()
+            session.request = Mock(side_effect=[
+                ["closed-child", "main"], WebDriverError("no such window"), None, "tauri://localhost/",
+            ])
+            ctx = NativeStepContext(session, Path(directory), {})
+            VERBS["switch_window"](ctx, {"route": ""})
+            session.wait_for_app_ready.assert_called_once_with()
+            session.request = Mock(side_effect=[["main"], WebDriverError("driver disconnected")])
+            with self.assertRaisesRegex(WebDriverError, "driver disconnected"):
+                VERBS["switch_window"](ctx, {"route": ""})
 
     def test_input_property_uses_single_argument_and_quotes_selector(self):
         with TemporaryDirectory() as directory:

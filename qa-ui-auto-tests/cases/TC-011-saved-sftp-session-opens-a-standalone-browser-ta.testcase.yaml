@@ -16,6 +16,7 @@ fixtures:
 - sftp_required
 steps:
 - open: ${cfg.app.base_url}
+- shell_navigate: sessions
 - wait_for:
     selector: '[data-testid="session-new"]'
     timeout_sec: 60
@@ -42,6 +43,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-sftp-session
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-sftp-session"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-sftp-session"]'
 - wait_for: '[data-testid="auth-prompt"]'
@@ -74,16 +76,21 @@ steps:
     min_height: 32
     same_width: true
     icon_size: 18
+    within_viewport: true
+    hit_center: true
 - eval_readonly:
-    expression: document.querySelector('nav button').getBoundingClientRect().left
-      >= document.querySelector('[data-window-drag]').getBoundingClientRect().right
-      && document.querySelector('nav').getBoundingClientRect().right <= innerWidth
+    expression: document.querySelector('nav').getBoundingClientRect().top >= document.querySelector('[data-window-drag]').getBoundingClientRect().bottom
     expect_truthy: true
-- eval_readonly:
-    expression: document.querySelector('nav button').getBoundingClientRect().left
-      >= document.querySelector('[data-window-drag]').getBoundingClientRect().right
-      && document.querySelector('nav').getBoundingClientRect().right <= innerWidth
-    expect_truthy: true
+- shell_navigate: tools
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"] > button'
+    min_count: 5
+    min_width: 32
+    min_height: 32
+    same_width: true
+    icon_size: 18
+    within_viewport: true
+    hit_center: true
 - screenshot: 011-standalone-sftp-session.png
 verification:
   review: reviewed
@@ -92,79 +99,80 @@ verification:
     requirement: 保存 SFTP 会话后双击并认证，独立 SFTP 双栏和队列就绪，导航到精确目标路径。
     actions:
     - 1
-    - 3
-    - 5
-    - 7
+    - 2
+    - 4
+    - 6
     - 8
     - 9
-    - 11
+    - 10
     - 12
-    - 14
+    - 13
     - 15
+    - 16
     - 17
     - 19
-    - 20
-    - 24
-    - 25
+    - 21
+    - 22
     - 26
-    - 31
-    checkpoints:
-    - step: 2
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec":
-        60}}'
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 6
-      expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
-    - step: 13
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-sftp-session\"]"}'
-    - step: 18
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
-    - step: 22
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
-    - step: 23
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
-    - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] >> text=\"REMOTE\""}'
-    - step: 29
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"] >> text=\"LOCAL\""}'
-    - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
-    - step: 32
-      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 33
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]",
-        "name": "value", "equals": "${fixture.sftp_sync_test_dir}"}}'
-    results:
+    - 27
+    - 28
     - 33
-  - id: R2
-    requirement: 打开和认证独立 SFTP 后，展开侧栏的 Sessions/Tools 保持相同尺寸且完整落在侧栏可视范围内，不因分栏或滚动到选中会话而裁切。
-    actions:
-    - 19
-    - 20
     checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-sftp-session\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] >> text=\"REMOTE\""}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"] >> text=\"LOCAL\""}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
     - step: 34
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]
-        > button", "min_count": 5, "min_width": 32, "min_height": 32, "same_width":
-        true, "icon_size": 18}}'
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 35
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav
-        button'').getBoundingClientRect().left >= document.querySelector(''[data-window-drag]'').getBoundingClientRect().right
-        && document.querySelector(''nav'').getBoundingClientRect().right <= innerWidth",
-        "expect_truthy": true}}'
-    - step: 36
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav
-        button'').getBoundingClientRect().left >= document.querySelector(''[data-window-drag]'').getBoundingClientRect().right
-        && document.querySelector(''nav'').getBoundingClientRect().right <= innerWidth",
-        "expect_truthy": true}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name":
+        "value", "equals": "${fixture.sftp_sync_test_dir}"}}'
     results:
-    - 34
     - 35
+  - id: R2
+    requirement: 独立 SFTP 就绪后，垂直 Shell Rail 的按钮与 18px 图标保持相同尺寸、至少 32px 点击高度，落在视口内且中心可命中；Rail 位于标题栏拖动区下方，切换
+      Navigator 到 Tools 后同样可用。
+    actions:
+    - 21
+    - 22
+    - 38
+    checkpoints:
+    - step: 36
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button",
+        "min_count": 5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport":
+        true, "hit_center": true}}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav'').getBoundingClientRect().top
+        >= document.querySelector(''[data-window-drag]'').getBoundingClientRect().bottom", "expect_truthy":
+        true}}'
+    - step: 39
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button",
+        "min_count": 5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport":
+        true, "hit_center": true}}'
+    results:
     - 36
+    - 37
+    - 39
   visual:
   - check: 独立标签和双栏目录显示清晰。
     method: manual
@@ -173,5 +181,5 @@ verification:
   - check: 原生磁盘和 SFTP 链路需 native 模式的真实执行；browser 本地窗格为 VFS。
     method: automated
     reason: 按实际执行模式解释；其他平台不继承 Linux 证据。
-description: ' Permanent rail geometry now uses the Shell Rail; standalone SFTP readiness,
-  path and transfer assertions are retained.'
+description: ' Permanent rail geometry now uses the Shell Rail; standalone SFTP readiness, path and transfer
+  assertions are retained.'

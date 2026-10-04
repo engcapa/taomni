@@ -4067,6 +4067,35 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         preview_url: stubGeneratedImageDataUri("pasted clipboard image"),
       } satisfies StubChatAttachment) as T;
     }
+    case "chat_stream": {
+      // Keep preview messages on the same event/persistence path as the native
+      // renderer. This response explicitly describes its IPC stub boundary.
+      const req = args?.req as { thread_id: string; content: string; attachments?: StubChatAttachment[] };
+      const threadId = req.thread_id;
+      const now = Math.floor(Date.now() / 1000);
+      const userMessage: StubChatMessage = {
+        id: crypto.randomUUID(), thread_id: threadId, role: "user",
+        content: req.content, created_at: now, redacted: false, attachments: req.attachments ?? [],
+      };
+      const assistantMessage: StubChatMessage = {
+        id: crypto.randomUUID(), thread_id: threadId, role: "assistant",
+        content: "Browser preview stub: connect a desktop AI provider to get a real response.",
+        created_at: now + 1, redacted: false,
+      };
+      const event = `chat-stream:${threadId}`;
+      await emit(event, { kind: "user_message", message: userMessage });
+      await emit(event, { kind: "assistant_start", id: assistantMessage.id, thread_id: threadId, created_at: assistantMessage.created_at });
+      for (const content of ["Browser preview stub: ", "connect a desktop AI provider ", "to get a real response."]) {
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+        await emit(event, { kind: "token", id: assistantMessage.id, content });
+      }
+      const messages = loadChatMessages();
+      messages[threadId] = [...(messages[threadId] ?? []), userMessage, assistantMessage];
+      saveChatMessages(messages);
+      saveChatThreads(loadChatThreads().map((thread) => thread.id === threadId ? { ...thread, updated_at: now } : thread));
+      await emit(event, { kind: "end", id: assistantMessage.id, content: assistantMessage.content });
+      return undefined as T;
+    }
     case "chat_send": {
       const req = (args as InvokeArgs | undefined)?.req as { thread_id?: string; content?: string; attachments?: StubChatAttachment[] } | undefined;
       const threadId = req?.thread_id ?? "";

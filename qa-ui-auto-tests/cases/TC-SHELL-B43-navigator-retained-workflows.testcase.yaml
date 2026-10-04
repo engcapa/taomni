@@ -108,7 +108,11 @@ steps:
     selector: '[data-testid="folder-name-dialog-input"]'
     value: SHELL group
 - click: '[data-testid="folder-name-dialog-confirm"]'
-- wait_for: '[data-testid="session-tree-folder"][data-folder-path="User sessions / SHELL group"]'
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="SHELL group"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="Shell"]'
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="Shell/甲"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="Shell/甲"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-id="shell-a"]'
 - right_click: '[data-testid="session-tree-item"][data-session-id="shell-a"]'
 - hover: '[data-testid="context-menu"] >> text="Move to folder"'
 - click: '[data-testid="context-menu"] >> text="SHELL group"'
@@ -119,7 +123,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-tree-item"][data-session-id="shell-a"]'
     name: data-group-path
-    equals: User sessions / SHELL group
+    equals: SHELL group
 - click: '[data-testid="session-tree-item"][data-session-id="shell-a"]'
 - click: '[data-testid="session-duplicate"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-alpha (copy)"]'
@@ -179,6 +183,10 @@ steps:
     contains: 1 of 2
 - click: '[data-testid="session-import-preview-confirm"]'
 - assert_not_visible: '[data-testid="session-import-preview"]'
+- wait_for: '[data-testid="session-tree-folder"][data-folder-path="Shell/导入"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="Shell/导入"]'
+- click: '[data-testid="session-tree-folder"][data-folder-path="Shell/乙"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-id="shell-b"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="SHELL imported"]'
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-sessions"]'
@@ -366,155 +374,170 @@ verification:
     - 57
     - 58
     - 60
-    - 61
     - 62
-    - 63
+    - 64
+    - 65
     - 66
     - 67
-    - 69
     - 70
-    - 72
+    - 71
+    - 73
     - 74
-    - 75
     - 76
+    - 78
+    - 79
+    - 80
     checkpoints:
     - step: 56
       expectation: '{"wait_for": "[data-testid=\"folder-name-dialog\"]"}'
     - step: 59
-      expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"User sessions
-        / SHELL group\"]"}'
-    - step: 64
+      expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"SHELL group\"]"}'
+    - step: 61
+      expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"Shell/甲\"]"}'
+    - step: 63
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-id=\"shell-a\"]"}'
-    - step: 65
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-id=\"shell-a\"]",
-        "name": "data-group-path", "equals": "User sessions / SHELL group"}}'
     - step: 68
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-id=\"shell-a\"]"}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-id=\"shell-a\"]",
+        "name": "data-group-path", "equals": "SHELL group"}}'
+    - step: 72
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-alpha (copy)\"]"}'
-    - step: 71
+    - step: 75
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 73
-      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
     - step: 77
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    - step: 81
       expectation: '{"assert_value": {"selector": "[data-testid=\"session-search\"]", "equals": "qa-alpha"}}'
-    - step: 78
+    - step: 82
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-id=\"shell-a\"]",
         "name": "aria-selected", "equals": "true"}}'
-    - step: 79
+    - step: 83
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-tree-item\"]", "equal": 2}}'
     results:
     - 56
     - 59
-    - 64
-    - 65
+    - 61
+    - 63
     - 68
-    - 71
-    - 73
+    - 69
+    - 72
+    - 75
     - 77
-    - 78
-    - 79
+    - 81
+    - 82
+    - 83
   - id: R7
     requirement: The actual menu file chooser and import preview cancel safely, import only the selected
       row, and export seven portable sessions with excluded secrets.
     actions:
-    - 80
-    - 81
-    - 82
-    - 83
     - 84
+    - 85
+    - 86
     - 87
     - 88
-    - 90
-    - 93
+    - 91
+    - 92
     - 94
-    - 95
-    - 96
+    - 97
+    - 98
     - 99
     - 100
-    - 102
-    - 105
+    - 103
+    - 104
     - 106
-    - 107
-    - 108
+    - 109
+    - 110
+    - 113
+    - 114
+    - 115
+    - 116
     checkpoints:
-    - step: 85
+    - step: 89
       expectation: '{"wait_for": "[data-testid=\"session-import-preview\"]"}'
-    - step: 86
+    - step: 90
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody
         tr", "equal": 2}}'
-    - step: 89
+    - step: 93
       expectation: '{"assert_text": {"selector": "[data-testid=\"session-import-preview-summary\"]", "contains":
         "1 of 2"}}'
-    - step: 91
+    - step: 95
       expectation: '{"assert_not_visible": "[data-testid=\"session-import-preview\"]"}'
-    - step: 92
+    - step: 96
       expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL
         imported\"]"}'
-    - step: 97
+    - step: 101
       expectation: '{"wait_for": "[data-testid=\"session-import-preview\"]"}'
-    - step: 98
+    - step: 102
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody
         tr", "equal": 2}}'
-    - step: 101
+    - step: 105
       expectation: '{"assert_text": {"selector": "[data-testid=\"session-import-preview-summary\"]", "contains":
         "1 of 2"}}'
-    - step: 103
+    - step: 107
       expectation: '{"assert_not_visible": "[data-testid=\"session-import-preview\"]"}'
-    - step: 104
+    - step: 108
+      expectation: '{"wait_for": "[data-testid=\"session-tree-folder\"][data-folder-path=\"Shell/导入\"]"}'
+    - step: 111
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-id=\"shell-b\"]"}'
+    - step: 112
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL imported\"]"}'
-    - step: 109
+    - step: 117
       expectation: '{"assert_json_file": {"path": "${fixture.shell_export}", "expect": {"format": "taomni.sessions",
         "schema_version": 1, "security.secrets": "excluded", "sessions": {"length_min": 7, "contains":
         "SHELL imported", "excludes": "password"}, "sessions.7": {"exists": false}}}}'
-    - step: 110
+    - step: 118
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-tree-item\"]", "equal": 7}}'
     results:
-    - 85
-    - 86
     - 89
-    - 91
-    - 92
-    - 97
-    - 98
+    - 90
+    - 93
+    - 95
+    - 96
     - 101
-    - 103
-    - 104
-    - 109
-    - 110
+    - 102
+    - 105
+    - 107
+    - 108
+    - 111
+    - 112
+    - 117
+    - 118
   - id: R8
     requirement: View Quick Connect rejects an empty SSH URL, authenticates the valid URL through the
       real opener and executes exactly one anchored output marker in Connect.
     actions:
-    - 111
-    - 112
-    - 113
-    - 115
-    - 116
-    - 118
     - 119
+    - 120
     - 121
     - 123
+    - 124
+    - 126
+    - 127
+    - 129
+    - 131
     checkpoints:
-    - step: 114
-      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
-    - step: 117
-      expectation: '{"assert_not_visible": "[data-testid=\"auth-prompt\"]"}'
-    - step: 120
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 122
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 125
+      expectation: '{"assert_not_visible": "[data-testid=\"auth-prompt\"]"}'
+    - step: 128
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 130
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
-    - step: 124
+    - step: 132
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
         "regex": "(?ms)\\A(?!(?:.*?^QUICK_SHELL_READY[ \\t]*$){2}).*?^QUICK_SHELL_READY[ \\t]*$"}}'
-    - step: 125
+    - step: 133
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "connect"}}'
     results:
-    - 114
-    - 117
-    - 120
     - 122
-    - 124
     - 125
+    - 128
+    - 130
+    - 132
+    - 133
   visual:
   - check: Inspect retained controls and content in the final screenshot
     method: manual

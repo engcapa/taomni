@@ -324,6 +324,11 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/ci_execute.py
           --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
           --report "qa-ui-auto-report/$QA_ENTRY"
+      - name: Verify macOS desktop after the display helper has exited
+        if: runner.os == 'macOS' && matrix.mode == 'native'
+        run: >-
+          swift .agents/skills/qa-ui-auto/scripts/setup_macos_display.swift --verify
+          > 'qa-ui-auto-report/${{ matrix.id }}/desktop-size-before-run.json'
       - name: Run selected cases
         if: runner.os != 'Linux' || matrix.mode != 'native'
         env:

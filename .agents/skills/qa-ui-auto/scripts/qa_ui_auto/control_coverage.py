@@ -72,7 +72,7 @@ INTERACTIVE_VERBS = {
     "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "upload_file",
     "set_check", "send_text_via_label", "open_session", "click_menu",
     "quick_connect", "auth", "attach_sftp", "set_remote_path",
-    "shell_navigate", "choose_file", "download_file",
+    "shell_navigate", "app_menu_action", "choose_file", "download_file",
 }
 DISPLAY_VERBS = {
     "assert_text_equals", "assert_items",
@@ -162,6 +162,10 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
     rich form; the path key is a filename and must NOT be reported.
     """
     out: list[str] = []
+    if verb == "app_menu_action" and args in {"split", "multiexec"}:
+        item = "split-terminal" if args == "split" else "multiexec"
+        return ['[data-testid="app-main-menu"]', '[data-testid="context-menu-item-view"]',
+                f'[data-testid="context-menu-item-{item}"]']
     if verb == "shell_navigate":
         if args == "tools":
             return ['[data-testid="shell-rail-workspaces"]', '[data-testid="shell-navigator-page"][data-page="tools"]']

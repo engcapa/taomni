@@ -126,6 +126,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `remove_storage` | `taomni.*` key string | Browser/native: remove exactly one persisted fixture input. Reload to exercise the production decoder/migration; does not change runtime stores. |
 | `assert_element_geometry` bounds | add `within_viewport: true`, `hit_center: true` to the existing geometry arguments | Browser/native: assert actual viewport containment and unobstructed, non-inert center hit; writes every raw rectangle to element-geometries.jsonl. |
 | `shell_navigate` | `sessions` or `tools` | Browser/native, all platforms. Observes visibility, clicks the permanent Sessions/Workspaces Rail when needed, selects the Tools page and waits for its real content. Repeating it keeps the requested page open. Does not mutate stores or storage. |
+| `app_menu_action` | `split` or `multiexec` | Browser/native, all platforms. Clicks the actual application View menu action; on macOS native, activates the installed AppKit NSMenu item through the opt-in QA bridge and requires its acknowledgement. Windows/Linux/browser reopen and hover the visible menu. Does not call frontend action handlers directly; cases separately assert the resulting split/MultiExec state. |
 | `assert_attribute` | `{selector, name, equals}` | Read element attribute and assert exact match. E.g. `type=password`. |
 | `assert_disabled` | selector | Pass when element is disabled. |
 | `assert_enabled` | selector | Pass when element is enabled. |

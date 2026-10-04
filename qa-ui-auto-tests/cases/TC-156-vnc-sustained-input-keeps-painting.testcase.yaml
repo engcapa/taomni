@@ -1,10 +1,9 @@
 id: TC-156
 title: VNC keeps painting after sustained pointer and keyboard input
-description: 'Regression coverage for the freeze reported after a few mouse
-  operations. Connect to the scriptable VNC fixture, verify the initial frame,
-  send a sustained sequence of pointer moves, left/right clicks and a key,
-  then force three remote DesktopSize updates. The fixture must receive the
-  input and the canvas must continue painting after the input burst.'
+description: Regression coverage for the freeze reported after a few mouse operations. Connect to the
+  scriptable VNC fixture, verify the initial frame, send a sustained sequence of pointer moves, left/right
+  clicks and a key, then force three remote DesktopSize updates. The fixture must receive the input and
+  the canvas must continue painting after the input burst.
 covers:
 - F9.6
 tags:
@@ -20,6 +19,7 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- shell_navigate: sessions
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-vnc"]'
@@ -35,6 +35,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-vnc-sustained-input
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-sustained-input"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-sustained-input"]'
 - wait_for:
@@ -52,7 +53,8 @@ steps:
     selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
     timeout_sec: 20
 - eval_readonly:
-    expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 1'
+    expression: Number(document.querySelector('[data-vnc-frames-painted]')?.getAttribute('data-vnc-frames-painted'))
+      >= 1
     timeout_sec: 10
 - mouse_path:
     points:
@@ -91,33 +93,43 @@ steps:
     contains: '"keysym": 97, "keysym_hex": "0x61"'
 - host_write_file:
     path: ${fixture.vnc_control}
-    text: "resize 1024 768\n"
+    text: 'resize 1024 768
+
+      '
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
     timeout_sec: 15
 - eval_readonly:
-    expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 2'
+    expression: Number(document.querySelector('[data-vnc-frames-painted]')?.getAttribute('data-vnc-frames-painted'))
+      >= 2
     timeout_sec: 10
 - host_write_file:
     path: ${fixture.vnc_control}
-    text: "resize 1280 720\n"
+    text: 'resize 1280 720
+
+      '
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
     timeout_sec: 15
 - eval_readonly:
-    expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 3'
+    expression: Number(document.querySelector('[data-vnc-frames-painted]')?.getAttribute('data-vnc-frames-painted'))
+      >= 3
     timeout_sec: 10
 - host_write_file:
     path: ${fixture.vnc_control}
-    text: "resize 1024 768\n"
+    text: 'resize 1024 768
+
+      '
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
     timeout_sec: 15
 - eval_readonly:
-    expression: 'Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted'')) >= 4'
+    expression: Number(document.querySelector('[data-vnc-frames-painted]')?.getAttribute('data-vnc-frames-painted'))
+      >= 4
     timeout_sec: 10
 - eval_readonly:
-    expression: "document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16, 1, 1).data[3] === 255"
+    expression: document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16,
+      1, 1).data[3] === 255
     timeout_sec: 10
 - wait: 1.5
 - screenshot: 156-vnc-sustained-input.png
@@ -125,22 +137,23 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A VNC session paints its initial framebuffer and remains connected while the user moves and clicks the remote canvas and types a key.
+    requirement: A VNC session paints its initial framebuffer and remains connected while the user moves
+      and clicks the remote canvas and types a key.
     actions:
     - 1
     - 2
-    - 4
+    - 3
     - 5
     - 6
     - 7
-    - 9
+    - 8
     - 10
+    - 11
     - 12
     - 14
     - 16
-    - 17
-    - 20
-    - 21
+    - 18
+    - 19
     - 22
     - 23
     - 24
@@ -154,62 +167,80 @@ verification:
     - 32
     - 33
     - 34
-    checkpoints:
-    - step: 18
-      expectation: The fixture framebuffer is visible at 1280x720 before input begins.
-    - step: 19
-      expectation: The initial pixels have actually been painted before sustained input.
-    - step: 25
-      expectation: The fixture event log contains pointer input.
-    - step: 26
-      expectation: The fixture event log contains the keysym for the typed key.
-    - step: 35
-      expectation: The painted-frame counter reaches at least four, accounting for the initial pixels and all three remote repaint updates after the input burst.
-    - step: 36
-      expectation: The final resized framebuffer contains opaque pixels instead of a cleared canvas.
-    results:
-    - 18
-    - 19
-    - 25
-    - 26
     - 35
     - 36
-  - id: R2
-    requirement: Remote DesktopSize changes still reach the canvas after sustained input, proving the relay continues requesting and painting updates.
-    actions:
+    checkpoints:
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]",
+        "timeout_sec": 20}}'
+    - step: 21
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted''))
+        >= 1", "timeout_sec": 10}}'
+    - step: 27
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\":
+        \"pointer\""}}'
+    - step: 28
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"keysym\":
+        97, \"keysym_hex\": \"0x61\""}}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted''))
+        >= 4", "timeout_sec": 10}}'
+    - step: 38
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.vnc-container canvas'').getContext(''2d'').getImageData(16,
+        16, 1, 1).data[3] === 255", "timeout_sec": 10}}'
+    results:
+    - 20
+    - 21
     - 27
     - 28
+    - 37
+    - 38
+  - id: R2
+    requirement: Remote DesktopSize changes still reach the canvas after sustained input, proving the
+      relay continues requesting and painting updates.
+    actions:
     - 29
     - 30
     - 31
     - 32
     - 33
     - 34
-    checkpoints:
-    - step: 28
-      expectation: The first remote resize is reflected as a 1024x768 canvas.
-    - step: 29
-      expectation: The first resized framebuffer is painted before the next resize.
-    - step: 31
-      expectation: The second remote resize returns the canvas to 1280x720.
-    - step: 32
-      expectation: The second resized framebuffer is painted before the final resize.
-    - step: 35
-      expectation: At least four frames have been painted after the sustained input and resize sequence.
-    - step: 36
-      expectation: The final resized canvas still contains rendered pixels.
-    results:
-    - 28
-    - 29
-    - 31
-    - 32
     - 35
     - 36
+    checkpoints:
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]",
+        "timeout_sec": 15}}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted''))
+        >= 2", "timeout_sec": 10}}'
+    - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]",
+        "timeout_sec": 15}}'
+    - step: 34
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted''))
+        >= 3", "timeout_sec": 10}}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-vnc-frames-painted]'')?.getAttribute(''data-vnc-frames-painted''))
+        >= 4", "timeout_sec": 10}}'
+    - step: 38
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.vnc-container canvas'').getContext(''2d'').getImageData(16,
+        16, 1, 1).data[3] === 255", "timeout_sec": 10}}'
+    results:
+    - 30
+    - 31
+    - 33
+    - 34
+    - 37
+    - 38
   visual:
-  - check: The final connected session shows the fixture gradient without a stale overlay, clipped canvas or frozen blank surface.
+  - check: The final connected session shows the fixture gradient without a stale overlay, clipped canvas
+      or frozen blank surface.
     method: manual
     reason: DOM dimensions and frame counters do not judge rendered pixel freshness.
   native:
-  - check: Native mode uses the packaged Rust RFB relay and WebKitGTK input path; browser mode exercises the shared panel through the Vite bridge.
+  - check: Native mode uses the packaged Rust RFB relay and WebKitGTK input path; browser mode exercises
+      the shared panel through the Vite bridge.
     method: automated
-    reason: The fixture is synthetic; the separate live VNC run covers the real RFB 18 server and its platform-specific behavior.
+    reason: The fixture is synthetic; the separate live VNC run covers the real RFB 18 server and its
+      platform-specific behavior.

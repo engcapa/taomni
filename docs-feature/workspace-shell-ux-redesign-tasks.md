@@ -79,3 +79,21 @@ TASK-01～10 已领取并集成初版，正在补齐异常路径和保留行为�
 - 单测收尾：全量 `shell-product-unit-all-68` 的 521 个文件 / 4951 项全部通过，仅编辑器文件 3 项失败。修复测试异步 dispatch 与拆分 8 个独立故障场景后，完整 `shell-editor-final-unit-77` 248/248 通过；两份原始结果共同覆盖当前 5199 项，不改写失败 JSON，也不将 unit-68 标为通过。仅测试编排改变，产品代码自 unit-68 后未改变。`shell-types-final-78` exit 0。
 - 最终静态 `shell-final-static-gate-76` 通过：required 967、covered_required 922、shallow 41、orphans 4；原 baseline 619/614/46/9 保持不变。57 条 Shell schema/reviewed contract 通过；7 条既有 DB 用例的缺失契约已按实际 SQL/UI 动作与结果补齐并通过静态检查。`shell-final-ci-plan-80` exit 0，精确规划 198 ID，无 capability gaps。20 条既有 case 的 needs-review/legacy-imported 标签仍在 selection 中明确列出，不从 schema 或入口迁移推断全面验收。
 - TASK-01～12 进入 verification，下一步以统一提交的 SHA 执行 GitHub browser/native。手工/外部及性能缺口仍保持未验证。
+
+### GitHub 第三轮（已完成；修复中）
+
+- 提交：`bf4d6639489d3379a041bd1d477b0d9c199f4cdc`；[run 37178495569](https://github.com/engcapa/taomni/actions/runs/37178495569)，`publish_issues=false`。
+- plan 的 runner、catalog、policy gate 通过；已下载的 selection 确认上述 SHA，无 capability gaps。三端 browser 各 156（44 Shell + 112 保留），native Linux 50（13 Shell + 37 保留）、Windows 44（12 + 32）、macOS 43（12 + 31）。仅 Linux 包含真 IME case N10。
+- 原始报告保留在 `qa-ui-auto-report/workspace-shell/github/run-37178495569/`；6/6 报告的 source identity、selection、receipt、artifact hash 均已核对通过。Linux/macOS browser 各 146 pass / 10 fail，Windows browser 148 / 8；Linux native 35 / 15，macOS native 23 / 20，Windows native 23 / 21，全部无 skip。workflow 的绿色不能替代以上 case 结果。
+- 本轮修复初次/重连 SSH 提示符被 banner 覆盖、总览 rename 自动焦点、点击区尺寸、DB rollback 关闭反馈、邮件已读响应竞态。更新旧 native Sessions 入口、SFTP owner 范围、菜单入口和持久化等待，保留业务断言及 1-based 验收映射。
+- runner 修复 newline/Mod 输入、Linux Unicode 原生 clipboard paste、MySQL env 配置解析、子窗口关闭/中断及退役 handle，并精确清理当前 Windows QA profile 的 WebView2 进程。macOS 显示配置改为 session 生效，运行前另行验证实际 NSScreen；原生效果待新 GitHub 输入验证。
+- 增加 B45/N19：Home 全局 AI 对话、流式发送、隐藏完成提示、精确跳转、草稿和历史；N19 使用只监听 loopback 的 OpenAI 协议 fixture，通过实际 Rust IPC/SQLite 与进程重启验证，包含真实 provider 503 和下一次发送恢复。browser 回复明确标记 IPC preview stub，不当作 native 证据。N20 轻量检查 LAN history 入口和同一 owner 的拒绝启用状态。
+- 用户指定的截图模块已扩大到全部 TC-SHOT browser/native 用例；当前选择 240 个独立 ID，最终每端数量以新 selection 为准。补充范围的 runtime 结果尚未建立。
+- 本地单测原始证据：`shell-product-repairs-unit-98` 62/62，`shell-runner-final-unit-101` 119 pass / 9 平台限定 skip（128 总数），`shell-ai-product-unit-104` 71/71，`shell-ai-runner-unit-105` 16/16。全局历史修复后的最终 AI 单测、类型和静态检查另行回填；旧失败日志保持原样。
+
+### 第四轮输入收尾（待远程验收）
+
+- 最终 AI / Shell 单测 `shell-ai-final-unit-111.json` 72/72 通过；TypeScript `shell-types-final-113` exit 0；受影响 Rust 文件 `rustfmt --edition 2024 --check` 通过。没有在本地启动 browser/native 或进行原生构建。
+- `shell-static-final-112` audit gate 通过：required 967、covered_required 922、shallow 41、orphans 4；baseline 未调整。`shell-dev-contract-114` exit 0，正常 Git `diff --check` 无错误。以上均为静态或单元测试证据。
+- `shell-ci-plan-108` 精确选择 240 个独立 ID，无 capability gaps：browser 三端各 183（45 Shell、27 Screenshot、111 其他保留），native Linux 65 / Windows 59 / macOS 58（分别含 15 / 14 / 14 Shell，三端各 13 Screenshot）。共 731 次平台/模式执行，尚未记为 runtime pass。
+- 本轮继续要求最终 SHA 的 selection、逐 case 结果、receipt、source identity 与 artifact hash 全部相符；TASK-01～12 保持 verification，未补齐的 OS/IME/读屏及匹配性能证据仍显式保留。

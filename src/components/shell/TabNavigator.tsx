@@ -29,7 +29,13 @@ export function TabNavigator({ onNewSession }: { onNewSession(): void }) {
     frozenMru.current = useShellLayoutStore.getState().mru;
     setQuery(""); setLane("all"); setAttention(false); setSort("recent"); setIndex(0); setDetails(null);
     searchRef.current?.focus();
+    const dialog = dialogRef.current;
     return () => {
+      // An action can transfer focus to a new control while closing this
+      // dialog, such as the tab rename input. Preserve that action's focus.
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active !== document.body && active.isConnected
+        && !dialog?.contains(active) && !active.closest('[inert],[aria-hidden="true"]')) return;
       const previous = opener.current;
       const fallback = document.querySelector<HTMLElement>('[data-testid="tab-item"][data-active="true"], [data-testid="shell-rail-home"]');
       if (previous?.isConnected && !previous.closest('[inert],[aria-hidden="true"]')) previous.focus({ preventScroll: true });

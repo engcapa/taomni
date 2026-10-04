@@ -1,11 +1,10 @@
 id: TC-151
 title: VNC session reaches the hosted RFB fixture, relays input and follows a remote resize
-description: 'Real RFB session for F9.6 against the scriptable VNC fixture (vnc_required):
-  the per-attempt unencrypted-connection warning, then VNCAuth through the session''s
-  own authentication form (asked only because the server requires a password, DEC-VNC-21),
-  first frame at the framebuffer size, pointer/key/Ctrl+Alt+Del arrival in the fixture''s event log,
-  and a server DesktopSize change. Native mode exercises the Rust RFB client and
-  relay; browser mode exercises the same panel through the dev-server VNC bridge.
+description: 'Real RFB session for F9.6 against the scriptable VNC fixture (vnc_required): the per-attempt
+  unencrypted-connection warning, then VNCAuth through the session''s own authentication form (asked only
+  because the server requires a password, DEC-VNC-21), first frame at the framebuffer size, pointer/key/Ctrl+Alt+Del
+  arrival in the fixture''s event log, and a server DesktopSize change. Native mode exercises the Rust
+  RFB client and relay; browser mode exercises the same panel through the dev-server VNC bridge.
 
   '
 covers:
@@ -23,6 +22,7 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- shell_navigate: sessions
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-vnc"]'
@@ -38,6 +38,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-vnc-fixture
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-fixture"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-fixture"]'
 - wait_for:
@@ -73,7 +74,9 @@ steps:
     contains: '"keysym": 65535, "keysym_hex": "0xffff"'
 - host_write_file:
     path: ${fixture.vnc_control}
-    text: "resize 1024 768\n"
+    text: 'resize 1024 768
+
+      '
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
     timeout_sec: 15
@@ -85,72 +88,88 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A saved VNC session without a stored password connects first, stops for the per-attempt unencrypted-connection confirmation, asks for the password only because the fixture requires VNCAuth, and then paints the remote desktop at its framebuffer size without warning again.
+    requirement: A saved VNC session without a stored password connects first, stops for the per-attempt
+      unencrypted-connection confirmation, asks for the password only because the fixture requires VNCAuth,
+      and then paints the remote desktop at its framebuffer size without warning again.
     actions:
     - 1
     - 2
-    - 4
+    - 3
     - 5
     - 6
     - 7
-    - 9
+    - 8
     - 10
+    - 11
     - 12
     - 14
     - 16
-    - 17
-    checkpoints:
-    - step: 3
-      expectation: The session editor opens.
-    - step: 8
-      expectation: The bookmark section is shown.
-    - step: 11
-      expectation: The saved VNC session appears in the session tree.
-    - step: 13
-      expectation: Opening the session connects without a password prompt and stops for the unencrypted-connection warning before any credential is sent.
-    - step: 15
-      expectation: The fixture asks for VNCAuth, so the session's own authentication form asks for the password.
-    - step: 18
-      expectation: The retry with the password does not warn again; the frame painter sizes the canvas to the fixture's 1280x720 framebuffer when it paints the first frame.
-    - step: 19
-      expectation: The fixture logs a successful VNCAuth handshake.
-    results:
     - 18
     - 19
-  - id: R2
-    requirement: Pointer, keyboard and the Ctrl+Alt+Del action reach the remote desktop as RFB pointer and key events.
-    actions:
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-vnc-fixture\"]"}'
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-unencrypted-continue\"]", "timeout_sec":
+        20}}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-auth-password\"]", "timeout_sec": 20}}'
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]",
+        "timeout_sec": 20}}'
+    - step: 21
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\":
+        \"auth\", \"ok\": true, \"security\": \"VNCAuth\""}}'
+    results:
     - 20
     - 21
+  - id: R2
+    requirement: Pointer, keyboard and the Ctrl+Alt+Del action reach the remote desktop as RFB pointer
+      and key events.
+    actions:
     - 22
-    checkpoints:
-    - step: 23
-      expectation: The fixture logs a left-button pointer event from the canvas click.
-    - step: 24
-      expectation: The fixture logs the keysym of the key typed on the canvas.
-    - step: 25
-      expectation: The fixture logs Delete from Ctrl+Alt+Del.
-    results:
     - 23
     - 24
+    checkpoints:
+    - step: 25
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\":
+        \"pointer\", \"mask\": 1"}}'
+    - step: 26
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"keysym\":
+        97, \"keysym_hex\": \"0x61\""}}'
+    - step: 27
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"keysym\":
+        65535, \"keysym_hex\": \"0xffff\""}}'
+    results:
     - 25
+    - 26
+    - 27
   - id: R3
     requirement: A server DesktopSize change resizes the canvas to the new framebuffer.
     actions:
-    - 26
-    checkpoints:
-    - step: 27
-      expectation: The canvas takes the new 1024x768 framebuffer size.
-    - step: 28
-      expectation: The fixture logs that it sent the DesktopSize change.
-    results:
-    - 27
     - 28
+    checkpoints:
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]",
+        "timeout_sec": 15}}'
+    - step: 30
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\":
+        \"desktop_size\", \"width\": 1024, \"height\": 768"}}'
+    results:
+    - 29
+    - 30
   visual:
-  - check: The connected session shows the fixture's gradient desktop without overlays, letterboxing or clipped tab actions.
+  - check: The connected session shows the fixture's gradient desktop without overlays, letterboxing or
+      clipped tab actions.
     method: manual
     reason: DOM and event-log assertions do not judge the rendered pixels.
   native:
-  - check: Native mode drives the Rust RFB client and WebSocket relay; browser mode drives the dev-server VNC bridge (None/VNCAuth, Raw, DesktopSize) and proves only the shared panel workflow.
+  - check: Native mode drives the Rust RFB client and WebSocket relay; browser mode drives the dev-server
+      VNC bridge (None/VNCAuth, Raw, DesktopSize) and proves only the shared panel workflow.
     method: automated
-    reason: The fixture is synthetic; OS input, the system clipboard, encodings and real VNC servers stay covered by the VNC skill's native scenarios.
+    reason: The fixture is synthetic; OS input, the system clipboard, encodings and real VNC servers stay
+      covered by the VNC skill's native scenarios.

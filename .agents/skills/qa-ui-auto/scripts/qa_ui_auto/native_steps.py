@@ -1595,6 +1595,28 @@ def _do_wait_for(ctx: NativeStepContext, args: Any) -> str:
     return _wait_for(ctx, args)
 
 
+@_verb("app_menu_action")
+def _do_app_menu_action(ctx, args):
+    if args not in {"split", "multiexec"}:
+        raise StepError("app_menu_action: expected split or multiexec")
+    if platform.system() == "Darwin":
+        result = ctx.session.request("POST", ctx.session.endpoint("/qa/native-view-menu"), {"action": args})
+        if result != {"activated": args, "transport": "AppKit NSMenu"}:
+            raise StepError("Native View menu action was not activated")
+        return "activated installed AppKit View menu " + args
+    ctx.session.click('[data-testid="app-main-menu"]')
+    _wait_for(ctx, '[data-testid="context-menu-item-view"]')
+    # A reopened portal can appear under the previous hover position. Enter
+    # it from the visible menu opener so WebKit delivers a new mouseenter.
+    _hover(ctx, '[data-testid="app-main-menu"]')
+    _hover(ctx, '[data-testid="context-menu-item-view"]')
+    item = "split-terminal" if args == "split" else "multiexec"
+    selector = f'[data-testid="context-menu-item-{item}"]'
+    _wait_for(ctx, selector)
+    ctx.session.click(selector)
+    return "clicked the renderer View menu " + args
+
+
 @_verb("shell_navigate")
 def _do_shell_navigate(ctx: NativeStepContext, args: Any) -> str:
     if args not in {"sessions", "tools"}:
@@ -3187,6 +3209,7 @@ from . import updater_steps  # noqa: E402,F401
 
 @_verb("switch_window")
 def _do_switch_window(ctx, args):
+    from tauri_webdriver import WebDriverError
     from .window_routes import matches_window_route
     deadline = time.monotonic() + args.get("timeout_sec", 10)
     session = ctx.session
@@ -3194,8 +3217,14 @@ def _do_switch_window(ctx, args):
     while time.monotonic() < deadline:
         handles = session.request("GET", session.endpoint("/window/handles"))
         for handle in handles:
-            session.request("POST", session.endpoint("/window"), {"handle": handle})
-            url = session.request("GET", session.endpoint("/url"))
+            try:
+                session.request("POST", session.endpoint("/window"), {"handle": handle})
+                url = session.request("GET", session.endpoint("/url"))
+            except WebDriverError as error:
+                if "no such window" in str(error).lower():
+                    # A scheduled native close may retire a handle after GET.
+                    continue
+                raise
             observed[str(handle)] = str(url)
             if matches_window_route(url, args["route"]):
                 session.wait_for_app_ready()
@@ -3230,12 +3259,11 @@ def _do_close_window(ctx, args):
     # Chromium's DELETE /window can close only the WebView target and skip the
     # Tauri window lifecycle. Use the native window close request on every OS.
     script = (
-        "const done = arguments[arguments.length - 1];"
         "const selected = window.__TAURI__.window.getCurrentWindow();"
-        "done({scheduled: true});"
-        "setTimeout(() => selected.close(), 0);"
+        "setTimeout(() => selected.close(), 100);"
+        "return {scheduled: true};"
     )
-    result = ctx.session.request("POST", ctx.session.endpoint("/execute/async"), {"script": script, "args": []})
+    result = ctx.session.request("POST", ctx.session.endpoint("/execute/sync"), {"script": script, "args": []})
     if result != {"scheduled": True}:
         raise StepError(f"close_window: native close request was not scheduled: {result!r}")
     return "scheduled a real Tauri window close request; assert the product outcome in the surviving window"
@@ -3252,11 +3280,10 @@ def _do_interrupt_detached_window(ctx, args):
     if not matches_window_route(url, route):
         raise StepError("interrupt_detached_window: selected window is not the requested QA child")
     script = (
-        "const done = arguments[arguments.length - 1];"
-        "done({scheduled: true});"
-        "setTimeout(() => window.__TAURI__.core.invoke('close_current_detached_window'), 0);"
+        "setTimeout(() => window.__TAURI__.core.invoke('close_current_detached_window'), 100);"
+        "return {scheduled: true};"
     )
-    result = ctx.session.request("POST", ctx.session.endpoint("/execute/async"), {"script": script, "args": []})
+    result = ctx.session.request("POST", ctx.session.endpoint("/execute/sync"), {"script": script, "args": []})
     if result != {"scheduled": True}:
         raise StepError(f"interrupt_detached_window: fault was not scheduled: {result!r}")
     return f"scheduled real destruction of the selected isolated QA child {route}; assert recovery in its parent"

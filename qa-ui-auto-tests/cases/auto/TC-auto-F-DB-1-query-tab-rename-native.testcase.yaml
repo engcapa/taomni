@@ -1,8 +1,6 @@
 id: TC-auto-F-DB-1-query-tab-rename-native
-title: Native query tab rename connects MySQL, records history and survives a WebView
-  reload
-description: 'Creates a real MySQL session against the configured QA database, renames
-  the
+title: Native query tab rename connects MySQL, records history and survives a WebView reload
+description: 'Creates a real MySQL session against the configured QA database, renames the
 
   query tab, runs a statement, verifies the history name chip, then reloads the
 
@@ -11,9 +9,11 @@ description: 'Creates a real MySQL session against the configured QA database, r
   QA application SQLite workspace. Cross-platform native target (Linux, macOS, Windows).
 
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained.
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'
 covers:
 - F-DB-1
 tags:
@@ -23,7 +23,6 @@ tags:
 - rename
 - persistence
 - native-boundary
-- needs-review
 modes:
 - native
 native_platforms:
@@ -109,18 +108,31 @@ steps:
     selector: '[data-testid="db-query-history-entry-name"]'
     contains: native-orders
 - wait: 8
+- reload: null
+- wait_for: '[data-testid="welcome-panel"]'
+- shell_navigate: sessions
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rename-native"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- assert_text:
+    selector: '[data-testid="db-query-tab"]'
+    contains: native-orders
+- click: '[data-testid="db-query-history-toggle"]'
+- wait_for:
+    selector: '[data-testid="db-query-history-entry"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="db-query-history-entry-name"]'
+    contains: native-orders
 - screenshot: native-query-tab-rename-history.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Native query tab rename connects MySQL, records history and survives
-      a WebView reload：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: 真实 MySQL 会话创建并连接；query tab 通过用户重命名为 native-orders。
     actions:
-    - 1
-    - 2
-    - 4
-    - 5
     - 8
     - 10
     - 12
@@ -139,51 +151,47 @@ verification:
     - 31
     - 34
     - 35
+    checkpoints:
+    - step: 29
+      expectation: 真实连接无错误 banner。
+    - step: 36
+      expectation: query tab 显示 native-orders。
+    results:
+    - 29
+    - 36
+  - id: R2
+    requirement: 在重命名的 query tab 执行 SQL 后，查询结果和真实历史中的名称关联正确。
+    actions:
     - 37
     - 38
     - 39
     - 41
     checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 6
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]",
-        "timeout_sec": 10}}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-pw1\"]",
-        "timeout_sec": 15}}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-rename-native\"]"}'
-    - step: 28
-      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec":
-        60}}'
-    - step: 29
-      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
-    - step: 32
-      expectation: '{"wait_for": "[data-testid=\"db-query-tab-input\"]"}'
-    - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"db-query-tab\"]",
-        "contains": "native-orders"}}'
     - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"query-result-grid\"]",
-        "timeout_sec": 60}}'
-    - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-history-entry\"]",
-        "timeout_sec": 30}}'
+      expectation: 真实查询结果网格可见。
     - step: 43
-      expectation: '{"assert_text": {"selector": "[data-testid=\"db-query-history-entry-name\"]",
-        "contains": "native-orders"}}'
+      expectation: 历史名称含 native-orders。
     results:
-    - 42
+    - 40
     - 43
+  - id: R3
+    requirement: 保持同一隔离原生进程，重载 WebView 后从保存会话重连，query 名称及历史可恢复。
+    actions:
+    - 45
+    - 47
+    - 48
+    - 52
+    checkpoints:
+    - step: 50
+      expectation: 重连无错误 banner。
+    - step: 51
+      expectation: 重载后的 query tab 保持 native-orders。
+    - step: 54
+      expectation: 重载后的历史名称保持 native-orders。
+    results:
+    - 50
+    - 51
+    - 54
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

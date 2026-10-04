@@ -1,7 +1,6 @@
 id: TC-auto-F-AI-2-7-acp-grok-settings
 title: Configure the generic ACP bridge and Grok preset
-description: 'Opens AI Settings, verifies the built-in Grok ACP profile, exercises
-  both
+description: 'Opens AI Settings, verifies the built-in Grok ACP profile, exercises both
 
   direct and application proxy policy, verifies the bridge/profile enable
 
@@ -10,15 +9,16 @@ description: 'Opens AI Settings, verifies the built-in Grok ACP profile, exercis
   The case does not run the real Grok process or require xAI credentials.
 
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained.
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'
 covers:
 - F-AI-2.7
 tags:
 - auto-generated
 - smoke
-- needs-review
 - settings
 - acp
 modes:
@@ -44,31 +44,64 @@ steps:
     selector: '[data-testid="acp-request-timeout"]'
     value: '90'
 - click: '[data-testid="acp-save"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"request_timeout_seconds":90'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"proxy_mode":"direct"'
+- reload: null
+- wait_for: '[data-testid="shell-rail-settings"]'
+- click: '[data-testid="shell-rail-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- assert_value:
+    selector: '[data-testid="acp-request-timeout"]'
+    equals: '90'
+- assert_count:
+    selector: '[data-testid="acp-global-proxy-direct"]:checked'
+    equal: 1
 - screenshot: ai-acp-grok-settings.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Configure the generic ACP bridge and Grok preset：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: AI Settings 内置 Grok profile 可达；更改 bridge/profile、proxy 和超时后保存实际配置。
     actions:
-    - 1
     - 3
     - 5
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 6
-      expectation: '{"wait_for": "[data-testid=\"acp-settings\"]"}'
-    - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"acp-settings\"]"}'
     - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"acp-profile-grok\"]"}'
+      expectation: 内置 Grok profile 可见。
+    - step: 16
+      expectation: 保存的超时为 90 秒。
+    - step: 17
+      expectation: 保存的 proxy 策略为 direct。
     results:
-    - 6
-    - 7
     - 8
+    - 16
+    - 17
+  - id: R2
+    requirement: 重载后通过 Settings Rail 返回 AI 分组，已保存超时和 proxy 策略仍准确。
+    actions:
+    - 18
+    - 20
+    - 22
+    checkpoints:
+    - step: 23
+      expectation: 重载后输入值精确为 90。
+    - step: 24
+      expectation: 重载后 direct 策略保持选中。
+    results:
+    - 23
+    - 24
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

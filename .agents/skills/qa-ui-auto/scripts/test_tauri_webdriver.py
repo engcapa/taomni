@@ -15,6 +15,17 @@ from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, select
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_windows_teardown_ends_live_owned_tree_before_driver_delete_can_orphan_webviews(self):
+        closed = Mock()
+        session = NativeSession("http://driver.invalid", Path("unused"), closed)
+        session.session_id = "session-1"
+        session._harness = Mock()
+        session.request = Mock()
+        with patch("tauri_webdriver.platform.system", return_value="Windows"):
+            session.close()
+        session._harness.driver.stop.assert_called_once_with()
+        session.request.assert_not_called()
+        closed.assert_called_once_with()
     def test_modified_click_holds_keys_through_pointer_up_and_releases_them_on_failure(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
@@ -319,7 +330,7 @@ class NativeSessionFillTest(TestCase):
             "return !!el && document.activeElement === el;"
         )
         session.press_combo.assert_has_calls([
-            call("Control+a"),
+            call("Mod+a"),
             call("Enter"),
             call("Enter"),
         ])
@@ -333,6 +344,47 @@ class NativeSessionFillTest(TestCase):
 
         click_call = call("POST", "/session/session-1/element/element-1/click", {})
         self.assertEqual(session.request.call_args_list.count(click_call), 2)
+
+    def test_macos_contenteditable_fill_selects_the_whole_existing_document(self) -> None:
+        session = self.session(True)
+        with patch("tauri_webdriver.platform.system", return_value="Darwin"):
+            session.fill(".cm-content", "replacement")
+        session.press_combo.assert_called_once_with("Mod+a")
+        session.type_text.assert_called_once_with("replacement")
+
+    def test_contenteditable_empty_fill_removes_the_selected_document(self) -> None:
+        session = self.session(True)
+        session.fill(".cm-content", "")
+        self.assertEqual(session.press_combo.call_args_list, [call("Mod+a"), call("Backspace")])
+        session.type_text.assert_not_called()
+
+    def test_linux_unicode_editor_paste_waits_for_complete_consumption_before_restoring_clipboard(self) -> None:
+        session = self.session(True)
+        session.execute = Mock(side_effect=[True, True, False, True])
+        text = "SHELL-剪贴板\r\nComplete second line"
+        normalized = text.replace("\r\n", "\n")
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text, \
+                patch("tauri_webdriver.time.sleep") as sleep:
+            set_text.side_effect = lambda value: self.assertEqual(session.execute.call_count, 4) if value == "previous" else None
+            session.fill(".cm-content", text)
+        self.assertEqual(set_text.call_args_list, [call(normalized), call("previous")])
+        self.assertEqual(session.press_combo.call_args_list, [call("Mod+a"), call("Mod+v")])
+        session.type_text.assert_not_called()
+        self.assertIn(".cm-line", session.execute.call_args.args[0])
+        sleep.assert_called_once_with(0.05)
+
+    def test_linux_unicode_editor_paste_failure_restores_clipboard_and_fails(self) -> None:
+        session = self.session(True)
+        session.execute = Mock(side_effect=[True, True, False])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text, \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 6]):
+            with self.assertRaisesRegex(WebDriverError, "did not retain"):
+                session.fill(".cm-content", "中文")
+        self.assertEqual(set_text.call_args_list, [call("中文"), call("previous")])
 
     def test_input_fill_keeps_blur_committing_control_focused(self) -> None:
         session = self.session(False)
@@ -422,6 +474,18 @@ class NativeSessionFillTest(TestCase):
             session.fill('input[type="password"]', "Qa1_test:@!")
         session.type_text.assert_called_once_with("Qa1_test:@!")
         self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
+
+    def test_multiline_text_uses_enter_keys_on_each_platform(self) -> None:
+        for os_name in ("Windows", "Linux", "Darwin"):
+            with self.subTest(platform=os_name), patch("tauri_webdriver.platform.system", return_value=os_name):
+                session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+                session.session_id = "session-1"
+                session.request = Mock(return_value=None)
+                session.type_text("a\r\nb\nc\rd")
+                actions = [action for request in session.request.call_args_list if request.args[0] == "POST"
+                           for action in request.args[2]["actions"][0]["actions"]]
+                self.assertEqual([action["value"] for action in actions if action["type"] == "keyDown"],
+                                 ["a", "\ue007", "b", "\ue007", "c", "\ue007", "d"])
 
     def test_type_text_paces_contenteditable_key_transactions(self) -> None:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))

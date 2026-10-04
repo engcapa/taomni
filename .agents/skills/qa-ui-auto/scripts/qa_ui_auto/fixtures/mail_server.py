@@ -13,6 +13,8 @@ renderer orchestration only, never real IMAP.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from .. import mail_fake_server
@@ -56,5 +58,26 @@ def setup(ctx: Any) -> None:
 
 def teardown(ctx: Any) -> None:
     if mail_fake_server.ACTIVE is not None:
-        mail_fake_server.ACTIVE.stop()
-        mail_fake_server.ACTIVE = None
+        server = mail_fake_server.ACTIVE
+        try:
+            report = Path(ctx.case_dir) / "mail-protocol-observation.json"
+            report.write_text(json.dumps(protocol_observation(server.state), indent=2), encoding="utf-8")
+        finally:
+            server.stop()
+            mail_fake_server.ACTIVE = None
+
+
+def protocol_observation(state: Any) -> dict:
+    """Record protocol progress and counts, never authentication arguments."""
+    allowed = {"CAPABILITY", "LIST", "EXAMINE", "SELECT", "SEARCH", "FETCH", "STORE", "COPY", "MOVE", "EXPUNGE", "STATUS", "IDLE", "NOOP", "LOGOUT"}
+    with state.lock:
+        commands = []
+        for line in state.log:
+            tokens = line.upper().split()
+            if tokens and tokens[0] == "UID":
+                if len(tokens) > 1 and tokens[1] in allowed:
+                    commands.append("UID " + tokens[1])
+            elif tokens and tokens[0] in allowed:
+                commands.append(tokens[0])
+        folders = {name: {"total": len(folder.messages), "unread": sum("\\Seen" not in m.flags for m in folder.messages.values()), "uidNext": folder.uid_next} for name, folder in state.folders.items()}
+        return {"commands": commands, "folders": folders, "idleClients": len(state.idle_waiters)}

@@ -1244,5 +1244,8 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 | V-N16 | [原生 WebView 布局](../qa-ui-auto-tests/cases/TC-SHELL-N16-webview-layout-native.testcase.yaml) | 1440×900/800×600 客户区的几何、命中、Project/Tao 内容；OS DPI、跨屏、交通灯、读屏仍需独立执行 |
 | V-N17 | 本文 V-N17 性能测量步骤 | 匹配硬件/WebView/profile 的 baseline/candidate、原始样本和资源数据未完成；不声称性能无退化 |
 | V-N18 | [窗口中断恢复](../qa-ui-auto-tests/cases/TC-SHELL-N18-window-interruption-recovery-native.testcase.yaml) | 真实子窗口生命周期与 Notes 草稿恢复；权限/系统窗口故障的其余组合不由单一路径替代 |
+| B45 / N19（AI 强制保留范围） | [browser stream/history](../qa-ui-auto-tests/cases/TC-SHELL-B45-ai-stream-history.testcase.yaml)、[native stream/history](../qa-ui-auto-tests/cases/TC-SHELL-N19-ai-stream-history-native.testcase.yaml) | Home 无绑定会话发起对话；两次发送、隐藏完成通知、精确 thread 跳转、未发送多行草稿、历史重载。N19 另有真实 OpenAI loopback 协议/Rust stream/SQLite、503 后恢复和真实 QA 进程重启；独立 provider receipt 证明重载没有重新发送。browser 的 stream 是明示 IPC preview。待 GitHub 三端实测 |
+| N20（LAN 轻量范围） | [native LAN entry](../qa-ui-auto-tests/cases/TC-SHELL-N20-lan-entry-native.testcase.yaml)、B38 的 browser 草稿保留分支 | 原生 read-only history、拒绝开启、Home/quick-switch 回同一 owner；不声称真实 peer/multicast 收发。待 GitHub 三端实测 |
+| 截图强制保留范围 | `TC-SHOT-001…027` 与 `TC-SHOT-N1…N13` | 全部加入当前远程选择；native 使用实际捕获、OCR、clipboard、置顶、快捷键、scroll/recording 场景，依各 YAML 和 platform contract 验收。browser stub 与 native 结果分别记录；新远程输入尚未执行 |
 
 用户已授权实现、单测、推送及 GitHub browser/native 验证；当前任务状态与结果持续更新在 [实施任务](./workspace-shell-ux-redesign-tasks.md)。本稿的设计步骤保持完整，自动化数量、静态检查和单测通过均不代表全部三端桌面及人工边界已验收。

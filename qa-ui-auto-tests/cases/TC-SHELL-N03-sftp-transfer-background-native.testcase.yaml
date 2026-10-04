@@ -138,15 +138,16 @@ steps:
     value: ${env.QA_SHELL_SFTP_PASSWORD}
 - click: '[data-testid="auth-submit"]'
 - wait_for:
-    selector: '[data-testid="sftp-remote-list"]'
+    selector: '[data-tab-id]:not([inert]) [data-testid="sftp-remote-list"]'
     timeout_sec: 15
-- click: '[data-testid="sftp-local-path-edit"]'
+- click: '[data-tab-id]:not([inert]) [data-testid="sftp-local-path-edit"]'
 - fill:
-    selector: input[data-testid="sftp-local-path"]
+    selector: '[data-tab-id]:not([inert]) input[data-testid="sftp-local-path"]'
     value: ${fixture.shell_sftp_local}
 - press: Enter
 - wait_for:
-    selector: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
+    selector: '[data-tab-id]:not([inert]) [data-testid="sftp-local-list"] tr[data-row][title$="upload
+      中文.bin"]'
     timeout_sec: 15
 - click: '[data-testid="tab-item"][data-tab-title^="SHELL-SFTP-ALPHA"]'
 - click: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-close"]'
@@ -208,10 +209,10 @@ steps:
 - assert_not_visible: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="tab-item"][data-tab-title^="SHELL-SFTP-BETA"]'
 - wait_for:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-tab-id]:not([inert]) [data-testid="sftp-local-list"]'
     timeout_sec: 15
-- click: '[data-testid="sftp-local-list"] tr[data-row][title$="cancel 中文.bin"]'
-- click: '[data-testid="sftp-local-upload-selected"]'
+- click: '[data-tab-id]:not([inert]) [data-testid="sftp-local-list"] tr[data-row][title$="cancel 中文.bin"]'
+- click: '[data-tab-id]:not([inert]) [data-testid="sftp-local-upload-selected"]'
 - wait_for:
     selector: '[data-testid="transfer-job"][data-remote-path$="/cancel 中文.bin"][data-state="running"]'
     timeout_sec: 15
@@ -367,10 +368,11 @@ verification:
     - step: 53
       expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "timeout_sec": 15}}'
     - step: 56
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-tab-id]:not([inert]) [data-testid=\"sftp-remote-list\"]",
+        "timeout_sec": 15}}'
     - step: 60
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
-        中文.bin\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-tab-id]:not([inert]) [data-testid=\"sftp-local-list\"]
+        tr[data-row][title$=\"upload 中文.bin\"]", "timeout_sec": 15}}'
     - step: 63
       expectation: '{"wait_for": {"selector": "[data-testid=\"shell-close-dialog\"]", "timeout_sec": 15}}'
     - step: 64
@@ -462,7 +464,8 @@ verification:
     - 103
     checkpoints:
     - step: 92
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-tab-id]:not([inert]) [data-testid=\"sftp-local-list\"]",
+        "timeout_sec": 15}}'
     - step: 95
       expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/cancel
         中文.bin\"][data-state=\"running\"]", "timeout_sec": 15}}'

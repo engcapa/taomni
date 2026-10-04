@@ -175,6 +175,7 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
     { type: "separator" },
     { type: "item", id: "toggle-sidebar", label: t("menu.toggleSidebar"), action: "view" },
     { type: "item", id: "split", label: t("menu.splitTerminal"), action: "split" },
+    { type: "item", id: "multiexec", label: t("ribbon.multiExec"), action: "multiexec" },
   ];
 
   const xServerMenu: MenuNodeSpec[] = [

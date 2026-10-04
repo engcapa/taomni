@@ -1,0 +1,99 @@
+id: TC-SHELL-N20
+title: LAN history entry retains one owner and declined enable state
+description: 'Light LAN regression: the real native history entry opens, declining service enable leaves
+  the read-only roster usable, and Home/quick-switch reopens the same owner without another enable prompt.
+  No peer or multicast delivery claim.'
+covers:
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+modes:
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-lan-password
+- wait_for: '[data-testid="welcome-panel"]'
+- shell_navigate: tools
+- click: '[data-testid="sidebar-tool-lanchat"]'
+- wait_for: '[data-testid="lanchat-enable-prompt"]'
+- click: '[data-testid="lanchat-enable-prompt"] button:nth-of-type(1)'
+- wait_for: '[data-testid="lanchat-roster-panel"]'
+- assert_not_visible: '[data-testid="lanchat-enable-prompt"]'
+- click: '[data-testid="shell-rail-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="lanchat-roster-panel"]'
+- click: '[data-testid="shell-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: LAN Chat
+- click: '[data-testid="shell-quick-option"]'
+- wait_for: '[data-testid="lanchat-roster-panel"]'
+- assert_not_visible: '[data-testid="lanchat-enable-prompt"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="lanchat"]'
+    equal: 1
+- screenshot: tc-shell-n20-lan.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 'Light LAN regression: the real native history entry opens, declining service enable
+      leaves the read-only roster usable, and Home/quick-switch reopens the same owner without another
+      enable prompt. No peer or multicast delivery claim.'
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 10
+    - 13
+    - 14
+    - 15
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"lanchat-enable-prompt\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"lanchat-roster-panel\"]"}'
+    - step: 9
+      expectation: '{"assert_not_visible": "[data-testid=\"lanchat-enable-prompt\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 12
+      expectation: '{"assert_not_visible": "[data-testid=\"lanchat-roster-panel\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"lanchat-roster-panel\"]"}'
+    - step: 17
+      expectation: '{"assert_not_visible": "[data-testid=\"lanchat-enable-prompt\"]"}'
+    - step: 18
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"lanchat\"]",
+        "equal": 1}}'
+    results:
+    - 3
+    - 6
+    - 8
+    - 9
+    - 11
+    - 12
+    - 16
+    - 17
+    - 18
+  visual:
+  - check: Review the final readable conversation and Shell controls.
+    method: manual
+    reason: Screenshots require visual review.
+  native:
+  - check: Real Tauri stream and persisted history after QA process restart.
+    method: automated
+    reason: Native uses the loopback OpenAI protocol, actual Rust IPC and SQLite; the provider receipt
+      is independent of UI. Browser uses the explicitly labelled IPC preview reply.
+native_platforms:
+- Linux
+- Windows
+- macOS

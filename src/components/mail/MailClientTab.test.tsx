@@ -1371,6 +1371,29 @@ describe("MailClientTab", () => {
     expect(eventMocks.handlers.has("mail://idle")).toBe(false);
   });
 
+  it("retains a completed server read after the body load changes the selection effect", async () => {
+    const unread = { ...message, flags: [] };
+    mailMocks.mailListCachedMessages.mockResolvedValue([unread]);
+    let finish!: (result: { folder: string; marked: number }) => void;
+    mailMocks.mailMarkRead.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    renderMailbox();
+    await waitFor(() => expect(mailMocks.mailMarkRead).toHaveBeenCalled());
+    await waitFor(() => expect(mailMocks.mailGetMessageBody).toHaveBeenCalled());
+    await act(async () => { finish({ folder: "INBOX", marked: 1 }); });
+    await waitFor(() => expect(document.querySelector('[data-testid="mail-message-row"]')).toHaveAttribute("data-unread", "false"));
+  });
+
+  it("keeps IDLE active and publishes the exact new-mail count while hidden", async () => {
+    const view = renderMailbox();
+    await waitFor(() => expect(eventMocks.handlers.has("mail://idle")).toBe(true));
+    view.rerender(<MailClientTab tabId="mail-tab" info={info} visible={false} />);
+    mailMocks.mailSyncFolder.mockResolvedValue(stepResult({ newUnseen: 3 }));
+    const push = eventMocks.handlers.get("mail://idle")!;
+    act(() => push({ payload: { accountId: info.sessionId, folder: "INBOX", kind: "changed" } }));
+    await waitFor(() => expect(useTaoAlertStore.getState().mailNew).toMatchObject([{ mailTabId: "mail-tab", count: 3 }]), { timeout: 3000 });
+    expect(mailMocks.mailIdleStop).not.toHaveBeenCalled();
+  });
+
   it("manages folder subscriptions and hides unsubscribed folders (TASK-10)", async () => {
     window.localStorage.clear();
     const inbox: MailFolder = { ...folder, flags: ["\\Subscribed"] };

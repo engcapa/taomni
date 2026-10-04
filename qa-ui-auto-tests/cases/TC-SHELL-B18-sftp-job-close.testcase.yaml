@@ -162,6 +162,9 @@ steps:
 - shell_backend_scenario:
     action: release
 - assert_not_visible: '[data-testid="shell-close-dialog"]'
+- wait_for:
+    selector: '[data-testid="tab-item"]:has-text("qa-beta")'
+    state: detached
 - assert_count:
     selector: '[data-testid="tab-item"]:has-text("qa-beta")'
     equal: 0
@@ -340,7 +343,7 @@ verification:
     - 82
     - 83
     - 86
-    - 89
+    - 90
     checkpoints:
     - step: 84
       expectation: '{"assert_shell_backend": {"command": "sftp_cancel_transfer", "status": "held", "count":
@@ -351,15 +354,18 @@ verification:
     - step: 87
       expectation: '{"assert_not_visible": "[data-testid=\"shell-close-dialog\"]"}'
     - step: 88
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"]:has-text(\"qa-beta\")", "state":
+        "detached"}}'
+    - step: 89
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]:has-text(\"qa-beta\")",
         "equal": 0}}'
-    - step: 91
+    - step: 92
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-a\"]",
         "name": "data-state", "equals": "done"}}'
-    - step: 92
+    - step: 93
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"][data-session-id*=\"shell-b\"]",
         "name": "data-state", "equals": "cancelled"}}'
-    - step: 93
+    - step: 94
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-transfers\"] [data-testid=\"transfer-job\"]",
         "equal": 2}}'
     results:
@@ -367,9 +373,10 @@ verification:
     - 85
     - 87
     - 88
-    - 91
+    - 89
     - 92
     - 93
+    - 94
   visual:
   - check: Inspect the screenshot for readable job state and clipping.
     method: manual

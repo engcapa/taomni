@@ -195,6 +195,42 @@ describe("ChatDrawer provider and echo controls", () => {
     ]);
   });
 
+  it.each(["new", "send"])("creates a global Shell conversation from Home through %s", async (entry) => {
+    useAppStore.setState({ tabs: [], activeTabId: null });
+    const enqueue = vi.fn().mockResolvedValue({ status: "started" });
+    const originalEnqueue = useChatStore.getState().enqueueMessage;
+    useChatStore.setState({ threads: [], activeThreadId: null, messages: {}, drawerScope: null, drawerTabId: null, drawerOpen: true, enqueueMessage: enqueue });
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "chat_new_thread") return Promise.resolve({ id: "global-home", title: "New chat", provider_id: "deepseek", linked_session_id: null, created_at: 1, updated_at: 1, source: "drawer", mode: "chat" });
+      if (command === "chat_list_messages" || command === "chat_list_threads") return Promise.resolve([]);
+      if (command === "chat_purge_old") return Promise.resolve(0);
+      return Promise.resolve(null);
+    });
+    try {
+      render(<ChatDrawer shellHosted />);
+      if (entry === "new") {
+        fireEvent.click(screen.getByTitle("New chat"));
+      } else {
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "Home global question" } });
+        fireEvent.click(screen.getByTestId("ai-chat-send-button"));
+      }
+      await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("chat_new_thread", { providerId: "deepseek", linkedSessionId: null, mode: "chat" }));
+      expect(useChatStore.getState().threads[0].linked_session_id).toBeNull();
+      expect(screen.queryByTestId("shell-target-error")).toBeNull();
+      if (entry === "send") await waitFor(() => expect(enqueue).toHaveBeenCalledWith("global-home", "Home global question", undefined, []));
+    } finally {
+      useChatStore.setState({ enqueueMessage: originalEnqueue });
+    }
+  });
+
+  it("includes global conversations in Shell history after returning to Home", () => {
+    useAppStore.setState({ tabs: [], activeTabId: null });
+    useChatStore.setState({ drawerTabId: null, drawerScope: null, activeThreadId: "global-history", threads: [{ id: "global-history", title: "Global retained conversation", provider_id: "deepseek", linked_session_id: null, created_at: 1, updated_at: 1, source: "drawer", mode: "chat" }], messages: { "global-history": [] } });
+    render(<ChatDrawer shellHosted />);
+    fireEvent.click(screen.getByTitle("History"));
+    expect(document.querySelector('[data-chat-thread-id="global-history"]')).toHaveTextContent("Global retained conversation");
+  });
+
   it("includes provider groups in the manual provider picker", () => {
     const config = makeConfig();
     config.llm.provider_groups = {

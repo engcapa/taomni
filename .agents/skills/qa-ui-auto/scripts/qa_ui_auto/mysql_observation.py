@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path
 
+from .config import resolve
 from .steps import StepError
 
 
@@ -12,7 +13,7 @@ def assert_rows(cfg: dict, args: dict, case_dir: Path) -> None:
     query = args["query"].strip().rstrip(";")
     if not re.match(r"^SELECT\b", query, re.I) or ";" in query or re.search(r"\b(INTO|OUTFILE|DUMPFILE|FOR\s+UPDATE|LOCK)\b", query, re.I):
         raise StepError("mysql_assert_rows accepts one read-only SELECT")
-    section = cfg.get("database") or cfg.get("mysql") or {}
+    section = resolve(cfg.get("database") or cfg.get("mysql") or {}, cfg=cfg)
     if not all(section.get(key) for key in ("host", "port", "user", "password", "database")):
         raise StepError("mysql_assert_rows requires the configured disposable database")
     import pymysql
@@ -31,5 +32,7 @@ def assert_rows(cfg: dict, args: dict, case_dir: Path) -> None:
         if not passed:
             raise StepError(f"Independent committed rows {rows!r} differ from {args['equals']!r}")
     finally:
-        connection.rollback()
-        connection.close()
+        try:
+            connection.rollback()
+        finally:
+            connection.close()

@@ -1,12 +1,43 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from qa_ui_auto.steps.shell import navigate, backend_scenario
+from qa_ui_auto.steps.shell import navigate, backend_scenario, menu_action
+from qa_ui_auto.steps import StepError
 from qa_ui_auto.native_steps import VERBS
 from qa_ui_auto.control_coverage import _selectors_in_step
 
 
 class ShellNavigationTest(TestCase):
+    def test_browser_menu_action_uses_visible_menu_controls(self):
+        ctx = Mock(dry_run=False)
+        menu_action(ctx, "multiexec")
+        selectors = [call.args[0] for call in ctx.page.locator.call_args_list]
+        self.assertEqual(selectors, ['[data-testid="app-main-menu"]', '[data-testid="context-menu-item-view"]',
+                                    '[data-testid="context-menu-item-multiexec"]'])
+        ctx.page.locator.return_value.hover.assert_called_once_with()
+        self.assertEqual(ctx.page.locator.return_value.click.call_count, 2)
+
+    def test_macos_menu_action_requires_real_appkit_activation_acknowledgement(self):
+        ctx = Mock()
+        ctx.session.endpoint.side_effect = lambda path: path
+        ctx.session.request.return_value = {"activated": "split", "transport": "AppKit NSMenu"}
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Darwin"):
+            VERBS["app_menu_action"](ctx, "split")
+            ctx.session.request.assert_called_once_with("POST", "/qa/native-view-menu", {"action": "split"})
+            ctx.session.click.assert_not_called()
+            ctx.session.request.return_value = None
+            with self.assertRaisesRegex(StepError, "not activated"):
+                VERBS["app_menu_action"](ctx, "split")
+
+    def test_native_renderer_menu_reenters_a_reopened_portal_before_clicking(self):
+        ctx = Mock()
+        with patch("qa_ui_auto.native_steps.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.native_steps._wait_for"), patch("qa_ui_auto.native_steps._hover") as hover:
+            VERBS["app_menu_action"](ctx, "multiexec")
+        self.assertEqual([call.args[1] for call in hover.call_args_list],
+                         ['[data-testid="app-main-menu"]', '[data-testid="context-menu-item-view"]'])
+        self.assertEqual([call.args[0] for call in ctx.session.click.call_args_list],
+                         ['[data-testid="app-main-menu"]', '[data-testid="context-menu-item-multiexec"]'])
     def test_one_shot_hold_is_sent_as_external_boundary_input(self):
         ctx = Mock(dry_run=False, cfg={"app": {"mode": "browser"}})
         rule = {"action": "hold", "command": "workspace_list_dir", "owner": "/repo", "once": True}

@@ -2,13 +2,61 @@
 from __future__ import annotations
 
 import json
+import ntpath
 import os
 from pathlib import Path
 import platform
 import subprocess
 import time
+import re
 
 from .steps import StepError
+
+
+def windows_profile_owners(rows: list[dict], profile: Path) -> list[dict]:
+    expected = ntpath.normcase(ntpath.normpath(str(profile)))
+    allowed = {expected, ntpath.join(expected, "ebwebview")}
+    owners = []
+    for row in rows:
+        if str(row.get("Name", "")).lower() != "msedgewebview2.exe":
+            continue
+        match = re.search(r'--user-data-dir=(?:"([^"]+)"|([^\s]+))', row.get("CommandLine") or "", re.I)
+        if match and ntpath.normcase(ntpath.normpath(match[1] or match[2])) in allowed:
+            owners.append(row)
+    return owners
+
+
+def stop_windows_profile_owners(profile: Path) -> list[int]:
+    """Retire orphaned WebView2 owners of the exact, validated QA profile."""
+    def owners():
+        result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name='msedgewebview2.exe'\" | "
+            "Select-Object ProcessId,Name,CommandLine,@{Name='CreationDate';Expression={[string]$_.CreationDate.ToUniversalTime().Ticks}} | ConvertTo-Json -Compress"],
+            capture_output=True, text=True, timeout=15, check=True)
+        rows = json.loads(result.stdout) if result.stdout.strip() else []
+        return windows_profile_owners(rows if isinstance(rows, list) else [rows], profile)
+
+    terminated = []
+    script = (
+        "$ErrorActionPreference='Stop';"
+        "$qaProcess=Get-CimInstance Win32_Process -Filter ('ProcessId='+$env:QA_OWNED_WEBVIEW_PID);"
+        "if($qaProcess -and $qaProcess.Name -eq 'msedgewebview2.exe' -and "
+        "[string]$qaProcess.CreationDate.ToUniversalTime().Ticks -eq $env:QA_OWNED_WEBVIEW_CREATED){"
+        " $qaResult=Invoke-CimMethod -InputObject $qaProcess -MethodName Terminate;"
+        " if($qaResult.ReturnValue -ne 0){throw 'Owned QA WebView2 termination failed'} }"
+    )
+    for row in owners():
+        env = {**os.environ, "QA_OWNED_WEBVIEW_PID": str(row["ProcessId"]),
+               "QA_OWNED_WEBVIEW_CREATED": str(row["CreationDate"])}
+        subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                       env=env, capture_output=True, text=True, timeout=15, check=True)
+        terminated.append(int(row["ProcessId"]))
+    deadline = time.monotonic() + 5
+    while remaining := owners():
+        if time.monotonic() >= deadline:
+            raise StepError("The isolated QA WebView profile still has live owners: " + str([row["ProcessId"] for row in remaining]))
+        time.sleep(.1)
+    return terminated
 
 
 def snapshot() -> list[dict]:

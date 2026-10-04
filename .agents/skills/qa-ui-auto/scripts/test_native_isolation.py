@@ -66,6 +66,7 @@ class NativeBuildTest(unittest.TestCase):
 
                 with (
                     patch.object(native_build, "ROOT", root),
+                    patch.object(native_build, "ensure_linux_link_deps"),
                     patch.object(native_build, "build_inputs", return_value={"source_sha256": "test-source"}),
                     patch.object(native_build.platform, "system", return_value=system),
                     patch.object(native_build.shutil, "which", return_value="pnpm"),
@@ -86,6 +87,7 @@ class NativeBuildTest(unittest.TestCase):
             binary = recorded_binary(output)
             with (
                 patch.object(native_build, "ROOT", root),
+                patch.object(native_build, "ensure_linux_link_deps"),
                 patch.object(native_build, "build_inputs", return_value={"source_sha256": "test-source"}),
                 patch.object(native_build.platform, "system", return_value="Linux"),
                 patch.object(native_build.shutil, "which", return_value="pnpm"),
@@ -468,6 +470,7 @@ class NativeIsolationTest(unittest.TestCase):
             session.session_id = "lost-session"
             session.request = Mock(side_effect=native.WebDriverError("no such session"))
             with patch.object(native.platform, "system", return_value="Windows"), \
+                 patch("qa_ui_auto.native_processes.stop_windows_profile_owners", return_value=[]), \
                  patch.object(native.subprocess, "run", return_value=Mock(returncode=0)) as kill, \
                  patch.object(native, "_tcp_ok", return_value=False), \
                  patch.object(driver, "start") as start:

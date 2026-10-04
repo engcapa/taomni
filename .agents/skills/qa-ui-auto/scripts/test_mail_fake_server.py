@@ -17,6 +17,16 @@ class FakeMailServerTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.server.stop()
 
+    def test_protocol_evidence_omits_all_authentication_arguments(self) -> None:
+        from qa_ui_auto.fixtures.mail_server import protocol_observation
+        import json
+        self.server.state.log.extend(["LOGIN qa very-secret", "AUTHENTICATE PLAIN sensitive", "UID FETCH 1:*", "IDLE", "DONE", "CAPABILITY"])
+        result = protocol_observation(self.server.state)
+        self.assertEqual(result["commands"], ["UID FETCH", "IDLE", "CAPABILITY"])
+        self.assertNotIn("very-secret", json.dumps(result))
+        self.assertNotIn("sensitive", json.dumps(result))
+        self.assertEqual(result["folders"]["INBOX"]["total"], 5)
+
     def test_imap_examine_search_fetch_store(self) -> None:
         client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
         client.login("qa", "anything")

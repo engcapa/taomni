@@ -582,6 +582,53 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it.each(["initial", "reconnect"])("keeps an early SSH prompt usable after %s connection resolves", async (mode) => {
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
+    let onOutput: ((data: Uint8Array) => void) | undefined;
+    let lastLine = "";
+    const prompt = "user@example.test:/srv/project$ ";
+    ipcMocks.createTerminalSessionId
+      .mockReset()
+      .mockReturnValueOnce("terminal-session")
+      .mockReturnValueOnce("terminal-session-reconnect");
+    ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      term.buffer.active = {
+        type: "normal", length: 1, baseY: 0, cursorY: 0, cursorX: 0,
+        getLine: vi.fn(() => ({ isWrapped: false, translateToString: () => lastLine })),
+      };
+      term.write.mockImplementation((data: string | Uint8Array, callback?: () => void) => {
+        const text = typeof data === "string" ? data : new TextDecoder().decode(data);
+        const plain = text.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, "");
+        lastLine = (lastLine + plain).split(/\r\n|\r|\n/).at(-1) ?? "";
+        term.buffer.active.cursorX = lastLine.length;
+        callback?.();
+      });
+      onOutput = args[9] as (data: Uint8Array) => void;
+      onOutput(new TextEncoder().encode(`Welcome to OpenSSH\r\n${prompt}`));
+      return args[0] as string;
+    });
+    render(<TerminalPanel tabId="early-ssh" visible ssh={sshInfo} />);
+    const panel = screen.getByTestId("terminal-pane");
+    const finishIntegration = async (sessionId: string) => {
+      await waitFor(() => {
+        const writes = ipcMocks.writeTerminal.mock.calls as unknown[][];
+        expect(writes.some(([sid, data]) => sid === sessionId && typeof data === "string" && atob(data).includes("__taomni_osc7"))).toBe(true);
+      });
+      expect(lastLine).toBe(prompt);
+      await act(async () => {
+        onOutput?.(new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${CWD_INTEGRATION_DONE_MARKER}\r\n${prompt}`));
+      });
+      await waitFor(() => expect(panel).toHaveAttribute("data-terminal-ready", "true"));
+    };
+    await finishIntegration("terminal-session");
+    if (mode === "reconnect") {
+      await act(async () => ipcMocks.terminalExitHandlers.get("terminal-session")?.());
+      await act(async () => terminalMocks.state.onDataHandler?.("\r"));
+      await finishIntegration("terminal-session-reconnect");
+    }
+  });
+
   it("holds keystrokes while a hidden SSH setup line is still being installed", async () => {
     vi.stubGlobal("__TAURI_INTERNALS__", {});
     let onOutput: ((data: Uint8Array) => void) | undefined;
@@ -1872,7 +1919,7 @@ describe("TerminalPanel focus behavior", () => {
     });
     expect(terminalMocks.terminalCtor).toHaveBeenCalledTimes(1);
     expect(term.write).toHaveBeenCalledWith(expect.stringContaining("[Reconnecting"));
-    expect(term.write).toHaveBeenCalledWith(expect.stringContaining("[Reconnected"));
+    expect(term.write).not.toHaveBeenCalledWith(expect.stringContaining("[Reconnected"));
 
     ipcMocks.writeTerminal.mockClear();
     terminalMocks.state.onDataHandler?.("whoami\r");

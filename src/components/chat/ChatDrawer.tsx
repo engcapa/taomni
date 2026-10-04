@@ -201,9 +201,9 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
       const list = threads ?? [];
       return drawerTabId
         ? list.filter((thread) => thread.linked_session_id === drawerTabId)
-        : list.filter((thread) => thread.linked_session_id);
+        : shellHosted ? list : list.filter((thread) => thread.linked_session_id);
     },
-    [drawerTabId, threads],
+    [drawerTabId, shellHosted, threads],
   );
   const taoAlerts = useMemo(
     () => buildTaoAlerts(noteAlerts, aiDoneAlerts, mailNewAlerts, transferAlerts),
@@ -392,7 +392,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
 
   const handleNewThread = async () => {
     const linked = drawerTabId ?? activeChatTabId;
-    if (!linked) {
+    if (!linked && !shellHosted) {
       setError(t("chat.noTabBinding"));
       return;
     }
@@ -405,7 +405,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
     }
     setShowHistory(false);
     try {
-      await newThread(providerId, linked, newThreadMode);
+      await newThread(providerId, linked ?? undefined, newThreadMode);
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -424,7 +424,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
     if (!activeThread) return;
     if (activeThreadMode === mode) return;
     const linked = activeThread.linked_session_id ?? drawerTabId ?? activeChatTabId;
-    if (!linked) {
+    if (!linked && !shellHosted) {
       setError(t("chat.noTabBinding"));
       return;
     }
@@ -437,7 +437,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
       const loadedMessages = messages[activeThread.id];
       const replaceEmptyActiveThread = loadedMessages !== undefined && loadedMessages.length === 0;
       const oldThreadId = activeThread.id;
-      await newThread(providerId, linked, mode);
+      await newThread(providerId, linked ?? undefined, mode);
       if (replaceEmptyActiveThread) {
         await deleteThread(oldThreadId);
       }
@@ -527,7 +527,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
       let threadId = activeThreadId;
       if (!threadId) {
         const linked = drawerTabId ?? activeChatTabId;
-        if (!linked) {
+        if (!linked && !shellHosted) {
           setError(t("chat.noTabBinding"));
           return;
         }
@@ -538,7 +538,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
           setError(t("chat.noProviderForMode", { mode: t(`chat.mode_${newThreadMode}`) }));
           return;
         }
-        const thread = await newThread(providerId, linked, newThreadMode);
+        const thread = await newThread(providerId, linked ?? undefined, newThreadMode);
         threadId = thread.id;
       }
       // Queued rather than sent directly, so typing ahead of a running turn

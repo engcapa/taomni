@@ -49,6 +49,8 @@ export function ChatThreadList({ threads, activeThreadId, onSelect, onNew, onDel
         {threads.map((th) => (
           <div
             key={th.id}
+            data-chat-thread-id={th.id}
+            data-active={th.id === activeThreadId ? "true" : "false"}
             className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer group transition-colors ${
               th.id === activeThreadId
                 ? "bg-[var(--taomni-selected)] border-l-2 border-[var(--taomni-accent)]"

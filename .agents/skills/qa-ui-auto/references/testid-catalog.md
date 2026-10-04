@@ -53,6 +53,9 @@
 - `select[aria-label="Thread output format"]` — interactive [optional] — F-AI-2.4.ai-chat-output-format
 - `button[aria-label="Convert visible transcript to another format"]` — interactive [optional] — F-AI-2.4.ai-chat-format-cycle
 - `[data-testid="attachment-chip"]` — display [optional] — F-AI-2.4.attachment-chip
+- `[data-chat-role="assistant"]` — display [optional] — F-AI-2.4.ai-message-assistant
+- `[data-chat-role="user"]` — display [optional] — F-AI-2.4.ai-message-user
+- `[data-chat-thread-id]` — interactive [optional] — F-AI-2.4.ai-thread-row
 
 ## ai/models (F-AI-2.6)
 
@@ -1588,6 +1591,9 @@
 - `[data-testid="shell-tab-move-utility"]` — interactive — F-SHELL-1.shell-tab-move-utility
 - `[data-testid="shell-target-error"]` — display — F-SHELL-1.shell-target-error
 - `[data-testid="shell-transfers-trigger"]` — interactive — F-SHELL-1.shell-transfers-trigger
+- `[data-testid="sidebar-tool-lanchat"]` — interactive [optional] — F-SHELL-1.shell-lan-entry
+- `[data-testid="lanchat-enable-prompt"]` — display [optional] — F-SHELL-1.shell-lan-enable-prompt
+- `[data-testid="lanchat-enable-prompt"] button:nth-of-type(1)` — interactive [optional] — F-SHELL-1.shell-lan-enable-decline
 
 ## network/sockscap (F-Sockscap-1)
 
@@ -2226,7 +2232,9 @@
 - `[data-testid="sftp-local-pane"]` — display — F7.2.local-pane
 - `[data-testid="sftp-remote-pane"]` — display — F7.2.remote-pane
 - `[data-testid="sftp-local-list"]` — display — F7.2.local-list
+  ↳ `[data-tab-id]:not([inert]) [data-testid="sftp-local-list"]` — alias
 - `[data-testid="sftp-remote-list"]` — display — F7.2.remote-list
+  ↳ `[data-tab-id]:not([inert]) [data-testid="sftp-remote-list"]` — alias
 - `[data-testid="col-header-name"]` — interactive — F7.2.col-header-name
   ↳ `[data-testid="sftp-remote-pane"] [data-testid="col-header-name"]` — alias
 - `[data-testid="col-header-size"]` — interactive — F7.2.col-header-size
@@ -2262,14 +2270,17 @@
 - `[data-testid="sftp-remote-detach"]` — interactive [optional] — F7.4.remote-detach
 - `[data-testid="sftp-transfer-queue-collapsed"]` — display — F7.4.sftp-transfer-queue-collapsed
 - `[data-testid="sftp-detached-window"]` — display — F7.4.sftp-detached-window
+- `[data-testid="sftp-transfer-queue-close"]` — interactive [optional] — F7.4.sftp-transfer-queue-close
 
 ## sftp (F7.5)
 
 - `[data-testid="sftp-local-path"]` — interactive — F7.5.local-path
+  ↳ `[data-tab-id]:not([inert]) input[data-testid="sftp-local-path"]` — alias
   ↳ `input[data-testid="sftp-local-path"]` — alias
 - `[data-testid="sftp-remote-path"]` — interactive — F7.5.remote-path
   ↳ `input[data-testid="sftp-remote-path"]` — alias
 - `[data-testid="sftp-local-path-edit"]` — interactive — F7.5.local-path-edit
+  ↳ `[data-tab-id]:not([inert]) [data-testid="sftp-local-path-edit"]` — alias
 - `[data-testid="sftp-remote-path-edit"]` — interactive — F7.5.remote-path-edit
 - `[data-testid="sftp-local-path-segments"]` — display [optional] — F7.5.local-path-segments
 - `[data-testid="sftp-remote-path-segments"]` — display [optional] — F7.5.remote-path-segments
@@ -2282,6 +2293,7 @@
 - `[data-testid="sftp-local-up"]` — interactive — F7.5.local-up
 - `[data-testid="sftp-local-refresh"]` — interactive — F7.5.local-refresh
 - `[data-testid="sftp-local-upload-selected"]` — interactive [optional] — F7.5.local-upload-selected
+  ↳ `[data-tab-id]:not([inert]) [data-testid="sftp-local-upload-selected"]` — alias
 - `[data-testid="sftp-local-open-selected"]` — interactive [optional] — F7.5.local-open-selected
 - `[data-testid="sftp-local-reveal-in-os"]` — interactive [optional] — F7.5.local-reveal-in-os
 - `[data-testid="sftp-local-new-folder"]` — interactive — F7.5.local-new-folder

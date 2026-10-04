@@ -12,8 +12,8 @@ modes:
 - browser
 fixtures:
 - reset_db
-- parity008_git
 - shell_browser_catalog
+- parity008_git
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
@@ -139,11 +139,11 @@ verification:
     - 7
     checkpoints:
     - step: 5
-      expectation: A workspace opened from Home creates a persisted, restorable workset.
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
     - step: 8
-      expectation: A workspace opened from Home creates a persisted, restorable workset.
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 9
-      expectation: A workspace opened from Home creates a persisted, restorable workset.
+      expectation: '{"assert_visible": "[data-testid=\"welcome-restore-last-session\"]"}'
     results:
     - 5
     - 8
@@ -157,17 +157,15 @@ verification:
     - 15
     checkpoints:
     - step: 11
-      expectation: Restoring a persisted workspace reaches ready with one primary instance and no renderer
-        failure.
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
     - step: 13
-      expectation: Restoring a persisted workspace reaches ready with one primary instance and no renderer
-        failure.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name":
+        "data-state", "equals": "succeeded"}}'
     - step: 14
-      expectation: Restoring a persisted workspace reaches ready with one primary instance and no renderer
-        failure.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 1}}'
     - step: 16
-      expectation: Restoring a persisted workspace reaches ready with one primary instance and no renderer
-        failure.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
+        "equal": 1}}'
     results:
     - 11
     - 13

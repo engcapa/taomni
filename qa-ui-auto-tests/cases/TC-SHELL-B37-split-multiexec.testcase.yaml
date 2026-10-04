@@ -54,6 +54,9 @@ steps:
 - assert_text:
     selector: '[data-testid="multiexec-bar"]'
     contains: 2 / 3
+- wait_for: '[data-testid="terminal-split-pane"]:has(button[title="qa-alpha"]) [data-testid="terminal-pane"][data-terminal-ready="true"]'
+- wait_for: '[data-testid="terminal-split-pane"]:has(button[title="qa-beta"]) [data-testid="terminal-pane"][data-terminal-ready="true"]'
+- wait_for: '[data-testid="terminal-split-pane"]:has(button[title="qa-gamma"]) [data-testid="terminal-pane"][data-terminal-ready="true"]'
 - fill:
     selector: '[data-testid="multiexec-input"]'
     value: echo SHELL_BROADCAST_1
@@ -182,91 +185,103 @@ verification:
     - 24
     - 25
     - 27
-    - 29
-    - 30
+    - 32
+    - 33
     checkpoints:
     - step: 26
       expectation: '{"wait_for": "[data-testid=\"multiexec-bar\"]"}'
     - step: 28
       expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-bar\"]", "contains": "2 / 3"}}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-alpha\"])
+        [data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]"}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-beta\"])
+        [data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]"}'
     - step: 31
+      expectation: '{"wait_for": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-gamma\"])
+        [data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]"}'
+    - step: 34
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-alpha\"])
         [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_1[ \\t]*$){2}).*?^SHELL_BROADCAST_1[
         \\t]*$", "timeout_sec": 10}}'
-    - step: 32
+    - step: 35
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-beta\"])
         [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_1[ \\t]*$){2}).*?^SHELL_BROADCAST_1[
         \\t]*$", "timeout_sec": 10}}'
-    - step: 33
+    - step: 36
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]
         [data-testid=\"terminal-pane\"]", "regex": "^(?![\\s\\S]*SHELL_BROADCAST_1)[\\s\\S]*$", "timeout_sec":
         10}}'
     results:
     - 26
     - 28
+    - 29
+    - 30
     - 31
-    - 32
-    - 33
+    - 34
+    - 35
+    - 36
   - id: R3
     requirement: Build/Connect and Tao changes preserve the target set. Closing Beta leaves Alpha and
       the locked pane; the next broadcast reaches Alpha exactly once.
     actions:
-    - 34
-    - 35
-    - 36
+    - 37
     - 38
     - 39
-    - 40
     - 41
+    - 42
+    - 43
     - 44
-    - 45
-    - 46
     - 47
+    - 48
+    - 49
     - 50
-    - 54
-    - 55
+    - 53
+    - 57
+    - 58
     checkpoints:
-    - step: 37
+    - step: 40
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 42
+    - step: 45
       expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]",
         "equal": 1}}'
-    - step: 43
+    - step: 46
       expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-bar\"]", "contains": "2 / 3"}}'
-    - step: 48
+    - step: 51
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-alpha\"])
         [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_2[ \\t]*$){2}).*?^SHELL_BROADCAST_2[
         \\t]*$", "timeout_sec": 10}}'
-    - step: 49
+    - step: 52
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-beta\"])
         [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_2[ \\t]*$){2}).*?^SHELL_BROADCAST_2[
         \\t]*$", "timeout_sec": 10}}'
-    - step: 51
+    - step: 54
       expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 2}}'
-    - step: 52
+    - step: 55
       expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-bar\"]", "contains": "1 / 2"}}'
-    - step: 53
+    - step: 56
       expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]",
         "equal": 1}}'
-    - step: 56
+    - step: 59
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"]:has(button[title=\"qa-alpha\"])
         [data-testid=\"terminal-pane\"]", "regex": "(?ms)\\A(?!(?:.*?^SHELL_BROADCAST_3[ \\t]*$){2}).*?^SHELL_BROADCAST_3[
         \\t]*$", "timeout_sec": 10}}'
-    - step: 57
+    - step: 60
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-split-pane\"][data-input-locked=\"true\"]
         [data-testid=\"terminal-pane\"]", "regex": "^(?![\\s\\S]*SHELL_BROADCAST_)[\\s\\S]*$", "timeout_sec":
         10}}'
     results:
-    - 37
-    - 42
-    - 43
-    - 48
-    - 49
+    - 40
+    - 45
+    - 46
     - 51
     - 52
-    - 53
+    - 54
+    - 55
     - 56
-    - 57
+    - 59
+    - 60
   visual:
   - check: Inspect retained controls and content in the final screenshot
     method: manual

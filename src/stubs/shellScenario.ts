@@ -2,8 +2,9 @@
 import { vfsList, vfsMkdir, vfsReadText, vfsWriteText, vfsStat } from "./localVfs";
 import { emit } from "./tauri-event";
 import { shellTransferInvoke } from "./shellTransferFixture";
+import { CWD_INTEGRATION_DONE_MARKER } from "../lib/terminalShellIntegration";
 const PREFIX = "taomni.qa.shell.";
-const terminals = new Map<string, { output?: { onmessage(data: number[]): void }; cwd: string; input: string }>();
+const terminals = new Map<string, { output?: { onmessage(data: number[]): void }; cwd: string; input: string; cwdIntegration: boolean }>();
 const sftp = new Map<string, string>();
 const sftpOwners = new Map<string, string>();
 let sequence = 0;
@@ -64,7 +65,7 @@ export async function shellScenarioInvoke(command: string, args: any = {}): Prom
   if (command === "create_local_terminal" || command === "create_ssh_terminal") {
     if (command === "create_ssh_terminal" && !String(args.host).endsWith(".invalid")) return null;
     const id = args.sessionId || `shell-fixture-${++sequence}`;
-    terminals.set(id, { output: args.onOutput, cwd: args.cwd ?? "/preview", input: "" });
+    terminals.set(id, { output: args.onOutput, cwd: args.cwd ?? "/preview", input: "", cwdIntegration: false });
     setTimeout(() => output(id, `QA-${args.host ?? "LOCAL"}\r\n$ `), 0);
     return { value: command === "create_local_terminal" ? { sessionId: id, shellId: args.shell ?? "/bin/sh", taskEnvironment: {} } : id };
   }
@@ -75,10 +76,19 @@ export async function shellScenarioInvoke(command: string, args: any = {}): Prom
     output(args.sessionId, text.replace(/\r/g, "\r\n")); terminal.input += text;
     if (/[\r\n]/.test(terminal.input)) {
       const line = terminal.input.trim(); terminal.input = "";
+      if (line.includes("__taomni_osc7") && line.includes("printf '\\033]633;TaomniCwdIntegrationDone\\a'")) {
+        // Model the shell's external protocol, including the private marker
+        // that releases the renderer's setup echo suppressor.
+        const cwd = line.match(/ cd '((?:[^']|'\\'')*)' 2>\/dev\/null;/)?.[1];
+        if (cwd !== undefined) terminal.cwd = cwd.replace(/'\\''/g, "'");
+        terminal.cwdIntegration = true;
+        output(args.sessionId, `\x1b]133;A\x1b\\\x1b]7;file://qa${encodeURI(terminal.cwd)}\x1b\\${CWD_INTEGRATION_DONE_MARKER}$ `);
+        return { value: undefined };
+      }
       if (line.startsWith("cd ")) terminal.cwd = line.slice(3).replace(/^['"]|['"]$/g, "");
       else if (line === "pwd") output(args.sessionId, `${terminal.cwd}\r\n`);
       else if (line.startsWith("echo ")) output(args.sessionId, `${line.slice(5)}\r\n`);
-      output(args.sessionId, "$ ");
+      output(args.sessionId, `${terminal.cwdIntegration ? `\x1b]133;A\x1b\\\x1b]7;file://qa${encodeURI(terminal.cwd)}\x1b\\` : ""}$ `);
     }
     return { value: undefined };
   }

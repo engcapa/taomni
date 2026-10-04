@@ -1,13 +1,12 @@
 id: TC-auto-F1-9
-title: Control bar core commands dispatch Session / SFTP / Settings / Help to the
-  right surface
-description: "Coverage for F1.9 (core command dispatch via ControlBar). Exercises\
-  \ the\nfour primary commands dispatched from the unified app menu:\n  - new-remote-session\
-  \ → SessionEditor opens with SSH proto preselected\n  - new-sftp           → SessionEditor\
-  \ opens with SFTP proto preselected\n  - settings           → settings tab mounts\n\
-  \  - help               → About dialog opens\n\nShell v2 entry adaptation: Tools\
-  \ and Sessions use the permanent Rail with visibility-aware user clicks; Settings\
-  \ uses its permanent Rail button. Original business checks are retained."
+title: Control bar core commands dispatch Session / SFTP / Settings / Help to the right surface
+description: "Coverage for F1.9 (core command dispatch via ControlBar). Exercises the\nfour primary commands dispatched\
+  \ from the unified app menu:\n  - new-remote-session → SessionEditor opens with SSH proto preselected\n  - new-sftp\
+  \           → SessionEditor opens with SFTP proto preselected\n  - settings           → settings tab mounts\n\
+  \  - help               → About dialog opens\n\nShell v2 entry adaptation: Tools and Sessions use the permanent\
+  \ Rail with visibility-aware user clicks; Settings uses its permanent Rail button. Original business checks are\
+  \ retained.\nSemantic review for Shell v2: every original step is retained; requirements identify the actual user\
+  \ actions and decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries."
 covers:
 - F1.9
 tags:
@@ -16,7 +15,6 @@ tags:
 - p1
 - main
 - commands
-- needs-review
 modes:
 - browser
 fixtures:
@@ -69,86 +67,44 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Control bar core commands dispatch Session / SFTP / Settings / Help
-      to the right surface：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: 主菜单 new remote session 和 new SFTP 指向对应 SessionEditor，Escape 可取消。
     actions:
-    - 1
     - 4
     - 7
     - 10
     - 12
     - 15
     - 18
+    checkpoints:
+    - step: 9
+      expectation: remote 入口含 SSH protocol。
+    - step: 11
+      expectation: remote 对话框已隐藏。
+    - step: 17
+      expectation: SFTP 入口含 SFTP protocol。
+    - step: 19
+      expectation: SFTP 对话框已隐藏。
+    results:
+    - 9
+    - 11
+    - 17
+    - 19
+  - id: R2
+    requirement: 固定 Settings Rail 和主菜单 Help 仍分别打开 Settings/About；About 可取消返回。
+    actions:
     - 22
     - 25
     - 28
     - 31
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"app-main-menu\"]"}'
-    - step: 3
-      expectation: '{"assert_visible": "[data-testid=\"app-main-menu\"]"}'
-    - step: 5
-      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 6
-      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-remote-session\"]"}'
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 9
-      expectation: '{"assert_visible": "[data-testid=\"session-proto-ssh\"]"}'
-    - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]",
-        "state": "hidden", "timeout_sec": 5}}'
-    - step: 13
-      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-sftp\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 17
-      expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
-    - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]",
-        "state": "hidden", "timeout_sec": 5}}'
-    - step: 20
-      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
-    - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"shell-rail-settings\"]"}'
-    - step: 23
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 24
-      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"]"}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 27
-      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-help\"]"}'
-    - step: 29
-      expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
+      expectation: SettingsPanel 可见。
     - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"about-dialog\"]"}'
+      expectation: AboutDialog 可见。
     - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"about-dialog\"]", "state":
-        "detached", "timeout_sec": 5}}'
+      expectation: Escape 后 AboutDialog 卸载。
     results:
-    - 2
-    - 3
-    - 5
-    - 6
-    - 8
-    - 9
-    - 11
-    - 13
-    - 14
-    - 16
-    - 17
-    - 19
-    - 20
-    - 21
-    - 23
     - 24
-    - 26
-    - 27
-    - 29
     - 30
     - 32
   visual:

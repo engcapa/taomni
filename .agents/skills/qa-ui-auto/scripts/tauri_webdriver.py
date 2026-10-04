@@ -370,6 +370,15 @@ class TauriDriverProcess:
             # profile. The isolated driver owns this entire process tree;
             # terminate it now, before reset_db, and restart for the next case.
             self.stop()
+            from qa_ui_auto.native_processes import stop_windows_profile_owners
+            data_root = Path(native_isolation_env(self.report_root)["NEWMOB_DATA_DIR"])
+            profile = data_root / QA_APP_ID / "webview"
+            if not profile.resolve().is_relative_to(self.report_root.resolve()):
+                raise WebDriverError("WebView cleanup must remain inside this QA run")
+            stopped = stop_windows_profile_owners(profile)
+            if stopped:
+                with (self.report_root / "owned-webview-cleanup.jsonl").open("a", encoding="utf-8") as stream:
+                    stream.write(json.dumps({"profile": str(profile), "terminated": stopped}) + "\n")
 
     def stop(self) -> None:
         if not self.proc:
@@ -521,7 +530,13 @@ class NativeSession:
         from qa_ui_auto.deadline import Deadline
 
         try:
-            if self.session_id:
+            harness = getattr(self, "_harness", None)
+            if platform.system() == "Windows" and harness is not None:
+                # DELETE can let EdgeDriver exit before WebView2's descendants.
+                # End the owned tree while its ancestry still exists; the next
+                # case restarts the driver with the same verified QA identity.
+                harness.driver.stop()
+            elif self.session_id:
                 # Case/failure-capture/host-restoration budgets may already
                 # be exhausted. Always give DELETE its own bounded attempt.
                 self.deadline = Deadline(5)
@@ -859,8 +874,14 @@ class NativeSession:
                 time.sleep(0.1)
             else:
                 raise WebDriverError(f"contenteditable did not receive focus: {selector}")
-            self.press_combo("Control+a")
-            lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            self.press_combo("Mod+a")
+            normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+            if platform.system() == "Linux" and not normalized.isascii():
+                self._paste_linux_contenteditable(selector, normalized)
+                return f"filled contenteditable {selector}"
+            if not normalized:
+                self.press_combo("Backspace")
+            lines = normalized.split("\n")
             for index, line in enumerate(lines):
                 if index:
                     self.press_combo("Enter")
@@ -899,6 +920,31 @@ class NativeSession:
         else:
             self.type_text(text)
         return f"filled {selector}"
+
+    def _paste_linux_contenteditable(self, selector: str, text: str) -> None:
+        from qa_ui_auto import host_clipboard
+
+        # W3C Unicode key actions can lose characters in WebKitGTK editors.
+        # An OS paste exercises the editor's normal input and undo transaction.
+        previous = host_clipboard.get_text()
+        check = (
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "const lines = el?.querySelectorAll(':scope > .cm-line');"
+            "const actual = lines?.length ? Array.from(lines, line => line.textContent ?? '').join('\\n')"
+            " : el?.innerText?.replace(/\\r\\n?/g, '\\n');"
+            f"return actual === {json.dumps(text)};"
+        )
+        try:
+            host_clipboard.set_text(text)
+            self.press_combo("Mod+v")
+            deadline = time.monotonic() + 5
+            while self.execute(check) is not True:
+                if time.monotonic() >= deadline:
+                    raise WebDriverError(f"contenteditable did not retain the requested text after OS paste: {selector}")
+                time.sleep(0.05)
+        finally:
+            # Keep the paste selection alive until the editor has consumed it.
+            host_clipboard.set_text(previous)
 
     def _paste_linux_password(self, element: str, selector: str, text: str, check: str) -> None:
         from qa_ui_auto import host_clipboard
@@ -1048,6 +1094,7 @@ class NativeSession:
 
     def type_text(self, text: str) -> str:
         """Type text into the focused element, one paced key pair per char."""
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
         if platform.system() == "Darwin":
             # The macOS in-process bridge dispatches a whole /actions
             # sequence inside one synchronous JS task. MutationObserver
@@ -1055,7 +1102,8 @@ class NativeSession:
             # (native_editor_performance) sees one batch instead of one
             # sample per key. One request per char preserves event-loop
             # turns; tauri-driver platforms keep the single batched request.
-            for ch in text:
+            for char in normalized:
+                ch = "\ue007" if char == "\n" else char
                 self.request(
                     "POST",
                     self.endpoint("/actions"),
@@ -1067,7 +1115,8 @@ class NativeSession:
                 )
             return f"typed {len(text)} chars"
         seq: list[dict[str, Any]] = []
-        for ch in text:
+        for char in normalized:
+            ch = "\ue007" if char == "\n" else char
             if ch.isupper():
                 shift = self.MODIFIER_MAP["Shift"]
                 seq.append({"type": "keyDown", "value": shift})

@@ -8,7 +8,9 @@ description: 'Auto-generated focused coverage for F1.6 (WelcomePanel). The panel
 
   verifies the tips block renders.
 
-  '
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'
 covers:
 - F1.6
 tags:
@@ -16,7 +18,6 @@ tags:
 - smoke
 - p1
 - welcome
-- needs-review
 modes:
 - browser
 fixtures:
@@ -42,33 +43,26 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Welcome panel exposes the action cards and tips section：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Home 保留新建会话、Home folder 和 Tips；导入/刷新保留在 Sessions 入口；新建对话框可取消返回。
     actions:
-    - 1
     - 8
     - 10
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 3
-      expectation: '{"assert_visible": "text=\"New session…\""}'
+      expectation: 新建会话主动作可见。
     - step: 4
-      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"] >> text=\"Import
-        OpenSSH config\""}'
+      expectation: Home 不显示旧导入入口。
     - step: 5
-      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"] >> text=\"Refresh
-        sessions\""}'
+      expectation: Home 不显示旧刷新入口。
     - step: 6
-      expectation: '{"assert_visible": "[data-testid=\"welcome-open-home-folder\"]"}'
+      expectation: Home folder 次级入口可见。
     - step: 7
-      expectation: '{"assert_visible": "text=\"Tips\""}'
+      expectation: Tips 可见。
     - step: 9
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+      expectation: 主动作打开 SessionEditor。
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]",
-        "state": "hidden", "timeout_sec": 5}}'
+      expectation: Escape 后 SessionEditor 隐藏。
     results:
-    - 2
     - 3
     - 4
     - 5

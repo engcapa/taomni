@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useAppStore } from "../stores/appStore";
 import { useShellLayoutStore } from "../stores/shellLayoutStore";
-import { CloseCoordinator, getCloseAdapter, getSurfaceCloseTarget, listSurfaceCloseTargets, installTabCloseHandler, type ClosePlanItem, type CloseResult } from "../lib/shell/closeCoordinator";
+import { CloseCoordinator, getCloseAdapter, getSurfaceCloseTarget, listSurfaceCloseTargets, installTabCloseHandler, type CloseAdapter, type ClosePlanItem, type CloseResult } from "../lib/shell/closeCoordinator";
 import { closeSuccessor } from "../lib/shell/tabPresentation";
 import { getQueryTab } from "../lib/queryRegistry";
 import { promotedCloseTarget } from "../lib/shell/promotedSurfaceClose";
@@ -29,13 +29,26 @@ export function useShellCloseBridge() {
         const tab = state.tabs.find((item) => item.id === id);
         if (!tab?.closable) return [];
         if (tab.shellPanelId) return [promotedCloseTarget(tab.shellPanelId, id, tab.title)];
-        return [{ id, title: tab.title, adapter: getCloseAdapter(id) ?? {
+        const adapter: CloseAdapter = getCloseAdapter(id) ?? {
           getRisks: async () => [], resolve: async () => undefined,
           flush: async () => { await getQueryTab(id)?.flushWorkspace?.(); },
-        }, commit: () => {
+        };
+        let resolutionMessage: string | undefined;
+        const closeAdapter: CloseAdapter = {
+          getRisks: (exit) => adapter.getRisks(exit),
+          resolve: async (risk, choice, signal) => {
+            const previous = useAppStore.getState().statusMessage;
+            await adapter.resolve(risk, choice, signal);
+            const message = useAppStore.getState().statusMessage;
+            if (message !== previous) resolutionMessage = message;
+          },
+          flush: (signal) => adapter.flush(signal),
+        };
+        return [{ id, title: tab.title, adapter: closeAdapter, commit: () => {
           const current = useAppStore.getState(), shell = useShellLayoutStore.getState();
           const successor = closeSuccessor(current.tabs, new Set([id]), current.activeTabId, shell.mru, shell.laneOverrides);
           current.commitRemoveTab(id);
+          if (resolutionMessage) useAppStore.getState().setStatusMessage(resolutionMessage);
           for (const panel of Object.values(shell.panels)) if (panel.owner.kind === "tab" && panel.owner.tabId === id && panel.placement.kind === "primary" && panel.placement.tabId === id) shell.removePanel(panel.id);
           if (successor && current.activeTabId === id) useAppStore.getState().setActiveTab(successor);
         } }];

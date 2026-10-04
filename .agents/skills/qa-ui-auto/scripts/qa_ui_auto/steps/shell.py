@@ -4,6 +4,20 @@ from . import verb, StepError
 COMMANDS = {"create_local_terminal", "create_ssh_terminal", "save_session", "sftp_attach", "sftp_cancel_transfer", "workspace_list_dir", "workspace_write_file", "workspace_write_file_encoded", "workspace_write_loose_file_encoded", "db_save_query_workspace", "open_detached_window", "get_welcome_run_snapshot", "notes_list", "notes_get", "notes_update", "notes_list_alerts", "notes_ack_alert", "chat_list_threads", "chat_list_messages", "mail_list_cached_folders", "mail_list_cached_messages", "chat_stream", "test_proxy_connection"}
 
 
+@verb("app_menu_action")
+def menu_action(ctx, args):
+    if args not in {"split", "multiexec"}:
+        raise StepError("app_menu_action: expected split or multiexec")
+    if ctx.dry_run:
+        return
+    ctx.page.locator('[data-testid="app-main-menu"]').click()
+    view = ctx.page.locator('[data-testid="context-menu-item-view"]')
+    view.wait_for(state="visible")
+    view.hover()
+    item = "split-terminal" if args == "split" else "multiexec"
+    ctx.page.locator(f'[data-testid="context-menu-item-{item}"]').click()
+
+
 @verb("shell_navigate")
 def navigate(ctx, args):
     if args not in {"sessions", "tools"}:

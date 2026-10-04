@@ -1,8 +1,8 @@
 id: TC-158
 title: VNC accepts TigerVNC sync-flushed clipboard and preserves bidirectional copy (native)
-description: Receive a finished zlib stream, then two independent TigerVNC-style Z_SYNC_FLUSH messages with Unicode
-  text. Verify exact clipboard content, send a new local clipboard back, and then verify pointer/key input and repaint.
-  Independent host clipboard reads prove the OS boundary.
+description: Receive a finished zlib stream, then two independent TigerVNC-style Z_SYNC_FLUSH messages
+  with Unicode text. Verify exact clipboard content, send a new local clipboard back, and then verify
+  pointer/key input and repaint. Independent host clipboard reads prove the OS boundary.
 covers:
 - F9.6
 tags:
@@ -17,6 +17,7 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- shell_navigate: sessions
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-vnc"]'
@@ -32,6 +33,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-vnc-sync-clipboard-native
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-sync-clipboard-native"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-sync-clipboard-native"]'
 - wait_for:
@@ -123,8 +125,8 @@ steps:
     selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
     timeout_sec: 15
 - eval_readonly:
-    expression: document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16, 1, 1).data[3]
-      === 255
+    expression: document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16,
+      1, 1).data[3] === 255
     timeout_sec: 10
 - assert_not_visible: '[data-testid="vnc-reconnect"]'
 - wait: 1.5
@@ -133,66 +135,75 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Finished and independent sync-flushed remote copies reach the clipboard exactly; reverse copy,
-      input and repaint still work without disconnecting.
+    requirement: Finished and independent sync-flushed remote copies reach the clipboard exactly; reverse
+      copy, input and repaint still work without disconnecting.
     actions:
     - 1
     - 2
-    - 4
+    - 3
     - 5
     - 6
     - 7
-    - 9
+    - 8
     - 10
+    - 11
     - 12
     - 14
     - 16
-    - 17
-    - 21
+    - 18
+    - 19
+    - 23
+    - 26
+    - 29
+    - 32
+    - 34
+    - 35
+    - 37
+    - 40
+    checkpoints:
+    - step: 24
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "finished-stream-copy"}}'
+    - step: 27
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "LXQt 复制一 中文 123"}}'
+    - step: 30
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "LXQt 复制二 第二次 fresh
+        stream"}}'
+    - step: 33
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "client-to-server-copy-after-sync"}}'
+    - step: 36
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\":
+        \"ext_clipboard\", \"action\": \"provide\", \"formats\": 1, \"text\": \"client-to-server-copy-after-sync\""}}'
+    - step: 38
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"keysym\":
+        97, \"keysym_hex\": \"0x61\""}}'
+    - step: 39
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\":
+        \"pointer\", \"mask\": 1"}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]",
+        "timeout_sec": 15}}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.vnc-container canvas'').getContext(''2d'').getImageData(16,
+        16, 1, 1).data[3] === 255", "timeout_sec": 10}}'
+    - step: 43
+      expectation: '{"assert_not_visible": "[data-testid=\"vnc-reconnect\"]"}'
+    results:
     - 24
     - 27
     - 30
-    - 32
-    - 33
-    - 35
-    - 38
-    checkpoints:
-    - step: 22
-      expectation: Finished zlib clipboard text is received exactly.
-    - step: 25
-      expectation: First sync-flushed Unicode copy is received exactly.
-    - step: 28
-      expectation: Second independent sync-flushed copy is received exactly.
-    - step: 34
-      expectation: The fixture receives the new local clipboard text after both remote copies.
-    - step: 36
-      expectation: Typing still reaches the same session.
-    - step: 37
-      expectation: Pointer input still reaches the session.
-    - step: 39
-      expectation: The relay still processes a remote desktop resize.
-    - step: 40
-      expectation: The resized framebuffer contains opaque pixels.
-    - step: 41
-      expectation: There is no disconnected/reconnecting overlay.
-    - step: 31
-      expectation: The independent OS read confirms the new local text before pasting into VNC.
-    results:
-    - 22
-    - 25
-    - 28
-    - 34
     - 36
-    - 37
+    - 38
     - 39
-    - 40
     - 41
+    - 42
+    - 43
   visual:
   - check: The final screenshot shows a painted remote desktop without an error overlay.
     method: manual
     reason: Clipboard contents and DOM dimensions do not establish visual correctness.
   native:
-  - check: Independent OS clipboard oracle verifies received text, and fixture events verify transmitted text.
+  - check: Independent OS clipboard oracle verifies received text, and fixture events verify transmitted
+      text.
     method: automated
-    reason: Native host_clipboard uses an external platform-specific process; it does not read the product clipboard
-      cache.
+    reason: Native host_clipboard uses an external platform-specific process; it does not read the product
+      clipboard cache.

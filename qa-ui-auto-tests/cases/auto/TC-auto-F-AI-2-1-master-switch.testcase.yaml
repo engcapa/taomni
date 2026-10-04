@@ -9,9 +9,11 @@ description: 'F-AI-2.1 closes the gap by exercising the two top-level AI privacy
   renders when AI is enabled, so we assert it as soft-optional.
 
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware
-  user clicks; Settings uses its permanent Rail button. Original business checks are
-  retained.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained.
+
+  Semantic review for Shell v2: every original step is retained; requirements identify the actual user actions and
+  decisive outcomes. Additional postconditions do not certify unexecuted OS/manual boundaries.'
 covers:
 - F-AI-2.1
 tags:
@@ -19,7 +21,6 @@ tags:
 - ai
 - settings
 - p2
-- needs-review
 modes:
 - browser
 fixtures:
@@ -47,29 +48,25 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: AI master switch + privacy toggle render in Settings：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Settings 的 AI 总开关可达，关闭后托盘麦克风移除，再启用后恢复。
     actions:
-    - 1
     - 3
     - 5
     - 8
     - 10
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"shell-rail-settings\"]"}'
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 6
-      expectation: '{"assert_visible": "text=\"Disable AI completely\""}'
+      expectation: 禁用 AI 文案可见。
     - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"ai-master-switch\"]"}'
+      expectation: 总开关可见。
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "state":
-        "detached", "timeout_sec": 10}}'
+      expectation: 关闭后的 PTT 已从 DOM 移除。
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "timeout_sec":
-        10}}'
+      expectation: 重新启用后 PTT 恢复可见。
     results:
+    - 6
+    - 7
+    - 9
     - 11
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
