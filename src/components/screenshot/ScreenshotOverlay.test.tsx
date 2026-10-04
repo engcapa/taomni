@@ -69,6 +69,30 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it("dispatches manual scrolling from the selected region", async () => {
+    await open();
+    drag("screenshot-select-layer", [100, 100], [500, 450]);
+    fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-mode-manual"));
+    api.scrollCapture.mockRejectedValueOnce(new Error("scroll capture cancelled"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
+    await waitFor(() => expect(api.scrollCapture).toHaveBeenCalledWith("0,0", { x: 200, y: 150, width: 800, height: 525 }, "manual"));
+  });
+
+  it("applies a custom color to a selected annotation with an independent undo step", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
+    fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
+    drag("screenshot-annotation-layer", [130, 130], [230, 210]);
+    fireEvent.click(screen.getByTestId("screenshot-tool-move"));
+    drag("screenshot-annotation-layer", [150, 150], [150, 150]);
+    fireEvent.change(screen.getByTestId("screenshot-color-custom"), { target: { value: "#123456" } });
+    const ctx = (screen.getByTestId("screenshot-annotation-canvas") as HTMLCanvasElement).getContext("2d")!;
+    expect(ctx.strokeStyle).toBe("#123456");
+    fireEvent.click(screen.getByTestId("screenshot-undo"));
+    expect(ctx.strokeStyle).toBe("#ff4d4f");
+    expect(shapes()).toBe("1");
+  });
   it("preselects the current window without hiding it in a new full-display selection", async () => {
     api.fetchOverlayInit.mockResolvedValueOnce({ path: "window.png", displayId: "0,0", width: 2048, height: 1152, scaleFactor: 2,
       windowRegion: { x: 200, y: 150, width: 800, height: 600 } });

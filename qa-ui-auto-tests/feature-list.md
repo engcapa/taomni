@@ -9907,6 +9907,10 @@ controls:
     selector: '[data-testid="mfa-account-name"]'
     kind: display
     optional: true       # rows are asserted through data-account
+  - id: avatar
+    selector: '[data-testid="mfa-account-avatar"]'
+    kind: display
+    optional: true
   - id: hotp-next
     selector: '[data-testid="mfa-account-hotp-next"]'
     kind: interactive
@@ -9927,6 +9931,9 @@ controls:
     kind: interactive
   - id: menu-qr
     selector: '[data-testid="mfa-menu-qr"]'
+    kind: interactive
+  - id: menu-copy-secret
+    selector: '[data-testid="mfa-menu-copy-secret"]'
     kind: interactive
   - id: menu-pin
     selector: '[data-testid="mfa-menu-pin"]'
@@ -9976,6 +9983,22 @@ controls:
   - id: qr-image
     selector: '[data-testid="mfa-qr-image"]'
     kind: display
+  - id: qr-secret
+    selector: '[data-testid="mfa-qr-secret"]'
+    kind: display
+    optional: true
+  - id: qr-toggle-secret
+    selector: '[data-testid="mfa-qr-toggle-secret"]'
+    kind: interactive
+    optional: true
+  - id: qr-copy-secret
+    selector: '[data-testid="mfa-qr-copy-secret"]'
+    kind: interactive
+    optional: true
+  - id: qr-copy-uri
+    selector: '[data-testid="mfa-qr-copy-uri"]'
+    kind: interactive
+    optional: true
   - id: qr-error
     selector: '[data-testid="mfa-qr-error"]'
     kind: display
@@ -10283,6 +10306,7 @@ components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, RecorderBar, Scro
 files:
   - src/components/screenshot/ScreenshotOverlay.tsx
   - src/components/screenshot/AnnotationCanvas.tsx
+  - src/components/screenshot/ScreenshotFavorites.tsx
   - src/components/screenshot/PinnedImage.tsx
   - src/components/screenshot/RecorderBar.tsx
   - src/components/screenshot/ScrollCaptureBar.tsx
@@ -10294,6 +10318,10 @@ files:
   - src/lib/screenshot.ts
   - src/lib/screenshotSelection.ts
   - src/components/tabbar/ControlBar.tsx
+  - src-tauri/src/screenshot/favorites.rs
+  - src-tauri/src/screenshot/qa/pin_tools.rs
+  - src-tauri/src/screenshot/qa/scroll_manual.rs
+  - src-tauri/src/screenshot/qa/colors.rs
   - src-tauri/src/screenshot/mod.rs
   - src-tauri/src/screenshot/capture.rs
   - src-tauri/src/screenshot/scroll.rs
@@ -10701,6 +10729,126 @@ controls:
   - id: screenshot-annotation-resize-se
     selector: '[data-testid="screenshot-annotation-resize-se"]'
     kind: interactive
+  - id: screenshot-scroll-mode-auto
+    selector: '[data-testid="screenshot-scroll-mode-auto"]'
+    kind: interactive
+  - id: screenshot-scroll-mode-manual
+    selector: '[data-testid="screenshot-scroll-mode-manual"]'
+    kind: interactive
+  - id: screenshot-scroll-switch-mode
+    selector: '[data-testid="screenshot-scroll-switch-mode"]'
+    kind: interactive
+  - id: screenshot-color-orange
+    selector: '[data-testid="screenshot-color-orange"]'
+    kind: interactive
+  - id: screenshot-color-cyan
+    selector: '[data-testid="screenshot-color-cyan"]'
+    kind: interactive
+  - id: screenshot-color-purple
+    selector: '[data-testid="screenshot-color-purple"]'
+    kind: interactive
+  - id: screenshot-color-pink
+    selector: '[data-testid="screenshot-color-pink"]'
+    kind: interactive
+  - id: screenshot-color-gray
+    selector: '[data-testid="screenshot-color-gray"]'
+    kind: interactive
+  - id: screenshot-color-black
+    selector: '[data-testid="screenshot-color-black"]'
+    kind: interactive
+  - id: screenshot-color-custom
+    selector: '[data-testid="screenshot-color-custom"]'
+    kind: interactive
+  - id: screenshot-color-hex
+    selector: '[data-testid="screenshot-color-hex"]'
+    kind: interactive
+  - id: screenshot-pin-copy
+    selector: '[data-testid="screenshot-pin-copy"]'
+    kind: interactive
+  - id: screenshot-pin-save
+    selector: '[data-testid="screenshot-pin-save"]'
+    kind: interactive
+  - id: screenshot-pin-favorite
+    selector: '[data-testid="screenshot-pin-favorite"]'
+    kind: interactive
+  - id: screenshot-pin-collapse
+    selector: '[data-testid="screenshot-pin-collapse"]'
+    kind: interactive
+  - id: screenshot-pin-expand
+    selector: '[data-testid="screenshot-pin-expand"]'
+    kind: interactive
+  - id: screenshot-pin-menu-toggle
+    selector: '[data-testid="screenshot-pin-menu-toggle"]'
+    kind: interactive
+  - id: screenshot-pin-close
+    selector: '[data-testid="screenshot-pin-close"]'
+    kind: interactive
+  - id: screenshot-pin-zoom-out
+    selector: '[data-testid="screenshot-pin-zoom-out"]'
+    kind: interactive
+  - id: screenshot-pin-zoom-in
+    selector: '[data-testid="screenshot-pin-zoom-in"]'
+    kind: interactive
+  - id: screenshot-pin-reset
+    selector: '[data-testid="screenshot-pin-reset"]'
+    kind: interactive
+  - id: screenshot-pin-opacity
+    selector: '[data-testid="screenshot-pin-opacity"]'
+    kind: interactive
+  - id: system-screenshot-favorites
+    selector: '[data-testid="system-screenshot-favorites"]'
+    kind: interactive
+  - id: screenshot-favorites-refresh
+    selector: '[data-testid="screenshot-favorites-refresh"]'
+    kind: interactive
+  - id: screenshot-favorites-close
+    selector: '[data-testid="screenshot-favorites-close"]'
+    kind: interactive
+  - id: screenshot-favorite-open
+    selector: '[data-testid="screenshot-favorite-open"]'
+    kind: interactive
+  - id: screenshot-favorite-remove
+    selector: '[data-testid="screenshot-favorite-remove"]'
+    kind: interactive
+  - id: screenshot-scroll-mode-description
+    selector: '[data-testid="screenshot-scroll-mode-description"]'
+    kind: display
+  - id: screenshot-scroll-mode-hint
+    selector: '[data-testid="screenshot-scroll-mode-hint"]'
+    kind: display
+  - id: screenshot-pin-surface
+    selector: '[data-testid="screenshot-pin-surface"]'
+    kind: display
+  - id: screenshot-pin-toolbar
+    selector: '[data-testid="screenshot-pin-toolbar"]'
+    kind: display
+  - id: screenshot-pin-menu
+    selector: '[data-testid="screenshot-pin-menu"]'
+    kind: display
+  - id: screenshot-pin-zoom
+    selector: '[data-testid="screenshot-pin-zoom"]'
+    kind: display
+  - id: screenshot-pin-help
+    selector: '[data-testid="screenshot-pin-help"]'
+    kind: display
+  - id: screenshot-pin-notice
+    selector: '[data-testid="screenshot-pin-notice"]'
+    kind: display
+  - id: screenshot-favorites
+    selector: '[data-testid="screenshot-favorites"]'
+    kind: display
+  - id: screenshot-favorites-empty
+    selector: '[data-testid="screenshot-favorites-empty"]'
+    kind: display
+  - id: screenshot-favorite-item
+    selector: '[data-testid="screenshot-favorite-item"]'
+    kind: display
+  - id: screenshot-favorite-thumbnail
+    selector: '[data-testid="screenshot-favorite-thumbnail"]'
+    kind: display
+  - id: screenshot-favorites-error
+    selector: '[data-testid="screenshot-favorites-error"]'
+    kind: display
 -->
 
 - 系统截图工具：主窗口及独立终端/数据库/RDP/VNC 窗口共用相机入口，默认隐藏应用窗口；菜单“截取当前窗口”保留调用窗口并预选其物理边界。当前配置快捷键打开截图 overlay；默认 Windows/Linux `Ctrl+Alt+A`，macOS `Ctrl+Super+A`（Control+Command+A）。菜单支持 3/5/10 秒延迟，倒计时中点击相机取消。原有 session 图像截图/录制入口及实现已移除，终端文本日志录制继续保留。
@@ -10715,7 +10863,7 @@ controls:
 - `TC-SHOT-028` 覆盖多行输入、字体/字号、文字样式撤销/重做与窄窗口录制菜单；`TC-SHOT-003` 覆盖长图预览比例、100% 尺寸与完整输出。N3 同时检查原生菜单布局与剪贴板两行文字像素，N12 检查原生结果预览及继续标记比例。 验证 run37113915949（产品提交 `1b99b6a8`）：Linux/Windows/macOS browser 各 6/6、native 各 2/2，零失败零跳过；三端真实长图像素误差为 0，两行文字分别通过剪贴板像素检查。六组回执附件哈希、QA 构建源码身份及 15 个原生产物哈希已核验，报告保留于 `qa-ui-auto-report/hosted-37113915949/`。本地仅运行单测（截图相关 93 项、QA scenario 5 项）与目录静态校验；未在本地构建或运行 browser/native。
 - 合并后 `f60ba959` 的 macOS 兼容回归在 run37120338264（测试提交 `fac59f2b`）通过：Linux/Windows/macOS browser 各 6/6，native 分别 5/5、5/5、7/7，零失败零跳过。N14 的 GIF/MP4 分别记录 13/14 次 CoreGraphics 单帧读取、零持久流构造；全部帧匹配原画。N15 在 3.5 秒后仍显示权限说明、保留选区几何和标记，按钮及 Escape 退出均通过，未创建滚动控制窗口。六组源码/用例/构建身份、回执及附件哈希，另 931 个原生产物哈希已核对；证据位于 `qa-ui-auto-report/hosted-37120338264/`。本地仅运行单测（前端 77、Rust 截图 52、QA runner 6）及静态校验。Hosted macOS 为 15 ARM64；本结果不等于用户 macOS 14 Intel/VMware 的 WindowServer 长时稳定性实测。
 - 本轮回归用例 `TC-SHOT-024`–`030` 覆盖标注编辑、当前窗口选项、滚动控制和权限错误可退出；`TC-104` 检查旧 session 图像入口移除；`TC-SHOT-N12` 核对真实窗口可见性、选区预选、滚动完成/取消和原生边框位置，`TC-SHOT-N13` 核对全屏录制停止与控制排除，macOS 专用 `TC-SHOT-N14` 核对 GIF/MP4 CoreGraphics 单帧源，`TC-SHOT-N15` 核对 Accessibility 失败提示持续可见并可退出。N2/N9 的真实像素场景使用 CSS 隐藏鼠标指针，使桌面画面与保留的 canvas 原画一致；仍使用真实 OS 滚轮，逐像素阈值与比较区域不变。三平台执行证据以对应提交的 CI 产物为准。
-- `TC-SHOT-N16` 验证 macOS 屏幕录制权限未生效时，整屏/区域 IPC 拒绝采集，按钮、当前窗口选项和生产全局快捷键处理器显示可关闭的授权指引；实际应用窗口隐藏调用为零，主窗口保持可见，不生成截图覆盖层或新图片。复用 `alert-dialog-message` / `alert-dialog-ok`；仅在隔离 QA 中注入拒绝，不修改系统 TCC。系统快捷键物理输入和 Apple 授权弹窗不由该用例证明。
+- `TC-SHOT-N19` 验证 macOS 屏幕录制权限未生效时，整屏/区域 IPC 拒绝采集，按钮、当前窗口选项和生产全局快捷键处理器显示可关闭的授权指引；实际应用窗口隐藏调用为零，主窗口保持可见，不生成截图覆盖层或新图片。复用 `alert-dialog-message` / `alert-dialog-ok`；仅在隔离 QA 中注入拒绝，不修改系统 TCC。系统快捷键物理输入和 Apple 授权弹窗不由该用例证明。
 - `status: done` 表示功能代码已实装。完整原画内容比对标准下，run36973502375（SHA fb0f02c5）三端 native 各10/10、零失败零跳过；回执、构建身份、用例摘要与产物哈希均已核验，Pillow/PyAV 独立解码确认每一 GIF/MP4 帧匹配本轮原画且长图逐像素一致。该历史结果不证明新增自由选区或物理 Pin 拖动。最终扩展 run36991920385 已另行验证全部六组回执/源码/构建/配置/用例身份和产物哈希，独立解码12个 GIF/MP4 的283帧全部匹配原画/nonce/时间线，完整长图逐像素一致；27个便捷产物保留在 `qa-ui-auto-report/hosted-36991920385/outputs/{linux,windows,macos}/`，完整证据与两个独立校验 JSON 同根。旧标准 run36956493957 结果不作为该证据。混合 DPI/多显示器与 Wayland 仍未验证。
 
 ### 27.2 截图快捷键设置与能力状态

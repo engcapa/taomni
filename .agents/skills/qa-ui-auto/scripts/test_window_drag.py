@@ -15,7 +15,8 @@ from qa_ui_auto.window_drag import run_window_drag, validate_movement
 class WindowDragTest(TestCase):
     def test_main_rail_cases_validate_and_declare_native_platform_boundaries(self):
         cases = [load_case(path) for path in Path("qa-ui-auto-tests/cases").glob("TC-MAIN-RAIL-*.yaml")]
-        self.assertEqual(len(cases), 3)
+        self.assertTrue({"TC-MAIN-RAIL-01", "TC-MAIN-RAIL-02", "TC-MAIN-RAIL-03"}
+                        .issubset({case.id for case in cases}))
         for case in cases:
             if "native" in case.modes:
                 self.assertIsNone(native_support(case, "Linux"))

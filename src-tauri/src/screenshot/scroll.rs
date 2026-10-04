@@ -17,20 +17,21 @@ use std::time::Duration;
 
 use anyhow::Context;
 use image::RgbaImage;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
 use super::capture::{DisplayInfo, FrameSource, crop, save_png};
 
 /// Upper bound for one stitched image (pixels); caps memory at ~4*w*h bytes.
 const MAX_STITCHED_HEIGHT: u32 = 20_000;
-const MAX_FRAMES: u32 = 40;
+const MAX_FRAMES: u32 = 400;
 /// Let the hidden overlay leave the screen before the first frame.
 const INITIAL_SETTLE: Duration = Duration::from_millis(350);
 /// Smooth-scroll animations in WebView2/WebKit finish well within this.
 const SETTLE_DELAY: Duration = Duration::from_millis(450);
 /// Consecutive unchanged frames that end the capture (page bottom).
-const STILL_LIMIT: u32 = 2;
+const STILL_LIMIT: u32 = 6;
+const MANUAL_POLL: Duration = Duration::from_millis(120);
 /// Columns sampled per row for matching (frames are column-averaged to this).
 const MATCH_COLUMNS: usize = 128;
 /// Mean absolute luma difference accepted as "same content".
@@ -49,14 +50,60 @@ pub struct ScrollCaptureResult {
     pub frames: u32,
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ScrollMode {
+    #[default]
+    Auto,
+    Manual,
+}
+
 pub struct ScrollControl {
     pub stop: AtomicBool,
     pub cancel: AtomicBool,
     pub frames: AtomicU32,
+    automatic: AtomicBool,
+    needs_overlap: AtomicBool,
+}
+
+impl Default for ScrollControl {
+    fn default() -> Self {
+        Self::new(ScrollMode::Auto)
+    }
 }
 
 impl ScrollControl {
+    pub fn new(mode: ScrollMode) -> Self {
+        Self {
+            stop: AtomicBool::new(false),
+            cancel: AtomicBool::new(false),
+            frames: AtomicU32::new(0),
+            automatic: AtomicBool::new(mode == ScrollMode::Auto),
+            needs_overlap: AtomicBool::new(false),
+        }
+    }
+
+    pub fn mode(&self) -> ScrollMode {
+        if self.automatic.load(Ordering::SeqCst) {
+            ScrollMode::Auto
+        } else {
+            ScrollMode::Manual
+        }
+    }
+
+    pub fn set_mode(&self, mode: ScrollMode) {
+        self.automatic
+            .store(mode == ScrollMode::Auto, Ordering::SeqCst);
+    }
+
+    pub fn status(&self) -> serde_json::Value {
+        serde_json::json!({
+            "frames": self.frames.load(Ordering::SeqCst),
+            "mode": self.mode(),
+            "needsOverlap": self.needs_overlap.load(Ordering::SeqCst),
+        })
+    }
+
     pub fn request_stop(&self, cancel: bool) {
         if cancel {
             self.cancel.store(true, Ordering::SeqCst);
@@ -76,10 +123,7 @@ impl ScrollControl {
 
     fn progress(&self, app: &AppHandle, frames: u32) {
         self.frames.store(frames, Ordering::SeqCst);
-        let _ = app.emit(
-            "screenshot://scroll-progress",
-            serde_json::json!({ "frames": frames }),
-        );
+        let _ = app.emit("screenshot://scroll-progress", self.status());
     }
 }
 
@@ -114,8 +158,9 @@ pub fn scroll_capture_controlled(
     if width < 8 || height < (MIN_OVERLAP as u32) * 3 {
         anyhow::bail!("scroll capture region is too small ({width}x{height})");
     }
-    let mut wheel = Wheel::new()?;
-    wheel.move_to(display, x + width / 2, y + height / 2)?;
+    // Manual capture never initializes input synthesis or asks for control
+    // permission. Create it lazily if the user switches to automatic mode.
+    let mut wheel: Option<Wheel> = None;
     control.settle(INITIAL_SETTLE);
     if control.cancel.load(Ordering::SeqCst) {
         anyhow::bail!("scroll capture cancelled");
@@ -127,49 +172,128 @@ pub fn scroll_capture_controlled(
         Ok(crop(&full, x, y, width, height))
     };
 
-    let first = grab()?;
-    let mut stitcher = Stitcher::new(first);
-    control.progress(app, stitcher.frames);
+    let stitched = capture_frames(
+        &mut grab,
+        &mut |notches| {
+            if wheel.is_none() {
+                wheel = Some(Wheel::new()?);
+            }
+            let wheel = wheel.as_mut().unwrap();
+            // The user may have moved the pointer to the controls since the
+            // previous step; wheel events must still reach the selected page.
+            wheel.move_to(display, x + width / 2, y + height / 2)?;
+            wheel.scroll(notches)
+        },
+        &mut |duration| control.settle(duration),
+        &mut |frames| control.progress(app, frames),
+        max_frames,
+        control,
+    )?;
+    let (path, w, h) = save_png(&stitched.image, "scroll")?;
+    Ok(ScrollCaptureResult {
+        path: path.to_string_lossy().into_owned(),
+        width: w,
+        height: h,
+        frames: stitched.frames,
+    })
+}
+
+/// The capture policy is independent of OS input and frame acquisition so
+/// delayed scrolling, manual pauses and overlap recovery can be tested.
+fn capture_frames(
+    grab: &mut impl FnMut() -> anyhow::Result<RgbaImage>,
+    scroll: &mut impl FnMut(i32) -> anyhow::Result<()>,
+    wait: &mut impl FnMut(Duration),
+    progress: &mut impl FnMut(u32),
+    max_frames: u32,
+    control: &ScrollControl,
+) -> anyhow::Result<Stitched> {
+    let mut stitcher = Stitcher::new(grab()?);
+    progress(stitcher.frames);
     // Notches per step: large regions scroll faster; a step that jumps past
     // the region is undone and retried with a single notch.
-    let mut notches: i32 = if height >= 600 { 3 } else { 1 };
+    let mut notches: i32 = if stitcher.frame_h >= 600 { 3 } else { 1 };
     let mut still = 0u32;
+    let mut previous_mode = control.mode();
 
     while !control.stop.load(Ordering::SeqCst)
         && stitcher.frames < max_frames.min(MAX_FRAMES)
         && stitcher.height() < MAX_STITCHED_HEIGHT
     {
-        wheel.scroll(notches)?;
-        control.settle(SETTLE_DELAY);
+        let mode = control.mode();
+        if mode != previous_mode {
+            still = 0;
+            previous_mode = mode;
+        }
+        if mode == ScrollMode::Auto {
+            scroll(notches)?;
+        }
+        wait(if mode == ScrollMode::Auto {
+            SETTLE_DELAY
+        } else {
+            MANUAL_POLL
+        });
         if control.stop.load(Ordering::SeqCst) {
             break;
         }
-        let frame = grab()?;
-        match stitcher.push(frame) {
+        let mut step = stitcher.push(grab()?);
+        // Animations/lazy rendering can momentarily destroy the overlap.
+        // Re-read without injecting another scroll before trying recovery.
+        if mode == ScrollMode::Auto {
+            for _ in 0..3 {
+                if !matches!(step, Step::Lost) || control.stop.load(Ordering::SeqCst) {
+                    break;
+                }
+                wait(SETTLE_DELAY);
+                if control.stop.load(Ordering::SeqCst) {
+                    break;
+                }
+                step = stitcher.push(grab()?);
+            }
+        }
+        match step {
             Step::Appended => {
                 still = 0;
-                control.progress(app, stitcher.frames);
+                control.needs_overlap.store(false, Ordering::SeqCst);
+                progress(stitcher.frames);
             }
             Step::Unchanged => {
-                still += 1;
-                if still >= STILL_LIMIT {
-                    break;
+                // A pause is normal in manual mode, including at page end.
+                // Keep the session alive until Finish or Cancel is requested.
+                if mode == ScrollMode::Auto && control.mode() == ScrollMode::Auto {
+                    still += 1;
+                    if still >= STILL_LIMIT {
+                        if stitcher.frames > 1 {
+                            break;
+                        }
+                        // No movement may mean input was not accepted rather
+                        // than page end. Let the user take over instead of
+                        // returning a one-screen "long" screenshot.
+                        control.set_mode(ScrollMode::Manual);
+                        progress(stitcher.frames);
+                    }
                 }
             }
             Step::Lost => {
-                if notches > 1 {
-                    // Jumped further than the region: go back and slow down.
-                    wheel.scroll(-notches)?;
-                    control.settle(SETTLE_DELAY);
+                still = 0;
+                control.needs_overlap.store(true, Ordering::SeqCst);
+                if mode == ScrollMode::Auto && control.mode() == ScrollMode::Auto {
+                    scroll(-notches)?;
+                    wait(SETTLE_DELAY);
                     if control.stop.load(Ordering::SeqCst) {
                         break;
                     }
-                    notches = 1;
-                    let back = grab()?;
-                    stitcher.rebase(back);
-                } else {
-                    break;
+                    // Never rebase on an unverified frame: that would silently
+                    // skip content or duplicate rows in the accumulated image.
+                    let back = stitcher.push(grab()?);
+                    if notches > 1 && !matches!(back, Step::Lost) {
+                        notches = 1;
+                        control.needs_overlap.store(false, Ordering::SeqCst);
+                    } else {
+                        control.set_mode(ScrollMode::Manual);
+                    }
                 }
+                progress(stitcher.frames);
             }
         }
     }
@@ -178,14 +302,7 @@ pub fn scroll_capture_controlled(
         anyhow::bail!("scroll capture cancelled");
     }
 
-    let stitched = stitcher.finish();
-    let (path, w, h) = save_png(&stitched.image, "scroll")?;
-    Ok(ScrollCaptureResult {
-        path: path.to_string_lossy().into_owned(),
-        width: w,
-        height: h,
-        frames: stitched.frames,
-    })
+    Ok(stitcher.finish())
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +426,7 @@ impl Wheel {
 /// Column-averaged luma rows of a frame (`MATCH_COLUMNS` samples per row).
 struct Signature {
     rows: Vec<[u8; MATCH_COLUMNS]>,
+    columns: usize,
 }
 
 impl Signature {
@@ -333,7 +451,10 @@ impl Signature {
             }
             rows.push(row);
         }
-        Self { rows }
+        Self {
+            rows,
+            columns: cols,
+        }
     }
 
     fn len(&self) -> usize {
@@ -367,14 +488,15 @@ fn band_mean(
         n += 1;
         r += step;
     }
-    sum as f64 / (n.max(1) * MATCH_COLUMNS as u64) as f64
+    sum as f64 / (n.max(1) * a.columns.min(b.columns) as u64) as f64
 }
 
 /// Leading and trailing rows that did not change between two frames.
 fn static_margins(a: &Signature, b: &Signature) -> (usize, usize) {
     let h = a.len().min(b.len());
     let limit = h / 3;
-    let same = |y: usize| a.row_diff(y, b, y) as f64 / MATCH_COLUMNS as f64 <= STATIC_THRESHOLD;
+    let same =
+        |y: usize| a.row_diff(y, b, y) as f64 / a.columns.min(b.columns) as f64 <= STATIC_THRESHOLD;
     let top = (0..limit).take_while(|&y| same(y)).count();
     let bottom = (0..limit).take_while(|&k| same(h - 1 - k)).count();
     (top, bottom)
@@ -420,6 +542,7 @@ fn find_overlap(prev: &Signature, next: &Signature, top: usize, bottom: usize) -
     (mean <= MATCH_THRESHOLD).then_some(overlap)
 }
 
+#[derive(Debug)]
 enum Step {
     /// New rows were appended.
     Appended,
@@ -470,6 +593,9 @@ impl Stitcher {
             return Step::Lost;
         }
         let sig = Signature::of(&frame);
+        if sig.rows == self.last_sig.rows {
+            return Step::Unchanged;
+        }
         let (top, bottom) = match self.margins {
             Some(m) => m,
             None => {
@@ -505,14 +631,6 @@ impl Stitcher {
         Step::Appended
     }
 
-    /// Replace the reference frame after scrolling back (no rows appended).
-    fn rebase(&mut self, frame: RgbaImage) {
-        if frame.dimensions() == (self.width, self.frame_h) {
-            self.last_sig = Signature::of(&frame);
-            self.last = frame;
-        }
-    }
-
     fn finish(mut self) -> Stitched {
         if let Some((_, bottom)) = self.margins {
             let row_bytes = self.width as usize * 4;
@@ -533,13 +651,154 @@ impl Stitcher {
 mod tests {
     use super::*;
 
-    /// A tall "page" of 20px bands whose colors never repeat, so any
-    /// duplicated or missing rows are detectable.
+    #[test]
+    fn manual_pauses_do_not_finish_and_never_inject_wheel_input() {
+        let page = page(64, 1000);
+        let control = ScrollControl::new(ScrollMode::Manual);
+        let mut reads = 0;
+        let out = capture_frames(
+            &mut || {
+                reads += 1;
+                Ok(view(&page, if reads <= 12 { 0 } else { 120 }, 300, 0, 0))
+            },
+            &mut |_| panic!("manual mode must not synthesize input"),
+            &mut |_| {},
+            &mut |frames| {
+                if frames == 2 {
+                    control.request_stop(false);
+                }
+            },
+            MAX_FRAMES,
+            &control,
+        )
+        .unwrap();
+        assert_eq!(reads, 13);
+        assert_eq!(out.image, crop(&page, 0, 0, 64, 420));
+    }
+
+    #[test]
+    fn automatic_capture_waits_through_two_unchanged_frames_before_motion() {
+        let page = page(64, 1000);
+        let control = ScrollControl::default();
+        let mut reads = 0;
+        let mut wheels = Vec::new();
+        let out = capture_frames(
+            &mut || {
+                reads += 1;
+                Ok(view(&page, if reads <= 3 { 0 } else { 120 }, 300, 0, 0))
+            },
+            &mut |n| {
+                wheels.push(n);
+                Ok(())
+            },
+            &mut |_| {},
+            &mut |frames| {
+                if frames == 2 {
+                    control.request_stop(false);
+                }
+            },
+            MAX_FRAMES,
+            &control,
+        )
+        .unwrap();
+        assert_eq!(wheels, [1, 1, 1]);
+        assert_eq!(out.image, crop(&page, 0, 0, 64, 420));
+    }
+
+    #[test]
+    fn automatic_capture_rereads_a_transient_unmatchable_frame_without_scrolling_again() {
+        let page = page(64, 1000);
+        let control = ScrollControl::default();
+        let mut reads = 0;
+        let mut wheels = Vec::new();
+        let out = capture_frames(
+            &mut || {
+                reads += 1;
+                Ok(match reads {
+                    1 => view(&page, 0, 300, 0, 0),
+                    2 => image::RgbaImage::from_pixel(64, 300, image::Rgba([0, 0, 0, 255])),
+                    _ => view(&page, 120, 300, 0, 0),
+                })
+            },
+            &mut |n| {
+                wheels.push(n);
+                Ok(())
+            },
+            &mut |_| {},
+            &mut |frames| {
+                if frames == 2 {
+                    control.request_stop(false);
+                }
+            },
+            MAX_FRAMES,
+            &control,
+        )
+        .unwrap();
+        assert_eq!(wheels, [1]);
+        assert_eq!(out.image, crop(&page, 0, 0, 64, 420));
+    }
+
+    #[test]
+    fn manual_overlap_loss_keeps_the_anchor_until_the_user_returns() {
+        let page = page(64, 2000);
+        let mut probe = Stitcher::new(view(&page, 0, 300, 0, 0));
+        let lost = probe.push(view(&page, 600, 300, 0, 0));
+        assert!(
+            matches!(lost, Step::Lost),
+            "unexpected jump match: {lost:?}"
+        );
+        let control = ScrollControl::new(ScrollMode::Manual);
+        let mut positions = [0, 600, 0, 120, 240].into_iter();
+        let out = capture_frames(
+            &mut || {
+                Ok(view(
+                    &page,
+                    positions.next().expect("capture should finish"),
+                    300,
+                    0,
+                    0,
+                ))
+            },
+            &mut |_| panic!("unexpected OS input"),
+            &mut |_| {},
+            &mut |frames| {
+                if frames == 3 {
+                    control.request_stop(false);
+                }
+            },
+            MAX_FRAMES,
+            &control,
+        )
+        .unwrap();
+        assert_eq!(out.image, crop(&page, 0, 0, 64, 540));
+        assert!(!control.needs_overlap.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn cancellation_during_a_manual_pause_discards_the_capture() {
+        let control = ScrollControl::new(ScrollMode::Manual);
+        let result = capture_frames(
+            &mut || Ok(page(64, 300)),
+            &mut |_| panic!("unexpected OS input"),
+            &mut |_| control.request_stop(true),
+            &mut |_| {},
+            MAX_FRAMES,
+            &control,
+        );
+        assert!(result.is_err());
+    }
+
+    /// A tall "page" of independently hashed 20px bands with a diagonal
+    /// texture, so duplicated or missing rows are detectable.
     fn page(width: u32, height: u32) -> RgbaImage {
         RgbaImage::from_fn(width, height, |x, y| {
-            // Hashed band shades: no shift of the page lines up with itself.
-            let band = y / 20;
-            let shade = ((band.wrapping_mul(2_654_435_761) >> 16) % 200) as u8 + 20;
+            // Mix all bits before reducing to a shade; reducing a linear
+            // sequence directly can produce near-periodic stripe matches.
+            let mut band = y / 20;
+            band = (band ^ (band >> 16)).wrapping_mul(0x7feb352d);
+            band = (band ^ (band >> 15)).wrapping_mul(0x846ca68b);
+            band ^= band >> 16;
+            let shade = (band % 200) as u8 + 20;
             // A diagonal texture keeps rows within a band distinguishable.
             let tex = ((x + y) % 7) as u8 * 3;
             image::Rgba([shade, shade.wrapping_add(tex), 255 - shade, 255])
@@ -616,6 +875,15 @@ mod tests {
     fn unrelated_frames_do_not_stitch() {
         let a = RgbaImage::from_pixel(48, 120, image::Rgba([200, 30, 30, 255]));
         let b = RgbaImage::from_fn(48, 120, |_, y| image::Rgba([30, (y * 2) as u8, 30, 255]));
+        let mut stitcher = Stitcher::new(a);
+        assert!(matches!(stitcher.push(b), Step::Lost));
+        assert_eq!(stitcher.finish().image.height(), 120);
+    }
+
+    #[test]
+    fn narrow_regions_do_not_dilute_mismatched_pixels() {
+        let a = RgbaImage::from_pixel(8, 120, image::Rgba([20, 20, 20, 255]));
+        let b = RgbaImage::from_pixel(8, 120, image::Rgba([30, 30, 30, 255]));
         let mut stitcher = Stitcher::new(a);
         assert!(matches!(stitcher.push(b), Step::Lost));
         assert_eq!(stitcher.finish().image.height(), 120);

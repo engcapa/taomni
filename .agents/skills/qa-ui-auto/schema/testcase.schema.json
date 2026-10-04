@@ -572,7 +572,7 @@
           "additionalProperties": false,
           "required": ["scenario"],
           "properties": {
-            "scenario": {"enum": ["capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand", "controls", "full-recorder", "macos-capture-source", "scroll-permission-error", "capture-permission-error"]},
+            "scenario": {"enum": ["capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand", "controls", "full-recorder", "macos-capture-source", "scroll-permission-error", "capture-permission-error", "scroll-manual", "pin-tools", "colors"]},
             "format": {"enum": ["gif", "mp4"]},
             "secs": {"type": "integer", "minimum": 1, "maximum": 8}
           }

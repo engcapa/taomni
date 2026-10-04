@@ -12,6 +12,13 @@ unavailable:
     windows/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
     macos/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
 cases:
+- TC-SHOT-034
+- TC-SHOT-031
+- TC-SHOT-032
+- TC-SHOT-033
+- TC-SHOT-N16
+- TC-SHOT-N17
+- TC-SHOT-N18
 - TC-SHOT-028
 - TC-SHOT-029
 - TC-SHOT-030
@@ -447,7 +454,7 @@ cases:
 - TC-SHOT-N10
 - TC-SHOT-N14
 - TC-SHOT-N15
-- TC-SHOT-N16
+- TC-SHOT-N19
 - TC-RDPS-NAT-01-start-connect-display
 - TC-RDPS-NAT-02-clipboard-rich
 - TC-RDPS-NAT-03-clipboard-files
@@ -474,6 +481,7 @@ cases:
 - TC-MFA-009
 - TC-MFA-010
 - TC-MFA-011
+- TC-MFA-012
 - TC-MFA-101
 - TC-MFA-102
 - TC-MFA-103
@@ -481,6 +489,7 @@ cases:
 - TC-MFA-105
 - TC-MFA-106
 - TC-MFA-107
+- TC-MFA-108
 - TC-RDPS-PERF-03-photo-content
 - TC-RDPS-NAT-08-mstsc-interop
 - TC-RDPC-REF-01-termservice

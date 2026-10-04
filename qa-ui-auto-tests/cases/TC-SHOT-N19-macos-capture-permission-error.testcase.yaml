@@ -1,4 +1,4 @@
-id: TC-SHOT-N16
+id: TC-SHOT-N19
 title: macOS screenshot permission denial blocks partial captures before hiding windows
 covers: [F27.1, F27.2]
 tags: [screenshot, macos, native, regression, p1]
