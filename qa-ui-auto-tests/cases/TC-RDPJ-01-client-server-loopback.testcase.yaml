@@ -14,9 +14,9 @@ description: 'V-18 and V-20 (docs-feature/rdp-server-parity-design.md §4.6, §4
 
   first-use certificate confirmation the client shows the host desktop. A
 
-  click on the client canvas at the Tk target''s desktop position must flip
+  click on the client canvas at the independent target''s desktop position must flip
 
-  the target on the host (its state file counts the flips), proving client
+  the target on the host (AppKit on macOS, Tk on Windows/Linux; its state file counts the flips), proving client
 
   input reaches the host through the server. In OS full screen the
 

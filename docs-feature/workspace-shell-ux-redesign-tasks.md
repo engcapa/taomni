@@ -23,7 +23,7 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。Windows SSH、三端退出重启、Host 往返与 N15 已精准复验通过；完整 249 ID 的运行仍在收集报告，macOS B18 命中隐藏 owner 的用例定位需要修正复验。历史失败证据完整保留。
+TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。Windows SSH、三端退出重启、Host 往返、N15 与 B18 已精准复验通过；完整 249 ID 的运行已收齐五份报告，macOS RDP loopback 的宿主目标被 Python 本地网络权限弹窗影响，正在修正 fixture 并等待精准复验。历史失败证据完整保留。
 
 当前完整范围为 249 个独立 ID：browser 三端各 190，native Linux 67 / Windows 61 / macOS 60，共 758 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-269.txt`，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
@@ -235,3 +235,11 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - [统一 run 37218987069](https://github.com/engcapa/taomni/actions/runs/37218987069)，同一固定输入，249 ID / 758 次，selection 无 gaps/unreviewed。已收齐 Linux browser 190/0/0、macOS browser 189/1/0；两份身份、receipt/config 与 ZIP hashes 匹配，其余报告尚在运行。已查看这两端共 22 张 Home/Code/Git/SFTP/Tao 等原图，无明显遮挡；不提前宣布六端通过。
 - macOS B18 step 25 的 `.first` 命中了 parking 中被隐藏的 alpha 文件行；实际 Host 为可见且 ready 的 beta，原图中目标 job.txt 存在。用例现在以 Host owner 前缀精确限定两次 list/file/download 操作；隐藏的旧 controller/view 按设计保留。完整 95 步和 150 秒预算不变，所有 bytes/state/count、后台、pause/resume、完成通知与 held cancel 的断言保留。产品和 runner 未修改。
 - 293 audit gate 通过，baseline 未降低；294 的 StableSurface / sftpController 既有单测 2 files / 4 tests 全通过。修正只涉及六个定位 selector，未用 force click 或扩大超时；下一输入先三端 browser 精准复验 B18，同时收齐统一运行的其余原始报告。
+
+### B18 复验与 macOS RDP 宿主目标
+
+- [B18 run 37221675568](https://github.com/engcapa/taomni/actions/runs/37221675568)，固定输入 `62b668c50ce09ba7e39f2b7cd624bf6b95007ff8`：三端 browser 各 1 pass / 0 fail / 0 skip，95 步全部通过；source/runner/case/selection/receipt/config 与原始 ZIP hashes 均匹配。该精准结果没有改写上一完整运行的 B18 失败。
+- 完整 run 37218987069 已收齐五份报告：Linux/Windows browser 各 190/0/0，macOS browser 189/1/0；Linux native 67/0/0，macOS native 59/1/0；Windows native 仍在执行。五份身份、receipt/config、native build 与 ZIP hashes 匹配。已查看 browser 三端 33 张、Linux/macOS native 各 13 张成功原图，未见明显遮挡/裁切。
+- macOS 唯一 native 失败为 TC-RDPJ-01 step 45 的宿主 flip 计数为零。原始画面显示 Python 的本地网络权限弹窗，target-state 仍为 ready/零 flip。macOS flip 目标改用独立 AppKit 进程，保持真实宿主点击/按键、physical-pixel geometry、原子 JSON、PID、计数和子进程清理；不操作权限。Windows/Linux 及 animation/photo 测量仍使用原 Tk 目标。RDP 原 59 步、20 秒 flip 观察和 480 秒总预算完整保留。
+- 298 的改前工具单测保留：macOS GUI identity 选择断言真实失败，另有四个 Windows log 未关闭的清理错误；后者不能代替权限弹窗的原生证据。host_helper 在 Popen 后关闭父进程的 log handle，子进程继续拥有自己的 stdout。修复后的 299 为 66 项工具单测全通过，涵盖 dispatch/ready、spawn failure、幂等 cleanup 和相邻 RDP/CI/native assertions；不是本地 native 应用执行。AppKit 的实际效果待 GitHub 精准复验。
+- 300 audit gate 通过，原 coverage baseline 保持；301 精确六端计划仍为 249 ID / 758 次，无 gaps/unreviewed。只改测试工具与 RDP fixture 说明，产品、所有执行步骤和预算保持。随后固定输入推送并先复验 macOS 的真实 RDP 输入。

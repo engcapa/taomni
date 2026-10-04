@@ -3,7 +3,7 @@
 * ``open_route``      navigate the packaged main WebView to an app route
                       (e.g. ``?servers=main``) — the native analogue of
                       browser ``open: ${cfg.app.base_url}?servers=main``.
-* ``host_helper``     start/stop the stdlib-Tk visual target on the host.
+* ``host_helper``     start/stop the independent visual target on the host.
 * ``rdp_probe``       run one ``rdp-probe`` scenario (foreground or
                       background) and assert values in its JSON report.
 * ``rdp_probe_wait``  collect a background probe and assert its report.
@@ -139,13 +139,21 @@ def _do_host_helper(ctx: NativeStepContext, args: Any) -> str:
         raise StepError(f"host_helper: helper {name} is already running")
     state = _within_report(ctx, str(args.get("state") or f"{name}-state.json"))
     state.unlink(missing_ok=True)
-    command = [sys.executable, str(HELPERS / "rdp_target.py"), "--state", str(state),
-               "--mode", str(args.get("mode") or "flip"),
-               "--geometry", str(args.get("geometry") or "480x320+40+80")]
+    mode = str(args.get("mode") or "flip")
+    if platform.system() == "Darwin" and mode == "flip":
+        # Tk activates Python's GUI identity on macOS. A Python Local Network
+        # consent sheet can then block the independent host input target even
+        # though our services use loopback. Use a separate native window for
+        # input checks, without changing consent or the animation baseline.
+        command = ["swift", str(HELPERS / "rdp_target_macos.swift")]
+    else:
+        command = [sys.executable, str(HELPERS / "rdp_target.py"), "--mode", mode]
+    command += ["--state", str(state),
+                "--geometry", str(args.get("geometry") or "480x320+40+80")]
     if args.get("pattern"):
         command.append("--pattern")
-    log = (ctx.case_dir / f"{name}-helper.log").open("w", encoding="utf-8")
-    process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+    with (ctx.case_dir / f"{name}-helper.log").open("w", encoding="utf-8") as log:
+        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
     helpers[name] = process
     _register_cleanup(ctx, lambda: _stop_process(process))
     deadline = time.time() + float(args.get("timeout_sec") or 20)
