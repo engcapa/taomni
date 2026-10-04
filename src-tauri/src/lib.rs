@@ -1089,6 +1089,7 @@ pub fn run() {
             screenshot::screenshot_close_overlay,
             screenshot::screenshot_pin_to_screen,
             screenshot::screenshot_pin_init,
+            screenshot::screenshot_set_pin_compact,
             screenshot::screenshot_close_pin,
             screenshot::favorites::screenshot_list_favorites,
             screenshot::favorites::screenshot_add_favorite,

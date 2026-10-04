@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   closePin: vi.fn(), closeWindow: vi.fn(), startDragging: vi.fn(),
   copy: vi.fn(), save: vi.fn(), choosePath: vi.fn(), addFavorite: vi.fn(), removeFavorite: vi.fn(),
   setSize: vi.fn(), setResizable: vi.fn(), innerSize: vi.fn(), scaleFactor: vi.fn(),
+  setPinCompact: vi.fn(),
   translate: (key: string) => key,
 }));
 vi.mock("../../lib/i18n", () => ({ useT: () => mocks.translate }));
@@ -15,6 +16,7 @@ vi.mock("../../lib/screenshot", () => ({
   revokeScreenshotUrl: mocks.revokeScreenshotUrl, closePin: mocks.closePin,
   copyImageToClipboard: mocks.copy, saveImageToFile: mocks.save,
   addScreenshotFavorite: mocks.addFavorite, removeScreenshotFavorite: mocks.removeFavorite,
+  setPinCompact: mocks.setPinCompact,
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: mocks.choosePath }));
 vi.mock("@tauri-apps/api/window", () => ({
@@ -37,6 +39,7 @@ beforeEach(() => {
   mocks.removeFavorite.mockResolvedValue(undefined);
   mocks.setSize.mockResolvedValue(undefined);
   mocks.setResizable.mockResolvedValue(undefined);
+  mocks.setPinCompact.mockResolvedValue(undefined);
   mocks.innerSize.mockResolvedValue({ width: 640, height: 480 });
   mocks.scaleFactor.mockResolvedValue(2);
 });
@@ -120,11 +123,14 @@ describe("PinnedImage", () => {
     fireEvent.click(screen.getByTestId("screenshot-pin-collapse"));
     await screen.findByTestId("screenshot-pin-expand");
     expect(mocks.setSize).toHaveBeenCalledWith({ width: 64, height: 64 });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(mocks.setResizable).toHaveBeenCalledWith(false);
+    expect(mocks.setPinCompact).toHaveBeenCalledWith(true);
     fireEvent.click(screen.getByTestId("screenshot-pin-expand"));
     await screen.findByTestId("screenshot-pin-toolbar");
     expect(mocks.setSize).toHaveBeenLastCalledWith({ width: 320, height: 240 });
     expect(mocks.setResizable).toHaveBeenLastCalledWith(true);
+    expect(mocks.setPinCompact).toHaveBeenLastCalledWith(false);
     expect(screen.getByTestId("screenshot-pin-surface")).toHaveStyle({ opacity: "0.5" });
     expect(mocks.startDragging).not.toHaveBeenCalled();
   });
@@ -135,6 +141,20 @@ describe("PinnedImage", () => {
     await screen.findByTestId("screenshot-pin-image");
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(mocks.closeWindow).toHaveBeenCalledOnce());
+  });
+
+  it("keeps the expanded view usable and allows retry if native compact configuration fails", async () => {
+    mocks.setPinCompact.mockRejectedValueOnce(new Error("window unavailable"));
+    render(<PinnedImage />);
+    await screen.findByTestId("screenshot-pin-toolbar");
+    fireEvent.click(screen.getByTestId("screenshot-pin-collapse"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("window unavailable");
+    expect(screen.getByTestId("screenshot-pin-window")).toHaveAttribute("data-collapsed", "false");
+    expect(mocks.setSize).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("screenshot-pin-collapse"));
+    await screen.findByTestId("screenshot-pin-expand");
+    expect(mocks.setSize).toHaveBeenCalledWith({ width: 64, height: 64 });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("revokes a loaded URL when the pending image resolves after unmount", async () => {

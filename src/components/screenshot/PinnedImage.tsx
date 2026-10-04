@@ -6,6 +6,7 @@ import { formatUnknownError } from "../../lib/appDialogs";
 import {
   addScreenshotFavorite, removeScreenshotFavorite, copyImageToClipboard, saveImageToFile,
   closePin, fetchPinInit, loadScreenshotUrl, revokeScreenshotUrl, type PinInit,
+  setPinCompact,
 } from "../../lib/screenshot";
 
 /** An independent reference image; view changes never alter the original PNG. */
@@ -108,15 +109,18 @@ export function PinnedImage() {
   const collapse = async () => {
     if (sizeBusy.current) return;
     sizeBusy.current = true;
+    setError(null);
     try {
       const win = getCurrentWindow();
       if (collapsed) {
-        await win.setSize(expandedSize.current ?? new LogicalSize(320, 240));
         await win.setResizable(true);
+        await setPinCompact(false);
+        await win.setSize(expandedSize.current ?? new LogicalSize(320, 240));
       } else {
         const size = await win.innerSize();
         const scale = await win.scaleFactor();
         expandedSize.current = new LogicalSize(size.width / scale, size.height / scale);
+        await setPinCompact(true);
         await win.setSize(new LogicalSize(64, 64));
         await win.setResizable(false);
       }

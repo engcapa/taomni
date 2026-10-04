@@ -917,6 +917,48 @@ pub async fn screenshot_pin_init(window: WebviewWindow) -> Result<PinInit, Strin
         .ok_or_else(|| "no pinned screenshot for this window".to_string())
 }
 
+/// GTK otherwise raises a non-resizable window to its 200px natural size.
+/// Set the compact request on the UI thread and clear it before restoring.
+#[tauri::command]
+pub async fn screenshot_set_pin_compact(
+    window: WebviewWindow,
+    compact: bool,
+) -> Result<(), String> {
+    if !window.label().starts_with(PIN_LABEL_PREFIX) {
+        return Err("not a pin window".into());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let pin = window.clone();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        window
+            .run_on_main_thread(move || {
+                use webkit2gtk::glib::prelude::ObjectExt;
+                let result = pin
+                    .gtk_window()
+                    .map(|gtk| {
+                        let size = if compact { 64 } else { -1 };
+                        gtk.set_property("width-request", size);
+                        gtk.set_property("height-request", size);
+                        if compact {
+                            gtk.set_property("default-width", 64);
+                            gtk.set_property("default-height", 64);
+                        }
+                    })
+                    .map_err(|e| e.to_string());
+                let _ = tx.send(result);
+            })
+            .map_err(|e| e.to_string())?;
+        tokio::time::timeout(Duration::from_secs(5), rx)
+            .await
+            .map_err(|_| "configure compact pin timed out".to_string())?
+            .map_err(|e| e.to_string())??;
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = compact;
+    Ok(())
+}
+
 /// Close a pinned screenshot window by label.
 #[tauri::command]
 pub async fn screenshot_close_pin(app: AppHandle, label: String) -> Result<(), String> {

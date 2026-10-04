@@ -21,14 +21,17 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
         };
         #[cfg(target_os = "macos")]
         {
-            chord(&mut input, &[Key::Meta], Key::Unicode('a'))?;
+            // Hosted macOS uses the US keyboard. Physical ANSI A/G keycodes
+            // avoid Enigo querying HIToolbox's main-thread-only input-source
+            // APIs from this blocking worker (which traps on macOS 15).
+            chord(&mut input, &[Key::Meta], Key::Other(0))?;
             std::thread::sleep(Duration::from_millis(150));
             input
                 .text(destination.file_name().unwrap().to_string_lossy().as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
-            chord(&mut input, &[Key::Meta, Key::Shift], Key::Unicode('g'))?;
+            chord(&mut input, &[Key::Meta, Key::Shift], Key::Other(5))?;
             std::thread::sleep(Duration::from_millis(700));
-            chord(&mut input, &[Key::Meta], Key::Unicode('a'))?;
+            chord(&mut input, &[Key::Meta], Key::Other(0))?;
             input
                 .text(destination.parent().unwrap().to_string_lossy().as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;

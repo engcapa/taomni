@@ -1600,10 +1600,18 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     let mut green = 0;
     if clipboard.dimensions() == output.dimensions() {
         for x in 45..135 {
-            let a = clipboard.get_pixel(x, 80);
-            red += usize::from(a[0] > 220 && a[1] < 120 && a[2] < 120);
-            let b = clipboard.get_pixel(x, output.height() - 100);
-            green += usize::from(b[0] < 120 && b[1] > 160 && b[2] < 100);
+            // MouseEvent coordinates are integer CSS pixels in WebKit.
+            // At fit scale one pixel can span multiple original pixels;
+            // inspect the intended stroke band rather than its antialiased
+            // outermost row. Content outside these locations cannot pass.
+            red += usize::from((76..=84).any(|y| {
+                let a = clipboard.get_pixel(x, y);
+                a[0] > 220 && a[1] < 120 && a[2] < 120
+            }));
+            green += usize::from((output.height() - 104..=output.height() - 96).any(|y| {
+                let b = clipboard.get_pixel(x, y);
+                b[0] < 120 && b[1] > 160 && b[2] < 100
+            }));
         }
     }
     let marked_clipboard = done_closed

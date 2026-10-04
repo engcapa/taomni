@@ -206,6 +206,10 @@ export async function fetchPinInit(): Promise<PinInit> {
   return invoke<PinInit>("screenshot_pin_init");
 }
 
+export async function setPinCompact(compact: boolean): Promise<void> {
+  return invoke<void>("screenshot_set_pin_compact", { compact });
+}
+
 export async function closePin(label: string): Promise<void> {
   return invoke<void>("screenshot_close_pin", { label });
 }

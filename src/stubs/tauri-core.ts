@@ -5178,6 +5178,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       throw new Error("screenshot_read_file is native-only");
     }
     case "screenshot_copy_image":
+    case "screenshot_set_pin_compact":
     case "screenshot_save_image": {
       stubScreenshotCall(cmd, args);
       return (undefined as unknown) as T;

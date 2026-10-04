@@ -154,10 +154,13 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     )
     .await
     .map_err(|e| e.to_string())?;
+    run_js(&cancel_bar, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]');i++) await new Promise(r=>setTimeout(r,100)); if(!document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]')) throw new Error('manual Cancel control missing'); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    trace.mark("cancel-controls-ready", json!(true));
     tokio::time::sleep(Duration::from_millis(600)).await;
     cancel_bar
         .eval("document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]').click()")
         .map_err(|e| e.to_string())?;
+    trace.mark("cancel-clicked", json!(true));
     let cancelled = run_js(&original, "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase!=='annotate';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase==='annotate' && !document.querySelector('[data-testid=\"screenshot-scroll-result\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
     trace.mark("cancelled", cancelled.clone());
     Ok(report(
