@@ -401,7 +401,7 @@ class NativeSessionFillTest(TestCase):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"
         session.find = Mock(return_value="element-1")
-        session.request = Mock(return_value=None)
+        session.request = Mock(return_value=True)
         execute_results: list[bool] = [contenteditable]
         if contenteditable:
             execute_results.extend(focus_results or [True])
@@ -497,6 +497,38 @@ class NativeSessionFillTest(TestCase):
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_called_once_with("Taomni")
 
+    def test_form_fill_does_not_reclick_and_blur_an_already_focused_path(self) -> None:
+        session = self.session(False)
+        control = {"present": True, "focused": True}
+
+        def request(method, path, args=None):
+            if path.endswith("/click"):
+                # WebKit's element click can blur and commit a path editor
+                # which was already focused by its edit action.
+                control.update(present=False, focused=False)
+            if path.endswith("/execute/sync"):
+                self.assertIn("arguments[0].focus()", args["script"])
+                control["focused"] = control["present"]
+                return control["focused"]
+            return None
+
+        session.request.side_effect = request
+        session.press_combo.side_effect = lambda _: self.assertTrue(control["focused"])
+        session.type_text.side_effect = lambda _: self.assertTrue(control["focused"])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"):
+            session.fill('[data-testid="sftp-local-path"]', "/tmp/sftp-endpoint/local")
+        self.assertTrue(control["present"])
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
+
+    def test_form_fill_stops_before_global_keys_when_focus_is_unavailable(self) -> None:
+        session = self.session(False)
+        session.request.return_value = False
+        with patch("tauri_webdriver.platform.system", return_value="Linux"):
+            with self.assertRaisesRegex(WebDriverError, "could not receive focus"):
+                session.fill("input[name=path]", "/tmp/target")
+        session.press_combo.assert_not_called()
+        session.type_text.assert_not_called()
+
     def test_macos_fill_replaces_value_without_synthetic_backspace(self) -> None:
         session = self.session(False)
         with patch("tauri_webdriver.platform.system", return_value="Darwin"):
@@ -515,7 +547,10 @@ class NativeSessionFillTest(TestCase):
         self.assertEqual(result, 'filled input[type="password"]')
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.request.assert_has_calls([
-            call("POST", "/session/session-1/element/element-1/click", {}),
+            call("POST", "/session/session-1/execute/sync", {
+                "script": "arguments[0].focus(); return document.activeElement === arguments[0];",
+                "args": [{"element-6066-11e4-a52e-4f735466cecf": "element-1"}],
+            }),
             call("POST", "/session/session-1/element/element-1/value", {"text": text}),
         ])
         session.type_text.assert_not_called()

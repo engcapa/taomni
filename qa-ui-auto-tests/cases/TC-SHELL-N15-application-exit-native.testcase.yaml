@@ -173,6 +173,9 @@ steps:
 - fill:
     selector: input[data-testid="sftp-local-path"]
     value: ${fixture.shell_sftp_local}
+- assert_value:
+    selector: input[data-testid="sftp-local-path"]
+    equals: ${fixture.shell_sftp_local}
 - press: Enter
 - wait_for:
     selector: '[data-testid="sftp-local-list"] tr[data-row][title$="upload 中文.bin"]'
@@ -338,13 +341,13 @@ verification:
     - 75
     - 77
     - 78
-    - 79
-    - 81
+    - 80
     - 82
-    - 85
-    - 88
-    - 90
-    - 95
+    - 83
+    - 86
+    - 89
+    - 91
+    - 96
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -400,34 +403,36 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "timeout_sec": 15}}'
     - step: 76
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"]", "timeout_sec": 15}}'
-    - step: 80
+    - step: 79
+      expectation: The local path editor retains the complete fixture address before Enter.
+    - step: 81
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
         中文.bin\"]", "timeout_sec": 15}}'
-    - step: 83
+    - step: 84
       expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload 中文.bin\"][data-state=\"running\"]",
         "timeout_sec": 15}}'
-    - step: 84
+    - step: 85
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "growing", "full_size": 16777216}}'
-    - step: 86
+    - step: 87
       expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload 中文.bin\"][data-state=\"paused\"]",
         "timeout_sec": 15}}'
-    - step: 87
+    - step: 88
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "stable", "full_size": 16777216}}'
-    - step: 89
+    - step: 90
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 91
-      expectation: '{"native_app_process": {"state": "running"}}'
     - step: 92
-      expectation: '{"assert_native_window_count": {"equal": 2}}'
+      expectation: '{"native_app_process": {"state": "running"}}'
     - step: 93
+      expectation: '{"assert_native_window_count": {"equal": 2}}'
+    - step: 94
       expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
         [[1, "before"]]}}'
-    - step: 94
+    - step: 95
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "stable", "full_size": 16777216}}'
-    - step: 96
+    - step: 97
       expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Exit cancellation
         retains this note\n中文全文"}}'
     results:
@@ -455,107 +460,108 @@ verification:
     - 71
     - 73
     - 76
-    - 80
-    - 83
+    - 79
+    - 81
     - 84
-    - 86
+    - 85
     - 87
-    - 89
-    - 91
+    - 88
+    - 90
     - 92
     - 93
     - 94
-    - 96
+    - 95
+    - 97
   - id: R2
     requirement: Menu Exit exposes both real job and transaction risks and forbids leaving a job behind; cancelling
       the plan keeps the app and DB owner alive.
     actions:
-    - 98
-    - 100
-    - 105
+    - 99
+    - 101
+    - 106
     checkpoints:
-    - step: 99
+    - step: 100
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 101
-      expectation: '{"wait_for": "[data-testid=\"shell-close-dialog\"]"}'
     - step: 102
+      expectation: '{"wait_for": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 103
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-close-risk\"][data-risk-kind=\"transaction\"]",
         "equal": 1}}'
-    - step: 103
+    - step: 104
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-close-risk\"][data-risk-kind=\"job\"]",
         "equal": 1}}'
-    - step: 104
+    - step: 105
       expectation: '{"assert_not_visible": "[data-testid=\"shell-close-background\"]"}'
-    - step: 106
-      expectation: '{"native_app_process": {"state": "running"}}'
     - step: 107
+      expectation: '{"native_app_process": {"state": "running"}}'
+    - step: 108
       expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
         [[1, "before"]]}}'
-    - step: 114
+    - step: 115
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"database\"]",
         "equal": 1}}'
     results:
-    - 99
-    - 101
+    - 100
     - 102
     - 103
     - 104
-    - 106
+    - 105
     - 107
-    - 114
+    - 108
+    - 115
   - id: R3
     requirement: Explicit cancel-job and rollback precede actual app process exit; the independent client sees
       the original committed row and the incomplete remote file remains stable.
     actions:
-    - 116
-    - 118
-    - 120
+    - 117
+    - 119
     - 121
     - 122
+    - 123
     checkpoints:
-    - step: 117
+    - step: 118
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 119
+    - step: 120
       expectation: '{"wait_for": "[data-testid=\"shell-close-dialog\"]"}'
-    - step: 123
-      expectation: '{"native_app_process": {"state": "exited", "timeout_sec": 30}}'
     - step: 124
+      expectation: '{"native_app_process": {"state": "exited", "timeout_sec": 30}}'
+    - step: 125
       expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
         [[1, "before"]]}}'
-    - step: 125
+    - step: 126
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "incomplete", "full_size": 16777216}}'
-    - step: 126
+    - step: 127
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "stable", "full_size": 16777216}}'
     results:
-    - 117
-    - 119
-    - 123
+    - 118
+    - 120
     - 124
     - 125
     - 126
+    - 127
   - id: R5
     requirement: Cancelling application exit retains the database owner in Build, its exact SQL and pending
       Manual transaction; quick switch returns to that owner from Connect.
     actions:
-    - 105
-    - 108
+    - 106
     - 109
     - 110
+    - 111
     checkpoints:
-    - step: 112
-      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending: 1"}}'
     - step: 113
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending: 1"}}'
+    - step: 114
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sql-editor\"] .cm-content", "equals":
         "UPDATE qa_shell_tx SET v = ''pending'' WHERE id = 1;"}}'
-    - step: 114
+    - step: 115
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"database\"]",
         "equal": 1}}'
     results:
-    - 112
     - 113
     - 114
+    - 115
   visual:
   - check: Inspect the retained screenshot for readable controls and no clipping
     method: manual

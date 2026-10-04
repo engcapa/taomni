@@ -1302,3 +1302,7 @@ SSH 启动回归补充：TC-155 与 TC-IDE-PARITY-027-02 在真实认证、原 r
 | TC-auto-F-DB-1-sql-session-scaffold | Query Library namespace/archive/search、唯一名称和完整 SELECT 42 内容保存 | N12/N15 与 native query-workspace 边界；本例不声称真实数据库连接 |
 
 最终范围增至 249 个 ID，预计 browser 三端各 190，native Linux / Windows / macOS 为 67 / 61 / 60，共 758 次；以最终固定输入的 selection 与逐 case 报告核实。原 242 ID 文件和历史报告保留，不用新范围改写历史结果。
+
+七条 DB browser 在固定输入 `d39a285b983ad384bbc7e569ccdbb8b172132ae3` 的 [run 37215235654](https://github.com/engcapa/taomni/actions/runs/37215235654) 三端各 7 pass / 0 fail / 0 skip；selection/source/runner/case/receipt/config 与 ZIP hashes 一致。此结果只证明上述离线 renderer 验收，真实 SQL、事务、SQLite 和重启仍由最终输入的 native case 验证。
+
+N15 路径输入补充：在 Enter 之前用 `assert_value` 要求路径框精确等于隔离 fixture 的完整本地目录。它补充既有上传 growing/pause、退出取消、MySQL rollback 与进程退出检查；原 126 个动作和结果均保留，总预算仍为 600 秒。原生输入器复用已存在的 verified focus，避免 WebKit 重新点击 blur-commit 输入框使 Ctrl+A 落到整页。当前修复的单测通过不代替三端原生复验。

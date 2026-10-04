@@ -912,7 +912,10 @@ class NativeSession:
             )
             self._paste_linux_form_input(element, selector, text, check)
             return f"filled {selector}"
-        self.request("POST", self.element_path(element, "/click"), {})
+        # A WebKit element click can blur an already focused path/rename
+        # editor and commit it before select-all. Focus the live control
+        # without a pointer activation and reject unavailable focus.
+        self.focus(selector)
         self.press_combo("Mod+a")
         self.press_combo("Backspace")
         password_input = platform.system() == "Linux" and self.execute(
@@ -968,7 +971,7 @@ class NativeSession:
         with suppress(RuntimeError):
             previous = host_clipboard.get_text()
         try:
-            self.request("POST", self.element_path(element, "/click"), {})
+            self.focus(selector)
             self.press_combo("Mod+a")
             self.press_combo("Backspace")
             host_clipboard.set_text(text)

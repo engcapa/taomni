@@ -23,13 +23,13 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。第四轮六份报告及后续 browser 定位运行已收齐，继续按逐 case 结果修复；历史失败证据完整保留。
+TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。最新精准复验已收齐六份报告，Windows SSH、Linux 退出重启和 Host 往返通过；Linux N15 的路径输入失败仍需修复输入复验。历史失败证据完整保留。
 
-最新开发批次已集成稳定主工作面、SFTP 后台/跨窗口任务、Git/Notes 窗口恢复、workspace 并行恢复与取消，以及退出/数据库事务边界。第五轮已提交 Git N21，selection 为 241 个独立 ID（三端 browser 各 183，native Linux 66 / Windows 60 / macOS 59），共 734 次执行，包括全部截图回归和 AI streaming/history。数量以具体运行的 selection 为准。按用户要求，本地仅运行单元测试和静态检查，browser/native 与原生构建交给 GitHub。
+当前完整范围为 249 个独立 ID：browser 三端各 190，native Linux 67 / Windows 61 / macOS 60，共 758 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-269.txt`，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
 新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。这些缺口未记为 pass 或 done。
 
-最新候选新增 N22 的单仓库 Git 真操作，与 N21 的真实双 root 提交分开验收。远程统一选择增至 242 个 ID；预期 browser 三端各 183，native Linux 67 / Windows 61 / macOS 60，共 737 次执行，以最终 selection 核对。本批先定位已知失败与新的 Git case，取得邮件协议诊断后再回到最终输入的统一验收。
+N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既有 DB browser 用例补足离线 renderer 工作流。精准复验稳定后，以统一 SHA 执行上述 249 ID 六端验收，再核对逐 case 结果、receipt、源码/构建身份和原始截图。
 
 ## 验证记录
 
@@ -215,3 +215,10 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - 按用户点名的模块逐项核对选择，发现 7 条既有 DB browser 用例未纳入旧 242 ID；此前 native DB 有覆盖，不能代替 browser。现适配这些用例的 Sessions 入口、分别审阅打开连接和业务结果要求；原 SQL、事务状态、Query Library 和 rename 步骤及 45/90 秒预算保留。新增一次 Home/Overview 往返后的完整 SQL/Log 和单实例验收、Query Library 完整内容保存检查。
 - 最终预期范围增加为 249 ID / 758 次：browser 三端各 190，native Linux 67 / Windows 61 / macOS 60。新列表为 qa-ui-auto-report/_local/shell-ci-case-ids-final-269.txt；旧 242 ID 列表保留用于历史核验。schema/reviewed contract 已通过；本地 DB unit 与静态精确计划仍在执行，随后推送并通过 GitHub 验证。
 - 收尾结果：DB/Query Library/执行日志单测 266 为 3 files / 48 tests 全通过；静态 267 audit gate 与 249 ID / 758 次精确计划通过，gaps/unreviewed 为空；Git diff check 通过。只改用例和证据文档，未改产品或构建输入。本批先远程执行七条 DB browser，再用最终统一 SHA 验收六端全范围。
+
+### 原生精准复验与路径焦点修复
+
+- [run 37213780261](https://github.com/engcapa/taomni/actions/runs/37213780261)，固定输入 `1e2bb817cf8794495bbe22697ec54ef0960e09b5`：browser 三端各 4 pass / 0 fail / 0 skip；Windows/macOS native 各 5/0/0，Linux native 4/1/0。六份 source/runner/case/selection/receipt/config/native build 和原始 ZIP hashes 均匹配。Windows TC-155/IDE-027-02 及三端 N08/N09 通过；Linux N15 在上传前的本地路径导航失败，不能以 workflow success 记为通过。
+- Linux N15 原图显示本地列表仍为 `/home/runner`，整页文本被选中。原生 form fill 重新点击已经聚焦的 blur-commit 路径框，没有检查焦点；单测 274 的两个实际失败分别复现输入框提前提交和无焦点仍发全局快捷键。现在复用已有 locator focus 并验证 activeElement，保留真实 select-all/backspace/text 与 Unicode OS paste。N15 新增 Enter 前完整 fixture 路径值检查，原 126 步与 600 秒预算保留，requirements/checkpoints/results 随插入同步。
+- 本地 276 工具单测：117 项，108 pass / 9 平台限定 skip / 0 fail；这些 skip 不属于 browser/native 用例结果。277 audit gate 通过，未降低 baseline。273/275 的测试命令缺少模块路径或引用不存在模块，原日志保留，未当作产品失败或通过。本批不修改产品/构建输入，没有本地启动 browser/native 应用。
+- [DB browser run 37215235654](https://github.com/engcapa/taomni/actions/runs/37215235654)，固定输入 `d39a285b983ad384bbc7e569ccdbb8b172132ae3`：三端各 7/0/0，共 21 次全部通过；三份身份、receipt/config 与 ZIP hashes 匹配。实施基线以来改动的 208 个 YAML 全部包含在最终 249 ID 范围，无遗漏。N15 修复仍待 GitHub 精准复验，然后执行最终六端统一输入。
