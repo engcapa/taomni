@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[cfg(target_os = "macos")]
@@ -22,6 +22,7 @@ pub const DEFAULT_SHORTCUT: &str = "Control+Super+A";
 pub const DEFAULT_SHORTCUT: &str = "Control+Alt+A";
 
 const SETTINGS_FILE: &str = "screenshot-settings.json";
+const OPEN_FAILED_EVENT: &str = "screenshot://open-failed";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -104,13 +105,34 @@ fn register(app: &AppHandle, shortcut: Shortcut) -> Result<(), String> {
             if event.state == ShortcutState::Pressed {
                 let app = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    if let Err(e) = super::open_overlay(&app, None).await {
+                    if let Err(e) = open_from_shortcut(&app).await {
                         log::warn!("global screenshot shortcut failed: {e}");
                     }
                 });
             }
         })
         .map_err(|e| format!("{e}"))
+}
+
+/// Route a global-shortcut failure back to a visible app window so permission
+/// instructions remain usable even when the shortcut was pressed in another app.
+pub(super) async fn open_from_shortcut(app: &AppHandle) -> Result<(), String> {
+    let result = super::open_overlay(app, None).await;
+    if let Err(error) = &result {
+        let window = app.get_webview_window("main").or_else(|| {
+            app.webview_windows()
+                .into_values()
+                .find(|window| !window.label().starts_with("screenshot-"))
+        });
+        if let Some(window) = window {
+            let _ = window.show();
+            let _ = window.set_focus();
+            if let Err(e) = window.emit(OPEN_FAILED_EVENT, error.clone()) {
+                log::warn!("could not show screenshot error: {e}");
+            }
+        }
+    }
+    result
 }
 
 fn status_of(current: &Current) -> ShortcutStatus {

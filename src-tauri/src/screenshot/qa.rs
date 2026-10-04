@@ -1291,6 +1291,101 @@ async fn begin_scroll_ui(
     Ok(overlay)
 }
 
+/// Verify the real still-capture commands and screenshot entry points reject a
+/// denied permission before hiding any app windows or writing a partial image.
+#[tauri::command]
+pub async fn screenshot_qa_capture_permission_error(app: AppHandle) -> Result<String, String> {
+    ensure_qa(&app)?;
+    #[cfg(not(all(debug_assertions, target_os = "macos")))]
+    {
+        Err("macOS permission scenario requires macOS".into())
+    }
+    #[cfg(all(debug_assertions, target_os = "macos"))]
+    {
+        let _cleanup = ScenarioCleanup(app.clone());
+        super::close_session(&app);
+        let main = app
+            .get_webview_window("main")
+            .ok_or("main window missing")?;
+        let display = capture::resolve_display(&app, None).map_err(|e| e.to_string())?;
+        let actual_permission = capture::capture_permission_granted();
+        let _denial = capture::QaPermissionDenial::new(&app).map_err(|e| e.to_string())?;
+        let hide_calls_before = super::QA_WINDOW_HIDE_CALLS.load(Ordering::SeqCst);
+        let artifact_dir = capture::artifact_dir().map_err(|e| e.to_string())?;
+        let artifacts_before: Vec<_> = std::fs::read_dir(&artifact_dir)
+            .map_err(|e| e.to_string())?
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .collect();
+        let full_error = super::screenshot_capture_full(app.clone(), Some(display.id.clone()))
+            .await
+            .err();
+        let region_error =
+            super::screenshot_capture_region(app.clone(), Some(display.id.clone()), 0, 0, 10, 10)
+                .await
+                .err();
+        let mut attempts = Vec::new();
+        for entry in ["button", "current-window", "global-shortcut"] {
+            let trigger_error = if entry == "global-shortcut" {
+                super::shortcut::open_from_shortcut(&app).await.err()
+            } else {
+                let script = if entry == "button" {
+                    "document.querySelector('[data-testid=\"system-screenshot\"]').click(); return true;"
+                } else {
+                    "document.querySelector('[data-testid=\"system-screenshot-delay-toggle\"]').click(); await new Promise(r=>setTimeout(r,100)); document.querySelector('[data-testid=\"system-screenshot-current-window\"]').click(); return true;"
+                };
+                run_js(&main, script, Duration::from_secs(5))
+                    .await
+                    .map_err(|e| e.to_string())?;
+                None
+            };
+            let ui = run_js(&main, r#"
+                const q = id => document.querySelector('[data-testid="'+id+'"]');
+                for(let i=0;i<100 && !q('alert-dialog-message');i++) await new Promise(r=>setTimeout(r,50));
+                const text = q('alert-dialog-message')?.textContent || '';
+                const visible = !!q('alert-dialog') && q('alert-dialog').getBoundingClientRect().width > 0;
+                return {text, visible, remediation:/Screen Recording/.test(text) && /System Settings/.test(text) && /re-add/.test(text) && /reopen/.test(text)};
+            "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+            let no_overlay = app.get_webview_window(super::OVERLAY_LABEL).is_none()
+                && super::tool_state().overlay.is_none();
+            let hide_calls = super::QA_WINDOW_HIDE_CALLS.load(Ordering::SeqCst) - hide_calls_before;
+            let main_visible = main.is_visible().unwrap_or(false);
+            let no_new_artifacts = std::fs::read_dir(&artifact_dir)
+                .map_err(|e| e.to_string())?
+                .filter_map(Result::ok)
+                .all(|e| artifacts_before.contains(&e.path()));
+            let passed = ui["visible"] == json!(true)
+                && ui["remediation"] == json!(true)
+                && no_overlay
+                && hide_calls == 0
+                && main_visible
+                && no_new_artifacts
+                && (entry != "global-shortcut" || trigger_error.is_some());
+            let recovered = run_js(&main, r#"
+                document.querySelector('[data-testid="alert-dialog-ok"]').click();
+                for(let i=0;i<100 && (document.querySelector('[data-testid="alert-dialog"]') || document.querySelector('[data-testid="system-screenshot"]').disabled);i++) await new Promise(r=>setTimeout(r,50));
+                return !document.querySelector('[data-testid="alert-dialog"]') && !document.querySelector('[data-testid="system-screenshot"]').disabled;
+            "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+            attempts.push(
+                json!({"entry":entry,"passed":passed && recovered == json!(true),
+                "ui":ui,"noOverlay":no_overlay,"windowHideCalls":hide_calls,
+                "mainVisible":main_visible,"noNewArtifacts":no_new_artifacts,
+                "triggerError":trigger_error,"recovered":recovered}),
+            );
+        }
+        let command_errors = [&full_error, &region_error].iter().all(|error| {
+            error
+                .as_ref()
+                .is_some_and(|error| error.contains("Screen Recording"))
+        });
+        Ok(report(
+            command_errors && attempts.iter().all(|a| a["passed"] == json!(true)),
+            json!({"actualPermissionBeforeDenial":actual_permission,"fullError":full_error,
+                "regionError":region_error,"attempts":attempts,"denialOnly":true}),
+        ))
+    }
+}
+
 /// macOS permission regression: a denied Accessibility check must leave the
 /// selected image and annotations visible while presenting a persistent,
 /// closeable error instead of hiding the overlay or retrying in a loop.

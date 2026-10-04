@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Post-bundle release gate for the Taomni macOS app. This validates Taomni's
-# Developer ID/notarization chain separately from the pinned mitmproxy chain.
+# fixed signing certificate separately from Apple notarization and mitmproxy.
 set -euo pipefail
 export LC_ALL=C
 export LANG=C
@@ -13,6 +13,9 @@ fi
 target_triple="$1"
 expected_arch="$2"
 expected_team_id="${APPLE_TEAM_ID:-}"
+signing_mode="${MACOS_SIGNING_MODE:?MACOS_SIGNING_MODE is required}"
+expected_certificate="${MACOS_SIGNING_CERT_SHA1:-}"
+notarize="${MACOS_NOTARIZE:-false}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 bundle_root="$repo_root/src-tauri/target/$target_triple/release/bundle"
 app="$bundle_root/macos/Taomni.app"
@@ -31,15 +34,83 @@ test -x "$main_executable" || {
   exit 1
 }
 
-if [ -n "$expected_team_id" ]; then
-  codesign --verify --deep --strict --verbose=2 "$app"
-  signature="$(codesign -d --verbose=4 "$app" 2>&1)"
-  grep -Fq 'Identifier=com.taomni.app' <<<"$signature"
-  grep -Fq "TeamIdentifier=$expected_team_id" <<<"$signature"
-  grep -Eq 'flags=.*\(runtime\)' <<<"$signature"
+case "$signing_mode" in
+  developer-id|self-signed)
+    [[ "$expected_certificate" =~ ^[A-F0-9]{40}$ ]] || {
+      echo "A pinned MACOS_SIGNING_CERT_SHA1 is required for certificate-signed builds." >&2
+      exit 1
+    }
+    ;;
+  adhoc)
+    test -z "${RELEASE_TAG:-}" || {
+      echo "A release must use a fixed certificate; ad-hoc signing is only allowed for workflow artifacts." >&2
+      exit 1
+    }
+    test "$notarize" = false
+    ;;
+  *) echo "Unknown macOS signing mode: $signing_mode" >&2; exit 1 ;;
+esac
+
+verification_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/taomni-bundle-verify.XXXXXX")"
+trap 'rm -rf "$verification_dir"' EXIT
+
+verify_certificate_signature() {
+  local signed_app="$1"
+  local certificate_prefix="$2"
+  local signature requirement actual_certificate
+  codesign --verify --deep --strict --verbose=2 "$signed_app"
+  signature="$(codesign -d --verbose=4 "$signed_app" 2>&1)"
+  grep -Fxq 'Identifier=com.taomni.app' <<<"$signature"
+  if grep -Fq 'Signature=adhoc' <<<"$signature"; then
+    echo "Expected a certificate signature, found ad-hoc: $signed_app" >&2
+    return 1
+  fi
+  if [ "$signing_mode" = developer-id ]; then
+    grep -Eq 'flags=.*\(runtime\)' <<<"$signature"
+  elif grep -Eq 'flags=.*\(runtime\)' <<<"$signature"; then
+    echo "Self-signed bundles must disable hardened runtime to load krb5 libraries without an Apple Team ID." >&2
+    return 1
+  fi
+  codesign -d --extract-certificates "$certificate_prefix" "$signed_app"
+  actual_certificate="$(shasum -a 1 "${certificate_prefix}0" | awk '{print toupper($1)}')"
+  test "$actual_certificate" = "$expected_certificate" || {
+    echo "Signing certificate does not match MACOS_SIGNING_CERT_SHA1: $signed_app" >&2
+    return 1
+  }
+  requirement="$(codesign -d -r- "$signed_app" 2>&1 | sed -n 's/^designated => //p')"
+  grep -Fq 'identifier "com.taomni.app"' <<<"$requirement"
+  grep -Eq 'certificate |anchor( =)? H"' <<<"$requirement"
+  if grep -Fq 'cdhash' <<<"$requirement"; then
+    echo "The designated requirement depends on a changing binary hash: $signed_app" >&2
+    return 1
+  fi
+  if [ "$signing_mode" = developer-id ] && [ -n "$expected_team_id" ]; then
+    grep -Fxq "TeamIdentifier=$expected_team_id" <<<"$signature"
+  fi
+  printf '%s\n' "$requirement" > "${certificate_prefix}requirement"
+}
+
+if [ "$signing_mode" != adhoc ]; then
+  verify_certificate_signature "$app" "$verification_dir/app-cert-"
+  archive="$app.tar.gz"
+  test -s "$archive" || {
+    echo "The macOS app archive is missing." >&2
+    exit 1
+  }
+  if [ -n "${RELEASE_TAG:-}${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+    test -s "$archive.sig" || {
+      echo "The macOS updater signature is missing." >&2
+      exit 1
+    }
+  fi
+  mkdir "$verification_dir/updater"
+  tar -xzf "$archive" -C "$verification_dir/updater"
+  updater_app="$verification_dir/updater/Taomni.app"
+  verify_certificate_signature "$updater_app" "$verification_dir/updater-cert-"
+  cmp "$main_executable" "$updater_app/Contents/MacOS/taomni"
+  cmp "$verification_dir/app-cert-requirement" "$verification_dir/updater-cert-requirement"
 else
-  echo "APPLE_TEAM_ID is not set; skipping strict Developer ID signature checks."
-  codesign --verify --verbose=2 "$app" || true
+  echo "Workflow-only build without a certificate; fixed signing and updater signature checks are skipped."
 fi
 
 main_architectures="$(lipo -archs "$main_executable")"
@@ -77,11 +148,12 @@ bundled_license="$(find "$resource_root" -type f -path '*/sockscap/macos/redirec
 test -n "$bundled_manifest" && cmp "$pinned_manifest" "$bundled_manifest"
 test -n "$bundled_license" && cmp "$pinned_license" "$bundled_license"
 
-if [ -n "$expected_team_id" ]; then
+if [ "$notarize" = true ]; then
+  test "$signing_mode" = developer-id && test -n "$expected_team_id"
   gatekeeper="$(spctl --assess --type execute --verbose=4 "$app" 2>&1)"
   grep -Fq 'source=Notarized Developer ID' <<<"$gatekeeper"
   xcrun stapler validate "$app"
-  echo "Taomni macOS $expected_arch release verified: Developer ID, notarization, architecture, Xray and Redirector v0.12.11."
+  echo "Taomni macOS $expected_arch verified: fixed Developer ID certificate, updater app, notarization, architecture, Xray and Redirector v0.12.11."
 else
-  echo "Taomni macOS $expected_arch release verified: architecture, Xray and Redirector v0.12.11 (unnotarized build)."
+  echo "Taomni macOS $expected_arch verified: $signing_mode, architecture, Xray and Redirector v0.12.11 (unnotarized build)."
 fi

@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ShortcutStatus } from "./screenshot";
+import { SCREENSHOT_OPEN_FAILED_EVENT, type ShortcutStatus } from "./screenshot";
 import {
   DEFAULT_SCREENSHOT_SHORTCUT,
   screenshotShortcutLabel,
@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   native: false,
   windowLabel: "main",
   invoke: vi.fn<(command: string, args?: Record<string, unknown>) => Promise<unknown>>(),
+  listen: vi.fn(),
+  unlisten: vi.fn(),
+  dialogs: { alert: vi.fn() },
 }));
 
 vi.mock("./runtime", () => ({
@@ -20,7 +23,11 @@ vi.mock("./runtime", () => ({
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ label: mocks.windowLabel }),
+  getCurrentWindow: () => ({ label: mocks.windowLabel, listen: mocks.listen }),
+}));
+vi.mock("./appDialogs", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./appDialogs")>(),
+  useAppDialogs: () => mocks.dialogs,
 }));
 
 const fallback: ShortcutStatus = {
@@ -38,6 +45,9 @@ beforeEach(() => {
   mocks.invoke.mockReset().mockImplementation(async (command) =>
     command === "screenshot_shortcut_status" ? { ...fallback } : undefined,
   );
+  mocks.listen.mockReset().mockResolvedValue(mocks.unlisten);
+  mocks.unlisten.mockReset();
+  mocks.dialogs.alert.mockReset().mockResolvedValue(undefined);
   useScreenshotShortcutStore.setState({ status: { ...fallback }, loaded: false });
 });
 
@@ -192,12 +202,42 @@ describe("useScreenshotAppShortcut", () => {
     expect(openCalls()).toHaveLength(1);
   });
 
-  it("reports an opening failure rather than leaving an unhandled rejection", async () => {
-    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("shows permission instructions when the app shortcut fails", async () => {
     await mountShortcut();
     const error = new Error("capture permission denied");
     mocks.invoke.mockRejectedValueOnce(error);
     fireEvent.keyDown(document.body, chord);
-    await waitFor(() => expect(log).toHaveBeenCalledWith("[screenshot] app shortcut failed", error));
+    await waitFor(() => expect(mocks.dialogs.alert).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining(error.message),
+      tone: "error",
+    })));
+  });
+
+  it("shows backend global-shortcut failures even when global registration succeeded", async () => {
+    mocks.native = true;
+    mocks.invoke.mockResolvedValue({ ...fallback, registered: true });
+    const { unmount } = await mountShortcut();
+    expect(mocks.listen).toHaveBeenCalledWith(SCREENSHOT_OPEN_FAILED_EVENT, expect.any(Function));
+    const handler = mocks.listen.mock.calls[0][1];
+    await act(async () => {
+      handler({ payload: "Enable Taomni in macOS Screen Recording settings" });
+    });
+    expect(mocks.dialogs.alert).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining("Screen Recording"),
+      tone: "error",
+    }));
+    expect(openCalls()).toHaveLength(0);
+    unmount();
+    expect(mocks.unlisten).toHaveBeenCalledOnce();
+  });
+
+  it("releases an error listener that resolves after unmount", async () => {
+    mocks.native = true;
+    let resolveListen!: (stop: () => void) => void;
+    mocks.listen.mockImplementation(() => new Promise<() => void>((resolve) => { resolveListen = resolve; }));
+    const { unmount } = await mountShortcut();
+    unmount();
+    await act(async () => { resolveListen(mocks.unlisten); });
+    expect(mocks.unlisten).toHaveBeenCalledOnce();
   });
 });

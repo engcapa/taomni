@@ -25,6 +25,7 @@ SCENARIOS = {
     "full-recorder": "screenshot_qa_full_recorder",
     "macos-capture-source": "screenshot_qa_macos_capture_source",
     "scroll-permission-error": "screenshot_qa_scroll_permission_error",
+    "capture-permission-error": "screenshot_qa_capture_permission_error",
 }
 
 

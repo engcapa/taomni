@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Linux / Windows – unchanged matrix build
+  # Linux / Windows matrix build
   # ---------------------------------------------------------------------------
   build:
     name: Bundle (${{ matrix.platform }})
@@ -55,13 +55,13 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
           run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: '22'
           cache: pnpm
 
       - name: Setup Rust
@@ -255,60 +255,33 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Build and upload release bundles
-        id: tauri_release
-        if: steps.version.outputs.tag != ''
-        uses: tauri-apps/tauri-action@action-v0.6.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ steps.version.outputs.tag }}
-          releaseName: Taomni v${{ steps.version.outputs.version }}
-          releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
-          generateReleaseNotes: true
-          includeUpdaterJson: false
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          args: ${{ matrix.args }}
-
-      - name: Collect release workflow artifacts
-        if: steps.version.outputs.tag != ''
+      - name: Check updater signing configuration
         shell: bash
         env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_release.outputs.artifactPaths }}
-          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/${{ matrix.platform }}
-        run: node scripts/collect-tauri-action-artifacts.mjs
+          RELEASE_PLATFORM: ${{ runner.os }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: node scripts/configure-release-signing.mjs
 
-      - name: Upload release workflow artifacts
-        if: steps.version.outputs.tag != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: taomni-${{ steps.version.outputs.version }}-${{ matrix.platform }}
-          path: tauri-artifacts/${{ matrix.platform }}
-          if-no-files-found: error
-
-      - name: Build workflow bundles
-        id: tauri_workflow
-        if: steps.version.outputs.tag == ''
+      # Build only. Release assets are published by the finalizer after every
+      # platform and signature gate passes.
+      - name: Build desktop bundles
+        id: tauri_build
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
       - name: Collect workflow artifacts
-        if: steps.version.outputs.tag == ''
         shell: bash
         env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_workflow.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_build.outputs.artifactPaths }}
           TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/${{ matrix.platform }}
         run: node scripts/collect-tauri-action-artifacts.mjs
 
       - name: Upload workflow artifacts
-        if: steps.version.outputs.tag == ''
         uses: actions/upload-artifact@v4
         with:
           name: taomni-${{ steps.version.outputs.version }}-${{ matrix.platform }}
@@ -336,13 +309,13 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
           run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: '22'
           cache: pnpm
 
       - name: Setup Rust
@@ -415,53 +388,29 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      # Tauri updater signing and Apple Developer ID signing are independent
-      # trust chains. If Apple secrets are present, tauri-action will sign and
-      # notarize the macOS release bundle; otherwise, an unnotarized release build is generated.
-      - name: Check macOS release signing and notarization secrets
+      - name: Release signing unit contracts
+        run: node --test scripts/configure-release-signing.test.mjs scripts/verify-macos-release-bundle.test.mjs
+
+      # Reuse one .p12 and pin its fingerprint for both architectures and every
+      # upgrade. Import it into a temporary keychain before Tauri signs/bundles;
+      # never re-sign the app after the updater archive/.sig have been created.
+      # Apple notarization is optional and independent from fixed signing.
+      # See docs-issue/macos-screenshot-permission-and-signing.md for self-signing.
+      - name: Configure fixed macOS certificate and updater signing
         shell: bash
         env:
+          RELEASE_PLATFORM: macOS
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          missing_apple=()
-          for name in \
-            APPLE_CERTIFICATE \
-            APPLE_CERTIFICATE_PASSWORD \
-            APPLE_ID \
-            APPLE_PASSWORD \
-            APPLE_TEAM_ID; do
-            if [ -z "${!name:-}" ]; then
-              missing_apple+=("$name")
-            fi
-          done
-          if [ "${#missing_apple[@]}" -ne 0 ]; then
-            echo "::notice::Missing Apple release secrets (${missing_apple[*]}). Developer ID signing and Apple notarization will be skipped for macOS builds."
-          else
-            echo "All Apple Developer ID signing and notarization secrets are configured."
-            {
-              echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
-              echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
-              echo "APPLE_ID=$APPLE_ID"
-              echo "APPLE_PASSWORD=$APPLE_PASSWORD"
-              echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
-            } >> "$GITHUB_ENV"
-          fi
-
-          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
-            echo "::notice::TAURI_SIGNING_PRIVATE_KEY is missing. Tauri updater signatures will be skipped."
-          else
-            {
-              echo "TAURI_SIGNING_PRIVATE_KEY=$TAURI_SIGNING_PRIVATE_KEY"
-              echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
-            } >> "$GITHUB_ENV"
-          fi
+        run: node scripts/configure-release-signing.mjs
 
       # ---------- aarch64-apple-darwin (native) ----------
       - name: Stage and verify xray-core (aarch64)
@@ -471,9 +420,8 @@ jobs:
           pwsh scripts/fetch-xray.ps1 -Platform macos-arm64 -Force
           test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "arm64"
 
-      - name: Build and upload release bundle (aarch64)
-        id: tauri_macos_aarch64_release
-        if: steps.version.outputs.tag != ''
+      - name: Build macOS bundle (aarch64)
+        id: tauri_macos_aarch64
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -482,58 +430,21 @@ jobs:
           LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
           PKG_CONFIG_PATH: /opt/homebrew/opt/krb5/lib/pkgconfig
         with:
-          tagName: ${{ steps.version.outputs.tag }}
-          releaseName: Taomni v${{ steps.version.outputs.version }}
-          releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
-          generateReleaseNotes: true
-          includeUpdaterJson: false
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          args: --target aarch64-apple-darwin
+          args: --target aarch64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
-      - name: Verify signed and notarized release bundle (aarch64)
-        if: steps.version.outputs.tag != ''
+      - name: Verify fixed signature and updater app (aarch64)
         env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: bash scripts/verify-macos-release-bundle.sh aarch64-apple-darwin arm64
 
-      - name: Collect release workflow artifacts (aarch64)
-        if: steps.version.outputs.tag != ''
-        shell: bash
-        env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_aarch64_release.outputs.artifactPaths }}
-          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-aarch64
-        run: node scripts/collect-tauri-action-artifacts.mjs
-
-      - name: Upload release workflow artifacts (aarch64)
-        if: steps.version.outputs.tag != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: taomni-${{ steps.version.outputs.version }}-macos-aarch64
-          path: tauri-artifacts/macos-aarch64
-          if-no-files-found: error
-
-      - name: Build workflow bundle (aarch64)
-        id: tauri_macos_aarch64_workflow
-        if: steps.version.outputs.tag == ''
-        uses: tauri-apps/tauri-action@action-v0.6.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LIBGSSAPI_IMPL: mit
-          LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
-          PKG_CONFIG_PATH: /opt/homebrew/opt/krb5/lib/pkgconfig
-        with:
-          args: --target aarch64-apple-darwin
-
       - name: Collect workflow artifacts (aarch64)
-        if: steps.version.outputs.tag == ''
         shell: bash
         env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_aarch64_workflow.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_aarch64.outputs.artifactPaths }}
           TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-aarch64
         run: node scripts/collect-tauri-action-artifacts.mjs
 
       - name: Upload workflow artifacts (aarch64)
-        if: steps.version.outputs.tag == ''
         uses: actions/upload-artifact@v4
         with:
           name: taomni-${{ steps.version.outputs.version }}-macos-aarch64
@@ -548,9 +459,8 @@ jobs:
           pwsh scripts/fetch-xray.ps1 -Platform macos -Force
           test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "x86_64"
 
-      - name: Build and upload release bundle (x86_64)
-        id: tauri_macos_x86_64_release
-        if: steps.version.outputs.tag != ''
+      - name: Build macOS bundle (x86_64)
+        id: tauri_macos_x86_64
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -560,78 +470,41 @@ jobs:
           PKG_CONFIG_PATH: /usr/local/opt/krb5/lib/pkgconfig
           PKG_CONFIG_ALLOW_CROSS: "1"
         with:
-          tagName: ${{ steps.version.outputs.tag }}
-          releaseName: Taomni v${{ steps.version.outputs.version }}
-          releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
-          generateReleaseNotes: true
-          includeUpdaterJson: false
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          args: --target x86_64-apple-darwin
+          args: --target x86_64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
-      - name: Verify signed and notarized release bundle (x86_64)
-        if: steps.version.outputs.tag != ''
+      - name: Verify fixed signature and updater app (x86_64)
         env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: bash scripts/verify-macos-release-bundle.sh x86_64-apple-darwin x86_64
 
-      - name: Collect release workflow artifacts (x86_64)
-        if: steps.version.outputs.tag != ''
-        shell: bash
-        env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_x86_64_release.outputs.artifactPaths }}
-          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-x86_64
-        run: node scripts/collect-tauri-action-artifacts.mjs
-
-      - name: Upload release workflow artifacts (x86_64)
-        if: steps.version.outputs.tag != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: taomni-${{ steps.version.outputs.version }}-macos-x86_64
-          path: tauri-artifacts/macos-x86_64
-          if-no-files-found: error
-
-      - name: Build workflow bundle (x86_64)
-        id: tauri_macos_x86_64_workflow
-        if: steps.version.outputs.tag == ''
-        uses: tauri-apps/tauri-action@action-v0.6.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LIBGSSAPI_IMPL: mit
-          LIBGSSAPI_PREFIX: /usr/local/opt/krb5
-          PKG_CONFIG_PATH: /usr/local/opt/krb5/lib/pkgconfig
-          PKG_CONFIG_ALLOW_CROSS: "1"
-        with:
-          args: --target x86_64-apple-darwin
-
       - name: Collect workflow artifacts (x86_64)
-        if: steps.version.outputs.tag == ''
         shell: bash
         env:
-          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_x86_64_workflow.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_x86_64.outputs.artifactPaths }}
           TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-x86_64
         run: node scripts/collect-tauri-action-artifacts.mjs
 
       - name: Upload workflow artifacts (x86_64)
-        if: steps.version.outputs.tag == ''
         uses: actions/upload-artifact@v4
         with:
           name: taomni-${{ steps.version.outputs.version }}-macos-x86_64
           path: tauri-artifacts/macos-x86_64
           if-no-files-found: error
 
+      - name: Clean temporary macOS signing keychain
+        if: always() && env.MACOS_SIGNING_WORK_DIR != ''
+        run: node scripts/configure-release-signing.mjs --cleanup-macos
+
   # ---------------------------------------------------------------------------
   # Compose a single, complete latest.json for tauri-plugin-updater.
   #
-  # Each platform build uploads its own updater bundles + .sig files, but the
-  # updater needs ONE latest.json listing every platform. The per-arch macOS
-  # *.app.tar.gz assets share a filename and would collide on the release, so we
-  # rebuild from the uniquely-named per-arch workflow artifacts: re-upload each
-  # updater bundle under an arch-tagged name and overwrite latest.json. Runs
-  # after both build jobs. See claudedocs/auto-update-plan.md (must be verified
-  # by hand on the first signed release).
+  # Builders only upload workflow artifacts. After both jobs pass, validate all
+  # updater signatures and stage installers before creating/updating a release.
+  # Qualify same-named macOS archives by architecture without changing signed
+  # bytes. Upload latest.json last so every referenced asset is already present.
   # ---------------------------------------------------------------------------
   finalize-updater-manifest:
-    name: Compose latest.json
+    name: Publish verified bundles and latest.json
     needs: [build, build-macos]
     runs-on: ubuntu-22.04
     if: github.event_name == 'release' || github.ref_type == 'tag' || inputs.tag != ''
@@ -639,9 +512,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22'
       - name: Updater manifest unit contracts
-        run: node --test scripts/compose-updater-manifest.test.mjs
+        run: node --test scripts/compose-updater-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/release-workflow.test.mjs
       - name: Resolve release tag
         id: meta
         shell: bash
@@ -661,7 +534,7 @@ jobs:
         with:
           path: artifacts
 
-      - name: Rebuild and upload latest.json
+      - name: Verify and publish release assets
         if: steps.meta.outputs.tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -670,8 +543,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export RELEASE_NOTES="$(gh release view "$TAG" --json body --jq '.body // ""')"
           node scripts/compose-updater-manifest.mjs artifacts updater-assets
+          node scripts/verify-updater-signatures.mjs updater-assets
+
+          # No release mutation until every platform/signature gate has passed.
+          # Preserve an existing release's title/body; create one for tag pushes
+          # and manual dispatches that do not already have a release. Keep new
+          # releases draft until all assets and latest.json have been uploaded.
+          if publish_draft="$(gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
+            # A draft left by an interrupted earlier run is published only
+            # after this run uploads the complete verified asset set.
+            test "$publish_draft" = true || test "$publish_draft" = false
+          else
+            release_args=(--draft --title "Taomni $TAG" --generate-notes --target "$GITHUB_SHA")
+            if [[ "$TAG" == *-* ]]; then
+              release_args+=(--prerelease)
+            fi
+            gh release create "$TAG" "${release_args[@]}"
+            publish_draft=true
+          fi
+          RELEASE_NOTES="$(gh release view "$TAG" --json body --jq '.body // ""')"
+          export RELEASE_NOTES
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = 'updater-assets/latest.json';
+          const manifest = JSON.parse(readFileSync(path, 'utf8'));
+          if (process.env.RELEASE_NOTES) manifest.notes = process.env.RELEASE_NOTES;
+          writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
 
           # Validate and stage all platforms before uploading anything. macOS
           # bundles have arch-qualified names and retain their signed bytes.
@@ -681,3 +580,6 @@ jobs:
 
           # Publish the complete manifest only after every referenced asset exists.
           gh release upload "$TAG" updater-assets/latest.json --clobber
+          if [ "$publish_draft" = true ]; then
+            gh release edit "$TAG" --draft=false
+          fi
