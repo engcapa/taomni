@@ -266,6 +266,13 @@ async fn open_fixture(
     let _ = window.set_focus();
     // Let the window manager map and raise it.
     tokio::time::sleep(Duration::from_millis(700)).await;
+    if route == "anim" {
+        // A previous scroll scenario leaves the OS cursor over the fixture.
+        // CoreGraphics snapshots include it even when a different WebView has
+        // focus, so park it outside the source for every recording scenario.
+        park_pointer(input_point((display.x + 16, display.y + 16), s)).await?;
+        tokio::time::sleep(Duration::from_millis(350)).await;
+    }
     let pos = window.inner_position().context("fixture position")?;
     let size = window.inner_size().context("fixture size")?;
     let content_width = run_js(&window, "const root = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return root.querySelector('canvas')?.getBoundingClientRect().width ?? root.clientWidth;", Duration::from_secs(5)).await?.as_f64().context("fixture content width")?;
@@ -1656,8 +1663,13 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
       if(q('screenshot-annotation-canvas').dataset.shapes!=='0') throw new Error('undo lost after zoom');
       q('screenshot-redo').click(); await sleep(100);
       const viewport = q('screenshot-scroll-result-viewport');
-      viewport.scrollTop = viewport.scrollHeight; await sleep(100);
-      if(viewport.scrollTop<=0) throw new Error('long preview did not scroll');
+      for (let i = 0; i < 20; i++) {
+        viewport.scrollTop = viewport.scrollHeight;
+        viewport.scrollTo(0, viewport.scrollHeight);
+        if (viewport.scrollTop > 0) break;
+        await sleep(100);
+      }
+      if(viewport.scrollTop<=0) throw new Error(`long preview did not scroll (image=${image.naturalWidth}x${image.naturalHeight}, viewport=${viewport.clientWidth}x${viewport.clientHeight}, scrollHeight=${viewport.scrollHeight})`);
       q('screenshot-color-green').click(); await sleep(50);
       await draw(40,image.naturalHeight-100,100,60);
       q('screenshot-scroll-fit').click(); await sleep(100);
