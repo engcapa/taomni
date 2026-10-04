@@ -5,9 +5,28 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { cleanupMacosCertificate, githubEnvironment, importMacosCertificate, releaseSigningPlan, signingCertificate } from "./configure-release-signing.mjs";
+import { cleanupMacosCertificate, githubEnvironment, importMacosCertificate, releaseSigningPlan, security, signingCertificate } from "./configure-release-signing.mjs";
 
 const fingerprint = "0123456789ABCDEF0123456789ABCDEF01234567";
+
+test("keychain commands have a hard timeout, redact sensitive failures and restrict trust to hosted CI", () => {
+  let options;
+  const execute = (command, args, opts) => {
+    options = opts;
+    return { status: null, error: { code: "ETIMEDOUT" }, stderr: "private password data" };
+  };
+  assert.throws(() => security(["import", "private.p12", "-P", "private password"], "import .p12", {}, execute), (error) => {
+    assert.match(error.message, /timed out after 60 seconds/);
+    assert(!error.message.includes("private"));
+    return true;
+  });
+  assert.equal(options.timeout, 60_000);
+  assert.equal(options.killSignal, "SIGKILL");
+  assert.deepEqual(options.stdio, ["ignore", "pipe", "pipe"]);
+  for (const operation of ["add-trusted-cert", "remove-trusted-cert"]) {
+    assert.throws(() => security([operation], "test trust operation", {}, () => assert.fail("local trust must not be touched")), /disposable GitHub-hosted/);
+  }
+});
 function macos(overrides = {}) {
   return {
     RELEASE_PLATFORM: "macOS", RELEASE_TAG: "v0.4.30",

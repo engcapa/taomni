@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Post-bundle release gate for the Taomni macOS app. This validates Taomni's
 # fixed signing certificate separately from Apple notarization and mitmproxy.
-set -euo pipefail
+set -Eeuo pipefail
+trap 'status=$?; echo "macOS bundle verification failed at line $LINENO (exit $status)." >&2' ERR
 export LC_ALL=C
 export LANG=C
 
@@ -60,6 +61,7 @@ verify_certificate_signature() {
   local signature requirement actual_certificate
   codesign --verify --deep --strict --verbose=2 "$signed_app"
   signature="$(codesign -d --verbose=4 "$signed_app" 2>&1)"
+  printf '%s\n' "$signature"
   grep -Fxq 'Identifier=com.taomni.app' <<<"$signature"
   if grep -Fq 'Signature=adhoc' <<<"$signature"; then
     echo "Expected a certificate signature, found ad-hoc: $signed_app" >&2
@@ -73,11 +75,13 @@ verify_certificate_signature() {
   fi
   codesign -d --extract-certificates "$certificate_prefix" "$signed_app"
   actual_certificate="$(shasum -a 1 "${certificate_prefix}0" | awk '{print toupper($1)}')"
+  printf 'Signing certificate SHA-1: %s\n' "$actual_certificate"
   test "$actual_certificate" = "$expected_certificate" || {
     echo "Signing certificate does not match MACOS_SIGNING_CERT_SHA1: $signed_app" >&2
     return 1
   }
   requirement="$(codesign -d -r- "$signed_app" 2>&1 | sed -n 's/^designated => //p')"
+  printf 'Designated requirement: %s\n' "$requirement"
   grep -Fq 'identifier "com.taomni.app"' <<<"$requirement"
   grep -Eq 'certificate |anchor( =)? H"' <<<"$requirement"
   if grep -Fq 'cdhash' <<<"$requirement"; then

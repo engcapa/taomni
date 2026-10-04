@@ -80,17 +80,23 @@ function exportEnvironment(env, values) {
   appendFileSync(env.GITHUB_ENV, githubEnvironment(values));
 }
 
-function security(args, purpose) {
+export function security(args, purpose, env = process.env, execute = spawnSync) {
   const trustOperation = ["add-trusted-cert", "remove-trusted-cert"].includes(args[0]);
-  if (trustOperation && (process.env.GITHUB_ACTIONS !== "true" || process.env.RUNNER_ENVIRONMENT !== "github-hosted")) {
+  if (trustOperation && (env.GITHUB_ACTIONS !== "true" || env.RUNNER_ENVIRONMENT !== "github-hosted")) {
     throw new Error("CI certificate trust may only be configured on a disposable GitHub-hosted runner.");
   }
   // Hosted macOS runners support passwordless sudo. Admin trust avoids the
   // interactive authorization dialog required for user-domain trust updates.
-  const result = spawnSync(trustOperation ? "sudo" : "security", trustOperation ? ["-n", "security", ...args] : args, { encoding: "utf8" });
+  if (env.GITHUB_ACTIONS === "true") console.log(`macOS keychain: ${purpose}.`);
+  const result = execute(trustOperation ? "sudo" : "security", trustOperation ? ["-n", "security", ...args] : args, {
+    encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000, killSignal: "SIGKILL",
+  });
   // security arguments include passwords; never include arguments or captured
   // output in errors or logs (set-key-partition-list also prints key metadata).
-  if (result.error || result.status !== 0) throw new Error(`macOS keychain operation failed: ${purpose}.`);
+  if (result.error || result.status !== 0) {
+    const detail = result.error?.code === "ETIMEDOUT" ? " (timed out after 60 seconds)" : "";
+    throw new Error(`macOS keychain operation failed: ${purpose}${detail}.`);
+  }
   return result.stdout;
 }
 
