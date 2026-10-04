@@ -32,7 +32,9 @@ export class CloseCoordinator {
     try { items = await Promise.all(targets.map(async (target) => ({ target, risks: await target.adapter.getRisks(exit) }))); }
     catch (error) { return { status: "failed", closed, failed: [{ id: "prepare", error: String(error) }] }; }
     let choices: Record<string, CloseChoice> = {};
-    if (items.length > 1 || items.some((item) => item.risks.length)) {
+    // App exit has already confirmed the working set. Only unresolved business
+    // risks need a second decision; ordinary bulk tab close still reviews its targets.
+    if ((!exit && items.length > 1) || items.some((item) => item.risks.length)) {
       const answer = await this.prompt(items, []);
       if (!answer || Object.values(answer).includes("cancel")) return { status: "cancelled", closed, failed };
       choices = answer;

@@ -1394,6 +1394,35 @@ describe("MailClientTab", () => {
     expect(mailMocks.mailIdleStop).not.toHaveBeenCalled();
   });
 
+  it("publishes INBOX arrivals even when a legacy cache contains message keywords", async () => {
+    const legacyFolder = { ...folder, flags: ["\\Seen", "\\Draft", "$Junk", "$NotJunk"] };
+    mailMocks.mailListCachedFolders.mockResolvedValue([legacyFolder]);
+    mailMocks.mailSyncFolder.mockResolvedValue(stepResult({ folder: legacyFolder }));
+    const view = renderMailbox();
+    await waitFor(() => expect(eventMocks.handlers.has("mail://idle")).toBe(true));
+    view.rerender(<MailClientTab tabId="mail-tab" info={info} visible={false} />);
+    mailMocks.mailSyncFolder.mockResolvedValue(stepResult({ folder: legacyFolder, newUnseen: 3 }));
+    act(() => eventMocks.handlers.get("mail://idle")!({ payload: { accountId: info.sessionId, folder: "INBOX", kind: "changed" } }));
+    await waitFor(() => expect(useTaoAlertStore.getState().mailNew).toMatchObject([{ mailTabId: "mail-tab", count: 3 }]), { timeout: 3000 });
+  });
+
+  it.each(["\\Sent", "\\Trash", "\\Junk", "\\Drafts"])("excludes arrivals from the actual %s mailbox role", async (role) => {
+    const excluded = { ...folder, name: "Bucket", displayName: "Bucket", flags: [role] };
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, excluded]);
+    mailMocks.mailSyncFolder.mockImplementation((_info, name) => Promise.resolve(stepResult({ folder: name === "Bucket" ? excluded : folder })));
+    const view = renderMailbox();
+    await waitFor(() => expect(eventMocks.handlers.has("mail://idle")).toBe(true));
+    fireEvent.click(screen.getByText("Bucket"));
+    await waitFor(() => expect(mailMocks.mailListCachedMessages).toHaveBeenCalledWith(info.sessionId, "Bucket", 51, 0));
+    view.rerender(<MailClientTab tabId="mail-tab" info={info} visible={false} />);
+    mailMocks.mailSyncFolder.mockImplementation((_info, name) => Promise.resolve(stepResult({
+      folder: name === "Bucket" ? excluded : folder, newUnseen: name === "Bucket" ? 3 : 0,
+    })));
+    await act(async () => eventMocks.handlers.get("mail://idle")!({ payload: { accountId: info.sessionId, folder: "Bucket", kind: "changed" } }));
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledWith(info, "Bucket", expect.objectContaining({ mode: "reconcile" })));
+    expect(useTaoAlertStore.getState().mailNew).toEqual([]);
+  });
+
   it("publishes cached arrivals while a hidden folder flags reconciliation is still pending", async () => {
     const view = renderMailbox();
     await waitFor(() => expect(eventMocks.handlers.has("mail://idle")).toBe(true));

@@ -419,6 +419,7 @@ class NativeSession:
         self._local_endpoint = (urllib.parse.urlsplit(self.driver_url)
                                 if host in {"localhost", "127.0.0.1", "::1"} else None)
         self._connection: http.client.HTTPConnection | None = None
+        self._app_exit_observed = False
         self._open = (urllib.request.build_opener(urllib.request.ProxyHandler({})).open
                       if host in {"localhost", "127.0.0.1", "::1"} else urllib.request.urlopen)
 
@@ -540,7 +541,7 @@ class NativeSession:
                 # End the owned tree while its ancestry still exists; the next
                 # case restarts the driver with the same verified QA identity.
                 harness.driver.stop()
-            elif self.session_id:
+            elif self.session_id and not self._app_exit_observed:
                 # Case/failure-capture/host-restoration budgets may already
                 # be exhausted. Always give DELETE its own bounded attempt.
                 self.deadline = Deadline(5)

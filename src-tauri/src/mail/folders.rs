@@ -377,6 +377,7 @@ mod tests {
             needs_repair: false,
             highest_modseq: Some(99),
             cached_uids: (1..=12).collect(),
+            ..FolderSyncState::default()
         };
         let status = FolderStatus {
             messages: Some(12),

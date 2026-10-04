@@ -490,6 +490,7 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                         last_step, last_verb, last_args = 0, "<setup>", None
                         for i, step in enumerate(c.steps, start=1):
                             ctx_ns.step_index = i
+                            nctx.step_index = i
                             verb, raw_args = tc_mod.step_verb_and_args(step)
                             last_step, last_verb, last_args = i, verb, raw_args
                             args = cfg_mod.resolve(

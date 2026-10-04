@@ -652,7 +652,7 @@ function folderMatchesSpecial(
   const manual = overrides?.[kind];
   if (manual) return folder.name === manual || folderLabel(folder) === manual;
   const matcher = SPECIAL_FOLDER_MATCHERS[kind];
-  if (folder.flags.some((flag) => flag.toLowerCase().includes(matcher.flag))) return true;
+  if (folder.flags.some((flag) => flag.toLowerCase() === `\\${matcher.flag}`)) return true;
   const haystack = `${folder.name} ${folderLabel(folder)}`.toLowerCase();
   return matcher.names.some((name) => haystack.includes(name));
 }
@@ -1986,6 +1986,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const isNewMailExcludedFolder = useCallback((folder: MailFolder) =>
     NEW_MAIL_EXCLUDED_KINDS.some((kind) => folderMatchesSpecial(folder, kind, info.specialFolders))
+    || folder.flags.some((flag) => flag.toLowerCase() === "\\drafts")
     || /draft|草稿/i.test(`${folder.name} ${folderLabel(folder)}`), [info.specialFolders]);
 
   const isNewMailExcludedName = useCallback((name: string) => {
@@ -1994,7 +1995,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   }, [isNewMailExcludedFolder]);
 
   const notifyNewMail = useCallback((count: number) => {
-    console.debug("mail arrival notification", { count, hidden: !visibleRef.current });
     if (count <= 0) return;
     const title = info.displayName?.trim() || info.emailAddress || info.sessionId;
     pushMailNew(tabId, info.sessionId, title, count);
@@ -2078,14 +2078,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const indicator = options.indicator ?? "none";
     let changed = false;
     try {
-      console.debug("mail folder sync started", { mode: options.mode ?? "auto", hidden: !visibleRef.current, cacheEnabled: info.cache.enabled });
       const loop = await runFolderSyncLoop({
         mode: options.mode ?? "auto",
         maxSteps: options.maxSteps ?? 40,
         isCancelled: () => syncGenerationRef.current !== generation,
         step: (mode) => mailSyncFolder(info, folder, { mode, limit: catchupBatchSize, includeBodies: false }),
         onStep: (result, progress) => {
-          console.debug("mail folder sync step", { mode: result.mode, fetched: result.fetched, newUnseen: result.newUnseen, more: result.more, highUid: result.folder.syncHighUid, hidden: !visibleRef.current });
           if (result.fetched > 0 || result.vanished > 0 || result.flagsUpdated > 0) changed = true;
           applySyncedFolder(result.folder);
           if (!visibleRef.current) {
@@ -2113,11 +2111,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       });
       if (changed && info.cache.enabled) await reloadVisibleFromCache(folder);
       if (loop.fetched > 0 && folder.trim().toUpperCase() === "INBOX") {
-        console.debug("mail incoming filters started", { fetched: loop.fetched });
         await incomingFiltersRef.current?.();
-        console.debug("mail incoming filters finished");
       }
-      console.debug("mail folder sync finished", { fetched: loop.fetched, newUnseen: loop.newUnseen, cancelled: loop.cancelled });
       return loop;
     } finally {
       if (indicator !== "none" && visibleRef.current) setSyncProgress(null);
@@ -2648,7 +2643,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     void listen<MailIdleEvent>(MAIL_IDLE_EVENT, (event) => {
       const payload = event.payload;
       if (disposed || payload?.accountId !== accountId) return;
-      console.debug("mail IDLE event", { kind: payload.kind, syncInFlight: syncInFlightRef.current, hidden: !visibleRef.current });
       // "stopped" may come from a previous watcher replaced by this tab's.
       if (payload.kind === "stopped") return;
       setIdleState(payload.kind);

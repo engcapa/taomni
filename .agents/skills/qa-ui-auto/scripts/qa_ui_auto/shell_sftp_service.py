@@ -18,9 +18,14 @@ class RateHandle(paramiko.SFTPHandle):
     def __init__(self, endpoint, path, flags):
         super().__init__(flags)
         self.endpoint, self.path = endpoint, path
+        self._ready_at = time.monotonic()
 
     def observe(self, action, offset, size):
-        if self.endpoint.stop_event.wait(size / self.endpoint.bytes_per_sec):
+        now = time.monotonic()
+        # Count time already spent exchanging packets toward the configured
+        # rate. An idle gap can credit at most one chunk, never a whole file.
+        self._ready_at = max(self._ready_at + size / self.endpoint.bytes_per_sec, now)
+        if self.endpoint.stop_event.wait(self._ready_at - now):
             raise OSError("QA SFTP endpoint stopped")
         row = dict(action=action, path=self.path.relative_to(self.endpoint.remote).as_posix(), offset=offset, bytes=size, monotonic=time.monotonic())
         with self.endpoint.lock, (self.endpoint.root / "sftp-service-bytes.jsonl").open("a", encoding="utf-8") as stream:

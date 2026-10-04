@@ -429,7 +429,7 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
             let highest = state.highest_modseq;
             match state.folders.get(&name) {
                 Some(folder) => {
-                    out.push_str("* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft)\r\n");
+                    out.push_str("* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft $Junk $NotJunk)\r\n");
                     out.push_str(&format!("* {} EXISTS\r\n", folder.messages.len()));
                     out.push_str("* 0 RECENT\r\n");
                     out.push_str(&format!(

@@ -134,3 +134,4 @@ class NativeProcessContract(TestCase):
             records = [json.loads(line) for line in (Path(directory) / "native-app-processes.jsonl").read_text().splitlines()]
             self.assertTrue(all(row["passed"] for row in records))
             self.assertEqual(records[0]["samples"][0]["apps"][0]["pid"], 2)
+            self.assertTrue(ctx.session._app_exit_observed)

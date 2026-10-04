@@ -6,6 +6,28 @@ function target(id: string, adapter?: Partial<CloseAdapter>): CloseTarget {
   return { id, title: id, adapter: { getRisks: async () => [], resolve: async () => undefined, flush: async () => undefined, ...adapter }, commit: vi.fn() };
 }
 describe("Close transactions", () => {
+  it("flushes clean exit targets once without repeating the app exit confirmation", async () => {
+    const order: string[] = [];
+    const targets = ["workspace", "git", "problems", "terminal"].map((id) => ({
+      ...target(id, { flush: async () => { order.push(`flush:${id}`); } }),
+      commit: () => { order.push(`close:${id}`); },
+    }));
+    const prompt = vi.fn(async () => null);
+    const result = await new CloseCoordinator(prompt).request(targets, true);
+    expect(result).toEqual({ status: "closed", closed: targets.map((item) => item.id), failed: [] });
+    expect(prompt).not.toHaveBeenCalled();
+    expect(order).toEqual(targets.flatMap((item) => [`flush:${item.id}`, `close:${item.id}`]));
+  });
+
+  it("still confirms a clean bulk tab close and preserves every target on cancel", async () => {
+    const targets = [target("workspace"), target("terminal")];
+    const prompt = vi.fn(async () => null);
+    const result = await new CloseCoordinator(prompt).request(targets);
+    expect(result.status).toBe("cancelled");
+    expect(prompt).toHaveBeenCalledTimes(1);
+    targets.forEach((item) => expect(item.commit).not.toHaveBeenCalled());
+  });
+
   it("does not remove anything when preflight is cancelled", async () => {
     const a = target("a", { getRisks: async () => [{ id: "dirty", ownerId: "a", kind: "dirty", detail: "Unsaved", revision: "1", choices: ["save", "discard", "cancel"] }] });
     const b = target("b");

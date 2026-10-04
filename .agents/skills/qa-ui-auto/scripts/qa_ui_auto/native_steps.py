@@ -57,6 +57,7 @@ class NativeStepContext:
         self.session = session
         self.case_dir = case_dir
         self.cfg = cfg
+        self.step_index = 0
         self._parity005_trace_positions: dict[tuple[str, str, str], int] = {}
         self._permission_restores: dict[Path, int] = {}
         # External X11 CLIPBOARD owner started by native_clipboard_owner, plus

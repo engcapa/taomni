@@ -42,11 +42,11 @@ use crate::terminal::network::NetworkSettings;
 pub mod autoconfig;
 pub mod caldav;
 pub mod calendar;
-pub mod contacts;
-pub mod filters;
 pub mod certs;
+pub mod contacts;
 #[cfg(test)]
 mod fake_imap;
+pub mod filters;
 pub mod folders;
 pub mod idle;
 pub mod lists;
@@ -1979,6 +1979,7 @@ pub async fn mail_sync_all_folders(
                     }
                     let name = folder.name.clone();
                     let mut folder_state = sync_states.get(&name).cloned().unwrap_or_default();
+                    folder_state.attributes = Some(sync::MailboxAttributes::from(&*folder));
                     // Periodic scans: one STATUS round trip proves an idle
                     // folder unchanged (AC-33); manual syncs always reconcile.
                     if skip_unchanged && condstore {

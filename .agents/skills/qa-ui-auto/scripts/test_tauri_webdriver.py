@@ -15,6 +15,29 @@ from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, select
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_verified_app_exit_releases_transport_and_driver_without_contacting_the_dead_bridge(self):
+        closed = Mock()
+        session = NativeSession("http://driver.invalid", Path("unused"), closed)
+        session.session_id = "exited-session"
+        session._app_exit_observed = True
+        connection = Mock()
+        session._connection = connection
+        session.request = Mock(side_effect=ConnectionRefusedError("dead bridge"))
+        with patch("tauri_webdriver.platform.system", return_value="Darwin"):
+            session.close()
+            session.close()
+        session.request.assert_not_called()
+        connection.close.assert_called_once_with()
+        closed.assert_called_once_with()
+
+    def test_unverified_bridge_failure_is_still_a_cleanup_failure(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "running-session"
+        session.request = Mock(side_effect=ConnectionRefusedError("unverified disappearance"))
+        with patch("tauri_webdriver.platform.system", return_value="Darwin"), \
+             self.assertRaisesRegex(ConnectionRefusedError, "unverified disappearance"):
+            session.close()
+
     def test_windows_teardown_ends_live_owned_tree_before_driver_delete_can_orphan_webviews(self):
         closed = Mock()
         session = NativeSession("http://driver.invalid", Path("unused"), closed)

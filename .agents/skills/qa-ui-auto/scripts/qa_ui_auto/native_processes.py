@@ -110,6 +110,7 @@ def observe(ctx, args):
             passed = len(apps) == 1
             if passed:
                 ctx._app_processes = apps
+                ctx.session._app_exit_observed = False
         else:
             apps = [row for row in rows if any(row["pid"] == old["pid"] and row["executable"] == old["executable"] for old in saved)]
             passed = not apps
@@ -122,3 +123,7 @@ def observe(ctx, args):
         stream.write(json.dumps({"expected": expected, "passed": passed, "samples": samples}) + "\n")
     if not passed:
         raise StepError(f"The owned QA app did not reach process state {expected}")
+    if expected == "exited":
+        # The macOS WebDriver bridge lives inside the app. Its disappearance
+        # after this independent PID observation needs no HTTP DELETE reply.
+        ctx.session._app_exit_observed = True

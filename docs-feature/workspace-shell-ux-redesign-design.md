@@ -451,6 +451,7 @@ CloseRisk 必须为判别联合：dirty（可 save/discard/cancel）、transacti
 6. 批量关闭按已捕获 tab 顺序处理；预检取消不关闭任何 tab。提交阶段不可逆副作用失败时报告“已关闭 X / 未关闭 Y”，余下保留，不伪称回滚已保存或已提交的业务。
 7. 统一覆盖 tab X、中键、Overview Delete/按钮、右键 close/all/others、应用 close-active、自动化/agent 的 tab_close、OS close、菜单 exit。非用户的生命周期清理使用内部 commit API，并明确已满足风险检查。现有 removeTab 的 fire-and-forget query flush 移入可等待 adapter；内部 commit 删除不再次 flush，避免双保存及删后迟到错误。
 8. 应用退出继续使用 requestAppExit 清理链；有 jobs 时仅允许等待/取消并退出/取消退出，无“进程退出后继续传输”承诺。
+9. 应用退出确认已覆盖本次工作集。所有业务风险为空时，多个干净 tab/子面板直接依次 flush 和关闭，不重复询问批量关闭；有 dirty、事务或 job 时继续显示业务风险对话框并等待真实处理结果。普通批量关闭保留目标确认。
 
 ### 8.3 版本化布局
 

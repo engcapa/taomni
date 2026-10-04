@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     MailCacheSettings, MailFolder, MailMessageCached, MailMessageHeader, ResolvedMailAccount,
-    decode_imap_modified_utf7, fetch_flag_strings, imap_fetch_messages_for_uids,
+    decode_imap_modified_utf7, fetch_flag_strings, imap_fetch_messages_for_uids, imap_list_folders,
     imap_page_uids_newest_first, imap_unread_count, now_ts, prune_mail_cache,
     reindex_cached_contacts, uid_set_string, upsert_folder, upsert_message,
 };
@@ -85,9 +85,26 @@ pub struct MailFolderSyncResult {
     pub synced_at: i64,
 }
 
+/// Mailbox attributes come from LIST, not EXAMINE's supported message FLAGS.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(super) struct MailboxAttributes {
+    pub flags: Vec<String>,
+    pub delimiter: Option<String>,
+}
+
+impl From<&MailFolder> for MailboxAttributes {
+    fn from(folder: &MailFolder) -> Self {
+        Self {
+            flags: folder.flags.clone(),
+            delimiter: folder.delimiter.clone(),
+        }
+    }
+}
+
 /// Persisted per-folder sync state plus the cached UID set.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct FolderSyncState {
+    pub attributes: Option<MailboxAttributes>,
     pub uid_validity: Option<u32>,
     pub low: Option<u32>,
     pub high: Option<u32>,
@@ -197,10 +214,19 @@ pub(super) fn load_folder_sync_state(
     account_id: &str,
     folder: &str,
 ) -> SqlResult<FolderSyncState> {
-    let row: Option<(Option<u32>, Option<u32>, Option<u32>, i64, i64, Option<i64>)> = conn
+    let row: Option<(
+        Option<u32>,
+        Option<u32>,
+        Option<u32>,
+        i64,
+        i64,
+        Option<i64>,
+        String,
+        Option<String>,
+    )> = conn
         .query_row(
             "SELECT uid_validity, sync_low_uid, sync_high_uid, sync_complete,
-                    sync_needs_repair, highest_modseq
+                    sync_needs_repair, highest_modseq, flags_json, delimiter
              FROM mail_folders WHERE account_id = ?1 AND name = ?2",
             params![account_id, folder],
             |row| {
@@ -211,6 +237,8 @@ pub(super) fn load_folder_sync_state(
                     row.get(3)?,
                     row.get(4)?,
                     row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
                 ))
             },
         )
@@ -225,7 +253,13 @@ pub(super) fn load_folder_sync_state(
         cached_uids,
         ..FolderSyncState::default()
     };
-    if let Some((uid_validity, low, high, complete, needs_repair, modseq)) = row {
+    if let Some((uid_validity, low, high, complete, needs_repair, modseq, flags_json, delimiter)) =
+        row
+    {
+        state.attributes = Some(MailboxAttributes {
+            flags: serde_json::from_str(&flags_json).unwrap_or_default(),
+            delimiter,
+        });
         state.uid_validity = uid_validity;
         state.low = low;
         state.high = high;
@@ -514,7 +548,7 @@ pub(super) struct RemoteMailbox {
     pub exists: u32,
     pub uid_validity: Option<u32>,
     pub uid_next: Option<u32>,
-    pub flags: Vec<String>,
+    pub message_flags: Vec<String>,
     pub highest_modseq: Option<u64>,
 }
 
@@ -540,7 +574,7 @@ pub(super) fn parse_examine_response(raw: &str) -> RemoteMailbox {
         exists: 0,
         uid_validity: None,
         uid_next: None,
-        flags: Vec::new(),
+        message_flags: Vec::new(),
         highest_modseq: None,
     };
     for line in raw.lines() {
@@ -553,7 +587,7 @@ pub(super) fn parse_examine_response(raw: &str) -> RemoteMailbox {
             mailbox.exists = count.trim().parse().unwrap_or(mailbox.exists);
         } else if upper.starts_with("FLAGS (") {
             if let (Some(open), Some(close)) = (rest.find('('), rest.rfind(')')) {
-                mailbox.flags = rest[open + 1..close]
+                mailbox.message_flags = rest[open + 1..close]
                     .split_whitespace()
                     .map(ToOwned::to_owned)
                     .collect();
@@ -605,7 +639,7 @@ fn imap_examine<T: Read + Write>(
         exists: mailbox.exists,
         uid_validity: mailbox.uid_validity,
         uid_next: mailbox.uid_next,
-        flags: mailbox.flags.iter().map(|flag| flag.to_string()).collect(),
+        message_flags: mailbox.flags.iter().map(|flag| flag.to_string()).collect(),
         highest_modseq: None,
     })
 }
@@ -711,14 +745,23 @@ pub(super) fn imap_sync_folder_step<T: Read + Write>(
     state: &FolderSyncState,
     params: &StepParams,
 ) -> Result<FolderStepOutcome, String> {
+    let account_id = &account.config.session_id;
+    let attributes = match &state.attributes {
+        Some(attributes) => attributes.clone(),
+        None => imap_list_folders(session, account_id)?
+            .iter()
+            .find(|listed| listed.name == folder)
+            .map(MailboxAttributes::from)
+            .unwrap_or_default(),
+    };
     let remote = imap_examine(session, folder, params.condstore)?;
     let unread = imap_unread_count(session, folder);
-    let account_id = &account.config.session_id;
     let folder_info = MailFolder {
         account_id: account_id.clone(),
         name: folder.to_string(),
         display_name: decode_imap_modified_utf7(folder),
-        flags: remote.flags.clone(),
+        flags: attributes.flags,
+        delimiter: attributes.delimiter,
         uid_validity: remote.uid_validity,
         uid_next: remote.uid_next,
         total: Some(remote.exists),
@@ -947,6 +990,7 @@ pub(super) fn advance_state(
     cached_uids.sort_unstable();
     let wm = outcome.watermark;
     FolderSyncState {
+        attributes: Some(MailboxAttributes::from(&outcome.folder)),
         uid_validity: outcome.folder.uid_validity.or(state.uid_validity),
         low: wm.low,
         high: wm.high,
@@ -1094,7 +1138,7 @@ mod tests {
         assert_eq!(parsed.uid_next, Some(4392));
         assert_eq!(parsed.highest_modseq, Some(715_194_045_007));
         assert_eq!(
-            parsed.flags,
+            parsed.message_flags,
             vec!["\\Answered", "\\Flagged", "\\Seen", "$Junk"]
         );
     }
@@ -1196,6 +1240,104 @@ mod tests {
             )
             .unwrap();
         serde_json::from_str(&json).unwrap()
+    }
+
+    #[test]
+    fn sync_keeps_list_attributes_separate_from_supported_message_flags() {
+        for condstore in [false, true] {
+            for role in ["\\HasNoChildren", "\\Sent", "\\Trash", "\\Junk", "\\Drafts"] {
+                let fake = FakeImap::start(condstore);
+                fake.deliver("INBOX", 1, "baseline");
+                let conn = db();
+                let account = account(serde_json::json!({ "enabled": true }));
+                let listed = MailFolder {
+                    account_id: "acct".into(),
+                    name: "INBOX".into(),
+                    flags: vec![role.into(), "\\Subscribed".into()],
+                    delimiter: Some("/".into()),
+                    ..MailFolder::default()
+                };
+                upsert_folder(&conn, &listed).unwrap();
+                let initial = step(&fake, &conn, &account, MailSyncRequestMode::Auto, 50);
+                assert_eq!(initial.folder.flags, listed.flags);
+                assert_eq!(initial.folder.delimiter, listed.delimiter);
+                assert_eq!(initial.new_unseen, 0);
+                fake.deliver("INBOX", 3, "arrival");
+                let catchup = step(&fake, &conn, &account, MailSyncRequestMode::Auto, 50);
+                assert_eq!(catchup.new_unseen, 3);
+                assert_eq!(catchup.folder.flags, listed.flags);
+                assert_eq!(catchup.folder.delimiter, listed.delimiter);
+                assert_eq!(
+                    load_folder_sync_state(&conn, "acct", "INBOX")
+                        .unwrap()
+                        .attributes,
+                    Some(MailboxAttributes::from(&listed))
+                );
+                fake.reset_uid_validity("INBOX", 2000);
+                let reset = step(&fake, &conn, &account, MailSyncRequestMode::Auto, 50);
+                assert!(reset.uid_validity_reset);
+                assert_eq!(reset.folder.flags, listed.flags);
+                assert_eq!(reset.folder.delimiter, listed.delimiter);
+            }
+        }
+    }
+
+    #[test]
+    fn uncached_sync_obtains_mailbox_attributes_from_list() {
+        for condstore in [false, true] {
+            let fake = FakeImap::start(condstore);
+            fake.deliver("INBOX", 1, "fresh");
+            let account = account(serde_json::json!({ "enabled": false }));
+            let mut session = fake.session();
+            let outcome = imap_sync_folder_step(
+                &mut session,
+                &account,
+                "INBOX",
+                &FolderSyncState::default(),
+                &StepParams {
+                    request: MailSyncRequestMode::Auto,
+                    limit: 50,
+                    include_bodies: false,
+                    condstore,
+                },
+            )
+            .unwrap();
+            assert!(outcome.folder.flags.contains(&"\\HasNoChildren".into()));
+            assert!(
+                !outcome
+                    .folder
+                    .flags
+                    .iter()
+                    .any(|flag| flag.contains("Junk"))
+            );
+            assert_eq!(outcome.folder.delimiter.as_deref(), Some("/"));
+            let advanced = advance_state(&FolderSyncState::default(), &outcome);
+            let lists_before = fake
+                .log()
+                .iter()
+                .filter(|command| command.starts_with("LIST"))
+                .count();
+            imap_sync_folder_step(
+                &mut session,
+                &account,
+                "INBOX",
+                &advanced,
+                &StepParams {
+                    request: MailSyncRequestMode::Auto,
+                    limit: 50,
+                    include_bodies: false,
+                    condstore,
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                fake.log()
+                    .iter()
+                    .filter(|command| command.starts_with("LIST"))
+                    .count(),
+                lists_before
+            );
+        }
     }
 
     /// AC-01/AC-02 (R1): more new mail than one batch after an absence is

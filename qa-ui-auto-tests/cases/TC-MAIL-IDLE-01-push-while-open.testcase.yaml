@@ -21,7 +21,8 @@ description: 'TASK-12 (docs-feature/mail-thunderbird-parity-design.md AC-36/AC-3
   The original IDLE readiness, 15-second list sync and close-release assertions remain. Unread rows must
   match the independent server after notification acknowledgement (ack does not mark messages read). Maps
   V-B26/V-N13. Arrival notifications must be published after header catch-up without waiting for optional
-  flags reconciliation; notification and independent unread-count assertions retain their original budgets.'
+  flags reconciliation; notification and independent unread-count assertions retain their original budgets.
+  EXAMINE advertises message keywords $Junk/$NotJunk; these must not reclassify INBOX as a Junk mailbox.'
 covers:
 - F-MAIL-10
 - F-MAIL-5

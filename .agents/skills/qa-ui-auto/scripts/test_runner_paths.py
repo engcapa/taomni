@@ -68,3 +68,36 @@ class RunnerPathsTest(TestCase):
                     Path(os.path.relpath(root)), False)[0]
             self.assertEqual(result["status"], "passed", result["failure"])
             self.assertEqual(constructor.call_args.args[1], root)
+
+    def test_native_git_steps_retain_distinct_evidence_with_the_real_context(self):
+        from qa_ui_auto.fixtures import git_diff_repo
+        from qa_ui_auto.native_steps import NativeStepContext
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            case = SimpleNamespace(id="TC-GIT", title="Git evidence", tags=[], covers=[], modes=["native"],
+                native_platforms=[], fixtures=["git_diff_repo"], timeout_sec=60, skip=None,
+                steps=[
+                    {"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branch": "main", "status": {}}},
+                    {"git_assert_state": {"repo": "${fixture.git_diff_aux_repo}", "branches": ["main"]}},
+                ])
+            harness = MagicMock()
+            harness.__enter__.return_value = harness
+            harness.create_session.return_value.console_entries.return_value = []
+            with patch("tauri_webdriver.NativeHarness", return_value=harness), \
+                 patch.object(runner.platform, "system", return_value="Linux"), \
+                 patch.object(runner, "get_fixture", return_value=git_diff_repo), \
+                 patch.object(runner, "_jdtls_pids", return_value=set()), \
+                 patch.object(runner, "_matching_pids", return_value=set()), \
+                 patch.object(runner, "_reap_orphaned_jdtls", return_value={}), \
+                 patch.object(runner, "_reap_lingering_qa_apps", return_value={}), \
+                 patch("qa_ui_auto.native_diagnostics.collect"):
+                result = runner._native_run([case], {"app": {"mode": "native"}}, {}, root, False)[0]
+            self.assertEqual(result["status"], "passed", result["failure"])
+            import json
+            first = json.loads((root / "TC-GIT/git-state-1.json").read_text(encoding="utf-8"))
+            second = json.loads((root / "TC-GIT/git-state-2.json").read_text(encoding="utf-8"))
+            self.assertTrue(first["passed"] and second["passed"])
+            self.assertEqual(first["expected"], {"branch": "main", "status": {}})
+            self.assertEqual(second["expected"], {"branches": ["main"]})
+            self.assertEqual(NativeStepContext(None, root, {}).step_index, 0)

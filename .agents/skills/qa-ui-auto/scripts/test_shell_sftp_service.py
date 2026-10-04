@@ -1,9 +1,31 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 
 class ShellSftpServiceTest(TestCase):
+    def test_rate_accounts_for_packet_elapsed_time_and_does_not_bank_idle_credit(self):
+        import threading
+        from qa_ui_auto.shell_sftp_service import RateHandle
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            remote = root / "remote"
+            remote.mkdir()
+            stop = Mock()
+            stop.wait.return_value = False
+            endpoint = SimpleNamespace(root=root, remote=remote, bytes_per_sec=256 * 1024,
+                stop_event=stop, lock=threading.Lock())
+            with patch("qa_ui_auto.shell_sftp_service.time.monotonic",
+                       side_effect=[0, 0, .25, .35, .5, 10, 10, 10.01, 10.25]):
+                handle = RateHandle(endpoint, remote / "payload", 0)
+                for offset in range(0, 4 * 65536, 65536):
+                    handle.observe("read", offset, 65536)
+            waits = [call.args[0] for call in stop.wait.call_args_list]
+            for actual, expected in zip(waits, [.25, .15, 0, .24], strict=True):
+                self.assertAlmostEqual(actual, expected)
+
     def test_real_protocol_authentication_byte_roundtrip_fstat_and_hidden_paths(self):
         import paramiko
         from qa_ui_auto.shell_sftp_service import ShellSftpServer
