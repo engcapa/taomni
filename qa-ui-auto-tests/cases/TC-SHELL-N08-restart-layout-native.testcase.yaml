@@ -4,7 +4,8 @@ description: Isolated packaged Tauri boundary. A clean workspace and its child p
   no redundant bulk-close prompt may stop the process. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n08 records
   the complete scenario and any remaining manual boundary. Exit through the real platform menu, confirm close, independently
   observe the owned PID exit, then reopen the same profile. This is a normal close/reopen contract; corrupt-profile
-  recovery is separately unverified.
+  recovery is separately unverified. After startup, check the stored and rendered Navigator width together before
+  the original exact width assertion; this distinguishes storage loss from unfinished UI restoration.
 covers:
 - F1.6
 - F-SHELL-1
@@ -72,6 +73,13 @@ steps:
     width: 1280
     height: 800
 - wait_for: '[data-testid="shell-root"][data-mode="wide"]'
+- eval_readonly:
+    expression: >-
+      JSON.stringify({storedWidth: JSON.parse(localStorage.getItem('taomni.shellLayout.v2') ?? 'null')?.navigator?.width ?? null,
+      renderedWidth: document.querySelector('[data-testid\x3d"main-sidebar-resize-handle"]')?.getAttribute('aria-valuenow') ?? null})
+    contains: '{"storedWidth":232,"renderedWidth":"232"}'
+    expect_truthy: true
+    timeout_sec: 5
 - assert_attribute:
     selector: '[data-testid="main-sidebar-resize-handle"]'
     name: aria-valuenow
@@ -151,35 +159,38 @@ verification:
     actions:
     - 23
     - 25
-    - 28
-    - 30
-    - 33
+    - 29
+    - 31
+    - 34
     checkpoints:
     - step: 24
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 26
       expectation: '{"wait_for": "[data-testid=\"shell-root\"][data-mode=\"wide\"]"}'
     - step: 27
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify({storedWidth: JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'') ?? ''null'')?.navigator?.width ?? null, renderedWidth: document.querySelector(''[data-testid\\x3d\"main-sidebar-resize-handle\"]'')?.getAttribute(''aria-valuenow'') ?? null})", "contains": "{\"storedWidth\":232,\"renderedWidth\":\"232\"}", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 28
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]", "name": "aria-valuenow",
         "equals": "232"}}'
-    - step: 29
+    - step: 30
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]", "timeout_sec": 60}}'
-    - step: 31
+    - step: 32
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state",
         "equals": "succeeded"}}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 1}}'
-    - step: 34
+    - step: 35
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
         "equal": 1}}'
     results:
     - 24
     - 26
     - 27
-    - 29
-    - 31
+    - 28
+    - 30
     - 32
-    - 34
+    - 33
+    - 35
   visual:
   - check: Read final screenshot for clipped controls and retained content
     method: manual
