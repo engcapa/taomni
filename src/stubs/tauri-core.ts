@@ -28,6 +28,7 @@ import {
 import type { MailAddressBookEntry } from "../lib/mailContacts";
 import { stubAddInviteToCalendar, stubCalDavSync, stubListAgenda } from "./mailCalendarStub";
 import { stubMfaInvoke } from "./mfaStub";
+import { createScreenshotFavoritesFault } from "./screenshotFavoritesFault";
 import type { MailFilter } from "../lib/mailFilters";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
@@ -1660,7 +1661,7 @@ const STUB_SCREENSHOT_DATA_URL: string = "data:image/png;base64,iVBORw0KGgoAAAAN
 const stubScreenshotFiles = new Map<string, string>();
 let stubScreenshotIncludeWindow = false;
 let stubScreenshotScrollAttempts = 0;
-let stubScreenshotFavoritesAttempts = 0;
+const stubScreenshotFavoritesFails = createScreenshotFavoritesFault();
 let stubScreenshotActivePin: { path: string; width: number; height: number; favoriteId: string | null } | null = null;
 type StubScreenshotFavorite = { id: string; width: number; height: number; createdAt: number; dataUrl: string };
 const STUB_SCREENSHOT_FAVORITES = "taomni.stub.screenshotFavorites.v1";
@@ -5201,7 +5202,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "screenshot_list_favorites": {
       stubScreenshotCall(cmd, args);
       const fault = new URLSearchParams(location.search).get("qaScreenshotFavoritesError");
-      if (fault === "always" || (fault === "once" && stubScreenshotFavoritesAttempts++ === 0)) throw new Error("Screenshot favorites storage unavailable");
+      if (stubScreenshotFavoritesFails(fault)) throw new Error("Screenshot favorites storage unavailable");
       return screenshotFavorites().map(({ dataUrl: _dataUrl, ...item }) => item) as T;
     }
     case "screenshot_add_favorite": {

@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
+import { createScreenshotFavoritesFault } from "../../stubs/screenshotFavoritesFault";
 import { ScreenshotFavorites } from "./ScreenshotFavorites";
 const api = vi.hoisted(() => ({ list: vi.fn(), thumbnail: vi.fn(), pin: vi.fn(), remove: vi.fn(), revoke: vi.fn(), confirm: vi.fn() }));
 vi.mock("../../lib/screenshot", () => ({ listScreenshotFavorites: api.list, loadFavoriteThumbnail: api.thumbnail, pinScreenshotFavorite: api.pin, removeScreenshotFavorite: api.remove, revokeScreenshotUrl: api.revoke }));
@@ -38,5 +40,17 @@ describe("ScreenshotFavorites", () => {
     fireEvent.click(screen.getByTestId("screenshot-favorites-refresh"));
     await screen.findByTestId("screenshot-favorite-thumbnail");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+  it("retains a failed initial load through StrictMode replay and recovers on refresh", async () => {
+    const fails = createScreenshotFavoritesFault();
+    api.list.mockImplementation(() => fails("once")
+      ? Promise.reject(new Error("storage unavailable")) : Promise.resolve([]));
+    render(<StrictMode><ScreenshotFavorites onClose={vi.fn()} /></StrictMode>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("storage unavailable");
+    expect(api.list).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByTestId("screenshot-favorites-refresh"));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByTestId("screenshot-favorites-empty")).toBeVisible();
+    expect(api.list).toHaveBeenCalledTimes(3);
   });
 });
