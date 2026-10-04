@@ -146,4 +146,21 @@ describe("MfaPanel", () => {
     fireEvent.click(screen.getByTestId("mfa-qr-close"));
     expect(screen.queryByTestId("mfa-qr-dialog")).toBeNull();
   });
+
+  it("opens the secret copy dialog from the row menu and copies secret on reveal", async () => {
+    const onStatus = vi.fn();
+    render(<MfaPanel onStatusMessage={onStatus} />);
+    await screen.findByTestId("mfa-empty");
+    await addHotp("QA Bank");
+    fireEvent.click(screen.getByTestId("mfa-account-menu"));
+    fireEvent.click(await screen.findByTestId("mfa-menu-copy-secret"));
+    expect(await screen.findByTestId("mfa-qr-dialog")).toHaveAttribute("data-state", "locked");
+    fireEvent.change(screen.getByTestId("mfa-qr-password"), { target: { value: "any" } });
+    fireEvent.click(screen.getByTestId("mfa-qr-reveal"));
+    expect(await screen.findByTestId("mfa-qr-secret")).toBeInTheDocument();
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(RFC4226));
+    expect(screen.getByTestId("mfa-status")).toHaveTextContent("Copied QA Bank · qa secret key");
+    fireEvent.click(screen.getByTestId("mfa-qr-close"));
+    expect(screen.queryByTestId("mfa-qr-dialog")).toBeNull();
+  });
 });

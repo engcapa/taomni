@@ -40,7 +40,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
   const [addMode, setAddMode] = useState<MfaAddMode | null>(null);
   const [addItems, setAddItems] = useState<MfaParsedItem[] | null>(null);
   const [editing, setEditing] = useState<MfaAccount | null>(null);
-  const [qrAccount, setQrAccount] = useState<MfaAccount | null>(null);
+  const [qrDialogState, setQrDialogState] = useState<{ account: MfaAccount; action: "qr" | "copy-secret" } | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const lastRefreshRef = useRef(0);
@@ -110,7 +110,12 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
   const openMenu = (event: React.MouseEvent, account: MfaAccount, index: number) => {
     const items: MenuItem[] = [
       { label: t("mfa.menuEdit"), testId: "mfa-menu-edit", onClick: () => setEditing(account) },
-      { label: t("mfa.menuShowQr"), testId: "mfa-menu-qr", onClick: () => setQrAccount(account) },
+      { label: t("mfa.menuShowQr"), testId: "mfa-menu-qr", onClick: () => setQrDialogState({ account, action: "qr" }) },
+      {
+        label: t("mfa.menuCopySecret"),
+        testId: "mfa-menu-copy-secret",
+        onClick: () => setQrDialogState({ account, action: "copy-secret" }),
+      },
       {
         label: account.pinned ? t("mfa.unpin") : t("mfa.pin"),
         testId: "mfa-menu-pin",
@@ -149,7 +154,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
   // A screenshot pasted onto the tab itself jumps straight to the import preview.
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
-      if (addMode || editing || qrAccount) return;
+      if (addMode || editing || qrDialogState) return;
       const target = event.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, [contenteditable]")) return;
       const active = document.activeElement;
@@ -171,7 +176,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [addMode, announce, editing, qrAccount, t]);
+  }, [addMode, announce, editing, qrDialogState, t]);
 
   const openAdd = (mode: MfaAddMode) => {
     setAddItems(null);
@@ -309,7 +314,7 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
             {t("mfa.noResults")}
           </div>
         ) : (
-          <ul ref={listRef} data-testid="mfa-list" aria-label={t("mfa.title")}>
+          <ul ref={listRef} data-testid="mfa-list" aria-label={t("mfa.title")} className="py-2">
             {visible.map((account, index) => (
               <MfaAccountRow
                 key={account.id}
@@ -374,7 +379,14 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
           }}
         />
       ) : null}
-      {qrAccount ? <MfaQrDialog account={qrAccount} onClose={() => setQrAccount(null)} /> : null}
+      {qrDialogState ? (
+        <MfaQrDialog
+          account={qrDialogState.account}
+          initialAction={qrDialogState.action}
+          onClose={() => setQrDialogState(null)}
+          onCopiedSecret={(name) => announce(t("mfa.copiedSecret", { name }))}
+        />
+      ) : null}
     </div>
   );
 }

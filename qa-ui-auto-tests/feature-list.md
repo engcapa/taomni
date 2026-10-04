@@ -9907,6 +9907,10 @@ controls:
     selector: '[data-testid="mfa-account-name"]'
     kind: display
     optional: true       # rows are asserted through data-account
+  - id: avatar
+    selector: '[data-testid="mfa-account-avatar"]'
+    kind: display
+    optional: true
   - id: hotp-next
     selector: '[data-testid="mfa-account-hotp-next"]'
     kind: interactive
@@ -9927,6 +9931,9 @@ controls:
     kind: interactive
   - id: menu-qr
     selector: '[data-testid="mfa-menu-qr"]'
+    kind: interactive
+  - id: menu-copy-secret
+    selector: '[data-testid="mfa-menu-copy-secret"]'
     kind: interactive
   - id: menu-pin
     selector: '[data-testid="mfa-menu-pin"]'
@@ -9976,6 +9983,22 @@ controls:
   - id: qr-image
     selector: '[data-testid="mfa-qr-image"]'
     kind: display
+  - id: qr-secret
+    selector: '[data-testid="mfa-qr-secret"]'
+    kind: display
+    optional: true
+  - id: qr-toggle-secret
+    selector: '[data-testid="mfa-qr-toggle-secret"]'
+    kind: interactive
+    optional: true
+  - id: qr-copy-secret
+    selector: '[data-testid="mfa-qr-copy-secret"]'
+    kind: interactive
+    optional: true
+  - id: qr-copy-uri
+    selector: '[data-testid="mfa-qr-copy-uri"]'
+    kind: interactive
+    optional: true
   - id: qr-error
     selector: '[data-testid="mfa-qr-error"]'
     kind: display

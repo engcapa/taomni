@@ -5,6 +5,13 @@ export function formatCode(code: string): string {
   return `${code.slice(0, half)} ${code.slice(half)}`;
 }
 
+/** Split Base32 secret into 4-character chunks for readable display: JBSWY3DPEHPK3PXP → "JBSW Y3DP EHPK 3PXP". */
+export function formatSecretKey(secret: string): string {
+  const clean = secret.replace(/\s+/g, "").toUpperCase();
+  if (!clean) return "";
+  return clean.match(/.{1,4}/g)?.join(" ") ?? clean;
+}
+
 /** Whole seconds left in a TOTP window (never below zero). */
 export function remainingSeconds(validUntilMs: number | null, nowMs: number): number {
   if (validUntilMs === null) return 0;
