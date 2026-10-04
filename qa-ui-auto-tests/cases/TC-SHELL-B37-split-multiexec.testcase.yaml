@@ -108,7 +108,7 @@ steps:
     selector: '[data-testid="terminal-split-pane"]:has(button[title^="qa-beta"]) [data-testid="terminal-pane"]'
     regex: (?ms)\A(?!(?:.*?^SHELL_BROADCAST_2[ \t]*$){2}).*?^SHELL_BROADCAST_2[ \t]*$
     timeout_sec: 10
-- click: '[data-testid="tab-item"][data-tab-title="qa-beta"] [data-testid="tab-close"]'
+- click: '[data-testid="tab-item"][data-tab-title^="qa-beta"] [data-testid="tab-close"]'
 - assert_count:
     selector: '[data-testid="terminal-split-pane"]'
     equal: 2

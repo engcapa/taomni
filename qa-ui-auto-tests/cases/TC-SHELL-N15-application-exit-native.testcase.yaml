@@ -237,6 +237,18 @@ steps:
     equals:
     - - 1
       - before
+- click: '[data-testid="shell-quick-switch"]'
+- fill:
+    selector: '[data-testid="shell-quick-input"]'
+    value: qa-db-tx2
+- click: '[data-testid="shell-quick-option"]'
+- wait_for: '[data-testid="db-tx-pending"]'
+- assert_text:
+    selector: '[data-testid="db-tx-pending"]'
+    contains: 'Pending: 1'
+- assert_text_equals:
+    selector: '[data-testid="sql-editor"] .cm-content'
+    equals: UPDATE qa_shell_tx SET v = 'pending' WHERE id = 1;
 - assert_count:
     selector: '[data-testid="tab-item"][data-tab-type="database"]'
     equal: 1
@@ -269,8 +281,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: System Close cancellation keeps both QA windows and the exact Notes body; the app PID,
-      paused partial upload and uncommitted MySQL state remain.
+    requirement: System Close cancellation keeps both QA windows and the exact Notes body; the app PID, paused
+      partial upload and uncommitted MySQL state remain.
     actions:
     - 1
     - 2
@@ -363,8 +375,8 @@ verification:
     - step: 40
       expectation: '{"wait_for": "[data-testid=\"db-tx-mode\"][data-mode=\"manual\"]"}'
     - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending:
-        1", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending: 1",
+        "timeout_sec": 60}}'
     - step: 46
       expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
         [[1, "before"]]}}'
@@ -389,14 +401,14 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
         中文.bin\"]", "timeout_sec": 15}}'
     - step: 82
-      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload
-        中文.bin\"][data-state=\"running\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload 中文.bin\"][data-state=\"running\"]",
+        "timeout_sec": 15}}'
     - step: 83
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "growing", "full_size": 16777216}}'
     - step: 85
-      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload
-        中文.bin\"][data-state=\"paused\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-remote-path$=\"/upload 中文.bin\"][data-state=\"paused\"]",
+        "timeout_sec": 15}}'
     - step: 86
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "stable", "full_size": 16777216}}'
@@ -413,8 +425,8 @@ verification:
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "stable", "full_size": 16777216}}'
     - step: 95
-      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Exit
-        cancellation retains this note\n中文全文"}}'
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "Exit cancellation
+        retains this note\n中文全文"}}'
     results:
     - 3
     - 6
@@ -452,8 +464,8 @@ verification:
     - 93
     - 95
   - id: R2
-    requirement: Menu Exit exposes both real job and transaction risks and forbids leaving a job behind;
-      cancelling the plan keeps the app and DB owner alive.
+    requirement: Menu Exit exposes both real job and transaction risks and forbids leaving a job behind; cancelling
+      the plan keeps the app and DB owner alive.
     actions:
     - 97
     - 98
@@ -477,7 +489,7 @@ verification:
     - step: 107
       expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
         [[1, "before"]]}}'
-    - step: 108
+    - step: 114
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"database\"]",
         "equal": 1}}'
     results:
@@ -488,40 +500,61 @@ verification:
     - 104
     - 106
     - 107
-    - 108
+    - 114
   - id: R3
-    requirement: Explicit cancel-job and rollback precede actual app process exit; the independent client
-      sees the original committed row and the incomplete remote file remains stable.
+    requirement: Explicit cancel-job and rollback precede actual app process exit; the independent client sees
+      the original committed row and the incomplete remote file remains stable.
     actions:
-    - 110
-    - 111
-    - 113
-    - 115
     - 116
     - 117
+    - 119
+    - 121
+    - 122
+    - 123
     checkpoints:
-    - step: 112
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 114
-      expectation: '{"wait_for": "[data-testid=\"shell-close-dialog\"]"}'
     - step: 118
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 120
+      expectation: '{"wait_for": "[data-testid=\"shell-close-dialog\"]"}'
+    - step: 124
       expectation: '{"native_app_process": {"state": "exited", "timeout_sec": 30}}'
-    - step: 119
+    - step: 125
       expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
         [[1, "before"]]}}'
-    - step: 120
+    - step: 126
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "incomplete", "full_size": 16777216}}'
-    - step: 121
+    - step: 127
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "stable", "full_size": 16777216}}'
     results:
-    - 112
-    - 114
     - 118
-    - 119
     - 120
-    - 121
+    - 124
+    - 125
+    - 126
+    - 127
+  - id: R5
+    requirement: Cancelling application exit retains the database owner in Build, its exact SQL and pending
+      Manual transaction; quick switch returns to that owner from Connect.
+    actions:
+    - 105
+    - 108
+    - 109
+    - 110
+    checkpoints:
+    - step: 112
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-tx-pending\"]", "contains": "Pending: 1"}}'
+    - step: 113
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sql-editor\"] .cm-content", "equals":
+        "UPDATE qa_shell_tx SET v = ''pending'' WHERE id = 1;"}}'
+    - step: 114
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"database\"]",
+        "equal": 1}}'
+    results:
+    - 112
+    - 113
+    - 114
   visual:
   - check: Inspect the retained screenshot for readable controls and no clipping
     method: manual
@@ -529,5 +562,4 @@ verification:
   native:
   - check: Real IPC and independent process/service effects listed in this case
     method: automated
-    reason: No browser stub is used; physical input and unsupported OS boundary steps remain separately
-      recorded
+    reason: No browser stub is used; physical input and unsupported OS boundary steps remain separately recorded

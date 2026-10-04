@@ -2,6 +2,7 @@ import { useTransferStore, isTransferActive } from "../../stores/transferStore";
 import { trackSftpTransfer } from "../sftpTransferTracking";
 import type { TransferItem } from "../sftp";
 import type { PanelWindowEnvelope } from "./types";
+import { mergeTransferSnapshot } from "../sftpTransferSnapshot";
 
 export interface SftpWindowSnapshot { localPath?: string; remotePath?: string; localSelection?: string[]; remoteSelection?: string[]; jobs: TransferItem[] }
 export function readSftpWindowSnapshot(value: unknown, sessionId: string): SftpWindowSnapshot | null {
@@ -16,7 +17,8 @@ export function readSftpWindowSnapshot(value: unknown, sessionId: string): SftpW
 export async function receiveWindowTransfers(snapshot: SftpWindowSnapshot, envelope: PanelWindowEnvelope) {
   const store = useTransferStore.getState();
   for (const original of snapshot.jobs) {
-    const item = { ...original, viewWindowLabel: envelope.windowLabel, originWindowLabel: envelope.windowLabel, panelId: envelope.panelId };
+    const mirrored = { ...original, viewWindowLabel: envelope.windowLabel, originWindowLabel: envelope.windowLabel, panelId: envelope.panelId };
+    const item = mergeTransferSnapshot(store.byId(original.id), mirrored);
     const current = store.byId(item.id);
     if (current && !isTransferActive(current.state) && isTransferActive(item.state) && current.startedAt === item.startedAt) continue;
     if (!current) store.add({ ...item, state: "queued" });
@@ -24,6 +26,10 @@ export async function receiveWindowTransfers(snapshot: SftpWindowSnapshot, envel
     if (isTransferActive(item.state)) {
       store.patch(item.id, { state: item.state });
       await trackSftpTransfer(item.id, item.sessionId);
-    } else store.setState(item.id, item.state, item.error ?? undefined);
+    } else if (!current || current.state !== item.state || current.startedAt !== item.startedAt) {
+      // Repeated terminal snapshots must keep the original acknowledgement
+      // time. Refreshing finishedAt on each mirror creates a broadcast loop.
+      store.setState(item.id, item.state, item.error ?? undefined);
+    }
   }
 }

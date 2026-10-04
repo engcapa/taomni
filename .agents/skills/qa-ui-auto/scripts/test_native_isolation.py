@@ -122,6 +122,25 @@ class NativeBuildTest(unittest.TestCase):
 
 
 class NativeIsolationTest(unittest.TestCase):
+    def test_macos_harness_sets_isolation_before_fixtures_and_launches_only_on_session(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = recorded_binary(root)
+            harness = native.NativeHarness({"app": {"native_binary": str(binary)}}, root / "run")
+            harness.driver = Mock()
+            with patch.object(native.platform, "system", return_value="Darwin"), \
+                 patch("tauri_webdriver.NativeSession") as factory:
+                with harness:
+                    harness.driver.start.assert_not_called()
+                    config = Path(os.environ["NEWMOB_CONFIG_DIR"]) / native_build.QA_APP_ID / "taomni" / "ai.json"
+                    config.parent.mkdir(parents=True)
+                    config.write_text("fixture seeded before app launch", encoding="utf-8")
+                    harness.driver.ensure_running.side_effect = lambda: self.assertEqual(config.read_text(), "fixture seeded before app launch")
+                    harness.create_session()
+                    harness.driver.ensure_running.assert_called_once_with()
+                    factory.return_value.start.assert_called_once_with()
+            harness.driver.stop.assert_called_once_with()
+
     def test_harness_restores_environment_after_success_and_start_failure(self):
         for fails in (False, True):
             with self.subTest(fails=fails), TemporaryDirectory() as directory:
@@ -456,6 +475,10 @@ class NativeIsolationTest(unittest.TestCase):
                  patch.object(native, "_tcp_ok", return_value=False), \
                  patch.object(driver, "start") as start:
                 driver.mark_session_closed()
+                # The profile can now be reset before ensure_running launches
+                # the next case. Deferring stop until then deletes live stores.
+                live_proc.terminate.assert_called_once_with()
+                self.assertIsNone(driver.proc)
                 driver.ensure_running()
             live_proc.terminate.assert_called_once_with()
             start.assert_called_once_with()

@@ -17,6 +17,7 @@
  */
 import { useTransferStore } from "../stores/transferStore";
 import type { TransferItem } from "./sftp";
+import { mergeTransferSnapshot } from "./sftpTransferSnapshot";
 
 const CHANNEL = "taomni.sftp.sync";
 const senderId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -25,6 +26,7 @@ type ItemsMessage = {
   type: "items";
   from: string;
   items: TransferItem[];
+  takeovers?: string[];
 };
 
 type CwdMessage = {
@@ -47,6 +49,8 @@ let channel: BroadcastChannel | null = null;
 let unsubscribeStore: (() => void) | null = null;
 let lastBroadcast = "";
 let suppressNextBroadcast = false;
+const transferOwners = new Map<string, string>();
+const pendingTakeovers = new Set<string>();
 const cwdListeners = new Set<CwdListener>();
 const lastCwd = new Map<string, string | null>();
 
@@ -68,6 +72,13 @@ function dispatch(msg: SyncMessage): void {
   }
 }
 
+function ownedItems(items: TransferItem[]): TransferItem[] {
+  return items.filter((item) => {
+    if (!transferOwners.has(item.id) && !item.viewWindowLabel) transferOwners.set(item.id, senderId);
+    return transferOwners.get(item.id) === senderId;
+  });
+}
+
 export function attachSftpSync(): () => void {
   if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
     return () => {};
@@ -84,8 +95,26 @@ export function attachSftpSync(): () => void {
     const msg = event.data;
     if (!msg || msg.from === senderId) return;
     if (msg.type === "items") {
+      // Each window publishes its own jobs. A full peer snapshot must neither
+      // erase another window's rows nor echo stale progress back to its owner.
+      const incomingIds = new Set(msg.items.map((item) => item.id));
+      const items = useTransferStore.getState().items.filter((item) =>
+        transferOwners.get(item.id) !== msg.from || incomingIds.has(item.id));
+      for (const incoming of msg.items) {
+        const owner = transferOwners.get(incoming.id);
+        const index = items.findIndex((item) => item.id === incoming.id);
+        const current = index < 0 ? undefined : items[index];
+        if (current && incoming.startedAt < current.startedAt) continue;
+        const takeover = msg.takeovers?.includes(incoming.id) === true;
+        if (owner && owner !== msg.from && !takeover && !(current && incoming.startedAt > current.startedAt)) continue;
+        transferOwners.set(incoming.id, msg.from);
+        const merged = mergeTransferSnapshot(current, incoming);
+        const item = takeover ? { ...merged, viewWindowLabel: incoming.viewWindowLabel } : merged;
+        if (index < 0) items.push(item);
+        else items[index] = item;
+      }
       suppressNextBroadcast = true;
-      useTransferStore.setState({ items: msg.items });
+      useTransferStore.setState({ items });
       return;
     }
     if (msg.type === "cwd") {
@@ -105,7 +134,7 @@ export function attachSftpSync(): () => void {
       dispatch({
         type: "items",
         from: senderId,
-        items: useTransferStore.getState().items,
+        items: ownedItems(useTransferStore.getState().items),
       });
       lastCwd.forEach((cwd, sessionId) => {
         dispatch({ type: "cwd", from: senderId, sessionId, cwd });
@@ -114,16 +143,29 @@ export function attachSftpSync(): () => void {
     }
   };
 
-  unsubscribeStore = useTransferStore.subscribe((state) => {
+  unsubscribeStore = useTransferStore.subscribe((state, previous) => {
+    if (!suppressNextBroadcast) {
+      for (const item of state.items) {
+        const before = previous.items.find((row) => row.id === item.id);
+        if (before && (item.startedAt > before.startedAt || before.viewWindowLabel && !item.viewWindowLabel)) {
+          // A retry initiated here owns the new attempt. The checked native
+          // window lifecycle may also adopt an interrupted view's live job.
+          transferOwners.set(item.id, senderId);
+          pendingTakeovers.add(item.id);
+        }
+      }
+    }
+    const items = ownedItems(state.items);
     if (suppressNextBroadcast) {
       suppressNextBroadcast = false;
-      lastBroadcast = snapshot(state.items);
+      lastBroadcast = snapshot(items);
       return;
     }
-    const sig = snapshot(state.items);
-    if (sig === lastBroadcast) return;
+    const sig = snapshot(items);
+    if (sig === lastBroadcast && !pendingTakeovers.size) return;
     lastBroadcast = sig;
-    dispatch({ type: "items", from: senderId, items: state.items });
+    dispatch({ type: "items", from: senderId, items, takeovers: [...pendingTakeovers] });
+    pendingTakeovers.clear();
   });
 
   // Ask peers for any state they already have (transfer rows + cwd hints)
@@ -143,6 +185,10 @@ export function detachSftpSync(): void {
     /* noop */
   }
   channel = null;
+  transferOwners.clear();
+  pendingTakeovers.clear();
+  lastBroadcast = "";
+  suppressNextBroadcast = false;
 }
 
 /** Broadcast the latest terminal cwd hint for `sessionId`. */

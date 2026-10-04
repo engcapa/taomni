@@ -4,6 +4,8 @@ description: V-N04 and SFTP portion of V-N18. The real original channel uploads 
   downloads. OS close preserves a running child; the parent Transfers shows both actual jobs. Hard destruction
   returns the source and adopts live bytes before an explicit cancel. Final normal detach/OS-close restores
   path and selection once. Physical focus, IME and complete process crashes remain separate manual boundaries.
+  Child checks target the current detached view and exact cancel transfer, avoiding unrelated hidden global
+  rows; byte-growth and cancellation postconditions remain independent.
 covers:
 - F7.4
 - F-SHELL-1
@@ -115,8 +117,7 @@ steps:
     equal: 2
 - click: '[data-testid="shell-transfers-trigger"]'
 - wait_for:
-    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/download
-      中文.bin"]'
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/download 中文.bin"]'
     timeout_sec: 20
 - assert_count:
     selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"]'
@@ -139,7 +140,7 @@ steps:
 - assert_native_window_count:
     equal: 2
 - wait_for:
-    selector: '[data-testid="transfer-job"][data-state="done"]'
+    selector: '[data-testid="sftp-detached-window"] [data-testid="transfer-job"][data-state="done"]'
     timeout_sec: 90
     state: attached
 - assert_file_sha256:
@@ -148,7 +149,8 @@ steps:
 - click: '[data-testid="sftp-local-list"] tr[data-row][title$="cancel 中文.bin"]'
 - click: '[data-testid="sftp-local-upload-selected"]'
 - wait_for:
-    selector: '[data-testid="transfer-job"][data-state="running"]'
+    selector: '[data-testid="sftp-detached-window"] [data-testid="transfer-job"][data-state="running"][data-remote-path$="/cancel
+      中文.bin"]'
     timeout_sec: 20
 - assert_file_progress:
     path: ${fixture.shell_sftp_remote}/cancel 中文.bin
@@ -169,8 +171,7 @@ steps:
     full_size: 16777216
 - click: '[data-testid="shell-transfers-trigger"]'
 - wait_for:
-    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel
-      中文.bin"]'
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel 中文.bin"]'
     timeout_sec: 20
 - assert_count:
     selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-state="running"]'
@@ -178,8 +179,7 @@ steps:
 - click: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel 中文.bin"]
     [data-testid="transfer-job-cancel"]'
 - wait_for:
-    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel
-      中文.bin"][data-state="cancelled"]'
+    selector: '[data-testid="shell-transfers"] [data-testid="transfer-job"][data-remote-path$="/cancel 中文.bin"][data-state="cancelled"]'
     timeout_sec: 20
 - assert_file_progress:
     path: ${fixture.shell_sftp_remote}/cancel 中文.bin
@@ -220,9 +220,9 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Real independent SFTP channels preserve original and child byte streams through hidden
-      OS windows, maintain the global job result, adopt an interrupted live transfer and restore exactly
-      one interactive view and selected remote file.
+    requirement: Real independent SFTP channels preserve original and child byte streams through hidden OS
+      windows, maintain the global job result, adopt an interrupted live transfer and restore exactly one interactive
+      view and selected remote file.
     actions:
     - 1
     - 2
@@ -283,8 +283,8 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row][title$=\"upload
         中文.bin\"]", "timeout_sec": 15}}'
     - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"running\"]",
-        "timeout_sec": 20}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"running\"]", "timeout_sec":
+        20}}'
     - step: 28
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/upload 中文.bin", "state":
         "growing", "full_size": 16777216}}'
@@ -300,8 +300,8 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tr[data-row][title=\"/download
         中文.bin\"]", "timeout_sec": 20}}'
     - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"running\"]",
-        "timeout_sec": 20}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"running\"]", "timeout_sec":
+        20}}'
     - step: 39
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_local}/download 中文.bin", "state":
         "growing", "full_size": 16777216}}'
@@ -331,14 +331,14 @@ verification:
     - step: 54
       expectation: '{"assert_native_window_count": {"equal": 2}}'
     - step: 55
-      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"done\"]", "timeout_sec":
-        90, "state": "attached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-detached-window\"] [data-testid=\"transfer-job\"][data-state=\"done\"]",
+        "timeout_sec": 90, "state": "attached"}}'
     - step: 56
       expectation: '{"assert_file_sha256": {"path": "${fixture.shell_sftp_local}/download 中文.bin", "equals":
         "${fixture.shell_sftp_sha256}"}}'
     - step: 59
-      expectation: '{"wait_for": {"selector": "[data-testid=\"transfer-job\"][data-state=\"running\"]",
-        "timeout_sec": 20}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-detached-window\"] [data-testid=\"transfer-job\"][data-state=\"running\"][data-remote-path$=\"/cancel
+        中文.bin\"]", "timeout_sec": 20}}'
     - step: 60
       expectation: '{"assert_file_progress": {"path": "${fixture.shell_sftp_remote}/cancel 中文.bin", "state":
         "growing", "full_size": 16777216}}'
@@ -425,8 +425,7 @@ verification:
     - 84
     - 85
   native:
-  - check: Real W3C native window handles, independent native SFTP upload/download and host byte/hash
-      observations
+  - check: Real W3C native window handles, independent native SFTP upload/download and host byte/hash observations
     method: external
     reason: Browser service stubs cannot establish these native channels or filesystem effects.
   visual:

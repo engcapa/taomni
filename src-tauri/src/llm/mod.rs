@@ -243,6 +243,22 @@ pub trait Llm: Send + Sync {
         false
     }
 
+    /// Stream text during a tool-capable turn, then return the complete tool
+    /// calls for execution. Providers without this transport retain their
+    /// existing tool request and publish its completed text once.
+    async fn chat_with_tools_stream(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+        on_token: std::sync::Arc<dyn Fn(String) + Send + Sync>,
+    ) -> LlmResult<ChatResponse> {
+        let response = self.chat_with_tools(req, tools).await?;
+        if !response.content.is_empty() {
+            on_token(response.content.clone());
+        }
+        Ok(response)
+    }
+
     /// Streaming chat. Default implementation yields a single full event from
     /// the non-streaming `chat` method, so providers that don't natively
     /// stream still satisfy the trait.

@@ -1,8 +1,8 @@
 id: TC-SHELL-N20
 title: LAN history entry retains one owner and declined enable state
-description: 'Light LAN regression: the real native history entry opens, declining service enable leaves
-  the read-only roster usable, and Home/quick-switch reopens the same owner without another enable prompt.
-  No peer or multicast delivery claim.'
+description: 'Light LAN regression: the real native history entry opens, declining service enable leaves the
+  read-only roster usable, and Home/quick-switch reopens the same owner without another enable prompt. No peer
+  or multicast delivery claim.'
 covers:
 - F-SHELL-1
 tags:
@@ -18,7 +18,7 @@ steps:
 - vault_first_run: qa-shell-lan-password
 - wait_for: '[data-testid="welcome-panel"]'
 - shell_navigate: tools
-- click: '[data-testid="sidebar-tool-lanchat"]'
+- click: '[data-testid="sidebar-tool-lan-chat"]'
 - wait_for: '[data-testid="lanchat-enable-prompt"]'
 - click: '[data-testid="lanchat-enable-prompt"] button:nth-of-type(1)'
 - wait_for: '[data-testid="lanchat-roster-panel"]'
@@ -41,9 +41,9 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 'Light LAN regression: the real native history entry opens, declining service enable
-      leaves the read-only roster usable, and Home/quick-switch reopens the same owner without another
-      enable prompt. No peer or multicast delivery claim.'
+    requirement: 'Light LAN regression: the real native history entry opens, declining service enable leaves
+      the read-only roster usable, and Home/quick-switch reopens the same owner without another enable prompt.
+      No peer or multicast delivery claim.'
     actions:
     - 1
     - 2
@@ -89,10 +89,10 @@ verification:
     method: manual
     reason: Screenshots require visual review.
   native:
-  - check: Real Tauri stream and persisted history after QA process restart.
+  - check: Real LAN history owner and declined service-enable state survive Home and quick switch.
     method: automated
-    reason: Native uses the loopback OpenAI protocol, actual Rust IPC and SQLite; the provider receipt
-      is independent of UI. Browser uses the explicitly labelled IPC preview reply.
+    reason: Runs the packaged native LAN entry and its actual vault/service state. Peer discovery and delivery
+      remain outside this lightweight case.
 native_platforms:
 - Linux
 - Windows

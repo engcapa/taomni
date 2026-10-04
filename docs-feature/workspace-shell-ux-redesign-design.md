@@ -104,7 +104,7 @@
 |---|---|---|
 | 标题栏 | 默认高 42；W<560 时两行共 84；按钮命中区至少 32×32，图标 16 | app menu、Navigator toggle、Quick Switch、lane、tab strip、面板、Tao、所有标签、更多、系统区；Windows/Linux 系统按钮保留每个宽 40 |
 | 全高拖拽带 | 复用 WindowDragHandle 的现有宽度，位于 Rail 外侧 | 保留上中下拖拽；交互元素不落入 drag region；不以整个标题栏覆盖式拖动 |
-| Rail | 宽 52；图标命中区 40×40；上下间距 4 | Home / Sessions / Workspaces / Tao，底部 Settings；窄屏也不消失 |
+| Rail | 图标模式宽 52，命中区 40×40；显示名称时宽至少 68、按钮高 48，名称位于图标下方；上下间距 4 | Home / Sessions / Workspaces / Tao，底部 Settings；沿用原名称/宽度偏好，英文主入口完整可读，窄屏也不消失 |
 | Navigator | 默认 248，最小 200，最大 min(400, W×0.32) | 独立纵向滚动，标题固定；折叠不占宽度；splitter 6 |
 | 主工作面 | flex 1，min-width/min-height:0；普通停靠时尽量保留 480×240 | 业务自己处理内部溢出；Shell 不给整个页面加横向滚动 |
 | surface toolbar | 内容需要时 36；业务无动作时不额外占行 | 标题、owner 信息、上下文入口；不能复制已有业务标题栏 |

@@ -23,7 +23,7 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。前三轮 GitHub 的实际失败证据完整保留，第四轮三端 browser 已完成，native 仍在运行；继续按逐 case 结果修复。
+TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。第四轮六份报告及后续 browser 定位运行已收齐，继续按逐 case 结果修复；历史失败证据完整保留。
 
 最新开发批次已集成稳定主工作面、SFTP 后台/跨窗口任务、Git/Notes 窗口恢复、workspace 并行恢复与取消，以及退出/数据库事务边界。第四轮 selection 为 240 个独立 ID（三端 browser 各 183，native Linux 65 / Windows 59 / macOS 58），包括全部截图回归和 AI streaming/history；补充的 Git N21 待下一轮一并提交，届时为 241 ID。数量以具体运行的 selection 为准。按用户要求，本地仅运行单元测试和静态检查，browser/native 与原生构建交给 GitHub。
 
@@ -107,3 +107,18 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - 修复同一保存会话的重复标签继承原标签 pin/lane 偏好；保存连接的首个 live owner 持有恢复偏好，新副本保持独立，原 owner 关闭后剩余实例接管。修复活动工作区模型晚绑定时漏记 last-active restore identity。
 - `shell_navigate` 先等实际 Rail 挂载再读取可见性，避免 React 初始挂载期间把默认展开的 Navigator 关闭。B37 保留 anchored/exactly-once output，用目标标题前缀兼容 cwd 自动后缀；B43 使用生产规范 folder path。旧 Settings 用例先改为 35 并核对保存，再改回 20；B04 显式清除 legacy session candidate，仅恢复其明确打开的工作区。
 - 本地 `shell-browser-repairs-unit-130` 120/120、`shell-browser-runner-repairs-131` 27/27 通过；TypeScript `shell-browser-final-types-132` exit 0；静态 `shell-browser-final-static-133` gate 通过（required 970 / covered_required 925 / shallow 41 / orphans 4），baseline 未改。61 条 Shell YAML 及上述 Settings case 的 schema/reviewed contract 均通过。下一候选先远程验证这 8 个失败 ID，再合入 native 实际结果的修复批次。
+
+### 第四轮完整结果与本次修复批次
+
+- [run 37186026272](https://github.com/engcapa/taomni/actions/runs/37186026272) 的 6/6 报告已核对 selection、source identity、receipt 与 ZIP 内 artifact hashes，全部匹配。共 731 次执行：667 pass、64 fail、0 skip。三端 browser 结果见上文；native Linux 55/65、Windows 43/59、macOS 43/58 通过。workflow success 仍不代表 case 全部通过。
+- `2c5a6eacf7583020d539bf97a8d8b7b495016b59` 的 [browser 定位 run 37188658984](https://github.com/engcapa/taomni/actions/runs/37188658984) 包含 8 个 ID，六种旧失败中的导航、duplicate 偏好和恢复问题已在三端通过；剩余 TC-011、B37、B43 为实际 ControlBar 几何及新标题/菜单选择器问题。Linux/macOS 各 5 pass / 3 fail，Windows 6 / 2，身份和 hashes 匹配且无 skip；保留广播 exactly-once 与业务结果断言。
+- Linux 原生输入器为 `_`、引号等符号补真实 Shift，并让 Unicode form/textarea 使用完整 OS paste 后才恢复 clipboard；修复 N12 的 `qa_shell_tx` 被输入成 `qa-shell-tx` 和 N07 的中文重复输入。Windows 当前候选沿用精确 QA profile 的进程清理；旧轮 WebView2 锁文件失败尚需新运行确认。
+- macOS 在 fixtures 完成后才启动 QA app，session 结束立即释放进程；WKWebView 使用每个隔离 profile 的持久 UUID store，同一 case 的窗口/重启共享，reset 后新 case 换 store。AI fixture 写入实际 `com.taomni.app.qa/taomni/ai.json` 配置路径，Linux 保持 XDG 路径。
+- 修复 MySQL 查询取消：单连接事务 owner 的 SQL 使用独立控制连接执行 `KILL QUERY`，等原命令响应结束后再报告取消；失败连接不回池。N12 的独立 PROCESSLIST 零条 SLEEP 断言保持不变，三端效果待远程验收。
+- 修复带生产工具目录的 OpenAI 请求走真实 SSE，按字节解析 UTF-8、并行 tool call 分片、usage、结束标记和 provider error。已经发出文本的 key/group 流不会切换 provider 重复输出；N19 独立 receipt 要求 4 次真实 stream 且 4 次含 tools，503 恢复、持久历史和进程重启断言保留。
+- SFTP 镜像只广播窗口拥有的任务，合并时保护推进的字节/终态并保留 owner 元数据；重复完成 snapshot 不刷新 finishedAt，避免队列广播循环与存储写入风暴。N04 的真实并行字节、文件 hash、隐藏/中断/回停靠和取消断言及原有时间预算均保持；scope 区分当前 child 与隐藏全局队列。
+- Mail catch-up 已缓存新 headers 后立即发布到达通知，不再等待可选 flags reconcile；N16 Navigator hide 点击区固定 28×28；N03 等实际 tab 删除后核对精确数量；N15 Cancel 后通过 quick switch 返回 Build 数据库 owner 并核对完整 SQL/Pending；LAN 入口适配当前 testid。
+- 本地 `shell-runner-unit-142` 共 95 项，86 pass / 9 平台限定 skip；`shell-mail-unit-144` 48/48、`shell-sftp-unit-146` 32/32、最终同步/幂等/重试/接管 `shell-sftp-owner-unit-155` 8/8、Shell 布局/关闭/持久化 `shell-layout-unit-150` 24/24 通过。`shell-types-final-156` exit 0；62 条 Shell/改动 case 的 schema/reviewed contract 通过。以上不是 browser/native 运行证据。
+- 全后端单测 `shell-rust-unit-145` 首轮 1583 pass / 4 fail / 16 ignored，完整保留日志。修正四条旧测试的 Windows absolute path、隔离的不存在路径、canonical verbatim prefix、读取目录时原生 Permission 分类假设，保留迁移数量、hash、字节意图及零写入效果断言；不改变这些模块的产品路径处理。最终 `shell-rust-final-unit-153`：1587 pass / 0 fail / 16 原有 opt-in ignored，exit 0。新增真实工具 stream/parser/fallback 与 MySQL 取消响应单测均在其中通过。
+- 控件增加 B43 实际动态 group testid 的 alias 并重新生成 catalog；未调整 baseline。此前 static-154 的 stale-catalog 失败日志保留，最终 `shell-static-reviewed-157` gate 通过（required 970 / covered_required 925 / shallow 41 / orphans 4）。受影响 Rust 格式和 Git diff check 通过。
+- 下一次统一三端 browser/native 选择 241 个 ID，预期 browser 各 183，native Linux 66 / Windows 60 / macOS 59，共 734 次执行，以实际 selection 为准。全部单测与静态检查通过后提交、推送、验证并继续修复；任务保持 verification。

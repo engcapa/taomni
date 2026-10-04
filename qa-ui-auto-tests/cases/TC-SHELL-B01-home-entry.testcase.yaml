@@ -1,7 +1,8 @@
 id: TC-SHELL-B01
 title: Unique Home and three primary launch entries
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b01.
-  Browser IPC fixtures prove renderer outcomes only.'
+  Browser IPC fixtures prove renderer outcomes only. The named and icon Rail states include exact label count,
+  text containment and real control hit geometry; screenshots are retained for visual review.'
 covers:
 - F1.2
 - F1.6
@@ -83,42 +84,74 @@ steps:
     equal: 1
 - assert_not_visible: '[data-testid="shell-close-dialog"]'
 - screenshot: tc-shell-b01.png
+- right_click: '[data-testid="shell-rail"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_count:
+    selector: '[data-testid="shell-rail"] button > span'
+    equal: 4
+- eval_readonly:
+    expression: document.querySelector('nav[aria-label] > button:nth-of-type(1) > span').scrollWidth <= document.querySelector('nav[aria-label]
+      > button:nth-of-type(1) > span').clientWidth
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('nav[aria-label] > button:nth-of-type(2) > span').scrollWidth <= document.querySelector('nav[aria-label]
+      > button:nth-of-type(2) > span').clientWidth
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('nav[aria-label] > button:nth-of-type(3) > span').scrollWidth <= document.querySelector('nav[aria-label]
+      > button:nth-of-type(3) > span').clientWidth
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('nav[aria-label] > button:nth-of-type(4) > span').scrollWidth <= document.querySelector('nav[aria-label]
+      > button:nth-of-type(4) > span').clientWidth
+    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail-home"], [data-testid="shell-rail-sessions"], [data-testid="shell-rail-workspaces"],
+      [data-testid="shell-rail-tao"]'
+    min_count: 4
+    min_width: 40
+    min_height: 40
+    within_viewport: true
+    hit_center: true
+- screenshot: tc-shell-b01-named-rail.png
+- right_click: '[data-testid="shell-rail"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_count:
+    selector: '[data-testid="shell-rail"] button > span'
+    equal: 0
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 52
+    max_width: 52
+    min_height: 1
+    within_viewport: true
+- screenshot: tc-shell-b01-icon-rail.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: One Home instance exposes connection, workspace and local shell actions
-      in order.
+    requirement: One Home instance exposes connection, workspace and local shell actions in order.
     actions:
     - 1
     checkpoints:
     - step: 3
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     - step: 4
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     - step: 5
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     - step: 6
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     - step: 7
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     - step: 8
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     - step: 9
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     - step: 10
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     - step: 11
-      expectation: One Home instance exposes connection, workspace and local shell
-        actions in order.
+      expectation: One Home instance exposes connection, workspace and local shell actions in order.
     results:
     - 3
     - 4
@@ -130,8 +163,8 @@ verification:
     - 10
     - 11
   - id: R2
-    requirement: Opening a local terminal and repeatedly returning through both Home
-      entries creates no extra Home or terminal.
+    requirement: Opening a local terminal and repeatedly returning through both Home entries creates no extra
+      Home or terminal.
     actions:
     - 12
     - 14
@@ -141,20 +174,20 @@ verification:
     - 20
     checkpoints:
     - step: 13
-      expectation: Opening a local terminal and repeatedly returning through both
-        Home entries creates no extra Home or terminal.
+      expectation: Opening a local terminal and repeatedly returning through both Home entries creates no extra
+        Home or terminal.
     - step: 18
-      expectation: Opening a local terminal and repeatedly returning through both
-        Home entries creates no extra Home or terminal.
+      expectation: Opening a local terminal and repeatedly returning through both Home entries creates no extra
+        Home or terminal.
     - step: 19
-      expectation: Opening a local terminal and repeatedly returning through both
-        Home entries creates no extra Home or terminal.
+      expectation: Opening a local terminal and repeatedly returning through both Home entries creates no extra
+        Home or terminal.
     - step: 21
-      expectation: Opening a local terminal and repeatedly returning through both
-        Home entries creates no extra Home or terminal.
+      expectation: Opening a local terminal and repeatedly returning through both Home entries creates no extra
+        Home or terminal.
     - step: 22
-      expectation: Opening a local terminal and repeatedly returning through both
-        Home entries creates no extra Home or terminal.
+      expectation: Opening a local terminal and repeatedly returning through both Home entries creates no extra
+        Home or terminal.
     results:
     - 13
     - 18
@@ -162,34 +195,72 @@ verification:
     - 21
     - 22
   - id: R3
-    requirement: Home cannot be deleted from overview or by middle clicking its fixed
-      tab.
+    requirement: Home cannot be deleted from overview or by middle clicking its fixed tab.
     actions:
     - 23
     - 25
     - 26
     checkpoints:
     - step: 24
-      expectation: Home cannot be deleted from overview or by middle clicking its
-        fixed tab.
+      expectation: Home cannot be deleted from overview or by middle clicking its fixed tab.
     - step: 27
-      expectation: Home cannot be deleted from overview or by middle clicking its
-        fixed tab.
+      expectation: Home cannot be deleted from overview or by middle clicking its fixed tab.
     - step: 28
-      expectation: Home cannot be deleted from overview or by middle clicking its
-        fixed tab.
+      expectation: Home cannot be deleted from overview or by middle clicking its fixed tab.
     results:
     - 24
     - 27
     - 28
+  - id: R4
+    requirement: The retained Rail name toggle shows all four complete primary labels below their icons without
+      text overflow. Controls remain reachable; toggling back restores the compact 52px rail.
+    actions:
+    - 30
+    - 31
+    - 39
+    - 40
+    checkpoints:
+    - step: 32
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"] button > span", "equal": 4}}'
+    - step: 33
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav[aria-label] > button:nth-of-type(1)
+        > span'').scrollWidth <= document.querySelector(''nav[aria-label] > button:nth-of-type(1) > span'').clientWidth",
+        "expect_truthy": true}}'
+    - step: 34
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav[aria-label] > button:nth-of-type(2)
+        > span'').scrollWidth <= document.querySelector(''nav[aria-label] > button:nth-of-type(2) > span'').clientWidth",
+        "expect_truthy": true}}'
+    - step: 35
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav[aria-label] > button:nth-of-type(3)
+        > span'').scrollWidth <= document.querySelector(''nav[aria-label] > button:nth-of-type(3) > span'').clientWidth",
+        "expect_truthy": true}}'
+    - step: 36
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav[aria-label] > button:nth-of-type(4)
+        > span'').scrollWidth <= document.querySelector(''nav[aria-label] > button:nth-of-type(4) > span'').clientWidth",
+        "expect_truthy": true}}'
+    - step: 37
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail-home\"], [data-testid=\"shell-rail-sessions\"],
+        [data-testid=\"shell-rail-workspaces\"], [data-testid=\"shell-rail-tao\"]", "min_count": 4, "min_width":
+        40, "min_height": 40, "within_viewport": true, "hit_center": true}}'
+    - step: 41
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"] button > span", "equal": 0}}'
+    - step: 42
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 52,
+        "max_width": 52, "min_height": 1, "within_viewport": true}}'
+    results:
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 41
+    - 42
   visual:
-  - check: Inspect the final screenshot for readable controls, clipping and overlay
-      placement.
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual
-    reason: Screenshots require a visual verdict; geometry assertions are recorded
-      separately.
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
   native:
   - check: Tauri, OS window, physical input and real service effects
     method: not-applicable
-    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
-      native boundaries.
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

@@ -365,6 +365,10 @@ class TauriDriverProcess:
         """Release owned Windows children before the next fixture reset."""
         if platform.system() in ("Darwin", "Windows"):
             self._restart_required = True
+        if platform.system() == "Darwin":
+            # WKWebView lives in this process. Release it before the next
+            # case's fixtures remove the run-owned database/configuration.
+            self.stop()
         if platform.system() == "Windows":
             # DELETE can fail or return while WebView2/the app still owns the
             # profile. The isolated driver owns this entire process tree;
@@ -897,6 +901,13 @@ class NativeSession:
         # WebDriver /clear unfocuses form controls. Blur-committing inputs
         # (path breadcrumbs, rename fields) disappear before /value arrives.
         # Select and replace through keyboard input while retaining focus.
+        if platform.system() == "Linux" and not text.isascii():
+            check = (
+                f"const el = document.querySelector({json.dumps(selector)});"
+                f"return !!el && el.value === {json.dumps(text)};"
+            )
+            self._paste_linux_form_input(element, selector, text, check)
+            return f"filled {selector}"
         self.request("POST", self.element_path(element, "/click"), {})
         self.press_combo("Mod+a")
         self.press_combo("Backspace")
@@ -916,7 +927,7 @@ class NativeSession:
             if self.execute(check) is not True:
                 # The same mapping can affect /value after modifier drags.
                 # Paste through the OS clipboard instead of translating keys.
-                self._paste_linux_password(element, selector, text, check)
+                self._paste_linux_form_input(element, selector, text, check)
         else:
             self.type_text(text)
         return f"filled {selector}"
@@ -946,7 +957,7 @@ class NativeSession:
             # Keep the paste selection alive until the editor has consumed it.
             host_clipboard.set_text(previous)
 
-    def _paste_linux_password(self, element: str, selector: str, text: str, check: str) -> None:
+    def _paste_linux_form_input(self, element: str, selector: str, text: str, check: str) -> None:
         from qa_ui_auto import host_clipboard
 
         previous = ""
@@ -962,10 +973,11 @@ class NativeSession:
             while self.execute(check) is not True:
                 if time.monotonic() >= deadline:
                     # Do not expose credential bytes in driver diagnostics.
-                    raise WebDriverError(f"password input did not retain the requested value: {selector}")
+                    raise WebDriverError(f"form input did not retain the requested value: {selector}")
                 time.sleep(0.05)
         finally:
-            # Remove the disposable password and retain the prior text payload.
+            # Restore only after the control has consumed the entire paste.
+            # This also removes any disposable password from the clipboard.
             host_clipboard.set_text(previous)
 
     def send_keys(self, text: str) -> str:
@@ -1117,7 +1129,7 @@ class NativeSession:
         seq: list[dict[str, Any]] = []
         for char in normalized:
             ch = "\ue007" if char == "\n" else char
-            if ch.isupper():
+            if ch.isupper() or ch in '~!@#$%^&*()_+{}|:"<>?':
                 shift = self.MODIFIER_MAP["Shift"]
                 seq.append({"type": "keyDown", "value": shift})
                 seq.append({"type": "keyDown", "value": ch})
@@ -1271,7 +1283,10 @@ class NativeHarness:
                             "profile": identity.get("profile")}, indent=2) + "\n",
                 encoding="utf-8",
             )
-            self.driver.start()
+            # On macOS the driver is the application. Launch after fixtures
+            # have reset the profile and supplied configuration for this case.
+            if platform.system() != "Darwin":
+                self.driver.start()
         except BaseException:
             self.__exit__(None, None, None)
             raise

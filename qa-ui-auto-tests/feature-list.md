@@ -1451,7 +1451,7 @@ controls:
     optional: true
   - id: context-move-destination
     selector: '[data-testid^="context-menu-item-user-sessions-"]'
-    aliases: ['[data-testid="context-menu-item-user-sessions-qa-selection-target"]']
+    aliases: ['[data-testid="context-menu-item-user-sessions-qa-selection-target"]', '[data-testid="context-menu-item-user-sessions-shell-group"]']
     kind: interactive
     optional: true
   - id: drag-preview

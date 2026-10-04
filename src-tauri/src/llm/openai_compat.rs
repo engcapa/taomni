@@ -215,6 +215,38 @@ impl Llm for OpenAiCompatProvider {
         true
     }
 
+    async fn chat_with_tools_stream(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+        on_token: std::sync::Arc<dyn Fn(String) + Send + Sync>,
+    ) -> LlmResult<ChatResponse> {
+        let body = openai_request_body(&self.model, &req, true, &tools);
+        let response = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .bearer_auth(&self.api_key)
+            .json(&body)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let text = response.text().await.unwrap_or_default();
+            let message = serde_json::from_str::<ApiError>(&text)
+                .map(|error| error.error.message)
+                .unwrap_or(text);
+            return Err(LlmError::Provider { status, message });
+        }
+        let mut decoder = ToolStreamDecoder::new(self.model.clone());
+        let mut bytes = Box::pin(response.bytes_stream());
+        while let Some(chunk) = bytes.next().await {
+            if decoder.push(&chunk?, on_token.as_ref())? {
+                break;
+            }
+        }
+        decoder.finish()
+    }
+
     async fn chat_stream(
         &self,
         req: ChatRequest,
@@ -532,4 +564,217 @@ struct StreamChoice {
 struct StreamDelta {
     #[serde(default)]
     content: Option<String>,
+}
+
+#[derive(Default)]
+struct ToolStreamCall {
+    id: String,
+    name: String,
+    arguments: String,
+}
+
+struct ToolStreamDecoder {
+    buffer: Vec<u8>,
+    content: String,
+    model: Option<String>,
+    usage: Option<TokenUsage>,
+    calls: std::collections::BTreeMap<usize, ToolStreamCall>,
+    ended: bool,
+}
+
+impl ToolStreamDecoder {
+    fn new(model: String) -> Self {
+        Self {
+            buffer: Vec::new(),
+            content: String::new(),
+            model: Some(model),
+            usage: None,
+            calls: Default::default(),
+            ended: false,
+        }
+    }
+    fn push(&mut self, bytes: &[u8], on_token: &(dyn Fn(String) + Send + Sync)) -> LlmResult<bool> {
+        self.buffer.extend_from_slice(bytes);
+        loop {
+            let boundary = self
+                .buffer
+                .windows(2)
+                .position(|part| part == b"\n\n")
+                .map(|index| (index, 2))
+                .or_else(|| {
+                    self.buffer
+                        .windows(4)
+                        .position(|part| part == b"\r\n\r\n")
+                        .map(|index| (index, 4))
+                });
+            let Some((index, length)) = boundary else {
+                return Ok(false);
+            };
+            let frame = self.buffer.drain(..index + length).collect::<Vec<_>>();
+            let frame = std::str::from_utf8(&frame).map_err(|error| LlmError::Provider {
+                status: 0,
+                message: format!("Invalid streaming UTF-8: {error}"),
+            })?;
+            for line in frame.lines() {
+                let Some(payload) = line.strip_prefix("data:") else {
+                    continue;
+                };
+                let payload = payload.trim();
+                if payload == "[DONE]" {
+                    self.ended = true;
+                    return Ok(true);
+                }
+                let value: Value = serde_json::from_str(payload)?;
+                if let Some(error) = value.get("error") {
+                    return Err(LlmError::Provider {
+                        status: 0,
+                        message: error["message"]
+                            .as_str()
+                            .unwrap_or("Provider stream failed")
+                            .to_string(),
+                    });
+                }
+                if let Some(model) = value["model"].as_str() {
+                    self.model = Some(model.to_string());
+                }
+                if !value["usage"].is_null() {
+                    self.usage = Some(serde_json::from_value(value["usage"].clone())?);
+                }
+                if value["choices"][0]["finish_reason"].is_string() {
+                    self.ended = true;
+                }
+                let delta = &value["choices"][0]["delta"];
+                if let Some(token) = delta["content"].as_str().filter(|token| !token.is_empty()) {
+                    self.content.push_str(token);
+                    on_token(token.to_string());
+                }
+                if let Some(calls) = delta["tool_calls"].as_array() {
+                    for call in calls {
+                        let index = call["index"].as_u64().ok_or_else(|| LlmError::Provider {
+                            status: 0,
+                            message: "Stream tool call is missing its index".into(),
+                        })? as usize;
+                        let current = self.calls.entry(index).or_default();
+                        if let Some(id) = call["id"].as_str() {
+                            current.id.push_str(id);
+                        }
+                        if let Some(name) = call["function"]["name"].as_str() {
+                            current.name.push_str(name);
+                        }
+                        if let Some(arguments) = call["function"]["arguments"].as_str() {
+                            current.arguments.push_str(arguments);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fn finish(self) -> LlmResult<ChatResponse> {
+        if !self.ended || self.buffer.iter().any(|byte| !byte.is_ascii_whitespace()) {
+            return Err(LlmError::Provider {
+                status: 0,
+                message: "Provider stream ended before a complete response".into(),
+            });
+        }
+        let tool_calls = self
+            .calls
+            .into_values()
+            .map(|call| {
+                if call.id.is_empty() || call.name.is_empty() {
+                    return Err(LlmError::Provider {
+                        status: 0,
+                        message: "Incomplete streaming tool call".into(),
+                    });
+                }
+                let arguments = if call.arguments.is_empty() {
+                    json!({})
+                } else {
+                    serde_json::from_str(&call.arguments)?
+                };
+                Ok(ChatToolCall {
+                    id: call.id,
+                    name: call.name,
+                    arguments,
+                })
+            })
+            .collect::<LlmResult<Vec<_>>>()?;
+        Ok(ChatResponse {
+            content: self.content,
+            model: self.model,
+            usage: self.usage,
+            tool_calls,
+        })
+    }
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::*;
+    #[test]
+    fn tool_stream_keeps_split_utf8_text_and_parallel_arguments() {
+        let frames = concat!(
+            "data: {\"model\":\"test\",\"choices\":[{\"delta\":{\"content\":\"中文\",\"tool_calls\":[{\"index\":1,\"id\":\"b\",\"function\":{\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\"}},{\"index\":0,\"id\":\"a\",\"function\":{\"name\":\"list\",\"arguments\":\"{}\"}}]}}]}\r\n\r\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\" done\",\"tool_calls\":[{\"index\":1,\"function\":{\"arguments\":\"\\\"文件\\\"}\"}}]}}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let tokens = std::sync::Mutex::new(Vec::new());
+        let receive = |token| tokens.lock().unwrap().push(token);
+        let mut decoder = ToolStreamDecoder::new("initial".into());
+        let mut ended = false;
+        for byte in frames.as_bytes() {
+            ended = decoder.push(&[*byte], &receive).unwrap();
+        }
+        assert!(ended);
+        let response = decoder.finish().unwrap();
+        assert_eq!(*tokens.lock().unwrap(), ["中文", " done"]);
+        assert_eq!(response.content, "中文 done");
+        assert_eq!(response.model.as_deref(), Some("test"));
+        assert_eq!(
+            response.tool_calls,
+            [
+                ChatToolCall {
+                    id: "a".into(),
+                    name: "list".into(),
+                    arguments: json!({})
+                },
+                ChatToolCall {
+                    id: "b".into(),
+                    name: "read".into(),
+                    arguments: json!({"path":"文件"})
+                }
+            ]
+        );
+    }
+    #[test]
+    fn invalid_tool_json_and_provider_errors_do_not_execute_partial_calls() {
+        let mut decoder = ToolStreamDecoder::new("test".into());
+        decoder.push(b"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"a\",\"function\":{\"name\":\"read\",\"arguments\":\"{\"}}]}}]}\n\ndata: [DONE]\n\n", &|_| {}).unwrap();
+        assert!(decoder.finish().is_err());
+        let mut decoder = ToolStreamDecoder::new("test".into());
+        assert!(
+            decoder
+                .push(
+                    b"data: {\"error\":{\"message\":\"unavailable\"}}\n\n",
+                    &|_| {}
+                )
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn tool_stream_rejects_truncated_transport_and_retains_terminal_usage() {
+        let mut decoder = ToolStreamDecoder::new("test".into());
+        decoder
+            .push(
+                b"data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n",
+                &|_| {},
+            )
+            .unwrap();
+        assert!(decoder.finish().is_err());
+        let mut decoder = ToolStreamDecoder::new("test".into());
+        decoder.push(b"data: {\"choices\":[{\"delta\":{\"content\":\"done\"},\"finish_reason\":\"stop\"}]}\r\n\r\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":3,\"total_tokens\":5}}\r\n\r\ndata: [DONE]\r\n\r\n", &|_| {}).unwrap();
+        let response = decoder.finish().unwrap();
+        assert_eq!(response.content, "done");
+        assert_eq!(response.usage.unwrap().total_tokens, 5);
+    }
 }

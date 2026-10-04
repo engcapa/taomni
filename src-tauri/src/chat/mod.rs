@@ -3166,14 +3166,27 @@ pub async fn chat_stream(
                             messages: messages.clone(),
                             max_tokens: llm_req.max_tokens,
                             temperature: llm_req.temperature,
-                            stream: false,
+                            stream: true,
                         };
+                        let stream_app = app.clone();
+                        let stream_event = event_name.clone();
+                        let stream_id = assistant_id.clone();
+                        let on_token: Arc<dyn Fn(String) + Send + Sync> =
+                            Arc::new(move |content| {
+                                let _ = stream_app.emit(
+                                    &stream_event,
+                                    StreamEventOut::Token {
+                                        id: stream_id.clone(),
+                                        content,
+                                    },
+                                );
+                            });
                         let resp = tokio::select! {
                             _ = cancel_token.cancelled() => {
                                 is_cancelled = true;
                                 break 'tool_rounds;
                             }
-                            result = provider.chat_with_tools(turn_req, llm_tools.clone()) => result,
+                            result = provider.chat_with_tools_stream(turn_req, llm_tools.clone(), on_token) => result,
                         };
                         let resp = match resp {
                             Ok(resp) => resp,
@@ -3189,10 +3202,6 @@ pub async fn chat_stream(
 
                         if !resp.content.is_empty() {
                             accumulated.push_str(&resp.content);
-                            emit(&StreamEventOut::Token {
-                                id: assistant_id.clone(),
-                                content: resp.content.clone(),
-                            });
                         }
 
                         if resp.tool_calls.is_empty() {

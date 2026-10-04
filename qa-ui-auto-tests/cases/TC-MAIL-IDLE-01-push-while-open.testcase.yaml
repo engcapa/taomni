@@ -20,7 +20,8 @@ description: 'TASK-12 (docs-feature/mail-thunderbird-parity-design.md AC-36/AC-3
   Shell v2: hide the mail owner before delivery, then reveal the exact ready account from Tao before acknowledgement.
   The original IDLE readiness, 15-second list sync and close-release assertions remain. Unread rows must
   match the independent server after notification acknowledgement (ack does not mark messages read). Maps
-  V-B26/V-N13.'
+  V-B26/V-N13. Arrival notifications must be published after header catch-up without waiting for optional
+  flags reconciliation; notification and independent unread-count assertions retain their original budgets.'
 covers:
 - F-MAIL-10
 - F-MAIL-5

@@ -1394,6 +1394,21 @@ describe("MailClientTab", () => {
     expect(mailMocks.mailIdleStop).not.toHaveBeenCalled();
   });
 
+  it("publishes cached arrivals while a hidden folder flags reconciliation is still pending", async () => {
+    const view = renderMailbox();
+    await waitFor(() => expect(eventMocks.handlers.has("mail://idle")).toBe(true));
+    view.rerender(<MailClientTab tabId="mail-tab" info={info} visible={false} />);
+    let finishReconcile!: (value: MailFolderSyncResult) => void;
+    mailMocks.mailSyncFolder.mockImplementation((_info, _folder, options) => options?.mode === "reconcile"
+      ? new Promise((resolve) => { finishReconcile = resolve; })
+      : Promise.resolve(stepResult({ newUnseen: 2 })));
+    act(() => eventMocks.handlers.get("mail://idle")!({ payload: { accountId: info.sessionId, folder: "INBOX", kind: "changed" } }));
+    await waitFor(() => expect(finishReconcile).toBeDefined(), { timeout: 3000 });
+    expect(useTaoAlertStore.getState().mailNew).toMatchObject([{ mailTabId: "mail-tab", count: 2 }]);
+    await act(async () => finishReconcile(stepResult({ newUnseen: 0 })));
+    expect(useTaoAlertStore.getState().mailNew).toMatchObject([{ mailTabId: "mail-tab", count: 2 }]);
+  });
+
   it("manages folder subscriptions and hides unsubscribed folders (TASK-10)", async () => {
     window.localStorage.clear();
     const inbox: MailFolder = { ...folder, flags: ["\\Subscribed"] };

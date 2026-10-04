@@ -14,7 +14,7 @@ vi.mock("../sftp", async (importOriginal) => ({ ...await importOriginal<typeof i
 }));
 const envelope: PanelWindowEnvelope = { version: 1, operationId: "operation", panelId: "files:owner", generation: 1, windowLabel: "sftp-child", event: "snapshot" };
 const job: TransferItem = { id: "native-job", sessionId: "channel__detached", kind: "file", direction: "upload", localPath: "/local/中文.bin", remotePath: "/remote/中文.bin", bytes: 10, size: 100, eta: 1, rate: 10, state: "running", startedAt: 1 };
-afterEach(() => { useTransferStore.setState({ items: [] }); useTaoAlertStore.getState().clearAll(); boundary.detach.mockClear(); boundary.off.mockClear(); });
+afterEach(() => { useTransferStore.setState({ items: [] }); useTaoAlertStore.getState().clearAll(); boundary.detach.mockClear(); boundary.off.mockClear(); vi.restoreAllMocks(); });
 describe("SFTP window job ownership", () => {
   it("keeps a foreign view's lease in that view, then adopts and releases its real channel after destruction", async () => {
     await receiveWindowTransfers({ jobs: [job] }, envelope);
@@ -35,9 +35,12 @@ describe("SFTP window job ownership", () => {
   });
   it("imports a terminal snapshot once without retaining or closing the live child's channel", async () => {
     await receiveWindowTransfers({ jobs: [{ ...job, id: "finished-job", state: "error", error: "Network failed" }] }, envelope);
+    const finishedAt = useTransferStore.getState().byId("finished-job")?.finishedAt;
     expect(useTaoAlertStore.getState().transfer).toHaveLength(1);
     expect(boundary.detach).not.toHaveBeenCalled();
+    vi.spyOn(Date, "now").mockReturnValue((finishedAt ?? 0) + 5000);
     await receiveWindowTransfers({ jobs: [{ ...job, id: "finished-job", state: "error" }] }, envelope);
+    expect(useTransferStore.getState().byId("finished-job")?.finishedAt).toBe(finishedAt);
     expect(useTaoAlertStore.getState().transfer).toHaveLength(1);
   });
   it("rejects invalid metadata and another connection's jobs at the window boundary", () => {

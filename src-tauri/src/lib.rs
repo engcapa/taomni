@@ -98,6 +98,25 @@ pub(crate) fn configure_qa_webview<'a>(
                 let webview_dir = data_dir.join("webview");
                 std::fs::create_dir_all(&webview_dir).ok();
                 builder = builder.data_directory(webview_dir);
+                #[cfg(target_os = "macos")]
+                {
+                    // WKWebView ignores data_directory. A persistent custom
+                    // store shares handoffs across windows and survives an app
+                    // restart. reset_db removes this run-owned marker between
+                    // cases, so a later case receives a fresh store.
+                    let marker = data_dir.join("qa-webview-store-id");
+                    let id = std::fs::read_to_string(&marker)
+                        .ok()
+                        .and_then(|text| uuid::Uuid::parse_str(text.trim()).ok())
+                        .unwrap_or_else(|| {
+                            let id = uuid::Uuid::new_v4();
+                            std::fs::write(&marker, id.to_string()).expect(
+                                "could not persist the isolated QA WebView store identifier",
+                            );
+                            id
+                        });
+                    builder = builder.data_store_identifier(*id.as_bytes());
+                }
                 #[cfg(target_os = "windows")]
                 if let Ok(arguments) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
                     if !arguments.trim().is_empty() {

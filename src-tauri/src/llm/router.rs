@@ -126,6 +126,35 @@ impl Llm for KeyRotatingLlm {
         Err(last_err.unwrap_or(LlmError::NoProvider(TaskKind::ChatDrawer)))
     }
 
+    async fn chat_with_tools_stream(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+        on_token: Arc<dyn Fn(String) + Send + Sync>,
+    ) -> LlmResult<ChatResponse> {
+        let started = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let signal = started.clone();
+        let receive: Arc<dyn Fn(String) + Send + Sync> = Arc::new(move |token| {
+            signal.store(true, Ordering::SeqCst);
+            on_token(token);
+        });
+        let mut last_err = None;
+        for _ in 0..self.variants.len() {
+            let Some(provider) = self.next_variant() else {
+                break;
+            };
+            match provider
+                .chat_with_tools_stream(req.clone(), tools.clone(), receive.clone())
+                .await
+            {
+                Ok(response) => return Ok(response),
+                Err(error) if started.load(Ordering::SeqCst) => return Err(error),
+                Err(error) => last_err = Some(error),
+            }
+        }
+        Err(last_err.unwrap_or(LlmError::NoProvider(TaskKind::ChatDrawer)))
+    }
+
     fn supports_tools(&self) -> bool {
         self.variants
             .iter()
@@ -275,6 +304,42 @@ impl Llm for ProviderGroupLlm {
                 self.route_id
             ),
         }))
+    }
+
+    async fn chat_with_tools_stream(
+        &self,
+        req: ChatRequest,
+        tools: Vec<ChatTool>,
+        on_token: Arc<dyn Fn(String) + Send + Sync>,
+    ) -> LlmResult<ChatResponse> {
+        let started = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let signal = started.clone();
+        let receive: Arc<dyn Fn(String) + Send + Sync> = Arc::new(move |token| {
+            signal.store(true, Ordering::SeqCst);
+            on_token(token);
+        });
+        let mut last_err = None;
+        for _ in 0..self.state.len() {
+            let Some(id) = self.state.next_provider_id() else {
+                break;
+            };
+            let Some(provider) = self
+                .providers
+                .get(&id)
+                .filter(|provider| provider.supports_tools())
+            else {
+                continue;
+            };
+            match provider
+                .chat_with_tools_stream(req.clone(), tools.clone(), receive.clone())
+                .await
+            {
+                Ok(response) => return Ok(response),
+                Err(error) if started.load(Ordering::SeqCst) => return Err(error),
+                Err(error) => last_err = Some(error),
+            }
+        }
+        Err(last_err.unwrap_or(LlmError::NoProvider(TaskKind::ChatDrawer)))
     }
 
     fn supports_tools(&self) -> bool {
@@ -759,4 +824,108 @@ pub fn build_router_from_ai_with_proxy_db(
     proxy_db: Option<&rusqlite::Connection>,
 ) -> LlmRouter {
     build_router_with_proxy_db(&cfg.llm, vault, cfg.full_local_mode, proxy_db)
+}
+
+#[cfg(test)]
+mod tool_stream_tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    struct ProbeProvider {
+        calls: AtomicUsize,
+        prefix: &'static str,
+        fail: bool,
+    }
+
+    #[async_trait]
+    impl Llm for ProbeProvider {
+        async fn chat(&self, _req: ChatRequest) -> LlmResult<ChatResponse> {
+            unreachable!("tool streams must use the tool-capable transport")
+        }
+        async fn chat_with_tools_stream(
+            &self,
+            _req: ChatRequest,
+            _tools: Vec<ChatTool>,
+            receive: Arc<dyn Fn(String) + Send + Sync>,
+        ) -> LlmResult<ChatResponse> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if !self.prefix.is_empty() {
+                receive(self.prefix.into());
+            }
+            if self.fail {
+                return Err(LlmError::Provider {
+                    status: 503,
+                    message: "transport failed".into(),
+                });
+            }
+            Ok(ChatResponse {
+                content: self.prefix.into(),
+                model: None,
+                usage: None,
+                tool_calls: vec![],
+            })
+        }
+        fn supports_tools(&self) -> bool {
+            true
+        }
+        fn provider_id(&self) -> &str {
+            "probe"
+        }
+        fn model(&self) -> &str {
+            "probe"
+        }
+    }
+
+    #[tokio::test]
+    async fn tools_retry_only_before_text_has_been_published_for_keys_and_groups() {
+        for group in [false, true] {
+            for prefix in ["", "partial"] {
+                let first = Arc::new(ProbeProvider {
+                    calls: AtomicUsize::new(0),
+                    prefix,
+                    fail: true,
+                });
+                let second = Arc::new(ProbeProvider {
+                    calls: AtomicUsize::new(0),
+                    prefix: "recovered",
+                    fail: false,
+                });
+                let provider: Arc<dyn Llm> = if group {
+                    Arc::new(ProviderGroupLlm::new(
+                        "group:probe",
+                        Arc::new(ProviderGroupState::new(vec!["a".into(), "b".into()])),
+                        HashMap::from([
+                            ("a".into(), first.clone() as Arc<dyn Llm>),
+                            ("b".into(), second.clone() as Arc<dyn Llm>),
+                        ]),
+                    ))
+                } else {
+                    Arc::new(KeyRotatingLlm::new(
+                        "probe",
+                        vec![first.clone(), second.clone()],
+                        Arc::new(KeyRotationState::new()),
+                    ))
+                };
+                let tokens = Arc::new(Mutex::new(Vec::new()));
+                let observed = tokens.clone();
+                let result = provider
+                    .chat_with_tools_stream(
+                        ChatRequest::simple("", "test"),
+                        vec![],
+                        Arc::new(move |text| observed.lock().unwrap().push(text)),
+                    )
+                    .await;
+                assert_eq!(first.calls.load(Ordering::SeqCst), 1);
+                if prefix.is_empty() {
+                    assert_eq!(result.unwrap().content, "recovered");
+                    assert_eq!(second.calls.load(Ordering::SeqCst), 1);
+                    assert_eq!(*tokens.lock().unwrap(), ["recovered"]);
+                } else {
+                    assert!(result.is_err());
+                    assert_eq!(second.calls.load(Ordering::SeqCst), 0);
+                    assert_eq!(*tokens.lock().unwrap(), ["partial"]);
+                }
+            }
+        }
+    }
 }

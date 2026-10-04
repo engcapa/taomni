@@ -2234,6 +2234,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           console.debug("quiet INBOX poll failed", e);
         }
       }
+      // Arrival is established by catch-up. A slow flags reconciliation must
+      // not hold its alert hostage after the new headers are already cached.
+      notifyNewMail(newUnseen);
       if (info.cache.enabled) {
         try {
           await runFolderSync(activeFolder, { mode: "reconcile", maxSteps: 3 });
@@ -2241,7 +2244,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           console.debug("quiet mail reconcile failed", e);
         }
       }
-      notifyNewMail(newUnseen);
     } catch (e) {
       console.debug("quiet mail poll failed", e);
     } finally {

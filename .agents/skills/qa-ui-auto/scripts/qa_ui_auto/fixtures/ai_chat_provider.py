@@ -48,7 +48,7 @@ class ProviderServer:
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 users = [m["content"] for m in body.get("messages", []) if m.get("role") == "user"]
                 with owner.lock:
-                    owner.requests.append({"stream": body.get("stream") is True, "model": body.get("model"), "lastUserMessage": users[-1] if users else ""})
+                    owner.requests.append({"stream": body.get("stream") is True, "tools": bool(body.get("tools")), "model": body.get("model"), "lastUserMessage": users[-1] if users else ""})
                     owner.write_receipt()
                 if users and users[-1] == "SHELL AI error":
                     self.send_response(503)
@@ -85,7 +85,7 @@ class ProviderServer:
     def write_receipt(self):
         self.receipt.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.receipt.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"requests": len(self.requests), "streamRequests": sum(r["stream"] for r in self.requests), "lastUserMessage": self.requests[-1]["lastUserMessage"] if self.requests else "", "model": self.requests[-1]["model"] if self.requests else ""}, ensure_ascii=False), encoding="utf-8")
+        temporary.write_text(json.dumps({"requests": len(self.requests), "streamRequests": sum(r["stream"] for r in self.requests), "toolRequests": sum(r["tools"] for r in self.requests), "lastUserMessage": self.requests[-1]["lastUserMessage"] if self.requests else "", "model": self.requests[-1]["model"] if self.requests else ""}, ensure_ascii=False), encoding="utf-8")
         temporary.replace(self.receipt)
 
     def stop(self):
@@ -106,7 +106,11 @@ def setup(ctx: Any) -> None:
     provider = ProviderServer(Path(ctx.case_dir) / "ai-provider-requests.json")
     ctx._ai_chat_provider = provider
     try:
-        base = Path(expected.get("NEWMOB_CONFIG_DIR") or expected["XDG_CONFIG_HOME"])
+        if "NEWMOB_CONFIG_DIR" in expected:
+            from native_build import QA_APP_ID
+            base = Path(expected["NEWMOB_CONFIG_DIR"]) / QA_APP_ID
+        else:
+            base = Path(expected["XDG_CONFIG_HOME"])
         target = base / "taomni" / "ai.json"
         if not target.resolve().is_relative_to(root):
             raise RuntimeError("AI fixture config escaped the current run")

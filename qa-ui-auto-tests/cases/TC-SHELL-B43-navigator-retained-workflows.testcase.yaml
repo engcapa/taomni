@@ -116,7 +116,7 @@ steps:
 - wait_for: '[data-testid="session-tree-item"][data-session-id="shell-a"]'
 - right_click: '[data-testid="session-tree-item"][data-session-id="shell-a"]'
 - hover: '[data-testid="context-menu"] >> text="Move to folder"'
-- click: '[data-testid="context-menu"] >> text="SHELL group"'
+- click: '[data-testid="context-menu-item-user-sessions-shell-group"]'
 - fill:
     selector: '[data-testid="session-search"]'
     value: qa-alpha

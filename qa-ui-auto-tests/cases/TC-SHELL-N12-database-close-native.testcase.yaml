@@ -2,7 +2,8 @@ id: TC-SHELL-N12
 title: Real MySQL close entries preserve draft/transaction on cancel and resolve rollback, commit and
   running query
 description: Native automated boundaries for docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n12.
-  OS/manual gaps are recorded separately.
+  OS/manual gaps are recorded separately. Cancel-and-close requires the server to acknowledge query termination;
+  the independent PROCESSLIST check must find zero sleeping statements after the tab has closed.
 covers:
 - F-DB-1
 - F1.5

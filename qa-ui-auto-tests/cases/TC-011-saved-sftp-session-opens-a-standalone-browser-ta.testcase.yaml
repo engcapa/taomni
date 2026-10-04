@@ -79,7 +79,7 @@ steps:
     within_viewport: true
     hit_center: true
 - eval_readonly:
-    expression: document.querySelector('nav').getBoundingClientRect().top >= document.querySelector('[data-window-drag]').getBoundingClientRect().bottom
+    expression: document.querySelector('nav').getBoundingClientRect().top >= document.querySelector('.shell-titlebar-start').parentElement.getBoundingClientRect().bottom
     expect_truthy: true
 - shell_navigate: tools
 - assert_element_geometry:
@@ -145,30 +145,30 @@ verification:
     - step: 34
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name":
-        "value", "equals": "${fixture.sftp_sync_test_dir}"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "${fixture.sftp_sync_test_dir}"}}'
     results:
     - 35
   - id: R2
-    requirement: 独立 SFTP 就绪后，垂直 Shell Rail 的按钮与 18px 图标保持相同尺寸、至少 32px 点击高度，落在视口内且中心可命中；Rail 位于标题栏拖动区下方，切换
-      Navigator 到 Tools 后同样可用。
+    requirement: 独立 SFTP 就绪后，垂直 Shell Rail 的按钮与 18px 图标保持相同尺寸、至少 32px 点击高度，落在视口内且中心可命中；Rail 位于标题栏拖动区下方，切换 Navigator
+      到 Tools 后同样可用。
     actions:
     - 21
     - 22
     - 38
     checkpoints:
     - step: 36
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button",
-        "min_count": 5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport":
-        true, "hit_center": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button", "min_count":
+        5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport": true,
+        "hit_center": true}}'
     - step: 37
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav'').getBoundingClientRect().top
-        >= document.querySelector(''[data-window-drag]'').getBoundingClientRect().bottom", "expect_truthy":
-        true}}'
+        >= document.querySelector(''.shell-titlebar-start'').parentElement.getBoundingClientRect().bottom",
+        "expect_truthy": true}}'
     - step: 39
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button",
-        "min_count": 5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport":
-        true, "hit_center": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button", "min_count":
+        5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport": true,
+        "hit_center": true}}'
     results:
     - 36
     - 37
@@ -182,4 +182,5 @@ verification:
     method: automated
     reason: 按实际执行模式解释；其他平台不继承 Linux 证据。
 description: ' Permanent rail geometry now uses the Shell Rail; standalone SFTP readiness, path and transfer
-  assertions are retained.'
+  assertions are retained. Rail geometry observes the enclosing ControlBar; a flexible drag spacer is not the
+  titlebar boundary.'

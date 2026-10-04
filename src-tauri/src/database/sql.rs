@@ -8,9 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::TryStreamExt;
+use futures::{TryStreamExt, future::BoxFuture};
 use sqlx_core::Error as SqlxError;
 use sqlx_core::column::Column;
+use sqlx_core::connection::Connection;
 use sqlx_core::pool::Pool;
 use sqlx_core::query::query;
 use sqlx_core::raw_sql::raw_sql;
@@ -18,7 +19,9 @@ use sqlx_core::row::Row;
 use sqlx_core::sql_str::AssertSqlSafe;
 use sqlx_core::type_info::TypeInfo;
 use sqlx_core::types::{BigDecimal, Uuid};
-use sqlx_mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions, MySqlRow, MySqlSslMode};
+use sqlx_mysql::{
+    MySql, MySqlConnectOptions, MySqlConnection, MySqlPoolOptions, MySqlRow, MySqlSslMode,
+};
 use sqlx_postgres::{PgConnectOptions, PgPoolOptions, PgRow, PgSslMode, Postgres};
 use tiberius::{
     AuthMethod as TdsAuthMethod, Client as TdsClient, ColumnType as TdsColumnType,
@@ -777,18 +780,113 @@ async fn sqlserver_query_result(
 // Execute
 // ---------------------------------------------------------------------------
 
+enum MysqlQueryOutcome<T> {
+    Completed(Result<T, String>),
+    Cancelled,
+    Discard(String),
+}
+
+async fn wait_mysql_query<T>(
+    query: impl std::future::Future<Output = Result<T, String>>,
+    token: &CancellationToken,
+    interrupt: impl std::future::Future<Output = Result<(), String>>,
+) -> MysqlQueryOutcome<T> {
+    tokio::pin!(query);
+    tokio::select! {
+        biased;
+        result = &mut query => MysqlQueryOutcome::Completed(result),
+        _ = token.cancelled() => {
+            if let Err(error) = interrupt.await {
+                return MysqlQueryOutcome::Discard(error);
+            }
+            // A dropped sqlx future leaves MySQL executing and the connection
+            // draining its response in the pool. Consume the killed command's
+            // acknowledgement before publishing cancellation or reusing it.
+            match tokio::time::timeout(Duration::from_secs(5), &mut query).await {
+                Ok(_) => MysqlQueryOutcome::Cancelled,
+                Err(_) => MysqlQueryOutcome::Discard("MySQL did not acknowledge query cancellation".into()),
+            }
+        }
+    }
+}
+
+async fn interrupt_mysql_query(pool: &Pool<MySql>, connection_id: u64) -> Result<(), String> {
+    let cancel = async {
+        // The session pool has one connection so transactions remain on their
+        // owner. A separate control connection can interrupt that busy owner.
+        let mut control = MySqlConnection::connect_with(&pool.connect_options())
+            .await
+            .map_err(|error| format!("MySQL cancellation connection failed: {error}"))?;
+        let statement = format!("KILL QUERY {connection_id}");
+        let result = raw_sql(AssertSqlSafe(statement.as_str()))
+            .execute(&mut control)
+            .await
+            .map_err(|error| format!("MySQL query cancellation failed: {error}"));
+        let _ = control.close().await;
+        result.map(|_| ())
+    };
+    tokio::time::timeout(Duration::from_secs(10), cancel)
+        .await
+        .map_err(|_| "MySQL query cancellation timed out".to_string())?
+}
+
+async fn run_mysql_cancellable<T>(
+    pool: &Pool<MySql>,
+    token: &CancellationToken,
+    operation: impl for<'c> FnOnce(&'c mut MySqlConnection) -> BoxFuture<'c, Result<T, String>>,
+) -> Result<T, String> {
+    let mut connection = tokio::select! {
+        biased;
+        _ = token.cancelled() => return Err("Query cancelled".into()),
+        result = pool.acquire() => result.map_err(|error| format!("MySQL connection unavailable: {error}"))?,
+    };
+    let row = query("SELECT CONNECTION_ID()")
+        .fetch_one(&mut *connection)
+        .await
+        .map_err(|error| format!("MySQL connection identity unavailable: {error}"))?;
+    let connection_id: u64 = row.try_get(0).map_err(|error| error.to_string())?;
+    if token.is_cancelled() {
+        return Err("Query cancelled".into());
+    }
+    let outcome = wait_mysql_query(
+        operation(&mut connection),
+        token,
+        interrupt_mysql_query(pool, connection_id),
+    )
+    .await;
+    match outcome {
+        MysqlQueryOutcome::Completed(result) => result,
+        MysqlQueryOutcome::Cancelled => Err("Query cancelled".into()),
+        MysqlQueryOutcome::Discard(error) => {
+            // An unacknowledged command must never be returned to the pool.
+            let _ = connection.detach().close_hard().await;
+            Err(error)
+        }
+    }
+}
+
 pub async fn execute_mysql(
     pool: &Pool<MySql>,
     sql: &str,
     token: &CancellationToken,
 ) -> Result<QueryResult, String> {
+    let sql = sql.to_string();
+    run_mysql_cancellable(pool, token, move |connection| {
+        Box::pin(async move { execute_mysql_on(connection, &sql).await })
+    })
+    .await
+}
+
+async fn execute_mysql_on(
+    connection: &mut MySqlConnection,
+    sql: &str,
+) -> Result<QueryResult, String> {
     let start = Instant::now();
     if is_query(sql) {
-        let fetch = query(AssertSqlSafe(sql)).fetch_all(pool);
-        let rows = tokio::select! {
-            _ = token.cancelled() => return Err("Query cancelled".into()),
-            r = fetch => r.map_err(|e| format!("Query failed: {e}"))?,
-        };
+        let rows = query(AssertSqlSafe(sql))
+            .fetch_all(connection)
+            .await
+            .map_err(|e| format!("Query failed: {e}"))?;
         let columns = if let Some(first) = rows.first() {
             first
                 .columns()
@@ -819,11 +917,10 @@ pub async fn execute_mysql(
     } else if needs_mysql_text_protocol(sql) {
         // MySQL rejects USE (and a few admin commands) on COM_STMT_PREPARE with
         // 1295 HY000. Text protocol via raw_sql is required.
-        let exec = raw_sql(AssertSqlSafe(sql)).execute(pool);
-        let res = tokio::select! {
-            _ = token.cancelled() => return Err("Query cancelled".into()),
-            r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
-        };
+        let res = raw_sql(AssertSqlSafe(sql))
+            .execute(connection)
+            .await
+            .map_err(|e| format!("Statement failed: {e}"))?;
         Ok(QueryResult {
             columns: Vec::new(),
             rows: Vec::new(),
@@ -832,11 +929,10 @@ pub async fn execute_mysql(
             warnings: Vec::new(),
         })
     } else {
-        let exec = query(AssertSqlSafe(sql)).execute(pool);
-        let res = tokio::select! {
-            _ = token.cancelled() => return Err("Query cancelled".into()),
-            r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
-        };
+        let res = query(AssertSqlSafe(sql))
+            .execute(connection)
+            .await
+            .map_err(|e| format!("Statement failed: {e}"))?;
         Ok(QueryResult {
             columns: Vec::new(),
             rows: Vec::new(),
@@ -948,9 +1044,25 @@ pub async fn execute_mysql_stream(
     token: &CancellationToken,
     on_event: &QueryStreamChannel,
 ) -> Result<(), String> {
+    let sql = sql.to_string();
+    let on_event = on_event.clone();
+    run_mysql_cancellable(pool, token, move |connection| {
+        Box::pin(
+            async move { execute_mysql_stream_on(connection, &sql, max_rows, &on_event).await },
+        )
+    })
+    .await
+}
+
+async fn execute_mysql_stream_on(
+    connection: &mut MySqlConnection,
+    sql: &str,
+    max_rows: Option<u64>,
+    on_event: &QueryStreamChannel,
+) -> Result<(), String> {
     let start = Instant::now();
     if is_query(sql) {
-        let mut stream = query(AssertSqlSafe(sql)).fetch(pool);
+        let mut stream = query(AssertSqlSafe(sql)).fetch(connection);
         let mut columns_sent = false;
         let mut row_count = 0_u64;
         let max_rows = max_rows.filter(|value| *value > 0);
@@ -962,10 +1074,10 @@ pub async fn execute_mysql_stream(
                 limit_reached = true;
                 break;
             }
-            let next = tokio::select! {
-                _ = token.cancelled() => return Err("Query cancelled".into()),
-                r = stream.try_next() => r.map_err(|e| format!("Query failed: {e}"))?,
-            };
+            let next = stream
+                .try_next()
+                .await
+                .map_err(|e| format!("Query failed: {e}"))?;
             let Some(row) = next else {
                 break;
             };
@@ -1011,11 +1123,10 @@ pub async fn execute_mysql_stream(
             },
         )
     } else if needs_mysql_text_protocol(sql) {
-        let exec = raw_sql(AssertSqlSafe(sql)).execute(pool);
-        let res = tokio::select! {
-            _ = token.cancelled() => return Err("Query cancelled".into()),
-            r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
-        };
+        let res = raw_sql(AssertSqlSafe(sql))
+            .execute(connection)
+            .await
+            .map_err(|e| format!("Statement failed: {e}"))?;
         send_query_stream_event(
             on_event,
             QueryStreamEvent::Done {
@@ -1025,11 +1136,10 @@ pub async fn execute_mysql_stream(
             },
         )
     } else {
-        let exec = query(AssertSqlSafe(sql)).execute(pool);
-        let res = tokio::select! {
-            _ = token.cancelled() => return Err("Query cancelled".into()),
-            r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
-        };
+        let res = query(AssertSqlSafe(sql))
+            .execute(connection)
+            .await
+            .map_err(|e| format!("Statement failed: {e}"))?;
         send_query_stream_event(
             on_event,
             QueryStreamEvent::Done {
@@ -2549,6 +2659,57 @@ pub async fn table_stats_sqlserver(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn mysql_cancel_waits_for_server_and_drains_the_interrupted_response() {
+        let token = CancellationToken::new();
+        let (finish, response) = tokio::sync::oneshot::channel::<()>();
+        let order = std::sync::Mutex::new(Vec::new());
+        let command = async {
+            token.cancel();
+            let _ = response.await;
+            order.lock().unwrap().push("response drained");
+            Err::<(), _>("server: Query execution was interrupted".to_string())
+        };
+        let interrupt = async {
+            order.lock().unwrap().push("server interrupted");
+            finish.send(()).unwrap();
+            Ok(())
+        };
+        assert!(matches!(
+            wait_mysql_query(command, &token, interrupt).await,
+            MysqlQueryOutcome::Cancelled
+        ));
+        assert_eq!(
+            *order.lock().unwrap(),
+            ["server interrupted", "response drained"]
+        );
+    }
+
+    #[tokio::test]
+    async fn mysql_cancel_failure_discards_the_connection_instead_of_reporting_success() {
+        let token = CancellationToken::new();
+        token.cancel();
+        let outcome = wait_mysql_query(
+            std::future::pending::<Result<(), String>>(),
+            &token,
+            async { Err("control connection failed".into()) },
+        )
+        .await;
+        assert!(
+            matches!(outcome, MysqlQueryOutcome::Discard(error) if error == "control connection failed")
+        );
+    }
+
+    #[tokio::test]
+    async fn completed_mysql_query_does_not_open_a_cancellation_connection() {
+        let token = CancellationToken::new();
+        let outcome = wait_mysql_query(async { Ok(42) }, &token, async {
+            panic!("a completed query must not invoke cancellation")
+        })
+        .await;
+        assert!(matches!(outcome, MysqlQueryOutcome::Completed(Ok(42))));
+    }
 
     #[test]
     fn mysql_schema_names_include_visible_databases_and_deduplicate() {

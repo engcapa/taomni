@@ -9,6 +9,7 @@ import urllib.request
 from unittest.mock import patch
 
 from qa_ui_auto.fixtures import ai_chat_provider as fixture
+from native_build import QA_APP_ID
 
 
 class AiChatProviderTest(unittest.TestCase):
@@ -27,7 +28,7 @@ class AiChatProviderTest(unittest.TestCase):
                 self.assertIn("data: [DONE]", raw)
                 receipt = server.receipt.read_text(encoding="utf-8")
                 self.assertNotIn("never-record-this", receipt)
-                self.assertEqual(json.loads(receipt), {"requests": 1, "streamRequests": 1, "lastUserMessage": "SHELL AI 第一条", "model": "qa-model"})
+                self.assertEqual(json.loads(receipt), {"requests": 1, "streamRequests": 1, "toolRequests": 0, "lastUserMessage": "SHELL AI 第一条", "model": "qa-model"})
             finally:
                 server.stop()
 
@@ -39,11 +40,41 @@ class AiChatProviderTest(unittest.TestCase):
                     fixture.setup(ctx)
             self.assertFalse(hasattr(ctx, "_ai_chat_provider"))
 
+    def test_sse_with_production_tool_catalog_records_tools_without_secret_payload(self):
+        with TemporaryDirectory() as directory:
+            server = fixture.ProviderServer(Path(directory) / "requests.json")
+            try:
+                body = {"stream": True, "model": "qa-model", "messages": [{"role": "user", "content": "test"}],
+                        "tools": [{"type": "function", "function": {"name": "list", "parameters": {"type": "object"}}}]}
+                request = urllib.request.Request(server.base_url + "/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"})
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    self.assertIn(b"data: [DONE]", response.read())
+                receipt = json.loads(server.receipt.read_text(encoding="utf-8"))
+                self.assertEqual((receipt["requests"], receipt["streamRequests"], receipt["toolRequests"]), (1, 1, 1))
+                self.assertNotIn("tools", receipt)
+            finally:
+                server.stop()
+
+    def test_linux_fixture_uses_xdg_config_without_the_qa_app_id_layer(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            config_root = root / "native-config"
+            ctx = SimpleNamespace(cfg={"app": {"mode": "native"}}, report_root=root, case_dir=root / "case", values={})
+            expected = {"XDG_CONFIG_HOME": str(config_root)}
+            with patch.object(fixture, "native_isolation_env", return_value=expected), patch.dict(os.environ, expected):
+                fixture.setup(ctx)
+                try:
+                    self.assertEqual(ctx._ai_config_target, config_root / "taomni" / "ai.json")
+                    self.assertTrue(ctx._ai_config_target.is_file())
+                finally:
+                    fixture.teardown(ctx)
+                self.assertFalse(ctx._ai_config_target.exists())
+
     def test_native_fixture_restores_previous_config_and_only_uses_owned_root(self):
         with TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             config_root = root / "native-config"
-            target = config_root / "taomni" / "ai.json"
+            target = config_root / QA_APP_ID / "taomni" / "ai.json"
             target.parent.mkdir(parents=True)
             target.write_bytes(b"previous configuration")
             ctx = SimpleNamespace(cfg={"app": {"mode": "native"}}, report_root=root, case_dir=root / "case", values={})

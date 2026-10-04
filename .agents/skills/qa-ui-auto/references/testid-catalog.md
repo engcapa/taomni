@@ -1918,6 +1918,7 @@
 - `[data-testid="context-menu-item-user-sessions"]` — interactive [optional] — F6.2.context-move-root
 - `[data-testid^="context-menu-item-user-sessions-"]` — interactive [optional] — F6.2.context-move-destination
   ↳ `[data-testid="context-menu-item-user-sessions-qa-selection-target"]` — alias
+  ↳ `[data-testid="context-menu-item-user-sessions-shell-group"]` — alias
 - `[data-custom-drag-ghost="true"]` — display [optional] — F6.2.drag-preview
 - `[data-testid="session-search"]` — interactive — F6.2.session-search
 - `[data-testid="session-new"]` — interactive — F6.2.session-new

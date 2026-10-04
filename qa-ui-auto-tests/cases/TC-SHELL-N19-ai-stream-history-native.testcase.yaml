@@ -1,10 +1,11 @@
 id: TC-SHELL-N19
 title: AI stream, hidden completion, drafts and retained conversation
-description: The active qa-loopback provider receives the sent user content. Both replies finish, hidden
-  completion raises one Tao alert and reveals the exact ready thread, hide/reopen preserves the unsent
-  multiline draft, and history reloads one conversation without resending. Native additionally observes
-  four actual protocol requests including provider failure/recovery and restarts the real isolated QA
-  process; browser uses the explicitly labelled IPC preview stream.
+description: The active qa-loopback provider receives the sent user content. Both replies finish, hidden completion
+  raises one Tao alert and reveals the exact ready thread, hide/reopen preserves the unsent multiline draft,
+  and history reloads one conversation without resending. Native additionally observes four actual protocol
+  requests including provider failure/recovery and restarts the real isolated QA process; browser uses the
+  explicitly labelled IPC preview stream. Provider receipts additionally require four requests with the production
+  tool catalog present, including real SSE text delivery and failure/recovery.
 covers:
 - F-AI-2.4
 - F-SHELL-1
@@ -101,6 +102,7 @@ steps:
       streamRequests: 4
       lastUserMessage: SHELL AI recovery
       model: qa-model
+      toolRequests: 4
 - restart_native_app: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="shell-rail-tao"]'
@@ -133,16 +135,17 @@ steps:
       streamRequests: 4
       lastUserMessage: SHELL AI recovery
       model: qa-model
+      toolRequests: 4
 - screenshot: tc-shell-ai-stream-history.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The active qa-loopback provider receives the sent user content. Both replies finish,
-      hidden completion raises one Tao alert and reveals the exact ready thread, hide/reopen preserves
-      the unsent multiline draft, and history reloads one conversation without resending. Native additionally
-      observes four actual protocol requests including provider failure/recovery and restarts the real
-      isolated QA process; browser uses the explicitly labelled IPC preview stream.
+    requirement: The active qa-loopback provider receives the sent user content. Both replies finish, hidden
+      completion raises one Tao alert and reveals the exact ready thread, hide/reopen preserves the unsent
+      multiline draft, and history reloads one conversation without resending. Native additionally observes
+      four actual protocol requests including provider failure/recovery and restarts the real isolated QA process;
+      browser uses the explicitly labelled IPC preview stream.
     actions:
     - 1
     - 2
@@ -177,11 +180,10 @@ verification:
       expectation: '{"assert_value": {"selector": "[data-testid=\"ai-chat-drawer\"] select[aria-label=\"Thread
         LLM provider\"]", "equals": "qa-loopback"}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-chat-role=\"assistant\"]", "contains": "SHELL
-        AI response 中文\nSecond paragraph", "timeout_sec": 20}}'
+      expectation: '{"assert_text": {"selector": "[data-chat-role=\"assistant\"]", "contains": "SHELL AI response
+        中文\nSecond paragraph", "timeout_sec": 20}}'
     - step: 11
-      expectation: '{"assert_text_equals": {"selector": "[data-chat-role=\"user\"]", "equals": "SHELL
-        AI 第一条"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-chat-role=\"user\"]", "equals": "SHELL AI 第一条"}}'
     - step: 12
       expectation: '{"assert_value": {"selector": "[data-testid=\"ai-chat-composer\"] textarea", "equals":
         ""}}'
@@ -203,15 +205,16 @@ verification:
       expectation: '{"assert_value": {"selector": "[data-testid=\"ai-chat-composer\"] textarea", "equals":
         "SHELL AI unsent 中文\nSecond draft line"}}'
     - step: 31
-      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "QA
-        provider unavailable", "timeout_sec": 20}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "QA provider
+        unavailable", "timeout_sec": 20}}'
     - step: 34
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-thread-id][data-ready]'').textContent.split(''SHELL
         AI response 中文'').length === 4 && document.querySelector(''[data-thread-id][data-ready]'').textContent.split(''Second
         paragraph'').length === 4", "expect_truthy": true, "timeout_sec": 20}}'
     - step: 35
       expectation: '{"assert_json_file": {"path": "${fixture.ai_provider_requests}", "expect": {"requests":
-        4, "streamRequests": 4, "lastUserMessage": "SHELL AI recovery", "model": "qa-model"}}}'
+        4, "streamRequests": 4, "lastUserMessage": "SHELL AI recovery", "model": "qa-model", "toolRequests":
+        4}}}'
     - step: 37
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 41
@@ -234,7 +237,8 @@ verification:
         AI recovery"}}'
     - step: 49
       expectation: '{"assert_json_file": {"path": "${fixture.ai_provider_requests}", "expect": {"requests":
-        4, "streamRequests": 4, "lastUserMessage": "SHELL AI recovery", "model": "qa-model"}}}'
+        4, "streamRequests": 4, "lastUserMessage": "SHELL AI recovery", "model": "qa-model", "toolRequests":
+        4}}}'
     results:
     - 3
     - 6
@@ -268,8 +272,8 @@ verification:
   native:
   - check: Real Tauri stream and persisted history after QA process restart.
     method: automated
-    reason: Native uses the loopback OpenAI protocol, actual Rust IPC and SQLite; the provider receipt
-      is independent of UI. Browser uses the explicitly labelled IPC preview reply.
+    reason: Native uses the loopback OpenAI protocol, actual Rust IPC and SQLite; the provider receipt is independent
+      of UI. Browser uses the explicitly labelled IPC preview reply.
 native_platforms:
 - Linux
 - Windows

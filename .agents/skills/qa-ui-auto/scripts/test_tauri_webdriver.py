@@ -434,7 +434,7 @@ class NativeSessionFillTest(TestCase):
                 patch("tauri_webdriver.time.monotonic", side_effect=[0, 6]):
             with self.assertRaises(WebDriverError) as error:
                 session.fill('input[type="password"]', text)
-        self.assertIn("password input did not retain the requested value", str(error.exception))
+        self.assertIn("form input did not retain the requested value", str(error.exception))
         self.assertNotIn(text, str(error.exception))
         self.assertEqual(set_text.call_args_list, [call(text), call("previous")])
         session.type_text.assert_not_called()
@@ -455,6 +455,38 @@ class NativeSessionFillTest(TestCase):
         ])
         sleep.assert_called_once_with(0.05)
         session.type_text.assert_not_called()
+
+    def test_linux_unicode_textarea_replaces_the_whole_value_before_restoring_clipboard(self) -> None:
+        session = self.session(False)
+        text = "First line\n第二行\nChild edit"
+        order = []
+        observed = iter([False, False, True])
+        def read(script):
+            result = next(observed)
+            order.append(("read", result))
+            return result
+        session.execute = Mock(side_effect=read)
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text", side_effect=lambda value: order.append(("clipboard", value))), \
+                patch("tauri_webdriver.time.sleep"):
+            session.fill('[data-testid="note-editor-body"]', text)
+        self.assertEqual(order, [("read", False), ("clipboard", text), ("read", False), ("read", True), ("clipboard", "previous")])
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace"), call("Control+v")])
+        session.type_text.assert_not_called()
+        self.assertIn(json.dumps(text), session.execute.call_args.args[0])
+
+    def test_linux_unicode_form_restores_clipboard_on_incomplete_paste(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(return_value=False)
+        text = "中文 replacement"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as write, \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 6]):
+            with self.assertRaisesRegex(WebDriverError, "form input did not retain"):
+                session.fill("textarea", text)
+        self.assertEqual(write.call_args_list, [call(text), call("previous")])
 
     def test_linux_password_fill_removes_password_from_clipboard_after_paste_failure(self) -> None:
         session = self.session(False)
@@ -509,6 +541,27 @@ class NativeSessionFillTest(TestCase):
             ],
         )
         self.assertEqual(session.request.call_args.args, ("DELETE", "/session/session-1/actions"))
+
+    def test_shifted_sql_punctuation_uses_shift_and_releases_it_before_next_key(self) -> None:
+        for system in ("Linux", "Windows"):
+            with self.subTest(system=system), patch("tauri_webdriver.platform.system", return_value=system):
+                session = NativeSession("http://driver.invalid", Path("unused"))
+                session.session_id = "session-1"
+                session.request = Mock()
+                session.type_text('qa_tx = "中文";')
+                actions = session.request.call_args_list[0].args[2]["actions"][0]["actions"]
+                held = set()
+                for action in actions:
+                    if action["type"] == "keyDown":
+                        char = action["value"]
+                        if char in ('_', '"'):
+                            self.assertIn("\ue008", held)
+                        elif char in ('q', 'a', 't', 'x', '=', ';', ' '):
+                            self.assertNotIn("\ue008", held)
+                        held.add(char)
+                    elif action["type"] == "keyUp":
+                        held.discard(action["value"])
+                self.assertFalse(held)
 
     def test_type_text_splits_per_char_on_darwin(self) -> None:
         # The macOS bridge dispatches a whole sequence in one synchronous
