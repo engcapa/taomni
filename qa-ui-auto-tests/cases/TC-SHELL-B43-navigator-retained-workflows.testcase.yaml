@@ -1,9 +1,9 @@
 id: TC-SHELL-B43
 title: Navigator retains sessions, JSON import/export, Quick Connect and utility menu routes
 description: Workspace Shell renderer and retained workflow evidence. See docs-feature/workspace-shell-ux-redesign-test-cases.md;
-  native effects require the paired native cases. Folder selectors use the production canonical display path with
-  spaced separators; import inputs retain their portable raw paths. Sessions/Tools switches keep expanded branches
-  mounted; clearing the preserved search must reveal the previously expanded branch before import.
+  native effects require the paired native cases. Folder selectors use the production canonical display path
+  with spaced separators; import inputs retain their portable raw paths. Sessions/Tools switches keep expanded
+  branches mounted; clearing the preserved search must reveal the previously expanded branch before import.
 covers:
 - F1.9
 - F8.1
@@ -207,8 +207,57 @@ steps:
       sessions:
         length_min: 7
         contains: SHELL imported
-        excludes: password
+        excludes: qa-export-must-be-excluded
       sessions.7:
+        exists: false
+      sessions.0.auth:
+        equals:
+          kind: agent
+      sessions.0.password:
+        exists: false
+      sessions.0.options.proxyPass:
+        exists: false
+      sessions.1.auth:
+        equals:
+          kind: agent
+      sessions.1.password:
+        exists: false
+      sessions.1.options.proxyPass:
+        exists: false
+      sessions.2.auth:
+        equals:
+          kind: agent
+      sessions.2.password:
+        exists: false
+      sessions.2.options.proxyPass:
+        exists: false
+      sessions.3.auth:
+        equals:
+          kind: agent
+      sessions.3.password:
+        exists: false
+      sessions.3.options.proxyPass:
+        exists: false
+      sessions.4.auth:
+        equals:
+          kind: agent
+      sessions.4.password:
+        exists: false
+      sessions.4.options.proxyPass:
+        exists: false
+      sessions.5.auth:
+        equals:
+          kind: agent
+      sessions.5.password:
+        exists: false
+      sessions.5.options.proxyPass:
+        exists: false
+      sessions.6.auth:
+        equals:
+          kind: agent
+      sessions.6.password:
+        exists: false
+      sessions.6.options.proxyPass:
         exists: false
 - assert_count:
     selector: '[data-testid="session-tree-item"]'
@@ -274,8 +323,8 @@ verification:
     - 15
     - 18
   - id: R2
-    requirement: tunneling remains accessible from Navigator Tools and the application Tools menu; repeated entry
-      preserves its existing view.
+    requirement: tunneling remains accessible from Navigator Tools and the application Tools menu; repeated
+      entry preserves its existing view.
     actions:
     - 14
     - 17
@@ -290,8 +339,8 @@ verification:
     - step: 25
       expectation: '{"wait_for": "[data-testid=\"tunnel-manager\"]"}'
     - step: 26
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"nettools\"]", "equal":
-        1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"nettools\"]",
+        "equal": 1}}'
     - step: 27
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
@@ -301,8 +350,8 @@ verification:
     - 26
     - 27
   - id: R3
-    requirement: sockscap remains accessible from Navigator Tools and the application Tools menu; repeated entry
-      preserves its existing view.
+    requirement: sockscap remains accessible from Navigator Tools and the application Tools menu; repeated
+      entry preserves its existing view.
     actions:
     - 28
     - 29
@@ -315,8 +364,8 @@ verification:
     - step: 34
       expectation: '{"wait_for": "[data-testid=\"sockscap-panel\"]"}'
     - step: 35
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"sockscap\"]", "equal":
-        1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"sockscap\"]",
+        "equal": 1}}'
     - step: 36
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
         "equals": "utility"}}'
@@ -326,8 +375,8 @@ verification:
     - 35
     - 36
   - id: R4
-    requirement: mfa remains accessible from Navigator Tools and the application Tools menu; repeated entry preserves
-      its existing view.
+    requirement: mfa remains accessible from Navigator Tools and the application Tools menu; repeated entry
+      preserves its existing view.
     actions:
     - 37
     - 38
@@ -351,8 +400,8 @@ verification:
     - 46
     - 47
   - id: R5
-    requirement: The existing network tools placeholder remains reachable in Utility and exposes its current availability
-      status.
+    requirement: The existing network tools placeholder remains reachable in Utility and exposes its current
+      availability status.
     actions:
     - 48
     - 49
@@ -369,8 +418,9 @@ verification:
     - 51
     - 52
   - id: R6
-    requirement: Sessions create/move/copy/edit preserves exact folder, filtered selection and two results after
-      switching Navigator pages; clearing the retained search reveals the still-expanded original folder and child row.
+    requirement: Sessions create/move/copy/edit preserves exact folder, filtered selection and two results
+      after switching Navigator pages; clearing the retained search reveals the still-expanded original folder
+      and child row.
     actions:
     - 53
     - 54
@@ -432,8 +482,9 @@ verification:
     - 82
     - 83
   - id: R7
-    requirement: The actual menu file chooser and import preview cancel safely, import only the selected row, and
-      export seven portable sessions with excluded secrets.
+    requirement: The actual menu file chooser and import preview cancel safely, import only the selected row,
+      and export seven portable sessions with excluded secrets. The portable agent auth descriptor must round-trip
+      unchanged for all seven sessions; the seeded proxy credential and password fields must be absent.
     actions:
     - 84
     - 87
@@ -460,8 +511,8 @@ verification:
     - step: 91
       expectation: '{"wait_for": "[data-testid=\"session-import-preview\"]"}'
     - step: 92
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody tr", "equal":
-        2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody tr",
+        "equal": 2}}'
     - step: 95
       expectation: '{"assert_text": {"selector": "[data-testid=\"session-import-preview-summary\"]", "contains":
         "1 of 2"}}'
@@ -472,8 +523,8 @@ verification:
     - step: 103
       expectation: '{"wait_for": "[data-testid=\"session-import-preview\"]"}'
     - step: 104
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody tr", "equal":
-        2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-import-preview-table\"] tbody tr",
+        "equal": 2}}'
     - step: 107
       expectation: '{"assert_text": {"selector": "[data-testid=\"session-import-preview-summary\"]", "contains":
         "1 of 2"}}'
@@ -487,8 +538,18 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL imported\"]"}'
     - step: 119
       expectation: '{"assert_json_file": {"path": "${fixture.shell_export}", "expect": {"format": "taomni.sessions",
-        "schema_version": 1, "security.secrets": "excluded", "sessions": {"length_min": 7, "contains": "SHELL imported",
-        "excludes": "password"}, "sessions.7": {"exists": false}}}}'
+        "schema_version": 1, "security.secrets": "excluded", "sessions": {"length_min": 7, "contains": "SHELL
+        imported", "excludes": "qa-export-must-be-excluded"}, "sessions.7": {"exists": false}, "sessions.0.auth":
+        {"equals": {"kind": "agent"}}, "sessions.0.password": {"exists": false}, "sessions.0.options.proxyPass":
+        {"exists": false}, "sessions.1.auth": {"equals": {"kind": "agent"}}, "sessions.1.password": {"exists":
+        false}, "sessions.1.options.proxyPass": {"exists": false}, "sessions.2.auth": {"equals": {"kind": "agent"}},
+        "sessions.2.password": {"exists": false}, "sessions.2.options.proxyPass": {"exists": false}, "sessions.3.auth":
+        {"equals": {"kind": "agent"}}, "sessions.3.password": {"exists": false}, "sessions.3.options.proxyPass":
+        {"exists": false}, "sessions.4.auth": {"equals": {"kind": "agent"}}, "sessions.4.password": {"exists":
+        false}, "sessions.4.options.proxyPass": {"exists": false}, "sessions.5.auth": {"equals": {"kind": "agent"}},
+        "sessions.5.password": {"exists": false}, "sessions.5.options.proxyPass": {"exists": false}, "sessions.6.auth":
+        {"equals": {"kind": "agent"}}, "sessions.6.password": {"exists": false}, "sessions.6.options.proxyPass":
+        {"exists": false}}}}'
     - step: 120
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-tree-item\"]", "equal": 7}}'
     results:
@@ -507,8 +568,8 @@ verification:
     - 119
     - 120
   - id: R8
-    requirement: View Quick Connect rejects an empty SSH URL, authenticates the valid URL through the real opener
-      and executes exactly one anchored output marker in Connect.
+    requirement: View Quick Connect rejects an empty SSH URL, authenticates the valid URL through the real
+      opener and executes exactly one anchored output marker in Connect.
     actions:
     - 121
     - 122
@@ -543,8 +604,8 @@ verification:
     - 135
   - id: R10
     requirement: Navigator Tools and Sessions retain the same session tree. Clearing the preserved search reveals
-      the previously expanded Shell/甲 branch and SFTP row before import; importing the chosen row keeps the exact
-      seven-session export and cancels without creating a row.
+      the previously expanded Shell/甲 branch and SFTP row before import; importing the chosen row keeps the
+      exact seven-session export and cancels without creating a row.
     actions:
     - 79
     - 80
@@ -563,5 +624,5 @@ verification:
   native:
   - check: Real processes, services and OS input
     method: not-applicable
-    reason: This case runs the renderer against declared external IPC fixtures; paired native cases establish real
-      effects.
+    reason: This case runs the renderer against declared external IPC fixtures; paired native cases establish
+      real effects.

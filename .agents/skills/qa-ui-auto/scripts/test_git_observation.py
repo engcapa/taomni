@@ -15,12 +15,12 @@ class GitObservationTest(TestCase):
     def test_workspace_companion_is_owned_clean_and_independent_from_the_changed_repository(self):
         from qa_ui_auto.fixtures import git_diff_repo
         with TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             ctx = SimpleNamespace(cfg={"app": {"mode": "native"}}, report_root=root,
                                   case_dir=root / "case", step_index=1, values={})
             git_diff_repo.setup(ctx)
-            primary = Path(ctx.values["git_diff_repo"])
-            auxiliary = Path(ctx.values["git_diff_aux_repo"])
+            primary = Path(ctx.values["git_diff_repo"]).resolve()
+            auxiliary = Path(ctx.values["git_diff_aux_repo"]).resolve()
             self.assertNotEqual(primary, auxiliary)
             self.assertTrue(primary.is_relative_to(root))
             self.assertTrue(auxiliary.is_relative_to(root))

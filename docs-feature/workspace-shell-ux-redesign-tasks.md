@@ -157,3 +157,10 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 
 - [run 37199342505](https://github.com/engcapa/taomni/actions/runs/37199342505)，输入 `26efb101875ebce46ebe517206ccde60f3d1bbd5`，在 plan 的 QA tools 单测阶段被两条旧 taskkill 测试拦下，未执行任何 browser/native case。旧 mock 仍返回字符串并要求 `text=True`，与修复后的 bytes 输出不符；该运行不是产品用例结果。
 - 修正旧 mock/参数预期，并加入中文 OEM 错误 bytes 下仍报告失败、保留 owned PID、下一次清理能成功的回归。新增测试第一次在重试成功路径缺少 profile-owner mock，局部单测明确失败；补上外部过程 mock 后，相关 isolation/transport 单测 40 项，38 pass / 2 平台限定 skip，exit 0。没有启动实际 browser/native app。继续以新 runner 输入触发同一精确失败集。
+
+### 远程路径与导出契约定位
+
+- 继发定位 [run 37199680203](https://github.com/engcapa/taomni/actions/runs/37199680203)，输入 `05588c93cfeaa7bbd7deba6a985166f4351a9eff`，plan 单测和静态 gate 通过；selection 为 browser 每端 5、native 每端 13，共 54 次执行，gaps/unreviewed 为空。
+- Windows/macOS 的 browser/native 四个 job 在 Git fixture 单测阶段拦下，均未执行 UI：导出的仓库已经 canonicalize，但测试拿它与尚未 resolve 的临时目录作词法比较。macOS 临时目录别名与 Windows runner 目录映射暴露此问题；本次对双方 resolve 后继续验证 primary/aux 都归属 run-root，未放宽边界。相关三个工具模块本地 22/22 通过。
+- Linux browser 4 pass / 1 fail / 0 skip，身份、配置、receipt、hashes 匹配；B43 现在能独立读取 export 文件，后续失败是 fixture 的 `auth: agent` 字符串不符合 v1 的 `auth: {kind: agent}` 契约，导入 fallback 变成 password。对整个文件禁止 `password` 单词也会误伤合法认证类型。本次修正输入格式，并要求七个 export auth 都精确为 agent；为 qa-alpha seed 明确的 proxy 凭据样本，检查该值和各 session 的 password/proxyPass 字段全部缺席，保持七条 session 与取消/导入断言。
+- 本地 `shell-export-unit-203` 47/47，使用生产 parser/serializer 证明 agent round-trip 与凭据排除；`shell-static-204` gate 通过，coverage baseline 未改。Linux native 的旧输入仍在执行，用于收集邮件阶段/UID 诊断；下一运行先恢复 Windows/macOS 的实际用例执行。

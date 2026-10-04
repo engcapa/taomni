@@ -138,6 +138,31 @@ function makeStoredZip(entries: Record<string, string>): Uint8Array {
 }
 
 describe("Taomni session import/export", () => {
+  it("preserves portable agent authentication and omits seeded proxy credentials", () => {
+    const imported = parseTaomniSessions(JSON.stringify({
+      format: "taomni.sessions",
+      schema_version: 1,
+      sessions: [{
+        name: "SHELL imported", type: "SSH", host: "imported.invalid", port: 22,
+        username: "qa", auth: { kind: "agent" }, folder_path: "Shell/导入", options: {},
+      }],
+    }), { now: 1234 });
+    expect(imported.sessions).toHaveLength(1);
+    expect(imported.sessions[0].auth_method).toBe("Agent");
+    const exported = serializeTaomniSessions([
+      session({ auth_method: "Agent", options_json: JSON.stringify({ proxyPass: "qa-export-must-be-excluded" }) }),
+      imported.sessions[0],
+    ], null);
+    const payload = JSON.parse(exported.text);
+    expect(payload.security.secrets).toBe("excluded");
+    expect(payload.sessions.map((entry: { auth: unknown }) => entry.auth)).toEqual([
+      { kind: "agent" }, { kind: "agent" },
+    ]);
+    expect(payload.sessions[0].options).not.toHaveProperty("proxyPass");
+    expect(exported.text).not.toContain("qa-export-must-be-excluded");
+    expect(exported.text).not.toContain('"password":');
+  });
+
   it("round trips safe session fields and strips local log paths", () => {
     const exported = serializeTaomniSessions([session()], "Production");
     const parsed = JSON.parse(exported.text) as { sessions: Array<{ folder_path: string | null; options: Record<string, unknown> }> };

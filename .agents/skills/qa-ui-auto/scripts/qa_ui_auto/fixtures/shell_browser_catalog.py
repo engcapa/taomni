@@ -20,13 +20,14 @@ def setup(ctx):
                              created_at=1000, updated_at=1000, last_connected_at=2000-index, sort_order=index))
     case = ctx.case_id
     if case == "TC-SHELL-B43":
+        sessions[0]["options_json"] = json.dumps({"proxyPass": "qa-export-must-be-excluded"})
         # A chooser supplies only portable connection data; product import,
         # duplicate detection and persistence still run through the real UI.
         source = Path(ctx.case_dir) / "shell-import.json"
         source.parent.mkdir(parents=True, exist_ok=True)
         source.write_text(json.dumps({"format": "taomni.sessions", "schema_version": 1, "sessions": [
-            {"name": "qa-alpha", "type": "SSH", "host": "alpha.invalid", "port": 22, "username": "qa", "auth": "agent", "folder_path": "Shell/甲", "options": {}},
-            {"name": "SHELL imported", "type": "SSH", "host": "imported.invalid", "port": 22, "username": "qa", "auth": "agent", "folder_path": "Shell/导入", "options": {}},
+            {"name": "qa-alpha", "type": "SSH", "host": "alpha.invalid", "port": 22, "username": "qa", "auth": {"kind": "agent"}, "folder_path": "Shell/甲", "options": {}},
+            {"name": "SHELL imported", "type": "SSH", "host": "imported.invalid", "port": 22, "username": "qa", "auth": {"kind": "agent"}, "folder_path": "Shell/导入", "options": {}},
         ]}, ensure_ascii=False), encoding="utf-8")
         ctx.values.update(shell_import=source.as_posix(), shell_export=(source.parent / "shell-export.json").as_posix())
     if case in {"TC-SHELL-B06", "TC-SHELL-B38"}:
