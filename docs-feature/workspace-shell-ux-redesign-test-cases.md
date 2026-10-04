@@ -1254,7 +1254,7 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 | 产物 / 范围 | 当前结果 | 实施完成时回填 |
 |---|---|---|
 | Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；D2 精准 run 37230541532 三端各 1/0/0。最新全量 run 37231369098 的 Linux 190/0/0、macOS 188/2/0，其余报告待收齐；B07 延迟绑定回归已修复、B17 实际 ready 等待已补，待修正输入复验 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
-| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用。完整 run 37227772151 为 Linux 68/0/0、Windows 62/0/0、macOS 60/1/0；macOS N08 重启 width=248 仍需诊断。新增 stored/rendered 精确 232 检查的三端 native run 37233544174 运行中 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
+| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用。完整 run 37227772151 为 Linux 68/0/0、Windows 62/0/0、macOS 60/1/0；macOS 旧 N08 的 width=248 失败保留。新增 stored/rendered 精确 232 检查的 run 37233544174 三端各 1/0/0，36 步全执行；同产品源码的完整 run 37231369098 Linux 68/0/0、macOS 61/0/0，Windows native 待收齐 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
 | fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
 | 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
 | 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸已有自动化断言；历史部分画面已检查 | 当前 SHA 画面、读屏、OS DPI/跨屏与系统控件仍按平台单列 |
@@ -1321,3 +1321,8 @@ B07 延迟绑定回归：在原 empty lane/inert 检查后，读取实际持久�
 B17 ready 前置条件：原 list 可见不等于 React Host 的 phase effect 已提交。失败 HTML 随后为 ready，所以在原 exact phase 检查前增加对真实 `[data-testid="shell-host"][data-phase="ready"]` 的有界等待；原 26 步、150 秒、attach 次数/唯一实例/owner 切换检查完整保留。
 
 N08 诊断补充：真退出、独立 PID 消失、同 profile 重启后，在原 exact 232px handle 之前检查完整 JSON `{"storedWidth":232,"renderedWidth":"232"}`；失败显示实际二字段值以区分持久化与渲染恢复。原 35 步、300 秒保留，现 36 步。精准 run 37233544174 在固定输入 9ad0a3ea928647bd7f06387e73de9fe651124b77 上运行中，当前不把根因或修复效果记为已证明。
+
+
+N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、native build 与原始 ZIP hashes 匹配；macOS 首次读取即为精确 stored/rendered 232/232，同产品源码的完整 run 37231369098 原 N08 的即时 width 也通过。旧失败未改写，旧 248 原因未在该精准输入复现；新增二字段检查继续保留以防后续失效被忽略。
+
+本地单测收尾：全量 342 的其它 525 文件 / 4994 项通过；修正编辑器测试的 provider 暂停时钟和 WebView reset 模拟时机后，完整 352 的 250 项全通过。当前 526 文件 / 5244 项的原始报告、名称集合及哈希核对见 `shell-unit-review-353.json`；原失败保留，不称 342 为全通过。两处为 unit fixture 调整，原生产逻辑、期限和业务断言保持。

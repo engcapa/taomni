@@ -23,7 +23,7 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。统一 [run 37227772151](https://github.com/engcapa/taomni/actions/runs/37227772151) 的六份原始报告已收齐并核对：759 pass / 2 fail / 0 skip。Linux D2 已在三端精准复验通过，macOS N08 的 232px 重启恢复仍在诊断。后续 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098) 的 Linux browser 190/0/0、macOS browser 188/2/0；B07 延迟绑定导航回归已本地修复，B17 已补实际 ready 状态等待，均待修正输入远程复验。三端 [N08 诊断 run 37233544174](https://github.com/engcapa/taomni/actions/runs/37233544174) 正在运行。历史失败完整保留，不以 workflow job success 代替逐 case 通过。
+TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。统一 [run 37227772151](https://github.com/engcapa/taomni/actions/runs/37227772151) 的六份原始报告已收齐并核对：759 pass / 2 fail / 0 skip。Linux D2 已在三端精准复验通过，macOS N08 的 232px 重启恢复仍在诊断。后续 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098) 的 Linux browser 190/0/0、macOS browser 188/2/0；B07 延迟绑定导航回归已本地修复，B17 已补实际 ready 状态等待，均待修正输入远程复验。三端 [N08 诊断 run 37233544174](https://github.com/engcapa/taomni/actions/runs/37233544174) 各 1/0/0，36 步全部通过；本地前端 526 文件 / 5244 项已按原始报告和完整编辑器重跑核对通过。历史失败完整保留，不以 workflow job success 代替逐 case 通过。
 
 最终完整范围为 250 个独立 ID：browser 三端各 190，native Linux 68 / Windows 62 / macOS 61，共 761 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-307.txt`；269 的旧 249 ID 列表保留。新增一个既有 RDP Server 用例保护本轮共享 host_helper 修改，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
@@ -269,3 +269,13 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - N08 原失败前的 232px handle、实际 localStorage 写入、真实 Exit 与独立 PID 退出均通过；重启后即时 handle 为 248。新增只读 stored/rendered 双字段检查，要求两者精确为 232，随后保留原 exact width 与 workspace restore；35 个原步骤、300 秒预算保留，现 36 步。327 的布局/store/Shell 单测 14/14 pass；初始 expression 触发 schema 的 CSS 等号误判，328/329 无效日志保留。改用等价只读转义后，330 audit 与 331 三端 native 精准 plan 通过。固定输入 `9ad0a3ea928647bd7f06387e73de9fe651124b77` 的 run 37233544174 已启动，尚不确定是存储丢失还是恢复时序。
 - 本轮已查看 run 37227772151 的 macOS native 12 张成功原图，未见捕获状态的明显遮挡/裁切；审阅记录 `shell-visual-reviewed-macos-native-341.json`。该结果不代替最终输入的画面、DPI/读屏或像素基线。
 - 全量前端 unit 342 已启动，结果尚待收齐；原始旧失败报告保留。本批没有本地 browser/native 启动或 native build。所有修正需统一输入通过六端逐 case 验收后更新当前任务状态。
+
+
+### N08 复验与本地单测收尾
+
+- 固定输入 9ad0a3ea928647bd7f06387e73de9fe651124b77 的 [run 37233544174](https://github.com/engcapa/taomni/actions/runs/37233544174) 三端 native 各 1 pass / 0 fail / 0 skip，36 步完整执行，共 108 步。三份 source/runner/case/selection/receipt/config/native build 和原始 ZIP hashes 均匹配。macOS 的 stored/rendered 检查在首次读取即为精确 232/232；此精准运行未复现旧 248，不能据此确定旧失败根因。
+- 完整 run 37231369098 已收齐 Linux native 68/0/0、macOS native 61/0/0；macOS 原 N08 的 35 步、即时 exact width 也通过，step 27 约 0.008 秒。两份身份、receipt/config/build 和 ZIP hashes 匹配，Windows native 尚待收齐。macOS N19 独立 provider receipt 为 5 stream/tool requests、1 cancelled stream、3 completed streams、最后 SHELL AI recovery；未把 UI 成功提示当成真实 provider 结果。
+- 全量前端 342 为 526 files / 5244 tests，525 文件全通过，编辑器文件仅 pending Java didChange barrier 的一项失败。347 原断言独立运行通过；该成功同步场景刻意暂停 provider，真实 400ms feature deadline 会在忙碌的 act 期间到期。仅在暂停阶段使用受控测试时钟并在 finally 恢复，保留零提前查询、两次 didChange 与精确 definition 请求；生产期限未改变。
+- 编辑器完整 349 的 barrier 已通过，但另一个 focus-reset fixture 在 await menu disappearance 后才 blur，可能晚于两个真实焦点恢复回调。现在在菜单卸载的同一同步提交模拟 WebView reset，再保留原精确 row focus 等待；没有改变产品焦点恢复。351 两项聚焦 unit 通过；排除的 248 项仅为 filter，不当 UI skip 或完整回归通过。
+- 最终完整编辑器 352 为 250/250 pass，TypeScript 350 exit 0。342 的另外 525 文件 / 4994 项与 352 的全部 250 项共同覆盖当前前端 526 文件 / 5244 项；完整 assertion 名称集合相同，原 342/349 失败报告未改写，核对记录 `shell-unit-review-353.json`。本批 unit fixture 修改没有新的用户行为或 executable case；原 tree focus 边界继续由 TC-IDE-TREEOPEN-01 保护，同步屏障由原 unit 成功/失败分支保护。产品代码在 342 后未改变。
+- 345 的精确并集仍为 250 ID / 761 次，gaps/unreviewed 为空；346 提交后的 development contract 通过。下一输入先通过 GitHub 三端 browser 复验 B07/B17，再执行稳定输入的完整六端验收。没有本地 browser/native 启动或 native build。

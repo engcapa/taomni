@@ -7050,12 +7050,11 @@ describe("CodeWorkspaceTab", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
 
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
-    });
-
     // WebView2 drops DOM focus to the body when the focused menu node leaves
     // the document, after the restore that ran before the unmount commit.
+    // Apply that reset in the same commit, before an awaited assertion can let
+    // both the microtask and next-paint focus retries complete.
+    expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
     (document.activeElement as HTMLElement | null)?.blur();
 
     await waitFor(() => {
@@ -8288,18 +8287,25 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(changeCalls).toBe(1), { timeout: 2_000 });
 
     let navigation!: Promise<unknown>;
-    await act(async () => {
-      // Keep the action pending while the provider is deliberately held.
-      // Awaiting its completion here would block the test's own release.
-      navigation = registrationRef.current!.executeAction("workspace.gotoDefinition");
-      await Promise.resolve();
-    });
-    expect(lspMocks.lspDefinition).not.toHaveBeenCalled();
+    // Control the clock only while the provider is deliberately held. A busy
+    // suite can otherwise expire the real 400ms feature deadline during act,
+    // turning this successful synchronization scenario into a timeout scenario.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await act(async () => {
+        // Awaiting navigation here would block the test's own provider release.
+        navigation = registrationRef.current!.executeAction("workspace.gotoDefinition");
+        await Promise.resolve();
+      });
+      expect(lspMocks.lspDefinition).not.toHaveBeenCalled();
 
-    await act(async () => {
-      releaseFirstChange();
-      await Promise.resolve();
-    });
+      await act(async () => {
+        releaseFirstChange();
+        await navigation;
+      });
+    } finally {
+      vi.useRealTimers();
+    }
     await waitFor(() => expect(changeCalls).toBe(2));
     await waitFor(() => expect(lspMocks.lspDefinition).toHaveBeenCalledWith(
       expect.objectContaining({ filePath: "src/Main.java" }),
