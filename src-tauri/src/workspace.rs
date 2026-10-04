@@ -3901,7 +3901,14 @@ mod tests {
         let target = dir.path().join("target-dir");
         fs::create_dir(&target).unwrap();
         let err = write_workspace_bytes(&target, b"new".to_vec(), None).unwrap_err();
-        assert_eq!(err.kind, WorkspaceWriteErrorKind::Io);
+        // Windows reports opening a directory for reading as access denied;
+        // POSIX reports a directory I/O error. Both must prove zero writes.
+        let expected = if cfg!(windows) {
+            WorkspaceWriteErrorKind::Permission
+        } else {
+            WorkspaceWriteErrorKind::Io
+        };
+        assert_eq!(err.kind, expected);
         assert_eq!(err.effect, Some(WorkspaceWriteEffect::None));
         assert_eq!(
             err.intent_hash.as_deref(),
@@ -4198,7 +4205,10 @@ mod tests {
         let path_string = path.to_string_lossy().to_string();
 
         let file = workspace_read_loose_file(path_string.clone(), None).unwrap();
-        assert_eq!(PathBuf::from(&file.path), path.canonicalize().unwrap());
+        assert_eq!(
+            PathBuf::from(&file.path).canonicalize().unwrap(),
+            path.canonicalize().unwrap()
+        );
         assert_eq!(file.text, "one");
 
         let saved =
