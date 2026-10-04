@@ -18,6 +18,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- shell_navigate: sessions
 - wait_for: '[data-testid="sidebar"]'
 - wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
@@ -62,3 +63,76 @@ steps:
     selector: '[data-testid="result-log-tab"]'
     equal: 0
 - screenshot: db-exec-004-explain-browser.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Navigate from Home to Sessions, save and open the fixture MySQL bookmark, and reach the
+      declared offline connection banner.
+    actions:
+    - 1
+    - 2
+    - 5
+    - 7
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 18
+    checkpoints:
+    - step: 3
+      expectation: the Sessions Navigator is visible.
+    - step: 4
+      expectation: the New session control is visible.
+    - step: 6
+      expectation: the session editor is visible.
+    - step: 8
+      expectation: the MySQL settings is visible.
+    - step: 14
+      expectation: the bookmark editor is visible.
+    - step: 17
+      expectation: The fixture session or saved query is visible at [data-testid="session-tree-item"][data-session-name="qa-db-explain"].
+    - step: 19
+      expectation: the expected offline connection banner is visible.
+    results:
+    - 3
+    - 4
+    - 6
+    - 8
+    - 14
+    - 17
+    - 19
+  - id: R2
+    requirement: Explain rejects CREATE TABLE with the supported-statement reason and creates no execution
+      log.
+    actions:
+    - 20
+    - 21
+    - 22
+    - 23
+    - 26
+    checkpoints:
+    - step: 24
+      expectation: the Explain reason is visible.
+    - step: 25
+      expectation: '[data-testid="alert-dialog-message"] contains the required text ''Explain supports
+        SELECT''.'
+    - step: 27
+      expectation: Exactly 0 elements match [data-testid="result-log-tab"].
+    results:
+    - 24
+    - 25
+    - 27
+  visual:
+  - check: Inspect SQL toolbar, result log or Query Library inside the current Shell for clipping and
+      readable controls.
+    method: manual
+    reason: DOM assertions need a separate screenshot verdict.
+  native:
+  - check: Real database connection, execution and transaction effects
+    method: not-applicable
+    reason: This browser case explicitly uses offline IPC preview; paired native DB cases prove real SQL
+      and transaction effects.

@@ -1286,3 +1286,19 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 用户已授权实现、单测、推送及 GitHub browser/native 验证；当前任务状态与结果持续更新在 [实施任务](./workspace-shell-ux-redesign-tasks.md)。本稿的设计步骤保持完整，自动化数量、静态检查和单测通过均不代表全部三端桌面及人工边界已验收。
 
 SSH 启动回归补充：TC-155 与 TC-IDE-PARITY-027-02 在真实认证、原 ready 预算之后，读取实际终端 buffer 并要求隐藏 prompt hook 未泄露。原 132/69 个动作与检查、模式、覆盖归属和 240/180 秒总预算均保留，只各增加一个结果检查；完整首列输出/系统 clipboard 和 Files 单实例/终端可见性的原验收继续执行。对应挂载单测使用 2/24/50 行 xterm buffer，而不是把屏幕预分配行数等同于实际输出行数。
+
+### DB browser 补充范围
+
+逐模块核对发现旧 242 ID 选择未包含下面 7 条 DB browser 用例。它们保留原 SQL/事务状态/Query Library 断言和预算，入口改为 Home → Sessions Navigator；每条分别审阅打开连接与业务结果两项要求。两条旧 auto 用例已按实际动作和结果重写 requirement/checkpoint，去掉旧 needs-review 标记。此处的 reviewed 只代表用例语义审阅，运行结果仍待 GitHub。
+
+| 用例 | 当前 renderer 验收 | paired native 边界 |
+|---|---|---|
+| TC-DB-EXEC-001-execution-log-browser | 第一条失败后 Stop；FAILED / NOT RUN 精确数量与汇总；SQL/Log 在 Home 和 Overview 往返后保留且只一个 editor | 同名 native 用例验证真实执行及结果集 |
+| TC-DB-EXEC-002-error-choice-browser | Skip 第一条、Stop 第二条；statement 编号与 2 FAILED / 1 NOT RUN | 同名 native 用例验证真实多语句执行选择 |
+| TC-DB-EXEC-003-dangerous-confirm-browser | DROP Cancel 零执行、确认后产生一个失败日志 | 同名 native 用例验证确认与实际数据库效果 |
+| TC-DB-EXEC-004-explain-browser | DDL Explain 显示原因且无执行日志 | 同名 native 用例验证真实 Explain 结果 |
+| TC-DB-TX-001-manual-commit-browser | 离线 Auto 禁用，Commit/pending 控件缺席 | 同名 native 用例验证真实 manual commit / rollback |
+| TC-auto-F-DB-1-query-tab-rename | 双击 rename 保存完整名称；菜单 rename 的 Escape 取消 | query-tab-rename-native / native-restore 验证 SQLite 和重启 |
+| TC-auto-F-DB-1-sql-session-scaffold | Query Library namespace/archive/search、唯一名称和完整 SELECT 42 内容保存 | N12/N15 与 native query-workspace 边界；本例不声称真实数据库连接 |
+
+最终范围增至 249 个 ID，预计 browser 三端各 190，native Linux / Windows / macOS 为 67 / 61 / 60，共 758 次；以最终固定输入的 selection 与逐 case 报告核实。原 242 ID 文件和历史报告保留，不用新范围改写历史结果。

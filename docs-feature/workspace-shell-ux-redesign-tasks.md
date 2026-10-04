@@ -208,3 +208,10 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - Linux N08 的正常 Exit 与独立 PID 退出已通过，restart 收到 Maximum number of active sessions，后续 29 项在 setup 同样失败。macOS bridge 随应用退出，Linux 的独立 WebKit driver 仍保留会话名额；现在只对已观察退出的 macOS 免 DELETE。真实 loopback HTTP 工具单测验证 exit→DELETE→restart→close→下一例和幂等清理；改前 251 失败，修后 252 为 131 项、122 pass / 9 平台限定 skip、零 fail。没有本地启动原生应用。
 - Windows 失败原图与 buffer 显示原生终端可见，但 readiness 在初始化后失效，且 TC-155 命令被解释成 cho。已发现近期输出读取只看 buffer 最后三行，真实 24/50 行的尾部预分配空行使 MINGW64 识别失效。新增真实行数的 mounted 回归，改前 257 为 1 pass / 2 fail；读取前先去尾部空行后，TerminalPanel / shell integration / cwd 的 258 共 3 files / 103 tests 全通过。两个既有 YAML 各加一次隐藏初始化命令未泄露检查，所有原步骤和预算保留；尚待 GitHub 证明 Windows 原生失败已解决。
 - 本批最终 TypeScript 260 exit 0；静态 261 audit gate、242 ID / 737 次精确计划通过，gaps/unreviewed 为空；两条 SSH YAML 的 schema/reviewed contract 通过，Git diff check 通过。没有本地 browser/native 或 app 构建；下一候选固定输入复验八个相关 ID。
+
+### 逐模块范围复核与 DB browser 补充
+
+- 候选 1e2bb817cf8794495bbe22697ec54ef0960e09b5 已快进合入并推送 feat/ui-layout-refactor。[复验 37213780261](https://github.com/engcapa/taomni/actions/runs/37213780261) 为八个 ID、六端 27 次执行；已收齐的 browser 三端各 4/4 通过，身份、receipt/config 与 hashes 匹配；native 尚在执行。没有提前宣称 Windows SSH 或 Linux restart 已通过。
+- 按用户点名的模块逐项核对选择，发现 7 条既有 DB browser 用例未纳入旧 242 ID；此前 native DB 有覆盖，不能代替 browser。现适配这些用例的 Sessions 入口、分别审阅打开连接和业务结果要求；原 SQL、事务状态、Query Library 和 rename 步骤及 45/90 秒预算保留。新增一次 Home/Overview 往返后的完整 SQL/Log 和单实例验收、Query Library 完整内容保存检查。
+- 最终预期范围增加为 249 ID / 758 次：browser 三端各 190，native Linux 67 / Windows 61 / macOS 60。新列表为 qa-ui-auto-report/_local/shell-ci-case-ids-final-269.txt；旧 242 ID 列表保留用于历史核验。schema/reviewed contract 已通过；本地 DB unit 与静态精确计划仍在执行，随后推送并通过 GitHub 验证。
+- 收尾结果：DB/Query Library/执行日志单测 266 为 3 files / 48 tests 全通过；静态 267 audit gate 与 249 ID / 758 次精确计划通过，gaps/unreviewed 为空；Git diff check 通过。只改用例和证据文档，未改产品或构建输入。本批先远程执行七条 DB browser，再用最终统一 SHA 验收六端全范围。
