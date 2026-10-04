@@ -29,6 +29,7 @@ steps:
 - click: '[data-testid="screenshot-pin"]'
 - wait_for: '[data-testid="screenshot-pin-image"]'
 - click: '[data-testid="screenshot-pin-favorite"]'
+- wait_for: '[data-testid="screenshot-pin-favorite"][aria-pressed="true"]'
 - assert_attribute:
     selector: '[data-testid="screenshot-pin-favorite"]'
     name: aria-pressed
@@ -58,8 +59,8 @@ verification:
   review: reviewed
   requirements:
   - id: recovery
-    requirement: A failed list read shows a persistent error and Refresh recovers. Cancelling removal retains the favorite; confirming
-      removes it and the empty dialog closes with Escape.
+    requirement: A failed list read shows a persistent error and Refresh recovers. Cancelling removal retains the favorite;
+      confirming removes it and the empty dialog closes with Escape.
     actions:
     - 1
     - 3
@@ -70,38 +71,38 @@ verification:
     - 13
     - 14
     - 16
-    - 18
-    - 20
+    - 19
     - 21
-    - 23
-    - 25
-    - 27
-    - 29
-    - 32
+    - 22
+    - 24
+    - 26
+    - 28
+    - 30
+    - 33
     checkpoints:
     - step: 6
       expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-favorites-error"]'', ''contains'': ''storage unavailable''}'
     - step: 9
       expectation: 'assert_not_visible: [data-testid="screenshot-favorites-error"]'
-    - step: 17
-      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'', ''equals'':
-        ''true''}'
-    - step: 26
+    - step: 18
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''true''}'
+    - step: 27
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 1}'
-    - step: 31
+    - step: 32
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 0}'
-    - step: 33
-      expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
     - step: 34
+      expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
+    - step: 35
       expectation: 'assert_visible: [data-testid="system-screenshot"]'
     results:
     - 6
     - 9
-    - 17
-    - 26
-    - 31
-    - 33
+    - 18
+    - 27
+    - 32
     - 34
+    - 35
   visual:
   - check: Load error and recovered empty state
     method: automated

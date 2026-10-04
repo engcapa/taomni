@@ -87,6 +87,7 @@ steps:
     expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_save_image" && window.__taomniStubScreenshotCalls.at(-1).args.dest
       === "pinned-original.png"
 - click: '[data-testid="screenshot-pin-favorite"]'
+- wait_for: '[data-testid="screenshot-pin-favorite"][aria-pressed="true"]'
 - assert_attribute:
     selector: '[data-testid="screenshot-pin-favorite"]'
     name: aria-pressed
@@ -106,6 +107,7 @@ steps:
 - wait_for: '[data-testid="screenshot-favorite-open"]'
 - click: '[data-testid="screenshot-favorite-open"]'
 - wait_for: '[data-testid="screenshot-pin-image"]'
+- wait_for: '[data-testid="screenshot-pin-favorite"][aria-pressed="true"]'
 - assert_attribute:
     selector: '[data-testid="screenshot-pin-favorite"]'
     name: aria-pressed
@@ -113,6 +115,7 @@ steps:
 - eval_readonly:
     expression: document.querySelector('img').naturalWidth === 400 && document.querySelector('img').naturalHeight === 300
 - press: Mod+D
+- wait_for: '[data-testid="screenshot-pin-favorite"][aria-pressed="false"]'
 - assert_attribute:
     selector: '[data-testid="screenshot-pin-favorite"]'
     name: aria-pressed
@@ -132,9 +135,9 @@ verification:
   review: reviewed
   requirements:
   - id: workflow
-    requirement: Right-click opens help without closing. Zoom and opacity affect the view; collapse/expand preserves opacity. Copy/save
-      keep the pin open. Favorite survives a full page reload and restores the same original dimensions; un-favorite removes only the
-      persistent entry.
+    requirement: Right-click opens help without closing. Zoom and opacity affect the view; collapse/expand preserves opacity.
+      Copy/save keep the pin open. Favorite survives a full page reload and restores the same original dimensions; un-favorite
+      removes only the persistent entry.
     actions:
     - 1
     - 2
@@ -159,22 +162,23 @@ verification:
     - 40
     - 41
     - 44
-    - 46
-    - 48
-    - 50
+    - 47
+    - 49
     - 51
-    - 55
-    - 57
-    - 61
+    - 52
+    - 56
+    - 58
     - 63
-    - 65
     - 66
+    - 68
     - 69
+    - 72
     checkpoints:
     - step: 10
       expectation: 'assert_not_visible: [data-testid="screenshot-pin-menu"]'
     - step: 13
-      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-pin-help"]'', ''contains'': ''Favorites stay on this device''}'
+      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-pin-help"]'', ''contains'': ''Favorites stay on
+        this device''}'
     - step: 15
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''100%''}'
     - step: 17
@@ -185,8 +189,8 @@ verification:
       expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
         === 0.5''}'
     - step: 28
-      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-window"]'', ''name'': ''data-collapsed'', ''equals'':
-        ''true''}'
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-window"]'', ''name'': ''data-collapsed'',
+        ''equals'': ''true''}'
     - step: 31
       expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
         === 0.5''}'
@@ -195,27 +199,27 @@ verification:
     - step: 37
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_copy_image"''}'
     - step: 43
-      expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_save_image" && window.__taomniStubScreenshotCalls.at(-1).args.dest
-        === "pinned-original.png"''}'
-    - step: 45
-      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'', ''equals'':
-        ''true''}'
-    - step: 53
+      expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_save_image"
+        && window.__taomniStubScreenshotCalls.at(-1).args.dest === "pinned-original.png"''}'
+    - step: 46
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''true''}'
+    - step: 54
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 1}'
-    - step: 59
-      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'', ''equals'':
-        ''true''}'
-    - step: 60
+    - step: 61
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''true''}'
+    - step: 62
       expectation: 'eval_readonly: {''expression'': "document.querySelector(''img'').naturalWidth === 400 && document.querySelector(''img'').naturalHeight
         === 300"}'
-    - step: 62
-      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'', ''equals'':
-        ''false''}'
-    - step: 68
-      expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 0}'
-    - step: 70
-      expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
+    - step: 65
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''false''}'
     - step: 71
+      expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 0}'
+    - step: 73
+      expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
+    - step: 74
       expectation: Main screenshot entry remains usable.
     results:
     - 10
@@ -229,14 +233,14 @@ verification:
     - 32
     - 37
     - 43
-    - 45
-    - 53
-    - 59
-    - 60
+    - 46
+    - 54
+    - 61
     - 62
-    - 68
-    - 70
+    - 65
     - 71
+    - 73
+    - 74
   visual:
   - check: Visible controls, state and image dimensions
     method: automated
