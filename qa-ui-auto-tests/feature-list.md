@@ -5580,6 +5580,9 @@ controls:
 - id: ai-chat-send-button
   selector: '[data-testid="ai-chat-send-button"]'
   kind: interactive
+- id: ai-chat-stop-button
+  selector: '[data-testid="ai-chat-stop-button"]'
+  kind: interactive
 - id: note-editor-body
   selector: '[data-testid="note-editor-body"]'
   kind: interactive

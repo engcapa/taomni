@@ -1247,6 +1247,7 @@ export function ChatDrawer({ terminalContext, shellHosted = false }: ChatDrawerP
               </div>
               <button
                 type="button"
+                data-testid="ai-chat-stop-button"
                 className="taomni-btn h-5 px-2 text-[10px] flex items-center gap-1 hover:text-red-400 border border-[var(--taomni-divider)] rounded hover:bg-[var(--taomni-hover)] transition-colors"
                 // Stops this turn only — the queue keeps draining, so this is
                 // "skip this answer" rather than "abandon everything".

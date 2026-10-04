@@ -25,7 +25,7 @@
 
 TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。第四轮六份报告及后续 browser 定位运行已收齐，继续按逐 case 结果修复；历史失败证据完整保留。
 
-最新开发批次已集成稳定主工作面、SFTP 后台/跨窗口任务、Git/Notes 窗口恢复、workspace 并行恢复与取消，以及退出/数据库事务边界。第四轮 selection 为 240 个独立 ID（三端 browser 各 183，native Linux 65 / Windows 59 / macOS 58），包括全部截图回归和 AI streaming/history；补充的 Git N21 待下一轮一并提交，届时为 241 ID。数量以具体运行的 selection 为准。按用户要求，本地仅运行单元测试和静态检查，browser/native 与原生构建交给 GitHub。
+最新开发批次已集成稳定主工作面、SFTP 后台/跨窗口任务、Git/Notes 窗口恢复、workspace 并行恢复与取消，以及退出/数据库事务边界。第五轮已提交 Git N21，selection 为 241 个独立 ID（三端 browser 各 183，native Linux 66 / Windows 60 / macOS 59），共 734 次执行，包括全部截图回归和 AI streaming/history。数量以具体运行的 selection 为准。按用户要求，本地仅运行单元测试和静态检查，browser/native 与原生构建交给 GitHub。
 
 新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。这些缺口未记为 pass 或 done。
 
@@ -122,3 +122,10 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - 全后端单测 `shell-rust-unit-145` 首轮 1583 pass / 4 fail / 16 ignored，完整保留日志。修正四条旧测试的 Windows absolute path、隔离的不存在路径、canonical verbatim prefix、读取目录时原生 Permission 分类假设，保留迁移数量、hash、字节意图及零写入效果断言；不改变这些模块的产品路径处理。最终 `shell-rust-final-unit-153`：1587 pass / 0 fail / 16 原有 opt-in ignored，exit 0。新增真实工具 stream/parser/fallback 与 MySQL 取消响应单测均在其中通过。
 - 控件增加 B43 实际动态 group testid 的 alias 并重新生成 catalog；未调整 baseline。此前 static-154 的 stale-catalog 失败日志保留，最终 `shell-static-reviewed-157` gate 通过（required 970 / covered_required 925 / shallow 41 / orphans 4）。受影响 Rust 格式和 Git diff check 通过。
 - 下一次统一三端 browser/native 选择 241 个 ID，预期 browser 各 183，native Linux 66 / Windows 60 / macOS 59，共 734 次执行，以实际 selection 为准。全部单测与静态检查通过后提交、推送、验证并继续修复；任务保持 verification。
+
+### 第五轮与 AI 停止保留契约补充
+
+- 第五轮 [run 37193142141](https://github.com/engcapa/taomni/actions/runs/37193142141) 固定输入 `85a1d57b48e803bb2d81d61fdace45b140ab784b`，已提交并推送。selection 核对为 241 ID、上述六端 734 次执行，`gaps=[]`、`unreviewed=[]`。运行中，尚未建立完整 runtime 结果。
+- 核对停止逻辑的改前源码：失败/停止不持久化 assistant 回答是既有契约，不能把它误记为工具 SSE 重构引入的数据丢失。本轮保留该语义、用户消息与发送队列，补充实际停止验收。
+- B25 增加声明的 browser IPC hold→Stop→排队发送完成一次；N19 增加真实 SSE 部分回答→排队→Stop→实际连接取消→下一请求完成→重启历史。独立 provider receipt 要求 5 次真实 stream/tools 请求、3 次完成、1 次取消；重启只恢复 3 个完整 assistant 回答，不重发。没有提高原 150/180 秒预算或放宽既有断言。这些新增分支不在第五轮冻结输入中，待下一候选远程执行。
+- 本地 `shell-ai-stop-unit-161` 4 files / 80 tests、`shell-ai-provider-unit-162` 6 tests 通过；后者用真实 stdlib HTTP 客户端关闭测试连接验证服务端取消记录，未启动 browser/native app。`shell-ai-stop-types-163` exit 0；两个修改 case 的 schema/reviewed contract、`shell-ai-stop-static-164` audit gate 与 Git diff check 通过。静态 coverage baseline 未变，任务仍为 verification。

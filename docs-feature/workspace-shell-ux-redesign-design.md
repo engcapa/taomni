@@ -363,6 +363,8 @@ Code Workspace 项目树迁移到 Navigator 时保留模型、展开、选中、
 
 关闭只是 hide，不取消 AI 生成，不清 Notes 草稿。切 hub tab 保留各自输入和滚动；重新打开默认 last chat/notes，Notifications 在本次运行内保留但不写旧 lastTab key。AI master 关闭只让 Chat 显示设置入口/不可发送；Notes 和 Notifications 仍可访问。已有 Ribbon 可保留兼容入口，但不重复抢占窄屏空间或成为唯一入口。
 
+AI 的显式 Stop 沿用既有契约：取消当前 provider/tool turn，显示停止状态，已排队的发送继续顺序执行。未完成或失败的 assistant 回答不写入历史，用户已发送的消息保留；重启后只有完成的回答恢复。B25 通过明确的 browser IPC fixture 验证停止与队列接线；N19 在收到真实 SSE 部分文字后点击 Stop，以独立服务端连接关闭记录、下一条排队请求及 SQLite 重启历史共同验收，不能仅凭按钮状态判定取消成功。
+
 Chat 上下文显示绑定目标名称；默认 follow active，但用户显式固定会话时保持 chatTabId。A 生成中切到 B 后 A 回复仍在 A thread，通知跳回 A。没有可用上下文时显示全局对话/选择绑定提示，不能沿用已关闭 tab 的失效 backend handle。
 
 ### 7.2 通知目标与确认语义

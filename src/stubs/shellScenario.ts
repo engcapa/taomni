@@ -4,6 +4,7 @@ import { emit } from "./tauri-event";
 import { shellTransferInvoke } from "./shellTransferFixture";
 import { CWD_INTEGRATION_DONE_MARKER } from "../lib/terminalShellIntegration";
 const PREFIX = "taomni.qa.shell.";
+const chatRuns = new Map<string, { stopped: boolean }>();
 const terminals = new Map<string, { output?: { onmessage(data: number[]): void }; cwd: string; input: string; cwdIntegration: boolean }>();
 const sftp = new Map<string, string>();
 const sftpOwners = new Map<string, string>();
@@ -40,27 +41,51 @@ export async function shellScenarioInvoke(command: string, args: any = {}): Prom
     observe(command, String(args.proxyHost), "completed");
     return { value: `QA proxy accepted ${args.testHost}:${args.testPort}` };
   }
+  if (command === "chat_stop_stream") {
+    const threadId = String(args.threadId);
+    const run = chatRuns.get(threadId);
+    if (run) run.stopped = true;
+    observe(command, threadId, "completed");
+    return { value: undefined };
+  }
   if (command === "chat_stream") {
     const req = args.req, threadId = String(req.thread_id), now = Math.floor(Date.now() / 1000);
     const user = { id: crypto.randomUUID(), thread_id: threadId, role: "user", content: String(req.content), created_at: now, redacted: false, attachments: req.attachments ?? [] };
     const assistant = { ...user, id: crypto.randomUUID(), role: "assistant", content: `QA fixture reply: ${req.content}`, attachments: [] };
     const event = `chat-stream:${threadId}`;
-    await emit(event, { kind: "user_message", message: user });
-    await emit(event, { kind: "assistant_start", id: assistant.id, thread_id: threadId, created_at: now });
-    await emit(event, { kind: "token", id: assistant.id, content: "QA fixture reply: " });
-    const key = `${PREFIX}fault`, rule = JSON.parse(localStorage.getItem(key) ?? "null");
-    if (rule?.command === command && rule.mode === "hold") {
-      observe(command, threadId, "held");
-      const deadline = Date.now() + 10000;
-      while (localStorage.getItem(key) && Date.now() < deadline) await new Promise<void>((resolve) => setTimeout(resolve, 25));
-      if (localStorage.getItem(key)) throw new Error("Chat fixture hold exceeded the preparation deadline");
+    const run = { stopped: false };
+    chatRuns.set(threadId, run);
+    const storageKey = "taomni.stub.chatMessages.v1";
+    const saveMessage = (message: typeof user) => {
+      const messages = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
+      messages[threadId] = [...(messages[threadId] ?? []), message];
+      localStorage.setItem(storageKey, JSON.stringify(messages));
+    };
+    // Native saves the user's turn before asking the provider; an interrupted
+    // assistant answer remains transient while the next queued turn can run.
+    saveMessage(user);
+    try {
+      await emit(event, { kind: "user_message", message: user });
+      await emit(event, { kind: "assistant_start", id: assistant.id, thread_id: threadId, created_at: now });
+      await emit(event, { kind: "token", id: assistant.id, content: "QA fixture reply: " });
+      const key = `${PREFIX}fault`, rule = JSON.parse(localStorage.getItem(key) ?? "null");
+      if (rule?.command === command && rule.mode === "hold") {
+        observe(command, threadId, "held");
+        const deadline = Date.now() + 10000;
+        while (!run.stopped && localStorage.getItem(key) && Date.now() < deadline) await new Promise<void>((resolve) => setTimeout(resolve, 25));
+        if (!run.stopped && localStorage.getItem(key)) throw new Error("Chat fixture hold exceeded the preparation deadline");
+      }
+      if (run.stopped) {
+        await emit(event, { kind: "error", id: assistant.id, message: "Stream stopped by user" });
+        return { value: undefined };
+      }
+      saveMessage(assistant);
+      await emit(event, { kind: "end", id: assistant.id, thread_id: threadId, content: assistant.content, redacted_count: 0 });
+      observe(command, threadId, "completed");
+      return { value: undefined };
+    } finally {
+      if (chatRuns.get(threadId) === run) chatRuns.delete(threadId);
     }
-    const storageKey = "taomni.stub.chatMessages.v1", messages = JSON.parse(localStorage.getItem(storageKey) ?? "{}");
-    messages[threadId] = [...(messages[threadId] ?? []), user, assistant];
-    localStorage.setItem(storageKey, JSON.stringify(messages));
-    await emit(event, { kind: "end", id: assistant.id, thread_id: threadId, content: assistant.content, redacted_count: 0 });
-    observe(command, threadId, "completed");
-    return { value: undefined };
   }
   if (command === "create_local_terminal" || command === "create_ssh_terminal") {
     if (command === "create_ssh_terminal" && !String(args.host).endsWith(".invalid")) return null;

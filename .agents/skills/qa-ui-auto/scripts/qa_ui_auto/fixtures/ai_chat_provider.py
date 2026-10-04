@@ -4,6 +4,8 @@ from __future__ import annotations
 import http.server
 import json
 import os
+import select
+import socket
 from pathlib import Path
 import threading
 import time
@@ -35,6 +37,7 @@ class ProviderServer:
         self.receipt = receipt
         self.lock = threading.Lock()
         self.requests = []
+        self.stopping = threading.Event()
         owner = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -48,13 +51,15 @@ class ProviderServer:
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 users = [m["content"] for m in body.get("messages", []) if m.get("role") == "user"]
                 with owner.lock:
-                    owner.requests.append({"stream": body.get("stream") is True, "tools": bool(body.get("tools")), "model": body.get("model"), "lastUserMessage": users[-1] if users else ""})
+                    request = {"stream": body.get("stream") is True, "tools": bool(body.get("tools")), "model": body.get("model"), "lastUserMessage": users[-1] if users else "", "outcome": "pending"}
+                    owner.requests.append(request)
                     owner.write_receipt()
                 if users and users[-1] == "SHELL AI error":
                     self.send_response(503)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(b'{"error":{"message":"QA provider unavailable"}}')
+                    owner.finish(request, "failed")
                     return
                 if body.get("stream") is not True:
                     self.send_error(400, "This fixture requires the real streaming path")
@@ -64,6 +69,22 @@ class ProviderServer:
                 self.send_header("Connection", "close")
                 self.end_headers()
                 try:
+                    if users and users[-1] == "SHELL AI stop":
+                        payload = {"choices": [{"index": 0, "delta": {"content": "SHELL AI partial answer"}, "finish_reason": None}]}
+                        self.wfile.write(("data: " + json.dumps(payload) + "\n\n").encode("utf-8"))
+                        self.wfile.flush()
+                        # This turn deliberately has no final answer. Only the
+                        # client's real transport closure establishes Stop.
+                        deadline = time.monotonic() + 30
+                        while not owner.stopping.is_set() and time.monotonic() < deadline:
+                            readable, _, _ = select.select([self.connection], [], [], 0.1)
+                            if readable and not self.connection.recv(1, socket.MSG_PEEK):
+                                owner.finish(request, "cancelled")
+                                return
+                            self.wfile.write(b": waiting for user stop\n\n")
+                            self.wfile.flush()
+                        owner.finish(request, "unfinished")
+                        return
                     for token in ("SHELL AI response ", "中文\n", "Second paragraph"):
                         payload = {"id": "qa-stream", "model": "qa-model", "choices": [{"index": 0, "delta": {"content": token}, "finish_reason": None}]}
                         self.wfile.write(("data: " + json.dumps(payload, ensure_ascii=False) + "\n\n").encode("utf-8"))
@@ -71,9 +92,11 @@ class ProviderServer:
                         time.sleep(0.15)
                     self.wfile.write(b'data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')
                     self.wfile.flush()
+                    owner.finish(request, "completed")
                 except (BrokenPipeError, ConnectionResetError):
-                    pass
-                self.close_connection = True
+                    owner.finish(request, "cancelled")
+                finally:
+                    self.close_connection = True
 
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.daemon_threads = True
@@ -85,10 +108,16 @@ class ProviderServer:
     def write_receipt(self):
         self.receipt.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.receipt.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"requests": len(self.requests), "streamRequests": sum(r["stream"] for r in self.requests), "toolRequests": sum(r["tools"] for r in self.requests), "lastUserMessage": self.requests[-1]["lastUserMessage"] if self.requests else "", "model": self.requests[-1]["model"] if self.requests else ""}, ensure_ascii=False), encoding="utf-8")
+        temporary.write_text(json.dumps({"requests": len(self.requests), "streamRequests": sum(r["stream"] for r in self.requests), "toolRequests": sum(r["tools"] for r in self.requests), "cancelledStreams": sum(r["outcome"] == "cancelled" for r in self.requests), "completedStreams": sum(r["outcome"] == "completed" for r in self.requests), "lastUserMessage": self.requests[-1]["lastUserMessage"] if self.requests else "", "model": self.requests[-1]["model"] if self.requests else ""}, ensure_ascii=False), encoding="utf-8")
         temporary.replace(self.receipt)
 
+    def finish(self, request, outcome):
+        with self.lock:
+            request["outcome"] = outcome
+            self.write_receipt()
+
     def stop(self):
+        self.stopping.set()
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)

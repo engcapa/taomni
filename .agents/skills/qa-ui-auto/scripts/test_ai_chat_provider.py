@@ -1,6 +1,7 @@
 """Unit tests for protocol evidence and run-owned AI fixture input/cleanup."""
 import json
 import os
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -28,7 +29,27 @@ class AiChatProviderTest(unittest.TestCase):
                 self.assertIn("data: [DONE]", raw)
                 receipt = server.receipt.read_text(encoding="utf-8")
                 self.assertNotIn("never-record-this", receipt)
-                self.assertEqual(json.loads(receipt), {"requests": 1, "streamRequests": 1, "toolRequests": 0, "lastUserMessage": "SHELL AI 第一条", "model": "qa-model"})
+                self.assertEqual(json.loads(receipt), {"requests": 1, "streamRequests": 1, "toolRequests": 0, "cancelledStreams": 0, "completedStreams": 1, "lastUserMessage": "SHELL AI 第一条", "model": "qa-model"})
+            finally:
+                server.stop()
+
+    def test_slow_turn_never_completes_and_receipt_observes_client_disconnect(self):
+        with TemporaryDirectory() as directory:
+            server = fixture.ProviderServer(Path(directory) / "requests.json")
+            try:
+                body = {"stream": True, "model": "qa-model", "messages": [{"role": "user", "content": "SHELL AI stop"}]}
+                request = urllib.request.Request(server.base_url + "/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"})
+                with urllib.request.urlopen(request, timeout=3) as response:
+                    line = response.readline().decode("utf-8")
+                    self.assertIn("SHELL AI partial answer", line)
+                    self.assertEqual(json.loads(server.receipt.read_text(encoding="utf-8"))["completedStreams"], 0)
+                deadline = time.monotonic() + 3
+                while time.monotonic() < deadline:
+                    receipt = json.loads(server.receipt.read_text(encoding="utf-8"))
+                    if receipt["cancelledStreams"] == 1:
+                        break
+                    time.sleep(0.02)
+                self.assertEqual((receipt["requests"], receipt["cancelledStreams"], receipt["completedStreams"]), (1, 1, 0))
             finally:
                 server.stop()
 

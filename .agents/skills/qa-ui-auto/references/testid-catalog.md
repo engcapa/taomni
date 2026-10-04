@@ -1693,6 +1693,7 @@
 - `[data-testid="shell-notes-window-error"]` — display [optional] — F-TAO-1.shell-notes-window-error
 - `[data-testid="note-editor-scroll"]` — display [optional] — F-TAO-1.note-editor-scroll
 - `[data-testid="ai-chat-send-button"]` — interactive — F-TAO-1.ai-chat-send-button
+- `[data-testid="ai-chat-stop-button"]` — interactive — F-TAO-1.ai-chat-stop-button
 - `[data-testid="note-editor-body"]` — interactive — F-TAO-1.note-editor-body
 - `[data-testid="note-editor-new-step"]` — interactive — F-TAO-1.note-editor-new-step
 - `[data-testid="note-editor-new-tag"]` — interactive — F-TAO-1.note-editor-new-tag

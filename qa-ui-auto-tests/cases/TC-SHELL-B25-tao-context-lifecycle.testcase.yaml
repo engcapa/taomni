@@ -1,7 +1,8 @@
 id: TC-SHELL-B25
 title: Chat follows or pins context and keeps a streaming reply in its original thread
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b25.
-  Browser IPC fixtures prove renderer outcomes only.'
+  Browser IPC fixtures prove renderer outcomes only. A held browser IPC answer additionally exercises
+  Stop and exactly-once draining of the queued prompt; TC-SHELL-N19 verifies real transport cancellation.'
 covers:
 - F-TAO-1
 tags:
@@ -112,13 +113,43 @@ steps:
 - assert_value:
     selector: '[data-testid="note-editor-new-tag"]'
     equals: unfinished tag
+- click: '[data-testid="tao-hub-tab-chat"]'
+- shell_backend_scenario:
+    command: chat_stream
+    action: hold
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: QA-CANCEL-PROMPT
+- click: '[data-testid="ai-chat-send-button"]'
+- wait_for: '[data-testid="ai-chat-stop-button"]'
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: QA-QUEUED-PROMPT
+- click: '[data-testid="ai-chat-send-button"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-queue-badge"]'
+    contains: '1'
+- click: '[data-testid="ai-chat-stop-button"]'
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: Stream stopped by user
+- shell_backend_scenario:
+    command: chat_stream
+    action: release
+- assert_text:
+    selector: '[data-testid="shell-chat-content"]'
+    contains: 'QA fixture reply: QA-QUEUED-PROMPT'
+- assert_shell_backend:
+    command: chat_stream
+    status: completed
+    count: 2
+- assert_not_visible: '[data-testid="ai-chat-queue-badge"]'
 - screenshot: tc-shell-b25.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: An in-flight reply started on A continues on A while B follows the
-      newly active workspace.
+    requirement: An in-flight reply started on A continues on A while B follows the newly active workspace.
     actions:
     - 3
     - 4
@@ -133,26 +164,19 @@ verification:
     - 19
     checkpoints:
     - step: 5
-      expectation: An in-flight reply started on A continues on A while B follows
-        the newly active workspace.
+      expectation: An in-flight reply started on A continues on A while B follows the newly active workspace.
     - step: 11
-      expectation: An in-flight reply started on A continues on A while B follows
-        the newly active workspace.
+      expectation: An in-flight reply started on A continues on A while B follows the newly active workspace.
     - step: 15
-      expectation: An in-flight reply started on A continues on A while B follows
-        the newly active workspace.
+      expectation: An in-flight reply started on A continues on A while B follows the newly active workspace.
     - step: 16
-      expectation: An in-flight reply started on A continues on A while B follows
-        the newly active workspace.
+      expectation: An in-flight reply started on A continues on A while B follows the newly active workspace.
     - step: 17
-      expectation: An in-flight reply started on A continues on A while B follows
-        the newly active workspace.
+      expectation: An in-flight reply started on A continues on A while B follows the newly active workspace.
     - step: 18
-      expectation: An in-flight reply started on A continues on A while B follows
-        the newly active workspace.
+      expectation: An in-flight reply started on A continues on A while B follows the newly active workspace.
     - step: 20
-      expectation: An in-flight reply started on A continues on A while B follows
-        the newly active workspace.
+      expectation: An in-flight reply started on A continues on A while B follows the newly active workspace.
     results:
     - 5
     - 11
@@ -162,8 +186,8 @@ verification:
     - 18
     - 20
   - id: R2
-    requirement: The completion notification reveals the original thread; pinning
-      survives another tab and unpinning follows it.
+    requirement: The completion notification reveals the original thread; pinning survives another tab
+      and unpinning follows it.
     actions:
     - 21
     - 23
@@ -171,23 +195,23 @@ verification:
     - 28
     checkpoints:
     - step: 22
-      expectation: The completion notification reveals the original thread; pinning
-        survives another tab and unpinning follows it.
+      expectation: The completion notification reveals the original thread; pinning survives another tab
+        and unpinning follows it.
     - step: 24
-      expectation: The completion notification reveals the original thread; pinning
-        survives another tab and unpinning follows it.
+      expectation: The completion notification reveals the original thread; pinning survives another tab
+        and unpinning follows it.
     - step: 25
-      expectation: The completion notification reveals the original thread; pinning
-        survives another tab and unpinning follows it.
+      expectation: The completion notification reveals the original thread; pinning survives another tab
+        and unpinning follows it.
     - step: 27
-      expectation: The completion notification reveals the original thread; pinning
-        survives another tab and unpinning follows it.
+      expectation: The completion notification reveals the original thread; pinning survives another tab
+        and unpinning follows it.
     - step: 29
-      expectation: The completion notification reveals the original thread; pinning
-        survives another tab and unpinning follows it.
+      expectation: The completion notification reveals the original thread; pinning survives another tab
+        and unpinning follows it.
     - step: 30
-      expectation: The completion notification reveals the original thread; pinning
-        survives another tab and unpinning follows it.
+      expectation: The completion notification reveals the original thread; pinning survives another tab
+        and unpinning follows it.
     results:
     - 22
     - 24
@@ -196,8 +220,8 @@ verification:
     - 29
     - 30
   - id: R3
-    requirement: One Notes editor retains title, body and unsubmitted step/tag drafts
-      through Notifications, hide and reopen.
+    requirement: One Notes editor retains title, body and unsubmitted step/tag drafts through Notifications,
+      hide and reopen.
     actions:
     - 31
     - 32
@@ -211,23 +235,23 @@ verification:
     - 41
     checkpoints:
     - step: 33
-      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
-        through Notifications, hide and reopen.
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts through Notifications,
+        hide and reopen.
     - step: 42
-      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
-        through Notifications, hide and reopen.
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts through Notifications,
+        hide and reopen.
     - step: 43
-      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
-        through Notifications, hide and reopen.
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts through Notifications,
+        hide and reopen.
     - step: 44
-      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
-        through Notifications, hide and reopen.
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts through Notifications,
+        hide and reopen.
     - step: 45
-      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
-        through Notifications, hide and reopen.
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts through Notifications,
+        hide and reopen.
     - step: 46
-      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts
-        through Notifications, hide and reopen.
+      expectation: One Notes editor retains title, body and unsubmitted step/tag drafts through Notifications,
+        hide and reopen.
     results:
     - 33
     - 42
@@ -235,14 +259,48 @@ verification:
     - 44
     - 45
     - 46
+  - id: R4
+    requirement: With a reply held by the declared browser IPC fixture, Stop ends only that answer; the
+      queued prompt drains once, produces its full reply, and clears the queue. Real transport cancellation
+      is paired with TC-SHELL-N19.
+    actions:
+    - 47
+    - 48
+    - 49
+    - 50
+    - 52
+    - 53
+    - 55
+    - 57
+    checkpoints:
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-stop-button\"]"}'
+    - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ai-chat-queue-badge\"]", "contains":
+        "1"}}'
+    - step: 56
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "Stream
+        stopped by user"}}'
+    - step: 58
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-chat-content\"]", "contains": "QA
+        fixture reply: QA-QUEUED-PROMPT"}}'
+    - step: 59
+      expectation: '{"assert_shell_backend": {"command": "chat_stream", "status": "completed", "count":
+        2}}'
+    - step: 60
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-queue-badge\"]"}'
+    results:
+    - 51
+    - 54
+    - 56
+    - 58
+    - 59
+    - 60
   visual:
-  - check: Inspect the final screenshot for readable controls, clipping and overlay
-      placement.
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual
-    reason: Screenshots require a visual verdict; geometry assertions are recorded
-      separately.
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
   native:
   - check: Tauri, OS window, physical input and real service effects
     method: not-applicable
-    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
-      native boundaries.
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

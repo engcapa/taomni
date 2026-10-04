@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { shellScenarioBefore, shellScenarioInvoke } from "./shellScenario";
+import { listen } from "./tauri-event";
 import { buildLocalZshCwdIntegration, buildSshCwdIntegration, CWD_INTEGRATION_DONE_MARKER } from "../lib/terminalShellIntegration";
 import { createOscMarkerBlankingSuppressor } from "../lib/terminalOutputFilter";
 
@@ -15,6 +16,32 @@ describe("controlled Shell backend readiness", () => {
     vi.useFakeTimers();
   });
   afterEach(() => { vi.useRealTimers(); localStorage.clear(); });
+
+  it("stops only the selected held turn, saves its user text, and lets the next turn finish", async () => {
+    localStorage.setItem(faultKey, JSON.stringify({ command: "chat_stream", mode: "hold" }));
+    const events: { kind: string; message?: string }[] = [];
+    const unlisten = await listen("chat-stream:stop-test", (event) => { events.push(event.payload as typeof events[number]); });
+    try {
+      const pending = shellScenarioInvoke("chat_stream", { req: { thread_id: "stop-test", content: "stop this" } });
+      await vi.advanceTimersByTimeAsync(0);
+      await shellScenarioInvoke("chat_stop_stream", { threadId: "another-thread" });
+      await vi.advanceTimersByTimeAsync(25);
+      expect(events.some((event) => event.kind === "error" || event.kind === "end")).toBe(false);
+      await shellScenarioInvoke("chat_stop_stream", { threadId: "stop-test" });
+      await vi.advanceTimersByTimeAsync(25);
+      await pending;
+      expect(events.filter((event) => event.kind === "error")).toEqual([expect.objectContaining({ message: "Stream stopped by user" })]);
+      expect(events.some((event) => event.kind === "end")).toBe(false);
+      const stored = () => JSON.parse(localStorage.getItem("taomni.stub.chatMessages.v1")!)["stop-test"] as { role: string; content: string }[];
+      expect(stored().map(({ role, content }) => [role, content])).toEqual([["user", "stop this"]]);
+      localStorage.removeItem(faultKey);
+      await shellScenarioInvoke("chat_stream", { req: { thread_id: "stop-test", content: "next turn" } });
+      expect(events.filter((event) => event.kind === "end")).toHaveLength(1);
+      expect(stored().map(({ role, content }) => [role, content])).toEqual([["user", "stop this"], ["user", "next turn"], ["assistant", "QA fixture reply: next turn"]]);
+    } finally {
+      unlisten();
+    }
+  });
 
   it("holds only the first matching workspace so a second same-path instance can finish first", async () => {
     hold(true);
