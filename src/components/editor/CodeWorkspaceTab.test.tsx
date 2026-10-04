@@ -2125,7 +2125,7 @@ describe("CodeWorkspaceTab", () => {
       expect(registrationRef.current?.items.find((item) => item.id === "workspace.goToSymbol")?.enabled)
         .toBe(true);
     });
-    act(() => {
+    await act(async () => {
       expect(registrationRef.current?.execute("workspace.goToSymbol")).toBe(true);
     });
     const input = await screen.findByLabelText("Go to symbol");
@@ -2145,7 +2145,13 @@ describe("CodeWorkspaceTab", () => {
       "instance-symbol-resolve",
     ).splitOrientation).toBe("vertical");
 
-    act(() => {
+    // The newly opened split has its own LSP synchronization. Reenter the
+    // symbol picker only after the target document has completed that handoff.
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-symbol-resolve",
+    ).lspFiles["root:app:src/target.ts"]?.syncedText).toBe("\n".repeat(8) + "class DeferredType {}"));
+    await act(async () => {
       expect(registrationRef.current?.execute("workspace.goToSymbol")).toBe(true);
     });
     const brokenInput = await screen.findByLabelText("Go to symbol");
@@ -2252,14 +2258,18 @@ describe("CodeWorkspaceTab", () => {
 
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
-    await waitFor(() => expect(lspMocks.lspDocumentSymbols).toHaveBeenCalled());
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-outline",
+    ).lspFiles["root:app:src/main.ts"]?.syncedText).toBe("function render() {}"));
     fireEvent.click(toolbarControl("code-workspace-right-pane-toggle"));
+    await waitFor(() => expect(lspMocks.lspDocumentSymbols).toHaveBeenCalled());
 
     // ED-PARITY-024: IDEA Structure is its own tool window (left bottom by default).
     const structureWindow = await screen.findByTestId("code-workspace-tool-window-structure");
     expect(within(structureWindow).getByTestId("code-workspace-tool-window-title-structure")).toHaveTextContent("Structure");
     const outline = await screen.findByTestId("code-workspace-outline-pane");
-    expect(outline).toHaveTextContent("render");
+    await waitFor(() => expect(outline).toHaveTextContent("render"));
     fireEvent.click(within(outline).getByText("render"));
   });
 
@@ -8248,8 +8258,11 @@ describe("CodeWorkspaceTab", () => {
     ).toBe(editedSource));
     await waitFor(() => expect(changeCalls).toBe(1), { timeout: 2_000 });
 
+    let navigation!: Promise<unknown>;
     await act(async () => {
-      await registrationRef.current?.executeAction("workspace.gotoDefinition");
+      // Keep the action pending while the provider is deliberately held.
+      // Awaiting its completion here would block the test's own release.
+      navigation = registrationRef.current!.executeAction("workspace.gotoDefinition");
       await Promise.resolve();
     });
     expect(lspMocks.lspDefinition).not.toHaveBeenCalled();
@@ -8264,6 +8277,7 @@ describe("CodeWorkspaceTab", () => {
       expect.anything(),
       expect.objectContaining({ signal: expect.anything() }),
     ));
+    await act(async () => { await navigation; });
   });
 
   it("applies the same sync barrier to Quick Definition and reports a retryable failure", async () => {
@@ -10900,10 +10914,19 @@ end_of_record
       const { disk } = await mountReplaceHistoryAndSearch("instance-parity-006-actions-undo");
       const row = await screen.findByTestId("code-workspace-find-match-row");
       row.focus();
-      fireEvent.keyDown(row, { key: "n", code: "KeyN", ctrlKey: true, shiftKey: true });
+      await act(async () => {
+        fireEvent.keyDown(row, { key: "n", code: "KeyN", ctrlKey: true, shiftKey: true });
+      });
       const popup = await screen.findByTestId("code-workspace-search-everywhere");
-      fireEvent.click(within(popup).getByRole("tab", { name: "Actions" }));
-      fireEvent.change(within(popup).getByLabelText("Search actions"), { target: { value: "Undo Replace in files" } });
+      await act(async () => {
+        fireEvent.click(within(popup).getByRole("tab", { name: "Actions" }));
+      });
+      const search = within(popup).getByLabelText("Search actions");
+      await waitFor(() => expect(document.activeElement).toBe(search));
+      // Let the real focus-scoped Action snapshot settle before choosing it.
+      await act(async () => {
+        fireEvent.change(search, { target: { value: "Undo Replace in files" } });
+      });
       const undo = await within(popup).findByText("Undo Replace in files");
       await act(async () => { fireEvent.click(undo); });
       expect(await screen.findByTestId("code-workspace-undo-confirm")).toHaveTextContent("Undo Replace in files?");
@@ -14515,7 +14538,7 @@ end_of_record
       expect(screen.queryByTestId("code-workspace-intention-extract")).not.toBeInTheDocument();
     });
 
-    it("Enter renames call site and declaration; Escape keeps the default name", async () => {
+    it("Enter renames call site and declaration and returns the caret to the call statement", async () => {
       const fixture = setupExtract("instance-extract-enter");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
@@ -14536,10 +14559,10 @@ end_of_record
       await waitFor(() => expect(
         view.state.doc.lineAt(view.state.selection.main.head).text,
       ).toBe("        int sum = sumOf(values);"));
+    });
 
-      // Fresh setup: the watcher echo of the extract's own save, delivered while
-      // the naming prompt is open, is not a workspace change (no stale cancel).
-      await cleanup();
+    it("a watcher echo of the extract save does not cancel the naming prompt", async () => {
+      // The watcher echo delivered while naming is open is not a workspace edit.
       runtimeState.tauri = true;
       const echoed = setupExtract("instance-extract-echo");
       const echo = await mountExtract(echoed);
@@ -14556,9 +14579,9 @@ end_of_record
       await waitFor(() => expect(echoed.text()).toBe(B2));
       expect(useAppStore.getState().statusMessage).not.toContain("workspace changed");
       runtimeState.tauri = false;
+    });
 
-      // Fresh setup: Escape keeps the provider default name and adds no history.
-      await cleanup();
+    it("Escape keeps the extracted provider name without adding rename history", async () => {
       const escaped = setupExtract("instance-extract-escape");
       const second = await mountExtract(escaped);
       selectExtractRange(second.content);
