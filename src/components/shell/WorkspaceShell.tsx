@@ -46,14 +46,18 @@ export function ShellFrame({ children, navigator, quickConnectHeight = 0, extras
   const stripe = useToolWindowStripeStore((s) => s.settings);
   const railWidth = stripe.showNames ? Math.max(68, effectiveStripeWidth(stripe, "left")) : 52;
   const active = tabs.find((tab) => tab.id === activeTabId), lane = shell.laneSelection ?? (active ? tabLane(active, shell.laneOverrides[active.id]) : "home");
-  const panels = Object.values(shell.panels).filter((p) => !shell.laneSelection && ["visible", "detached-placeholder"].includes(panelVisibility(p, activeTabId, shell.taoOpen, shell.layout.tao.edge)) && p.placement.kind !== "primary");
+  // Hidden tools still own their surface. Keep them reachable in the current
+  // owner's Host tabs while another tool on that edge is displayed.
+  const panels = Object.values(shell.panels).filter((p) => !shell.laneSelection && panelVisibility(p, activeTabId, shell.taoOpen, shell.layout.tao.edge) !== "inactive-owner" && p.placement.kind !== "primary");
   const at = (edge: "right" | "bottom") => panels.filter((p) => p.placement.kind === "dock" ? p.placement.edge === edge : edge === "right");
   const right = at("right"), bottom = at("bottom");
-  const rightPanel = right.find((p) => p.id === shell.activePanelByEdge.right) ?? right[0], bottomPanel = bottom.find((p) => p.id === shell.activePanelByEdge.bottom) ?? bottom[0];
+  const displayed = (panel: typeof panels[number]) => ["visible", "detached-placeholder"].includes(panelVisibility(panel, activeTabId, shell.taoOpen, shell.layout.tao.edge));
+  const rightPanel = right.find((p) => p.id === shell.activePanelByEdge.right && displayed(p)) ?? right.find(displayed);
+  const bottomPanel = bottom.find((p) => p.id === shell.activePanelByEdge.bottom && displayed(p)) ?? bottom.find(displayed);
   const layout = solveShellLayout({ ...size, railWidth, quickConnectHeight, navigatorRequested: !shell.layout.navigator.collapsedByLane[lane], navigatorWidth: preview.navigator ?? shell.layout.navigator.width,
     navigatorExplicit: shell.navigatorOverlay,
-    rightRequested: !!right.length, rightSize: preview.right ?? rightPanel?.preferredSize ?? shell.layout.panelDefaults[rightPanel?.kind ?? "sftp"].size,
-    bottomRequested: !!bottom.length, bottomSize: preview.bottom ?? bottomPanel?.preferredSize ?? shell.layout.panelDefaults[bottomPanel?.kind ?? "git"].size,
+    rightRequested: !!rightPanel, rightSize: preview.right ?? rightPanel?.preferredSize ?? shell.layout.panelDefaults[rightPanel?.kind ?? "sftp"].size,
+    bottomRequested: !!bottomPanel, bottomSize: preview.bottom ?? bottomPanel?.preferredSize ?? shell.layout.panelDefaults[bottomPanel?.kind ?? "git"].size,
     taoOpen: shell.taoOpen, taoEdge: shell.layout.tao.edge, taoPinned: shell.layout.tao.pinned, taoWidth: shell.layout.tao.width, taoHeight: shell.layout.tao.height });
   if (rightPanel && !rightPanel.pinned && layout.right === "dock") layout.right = "overlay";
   if (bottomPanel && !bottomPanel.pinned && layout.bottom === "dock") layout.bottom = "overlay";
@@ -86,7 +90,7 @@ export function ShellFrame({ children, navigator, quickConnectHeight = 0, extras
     if (node) observer.observe(node, { childList: true, subtree: true });
     document.addEventListener("pointerdown", outside);
     return () => { observer.disconnect(); document.removeEventListener("pointerdown", outside); node?.removeEventListener("keydown", key); if (opener?.isConnected && !opener.closest('[inert]')) opener.focus({ preventScroll: true }); };
-  }, [winner, lane, shell.layout.tao.edge]);
+  }, [winner, lane, shell.layout.tao.edge, layout.right, layout.bottom]);
   const taoSide = shell.layout.tao.edge === "left" || shell.layout.tao.edge === "right";
   const overlay = shell.overlay || shell.transfersOpen || (layout.tao === "overlay" && shell.taoOpen) || layout.right === "overlay" || layout.bottom === "overlay" || (layout.navigator === "overlay" && shell.navigatorOverlay);
   const frame = (mode: "hidden" | "dock" | "overlay", edge: string, width?: number, height?: number): React.CSSProperties => mode === "hidden" ? { display: "none" } : mode === "dock" ? { position: "relative", width, height, flexShrink: 0 }

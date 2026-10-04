@@ -305,6 +305,8 @@ interface PanelInstance {
 
 有效可见性派生为 `visible / hidden / suppressed-by-tao / inactive-owner / detached-placeholder`；不存在的实例即 closed。restoring 是恢复操作的 phase，不伪装成已连接。Host 同一 edge 有一个 tab strip，可含多个当前 owner 面板；面板内部 Files/Transfers、Changes/History/Branches 是业务子 tab，不能与 Host tab 混用。
 
+同一 owner 已创建且暂时隐藏的工具保留在 Host 标签中，点击标签恢复原实例；全部面板隐藏时收起该边的宿主。切换 owner 时只展示目标 owner 的标签。覆盖层跨边移动后，焦点与外部点击监听必须跟随当前宿主。
+
 实例查找键：SFTP 为 owner tabId + kind；Git 为 workspaceInstanceId + kind；Problems/Terminal 同 workspaceInstanceId。显式“新窗口/复制工作区”才产生新身份；同一目录的两个 workspace 实例不能合并。
 
 background.resourceKey 是逻辑面板的任务组身份，多个 job lease 可共同持有；jobId→resourceKey 由业务任务 registry 管理。不能只用某一个 jobId 作为面板 owner，导致同一面板第一个任务结束就释放其余任务。

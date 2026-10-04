@@ -73,22 +73,22 @@ steps:
 - screenshot: tc-shell-b09.png
 - click: '[data-testid="shell-overview-trigger"]'
 - assert_text_equals:
-    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-summary"]'
+    selector: '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-summary"]'
     equals: terminal · alpha.invalid
-- assert_visible: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-preview"]'
-- assert_visible: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-status"]'
-- click: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-details"]'
+- assert_visible: '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-preview"]'
+- assert_visible: '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-status"]'
+- click: '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-details"]'
 - assert_text:
-    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]'
+    selector: '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-detail"]'
     contains: terminal
 - assert_text:
-    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]'
+    selector: '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-detail"]'
     contains: alpha.invalid
 - assert_count:
-    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]
+    selector: '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-detail"]
       dd'
     equal: 3
-- click: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-details"]'
+- click: '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-details"]'
 - assert_count:
     selector: '[data-testid="shell-tab-card-detail"]'
     equal: 0
@@ -153,8 +153,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Searching case insensitive host and title tokens returns only Alpha
-      without changing the active Beta.
+    requirement: Searching case insensitive host and title tokens returns only Alpha without changing the active
+      Beta.
     actions:
     - 3
     - 4
@@ -165,23 +165,23 @@ verification:
     - 14
     checkpoints:
     - step: 5
-      expectation: Searching case insensitive host and title tokens returns only Alpha
-        without changing the active Beta.
+      expectation: Searching case insensitive host and title tokens returns only Alpha without changing the active
+        Beta.
     - step: 8
-      expectation: Searching case insensitive host and title tokens returns only Alpha
-        without changing the active Beta.
+      expectation: Searching case insensitive host and title tokens returns only Alpha without changing the active
+        Beta.
     - step: 11
-      expectation: Searching case insensitive host and title tokens returns only Alpha
-        without changing the active Beta.
+      expectation: Searching case insensitive host and title tokens returns only Alpha without changing the active
+        Beta.
     - step: 12
-      expectation: Searching case insensitive host and title tokens returns only Alpha
-        without changing the active Beta.
+      expectation: Searching case insensitive host and title tokens returns only Alpha without changing the active
+        Beta.
     - step: 13
-      expectation: Searching case insensitive host and title tokens returns only Alpha
-        without changing the active Beta.
+      expectation: Searching case insensitive host and title tokens returns only Alpha without changing the active
+        Beta.
     - step: 15
-      expectation: Searching case insensitive host and title tokens returns only Alpha
-        without changing the active Beta.
+      expectation: Searching case insensitive host and title tokens returns only Alpha without changing the active
+        Beta.
     results:
     - 5
     - 8
@@ -190,8 +190,8 @@ verification:
     - 13
     - 15
   - id: R2
-    requirement: Lane and query combine, empty results retain clear/Home/new entry
-      points, name sort gives an exact list.
+    requirement: Lane and query combine, empty results retain clear/Home/new entry points, name sort gives an exact
+      list.
     actions:
     - 16
     - 17
@@ -200,26 +200,26 @@ verification:
     - 26
     checkpoints:
     - step: 18
-      expectation: Lane and query combine, empty results retain clear/Home/new entry
-        points, name sort gives an exact list.
+      expectation: Lane and query combine, empty results retain clear/Home/new entry points, name sort gives an
+        exact list.
     - step: 19
-      expectation: Lane and query combine, empty results retain clear/Home/new entry
-        points, name sort gives an exact list.
+      expectation: Lane and query combine, empty results retain clear/Home/new entry points, name sort gives an
+        exact list.
     - step: 20
-      expectation: Lane and query combine, empty results retain clear/Home/new entry
-        points, name sort gives an exact list.
+      expectation: Lane and query combine, empty results retain clear/Home/new entry points, name sort gives an
+        exact list.
     - step: 21
-      expectation: Lane and query combine, empty results retain clear/Home/new entry
-        points, name sort gives an exact list.
+      expectation: Lane and query combine, empty results retain clear/Home/new entry points, name sort gives an
+        exact list.
     - step: 24
-      expectation: Lane and query combine, empty results retain clear/Home/new entry
-        points, name sort gives an exact list.
+      expectation: Lane and query combine, empty results retain clear/Home/new entry points, name sort gives an
+        exact list.
     - step: 25
-      expectation: Lane and query combine, empty results retain clear/Home/new entry
-        points, name sort gives an exact list.
+      expectation: Lane and query combine, empty results retain clear/Home/new entry points, name sort gives an
+        exact list.
     - step: 27
-      expectation: Lane and query combine, empty results retain clear/Home/new entry
-        points, name sort gives an exact list.
+      expectation: Lane and query combine, empty results retain clear/Home/new entry points, name sort gives an
+        exact list.
     results:
     - 18
     - 19
@@ -229,8 +229,8 @@ verification:
     - 25
     - 27
   - id: R3
-    requirement: Overview details show the selected type and host; attention excludes idle cards; empty Home and New
-      actions dismiss the overview and cancel creates no tab; backdrop dismissal keeps the active tab.
+    requirement: Overview details show the selected type and host; attention excludes idle cards; empty Home and
+      New actions dismiss the overview and cancel creates no tab; backdrop dismissal keeps the active tab.
     actions:
     - 29
     - 33
@@ -248,31 +248,25 @@ verification:
     - 62
     checkpoints:
     - step: 30
-      expectation: "assert_text_equals:\n  selector: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"\
-        ]:text-is(\"qa-alpha\"))\n    [data-testid=\"shell-tab-card-summary\"]'\n  equals: terminal · alpha.invalid"
+      expectation: Alpha is identified exactly as terminal at alpha.invalid.
     - step: 31
-      expectation: "assert_visible: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"]:text-is(\"\
-        qa-alpha\"))\n  [data-testid=\"shell-tab-card-preview\"]'"
+      expectation: Alpha has a visible retained preview.
     - step: 32
-      expectation: "assert_visible: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"]:text-is(\"\
-        qa-alpha\"))\n  [data-testid=\"shell-tab-card-status\"]'"
+      expectation: Alpha has a visible status and attention summary.
     - step: 34
-      expectation: "assert_text:\n  selector: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"\
-        ]:text-is(\"qa-alpha\"))\n    [data-testid=\"shell-tab-card-detail\"]'\n  contains: terminal"
+      expectation: Expanded Alpha details identify the terminal type.
     - step: 35
-      expectation: "assert_text:\n  selector: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"\
-        ]:text-is(\"qa-alpha\"))\n    [data-testid=\"shell-tab-card-detail\"]'\n  contains: alpha.invalid"
+      expectation: Expanded Alpha details identify alpha.invalid.
     - step: 36
-      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"\
-        ]:text-is(\"qa-alpha\"))\n    [data-testid=\"shell-tab-card-detail\"] dd'\n  equal: 3"
+      expectation: Alpha details contain the three complete metadata values.
     - step: 38
       expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card-detail\"]'\n  equal: 0"
     - step: 40
       expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"][data-attention=\"none\"]'\n  equal:\
         \ 0"
     - step: 41
-      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"][data-tab-type=\"welcome\"]'\n  equal:\
-        \ 0"
+      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"][data-tab-type=\"welcome\"]'\n \
+        \ equal: 0"
     - step: 43
       expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"]'\n  equal: 3"
     - step: 45
@@ -325,13 +319,10 @@ verification:
     - 63
     - 64
   visual:
-  - check: Inspect the final screenshot for readable controls, clipping and overlay
-      placement.
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual
-    reason: Screenshots require a visual verdict; geometry assertions are recorded
-      separately.
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
   native:
   - check: Tauri, OS window, physical input and real service effects
     method: not-applicable
-    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
-      native boundaries.
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

@@ -11199,12 +11199,12 @@ controls:
 - id: shell-tab-card-detail
   selector: '[data-testid="shell-tab-card-detail"]'
   aliases:
-  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]'
+  - '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-detail"]'
   kind: display
 - id: shell-tab-card-details
   selector: '[data-testid="shell-tab-card-details"]'
   aliases:
-  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-details"]'
+  - '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-details"]'
   kind: interactive
 - id: shell-tab-card-more
   selector: '[data-testid="shell-tab-card-more"]'
@@ -11235,17 +11235,17 @@ controls:
 - id: shell-tab-card-preview
   selector: '[data-testid="shell-tab-card-preview"]'
   aliases:
-  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-preview"]'
+  - '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-preview"]'
   kind: display
 - id: shell-tab-card-status
   selector: '[data-testid="shell-tab-card-status"]'
   aliases:
-  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-status"]'
+  - '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-status"]'
   kind: display
 - id: shell-tab-card-summary
   selector: '[data-testid="shell-tab-card-summary"]'
   aliases:
-  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-summary"]'
+  - '[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-summary"]'
   kind: display
 - id: shell-tab-card-title
   selector: '[data-testid="shell-tab-card-title"]'

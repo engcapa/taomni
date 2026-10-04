@@ -185,7 +185,17 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - 修正实际 scoped DOM selector 的 catalog aliases，使已发生的 card/keymap 子控件操作归属到真实控件。只取已有 YAML 的最终 descendant，不把 `:has` 内的被动子元素记作操作；static touch 仍不是 runtime 通过。
 - 本批本地 `shell-exit-runner-unit-222`：107 项工具单测，100 pass / 7 平台限定 skip，exit 0；包括正常退出、丢回复、仍存活、预先失联和缺失 owned PID 的真实契约回归。工具单测 skip 不计入 UI 用例通过。`shell-final-static-225` audit gate exit 0，required 975 / covered 947 / shallow 39 / orphans 4，baseline 未降低；未触达控件及 OS/IME/DPI/performance 边界仍显式保留。`shell-full-plan-224` 为 242 个 ID、六端 737 次执行，gaps/unreviewed 为空；尚不是 runtime 通过。Git diff check 通过。
 
-+- 最终统一单测：`shell-final-product-unit-227` 全量 526 files / 5235 tests，5231 pass / 4 fail，失败原始 JSON 保留。CodeWorkspace 的导航测试在故意 held didChange 释放前等待 action 完成；改为保留 pending promise、release 后要求真实 definition 调用与 action 完成。symbol split/Outline 按真实文档 synced 状态衔接；Extract 的 Enter、watcher echo、Escape 三个独立场景拆成三项，保留全部原断言与 15 秒单项预算。
-+- `shell-editor-async-unit-230` 聚焦 6/6 通过。整文件 `shell-final-editor-unit-231` 249/250，发现 Action 列表的 focus/snapshot 尚未 settle 就选 Undo；进一步以 async act 和实际 activeElement 衔接。最终 `shell-final-editor-unit-233` 250/250 通过。其它 525 个文件在 227 已通过且无修改；两份最终结果覆盖 5237 项，未把 227/231 失败运行改写为成功，也未降低断言或扩大超时。
-+- `shell-final-rust-unit-228` 全量 Rust --lib：1590 pass / 0 fail / 16 既有 ignored；仅 unit 编译，没有构建/启动 native app。`shell-final-types-232` TypeScript exit 0；Git diff check 通过。设计明确简洁工作流及未来 AI surface/关闭/跳转的复用边界，产品源码自七轮输入后未再修改。
-+- 已查看七轮同产品输入的 Windows native N08（恢复与总览）、N15（DB 与 Notes 同屏）以及 macOS browser B15 画面，无明显遮挡/裁切；contact sheet `qa-ui-auto-report/_local/shell-current-visual-234.png`。这仅是三张实际画面的检查，未替代最终版本的完整 UI/native 验收。
+- 最终统一单测：`shell-final-product-unit-227` 全量 526 files / 5235 tests，5231 pass / 4 fail，失败原始 JSON 保留。CodeWorkspace 的导航测试在故意 held didChange 释放前等待 action 完成；改为保留 pending promise、release 后要求真实 definition 调用与 action 完成。symbol split/Outline 按真实文档 synced 状态衔接；Extract 的 Enter、watcher echo、Escape 三个独立场景拆成三项，保留全部原断言与 15 秒单项预算。
+- `shell-editor-async-unit-230` 聚焦 6/6 通过。整文件 `shell-final-editor-unit-231` 249/250，发现 Action 列表的 focus/snapshot 尚未 settle 就选 Undo；进一步以 async act 和实际 activeElement 衔接。最终 `shell-final-editor-unit-233` 250/250 通过。其它 525 个文件在 227 已通过且无修改；两份最终结果覆盖 5237 项，未把 227/231 失败运行改写为成功，也未降低断言或扩大超时。
+- `shell-final-rust-unit-228` 全量 Rust --lib：1590 pass / 0 fail / 16 既有 ignored；仅 unit 编译，没有构建/启动 native app。`shell-final-types-232` TypeScript exit 0；Git diff check 通过。设计明确简洁工作流及未来 AI surface/关闭/跳转的复用边界，产品源码自七轮输入后未再修改。
+- 已查看七轮同产品输入的 Windows native N08（恢复与总览）、N15（DB 与 Notes 同屏）以及 macOS browser B15 画面，无明显遮挡/裁切；contact sheet `qa-ui-auto-report/_local/shell-current-visual-234.png`。这仅是三张实际画面的检查，未替代最终版本的完整 UI/native 验收。
+
+
+### 统一运行 37207509863 与 Host 后续修复
+
+- [run 37207509863](https://github.com/engcapa/taomni/actions/runs/37207509863)，固定输入 `228a09e74d5101dff533af0f39c0179e22f6fbc4`。selection 为 242 个 ID、六端 737 次执行，无 gaps/unreviewed；实施基线以来改动的 201 个 YAML 全部包含在选择中。browser 三端各 180 pass / 3 fail / 0 skip，已核对 source/runner/case/selection/receipt/config 与 ZIP 内的 artifact hashes；native 尚在运行。
+- B09 详情断言使用了 DOM querySelectorAll 不支持的 Playwright text 伪类，改为失败 DOM 中实际观察到的 fixture tab identity 前缀，保持全部 65 步、断言和动作映射。同步 catalog alias，并将六条详情 checkpoint 写为明确结果。
+- B22 暴露工作区旧 tool-window 选择器切换后，仍保留的 Problems 实例被 Host 标签列表排除；Host 现在展示当前 owner 在该边已创建的工具，只在有有效显示目标时打开宿主。点击标签经原 adapter 恢复工具，不增加一套工具可见性状态；全部隐藏与 owner 隔离继续保持。
+- B23 暴露未固定 Host 跨边移动后，外部点击监听仍引用旧宿主，点击新宿主的菜单会误隐藏面板。监听现在随实际右/底宿主模式更新。原关闭/重开及单实例、SSH 存活断言保持；没有扩大超时或移除验收步骤。
+- 独立 worktree 保持当前远程输入稳定。新增真实 ShellFrame/StableSurface 双向移动回归和已挂载 CodeWorkspace 的 Host 标签往返：改前 `shell-host-red-unit-239` 为 3 fail / 1 pass；修复后 `shell-host-green-unit-241` 为 4/4 pass。未选中的 249 个 editor 测试是 filter 排除，不算 UI skip。`shell-host-regression-unit-243` 为 17 files / 105 tests 全通过；TypeScript `shell-host-types-246` exit 0；`shell-host-static-245` audit/精确六端计划通过，仍为 242 ID / 737 executions，无 gaps/unreviewed。新候选运行效果尚待 GitHub 验证，TASK-01～12 保持 verification。
+- 另检查上一轮同产品源码的 12 张三端原生 SFTP/Git/恢复/退出取消画面，未见明显遮挡或裁切；原图与索引保存在 `qa-ui-auto-report/_local/shell-visual-review-37202537846/`。仅按实际检查范围记录，未替代新输入及 OS/IME/DPI/performance 的独立验收。

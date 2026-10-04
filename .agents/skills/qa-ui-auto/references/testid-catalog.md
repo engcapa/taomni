@@ -1536,9 +1536,9 @@
   ↳ `[data-testid="shell-tab-card"][data-tab-type="database"] [data-testid="shell-tab-card-close"]` — alias
   ↳ `[data-testid="shell-tab-card"][data-tab-type="placeholder"] [data-testid="shell-tab-card-close"]` — alias
 - `[data-testid="shell-tab-card-detail"]` — display — F-SHELL-1.shell-tab-card-detail
-  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-detail"]` — alias
 - `[data-testid="shell-tab-card-details"]` — interactive — F-SHELL-1.shell-tab-card-details
-  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-details"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-details"]` — alias
 - `[data-testid="shell-tab-card-more"]` — interactive — F-SHELL-1.shell-tab-card-more
   ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("SHELL action copy")) [data-testid="shell-tab-card-more"]` — alias
   ↳ `[data-testid="shell-tab-card"]:has-text("qa-001") [data-testid="shell-tab-card-more"]` — alias
@@ -1557,11 +1557,11 @@
   ↳ `[data-testid="shell-tab-card"]:has-text("qa-000") [data-testid="shell-tab-card-pin"]` — alias
   ↳ `[data-testid="shell-tab-card"][data-pinned="true"]:has-text("qa-alpha") [data-testid="shell-tab-card-pin"]` — alias
 - `[data-testid="shell-tab-card-preview"]` — display — F-SHELL-1.shell-tab-card-preview
-  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-preview"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-preview"]` — alias
 - `[data-testid="shell-tab-card-status"]` — display — F-SHELL-1.shell-tab-card-status
-  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-status"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-status"]` — alias
 - `[data-testid="shell-tab-card-summary"]` — display — F-SHELL-1.shell-tab-card-summary
-  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-summary"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-id^="ssh-shell-a-"] [data-testid="shell-tab-card-summary"]` — alias
 - `[data-testid="shell-tab-card-title"]` — display — F-SHELL-1.shell-tab-card-title
 - `[data-testid="shell-tab-clear"]` — interactive — F-SHELL-1.shell-tab-clear
 - `[data-testid="shell-tab-close-all"]` — interactive — F-SHELL-1.shell-tab-close-all
