@@ -387,7 +387,8 @@ verification:
       expectation: '{"mysql_assert_rows": {"query": "SELECT id, v FROM qa_shell_tx ORDER BY id", "equals":
         [[1, "before"]]}}'
     - step: 47
-      expectation: '{"native_app_process": {"state": "running"}}'
+      expectation: Independent OS enumeration finds exactly one QA executable in the run-owned driver process
+        tree and records its PID before any Exit assertion.
     - step: 51
       expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
     - step: 56

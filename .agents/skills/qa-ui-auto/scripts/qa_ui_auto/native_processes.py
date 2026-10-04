@@ -1,6 +1,7 @@
 """Independent process observations for the exact app owned by this QA driver."""
 from __future__ import annotations
 
+import ctypes
 import json
 import ntpath
 import os
@@ -59,13 +60,69 @@ def stop_windows_profile_owners(profile: Path) -> list[int]:
     return terminated
 
 
+class _WindowsProcessEntry(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", ctypes.c_uint32), ("cntUsage", ctypes.c_uint32),
+        ("th32ProcessID", ctypes.c_uint32), ("th32DefaultHeapID", ctypes.c_size_t),
+        ("th32ModuleID", ctypes.c_uint32), ("cntThreads", ctypes.c_uint32),
+        ("th32ParentProcessID", ctypes.c_uint32), ("pcPriClassBase", ctypes.c_int32),
+        ("dwFlags", ctypes.c_uint32), ("szExeFile", ctypes.c_wchar * 260),
+    ]
+
+
+def windows_snapshot(kernel32=None) -> list[dict]:
+    """Read PIDs, parent PIDs and full executable paths directly from Win32."""
+    kernel = kernel32 if kernel32 is not None else ctypes.WinDLL("kernel32", use_last_error=True)
+    entry_pointer = ctypes.POINTER(_WindowsProcessEntry)
+    signatures = {
+        "CreateToolhelp32Snapshot": ([ctypes.c_uint32, ctypes.c_uint32], ctypes.c_void_p),
+        "Process32FirstW": ([ctypes.c_void_p, entry_pointer], ctypes.c_int32),
+        "Process32NextW": ([ctypes.c_void_p, entry_pointer], ctypes.c_int32),
+        "OpenProcess": ([ctypes.c_uint32, ctypes.c_int32, ctypes.c_uint32], ctypes.c_void_p),
+        "QueryFullProcessImageNameW": ([ctypes.c_void_p, ctypes.c_uint32, ctypes.c_wchar_p,
+                                        ctypes.POINTER(ctypes.c_uint32)], ctypes.c_int32),
+        "CloseHandle": ([ctypes.c_void_p], ctypes.c_int32),
+        "GetLastError": ([], ctypes.c_uint32),
+    }
+    for name, (arguments, result) in signatures.items():
+        function = getattr(kernel, name)
+        function.argtypes, function.restype = arguments, result
+    handle = kernel.CreateToolhelp32Snapshot(0x00000002, 0)
+    if handle in (None, ctypes.c_void_p(-1).value):
+        raise StepError(f"Win32 process snapshot failed (error {kernel.GetLastError()})")
+    rows = []
+    entry = _WindowsProcessEntry()
+    entry.dwSize = ctypes.sizeof(entry)
+    try:
+        found = kernel.Process32FirstW(handle, ctypes.byref(entry))
+        while found:
+            executable = None
+            process = kernel.OpenProcess(0x1000, False, entry.th32ProcessID)
+            if process:
+                try:
+                    buffer = ctypes.create_unicode_buffer(32768)
+                    length = ctypes.c_uint32(len(buffer))
+                    if kernel.QueryFullProcessImageNameW(process, 0, buffer, ctypes.byref(length)):
+                        executable = buffer.value
+                finally:
+                    kernel.CloseHandle(process)
+            # Protected processes and processes that exit during enumeration
+            # can lack a readable path. Retain their PID for conservative exit
+            # checks instead of treating unreadability as absence.
+            rows.append({"pid": int(entry.th32ProcessID), "parent": int(entry.th32ParentProcessID),
+                         "executable": executable})
+            found = kernel.Process32NextW(handle, ctypes.byref(entry))
+        if (error := kernel.GetLastError()) != 18:  # ERROR_NO_MORE_FILES
+            raise StepError(f"Win32 process enumeration failed (error {error})")
+    finally:
+        kernel.CloseHandle(handle)
+    return rows
+
+
 def snapshot() -> list[dict]:
     system = platform.system()
     if system == "Windows":
-        command = "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,ExecutablePath | ConvertTo-Json -Compress"
-        result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", command], capture_output=True, text=True, timeout=15, check=True)
-        data = json.loads(result.stdout)
-        return [{"pid": int(row["ProcessId"]), "parent": int(row["ParentProcessId"]), "executable": row.get("ExecutablePath")} for row in data]
+        return windows_snapshot()
     if system == "Darwin":
         result = subprocess.run(["ps", "-A", "-o", "pid=,ppid=,comm="], capture_output=True, text=True, timeout=10, check=True)
         return [{"pid": int(parts[0]), "parent": int(parts[1]), "executable": parts[2]} for line in result.stdout.splitlines() if len(parts := line.strip().split(None, 2)) == 3]
@@ -112,7 +169,8 @@ def observe(ctx, args):
                 ctx._app_processes = apps
                 ctx.session._app_exit_observed = False
         else:
-            apps = [row for row in rows if any(row["pid"] == old["pid"] and row["executable"] == old["executable"] for old in saved)]
+            apps = [row for row in rows if any(row["pid"] == old["pid"] and
+                    (not row.get("executable") or row["executable"] == old["executable"]) for old in saved)]
             passed = not apps
         samples.append({"time": time.time(), "apps": apps})
         if passed:

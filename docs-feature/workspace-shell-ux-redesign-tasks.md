@@ -23,7 +23,7 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。最新精准复验已收齐六份报告，Windows SSH、Linux 退出重启和 Host 往返通过；Linux N15 的路径输入失败仍需修复输入复验。历史失败证据完整保留。
+TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。Windows SSH、三端退出重启和 Host 往返已经精准复验通过；N15 的路径修复已在 Linux/macOS 通过，Windows 独立进程枚举超时需要修复输入复验。历史失败证据完整保留。
 
 当前完整范围为 249 个独立 ID：browser 三端各 190，native Linux 67 / Windows 61 / macOS 60，共 758 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-269.txt`，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
@@ -222,3 +222,9 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - Linux N15 原图显示本地列表仍为 `/home/runner`，整页文本被选中。原生 form fill 重新点击已经聚焦的 blur-commit 路径框，没有检查焦点；单测 274 的两个实际失败分别复现输入框提前提交和无焦点仍发全局快捷键。现在复用已有 locator focus 并验证 activeElement，保留真实 select-all/backspace/text 与 Unicode OS paste。N15 新增 Enter 前完整 fixture 路径值检查，原 126 步与 600 秒预算保留，requirements/checkpoints/results 随插入同步。
 - 本地 276 工具单测：117 项，108 pass / 9 平台限定 skip / 0 fail；这些 skip 不属于 browser/native 用例结果。277 audit gate 通过，未降低 baseline。273/275 的测试命令缺少模块路径或引用不存在模块，原日志保留，未当作产品失败或通过。本批不修改产品/构建输入，没有本地启动 browser/native 应用。
 - [DB browser run 37215235654](https://github.com/engcapa/taomni/actions/runs/37215235654)，固定输入 `d39a285b983ad384bbc7e569ccdbb8b172132ae3`：三端各 7/0/0，共 21 次全部通过；三份身份、receipt/config 与 ZIP hashes 匹配。实施基线以来改动的 208 个 YAML 全部包含在最终 249 ID 范围，无遗漏。N15 修复仍待 GitHub 精准复验，然后执行最终六端统一输入。
+
+### N15 路径复验与 Windows 进程观察
+
+- [run 37216273760](https://github.com/engcapa/taomni/actions/runs/37216273760)，固定输入 `2bec9b26d5238e271d101b3ec33db27bfe449ee4`：Linux/macOS native 各 1/0/0，Windows 0/1/0。三份身份、receipt/config、native build 与 ZIP hashes 匹配。两端 N15 完整 127 步通过，Linux 路径修复得到实际证明；已检查 Linux 的 DB/Notes 同屏原图，无明显裁切。Windows 在 step 47 的独立 `Get-CimInstance` 全进程查询超过原有 15 秒预算，尚未执行该输入的 SFTP 路径部分。
+- Windows 独立 oracle 改为 Toolhelp32 + QueryFullProcessImageNameW，读取真实 PID、父 PID、完整 Unicode executable；所有已打开句柄在成功/失败时关闭。保护进程或查询时已退出的 PID 保留未知路径；观察到原 PID 但无法读取路径，不能误判 app 已退出。保留原 15 秒观察和 N15 600 秒 case 预算，未读取 renderer 的 PID 作为独立证据。WebView2 精确 profile 清理继续保持原身份保护。
+- 本地工具单测 285：124 项，115 pass / 9 平台限定 skip / 0 fail。包含 Windows API 实测识别本次 Python 单测进程的 PID、parent 和真实 executable，以及 Unicode 路径、访问拒绝、API 枚举失败/句柄清理和未知 executable 不能证明退出。284 的误判退出测试改前真实失败；另一个旧 mock 的 TypeError 保留但不计为根因证明。产品和 native build 输入未修改；下一输入先复验 Windows N15，再执行最终六端集合。
