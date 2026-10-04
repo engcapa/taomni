@@ -81,7 +81,15 @@ CoreGraphics 的 `CGWindowListCreateImage` 在屏幕录制权限缺失时仍可�
 
 tag 为空的测试构建未配置升级私钥时，通过临时配置关闭 `createUpdaterArtifacts`；这些产物用于手工测试，不具备自动升级签名。正式发布不允许使用该分支。
 
-验证范围：Node.js 22 下 48 项脚本测试通过，覆盖签名配置、模拟钥匙串导入/失败与清理、应用与升级归档验收分支、升级清单/签名校验。升级验签包含上游 Minisign 的已知测试向量、正确签名、错误密钥、篡改包和篡改 trusted comment；macOS 验收分支使用模拟系统命令，不等同于真实证书签包。`release-workflow.test.mjs` 读取当前工作流的汇总步骤，用临时升级签名包与模拟 gh 执行已有发行版、新建正式版/prerelease、草稿重跑和失败路径，确认签名校验失败时无 GitHub 调用、资源在清单之前上传、上传失败不公开草稿。工作流通过 actionlint、25 个 Bash run block 的语法检查和 YAML 解析。
+### 仅构建安装包的跨版本授权测试
+
+`workflow_dispatch` 新增 `platforms`（`all` / `macos`）、`macos_arch`（`both` / `x86_64` / `aarch64`）和可选 `test_version`。默认行为仍构建全部平台和架构。构建前的 plan 作业校验选择、tag 和测试版本；带 tag 的正式发布禁止部分构建和测试版本覆盖。
+
+Intel Mac 可使用空 tag、`platforms=macos`、`macos_arch=x86_64`，分别构建 `0.4.31-permission.1` 和 `0.4.31-permission.2`。测试版本通过 Tauri 配置覆盖同时应用到应用包和产物名称，不修改仓库版本。空 tag 始终跳过发行汇总作业，只保存 Actions artifacts；升级私钥和固定 macOS 证书继续使用仓库原有配置。
+
+先安装第一个版本、实际完成系统屏幕录制授权并截图另一个应用，再安装第二个版本。记录两次安装包的版本、证书指纹、指定要求和 cdhash：证书与指定要求应相同，而版本与 cdhash 应不同。只有第二个版本实际截图成功且没有重新授权，才能确认这台机器上的授权保留。
+
+验证范围：Node.js 22 下 55 项脚本测试通过，覆盖签名配置、模拟钥匙串导入/失败与清理、应用与升级归档验收分支、升级清单/签名校验。升级验签包含上游 Minisign 的已知测试向量、正确签名、错误密钥、篡改包和篡改 trusted comment；macOS 验收分支使用模拟系统命令，不等同于真实证书签包。`release-workflow.test.mjs` 读取当前工作流的汇总步骤，用临时升级签名包与模拟 gh 执行已有发行版、新建正式版/prerelease、草稿重跑和失败路径，确认签名校验失败时无 GitHub 调用、资源在清单之前上传、上传失败不公开草稿。工作流通过 actionlint、24 个 Bash run block 的语法检查和 YAML 解析。
 
 本地证据：`qa-ui-auto-report/macos-screenshot-permission/_local/release-signing-tests.log`。尚未使用真实发行证书运行 GitHub 发布，也没有实际安装两个版本来验证跨升级 TCC 授权保留；配置完成后的第一轮发布仍需这些验收。
 

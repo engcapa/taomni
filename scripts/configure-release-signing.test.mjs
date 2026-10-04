@@ -51,6 +51,17 @@ test("releases on every platform require an updater key, but artifact-only build
   assert.equal(releaseSigningPlan({ RELEASE_PLATFORM: "macOS" }).mode, "adhoc");
 });
 
+test("artifact-only versions are applied to the Tauri bundle without changing signing or updater keys", () => {
+  for (const RELEASE_PLATFORM of ["macOS", "Linux", "Windows"]) {
+    const plan = releaseSigningPlan(macos({ RELEASE_PLATFORM, RELEASE_TAG: "", RELEASE_TEST_VERSION: "0.4.31-permission.1" }));
+    assert.equal(JSON.parse(plan.environment.TAURI_RELEASE_CONFIG).version, "0.4.31-permission.1");
+    assert.equal(plan.environment.TAURI_SIGNING_PRIVATE_KEY, "fixed-updater-key\nsecond-line");
+    if (RELEASE_PLATFORM === "macOS") assert.equal(plan.environment.APPLE_SIGNING_IDENTITY, fingerprint);
+  }
+  assert.throws(() => releaseSigningPlan(macos({ RELEASE_TEST_VERSION: "0.4.31-permission.1" })), /empty tag/);
+  assert.throws(() => releaseSigningPlan(macos({ RELEASE_TAG: "", RELEASE_TEST_VERSION: "0.4.31\n" })), /valid SemVer/);
+});
+
 for (const name of ["APPLE_CERTIFICATE", "APPLE_SIGNING_IDENTITY", "MACOS_SIGNING_CERT_SHA1"]) {
   test(`missing ${name} never silently downgrades a macOS release or a partially configured workflow build`, () => {
     assert.throws(() => releaseSigningPlan(macos({ [name]: "" })), /refusing to fall back/);

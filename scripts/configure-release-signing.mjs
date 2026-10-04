@@ -4,12 +4,15 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { validateTestVersion } from "./resolve-release-build.mjs";
 
 /** The updater key and the macOS certificate serve independent trust chains. */
 export function releaseSigningPlan(env) {
   const release = Boolean(env.RELEASE_TAG);
   const platform = env.RELEASE_PLATFORM;
   const config = { bundle: { createUpdaterArtifacts: Boolean(env.TAURI_SIGNING_PRIVATE_KEY) } };
+  validateTestVersion(env.RELEASE_TEST_VERSION, env.RELEASE_TAG);
+  if (env.RELEASE_TEST_VERSION) config.version = env.RELEASE_TEST_VERSION;
   const environment = { TAURI_RELEASE_CONFIG: JSON.stringify(config) };
   if (!env.TAURI_SIGNING_PRIVATE_KEY && release) {
     throw new Error("TAURI_SIGNING_PRIVATE_KEY is required for releases; keep the key matching plugins.updater.pubkey.");

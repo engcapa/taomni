@@ -12,6 +12,22 @@ on:
         description: "Optional release tag, for example v0.1.0. Empty builds workflow artifacts only."
         required: false
         type: string
+      platforms:
+        description: "Artifact-only platform selection. Tagged releases require all."
+        required: true
+        default: all
+        type: choice
+        options: [all, macos]
+      macos_arch:
+        description: "Artifact-only macOS architecture selection. Tagged releases require both."
+        required: true
+        default: both
+        type: choice
+        options: [both, x86_64, aarch64]
+      test_version:
+        description: "Optional SemVer override for artifact-only upgrade tests; package.json is unchanged."
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -21,10 +37,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  plan:
+    name: Validate build selection
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      test_version: ${{ steps.plan.outputs.test_version }}
+      build_desktop: ${{ steps.plan.outputs.build_desktop }}
+      macos_aarch64: ${{ steps.plan.outputs.macos_aarch64 }}
+      macos_x86_64: ${{ steps.plan.outputs.macos_x86_64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build selection contracts
+        run: node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs
+      - name: Resolve build selection and version
+        id: plan
+        env:
+          RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_RELEASE_TAG: ${{ inputs.tag }}
+          INPUT_PLATFORMS: ${{ inputs.platforms }}
+          INPUT_MACOS_ARCH: ${{ inputs.macos_arch }}
+          RELEASE_TEST_VERSION: ${{ inputs.test_version }}
+        run: node scripts/resolve-release-build.mjs
+
   # ---------------------------------------------------------------------------
   # Linux / Windows matrix build
   # ---------------------------------------------------------------------------
   build:
+    needs: plan
+    if: needs.plan.outputs.build_desktop == 'true'
     name: Bundle (${{ matrix.platform }})
     runs-on: ${{ matrix.platform }}
     strategy:
@@ -234,32 +279,12 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --lib -- sockscap::policy sockscap::config sockscap::core
           pwsh scripts/stage-sockscap-windows.ps1 --check
 
-      - name: Resolve release version
-        id: version
-        shell: bash
-        run: |
-          version="$(node -p "require('./package.json').version")"
-          if [ "${{ github.event_name }}" = "release" ]; then
-            tag="${{ github.event.release.tag_name }}"
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            tag="${GITHUB_REF_NAME}"
-          else
-            tag="${{ inputs.tag }}"
-          fi
-
-          if [ -n "$tag" ] && [ "$tag" != "v$version" ]; then
-            echo "Release tag '$tag' must match package.json version 'v$version'." >&2
-            exit 1
-          fi
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
       - name: Check updater signing configuration
         shell: bash
         env:
           RELEASE_PLATFORM: ${{ runner.os }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          RELEASE_TEST_VERSION: ${{ needs.plan.outputs.test_version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: node scripts/configure-release-signing.mjs
@@ -284,7 +309,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: taomni-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          name: taomni-${{ needs.plan.outputs.version }}-${{ matrix.platform }}
           path: tauri-artifacts/${{ matrix.platform }}
           if-no-files-found: error
 
@@ -292,6 +317,7 @@ jobs:
   # macOS – single arm64 runner, cross-compiles both architectures
   # ---------------------------------------------------------------------------
   build-macos:
+    needs: plan
     name: Bundle (macOS)
     # Pin the major runner image instead of following the moving `macos-latest`
     # label. GitHub's macos-15 standard image is arm64 (Apple Silicon).
@@ -343,6 +369,7 @@ jobs:
         run: brew install krb5
 
       - name: Install MIT Kerberos (x86_64 – Rosetta 2)
+        if: needs.plan.outputs.macos_x86_64 == 'true'
         run: bash scripts/install-krb5-macos-x86_64.sh
 
       - name: Install frontend dependencies
@@ -367,27 +394,6 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::redirector -- --test-threads=1
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::recovery -- --test-threads=1
 
-      - name: Resolve release version
-        id: version
-        shell: bash
-        run: |
-          version="$(node -p "require('./package.json').version")"
-          if [ "${{ github.event_name }}" = "release" ]; then
-            tag="${{ github.event.release.tag_name }}"
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            tag="${GITHUB_REF_NAME}"
-          else
-            tag="${{ inputs.tag }}"
-          fi
-
-          if [ -n "$tag" ] && [ "$tag" != "v$version" ]; then
-            echo "Release tag '$tag' must match package.json version 'v$version'." >&2
-            exit 1
-          fi
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
       - name: Release signing unit contracts
         run: node --test scripts/configure-release-signing.test.mjs scripts/verify-macos-release-bundle.test.mjs
 
@@ -400,7 +406,8 @@ jobs:
         shell: bash
         env:
           RELEASE_PLATFORM: macOS
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          RELEASE_TEST_VERSION: ${{ needs.plan.outputs.test_version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -414,6 +421,7 @@ jobs:
 
       # ---------- aarch64-apple-darwin (native) ----------
       - name: Stage and verify xray-core (aarch64)
+        if: needs.plan.outputs.macos_aarch64 == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -421,6 +429,7 @@ jobs:
           test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "arm64"
 
       - name: Build macOS bundle (aarch64)
+        if: needs.plan.outputs.macos_aarch64 == 'true'
         id: tauri_macos_aarch64
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
@@ -433,11 +442,13 @@ jobs:
           args: --target aarch64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
       - name: Verify fixed signature and updater app (aarch64)
+        if: needs.plan.outputs.macos_aarch64 == 'true'
         env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: bash scripts/verify-macos-release-bundle.sh aarch64-apple-darwin arm64
 
       - name: Collect workflow artifacts (aarch64)
+        if: needs.plan.outputs.macos_aarch64 == 'true'
         shell: bash
         env:
           TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_aarch64.outputs.artifactPaths }}
@@ -445,14 +456,16 @@ jobs:
         run: node scripts/collect-tauri-action-artifacts.mjs
 
       - name: Upload workflow artifacts (aarch64)
+        if: needs.plan.outputs.macos_aarch64 == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: taomni-${{ steps.version.outputs.version }}-macos-aarch64
+          name: taomni-${{ needs.plan.outputs.version }}-macos-aarch64
           path: tauri-artifacts/macos-aarch64
           if-no-files-found: error
 
       # ---------- x86_64-apple-darwin (cross-compile) ----------
       - name: Stage and verify xray-core (x86_64)
+        if: needs.plan.outputs.macos_x86_64 == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -460,6 +473,7 @@ jobs:
           test "$(lipo -archs src-tauri/resources/sockscap/macos/xray)" = "x86_64"
 
       - name: Build macOS bundle (x86_64)
+        if: needs.plan.outputs.macos_x86_64 == 'true'
         id: tauri_macos_x86_64
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
@@ -473,11 +487,13 @@ jobs:
           args: --target x86_64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
       - name: Verify fixed signature and updater app (x86_64)
+        if: needs.plan.outputs.macos_x86_64 == 'true'
         env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: bash scripts/verify-macos-release-bundle.sh x86_64-apple-darwin x86_64
 
       - name: Collect workflow artifacts (x86_64)
+        if: needs.plan.outputs.macos_x86_64 == 'true'
         shell: bash
         env:
           TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_x86_64.outputs.artifactPaths }}
@@ -485,9 +501,10 @@ jobs:
         run: node scripts/collect-tauri-action-artifacts.mjs
 
       - name: Upload workflow artifacts (x86_64)
+        if: needs.plan.outputs.macos_x86_64 == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: taomni-${{ steps.version.outputs.version }}-macos-x86_64
+          name: taomni-${{ needs.plan.outputs.version }}-macos-x86_64
           path: tauri-artifacts/macos-x86_64
           if-no-files-found: error
 
@@ -505,9 +522,9 @@ jobs:
   # ---------------------------------------------------------------------------
   finalize-updater-manifest:
     name: Publish verified bundles and latest.json
-    needs: [build, build-macos]
+    needs: [plan, build, build-macos]
     runs-on: ubuntu-22.04
-    if: github.event_name == 'release' || github.ref_type == 'tag' || inputs.tag != ''
+    if: needs.plan.outputs.tag != ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -515,31 +532,18 @@ jobs:
           node-version: '22'
       - name: Updater manifest unit contracts
         run: node --test scripts/compose-updater-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/release-workflow.test.mjs
-      - name: Resolve release tag
-        id: meta
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            tag="${{ github.event.release.tag_name }}"
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            tag="${GITHUB_REF_NAME}"
-          else
-            tag="${{ inputs.tag }}"
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
       - name: Download workflow artifacts
-        if: steps.meta.outputs.tag != ''
+        if: needs.plan.outputs.tag != ''
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
       - name: Verify and publish release assets
-        if: steps.meta.outputs.tag != ''
+        if: needs.plan.outputs.tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ steps.meta.outputs.tag }}
+          TAG: ${{ needs.plan.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail

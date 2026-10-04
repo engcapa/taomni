@@ -8,6 +8,19 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const workflow = readFileSync(fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)), "utf8");
+test("artifact-only selection controls builders and cannot enter the publishing job", () => {
+  assert(workflow.includes("    if: needs.plan.outputs.build_desktop == 'true'"));
+  const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
+  assert(finalizer.includes("    needs: [plan, build, build-macos]"));
+  assert(finalizer.includes("    if: needs.plan.outputs.tag != ''"));
+  assert.equal((workflow.match(/RELEASE_TEST_VERSION: \$\{\{ needs.plan.outputs.test_version \}\}/g) ?? []).length, 2);
+  for (const arch of ["aarch64", "x86_64"]) {
+    for (const name of ["Stage and verify xray-core", "Build macOS bundle", "Verify fixed signature and updater app", "Collect workflow artifacts", "Upload workflow artifacts"]) {
+      const step = workflow.split(`      - name: ${name} (${arch})\n`)[1]?.split("      - name:")[0];
+      assert(step?.includes(`        if: needs.plan.outputs.macos_${arch} == 'true'`), `${name} (${arch}) must follow the validated build selection`);
+    }
+  }
+});
 const publishStep = workflow.split("      - name: Verify and publish release assets\n")[1];
 assert(publishStep, "the tested publishing step must exist in release.yml");
 const publishScript = publishStep.split("        run: |\n")[1].split("\n")
