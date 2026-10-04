@@ -22,23 +22,29 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
         #[cfg(target_os = "macos")]
         {
             chord(&mut input, &[Key::Meta], Key::Unicode('a'))?;
+            std::thread::sleep(Duration::from_millis(150));
             input
                 .text(destination.file_name().unwrap().to_string_lossy().as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
             chord(&mut input, &[Key::Meta, Key::Shift], Key::Unicode('g'))?;
-            std::thread::sleep(Duration::from_millis(500));
+            std::thread::sleep(Duration::from_millis(700));
+            chord(&mut input, &[Key::Meta], Key::Unicode('a'))?;
             input
                 .text(destination.parent().unwrap().to_string_lossy().as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
             input
                 .key(Key::Return, Direction::Click)
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
-            std::thread::sleep(Duration::from_millis(700));
+            std::thread::sleep(Duration::from_millis(1200));
         }
         #[cfg(target_os = "linux")]
         {
             chord(&mut input, &[Key::Control], Key::Unicode('l'))?;
             std::thread::sleep(Duration::from_millis(250));
+            // GTK selects the basename without its suffix by default.
+            // Replace the entire field so typing a PNG path cannot leave a
+            // second .png suffix behind.
+            chord(&mut input, &[Key::Control], Key::Unicode('a'))?;
             input
                 .text(destination.to_string_lossy().as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -63,6 +69,7 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
 pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
+    let mut trace = ScenarioTrace::new("pin-tools-phases.json");
     let source = RgbaImage::from_pixel(800, 600, image::Rgba([200, 20, 40, 255]));
     let (source_path, _, _) =
         capture::save_png(&source, "qa-pin-tools").map_err(|e| e.to_string())?;
@@ -79,6 +86,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     let drag = verify_pin_drag(&pin, &display)
         .await
         .map_err(|e| e.to_string())?;
+    trace.mark("dragged", drag.clone());
     let scale = pin.scale_factor().map_err(|e| e.to_string())?;
     let before = pin.inner_size().map_err(|e| e.to_string())?;
     let controls = run_js(&pin, r#"
@@ -131,15 +139,24 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     tokio::time::sleep(Duration::from_millis(450)).await;
     let restored = pin.inner_size().map_err(|e| e.to_string())?;
     let restored_opacity = run_js(&pin, "return Number(getComputedStyle(document.querySelector('[data-testid=\"screenshot-pin-surface\"]')).opacity);", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
+    trace.mark(
+        "restored",
+        json!({"size":restored,"opacity":restored_opacity}),
+    );
     let destination = evidence_path("pin-ui-saved.png");
     std::fs::create_dir_all(artifact_dir()).map_err(|e| e.to_string())?;
     pin.set_focus().map_err(|e| e.to_string())?;
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-save\"]').click()")
         .map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(1500)).await;
+    trace.mark("save-dialog-open", json!({"destination":destination}));
+    if let Ok(desktop) = capture::capture_display(&app, &display) {
+        keep_image(&desktop, "pin-save-dialog-open.png");
+    }
     choose_save_destination(destination.clone())
         .await
         .map_err(|e| e.to_string())?;
+    trace.mark("save-dialog-input-sent", json!(true));
     for _ in 0..60 {
         if destination.exists() {
             break;
@@ -148,7 +165,14 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     }
     let saved_identical = std::fs::read(&destination).ok() == std::fs::read(&source_path).ok()
         && destination.exists();
+    trace.mark(
+        "save-dialog-result",
+        json!({"originalSaved":saved_identical,"destination":destination}),
+    );
     if !saved_identical {
+        if let Ok(desktop) = capture::capture_display(&app, &display) {
+            keep_image(&desktop, "pin-save-dialog-failed.png");
+        }
         return Ok(report(
             false,
             json!({"nativeSaveDialog":"did not save original PNG","destination":destination,"controls":controls,"drag":drag}),

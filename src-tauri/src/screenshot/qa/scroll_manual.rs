@@ -6,10 +6,14 @@ use super::*;
 pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
+    let mut trace = ScenarioTrace::new("scroll-manual-phases.json");
     let (fixture, display, region) = open_fixture(&app, "scroll")
         .await
         .map_err(|e| format!("{e:#}"))?;
     let source = read_source(&fixture).await.map_err(|e| format!("{e:#}"))?;
+    let parked = input_point((display.x + 16, display.y + 16), source.scale);
+    park_pointer(parked).await.map_err(|e| e.to_string())?;
+    trace.mark("fixture-ready", json!({"region":region}));
     let overlay = begin_scroll_ui(&app, &display, region, false, false).await?;
     run_js(
         &overlay,
@@ -41,6 +45,7 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     {
         return Err(format!("manual pause ended early: {paused:?}"));
     }
+    trace.mark("initial-pause", json!(paused));
     run_js(&bar, "document.querySelector('[data-testid=\"screenshot-scroll-switch-mode\"]').click(); return true;", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
     let mut switched_auto = false;
     for _ in 0..100 {
@@ -71,6 +76,7 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     if !switched_manual {
         return Err("switching back to manual did not stop automatic input".into());
     }
+    trace.mark("switched-back-to-manual", json!(true));
     let center = input_point(
         (
             display.x + (region.0 + region.2 / 2) as i32,
@@ -79,16 +85,18 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         source.scale,
     );
     let mut positions = Vec::new();
+    let mut input = tokio::task::spawn_blocking(|| enigo::Enigo::new(&enigo::Settings::default()))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
     for _ in 0..70 {
-        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        input = tokio::task::spawn_blocking(move || -> anyhow::Result<enigo::Enigo> {
             use enigo::Mouse;
-            let mut input = enigo::Enigo::new(&enigo::Settings::default())
-                .map_err(|e| anyhow::anyhow!("OS input: {e}"))?;
             move_os_pointer(&mut input, center)?;
             input
                 .scroll(1, enigo::Axis::Vertical)
                 .map_err(|e| anyhow::anyhow!("wheel: {e}"))?;
-            Ok(())
+            Ok(input)
         })
         .await
         .map_err(|e| e.to_string())?
@@ -97,11 +105,13 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         let position = run_js(&fixture, "const el = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return {top:el.scrollTop, end:el.scrollHeight-el.clientHeight};", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
         let bottom = position["top"].as_f64().unwrap_or(0.0)
             >= position["end"].as_f64().unwrap_or(f64::MAX) - 1.0;
+        trace.mark("manual-wheel", position.clone());
         positions.push(position);
         if bottom {
             break;
         }
     }
+    trace.mark("bottom-pause", json!(true));
     tokio::time::sleep(Duration::from_millis(1800)).await;
     let at_bottom = super::super::tool_state()
         .scroll
@@ -126,10 +136,16 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         .to_rgba8();
     let comparison = compare_scroll_original(&image, &source).map_err(|e| e.to_string())?;
     let artifact = keep_image(&image, "scroll-manual.png");
+    trace.mark("finished-original", comparison.clone());
     super::super::close_session(&app);
+    if !wait_closed(&app, super::super::OVERLAY_LABEL, Duration::from_secs(5)).await {
+        return Err("finished overlay did not close before the next capture".into());
+    }
+    trace.mark("finished-overlay-closed", json!(true));
     // A second public capture exercises explicit cancellation, retaining the
     // selected original instead of installing a partial result.
     let original = begin_scroll_ui(&app, &display, region, false, false).await?;
+    trace.mark("cancel-selection-ready", json!(true));
     run_js(&original, "document.querySelector('[data-testid=\"screenshot-scroll-mode-manual\"]').click(); await new Promise(r=>setTimeout(r,100)); document.querySelector('[data-testid=\"screenshot-scroll-start\"]').click(); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     let cancel_bar = wait_window(
         &app,
@@ -143,6 +159,7 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         .eval("document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]').click()")
         .map_err(|e| e.to_string())?;
     let cancelled = run_js(&original, "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase!=='annotate';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase==='annotate' && !document.querySelector('[data-testid=\"screenshot-scroll-result\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    trace.mark("cancelled", cancelled.clone());
     Ok(report(
         bottom_still_active
             && preview["preview"] == true

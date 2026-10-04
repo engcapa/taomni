@@ -1,10 +1,11 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
 
-from stage_screenshot_artifacts import stage
+from stage_screenshot_artifacts import stage, stage_macos_crashes
 
 
 class StageScreenshotArtifactsTest(unittest.TestCase):
@@ -34,4 +35,19 @@ class StageScreenshotArtifactsTest(unittest.TestCase):
             result = stage(root / "missing", root / "report")
             self.assertFalse(result["source_exists"])
             self.assertEqual(result["files"], [])
+            self.assertNotIn("passed", result)
+
+    def test_only_recent_app_crashes_are_retained(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            crashes = root / "diagnostics"
+            crashes.mkdir()
+            for name in ["Taomni QA-recent.ips", "taomni-old.crash", "Other.ips", "taomni.txt"]:
+                (crashes / name).write_bytes(b"diagnostic")
+            os.utime(crashes / "taomni-old.crash", (1, 1))
+            (crashes / "taomni-symlink.ips").symlink_to(crashes / "Other.ips")
+            report = root / "report"
+            result = stage_macos_crashes([crashes, root / "missing"], report, since=2)
+            self.assertEqual([item["path"] for item in result["files"]], ["Taomni QA-recent.ips"])
+            self.assertEqual((report / "native-crash-reports/Taomni QA-recent.ips").read_bytes(), b"diagnostic")
             self.assertNotIn("passed", result)

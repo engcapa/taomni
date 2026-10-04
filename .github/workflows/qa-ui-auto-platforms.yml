@@ -330,6 +330,7 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/stage_screenshot_artifacts.py
           --source "$RUNNER_TEMP/taomni-qa-artifacts"
           --report "qa-ui-auto-report/$QA_ENTRY"
+          --macos-crash-reports
       - uses: actions/upload-artifact@v4
         if: always()
         with:
