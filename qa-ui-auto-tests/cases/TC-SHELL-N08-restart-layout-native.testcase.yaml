@@ -60,7 +60,9 @@ steps:
     state: running
 - app_menu_action: exit
 - wait_for: '[data-testid="confirm-dialog"]'
-- click: '[data-testid="confirm-dialog-confirm"]'
+- click_app_exit:
+    selector: '[data-testid="confirm-dialog-confirm"]'
+    timeout_sec: 30
 - native_app_process:
     state: exited
     timeout_sec: 30

@@ -2,7 +2,9 @@ id: TC-SHELL-N22
 title: Native single-repository GitPanel stages, cancels branch creation, commits and discards
 description: 'V-N22: real single-root GitPanel workflow on Windows/Linux/macOS. Owns an isolated repository under
   the report root and uses independent read-only Git oracles for HEAD, all branches, exact porcelain status and
-  full index/HEAD blobs. The multi-repository commit confirmation is covered independently by N21.'
+  full index/HEAD blobs. The multi-repository commit confirmation is covered independently by N21. Wait for the
+  commit control to become enabled after branch refresh before clicking; preserve the exact independent HEAD/status/blob
+  assertions.'
 covers:
 - F25.5
 - F26.2
@@ -174,6 +176,8 @@ steps:
 - set_check:
     selector: '[data-testid="git-change-row"][data-path="git-diff-fixture-manifest.json"] input[type="checkbox"]'
     checked: false
+- wait_for: '[data-testid="git-commit-submit"]:not([disabled])'
+- assert_enabled: '[data-testid="git-commit-submit"]'
 - click: '[data-testid="git-commit-submit"]'
 - git_assert_state:
     repo: ${fixture.git_diff_repo}
@@ -350,62 +354,62 @@ verification:
     actions:
     - 38
     - 39
-    - 40
-    - 44
+    - 42
     - 46
+    - 48
     checkpoints:
-    - step: 41
+    - step: 43
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "branches":
         ["${fixture.git_diff_branch}", "shell-single-qa"], "head_subject": "SHELL single Git 中文", "status": {"long-lines.txt":
         " M", "git-diff-fixture-manifest.json": "??"}, "head_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"},
         "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}, "timeout_sec": 30}}'
-    - step: 42
+    - step: 44
       expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": ""}}'
-    - step: 43
+    - step: 45
       expectation: '{"wait_for": {"selector": "[data-testid=\"git-change-row\"][data-path=\"short.txt\"]", "state":
         "detached"}}'
-    - step: 45
+    - step: 47
       expectation: '{"assert_text": {"selector": "[data-testid=\"git-log-commit\"]", "contains": "SHELL single Git
         中文", "timeout_sec": 30}}'
-    - step: 47
+    - step: 49
       expectation: '{"wait_for": {"selector": "[data-testid=\"git-log-file\"][data-path=\"short.txt\"]", "timeout_sec":
         30}}'
-    - step: 48
+    - step: 50
       expectation: '{"assert_count": {"selector": "[data-testid=\"git-log-file\"]", "equal": 1}}'
     results:
-    - 41
-    - 42
     - 43
+    - 44
     - 45
     - 47
-    - 48
+    - 49
+    - 50
   - id: SINGLE-R5
     requirement: Discard Cancel preserves the exact remaining status; Confirm discards only long-lines.txt and retains
       the committed short.txt plus untracked manifest.
     actions:
-    - 50
-    - 51
     - 52
+    - 53
     - 54
     - 56
-    - 57
+    - 58
+    - 59
     checkpoints:
-    - step: 53
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
     - step: 55
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 57
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "head_subject":
         "SHELL single Git 中文", "status": {"long-lines.txt": " M", "git-diff-fixture-manifest.json": "??"}}}'
-    - step: 58
+    - step: 60
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "head_subject":
         "SHELL single Git 中文", "status": {"git-diff-fixture-manifest.json": "??"}, "timeout_sec": 30}}'
-    - step: 59
+    - step: 61
       expectation: '{"wait_for": {"selector": "[data-testid=\"git-change-row\"][data-path=\"long-lines.txt\"]",
         "state": "detached"}}'
     results:
-    - 53
     - 55
-    - 58
-    - 59
+    - 57
+    - 60
+    - 61
   visual:
   - check: Read the final Git Log and Changes screenshots for readable content and unobstructed Host controls.
     method: manual

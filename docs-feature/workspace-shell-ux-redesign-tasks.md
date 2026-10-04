@@ -175,3 +175,12 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - macOS N15 的 126 个业务步骤全部通过，独立 PID 已退出后，清理 HTTP DELETE 因应用内 WebDriver bridge 已关闭而失败。仅在独立观察到先前 owned PID 退出后免去该请求；仍清理 transport 与 owned driver，未确认的连接失败继续报错。N04 的独立协议 receipt 记录 16 MB 每包额外固定等待造成实际约 168 KB/s，90 秒未完成；fixture 改为把协议耗时计入原 256 KB/s 的时间额度，禁止累计 idle credit。16 MB、90 秒、实际 growing / cancel / SHA256 断言全部保留。
 - runner focused 本地 79 项，72 pass / 7 平台限定 skip，exit 0；这些 skip 仅为工具单测的平台条件，不是 browser/native case 通过。TypeScript `shell-types-213` exit 0，受影响 Rust 格式与 Git diff 检查通过。TASK-01～12 继续 verification，下一固定输入先验以上根因修复，再执行 242 ID 六端统一验收。
 - 该批最终 runner 单测 `shell-runner-unit-214` 与上列 79 项结果一致。静态 audit gate exit 0：required 975 / covered 930 / shallow 41 / orphans 4，未调整 baseline；45 个未触达控件仍显式列为覆盖缺口，静态结果不代表 runtime 通过。
+
+### 七轮根因修复复验与入口覆盖补充
+
+- [run 37202537846](https://github.com/engcapa/taomni/actions/runs/37202537846)，固定输入 `bcdebdf5fb7b15fd632215bf999d08e60b9a47b7`，8 个 ID、27 次执行：browser 三端各 3/3；native 三端各 5 pass / 1 fail，全部 0 skip。6/6 报告的 source/runner/case/selection/receipt/config/native build 与 archive hashes 匹配。邮件 LIST/message FLAGS、N04 真实传输、N15 多窗口退出和 N21 多仓库 Git 修复均通过。
+- Linux N08 在真实 Exit 确认的 click 请求中收到 `Session terminated without a reply`，尚未运行下一条独立 PID 断言。新增 `click_app_exit`：先要求之前观察到 owned PID，并成功找到真正的最后确认按钮；点击后只在独立 OS 枚举确认该 PID 已退出时接受 transport 丢回复。按钮不存在、会话提前不可用、应用仍运行一律失败；原 30 秒退出预算与后续 PID/恢复断言保留。N15 最后风险确认复用同一契约。
+- Windows/macOS N22 独立 Git 记录显示分支已创建，但提交尚未发生；新分支的磁盘操作先于 renderer refresh/busy 完成。用例在 Commit 操作前等待真实按钮 enabled，再保留原 exact HEAD/status/index/blob 与取消分支断言。没有增加超时或接受未提交状态。
+- B03 新增 Navigator Recent → 既有 Workspace 的单实例结果；B09 新增详情 type/host、attention 过滤、type 排序、空态 Home/New 取消与 backdrop 恢复；B22 新增 Host 标签 Problems/Terminal 切换后的完整 buffer/undo；B23 新增右侧恢复、真正关闭 idle Files 后重开的视图数量和 SSH 存活。原步骤及其断言完整保留，新增动作结果单独映射。
+- 修正实际 scoped DOM selector 的 catalog aliases，使已发生的 card/keymap 子控件操作归属到真实控件。只取已有 YAML 的最终 descendant，不把 `:has` 内的被动子元素记作操作；static touch 仍不是 runtime 通过。
+- 本批本地 `shell-exit-runner-unit-222`：107 项工具单测，100 pass / 7 平台限定 skip，exit 0；包括正常退出、丢回复、仍存活、预先失联和缺失 owned PID 的真实契约回归。工具单测 skip 不计入 UI 用例通过。`shell-final-static-225` audit gate exit 0，required 975 / covered 947 / shallow 39 / orphans 4，baseline 未降低；未触达控件及 OS/IME/DPI/performance 边界仍显式保留。`shell-full-plan-224` 为 242 个 ID、六端 737 次执行，gaps/unreviewed 为空；尚不是 runtime 通过。Git diff check 通过。

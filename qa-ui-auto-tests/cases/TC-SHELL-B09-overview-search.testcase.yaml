@@ -4,6 +4,7 @@ description: 'Production renderer acceptance. Specification: docs-feature/worksp
   Browser IPC fixtures prove renderer outcomes only.'
 covers:
 - F1.5
+- F-SHELL-1
 tags:
 - p1
 - workspace-shell
@@ -70,6 +71,84 @@ steps:
     selector: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
     equals: qa-beta
 - screenshot: tc-shell-b09.png
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_text_equals:
+    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-summary"]'
+    equals: terminal · alpha.invalid
+- assert_visible: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-preview"]'
+- assert_visible: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-status"]'
+- click: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-details"]'
+- assert_text:
+    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]'
+    contains: terminal
+- assert_text:
+    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]'
+    contains: alpha.invalid
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]
+      dd'
+    equal: 3
+- click: '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-details"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card-detail"]'
+    equal: 0
+- set_check:
+    selector: '[data-testid="shell-tab-attention-filter"]'
+    checked: true
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-attention="none"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="welcome"]'
+    equal: 0
+- set_check:
+    selector: '[data-testid="shell-tab-attention-filter"]'
+    checked: false
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 3
+- select_option:
+    selector: '[data-testid="shell-tab-sort"]'
+    value: type
+- assert_items:
+    selector: '[data-testid="shell-tab-card-title"]'
+    equals:
+    - qa-alpha
+    - qa-beta
+    - Welcome
+- fill:
+    selector: '[data-testid="shell-tab-search"]'
+    value: does-not-exist
+- assert_visible: '[data-testid="shell-tab-empty"]'
+- click: '[data-testid="shell-tab-empty-home"]'
+- assert_not_visible: '[data-testid="shell-overview"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- fill:
+    selector: '[data-testid="shell-tab-search"]'
+    value: does-not-exist
+- click: '[data-testid="shell-tab-empty-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- assert_not_visible: '[data-testid="shell-overview"]'
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-editor"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"]'
+    equal: 3
+- assert_attribute:
+    selector: '[data-testid="shell-tab-card"][data-active="true"]'
+    name: data-tab-type
+    equals: welcome
+- assert_visible: '[data-testid="shell-tab-backdrop"]'
+- click:
+    selector: '[data-testid="shell-tab-backdrop"]'
+    position:
+      x: 8
+      y: 8
+- assert_not_visible: '[data-testid="shell-overview"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- screenshot: tc-shell-b09-details-empty.png
 verification:
   review: reviewed
   requirements:
@@ -149,6 +228,102 @@ verification:
     - 24
     - 25
     - 27
+  - id: R3
+    requirement: Overview details show the selected type and host; attention excludes idle cards; empty Home and New
+      actions dismiss the overview and cancel creates no tab; backdrop dismissal keeps the active tab.
+    actions:
+    - 29
+    - 33
+    - 37
+    - 39
+    - 42
+    - 44
+    - 46
+    - 48
+    - 51
+    - 52
+    - 53
+    - 56
+    - 58
+    - 62
+    checkpoints:
+    - step: 30
+      expectation: "assert_text_equals:\n  selector: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"\
+        ]:text-is(\"qa-alpha\"))\n    [data-testid=\"shell-tab-card-summary\"]'\n  equals: terminal · alpha.invalid"
+    - step: 31
+      expectation: "assert_visible: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"]:text-is(\"\
+        qa-alpha\"))\n  [data-testid=\"shell-tab-card-preview\"]'"
+    - step: 32
+      expectation: "assert_visible: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"]:text-is(\"\
+        qa-alpha\"))\n  [data-testid=\"shell-tab-card-status\"]'"
+    - step: 34
+      expectation: "assert_text:\n  selector: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"\
+        ]:text-is(\"qa-alpha\"))\n    [data-testid=\"shell-tab-card-detail\"]'\n  contains: terminal"
+    - step: 35
+      expectation: "assert_text:\n  selector: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"\
+        ]:text-is(\"qa-alpha\"))\n    [data-testid=\"shell-tab-card-detail\"]'\n  contains: alpha.invalid"
+    - step: 36
+      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"]:has([data-testid=\"shell-tab-card-title\"\
+        ]:text-is(\"qa-alpha\"))\n    [data-testid=\"shell-tab-card-detail\"] dd'\n  equal: 3"
+    - step: 38
+      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card-detail\"]'\n  equal: 0"
+    - step: 40
+      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"][data-attention=\"none\"]'\n  equal:\
+        \ 0"
+    - step: 41
+      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"][data-tab-type=\"welcome\"]'\n  equal:\
+        \ 0"
+    - step: 43
+      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"]'\n  equal: 3"
+    - step: 45
+      expectation: "assert_items:\n  selector: '[data-testid=\"shell-tab-card-title\"]'\n  equals:\n  - qa-alpha\n\
+        \  - qa-beta\n  - Welcome"
+    - step: 47
+      expectation: 'assert_visible: ''[data-testid="shell-tab-empty"]'''
+    - step: 49
+      expectation: 'assert_not_visible: ''[data-testid="shell-overview"]'''
+    - step: 50
+      expectation: 'assert_visible: ''[data-testid="welcome-panel"]'''
+    - step: 54
+      expectation: 'wait_for: ''[data-testid="session-editor"]'''
+    - step: 55
+      expectation: 'assert_not_visible: ''[data-testid="shell-overview"]'''
+    - step: 57
+      expectation: 'assert_not_visible: ''[data-testid="session-editor"]'''
+    - step: 59
+      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"]'\n  equal: 3"
+    - step: 60
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"shell-tab-card\"][data-active=\"true\"]'\n  name:\
+        \ data-tab-type\n  equals: welcome"
+    - step: 61
+      expectation: 'assert_visible: ''[data-testid="shell-tab-backdrop"]'''
+    - step: 63
+      expectation: 'assert_not_visible: ''[data-testid="shell-overview"]'''
+    - step: 64
+      expectation: 'assert_visible: ''[data-testid="welcome-panel"]'''
+    results:
+    - 30
+    - 31
+    - 32
+    - 34
+    - 35
+    - 36
+    - 38
+    - 40
+    - 41
+    - 43
+    - 45
+    - 47
+    - 49
+    - 50
+    - 54
+    - 55
+    - 57
+    - 59
+    - 60
+    - 61
+    - 63
+    - 64
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay
       placement.

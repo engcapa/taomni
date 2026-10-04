@@ -3343,6 +3343,12 @@ def _do_native_app_process(ctx, args):
     return "observed the exact run-owned QA application process " + args["state"]
 
 
+@_verb("click_app_exit")
+def _do_click_app_exit(ctx, args):
+    from .native_processes import click_exit
+    return click_exit(ctx, args)
+
+
 @_verb("assert_value")
 def _do_assert_value(ctx, args):
     deadline = time.monotonic() + args.get("timeout_sec", 10)

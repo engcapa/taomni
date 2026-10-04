@@ -530,6 +530,16 @@
             "equals": { "type": "array", "items": { "type": "array" } }
           }
         },
+        "click_app_exit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector"],
+          "properties": {
+            "selector": { "$ref": "#/$defs/selector" },
+            "timeout_sec": { "type": "number", "minimum": 0.1, "maximum": 60 }
+          },
+          "description": "Native only: click the final real Exit control, then independently require the previously observed owned PID to end. A lost WebDriver reply is accepted only after that process exit."
+        },
         "native_app_process": {
           "type": "object",
           "additionalProperties": false,

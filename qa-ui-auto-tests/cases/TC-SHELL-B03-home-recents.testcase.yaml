@@ -4,6 +4,7 @@ description: 'Production renderer acceptance. Specification: docs-feature/worksp
   Browser IPC fixtures prove renderer outcomes only.'
 covers:
 - F1.6
+- F-SHELL-1
 tags:
 - p1
 - workspace-shell
@@ -67,6 +68,22 @@ steps:
     selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
     equal: 1
 - screenshot: tc-shell-b03.png
+- press:
+    selector: '[data-testid="shell-tab-search"]'
+    key: Escape
+- shell_navigate: tools
+- click: '[data-testid="shell-navigator-page"][data-page="recent"]'
+- wait_for: '[data-testid="shell-recent-workspace"]'
+- click: '[data-testid="shell-recent-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- click: '[data-testid="shell-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
+    equal: 1
+- screenshot: tc-shell-b03-navigator-recent.png
 verification:
   review: reviewed
   requirements:
@@ -125,6 +142,29 @@ verification:
     - 16
     - 19
     - 21
+  - id: R3
+    requirement: Navigator Recent and Home reopen the same surviving workspace without creating a second instance.
+    actions:
+    - 23
+    - 24
+    - 25
+    - 27
+    - 30
+    checkpoints:
+    - step: 26
+      expectation: 'wait_for: ''[data-testid="shell-recent-workspace"]'''
+    - step: 28
+      expectation: 'wait_for: ''[data-testid="code-workspace-tab"]:visible'''
+    - step: 29
+      expectation: "assert_count:\n  selector: '[data-testid=\"code-workspace-tab\"]'\n  equal: 1"
+    - step: 31
+      expectation: "assert_count:\n  selector: '[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"\
+        ]'\n  equal: 1"
+    results:
+    - 26
+    - 28
+    - 29
+    - 31
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay
       placement.

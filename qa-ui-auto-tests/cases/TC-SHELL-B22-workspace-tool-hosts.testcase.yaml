@@ -60,6 +60,47 @@ steps:
     selector: '[data-testid="code-workspace-tree"]:visible'
     equal: 1
 - screenshot: tc-shell-b22.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+End
+- type: host-tab-edit
+- click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for: '[data-testid="code-workspace-terminal-dock"]'
+- click: '[data-testid="shell-host-tab"][data-panel-id$=":problems"]'
+- wait_for: '[data-testid="shell-host"][data-panel-id$=":problems"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host-tab"][data-panel-id$=":problems"]'
+    name: aria-selected
+    equals: 'true'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - host-tab-edit
+- click: '[data-testid="shell-host-tab"][data-panel-id$=":terminal"]'
+- wait_for: '[data-testid="code-workspace-terminal-dock"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host-tab"][data-panel-id$=":terminal"]'
+    name: aria-selected
+    equals: 'true'
+- press:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    key: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - ''
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-tree"]:visible'
+    equal: 1
+- screenshot: tc-shell-b22-host-tabs.png
 verification:
   review: reviewed
   requirements:
@@ -120,6 +161,50 @@ verification:
     - 20
     - 22
     - 23
+  - id: R3
+    requirement: The Host tablist switches Problems and Terminal on one workspace while retaining its edited buffer
+      and undo history.
+    actions:
+    - 25
+    - 26
+    - 27
+    - 28
+    - 30
+    - 34
+    - 37
+    checkpoints:
+    - step: 29
+      expectation: 'wait_for: ''[data-testid="code-workspace-terminal-dock"]'''
+    - step: 31
+      expectation: 'wait_for: ''[data-testid="shell-host"][data-panel-id$=":problems"]'''
+    - step: 32
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"shell-host-tab\"][data-panel-id$=\":problems\"\
+        ]'\n  name: aria-selected\n  equals: 'true'"
+    - step: 33
+      expectation: "assert_items:\n  selector: '[data-testid=\"code-workspace-editor\"] .cm-line'\n  equals:\n  -\
+        \ repo-a WORKTREE\n  - shared line\n  - host-tab-edit"
+    - step: 35
+      expectation: 'wait_for: ''[data-testid="code-workspace-terminal-dock"]'''
+    - step: 36
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"shell-host-tab\"][data-panel-id$=\":terminal\"\
+        ]'\n  name: aria-selected\n  equals: 'true'"
+    - step: 38
+      expectation: "assert_items:\n  selector: '[data-testid=\"code-workspace-editor\"] .cm-line'\n  equals:\n  -\
+        \ repo-a WORKTREE\n  - shared line\n  - ''"
+    - step: 39
+      expectation: "assert_count:\n  selector: '[data-testid=\"code-workspace-editor\"]'\n  equal: 1"
+    - step: 40
+      expectation: "assert_count:\n  selector: '[data-testid=\"code-workspace-tree\"]:visible'\n  equal: 1"
+    results:
+    - 29
+    - 31
+    - 32
+    - 33
+    - 35
+    - 36
+    - 38
+    - 39
+    - 40
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay
       placement.

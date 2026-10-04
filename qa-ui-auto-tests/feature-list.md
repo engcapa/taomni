@@ -11075,6 +11075,9 @@ controls:
   kind: display
 - id: shell-keymap-record
   selector: '[data-testid="shell-keymap-record"]'
+  aliases:
+  - '[data-testid="shell-keymap-row"][data-action-id="shell.home"] [data-testid="shell-keymap-record"]'
+  - '[data-testid="shell-keymap-row"][data-action-id="shell.overview"] [data-testid="shell-keymap-record"]'
   kind: interactive
 - id: shell-keymap-row
   selector: '[data-testid="shell-keymap-row"]'
@@ -11186,30 +11189,63 @@ controls:
   kind: display
 - id: shell-tab-card-close
   selector: '[data-testid="shell-tab-card-close"]'
+  aliases:
+  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("SHELL action copy")) [data-testid="shell-tab-card-close"]'
+  - '[data-testid="shell-tab-card"][data-tab-id="welcome"] [data-testid="shell-tab-card-close"]'
+  - '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-close"]'
+  - '[data-testid="shell-tab-card"][data-tab-type="database"] [data-testid="shell-tab-card-close"]'
+  - '[data-testid="shell-tab-card"][data-tab-type="placeholder"] [data-testid="shell-tab-card-close"]'
   kind: interactive
 - id: shell-tab-card-detail
   selector: '[data-testid="shell-tab-card-detail"]'
+  aliases:
+  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]'
   kind: display
 - id: shell-tab-card-details
   selector: '[data-testid="shell-tab-card-details"]'
+  aliases:
+  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-details"]'
   kind: interactive
 - id: shell-tab-card-more
   selector: '[data-testid="shell-tab-card-more"]'
+  aliases:
+  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("SHELL action copy")) [data-testid="shell-tab-card-more"]'
+  - '[data-testid="shell-tab-card"]:has-text("qa-001") [data-testid="shell-tab-card-more"]'
+  - '[data-testid="shell-tab-card"]:has-text("qa-alpha") [data-testid="shell-tab-card-more"]'
+  - '[data-testid="shell-tab-card"][data-pinned="false"]:has-text("SHELL action") [data-testid="shell-tab-card-more"]'
+  - '[data-testid="shell-tab-card"][data-pinned="true"]:has-text("SHELL action") [data-testid="shell-tab-card-more"]'
+  - '[data-testid="shell-tab-card"][data-pinned="true"]:has-text("qa-alpha") [data-testid="shell-tab-card-more"]'
+  - '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-more"]'
   kind: interactive
 - id: shell-tab-card-open
   selector: '[data-testid="shell-tab-card-open"]'
+  aliases:
+  - '[data-testid="shell-tab-card"][data-tab-id="welcome"] [data-testid="shell-tab-card-open"]'
+  - '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
+  - '[data-testid="shell-tab-card"][data-tab-type="placeholder"] [data-testid="shell-tab-card-open"]'
+  - '[data-testid="shell-tab-card"][data-tab-type="terminal"] [data-testid="shell-tab-card-open"]'
+  - '[data-testid="shell-tab-card"][data-tab-type="terminal"]:has-text("qa-alpha") [data-testid="shell-tab-card-open"]'
   kind: interactive
 - id: shell-tab-card-pin
   selector: '[data-testid="shell-tab-card-pin"]'
+  aliases:
+  - '[data-testid="shell-tab-card"]:has-text("qa-000") [data-testid="shell-tab-card-pin"]'
+  - '[data-testid="shell-tab-card"][data-pinned="true"]:has-text("qa-alpha") [data-testid="shell-tab-card-pin"]'
   kind: interactive
 - id: shell-tab-card-preview
   selector: '[data-testid="shell-tab-card-preview"]'
+  aliases:
+  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-preview"]'
   kind: display
 - id: shell-tab-card-status
   selector: '[data-testid="shell-tab-card-status"]'
+  aliases:
+  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-status"]'
   kind: display
 - id: shell-tab-card-summary
   selector: '[data-testid="shell-tab-card-summary"]'
+  aliases:
+  - '[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-summary"]'
   kind: display
 - id: shell-tab-card-title
   selector: '[data-testid="shell-tab-card-title"]'

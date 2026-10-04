@@ -66,10 +66,10 @@ from qa_ui_auto.testcase import discover, step_verb_and_args  # noqa: E402
 
 
 INTERACTIVE_VERBS = {
-    "middle_click",
+    "middle_click", "click_app_exit",
     "click", "dblclick", "right_click", "hover", "drag_to", "drag_path", "native_click",
     "native_pointer_drag", "native_window_drag",
-    "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "upload_file",
+    "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "set_check", "upload_file",
     "set_check", "send_text_via_label", "open_session", "click_menu",
     "quick_connect", "auth", "attach_sftp", "set_remote_path",
     "shell_navigate", "app_menu_action", "choose_file", "download_file",

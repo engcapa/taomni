@@ -9,7 +9,8 @@ import sys
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.steps.file_dialogs import choose_file, download_file
 from qa_ui_auto.mysql_observation import assert_rows
-from qa_ui_auto.native_processes import owned_apps, observe
+from qa_ui_auto.native_processes import owned_apps, observe, click_exit
+from tauri_webdriver import WebDriverError
 from qa_ui_auto.control_coverage import _selectors_in_step
 from qa_ui_auto.rdp_steps import _do_host_clipboard
 from qa_ui_auto.native_steps import _do_assert_value
@@ -112,6 +113,57 @@ class MysqlObservationContract(TestCase):
 
 
 class NativeProcessContract(TestCase):
+    def exit_context(self, directory):
+        app = Path(directory) / "qa.exe"
+        session = Mock(_harness=SimpleNamespace(application=app, driver=SimpleNamespace(proc=SimpleNamespace(pid=1))))
+        session._app_exit_observed = False
+        ctx = SimpleNamespace(case_dir=Path(directory), session=session, step_index=21)
+        rows = [dict(pid=2, parent=1, executable=str(app))]
+        with patch("qa_ui_auto.native_processes.snapshot", return_value=rows):
+            observe(ctx, {"state": "running"})
+        return ctx, rows
+
+    def test_exit_click_accepts_a_lost_reply_only_after_independent_owned_pid_exit(self):
+        for error in (None, WebDriverError("Session terminated without a reply"), OSError("connection refused")):
+            with self.subTest(error=error), TemporaryDirectory() as directory:
+                ctx, _ = self.exit_context(directory)
+                ctx.session.request.side_effect = error
+                with patch("qa_ui_auto.native_processes.snapshot", return_value=[]):
+                    click_exit(ctx, {"selector": "#final-exit", "timeout_sec": .01})
+                ctx.session.find.assert_called_once_with("#final-exit", interactive=True)
+                ctx.session.element_path.assert_called_once_with(ctx.session.find.return_value, "/click")
+                ctx.session.request.assert_called_once_with("POST", ctx.session.element_path.return_value, {})
+                record = json.loads((Path(directory) / "native-app-exit-click-21.json").read_text())
+                self.assertTrue(record["exit_observed"])
+                self.assertEqual(record["transport_error"], str(error) if error else None)
+                process = [json.loads(line) for line in (Path(directory) / "native-app-processes.jsonl").read_text().splitlines()]
+                self.assertEqual([r["expected"] for r in process], ["running", "exited"])
+                self.assertTrue(all(r["passed"] for r in process))
+
+    def test_exit_click_with_or_without_a_reply_fails_when_the_owned_app_survives(self):
+        for error in (None, WebDriverError("Session terminated without a reply")):
+            with self.subTest(error=error), TemporaryDirectory() as directory:
+                ctx, rows = self.exit_context(directory)
+                ctx.session.request.side_effect = error
+                with patch("qa_ui_auto.native_processes.snapshot", return_value=rows), self.assertRaisesRegex(StepError, "did not reach"):
+                    click_exit(ctx, {"selector": "#final-exit", "timeout_sec": .001})
+                record = json.loads((Path(directory) / "native-app-exit-click-21.json").read_text())
+                self.assertFalse(record["exit_observed"])
+
+    def test_exit_click_requires_a_previously_owned_pid_and_a_live_control(self):
+        with TemporaryDirectory() as directory:
+            ctx, _ = self.exit_context(directory)
+            del ctx._app_processes
+            with self.assertRaisesRegex(StepError, "before clicking"):
+                click_exit(ctx, {"selector": "#final-exit"})
+            ctx.session.find.assert_not_called()
+            ctx._app_processes = [dict(pid=2, parent=1, executable=str(Path(directory) / "qa.exe"))]
+            ctx.session.find.side_effect = WebDriverError("session already lost")
+            with patch("qa_ui_auto.native_processes.snapshot") as snapshot, self.assertRaisesRegex(WebDriverError, "already lost"):
+                click_exit(ctx, {"selector": "#final-exit"})
+            snapshot.assert_not_called()
+            ctx.session.request.assert_not_called()
+
     def test_selects_only_the_exact_app_in_the_owned_driver_tree(self):
         app = Path("qa.exe").resolve()
         rows = [dict(pid=1, parent=0, executable="driver"), dict(pid=2, parent=1, executable="web-driver"),

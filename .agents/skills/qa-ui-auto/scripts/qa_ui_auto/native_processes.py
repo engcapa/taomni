@@ -127,3 +127,32 @@ def observe(ctx, args):
         # The macOS WebDriver bridge lives inside the app. Its disappearance
         # after this independent PID observation needs no HTTP DELETE reply.
         ctx.session._app_exit_observed = True
+
+
+def click_exit(ctx, args):
+    """Click a real final Exit control and require the previously owned PID to end."""
+    from tauri_webdriver import WebDriverError
+
+    if not getattr(ctx, "_app_processes", None):
+        raise StepError("Observe the owned running app before clicking its final Exit control")
+    selector = args["selector"]
+    # An unavailable control/session is not evidence that this click exited.
+    element = ctx.session.find(selector, interactive=True)
+    error = None
+    try:
+        ctx.session.request("POST", ctx.session.element_path(element, "/click"), {})
+    except (WebDriverError, OSError) as exc:
+        error = exc
+    try:
+        observe(ctx, {"state": "exited", "timeout_sec": args.get("timeout_sec", 30)})
+    except StepError as exc:
+        if error:
+            raise exc from error
+        raise
+    finally:
+        ctx.case_dir.mkdir(parents=True, exist_ok=True)
+        (ctx.case_dir / f"native-app-exit-click-{ctx.step_index}.json").write_text(
+            json.dumps({"selector": selector, "transport_error": str(error) if error else None,
+                        "exit_observed": bool(getattr(ctx.session, "_app_exit_observed", False))}, indent=2),
+            encoding="utf-8")
+    return "clicked the final Exit control and independently observed the owned QA process exit"

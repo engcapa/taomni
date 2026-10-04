@@ -260,7 +260,9 @@ steps:
 - wait_for: '[data-testid="shell-close-dialog"]'
 - click: '[data-testid="shell-close-cancel-job"]'
 - click: '[data-testid="shell-close-rollback"]'
-- click: '[data-testid="shell-close-confirm"]'
+- click_app_exit:
+    selector: '[data-testid="shell-close-confirm"]'
+    timeout_sec: 30
 - native_app_process:
     state: exited
     timeout_sec: 30

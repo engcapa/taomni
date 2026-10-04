@@ -1491,6 +1491,8 @@
 - `[data-testid="shell-keymap-conflict"]` — display — F-SHELL-1.shell-keymap-conflict
 - `[data-testid="shell-keymap-dialog"]` — display — F-SHELL-1.shell-keymap-dialog
 - `[data-testid="shell-keymap-record"]` — interactive — F-SHELL-1.shell-keymap-record
+  ↳ `[data-testid="shell-keymap-row"][data-action-id="shell.home"] [data-testid="shell-keymap-record"]` — alias
+  ↳ `[data-testid="shell-keymap-row"][data-action-id="shell.overview"] [data-testid="shell-keymap-record"]` — alias
 - `[data-testid="shell-keymap-row"]` — display — F-SHELL-1.shell-keymap-row
 - `[data-testid="shell-keymap-save"]` — interactive — F-SHELL-1.shell-keymap-save
 - `[data-testid="shell-lane-empty"]` — display — F-SHELL-1.shell-lane-empty
@@ -1528,14 +1530,38 @@
 - `[data-testid="shell-tab-backdrop"]` — display — F-SHELL-1.shell-tab-backdrop
 - `[data-testid="shell-tab-card"]` — display — F-SHELL-1.shell-tab-card
 - `[data-testid="shell-tab-card-close"]` — interactive — F-SHELL-1.shell-tab-card-close
+  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("SHELL action copy")) [data-testid="shell-tab-card-close"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-id="welcome"] [data-testid="shell-tab-card-close"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-close"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-type="database"] [data-testid="shell-tab-card-close"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-type="placeholder"] [data-testid="shell-tab-card-close"]` — alias
 - `[data-testid="shell-tab-card-detail"]` — display — F-SHELL-1.shell-tab-card-detail
+  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-detail"]` — alias
 - `[data-testid="shell-tab-card-details"]` — interactive — F-SHELL-1.shell-tab-card-details
+  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-details"]` — alias
 - `[data-testid="shell-tab-card-more"]` — interactive — F-SHELL-1.shell-tab-card-more
+  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("SHELL action copy")) [data-testid="shell-tab-card-more"]` — alias
+  ↳ `[data-testid="shell-tab-card"]:has-text("qa-001") [data-testid="shell-tab-card-more"]` — alias
+  ↳ `[data-testid="shell-tab-card"]:has-text("qa-alpha") [data-testid="shell-tab-card-more"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-pinned="false"]:has-text("SHELL action") [data-testid="shell-tab-card-more"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-pinned="true"]:has-text("SHELL action") [data-testid="shell-tab-card-more"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-pinned="true"]:has-text("qa-alpha") [data-testid="shell-tab-card-more"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-more"]` — alias
 - `[data-testid="shell-tab-card-open"]` — interactive — F-SHELL-1.shell-tab-card-open
+  ↳ `[data-testid="shell-tab-card"][data-tab-id="welcome"] [data-testid="shell-tab-card-open"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-type="placeholder"] [data-testid="shell-tab-card-open"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-type="terminal"] [data-testid="shell-tab-card-open"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-tab-type="terminal"]:has-text("qa-alpha") [data-testid="shell-tab-card-open"]` — alias
 - `[data-testid="shell-tab-card-pin"]` — interactive — F-SHELL-1.shell-tab-card-pin
+  ↳ `[data-testid="shell-tab-card"]:has-text("qa-000") [data-testid="shell-tab-card-pin"]` — alias
+  ↳ `[data-testid="shell-tab-card"][data-pinned="true"]:has-text("qa-alpha") [data-testid="shell-tab-card-pin"]` — alias
 - `[data-testid="shell-tab-card-preview"]` — display — F-SHELL-1.shell-tab-card-preview
+  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-preview"]` — alias
 - `[data-testid="shell-tab-card-status"]` — display — F-SHELL-1.shell-tab-card-status
+  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-status"]` — alias
 - `[data-testid="shell-tab-card-summary"]` — display — F-SHELL-1.shell-tab-card-summary
+  ↳ `[data-testid="shell-tab-card"]:has([data-testid="shell-tab-card-title"]:text-is("qa-alpha")) [data-testid="shell-tab-card-summary"]` — alias
 - `[data-testid="shell-tab-card-title"]` — display — F-SHELL-1.shell-tab-card-title
 - `[data-testid="shell-tab-clear"]` — interactive — F-SHELL-1.shell-tab-clear
 - `[data-testid="shell-tab-close-all"]` — interactive — F-SHELL-1.shell-tab-close-all

@@ -77,6 +77,39 @@ steps:
     count: 1
     status: requested
 - screenshot: tc-shell-b23.png
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-move-right"]'
+- assert_attribute:
+    selector: '[data-testid="shell-host"]'
+    name: data-edge
+    equals: right
+- wait_for: '[data-testid="sftp-remote-list"]'
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- assert_shell_backend:
+    command: sftp_attach
+    count: 1
+    status: requested
+- click: '[data-testid="shell-host-more"]'
+- click: '[data-testid="shell-panel-close"]'
+- assert_not_visible: '[data-testid="shell-host"]'
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="terminal-pane"]:visible'
+    equal: 1
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="shell-host"]'
+- wait_for: '[data-testid="sftp-remote-list"]'
+- assert_count:
+    selector: '[data-testid="sftp-browser"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="terminal-pane"]:visible'
+    equal: 1
+- screenshot: tc-shell-b23-close-reopen.png
 verification:
   review: reviewed
   requirements:
@@ -163,6 +196,50 @@ verification:
     - 26
     - 27
     - 28
+  - id: R3
+    requirement: Moving Files back to the right retains its instance; closing the idle panel removes its view and
+      reopening restores one Files panel without closing the SSH terminal.
+    actions:
+    - 30
+    - 31
+    - 36
+    - 37
+    - 41
+    checkpoints:
+    - step: 32
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"shell-host\"]'\n  name: data-edge\n  equals: right"
+    - step: 33
+      expectation: 'wait_for: ''[data-testid="sftp-remote-list"]'''
+    - step: 34
+      expectation: "assert_count:\n  selector: '[data-testid=\"sftp-browser\"]'\n  equal: 1"
+    - step: 35
+      expectation: "assert_shell_backend:\n  command: sftp_attach\n  count: 1\n  status: requested"
+    - step: 38
+      expectation: 'assert_not_visible: ''[data-testid="shell-host"]'''
+    - step: 39
+      expectation: "assert_count:\n  selector: '[data-testid=\"sftp-browser\"]'\n  equal: 0"
+    - step: 40
+      expectation: "assert_count:\n  selector: '[data-testid=\"terminal-pane\"]:visible'\n  equal: 1"
+    - step: 42
+      expectation: 'wait_for: ''[data-testid="shell-host"]'''
+    - step: 43
+      expectation: 'wait_for: ''[data-testid="sftp-remote-list"]'''
+    - step: 44
+      expectation: "assert_count:\n  selector: '[data-testid=\"sftp-browser\"]'\n  equal: 1"
+    - step: 45
+      expectation: "assert_count:\n  selector: '[data-testid=\"terminal-pane\"]:visible'\n  equal: 1"
+    results:
+    - 32
+    - 33
+    - 34
+    - 35
+    - 38
+    - 39
+    - 40
+    - 42
+    - 43
+    - 44
+    - 45
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay
       placement.
