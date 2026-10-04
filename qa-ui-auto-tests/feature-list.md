@@ -10306,6 +10306,7 @@ components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, RecorderBar, Scro
 files:
   - src/components/screenshot/ScreenshotOverlay.tsx
   - src/components/screenshot/AnnotationCanvas.tsx
+  - src/components/screenshot/ScreenshotFavorites.tsx
   - src/components/screenshot/PinnedImage.tsx
   - src/components/screenshot/RecorderBar.tsx
   - src/components/screenshot/ScrollCaptureBar.tsx
@@ -10317,6 +10318,10 @@ files:
   - src/lib/screenshot.ts
   - src/lib/screenshotSelection.ts
   - src/components/tabbar/ControlBar.tsx
+  - src-tauri/src/screenshot/favorites.rs
+  - src-tauri/src/screenshot/qa/pin_tools.rs
+  - src-tauri/src/screenshot/qa/scroll_manual.rs
+  - src-tauri/src/screenshot/qa/colors.rs
   - src-tauri/src/screenshot/mod.rs
   - src-tauri/src/screenshot/capture.rs
   - src-tauri/src/screenshot/scroll.rs
@@ -10724,6 +10729,126 @@ controls:
   - id: screenshot-annotation-resize-se
     selector: '[data-testid="screenshot-annotation-resize-se"]'
     kind: interactive
+  - id: screenshot-scroll-mode-auto
+    selector: '[data-testid="screenshot-scroll-mode-auto"]'
+    kind: interactive
+  - id: screenshot-scroll-mode-manual
+    selector: '[data-testid="screenshot-scroll-mode-manual"]'
+    kind: interactive
+  - id: screenshot-scroll-switch-mode
+    selector: '[data-testid="screenshot-scroll-switch-mode"]'
+    kind: interactive
+  - id: screenshot-color-orange
+    selector: '[data-testid="screenshot-color-orange"]'
+    kind: interactive
+  - id: screenshot-color-cyan
+    selector: '[data-testid="screenshot-color-cyan"]'
+    kind: interactive
+  - id: screenshot-color-purple
+    selector: '[data-testid="screenshot-color-purple"]'
+    kind: interactive
+  - id: screenshot-color-pink
+    selector: '[data-testid="screenshot-color-pink"]'
+    kind: interactive
+  - id: screenshot-color-gray
+    selector: '[data-testid="screenshot-color-gray"]'
+    kind: interactive
+  - id: screenshot-color-black
+    selector: '[data-testid="screenshot-color-black"]'
+    kind: interactive
+  - id: screenshot-color-custom
+    selector: '[data-testid="screenshot-color-custom"]'
+    kind: interactive
+  - id: screenshot-color-hex
+    selector: '[data-testid="screenshot-color-hex"]'
+    kind: interactive
+  - id: screenshot-pin-copy
+    selector: '[data-testid="screenshot-pin-copy"]'
+    kind: interactive
+  - id: screenshot-pin-save
+    selector: '[data-testid="screenshot-pin-save"]'
+    kind: interactive
+  - id: screenshot-pin-favorite
+    selector: '[data-testid="screenshot-pin-favorite"]'
+    kind: interactive
+  - id: screenshot-pin-collapse
+    selector: '[data-testid="screenshot-pin-collapse"]'
+    kind: interactive
+  - id: screenshot-pin-expand
+    selector: '[data-testid="screenshot-pin-expand"]'
+    kind: interactive
+  - id: screenshot-pin-menu-toggle
+    selector: '[data-testid="screenshot-pin-menu-toggle"]'
+    kind: interactive
+  - id: screenshot-pin-close
+    selector: '[data-testid="screenshot-pin-close"]'
+    kind: interactive
+  - id: screenshot-pin-zoom-out
+    selector: '[data-testid="screenshot-pin-zoom-out"]'
+    kind: interactive
+  - id: screenshot-pin-zoom-in
+    selector: '[data-testid="screenshot-pin-zoom-in"]'
+    kind: interactive
+  - id: screenshot-pin-reset
+    selector: '[data-testid="screenshot-pin-reset"]'
+    kind: interactive
+  - id: screenshot-pin-opacity
+    selector: '[data-testid="screenshot-pin-opacity"]'
+    kind: interactive
+  - id: system-screenshot-favorites
+    selector: '[data-testid="system-screenshot-favorites"]'
+    kind: interactive
+  - id: screenshot-favorites-refresh
+    selector: '[data-testid="screenshot-favorites-refresh"]'
+    kind: interactive
+  - id: screenshot-favorites-close
+    selector: '[data-testid="screenshot-favorites-close"]'
+    kind: interactive
+  - id: screenshot-favorite-open
+    selector: '[data-testid="screenshot-favorite-open"]'
+    kind: interactive
+  - id: screenshot-favorite-remove
+    selector: '[data-testid="screenshot-favorite-remove"]'
+    kind: interactive
+  - id: screenshot-scroll-mode-description
+    selector: '[data-testid="screenshot-scroll-mode-description"]'
+    kind: display
+  - id: screenshot-scroll-mode-hint
+    selector: '[data-testid="screenshot-scroll-mode-hint"]'
+    kind: display
+  - id: screenshot-pin-surface
+    selector: '[data-testid="screenshot-pin-surface"]'
+    kind: display
+  - id: screenshot-pin-toolbar
+    selector: '[data-testid="screenshot-pin-toolbar"]'
+    kind: display
+  - id: screenshot-pin-menu
+    selector: '[data-testid="screenshot-pin-menu"]'
+    kind: display
+  - id: screenshot-pin-zoom
+    selector: '[data-testid="screenshot-pin-zoom"]'
+    kind: display
+  - id: screenshot-pin-help
+    selector: '[data-testid="screenshot-pin-help"]'
+    kind: display
+  - id: screenshot-pin-notice
+    selector: '[data-testid="screenshot-pin-notice"]'
+    kind: display
+  - id: screenshot-favorites
+    selector: '[data-testid="screenshot-favorites"]'
+    kind: display
+  - id: screenshot-favorites-empty
+    selector: '[data-testid="screenshot-favorites-empty"]'
+    kind: display
+  - id: screenshot-favorite-item
+    selector: '[data-testid="screenshot-favorite-item"]'
+    kind: display
+  - id: screenshot-favorite-thumbnail
+    selector: '[data-testid="screenshot-favorite-thumbnail"]'
+    kind: display
+  - id: screenshot-favorites-error
+    selector: '[data-testid="screenshot-favorites-error"]'
+    kind: display
 -->
 
 - 系统截图工具：主窗口及独立终端/数据库/RDP/VNC 窗口共用相机入口，默认隐藏应用窗口；菜单“截取当前窗口”保留调用窗口并预选其物理边界。当前配置快捷键打开截图 overlay；默认 Windows/Linux `Ctrl+Alt+A`，macOS `Ctrl+Super+A`（Control+Command+A）。菜单支持 3/5/10 秒延迟，倒计时中点击相机取消。原有 session 图像截图/录制入口及实现已移除，终端文本日志录制继续保留。

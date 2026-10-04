@@ -43,7 +43,7 @@ steps:
 - wait_for: '[data-testid="screenshot-scroll-confirm"]'
 - assert_text:
     selector: '[data-testid="screenshot-scroll-instructions"]'
-    contains: Taomni will scroll
+    contains: Choose automatic or manual
 - click: '[data-testid="screenshot-scroll-confirm-cancel"]'
 - assert_not_visible: '[data-testid="screenshot-scroll-confirm"]'
 - click: '[data-testid="screenshot-scroll-capture"]'
@@ -62,7 +62,7 @@ steps:
     contains: 400 × 1800
 - eval_readonly:
     expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_scroll_capture" && JSON.stringify(window.__taomniStubScreenshotCalls.at(-2).args)
-      === '{"displayId":"0,0","x":40,"y":40,"width":160,"height":120}'
+      === '{"displayId":"0,0","x":40,"y":40,"width":160,"height":120,"mode":"auto"}'
 - eval_readonly:
     expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_update" && window.__taomniStubScreenshotCalls.at(-1).args.width
       === 400 && window.__taomniStubScreenshotCalls.at(-1).args.height === 1800

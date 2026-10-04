@@ -1,0 +1,154 @@
+use super::*;
+
+/// Public manual mode, real user-equivalent OS wheel input, pauses, Finish
+/// and Cancel. The complete PNG is compared with the retained source page.
+#[tauri::command]
+pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, String> {
+    ensure_qa(&app)?;
+    let _cleanup = ScenarioCleanup(app.clone());
+    let (fixture, display, region) = open_fixture(&app, "scroll")
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+    let source = read_source(&fixture).await.map_err(|e| format!("{e:#}"))?;
+    let overlay = begin_scroll_ui(&app, &display, region, false, false).await?;
+    run_js(
+        &overlay,
+        r#"
+      document.querySelector('[data-testid="screenshot-scroll-mode-manual"]').click();
+      await new Promise(r => setTimeout(r, 100));
+      document.querySelector('[data-testid="screenshot-scroll-start"]').click();
+      return true;
+    "#,
+        Duration::from_secs(10),
+    )
+    .await
+    .map_err(|e| format!("{e:#}"))?;
+    let bar = wait_window(
+        &app,
+        super::super::surfaces::SCROLL_LABEL,
+        Duration::from_secs(10),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    tokio::time::sleep(Duration::from_millis(1800)).await;
+    let paused = super::super::tool_state()
+        .scroll
+        .as_ref()
+        .map(|c| c.status());
+    if !paused
+        .as_ref()
+        .is_some_and(|s| s["mode"] == "manual" && s["frames"] == 1)
+    {
+        return Err(format!("manual pause ended early: {paused:?}"));
+    }
+    run_js(&bar, "document.querySelector('[data-testid=\"screenshot-scroll-switch-mode\"]').click(); return true;", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
+    let mut switched_auto = false;
+    for _ in 0..100 {
+        switched_auto = super::super::tool_state().scroll.as_ref().is_some_and(|c| {
+            c.mode() == super::super::scroll::ScrollMode::Auto
+                && c.frames.load(Ordering::SeqCst) >= 2
+        });
+        if switched_auto {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    if !switched_auto {
+        return Err("switching from manual to automatic did not scroll the page".into());
+    }
+    run_js(&bar, "const button=document.querySelector('[data-testid=\"screenshot-scroll-switch-mode\"]'); for(let i=0;i<50 && button.disabled;i++) await new Promise(r=>setTimeout(r,100)); button.click(); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let mut switched_manual = false;
+    for _ in 0..50 {
+        switched_manual = super::super::tool_state()
+            .scroll
+            .as_ref()
+            .is_some_and(|c| c.mode() == super::super::scroll::ScrollMode::Manual);
+        if switched_manual {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    if !switched_manual {
+        return Err("switching back to manual did not stop automatic input".into());
+    }
+    let center = input_point(
+        (
+            display.x + (region.0 + region.2 / 2) as i32,
+            display.y + (region.1 + region.3 / 2) as i32,
+        ),
+        source.scale,
+    );
+    let mut positions = Vec::new();
+    for _ in 0..70 {
+        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            use enigo::Mouse;
+            let mut input = enigo::Enigo::new(&enigo::Settings::default())
+                .map_err(|e| anyhow::anyhow!("OS input: {e}"))?;
+            move_os_pointer(&mut input, center)?;
+            input
+                .scroll(1, enigo::Axis::Vertical)
+                .map_err(|e| anyhow::anyhow!("wheel: {e}"))?;
+            Ok(())
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+        tokio::time::sleep(Duration::from_millis(220)).await;
+        let position = run_js(&fixture, "const el = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return {top:el.scrollTop, end:el.scrollHeight-el.clientHeight};", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
+        let bottom = position["top"].as_f64().unwrap_or(0.0)
+            >= position["end"].as_f64().unwrap_or(f64::MAX) - 1.0;
+        positions.push(position);
+        if bottom {
+            break;
+        }
+    }
+    tokio::time::sleep(Duration::from_millis(1800)).await;
+    let at_bottom = super::super::tool_state()
+        .scroll
+        .as_ref()
+        .map(|c| c.status());
+    let bottom_still_active = at_bottom
+        .as_ref()
+        .is_some_and(|s| s["mode"] == "manual" && s["frames"].as_u64().unwrap_or(0) > 2);
+    bar.eval("document.querySelector('[data-testid=\"screenshot-scroll-stop\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let preview = run_js(&overlay, r#"
+      for (let i=0;i<100 && !document.querySelector('[data-testid="screenshot-scroll-result"]');i++) await new Promise(r=>setTimeout(r,100));
+      const img=document.querySelector('[data-testid="screenshot-scroll-result-image"]');
+      return {preview:!!img,width:img?.naturalWidth,height:img?.naturalHeight};
+    "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    let output = super::super::tool_state()
+        .overlay
+        .clone()
+        .ok_or("scroll result missing")?;
+    let image = image::open(&output.path)
+        .map_err(|e| e.to_string())?
+        .to_rgba8();
+    let comparison = compare_scroll_original(&image, &source).map_err(|e| e.to_string())?;
+    let artifact = keep_image(&image, "scroll-manual.png");
+    super::super::close_session(&app);
+    // A second public capture exercises explicit cancellation, retaining the
+    // selected original instead of installing a partial result.
+    let original = begin_scroll_ui(&app, &display, region, false, false).await?;
+    run_js(&original, "document.querySelector('[data-testid=\"screenshot-scroll-mode-manual\"]').click(); await new Promise(r=>setTimeout(r,100)); document.querySelector('[data-testid=\"screenshot-scroll-start\"]').click(); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let cancel_bar = wait_window(
+        &app,
+        super::super::surfaces::SCROLL_LABEL,
+        Duration::from_secs(10),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    cancel_bar
+        .eval("document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let cancelled = run_js(&original, "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase!=='annotate';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase==='annotate' && !document.querySelector('[data-testid=\"screenshot-scroll-result\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    Ok(report(
+        bottom_still_active
+            && preview["preview"] == true
+            && comparison["passed"] == true
+            && cancelled == true
+            && artifact.is_some(),
+        json!({"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
+    ))
+}

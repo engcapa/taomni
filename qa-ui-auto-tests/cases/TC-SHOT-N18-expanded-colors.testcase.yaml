@@ -1,0 +1,48 @@
+id: TC-SHOT-N18
+title: Every new preset and custom HEX color reaches the real OS clipboard at its fixed stroke coordinates through the public overlay
+  Copy action.
+covers:
+- F27.1
+tags:
+- screenshot
+- regression
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: colors
+- assert_visible: '[data-testid="system-screenshot"]'
+native_platforms:
+- Linux
+- Windows
+- macOS
+verification:
+  review: reviewed
+  requirements:
+  - id: workflow
+    requirement: Every new preset and custom HEX color reaches the real OS clipboard at its fixed stroke coordinates through the public
+      overlay Copy action.
+    actions:
+    - 1
+    - 3
+    checkpoints:
+    - step: 3
+      expectation: 'native_screenshot_scenario: {''scenario'': ''colors''}'
+    - step: 4
+      expectation: 'assert_visible: [data-testid="system-screenshot"]'
+    results:
+    - 3
+    - 4
+  visual:
+  - check: Visible controls, state and image dimensions
+    method: automated
+    reason: Assertions check actual renderer state and output; screenshots are retained.
+  native:
+  - check: OS input, clipboard, windows and persistent files
+    method: automated
+    reason: Native fixed scenarios verify the real OS and independent output pixels.
