@@ -7604,6 +7604,13 @@ describe("CodeWorkspaceTab", () => {
       await waitFor(() => expect(screen.getByTestId("shell-host")).toHaveAttribute("data-edge", "bottom"));
       expect(screen.getByTestId("code-workspace-tool-rail-left").contains(screen.getByTestId("code-workspace-bottom-tab-problems"))).toBe(true);
       expect(screen.getByTestId("code-workspace-problems-panel")).toBe(content);
+      const view = EditorView.findFromDOM(editor)!;
+      const originalText = view.state.doc.toString();
+      const editedText = originalText + "\nhost-tab-edit";
+      await act(async () => {
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: editedText } });
+      });
+      await waitFor(() => expect(view.state.doc.toString()).toBe(editedText));
       fireEvent.click(screen.getByTestId("code-workspace-bottom-tab-terminal"));
       await waitFor(() => expect(screen.getByTestId("shell-host")).toHaveAttribute("data-panel-id", "workspace:instance-hosted-focus:terminal"));
       const terminal = await screen.findByTestId("code-workspace-terminal-dock");
@@ -7614,14 +7621,20 @@ describe("CodeWorkspaceTab", () => {
       await waitFor(() => expect(screen.getByTestId("shell-host")).toHaveAttribute("data-panel-id", "workspace:instance-hosted-focus:problems"));
       expect(screen.getByTestId("code-workspace-problems-panel")).toBe(content);
       expect(problemsTab).toHaveAttribute("aria-selected", "true");
+      expect(view.state.doc.toString()).toBe(editedText);
       fireEvent.click(screen.getByTestId("shell-host").querySelector<HTMLElement>('[data-testid="shell-host-tab"][data-panel-id$=":terminal"]')!);
       await waitFor(() => expect(screen.getByTestId("shell-host")).toHaveAttribute("data-panel-id", "workspace:instance-hosted-focus:terminal"));
       expect(screen.getByTestId("code-workspace-terminal-dock")).toBe(terminal);
       expect(screen.getByTestId("code-workspace-editor").querySelector(".cm-content")).toBe(editor);
+      expect(EditorView.findFromDOM(editor)).toBe(view);
+      expect(view.state.doc.toString()).toBe(editedText);
       fireEvent.click(screen.getByTestId("shell-host").querySelector<HTMLElement>('[data-testid="shell-host-tab"][data-panel-id$=":problems"]')!);
       await waitFor(() => expect(screen.getByTestId("shell-host")).toHaveAttribute("data-panel-id", "workspace:instance-hosted-focus:problems"));
       fireEvent.click(screen.getByTestId("shell-host-hide"));
       await waitFor(() => expect(document.activeElement).toBe(editor));
+      expect(view.state.doc.toString()).toBe(editedText);
+      fireEvent.keyDown(editor, { key: "z", ctrlKey: true });
+      await waitFor(() => expect(view.state.doc.toString()).toBe(originalText));
       expect(editor.textContent).toBe("retained editor text");
     } finally {
       cleanup();

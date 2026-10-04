@@ -264,6 +264,10 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?s)^(?!.*__taomni_osc7).*$
+    timeout_sec: 5
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left
       - document.querySelector("[data-terminal-active]").getBoundingClientRect().left
@@ -415,19 +419,19 @@ verification:
     - 92
     - 94
     - 96
-    - 100
-    - 103
-    - 105
+    - 101
+    - 104
     - 106
-    - 110
-    - 112
-    - 114
-    - 117
-    - 119
-    - 121
-    - 124
-    - 126
-    - 130
+    - 107
+    - 111
+    - 113
+    - 115
+    - 118
+    - 120
+    - 122
+    - 125
+    - 127
+    - 131
     checkpoints:
     - step: 5
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-terminal-active]
@@ -516,37 +520,37 @@ verification:
     - step: 95
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"auth-password\"]",
         "name": "value", "equals": "${env.QA_SSH_PASSWORD}"}}'
-    - step: 98
+    - step: 99
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-terminal-active]
         .xterm-screen\").getBoundingClientRect().left - document.querySelector(\"[data-terminal-active]\").getBoundingClientRect().left
         >= 8", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 99
+    - step: 100
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-terminal-active]
         .xterm-screen\").getBoundingClientRect().right <= document.querySelector(\"[data-terminal-active]\").getBoundingClientRect().right",
         "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 101
+    - step: 102
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
         "regex": "(?m)^QA-LEFT-GUTTER\\r?$", "timeout_sec": 20}}'
-    - step: 108
+    - step: 109
       expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(\"[data-terminal-active]
         .terminal-search-hit-active\").getBoundingClientRect().left - document.querySelector(\"[data-terminal-active]
         .xterm-screen\").getBoundingClientRect().left) < 1", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 115
+    - step: 116
       expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals":
         "QA-LEFT-GUTTER"}}'
-    - step: 122
+    - step: 123
       expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals":
         "QA-LEFT-GUTTER"}}'
-    - step: 128
+    - step: 129
       expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]
         .terminal-block-selection"}'
-    - step: 129
+    - step: 130
       expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(\"[data-terminal-active]
         .terminal-block-selection\").getBoundingClientRect().left - document.querySelector(\"[data-terminal-active]
         .xterm-screen\").getBoundingClientRect().left) < 1", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 131
+    - step: 132
       expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals":
         "QA-LEFT-GUTTER"}}'
     results:
@@ -575,15 +579,31 @@ verification:
     - 88
     - 91
     - 95
-    - 98
     - 99
-    - 101
-    - 108
-    - 115
-    - 122
-    - 128
+    - 100
+    - 102
+    - 109
+    - 116
+    - 123
     - 129
-    - 131
+    - 130
+    - 132
+  - id: R-SSH-STARTUP
+    requirement: SSH startup preserves a clean prompt and normal input across real terminal viewport heights.
+    actions:
+    - 96
+    - 101
+    checkpoints:
+    - step: 97
+      expectation: The real SSH terminal reaches an idle ready prompt after authentication.
+    - step: 98
+      expectation: The terminal buffer does not expose the hidden prompt integration command.
+    - step: 102
+      expectation: The real SSH command produces the complete QA-LEFT-GUTTER output at column one.
+    results:
+    - 97
+    - 98
+    - 102
   visual:
   - check: Inspect first-column spacing, selected text and highlight alignment in
       normal and fullscreen screenshots.

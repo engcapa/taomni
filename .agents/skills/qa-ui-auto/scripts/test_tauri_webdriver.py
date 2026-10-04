@@ -15,6 +15,80 @@ from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, select
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_linux_exit_releases_the_driver_session_before_restart_and_the_next_case(self):
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def reply(self, value, status=200):
+                data = json.dumps({"value": value}).encode()
+                self.send_response(status)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                self.server.requests.append(("POST", self.path))
+                if self.path == "/session":
+                    if self.server.active:
+                        self.reply({"error": "session not created", "message": "Maximum number of active sessions"}, 500)
+                        return
+                    self.server.created += 1
+                    self.server.active = str(self.server.created)
+                    self.reply({"sessionId": self.server.active})
+                elif self.path.endswith("/click"):
+                    # The app has exited; the separate WebKit driver still
+                    # reserves the W3C session until it receives DELETE.
+                    self.reply({"error": "unknown error", "message": "Session terminated without a reply"}, 500)
+                else:
+                    self.reply(True)
+
+            def do_DELETE(self):
+                self.server.requests.append(("DELETE", self.path))
+                if self.path == "/session/" + self.server.active:
+                    self.server.active = ""
+                    self.reply(None)
+                else:
+                    self.reply({"error": "invalid session id"}, 404)
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server.requests, server.active, server.created = [], "", 0
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        session = None
+        try:
+            with TemporaryDirectory() as directory, patch("tauri_webdriver.platform.system", return_value="Linux"):
+                harness = NativeHarness({"app": {}}, Path(directory))
+                harness.driver = Mock(url=f"http://127.0.0.1:{server.server_port}")
+                session = harness.create_session()
+                original_id = session.session_id
+                with self.assertRaisesRegex(WebDriverError, "Session terminated without a reply"):
+                    session.request("POST", session.endpoint("/element/exit/click"), {})
+                session._app_exit_observed = True
+                session.restart()
+                self.assertNotEqual(session.session_id, original_id)
+                self.assertFalse(session._app_exit_observed)
+                self.assertEqual(server.requests.count(("DELETE", "/session/" + original_id)), 1)
+                delete_index = server.requests.index(("DELETE", "/session/" + original_id))
+                next_post = next(index for index, row in enumerate(server.requests) if index > delete_index and row == ("POST", "/session"))
+                self.assertGreater(next_post, delete_index)
+                session.close()
+                session = harness.create_session()
+                self.assertEqual(server.created, 3)
+                session.close()
+                session.close()
+                self.assertEqual(server.active, "")
+        finally:
+            if session is not None:
+                with patch("tauri_webdriver.platform.system", return_value="Linux"):
+                    session.close()
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
     def test_verified_app_exit_releases_transport_and_driver_without_contacting_the_dead_bridge(self):
         closed = Mock()
         session = NativeSession("http://driver.invalid", Path("unused"), closed)

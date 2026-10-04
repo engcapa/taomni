@@ -4419,7 +4419,13 @@ function getBufferText(term: Terminal): string {
 
 function getLastBufferLines(term: Terminal, lineCount: number): string {
   const buffer = term.buffer.active;
-  const total = buffer.length;
+  // xterm allocates empty rows below the prompt. Count recent output from
+  // the last occupied row so startup detection and context previews include
+  // the prompt even when it sits near the top of a tall viewport.
+  let total = buffer.length;
+  while (total > 0 && !buffer.getLine(total - 1)?.translateToString(true)) {
+    total -= 1;
+  }
   const start = Math.max(0, total - lineCount);
   const lines: string[] = [];
   for (let i = start; i < total; i++) {

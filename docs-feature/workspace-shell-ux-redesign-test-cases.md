@@ -448,6 +448,7 @@
 2. 树选文件→进入编辑器→输入一个字符→开Problems/Terminal→Esc回编辑器 → 完整文本/selection不变，undo只撤销该字符。
 3. Shift+F12隐藏工具窗，再恢复 → 原选中与尺寸恢复；不隐藏全局Tao，不修改另一个workspace。
 4. 改merge=false → 内部rail接管原工具入口，Global Rail仍在；Project只有一个可交互视图，展开/rename草稿/树滚动保留；改回true仍一致。
+5. 通过编辑器 fill 一次替换为完整三行（最后一行 host-tab-edit）→ 打开 Terminal，再通过 Host 标签切换 Problems/Terminal → 三行文本完整保留；一次 Undo 恢复编辑前的完整三行，仍只有一个 editor/Project。此处明确使用单次输入事务，逐字符 type 的撤销分组不作为该条验收的前提。
 
 **证据与收尾**：树/编辑器实例与完整内容、焦点/快捷键结果；实际disk与provider边界由N06。 执行 CMD-B；状态：待执行。
 
@@ -1283,3 +1284,5 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 | 原生 Git 保留操作 | [N21 多仓库](../qa-ui-auto-tests/cases/TC-SHELL-N21-git-actions-native.testcase.yaml)、[N22 单仓库](../qa-ui-auto-tests/cases/TC-SHELL-N22-single-git-actions-native.testcase.yaml) | 实际 stage/unstage、取消提交/建分支、选定文件提交、Log 文件集、discard 取消/确认；独立 Git 进程核对全部分支、精确 porcelain 集合与 HEAD/index 全文，aux 仓库保持不变。三端待本次输入远程运行；N05 的窗口与草稿验收继续保留 |
 
 用户已授权实现、单测、推送及 GitHub browser/native 验证；当前任务状态与结果持续更新在 [实施任务](./workspace-shell-ux-redesign-tasks.md)。本稿的设计步骤保持完整，自动化数量、静态检查和单测通过均不代表全部三端桌面及人工边界已验收。
+
+SSH 启动回归补充：TC-155 与 TC-IDE-PARITY-027-02 在真实认证、原 ready 预算之后，读取实际终端 buffer 并要求隐藏 prompt hook 未泄露。原 132/69 个动作与检查、模式、覆盖归属和 240/180 秒总预算均保留，只各增加一个结果检查；完整首列输出/系统 clipboard 和 Files 单实例/终端可见性的原验收继续执行。对应挂载单测使用 2/24/50 行 xterm buffer，而不是把屏幕预分配行数等同于实际输出行数。

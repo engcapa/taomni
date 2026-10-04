@@ -536,12 +536,15 @@ class NativeSession:
 
         try:
             harness = getattr(self, "_harness", None)
-            if platform.system() == "Windows" and harness is not None:
+            system = platform.system()
+            if system == "Windows" and harness is not None:
                 # DELETE can let EdgeDriver exit before WebView2's descendants.
                 # End the owned tree while its ancestry still exists; the next
                 # case restarts the driver with the same verified QA identity.
                 harness.driver.stop()
-            elif self.session_id and not self._app_exit_observed:
+            elif self.session_id and not (system == "Darwin" and self._app_exit_observed):
+                # Linux's separate WebKit driver retains the session slot
+                # after app exit. The macOS bridge exits with the app.
                 # Case/failure-capture/host-restoration budgets may already
                 # be exhausted. Always give DELETE its own bounded attempt.
                 self.deadline = Deadline(5)

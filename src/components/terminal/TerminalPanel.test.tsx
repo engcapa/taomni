@@ -693,7 +693,7 @@ describe("TerminalPanel focus behavior", () => {
       vi.useRealTimers();
     }
   });
-  it("releases SSH readiness when a Windows cwd probe never reports OSC 7", async () => {
+  it.each([2, 24, 50])("releases SSH readiness when a Windows cwd probe never reports OSC 7 with %i buffer rows", async (bufferRows) => {
     const originalPlatform = window.navigator.platform;
     Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" });
     vi.stubGlobal("__TAURI_INTERNALS__", {});
@@ -711,13 +711,13 @@ describe("TerminalPanel focus behavior", () => {
       const prompt = "user@host MINGW64 ~\n$ ";
       term.buffer.active = {
         type: "normal",
-        length: 2,
+        length: bufferRows,
         baseY: 0,
         cursorY: 1,
         cursorX: 2,
         getLine: vi.fn((row: number) => ({
           isWrapped: false,
-          translateToString: () => prompt.split("\n")[row],
+          translateToString: () => prompt.split("\n")[row] ?? "",
         })),
       };
       term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());

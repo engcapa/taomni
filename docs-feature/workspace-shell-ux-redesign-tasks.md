@@ -199,3 +199,12 @@ TASK-01～10 已集成，TASK-11 的当前用例和 runner 支持已实现；TAS
 - B23 暴露未固定 Host 跨边移动后，外部点击监听仍引用旧宿主，点击新宿主的菜单会误隐藏面板。监听现在随实际右/底宿主模式更新。原关闭/重开及单实例、SSH 存活断言保持；没有扩大超时或移除验收步骤。
 - 独立 worktree 保持当前远程输入稳定。新增真实 ShellFrame/StableSurface 双向移动回归和已挂载 CodeWorkspace 的 Host 标签往返：改前 `shell-host-red-unit-239` 为 3 fail / 1 pass；修复后 `shell-host-green-unit-241` 为 4/4 pass。未选中的 249 个 editor 测试是 filter 排除，不算 UI skip。`shell-host-regression-unit-243` 为 17 files / 105 tests 全通过；TypeScript `shell-host-types-246` exit 0；`shell-host-static-245` audit/精确六端计划通过，仍为 242 ID / 737 executions，无 gaps/unreviewed。新候选运行效果尚待 GitHub 验证，TASK-01～12 保持 verification。
 - 另检查上一轮同产品源码的 12 张三端原生 SFTP/Git/恢复/退出取消画面，未见明显遮挡或裁切；原图与索引保存在 `qa-ui-auto-report/_local/shell-visual-review-37202537846/`。仅按实际检查范围记录，未替代新输入及 OS/IME/DPI/performance 的独立验收。
+
+### Host 复验、Linux 会话释放与 Windows prompt 修复
+
+- 完整运行 37207509863 已收齐六份报告：browser 三端各 180 pass / 3 fail；Linux native 37 / 30，Windows native 59 / 2，macOS native 60 / 0；全部零 skip。六份 source/runner/case/selection/receipt/config/native build 与原始 ZIP hashes 均匹配。Windows 剩余失败为 TC-155 与 IDE-027-02；未把 workflow 的总体 success 当作 case 通过。
+- [Host 复验 37211142267](https://github.com/engcapa/taomni/actions/runs/37211142267) 输入 2325fd2e51847ed073c0463fa2b0a128272562e7，browser 三端各 2 pass / 1 fail / 0 skip；三份身份及 hashes 匹配。B09、B23 全步骤通过。B22 已通过 Host 标签往返和完整编辑内容，在一次 Undo 后观察到 host-tab-edi：逐字符 type 不构成单次撤销事务。现改用完整三行的单次 fill，保留 41 步、全文与一次 Undo/单实例断言；R3 checkpoint 明确结果。
+- B22 的真实挂载回归现在包含完整长文本事务、两个 Host 标签往返、相同 EditorView 与一次 Ctrl+Z 恢复原文。shell-host-undo-unit-253 1/1 通过（另 249 项是本次 filter 排除）；TypeScript 254 exit 0；静态 255 audit gate、242 ID / 737 次精确计划通过，无 gaps/unreviewed，baseline 未改。
+- Linux N08 的正常 Exit 与独立 PID 退出已通过，restart 收到 Maximum number of active sessions，后续 29 项在 setup 同样失败。macOS bridge 随应用退出，Linux 的独立 WebKit driver 仍保留会话名额；现在只对已观察退出的 macOS 免 DELETE。真实 loopback HTTP 工具单测验证 exit→DELETE→restart→close→下一例和幂等清理；改前 251 失败，修后 252 为 131 项、122 pass / 9 平台限定 skip、零 fail。没有本地启动原生应用。
+- Windows 失败原图与 buffer 显示原生终端可见，但 readiness 在初始化后失效，且 TC-155 命令被解释成 cho。已发现近期输出读取只看 buffer 最后三行，真实 24/50 行的尾部预分配空行使 MINGW64 识别失效。新增真实行数的 mounted 回归，改前 257 为 1 pass / 2 fail；读取前先去尾部空行后，TerminalPanel / shell integration / cwd 的 258 共 3 files / 103 tests 全通过。两个既有 YAML 各加一次隐藏初始化命令未泄露检查，所有原步骤和预算保留；尚待 GitHub 证明 Windows 原生失败已解决。
+- 本批最终 TypeScript 260 exit 0；静态 261 audit gate、242 ID / 737 次精确计划通过，gaps/unreviewed 为空；两条 SSH YAML 的 schema/reviewed contract 通过，Git diff check 通过。没有本地 browser/native 或 app 构建；下一候选固定输入复验八个相关 ID。

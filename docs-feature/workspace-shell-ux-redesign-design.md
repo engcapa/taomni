@@ -336,6 +336,8 @@ background.resourceKey 是逻辑面板的任务组身份，多个 job lease 可�
 
 主工作面按原 tab identity 挂载；lane 过滤只影响导航，可见性不决定连接生命周期。切 lane 不能重新执行 connect。图表/终端/editor 的 fit/measure 由可见性与最终尺寸触发；不在 0×0 隐藏状态发送远端 resize。DOM 移动前记录可恢复焦点，之后仅在原焦点仍属该 surface 时恢复。
 
+SSH 启动必须在真实空闲 prompt 后完成隐藏初始化，再提供 ready 状态；判断近期输出时先排除 xterm 预分配的尾部空白行。Git Bash 使用现有单次 cwd probe，避免在 ConPTY 中注入过长的 prompt hook。终端高度、Settings/Host 切换不能使初始化命令可见或破坏随后用户输入。
+
 Code Workspace 项目树迁移到 Navigator 时保留模型、展开、选中、rename 和拖拽控制器；该树只存在一个视图实例。内部 tool windows 通过 adapter 接入 Host。现有 Project/Problems/Terminal 快捷键和 Shift+F12 仍调用原工作区 action，再由 adapter 改 Host 可见性；不创建第二套“Problems 已打开”布尔值。
 
 ### 6.4 SFTP

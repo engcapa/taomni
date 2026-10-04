@@ -64,7 +64,9 @@ steps:
 - press:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     key: Mod+End
-- type: host-tab-edit
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: "repo-a WORKTREE\nshared line\nhost-tab-edit"
 - click: '[data-testid="code-workspace-bottom-tab-terminal"]'
 - wait_for: '[data-testid="code-workspace-terminal-dock"]'
 - click: '[data-testid="shell-host-tab"][data-panel-id$=":problems"]'
@@ -162,8 +164,8 @@ verification:
     - 22
     - 23
   - id: R3
-    requirement: The Host tablist switches Problems and Terminal on one workspace while retaining its edited buffer
-      and undo history.
+    requirement: The Host tablist switches Problems and Terminal on one workspace while
+      retaining a complete atomic text replacement and its single undo transaction.
     actions:
     - 25
     - 26
@@ -174,27 +176,23 @@ verification:
     - 37
     checkpoints:
     - step: 29
-      expectation: 'wait_for: ''[data-testid="code-workspace-terminal-dock"]'''
+      expectation: Terminal opens in the workspace Host.
     - step: 31
-      expectation: 'wait_for: ''[data-testid="shell-host"][data-panel-id$=":problems"]'''
+      expectation: The existing Problems instance opens through its Host tab.
     - step: 32
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"shell-host-tab\"][data-panel-id$=\":problems\"\
-        ]'\n  name: aria-selected\n  equals: 'true'"
+      expectation: The Problems Host tab is selected.
     - step: 33
-      expectation: "assert_items:\n  selector: '[data-testid=\"code-workspace-editor\"] .cm-line'\n  equals:\n  -\
-        \ repo-a WORKTREE\n  - shared line\n  - host-tab-edit"
+      expectation: All three editor lines retain the complete replacement including host-tab-edit.
     - step: 35
-      expectation: 'wait_for: ''[data-testid="code-workspace-terminal-dock"]'''
+      expectation: The existing Terminal instance opens through its Host tab.
     - step: 36
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"shell-host-tab\"][data-panel-id$=\":terminal\"\
-        ]'\n  name: aria-selected\n  equals: 'true'"
+      expectation: The Terminal Host tab is selected.
     - step: 38
-      expectation: "assert_items:\n  selector: '[data-testid=\"code-workspace-editor\"] .cm-line'\n  equals:\n  -\
-        \ repo-a WORKTREE\n  - shared line\n  - ''"
+      expectation: One Undo restores the complete original three-line buffer.
     - step: 39
-      expectation: "assert_count:\n  selector: '[data-testid=\"code-workspace-editor\"]'\n  equal: 1"
+      expectation: Exactly one workspace editor remains mounted.
     - step: 40
-      expectation: "assert_count:\n  selector: '[data-testid=\"code-workspace-tree\"]:visible'\n  equal: 1"
+      expectation: Exactly one Project tree remains visible.
     results:
     - 29
     - 31
