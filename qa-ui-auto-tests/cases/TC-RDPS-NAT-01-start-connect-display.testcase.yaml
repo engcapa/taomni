@@ -9,7 +9,8 @@ description: |
 
   rdp-probe, an out-of-process RDP client, then proves the observable
   server contract: NLA succeeds with the configured account, graphics
-  updates arrive, clicks injected over RDP reach a host Tk window (the
+  updates arrive, clicks injected over RDP reach an independent host window
+  (AppKit on macOS, Tk on Windows/Linux; the
   helper's own state file counts the flips, independently of server logs),
   a wrong password is refused at authentication, and after Stop the port no
   longer accepts connections. Control approval is disabled here; the
@@ -193,7 +194,7 @@ verification:
     - step: 20
       expectation: MPPC-64K is declared, compressed updates decode without errors, at least 8 of 10 clicks produce an observed pixel change and at most 2 time out.
     - step: 21
-      expectation: The host Tk target counted at least 10 flips in its own state file.
+      expectation: The independent host target counted at least 10 flips in its own state file.
     results:
     - 21
   - id: R3

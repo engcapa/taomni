@@ -23,13 +23,13 @@
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。Windows SSH、三端退出重启、Host 往返、N15 与 B18 已精准复验通过；完整 249 ID 的运行已收齐五份报告，macOS RDP loopback 的宿主目标被 Python 本地网络权限弹窗影响，正在修正 fixture 并等待精准复验。历史失败证据完整保留。
+TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification，尚未标记 done。Windows SSH、三端退出重启、Host 往返、N15 与 B18 已精准复验通过；完整 249 ID 的六份报告已收齐，756 pass / 2 fail / 0 skip。macOS RDP loopback 的宿主目标被 Python 本地网络权限弹窗影响，修正 fixture 正在精准复验。历史失败证据完整保留。
 
-当前完整范围为 249 个独立 ID：browser 三端各 190，native Linux 67 / Windows 61 / macOS 60，共 758 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-269.txt`，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
+最终完整范围为 250 个独立 ID：browser 三端各 190，native Linux 68 / Windows 62 / macOS 61，共 761 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-307.txt`；269 的旧 249 ID 列表保留。新增一个既有 RDP Server 用例保护本轮共享 host_helper 修改，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
 新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。这些缺口未记为 pass 或 done。
 
-N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既有 DB browser 用例补足离线 renderer 工作流。精准复验稳定后，以统一 SHA 执行上述 249 ID 六端验收，再核对逐 case 结果、receipt、源码/构建身份和原始截图。
+N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既有 DB browser 用例补足离线 renderer 工作流。精准复验稳定后，以统一 SHA 执行上述 250 ID 六端验收，再核对逐 case 结果、receipt、源码/构建身份和原始截图。
 
 ## 验证记录
 
@@ -243,3 +243,6 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - macOS 唯一 native 失败为 TC-RDPJ-01 step 45 的宿主 flip 计数为零。原始画面显示 Python 的本地网络权限弹窗，target-state 仍为 ready/零 flip。macOS flip 目标改用独立 AppKit 进程，保持真实宿主点击/按键、physical-pixel geometry、原子 JSON、PID、计数和子进程清理；不操作权限。Windows/Linux 及 animation/photo 测量仍使用原 Tk 目标。RDP 原 59 步、20 秒 flip 观察和 480 秒总预算完整保留。
 - 298 的改前工具单测保留：macOS GUI identity 选择断言真实失败，另有四个 Windows log 未关闭的清理错误；后者不能代替权限弹窗的原生证据。host_helper 在 Popen 后关闭父进程的 log handle，子进程继续拥有自己的 stdout。修复后的 299 为 66 项工具单测全通过，涵盖 dispatch/ready、spawn failure、幂等 cleanup 和相邻 RDP/CI/native assertions；不是本地 native 应用执行。AppKit 的实际效果待 GitHub 精准复验。
 - 300 audit gate 通过，原 coverage baseline 保持；301 精确六端计划仍为 249 ID / 758 次，无 gaps/unreviewed。只改测试工具与 RDP fixture 说明，产品、所有执行步骤和预算保持。随后固定输入推送并先复验 macOS 的真实 RDP 输入。
+- 完整 run 37218987069 已收齐：Windows native 61/0/0；最终共 756 pass / 2 fail / 0 skip，六份身份、receipt/config/native build 和 ZIP hashes 均匹配。三端 browser 共 33 张及三端 native 共 39 张成功原图已实际检查，无明显遮挡/裁切；索引及审阅记录为 `shell-visual-review-37218987069/` 与 `shell-visual-reviewed-306.json`。
+- 沿 host_helper 追踪全部消费者：macOS 的 functional flip 还被 TC-RDPS-NAT-01 和 PERF-01 使用；Windows 专属 NAT-06/NAT-08 无 backend 改变。补入既有 NAT-01 三端 native，保护 NLA、两组 codec、独立 10 次点击计数与 decoded framebuffer、错密拒绝和 Stop 后连接失败。原 28 步、420 秒和全部阈值不变；本条不是 Shell 匹配 baseline/candidate 性能验收。最终并集增为 250 ID / 761 次，旧 249 ID 原始结果保持。
+- 308 精确计划为 250 ID / 761 次，六端无 gaps/unreviewed；309 audit gate 通过且 baseline 未改。新增范围只是已存在的 native case；变更说明从 Tk 改为平台对应的真实宿主，不改 steps/modes/fixtures/thresholds。PERF-01 的 flip 源也随工具改变，若要比较其性能，必须重建使用同一目标的匹配 baseline/candidate；本轮未引用旧 Tk 性能结果。

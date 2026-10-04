@@ -1253,8 +1253,8 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 
 | 产物 / 范围 | 当前结果 | 实施完成时回填 |
 |---|---|---|
-| 44 browser 详细用例 | B01～B44 YAML 已登记；前轮 32 条三端通过，后续源码及扩展分支待当前 SHA 的 GitHub 执行 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
-| 18 native 详细用例 | 13 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用；每个平台以最新报告为准 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
+| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；249 ID 完整运行中三端分别 190/0、190/0、189/1，B18 修正已精准三端通过。最终 250 ID 输入待统一运行 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
+| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用；完整运行 Linux 67/0、Windows 61/0、macOS 59/1，RDP fixture 正在复验。N11/N17 及额外 OS 分支仍为独立手册 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
 | fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
 | 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
 | 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸已有自动化断言；历史部分画面已检查 | 当前 SHA 画面、读屏、OS DPI/跨屏与系统控件仍按平台单列 |
@@ -1312,3 +1312,5 @@ N15 路径输入补充：在 Enter 之前用 `assert_value` 要求路径框精�
 Windows N15 的新 oracle 已在固定输入 `dadb395d374a49524bc652bea351b987ae91fe86` 的 [run 37217880429](https://github.com/engcapa/taomni/actions/runs/37217880429) 127 步全部通过，报告身份、native build 和原始 ZIP hashes 匹配。随后同输入的六端 249 ID 运行中，Linux browser 190/0/0、macOS browser 189/1/0；macOS B18 原定位命中了隐藏 alpha view，现对 alpha/beta 的 list/file/download 操作分别限定真实 Host owner。95 步、150 秒和全部业务结果保持，修正输入待 GitHub 复验。
 
 B18 已在固定输入 `62b668c50ce09ba7e39f2b7cd624bf6b95007ff8` 的 [run 37221675568](https://github.com/engcapa/taomni/actions/runs/37221675568) 三端 browser 全部通过，95 步完整执行，身份与 ZIP hashes 匹配。完整 run 37218987069 的 Linux native 67 条通过、macOS native 59 通过/1 失败；macOS 的 TC-RDPJ-01 宿主 flip 目标出现 Python 本地网络权限弹窗。flip fixture 改为独立 AppKit 小窗口，真实 RDP 输入及外部 JSON 结果、59 步和所有预算保持；其它平台和 animation/photo 源不变。工具单测通过后，仍需 GitHub 原生精准复验和最终同输入全量运行。
+
+完整 run 37218987069 的 Windows native 61 条也已通过，六份原始证据身份均匹配。本轮改动共享 host_helper 的 macOS flip 源，最终并集追加既有 [TC-RDPS-NAT-01](../qa-ui-auto-tests/cases/TC-RDPS-NAT-01-start-connect-display.testcase.yaml) 的三端 native：独立 RDP client 的两组 codec/framebuffer、10 次真实点击和像素变化、错误密码与停止后拒绝连接。原 28 步、420 秒及所有阈值保持，不作为 Shell 原生性能基线。最终选择为 250 ID / 761 次，列表 `qa-ui-auto-report/_local/shell-ci-case-ids-final-307.txt`，仍需统一输入实际运行；旧 249 ID 报告不改写。
