@@ -1253,8 +1253,8 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 
 | 产物 / 范围 | 当前结果 | 实施完成时回填 |
 |---|---|---|
-| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；249 ID 完整运行中三端分别 190/0、190/0、189/1，B18 修正已精准三端通过。最终 250 ID 输入待统一运行 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
-| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用；完整运行 Linux 67/0、Windows 61/0、macOS 59/1，RDP fixture 正在复验。N11/N17 及额外 OS 分支仍为独立手册 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
+| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；B18 修正已精准三端通过。250 ID 的 run 37227772151 已收齐 Linux 189/1/0、macOS 190/0/0；Windows 报告待收齐。Linux D2 的 fill 已在预览之前保留默认内容，现新增编辑器全选与输入全文前置检查，待三端精准复验 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
+| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用；上一完整运行 Linux 67/0、Windows 61/0、macOS 59/1，RDP AppKit 目标已精准通过。当前统一输入新增三端 RDP Server 既有回归；N11/N17 及额外 OS 分支仍为独立手册 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
 | fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
 | 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
 | 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸已有自动化断言；历史部分画面已检查 | 当前 SHA 画面、读屏、OS DPI/跨屏与系统控件仍按平台单列 |
