@@ -20,7 +20,7 @@
 
 最终实现保留原来的 Tauri 鼠标查询，不增加 Cargo 依赖。
 
-## 当前构建与实测
+## 初始修复取证（efda46f9）
 
 全部 native 测试使用本次编译的 `src-tauri/target/qa-ui-auto/debug/taomni`，标识 `com.taomni.app.qa`，数据/config/cache 均隔离。桌面操作按 QA PID 定位窗口，用户的 `/usr/bin/taomni` 老版本未被替换。
 
@@ -39,7 +39,21 @@
 
 5 次真实鼠标截图通过后，测试清理误用了 `xdotool windowclose`。该命令调用 `XDestroyWindow` 直接销毁窗口，导致 GTK 报 `BadWindow`、退出码 133，见 [清理日志](../qa-ui-auto-report/_local/screenshot-x11/manual-gtk.log)。随后重新启动同一修复二进制，完成一次截图、Escape 恢复主窗口，再用真实 `Alt+F4` 正常退出，退出码为 0；见 [正常关闭证据](../qa-ui-auto-report/_local/screenshot-x11/os-normal-close-cycle/evidence.json) 与 [日志](../qa-ui-auto-report/_local/screenshot-x11/manual-normal-close.log)。此前失败日志保留，正常截图流程和正常窗口关闭均已验证。
 
-`pnpm build` 随 QA 构建通过，改动文件的 rustfmt、`git diff --check`、QA audit gate、用例契约与 Linux CI 选例均通过。全仓 `cargo fmt --check` 因 20 个未改动文件已有格式差异失败；本次两个 Rust 文件均通过，见 [完整格式检查日志](../qa-ui-auto-report/_local/screenshot-x11/final-cargo-fmt.log)。Wayland 和混合 DPI/多显示器尚未验证。报告与图像是本机保留的产物，未纳入 Git。
+`pnpm build` 随 QA 构建通过，改动文件的 rustfmt、`git diff --check`、QA audit gate、用例契约与 Linux CI 选例均通过。全仓 `cargo fmt --check` 因 20 个未改动文件已有格式差异失败；本次两个 Rust 文件均通过，见 [完整格式检查日志](../qa-ui-auto-report/_local/screenshot-x11/final-cargo-fmt.log)。报告与图像是本机保留的产物，未纳入 Git。
+
+## 当前构建与实测（733a81f0）
+
+水印面板修复后重新编译隔离 QA 版本，仍使用 `src-tauri/target/qa-ui-auto/debug/taomni`。源码指纹为 `465248cf4d0fb79c59fd1fdfe54beb95d00395ad3107d43cf4b317d316289d37`，runner 指纹为 `657381e986ec8308cb7c387a2a972d174410d8db5d9f40076aa4908aba497b5b`，二进制 SHA-256 为 `bf9c3fc956587b9a8feb43a5dfb29fb6944d557faa78c961d09ef592674b4f3b`。构建含 `pnpm build`，见 [构建日志](../qa-ui-auto-report/_local/screenshot-x11/watermark-native-build.log)。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| Browser：TC-SHOT-001、002、004、017、020、023、028、030 | 8/8 通过、零失败跳过；包含窄窗口水印面板及滑条边界；[报告](../qa-ui-auto-report/screenshot-x11/browser-current/run-20261005-110924-031313624/summary.md) |
+| Native：TC-SHOT-N3、N10、N12 | 3/3 通过、零失败跳过；N3 在同一进程两次真实截图、标注、剪贴板像素检查，并检查原生水印面板/滑条边界与 Escape 关闭；[报告](../qa-ui-auto-report/screenshot-x11/native-current/run-20261005-111026-243481353/summary.md) |
+| 当前桌面真实鼠标与 Escape | 当前 QA 进程 PID 339616 连续 2 次真实鼠标触发、截图提示渲染、Escape 关闭及主窗口恢复全部通过；随后真实 Alt+F4 正常退出，退出码 0；[逐次证据](../qa-ui-auto-report/_local/screenshot-x11/os-repeat-current/evidence.json)、[日志](../qa-ui-auto-report/_local/screenshot-x11/manual-current.log)、[构建身份](../qa-ui-auto-report/screenshot-x11/manual-current/build-identity.json) |
+| 独立图像检查 | Pillow 将 N10 的 500×428 截图和 N12 的 500×1283 长图与原画对应区域逐 RGB 像素比较，完全一致；[结果](../qa-ui-auto-report/_local/screenshot-x11/independent-current-pixels.json) |
+| 支持检查 | ScreenshotOverlay 单测 20/20、element_geometry 工具单测 6/6；QA audit gate（482 用例）、base 到 HEAD 用例契约、三个改动 Rust 文件格式和 `git diff --check` 通过 |
+
+当前构建、用例/config 指纹、runner receipt 和附件哈希已核对。所有测试使用本次编译的隔离 QA 版本，用户手工启动的老版本保持运行。Wayland 和混合 DPI/多显示器尚未验证。
 
 ## GitHub 三平台回归
 
@@ -49,7 +63,11 @@
 
 三端 browser 的同一个失败 `TC-SHOT-017` 来自水印弹层未限制视口边界：1000px 工具栏换行后，水印按钮靠左，原来的 `right:0` 对齐将面板及颜色按钮推出左边缘。修复为固定定位、按实测面板尺寸夹紧视口坐标，并允许透明度滑条收缩。用例在 1000px、实时缩到 520×420 和恢复后检查面板/滑条边界，保留窄窗口截图；N3 同时检查实际原生 WebView 的水印面板、滑条边界和 Escape 关闭。
 
-macOS `TC-SHOT-N7` 的 13 个 GIF 解码帧全部匹配原画/nonce/时间顺序，但首两帧间隔 900ms，未解释的漏采时间 849ms，超过既有 700ms 标准。像素与时间线失败均保留，标准未放宽；单独复跑同一提交定位是否稳定复现。
+macOS `TC-SHOT-N7` 的 13 个 GIF 解码帧全部匹配原画/nonce/时间顺序，但首两帧间隔 900ms，未解释的漏采时间 849ms，超过既有 700ms 标准。像素与时间线失败均保留，标准未放宽。
+
+单项 [run 37257920081](https://github.com/engcapa/taomni/actions/runs/37257920081) 使用同一 `efda46f9` 提交，N7 为 1/1 通过。13 帧、2760ms、最长帧间隔 920ms，扣除原画持续不变的时间后未解释间隔为 682ms，最大时间漂移 113ms，逐帧像素零不匹配。此结果未证明首次失败根因已消除：两轮首帧附近均出现较大间隔，完整批次仍需核查。原始报告保存在 `qa-ui-auto-report/hosted-37257920081/`。
+
+当前完整 [run 37258337972](https://github.com/engcapa/taomni/actions/runs/37258337972) 测试提交 `733a81f0de61e8658884c76bb411de58d8bb06e2`，共 156 执行项。截至 2026-10-05 11:33（Asia/Shanghai），三端 browser 均为 35/35，Linux native 为 16/16，均零失败跳过；Windows/macOS native 仍在执行。当前返回报告的 source/runner 指纹与上述本机构建一致；原始报告下载到 `qa-ui-auto-report/hosted-37258337972/artifacts/`，完整结果返回后再验证各组 receipt、附件及独立聚合结果。
 
 ## 实际安装命令
 
@@ -91,9 +109,9 @@ npx --yes --package=node@22 --package=pnpm@10 \
 本机复测修复版可执行以下命令，继续使用隔离 QA 配置：
 
 ```bash
-XDG_DATA_HOME="$PWD/qa-ui-auto-report/screenshot-x11/manual-gtk/native-appdata" \
-XDG_CONFIG_HOME="$PWD/qa-ui-auto-report/screenshot-x11/manual-gtk/native-appconfig" \
-XDG_CACHE_HOME="$PWD/qa-ui-auto-report/screenshot-x11/manual-gtk/native-appcache" \
+XDG_DATA_HOME="$PWD/qa-ui-auto-report/screenshot-x11/manual-current/native-appdata" \
+XDG_CONFIG_HOME="$PWD/qa-ui-auto-report/screenshot-x11/manual-current/native-appconfig" \
+XDG_CACHE_HOME="$PWD/qa-ui-auto-report/screenshot-x11/manual-current/native-appcache" \
 LD_LIBRARY_PATH="$PWD/qa-ui-auto-report/_local/screenshot-x11/pipewire-prefix/lib" \
 ./src-tauri/target/qa-ui-auto/debug/taomni
 ```
