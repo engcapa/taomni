@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import signal
 import subprocess
 import sys
@@ -13,6 +14,16 @@ import tempfile
 import time
 
 from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES
+
+
+def wayland_has_input(protocols: str) -> bool:
+    # Protocol globals alone do not prove input readiness: a headless Mutter
+    # advertises wl_seat with no capabilities until devices are attached.
+    seats = re.findall(r"interface: 'wl_seat'[^\n]*\n(.*?)(?=^interface:|\Z)",
+                       protocols, flags=re.MULTILINE | re.DOTALL)
+    return any(re.search(r"capabilities:[^\n]*\bpointer\b[^\n]*\bkeyboard\b", seat)
+               or re.search(r"capabilities:[^\n]*\bkeyboard\b[^\n]*\bpointer\b", seat)
+               for seat in seats)
 
 
 class Desktop:
@@ -93,7 +104,14 @@ class Desktop:
         shell = self.start(["gnome-shell", "--wayland", "--headless", "--virtual-monitor=1920x1080",
                             "--wayland-display=wayland-qa", "--mode=ubuntu"])
         self._wait(shell, lambda: (runtime / "wayland-qa").is_socket(), "GNOME Wayland compositor")
-        protocols = subprocess.check_output(["wayland-info"], text=True, timeout=20)
+        input_owner = self.start(["/usr/bin/python3", str(Path(__file__).with_name("ci_wayland_input.py")),
+                                  "--ready", str(self.root / "virtual-input-ready.json")])
+
+        def input_ready():
+            protocols = subprocess.check_output(["wayland-info"], text=True, timeout=20)
+            return protocols if wayland_has_input(protocols) else False
+
+        protocols = self._wait(input_owner, input_ready, "Wayland keyboard and pointer")
         (self.root / "wayland-info.txt").write_text(protocols, encoding="utf-8")
         for interface in ("wl_compositor", "xdg_wm_base", "wl_output"):
             if interface not in protocols:
@@ -116,6 +134,7 @@ class Desktop:
                 raise RuntimeError(f"GNOME desktop portal lacks {interface}")
         facts.update(gdk_display=probe[0], monitors=int(probe[1]),
                      wayland_display=os.environ["WAYLAND_DISPLAY"], input_transport="Wayland/WebDriver",
+                     input_devices=["keyboard", "pointer"], input_provider="Mutter RemoteDesktop",
                      renderer="software", screen=[1920, 1080],
                      gnome_version=subprocess.check_output(["gnome-shell", "--version"], text=True).strip(),
                      portal_interfaces=["Screenshot", "ScreenCast", "RemoteDesktop"],

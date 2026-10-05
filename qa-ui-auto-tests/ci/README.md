@@ -136,6 +136,12 @@ listed as profile-specific capability gaps during planning. They are not
 silently run with weaker assertions or counted as Wayland passes. Explicitly
 selecting a case unavailable in all requested combinations fails. Portal
 interface readiness alone does not prove user authorization or screen capture.
+Headless Mutter initially exposes a `wl_seat` without input devices. A
+job-owned Mutter RemoteDesktop session keeps a virtual keyboard and pointer
+attached; readiness requires both capabilities in `desktop/wayland-info.txt`.
+This enables normal WebView focus and editing on the virtual desktop and does
+not establish portal consent or physical input coverage. Text paste helpers
+use `wl-copy`/`wl-paste` on Wayland and retain `xclip` for X11.
 CI installs the Ubuntu GNOME session, theme and portal components explicitly
 with `--no-install-recommends`; provisioning runs noninteractively with a
 20-minute dependency timeout. Desktop application metapackages are unnecessary
