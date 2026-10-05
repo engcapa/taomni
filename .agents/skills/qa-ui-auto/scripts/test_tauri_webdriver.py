@@ -90,7 +90,7 @@ class NativeSessionTransportTest(TestCase):
         session.request = Mock(side_effect=[{"sessionId": "session-1"}, "window-qa", None])
         session.wait_for_app_ready = Mock()
         session.install_console_hook = Mock()
-        session.execute = Mock(side_effect=[False, True])
+        session.execute = Mock(side_effect=[False, False, True])
         with patch("tauri_webdriver.platform.system", return_value="Linux"), \
                 patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
                 patch("tauri_webdriver.time.sleep"):
@@ -109,7 +109,22 @@ class NativeSessionTransportTest(TestCase):
         session.execute = Mock(return_value=False)
         with self.assertRaisesRegex(WebDriverError, "window did not receive focus"):
             session.activate_wayland_window(timeout=0)
-        session.execute.assert_called_once_with("return document.hasFocus();")
+        self.assertEqual(session.execute.call_count, 2)
+        session.execute.assert_called_with("return document.hasFocus();")
+
+    def test_wayland_start_requests_owned_desktop_activation_when_document_is_unfocused(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock(side_effect=["window-qa", None])
+        session.execute = Mock(side_effect=[False, True])
+        with patch.dict(os.environ, {"QA_WAYLAND_INPUT_SOCKET": "/qa/private/input.sock"}), \
+                patch("tauri_webdriver.socket.socket") as factory:
+            connection = factory.return_value.__enter__.return_value
+            connection.recv.return_value = b'{"ok":true}\n'
+            session.activate_wayland_window()
+        connection.connect.assert_called_once_with("/qa/private/input.sock")
+        connection.sendall.assert_called_once_with(b"activate\n")
+        session.request.assert_called_with("POST", "/session/session-1/window", {"handle": "window-qa"})
 
     def test_right_click_uses_right_button_and_releases_on_failure(self):
         session = NativeSession("http://driver.invalid", Path("unused"))

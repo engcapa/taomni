@@ -142,6 +142,10 @@ attached; readiness requires both capabilities in `desktop/wayland-info.txt`.
 This enables normal WebView focus and editing on the virtual desktop and does
 not establish portal consent or physical input coverage. Text paste helpers
 use `wl-copy`/`wl-paste` on Wayland and retain `xclip` for X11.
+Before case steps, the harness activates an unfocused app through the owned
+desktop's Alt+Tab shortcut and switches to its WebDriver window. It requires
+`document.hasFocus()`; changing `activeElement` alone is insufficient for
+native CSS focus assertions.
 CI installs the Ubuntu GNOME session, theme and portal components explicitly
 with `--no-install-recommends`; provisioning runs noninteractively with a
 20-minute dependency timeout. Desktop application metapackages are unnecessary

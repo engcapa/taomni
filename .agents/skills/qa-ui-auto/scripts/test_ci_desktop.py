@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 from ci_desktop import Desktop, wayland_has_input
+from ci_wayland_input import activate_window
 
 
 WAYLAND_PROTOCOLS = "wl_compositor xdg_wm_base wl_output\ninterface: 'wl_seat', version: 10, name: 16\n\tname: seat0\n\tcapabilities: pointer keyboard\n"
@@ -16,6 +17,15 @@ class DesktopTests(unittest.TestCase):
                         return_value={'ID': 'ubuntu', 'VERSION_ID': '24.04'})
         release.start()
         self.addCleanup(release.stop)
+
+    def test_wayland_window_activation_uses_a_balanced_native_alt_tab_chord(self):
+        call = Mock()
+        with patch('ci_wayland_input.time.sleep'):
+            activate_window(call, '/owned-session', 'Mutter.Session', lambda signature, args: args)
+        self.assertEqual([request.args[3] for request in call.call_args_list],
+                         [(56, True), (15, True), (15, False), (56, False)])
+        self.assertTrue(all(request.args[:3] == ('/owned-session', 'Mutter.Session', 'NotifyKeyboardKeycode')
+                            for request in call.call_args_list))
 
     def test_linux_display_owns_a_compositor_for_transparent_windows(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \

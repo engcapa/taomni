@@ -111,8 +111,10 @@ class Desktop:
             "--object-path", "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.NameHasOwner",
             "org.gnome.Mutter.RemoteDesktop"], text=True, timeout=5).strip() == "(true,)",
             "Mutter RemoteDesktop service")
+        os.environ["QA_WAYLAND_INPUT_SOCKET"] = str(runtime / "input.sock")
         input_owner = self.start(["/usr/bin/python3", str(Path(__file__).with_name("ci_wayland_input.py")),
-                                  "--ready", str(self.root / "virtual-input-ready.json")])
+                                  "--ready", str(self.root / "virtual-input-ready.json"),
+                                  "--socket", os.environ["QA_WAYLAND_INPUT_SOCKET"]])
 
         def input_ready():
             protocols = subprocess.check_output(["wayland-info"], text=True, timeout=20)

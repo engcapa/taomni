@@ -188,7 +188,9 @@ jobs:
         with:
           workspaces: src-tauri -> target/qa-ui-auto
           shared-key: qa-platforms-${{ matrix.cache_key }}
-          key: hosted-services-v2
+          # Save changed workspace crates for this revision; an exact hit on
+          # the old static key otherwise rebuilds them on every follow-up run.
+          key: hosted-services-v3-${{ needs.plan.outputs.head }}
           cache-on-failure: true
           cache-workspace-crates: true
       - name: Windows build tools and WebView2 driver
