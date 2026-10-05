@@ -19,7 +19,7 @@ verification:
     requirement: Real captured image loads without canvas taint, region and rectangle commit, copy closes overlay and restores main; a second capture in the same process repeats the complete flow without aborting during monitor lookup or reopening.
     actions: [1, 3, 5]
     checkpoints:
-    - {step: 3, expectation: "Main hidden during capture, rectangle and two-line 24px monospace text committed, clipboard crop matches independent physical x/y scaling and red stroke at expected edge and green glyph pixels on both text rows; recording menu width and viewport bounds verified; PNG retained."}
+    - {step: 3, expectation: "Main hidden during capture, rectangle and two-line 24px monospace text committed, clipboard crop matches independent physical x/y scaling and red stroke at expected edge and green glyph pixels on both text rows; recording menu, watermark panel and opacity slider stay within the viewport and Escape closes the watermark panel; PNG retained."}
     - {step: 4, expectation: Main window usable after copy.}
     - {step: 5, expectation: "Second capture opens successfully, repeats annotation and actual clipboard pixel checks, closes the overlay and restores main. On Linux this repeats monitor enumeration and pointer lookup, protecting against the GDK/Xlib queue corruption that aborted on Ubuntu 22.04/VNC."}
     - {step: 6, expectation: Main window remains usable after the second copy.}

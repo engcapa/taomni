@@ -13,6 +13,29 @@ steps:
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - click: '[data-testid="screenshot-watermark"]'
 - wait_for: '[data-testid="screenshot-watermark-panel"]'
+- assert_element_geometry:
+    selector: '[data-testid="screenshot-watermark-panel"], [data-testid="screenshot-watermark-opacity"]'
+    min_width: 1
+    min_height: 1
+    min_count: 2
+    viewport_margin: 8
+- set_viewport: {width: 520, height: 420}
+- wait_for: '[data-testid="screenshot-watermark-panel"][style*="max-height: 404px"]'
+- assert_element_geometry:
+    selector: '[data-testid="screenshot-watermark-panel"], [data-testid="screenshot-watermark-opacity"]'
+    min_width: 1
+    min_height: 1
+    min_count: 2
+    viewport_margin: 8
+- screenshot: watermark-panel-narrow.png
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-watermark-panel"][style*="max-height: 734px"]'
+- assert_element_geometry:
+    selector: '[data-testid="screenshot-watermark-panel"], [data-testid="screenshot-watermark-opacity"]'
+    min_width: 1
+    min_height: 1
+    min_count: 2
+    viewport_margin: 8
 - fill:
     selector: '[data-testid="screenshot-watermark-text"]'
     value: QA watermark
@@ -93,34 +116,37 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Watermark text and opacity survive apply and reopen; Clear removes the applied state and text; Escape closes only the panel.
-    actions: [1, 2, 4, 6, 8, 9, 10, 12, 13, 16, 20, 23, 26]
+    requirement: The watermark panel and opacity control remain inside the viewport after toolbar wrapping and live resizing; watermark text and opacity survive apply and reopen; Clear removes the applied state and text; Escape closes only the panel.
+    actions: [1, 2, 4, 6, 9, 13, 16, 17, 18, 20, 21, 24, 28, 31, 34]
     checkpoints:
-    - {step: 11, expectation: Keyboard slider input changes opacity to eleven percent.}
-    - {step: 14, expectation: Apply closes the watermark panel.}
-    - {step: 15, expectation: Applied watermark keeps the action selected.}
-    - {step: 18, expectation: Reopen preserves the entered text.}
-    - {step: 19, expectation: Reopen preserves opacity.}
-    - {step: 21, expectation: Clear closes the panel.}
-    - {step: 22, expectation: Clear removes applied watermark state.}
-    - {step: 25, expectation: Cleared watermark text is empty on reopen.}
-    - {step: 27, expectation: Escape dismisses the panel.}
-    - {step: 28, expectation: The underlying crop remains selected.}
-    results: [14, 15, 18, 19, 21, 22, 25, 27, 28]
+    - {step: 8, expectation: Watermark panel and slider stay inside the 1000px viewport even when the toolbar wraps.}
+    - {step: 11, expectation: The open panel and slider reposition within a 520 by 420 viewport.}
+    - {step: 15, expectation: The open panel and slider remain within bounds after restoring the viewport.}
+    - {step: 19, expectation: Keyboard slider input changes opacity to eleven percent.}
+    - {step: 22, expectation: Apply closes the watermark panel.}
+    - {step: 23, expectation: Applied watermark keeps the action selected.}
+    - {step: 26, expectation: Reopen preserves the entered text.}
+    - {step: 27, expectation: Reopen preserves opacity.}
+    - {step: 29, expectation: Clear closes the panel.}
+    - {step: 30, expectation: Clear removes applied watermark state.}
+    - {step: 33, expectation: Cleared watermark text is empty on reopen.}
+    - {step: 35, expectation: Escape dismisses the panel.}
+    - {step: 36, expectation: The underlying crop remains selected.}
+    results: [8, 11, 15, 22, 23, 26, 27, 29, 30, 33, 35, 36]
   - id: R2
     requirement: OCR displays the exact returned fixture text including its email, copies that text, and closes its panel without creating annotations.
-    actions: [29, 34, 35, 38, 42]
+    actions: [37, 42, 43, 46, 50]
     checkpoints:
-    - {step: 31, expectation: OCR text is the actual deterministic stub result rather than an assumed error.}
-    - {step: 32, expectation: Recognized text is read-only.}
-    - {step: 33, expectation: OCR consumes the renderer export path.}
-    - {step: 36, expectation: Copy reports a successful text result.}
-    - {step: 37, expectation: Browser clipboard equals the complete OCR result with platform LF or CRLF line endings.}
-    - {step: 39, expectation: The OCR panel closes.}
-    - {step: 40, expectation: The capture selection stays in annotate phase.}
-    - {step: 41, expectation: OCR adds no annotation shapes.}
-    - {step: 43, expectation: Capture remains cancelable.}
-    results: [31, 32, 33, 36, 37, 39, 40, 41, 43]
+    - {step: 39, expectation: OCR text is the actual deterministic stub result rather than an assumed error.}
+    - {step: 40, expectation: Recognized text is read-only.}
+    - {step: 41, expectation: OCR consumes the renderer export path.}
+    - {step: 44, expectation: Copy reports a successful text result.}
+    - {step: 45, expectation: Browser clipboard equals the complete OCR result with platform LF or CRLF line endings.}
+    - {step: 47, expectation: The OCR panel closes.}
+    - {step: 48, expectation: The capture selection stays in annotate phase.}
+    - {step: 49, expectation: OCR adds no annotation shapes.}
+    - {step: 51, expectation: Capture remains cancelable.}
+    results: [39, 40, 41, 44, 45, 47, 48, 49, 51]
   visual:
   - check: Applied and cleared watermark state plus exact OCR content.
     method: automated

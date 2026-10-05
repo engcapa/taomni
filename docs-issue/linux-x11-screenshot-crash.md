@@ -10,7 +10,7 @@
 
 截图通过后台任务调用 `AppHandle::available_monitors()` 和 `primary_monitor()`。Tauri runtime-wry 2.11.4 的这两个 RuntimeHandle 方法直接访问 GDK，未自动调度到主线程；转换 Monitor 时还调用 Linux `gdk_monitor().workarea()`，内部执行 Xlib 请求。它们与 GTK 主线程共享连接，并发调用会破坏回复序列，之后鼠标查询或事件读取成为断言触发点。因此 `XIQueryPointer` 是暴露损坏的位置，单独改鼠标查询不足以修复。
 
-日志中的 AT-SPI bus 警告在修复后成功测试中仍存在，与本次退出无因果证据。用户报告 Ubuntu 24.04 和 Flameshot 正常；本轮未在 Ubuntu 24.04 重测。
+日志中的 AT-SPI bus 警告在修复后成功测试中仍存在，与本次退出无因果证据。用户报告 Ubuntu 24.04 和 Flameshot 正常；后续 GitHub native 测试使用 Ubuntu 24.04，结果见下文。
 
 ## 实现
 
@@ -39,7 +39,17 @@
 
 5 次真实鼠标截图通过后，测试清理误用了 `xdotool windowclose`。该命令调用 `XDestroyWindow` 直接销毁窗口，导致 GTK 报 `BadWindow`、退出码 133，见 [清理日志](../qa-ui-auto-report/_local/screenshot-x11/manual-gtk.log)。随后重新启动同一修复二进制，完成一次截图、Escape 恢复主窗口，再用真实 `Alt+F4` 正常退出，退出码为 0；见 [正常关闭证据](../qa-ui-auto-report/_local/screenshot-x11/os-normal-close-cycle/evidence.json) 与 [日志](../qa-ui-auto-report/_local/screenshot-x11/manual-normal-close.log)。此前失败日志保留，正常截图流程和正常窗口关闭均已验证。
 
-`pnpm build` 随 QA 构建通过，改动文件的 rustfmt、`git diff --check`、QA audit gate、用例契约与 Linux CI 选例均通过。全仓 `cargo fmt --check` 因 20 个未改动文件已有格式差异失败；本次两个 Rust 文件均通过，见 [完整格式检查日志](../qa-ui-auto-report/_local/screenshot-x11/final-cargo-fmt.log)。其他 OS、Wayland 和混合 DPI/多显示器本轮未验证。报告与图像是本机保留的产物，未纳入 Git。
+`pnpm build` 随 QA 构建通过，改动文件的 rustfmt、`git diff --check`、QA audit gate、用例契约与 Linux CI 选例均通过。全仓 `cargo fmt --check` 因 20 个未改动文件已有格式差异失败；本次两个 Rust 文件均通过，见 [完整格式检查日志](../qa-ui-auto-report/_local/screenshot-x11/final-cargo-fmt.log)。Wayland 和混合 DPI/多显示器尚未验证。报告与图像是本机保留的产物，未纳入 Git。
+
+## GitHub 三平台回归
+
+分支 `fix/linux-x11-screenshot-crash` 已推送，使用 `.github/workflows/qa-ui-auto-platforms.yml`、`scope=selected`、`features=F27.1,F27.2`，明确选择 Linux/Windows/macOS 的 browser/native 六组。每组 browser 35 项（包含旧 session 图像入口移除），Linux/Windows native 各 16 项，macOS native 19 项；选例没有 capability gap 或未审用例。
+
+首轮 [run 37255450923](https://github.com/engcapa/taomni/actions/runs/37255450923) 测试提交 `efda46f9cbfd3c56fdc3b49261f642dd5d594cfc`。Linux/Windows native 各 16/16 通过，macOS native 18/19；三个 browser 均为 34/35。工作流为报告收集用途，任务状态成功不能替代逐项通过判断。原始失败报告保存在 `qa-ui-auto-report/hosted-37255450923/artifacts/`。
+
+三端 browser 的同一个失败 `TC-SHOT-017` 来自水印弹层未限制视口边界：1000px 工具栏换行后，水印按钮靠左，原来的 `right:0` 对齐将面板及颜色按钮推出左边缘。修复为固定定位、按实测面板尺寸夹紧视口坐标，并允许透明度滑条收缩。用例在 1000px、实时缩到 520×420 和恢复后检查面板/滑条边界，保留窄窗口截图；N3 同时检查实际原生 WebView 的水印面板、滑条边界和 Escape 关闭。
+
+macOS `TC-SHOT-N7` 的 13 个 GIF 解码帧全部匹配原画/nonce/时间顺序，但首两帧间隔 900ms，未解释的漏采时间 849ms，超过既有 700ms 标准。像素与时间线失败均保留，标准未放宽；单独复跑同一提交定位是否稳定复现。
 
 ## 实际安装命令
 

@@ -47,6 +47,16 @@ class ElementGeometryTest(TestCase):
             self.assertEqual(receipt["measurements"][-1]["height"], 24)
             self.assertIn('document.querySelectorAll("button[data-tool-window-id]")', evaluate.call_args[0][0])
 
+    def test_viewport_margin_rejects_every_clipped_edge_and_invalid_bounds(self):
+        args = {"selector": "panel", "min_width": 1, "min_height": 1, "viewport_margin": 8}
+        sample = {"width": 224, "height": 170, "left": 8, "top": 8, "right": 232, "bottom": 178,
+                  "viewport_width": 520, "viewport_height": 420}
+        assert_geometry(args, [sample])
+        for edge, value in (("left", -139), ("top", -1), ("right", 513), ("bottom", 413),
+                            ("left", float("nan")), ("viewport_width", float("nan"))):
+            with self.subTest(edge=edge), self.assertRaisesRegex(StepError, "outside viewport"):
+                assert_geometry(args, [{**sample, edge: value}])
+
     def test_browser_and_native_dispatch_use_the_same_measurements(self):
         with TemporaryDirectory() as directory:
             ctx = Mock(case_dir=Path(directory), dry_run=False)
