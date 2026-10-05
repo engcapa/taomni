@@ -25,6 +25,8 @@ use super::qa_oracle;
 pub mod colors;
 pub mod pin_tools;
 pub mod scroll_manual;
+#[cfg(target_os = "windows")]
+mod windows_save_dialog;
 
 /// Window label of the QA content fixture (scrollable page / animation).
 pub const QA_WINDOW_LABEL: &str = "screenshot-qa-fixture";

@@ -67,7 +67,13 @@ macOS `TC-SHOT-N7` 的 13 个 GIF 解码帧全部匹配原画/nonce/时间顺序
 
 单项 [run 37257920081](https://github.com/engcapa/taomni/actions/runs/37257920081) 使用同一 `efda46f9` 提交，N7 为 1/1 通过。13 帧、2760ms、最长帧间隔 920ms，扣除原画持续不变的时间后未解释间隔为 682ms，最大时间漂移 113ms，逐帧像素零不匹配。此结果未证明首次失败根因已消除：两轮首帧附近均出现较大间隔，完整批次仍需核查。原始报告保存在 `qa-ui-auto-report/hosted-37257920081/`。
 
-当前完整 [run 37258337972](https://github.com/engcapa/taomni/actions/runs/37258337972) 测试提交 `733a81f0de61e8658884c76bb411de58d8bb06e2`，共 156 执行项。截至 2026-10-05 11:33（Asia/Shanghai），三端 browser 均为 35/35，Linux native 为 16/16，均零失败跳过；Windows/macOS native 仍在执行。当前返回报告的 source/runner 指纹与上述本机构建一致；原始报告下载到 `qa-ui-auto-report/hosted-37258337972/artifacts/`，完整结果返回后再验证各组 receipt、附件及独立聚合结果。
+第二轮完整 [run 37258337972](https://github.com/engcapa/taomni/actions/runs/37258337972) 测试提交 `733a81f0de61e8658884c76bb411de58d8bb06e2`，共 156 执行项。三端 browser 均为 35/35，Linux native 为 16/16，macOS native 为 19/19，Windows native 为 15/16，合计 155/156、零跳过。macOS N7 本轮 16 帧、2790ms、最长帧间隔 660ms、未解释间隔 601ms、最大漂移 23ms，零不匹配帧，满足原有标准。Pillow 独立解码 Linux/macOS GIF，帧数、时间和所有解码帧与报告附件完全一致，并独立核对原画裁切的逐帧像素误差；见 `qa-ui-auto-report/hosted-37258337972/independent-gif-decode.json`。
+
+六组原始报告的 source/runner/case/config 指纹、QA 二进制身份、230 个 receipt 附件及 1931 个原生输出附件哈希全部通过；独立聚合与 GitHub 聚合一致，严格 `passed=false`，唯一失败为 Windows N17。见 `qa-ui-auto-report/hosted-37258337972/independent-verification.json`。工作流的 success 不表示全部用例通过。
+
+Windows N17 失败发生在原生保存对话框输入。阶段记录中，保存按钮点击后仅固定等待 1.5s，在 8794ms 标记对话框打开、9493ms 发送全局键盘输入，但 [当时桌面图](../qa-ui-auto-report/hosted-37258337972/artifacts/qa-windows-native-f4d9247436f94cf1b252749590f0a70a/screenshot-outputs/windows-8351a522-3ced-4c51-9f30-d240bc51775c-8-pin-save-dialog-open.png) 尚无保存对话框。[失败时桌面图](../qa-ui-auto-report/hosted-37258337972/artifacts/qa-windows-native-f4d9247436f94cf1b252749590f0a70a/screenshot-outputs/windows-8351a522-3ced-4c51-9f30-d240bc51775c-9-pin-save-dialog-failed.png) 对话框已打开，文件名仍是默认 `Taomni-pin`，说明输入送早了；不是文件内容断言错误。
+
+修复 QA 输入时序：[windows_save_dialog.rs](../src-tauri/src/screenshot/qa/windows_save_dialog.rs) 读取实际 Win32 前台窗口及 GUI 线程焦点，等待当前 QA PID 的 `#32770` 对话框和默认文件名 Edit 字段获得焦点（最多 20s）后再输入。成功/失败证据记录 PID、类名、焦点控件、默认文件名和等待时间。仍通过真实 Enigo 键盘输入操作原生对话框、验证指定目标文件与原 PNG 字节完全相同，后续收藏持久化断言保留。Windows 专用模块已在本机使用 `x86_64-pc-windows-gnu` 对实际源码进行编译类型检查；完整原生运行仍需 hosted Windows 复测。
 
 ## 实际安装命令
 
@@ -78,9 +84,12 @@ sudo apt-get install -y xdotool
 sudo apt-get install -y libasound2-dev
 sudo apt-get install -y meson
 python qa-ui-auto-report/_local/screenshot-x11/install-pipewire.py
+rustup target add x86_64-pc-windows-gnu
 ```
 
 ALSA 开发包用于编译，xdotool 用于当前 X11 桌面操作。系统 PipeWire 0.3.48 缺少 pipewire-rs 所需的 `pw_buffer.requested`；安装脚本下载 PipeWire 1.0.5 到本地 QA 目录，编译并安装头文件与运行库到 `qa-ui-auto-report/_local/screenshot-x11/pipewire-prefix`。系统 PipeWire 服务和安装目录未替换。源码地址为 `https://codeload.github.com/PipeWire/pipewire/tar.gz/refs/tags/1.0.5`。
+
+Windows Rust 标准库 target 用于在 Linux 本机检查 Windows 对话框查询源码的 API 与类型，不替代真实 Windows native 验证。检查日志为 `qa-ui-auto-report/_local/screenshot-x11/windows-dialog-api-check.log`。
 
 该脚本内部执行的安装步骤如下：
 

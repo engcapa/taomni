@@ -151,8 +151,25 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     pin.set_focus().map_err(|e| e.to_string())?;
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-save\"]').click()")
         .map_err(|e| e.to_string())?;
-    tokio::time::sleep(Duration::from_millis(1500)).await;
-    trace.mark("save-dialog-open", json!({"destination":destination}));
+    #[cfg(target_os = "windows")]
+    let save_dialog_ready = match super::windows_save_dialog::wait_ready().await {
+        Ok(state) => state,
+        Err(error) => {
+            if let Ok(desktop) = capture::capture_display(&app, &display) {
+                keep_image(&desktop, "pin-save-dialog-not-ready.png");
+            }
+            return Err(format!("{error:#}"));
+        }
+    };
+    #[cfg(not(target_os = "windows"))]
+    let save_dialog_ready = {
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        json!({"waitedMs":1500})
+    };
+    trace.mark(
+        "save-dialog-open",
+        json!({"destination":destination,"readiness":save_dialog_ready}),
+    );
     if let Ok(desktop) = capture::capture_display(&app, &display) {
         keep_image(&desktop, "pin-save-dialog-open.png");
     }
@@ -178,7 +195,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         }
         return Ok(report(
             false,
-            json!({"nativeSaveDialog":"did not save original PNG","destination":destination,"controls":controls,"drag":drag}),
+            json!({"nativeSaveDialog":"did not save original PNG","destination":destination,"readiness":save_dialog_ready,"controls":controls,"drag":drag}),
         ));
     }
     run_js(&pin, "document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').click(); for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed')!=='true';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
@@ -255,6 +272,6 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         && favorite_artifact.is_some();
     Ok(report(
         ok,
-        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
+        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"saveDialogReady":save_dialog_ready,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
     ))
 }
