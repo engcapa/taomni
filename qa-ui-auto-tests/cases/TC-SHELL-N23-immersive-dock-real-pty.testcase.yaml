@@ -5,6 +5,7 @@ description: Shell redesign follow-up acceptance. User actions use production co
 covers:
 - F-SHELL-1
 - F2.1
+- F1.5
 tags:
 - workspace-shell
 - p1
@@ -138,6 +139,58 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: (?m)^QA_DOCK_AFTER\s*$
     timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_CATEGORY_RETAINED
+    submit: false
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: app.settings
+- click: '[data-testid="shell-action-result"][data-action-id="app.settings"]'
+- wait_for: '[data-testid="settings-search-input"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: retained native settings 中文
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
+- assert_visible: '[data-testid="shell-lane-empty-create"]'
+- assert_not_visible: '[data-testid="settings-search-input"]'
+- assert_not_visible: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- screenshot: native-empty-category.png
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: app.settings
+- click: '[data-testid="shell-action-result"][data-action-id="app.settings"]'
+- wait_for: '[data-testid="settings-search-input"]'
+- assert_value:
+    selector: '[data-testid="settings-search-input"]'
+    equals: retained native settings 中文
+- assert_not_visible: '[data-testid="shell-lane-empty"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    key: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_CATEGORY_RETAINED\s*$
+    timeout_sec: 20
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_IMMERSIVE_BEFORE\s*$
+    timeout_sec: 20
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
 verification:
   review: reviewed
   requirements:
@@ -283,6 +336,54 @@ verification:
     - 57
     - 59
     - 63
+  - id: R-empty-category-retention
+    requirement: Empty categories hide retained native controls; Actions restores the Settings search draft and
+      pending input in the original real PTY.
+    actions:
+    - 64
+    - 65
+    - 66
+    - 67
+    - 69
+    - 70
+    - 71
+    - 72
+    - 77
+    - 78
+    - 79
+    - 83
+    - 84
+    - 85
+    - 87
+    checkpoints:
+    - step: 73
+      expectation: '{"assert_visible": "[data-testid=\"shell-lane-empty-create\"]"}'
+    - step: 74
+      expectation: '{"assert_not_visible": "[data-testid=\"settings-search-input\"]"}'
+    - step: 75
+      expectation: '{"assert_not_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 81
+      expectation: '{"assert_value": {"selector": "[data-testid=\"settings-search-input\"]", "equals": "retained
+        native settings 中文"}}'
+    - step: 82
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 88
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
+        "regex": "(?m)^QA_CATEGORY_RETAINED\\s*$", "timeout_sec": 20}}'
+    - step: 89
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
+        "regex": "(?m)^QA_IMMERSIVE_BEFORE\\s*$", "timeout_sec": 20}}'
+    - step: 90
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    results:
+    - 73
+    - 74
+    - 75
+    - 81
+    - 82
+    - 88
+    - 89
+    - 90
   visual:
   - check: Dock, palette and content stay readable with no clipped controls.
     method: manual

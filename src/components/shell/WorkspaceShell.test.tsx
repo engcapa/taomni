@@ -31,16 +31,39 @@ it("keeps empty-lane Home actionable when the retained terminal gains its restor
   </ShellSurfaceRegistry>);
   const retained = screen.getByLabelText("Retained terminal input");
   expect(screen.getByTestId("shell-work-area")).toHaveAttribute("inert");
-  expect(screen.getByTestId("shell-work-area")).toHaveStyle({ visibility: "hidden" });
+  expect(retained).not.toBeVisible();
   act(() => useShellLayoutStore.getState().bindRestoreSource("ssh-alpha", { kind: "run-entry", identity: "saved:alpha" }, 1, true));
   expect(screen.getByTestId("shell-lane-empty-home")).toBeInTheDocument();
   expect(screen.getByTestId("shell-work-area")).toHaveAttribute("inert");
   fireEvent.click(screen.getByTestId("shell-lane-empty-home"));
   expect(useAppStore.getState().activeTabId).toBe("welcome");
   expect(screen.queryByTestId("shell-lane-empty")).toBeNull();
-  expect(screen.getByTestId("shell-work-area")).not.toHaveStyle({ visibility: "hidden" });
+  expect(retained).toBeVisible();
   expect(screen.getByLabelText("Retained terminal input")).toBe(retained);
   expect(retained).toHaveValue("draft 中文");
+});
+
+it("hides retained controls that declare visibility and restores their edited draft", () => {
+  useAppStore.setState({ tabs: [
+    { id: "welcome", title: "Home", type: "welcome", closable: false },
+    { id: "settings", title: "Settings", type: "settings", closable: true },
+  ], activeTabId: "settings" });
+  useShellLayoutStore.setState({ taoOpen: false });
+  render(<ShellSurfaceRegistry>
+    <ShellFrame navigator={null}>
+      <input aria-label="Settings search" style={{ visibility: "visible" }} defaultValue="" />
+    </ShellFrame>
+  </ShellSurfaceRegistry>);
+  const search = screen.getByRole("textbox", { name: "Settings search" });
+  fireEvent.change(search, { target: { value: "retained settings draft 中文" } });
+  act(() => useShellLayoutStore.getState().selectLane("communicate"));
+  expect(search).not.toBeVisible();
+  expect(screen.queryByRole("textbox", { name: "Settings search" })).toBeNull();
+  expect(screen.getByTestId("shell-lane-empty-home")).toBeVisible();
+  act(() => useShellLayoutStore.getState().selectLane(null));
+  expect(screen.getByRole("textbox", { name: "Settings search" })).toBe(search);
+  expect(search).toBeVisible();
+  expect(search).toHaveValue("retained settings draft 中文");
 });
 
 it("keeps the moved Tao overlay interactive and dismisses it only from outside its current host", () => {

@@ -368,3 +368,14 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 
 - 本机收尾：完整前端 `478` 为 **532 files / 5286 passed / 0 failed**；完整 Rust `479` 为 **1599 passed / 0 failed / 16 ignored**，忽略项为既有平台/外部依赖测试；catalog `480` 通过，开发契约通过。QA build `477` 成功且 ID 为 `com.taomni.app.qa`。本机 RDP 会话 `RDP-Tcp#0` 下没有强行执行系统截图/录屏/对话框子集；WebDriver native `484` 的 5 条（IDE-PARITY-010-04、MAIN-RAIL-01、SHELL-N22、SHELL-N23、WELCOME-RS-N-01）全部通过，包含真实 PTY、独立 Git 磁盘状态与 native 重启恢复。
 - 本机 browser `482` 的 B46/B48/B50/B51/B52 全部 5/0/0，覆盖四向 Dock、Java 切换复用、恢复错误、MRU 和部分关闭重试。`475/482/484` 的 current identity、stable 输入、receipt 与全部 artifact hashes 已核对；记录 `_local/shell-local-evidence-review-485.json`。3 张修后代表性截图已实际评审，记录 `_local/shell-local-visual-review-481.json`。下一步推送最终输入，执行 291 ID 的 GitHub 六端完整回归；远端未返回前全部任务仍 in_progress。
+
+### 2026-10-05 空分类截图回归
+
+- 输入 `4df6d953` 的 [run 37309271341](https://github.com/engcapa/taomni/actions/runs/37309271341) 已收到 Linux/macOS browser 各 218/0/0，身份、receipt、配置及原始 ZIP hashes 匹配。但实际 B49 截图仍有空 Messages 分类下的 Settings 搜索框残留，因此本批不能验收。此前 Windows 本机没有该绘制残留，不推广为其它平台通过。
+- B49 原隐藏断言只在返回 Code Workspace 后执行；新增空分类截图前的隐藏断言和通过 Actions 返回 Settings 的精确搜索草稿检查。Windows 修前 `490` 为 1/0/0，实际截图无残留，明确未在本机复现远端绘制问题。保留旧远端截图作为视觉失败证据。
+- Shell 改为在稳定业务容器上隐藏内容，保留 DOM、控制器与草稿；恢复时先显示容器再发尺寸变化通知，避免终端/编辑器测到隐藏尺寸。新增挂载回归保护隐藏/恢复和 resize 通知顺序，聚焦 `493` 为 4 files / 61 tests 全部通过。N23 增加真实 PTY 未提交输入与 Settings 搜索草稿的空分类往返，共 90 步，原 300 秒预算和原业务断言保持。
+- 当前修复仍待本机 browser/native、完整单测及新输入 GitHub 六端验证，全部任务保持 in_progress。
+
+- 本机修后收尾：完整前端 `498` 为 **532 files / 5288 passed / 0 failed**；聚焦 `493` 为 61/0。类型与 catalog/开发契约检查通过。Rust 源码本批没有变动，保留完整 `479` 的 1599/0/16 ignored 结果；隔离 QA build `497` 成功。native `502` 的 N02/N06/N23 为 **3/0/0**，真实 PTY 输入、磁盘保存/撤销及 90 步空分类往返全部通过，7 张实际截图已审阅。
+- browser `499` 为 5/0/0，但截图发现长期运行 Vite 缓存了合并前版本号常量。确认该 QA 服务的 PID/仓库/端口后重启为 `504`，读取 runtime defines 确认为 0.4.32；补跑 `506` 的 B07/B17/B46/B47/B49 为 **5/0/0**。8 张新截图已实际审阅。`_local/shell-empty-current-evidence-507.json` 核对两个实际报告的 current/stable identity、case/config、receipt、native build 与完整产物 hashes；没有用 dry-run 代替执行。
+- 旧输入 `37309271341` 三端 browser 各 218/0/0，Linux native 78/0/0；Windows/macOS native 此时仍执行。即使最终自动断言全部通过，旧 B49 视觉失败仍保留，本批完成条件继续由新修复输入的六端回归证明。

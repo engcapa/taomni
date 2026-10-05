@@ -47,6 +47,9 @@ steps:
 - assert_not_visible: '[data-testid="shell-panel-toggle"]'
 - click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: retained settings draft 中文
 - assert_not_visible: '[data-testid="tab-multiexec-toggle"]'
 - assert_not_visible: '[data-testid="tab-split-view"]'
 - assert_not_visible: '[data-testid="shell-panel-toggle"]'
@@ -65,6 +68,7 @@ steps:
     name: data-lane
     equals: communicate
 - assert_visible: '[data-testid="shell-lane-empty-create"]'
+- assert_not_visible: '[data-testid="settings-search-input"]'
 - screenshot: titlebar-context-and-overflow.png
 - click: '[data-testid="shell-lane-empty-create"]'
 - wait_for: '[data-testid="mail-unified-tab"]'
@@ -111,6 +115,16 @@ steps:
 - click: '[data-testid="ai-chat-drawer-hide"]'
 - assert_not_visible: '[data-testid="ai-chat-drawer"]'
 - assert_not_visible: '[data-testid="settings-search-input"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: app.settings
+- click: '[data-testid="shell-action-result"][data-action-id="app.settings"]'
+- wait_for: '[data-testid="settings-search-input"]'
+- assert_value:
+    selector: '[data-testid="settings-search-input"]'
+    equals: retained settings draft 中文
+- assert_not_visible: '[data-testid="shell-lane-empty"]'
 verification:
   review: reviewed
   requirements:
@@ -171,63 +185,60 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"tab-split-view\"]"}'
     - step: 24
       expectation: '{"assert_not_visible": "[data-testid=\"shell-panel-toggle\"]"}'
-    - step: 27
-      expectation: '{"assert_not_visible": "[data-testid=\"tab-multiexec-toggle\"]"}'
     - step: 28
-      expectation: '{"assert_not_visible": "[data-testid=\"tab-split-view\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-multiexec-toggle\"]"}'
     - step: 29
-      expectation: '{"assert_not_visible": "[data-testid=\"shell-panel-toggle\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-split-view\"]"}'
     - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"system-screenshot\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-panel-toggle\"]"}'
     - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"shell-tao-toggle\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"system-screenshot\"]"}'
     - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"shell-tao-toggle\"]"}'
+    - step: 33
       expectation: '{"assert_visible": "[data-testid=\"shell-overview-trigger\"]"}'
     results:
     - 22
     - 23
     - 24
-    - 27
     - 28
     - 29
     - 30
     - 31
     - 32
+    - 33
   - id: R3
     requirement: Portrait horizontal dock exposes less frequent categories through More and empty categories offer
       creation.
     actions:
-    - 33
     - 34
     - 35
     - 36
     - 37
+    - 38
     checkpoints:
-    - step: 38
+    - step: 39
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
         "communicate"}}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_visible": "[data-testid=\"shell-lane-empty-create\"]"}'
     results:
-    - 38
     - 39
+    - 40
   - id: R-followup
     requirement: Empty category creation opens Mail; at portrait width the retained terminal contextual actions
       remain keyboard reachable and Escape returns focus.
     actions:
-    - 41
-    - 44
-    - 45
+    - 43
     - 46
-    - 49
+    - 47
+    - 48
     - 51
-    - 54
+    - 53
     - 56
+    - 58
     checkpoints:
-    - step: 43
-      expectation: Empty category creation opens Mail; at portrait width the retained terminal contextual actions
-        remain keyboard reachable and Escape returns focus.
-    - step: 48
+    - step: 45
       expectation: Empty category creation opens Mail; at portrait width the retained terminal contextual actions
         remain keyboard reachable and Escape returns focus.
     - step: 50
@@ -236,7 +247,7 @@ verification:
     - step: 52
       expectation: Empty category creation opens Mail; at portrait width the retained terminal contextual actions
         remain keyboard reachable and Escape returns focus.
-    - step: 53
+    - step: 54
       expectation: Empty category creation opens Mail; at portrait width the retained terminal contextual actions
         remain keyboard reachable and Escape returns focus.
     - step: 55
@@ -245,41 +256,65 @@ verification:
     - step: 57
       expectation: Empty category creation opens Mail; at portrait width the retained terminal contextual actions
         remain keyboard reachable and Escape returns focus.
+    - step: 59
+      expectation: Empty category creation opens Mail; at portrait width the retained terminal contextual actions
+        remain keyboard reachable and Escape returns focus.
     results:
-    - 43
-    - 48
+    - 45
     - 50
     - 52
-    - 53
+    - 54
     - 55
     - 57
+    - 59
   - id: R-retained-controls
     requirement: Titlebar Context Panel opens the active workspace terminal and Tao opens its single global drawer.
     actions:
-    - 58
-    - 59
     - 60
     - 61
-    - 64
+    - 62
+    - 63
     - 66
     - 68
+    - 70
     checkpoints:
-    - step: 63
-      expectation: Titlebar Context Panel opens the active workspace terminal and Tao opens its single global drawer.
     - step: 65
       expectation: Titlebar Context Panel opens the active workspace terminal and Tao opens its single global drawer.
     - step: 67
       expectation: Titlebar Context Panel opens the active workspace terminal and Tao opens its single global drawer.
     - step: 69
       expectation: Titlebar Context Panel opens the active workspace terminal and Tao opens its single global drawer.
-    - step: 70
+    - step: 71
+      expectation: Titlebar Context Panel opens the active workspace terminal and Tao opens its single global drawer.
+    - step: 72
       expectation: '{"assert_not_visible": "[data-testid=\"settings-search-input\"]"}'
     results:
-    - 63
     - 65
     - 67
     - 69
-    - 70
+    - 71
+    - 72
+  - id: R-empty-retained-content
+    requirement: Empty categories hide retained Settings controls; returning through Actions restores the same search
+      draft.
+    actions:
+    - 27
+    - 38
+    - 73
+    - 74
+    - 75
+    checkpoints:
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"settings-search-input\"]"}'
+    - step: 77
+      expectation: '{"assert_value": {"selector": "[data-testid=\"settings-search-input\"]", "equals": "retained
+        settings draft 中文"}}'
+    - step: 78
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-lane-empty\"]"}'
+    results:
+    - 41
+    - 77
+    - 78
   visual:
   - check: Review captured layout for clipped controls and content.
     method: manual

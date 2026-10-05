@@ -58,9 +58,12 @@ function useViewport() {
 }
 interface ShellFrameProps { children: ReactNode; navigator: ReactNode; quickConnectHeight?: number; extras?: ReactNode; onCreateLane?(lane: string): void }
 export function ShellFrame({ children, ...chrome }: ShellFrameProps) {
+  const laneSelection = useShellLayoutStore((state) => state.laneSelection);
   // The business tree is a sibling of the chrome boundary. Both the normal
   // frame and fallback adopt the same DOM node, preserving controllers/PTYs.
-  return <><StableSurface id="shell-business" slot="shell-business" visible>{children}</StableSurface>
+  // Hide the persistent container itself for empty categories so descendant
+  // controls and composited sticky content cannot paint over the empty state.
+  return <><StableSurface id="shell-business" slot="shell-business" visible={!laneSelection}>{children}</StableSurface>
     <ShellBoundary workArea><ShellFrameChrome {...chrome}><SurfaceSlot id="shell-business" /></ShellFrameChrome></ShellBoundary></>;
 }
 function ShellFrameChrome({ children, navigator, quickConnectHeight = 0, extras, onCreateLane }: ShellFrameProps) {
@@ -136,7 +139,7 @@ function ShellFrameChrome({ children, navigator, quickConnectHeight = 0, extras,
       {shell.layout.tao.edge === "left" && taoFrame}
       <div className="relative flex-1 flex flex-col min-w-0 min-h-0">
         {shell.layout.tao.edge === "top" && taoFrame}
-        <div data-testid="shell-work-area" tabIndex={-1} className="relative flex-1 min-h-0 min-w-0" style={{ visibility: shell.laneSelection ? "hidden" : undefined }} inert={!!overlay || !!shell.laneSelection} aria-hidden={!!overlay || !!shell.laneSelection}>{children}</div>
+        <div data-testid="shell-work-area" tabIndex={-1} className="relative flex-1 min-h-0 min-w-0" inert={!!overlay || !!shell.laneSelection} aria-hidden={!!overlay || !!shell.laneSelection}>{children}</div>
         {layout.bottom !== "hidden" && bottomPanel && <div data-shell-overlay={layout.bottom === "overlay" ? "true" : undefined} role={layout.bottom === "overlay" ? "dialog" : undefined} aria-modal={layout.bottom === "overlay" || undefined} aria-label={t("shell.panel")} style={frame(layout.bottom, "bottom", undefined, layout.bottomSize)}><ShellResizeHandle kind="bottom" value={layout.bottomSize} min={220} max={600} onPreview={(value) => setPreview((p) => ({ ...p, bottom: value }))} onChange={(value) => shell.resizePanel(bottomPanel.id, value)} /><ContextPanelHost panels={bottom} activeId={bottomPanel.id} edge="bottom" /></div>}
         {shell.layout.tao.edge === "bottom" && taoFrame}
         {shell.laneSelection && <div data-testid="shell-lane-empty" className="absolute inset-0 p-8" style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)" }}><p>{t("shell.emptyLane")}</p><div className="flex gap-3 mt-3"><button data-testid="shell-lane-empty-home" className="taomni-button" onClick={() => { shell.selectLane(null); useAppStore.getState().setActiveTab("welcome"); }}>{t("shell.home")}</button>{onCreateLane && <button data-testid="shell-lane-empty-create" className="taomni-button" onClick={() => onCreateLane(lane)}>{t(lane === "build" ? "shell.workspaces" : lane === "communicate" ? "shell.mail" : lane === "utility" ? "menu.tools" : "shell.newSession")}</button>}</div></div>}

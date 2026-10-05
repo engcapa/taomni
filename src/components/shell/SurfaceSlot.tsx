@@ -25,13 +25,16 @@ export function StableSurface({ id, slot, visible, children }: { id: string; slo
   const [container] = useState(() => { const node = document.createElement("div"); node.className = "h-full w-full min-h-0 min-w-0"; node.dataset.surfaceId = id; return node; });
   const target = registry?.slots.get(slot);
   useLayoutEffect(() => {
-    if (!target) return;
     const focused = container.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
+    // Resize consumers must measure after the retained surface becomes visible.
+    container.style.display = visible ? "block" : "none";
+    container.inert = !visible;
+    container.setAttribute("aria-hidden", String(!visible));
+    if (!target) return;
     target.appendChild(container);
     if (focused && visible) focused.focus({ preventScroll: true });
     if (visible) window.dispatchEvent(new Event("resize"));
   }, [container, target, visible]);
   useLayoutEffect(() => () => container.remove(), [container]);
-  useLayoutEffect(() => { container.style.display = visible ? "block" : "none"; container.inert = !visible; container.setAttribute("aria-hidden", String(!visible)); }, [container, visible]);
   return createPortal(children, container, id);
 }

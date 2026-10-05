@@ -6,7 +6,7 @@
 >
 > 规范：[qa-ui-auto authoring](../.agents/skills/qa-ui-auto/references/authoring.md#design-to-implementation-handoff)、[verb catalog](../.agents/skills/qa-ui-auto/references/verb-catalog.md)、[native testing](../.agents/skills/qa-ui-auto/references/native-testing.md)。
 >
-> 初稿为 44 条 browser + 18 条 native，稳定 ID 为 `TC-SHELL-B01…B44` / `TC-SHELL-N01…N18`；保留范围现补充 B45、N19～N22。当前已登记 45 browser + 17 native Shell YAML；N01/N13/N14 的自动化部分复用既有用例，N11 与 N17 的必要边界仍单列。数量与 schema/contract 通过不代表完整规格已验收，实际范围以 YAML requirements 和当前平台报告为准。
+> 初稿为 44 条 browser + 18 条 native，稳定 ID 为 `TC-SHELL-B01…B44` / `TC-SHELL-N01…N18`；保留范围及 main 合并后增量补充 B45～B52、N19～N23。当前已登记 52 browser + 18 native Shell YAML；N01/N13/N14 的自动化部分复用既有用例，N11 与 N17 的必要边界仍单列。数量与 schema/contract 通过不代表完整规格已验收，实际范围以 YAML requirements 和当前平台报告为准。
 
 导航：[browser 用例](#browser-cases) · [native 用例](#native-cases) · [运行与交接](#execution-handoff)。单条用例有稳定 `#v-b01` / `#v-n01` 形式的锚点，YAML checklist 可直接引用。
 
@@ -1363,11 +1363,11 @@ N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、nat
 | V-B46 | 空 Home，800×1100；右键 Dock 四方向，检查主按钮尺寸/命中、存储值；隐藏并刷新，通过 F1 恢复 | [B46](../qa-ui-auto-tests/cases/TC-SHELL-B46-dock-orientations-and-recovery.testcase.yaml) | browser 三 OS；真实壳层 renderer |
 | V-B47 | 真实编辑器 fixture 中修改完整文本；F1 进入沉浸，Tao 临时打开/Escape，恢复后同一编辑器；搜索无结果不能执行；Actions 临时标题栏并收回 | [B47](../qa-ui-auto-tests/cases/TC-SHELL-B47-immersive-actions-editor.testcase.yaml) | browser 三 OS；无 OS decoration 结论 |
 | V-B48 | 多模块 Maven + Main.java；初始 discovery 后修改草稿，阻塞后续目录访问；Home 最近项与已有标签切换均保留草稿/单实例且不重新扫描 | [B48](../qa-ui-auto-tests/cases/TC-SHELL-B48-java-workspace-switch-retains-discovery.testcase.yaml) | browser 三 OS；检测重复工作，不宣称实机延迟基线达标 |
-| V-B49 | Home/Workspace/本地终端/Settings；按能力显示，Project 单入口；竖屏 More 选空分类并实际创建；窄屏内容操作展开、Escape 回焦，系统多发送实际打开 | [B49](../qa-ui-auto-tests/cases/TC-SHELL-B49-contextual-titlebar-and-unified-dock.testcase.yaml) | browser 三 OS；其它业务动作继续执行原 SFTP/DB/RDP/VNC 回归 |
+| V-B49 | Home/Workspace/本地终端/Settings；按能力显示，Project 单入口；Settings 搜索草稿后通过竖屏 More 选空分类，在截图前断言搜索框隐藏，再实际创建；窄屏内容操作展开、Escape 回焦，系统多发送实际打开；Actions 返回 Settings 后搜索草稿不丢失 | [B49](../qa-ui-auto-tests/cases/TC-SHELL-B49-contextual-titlebar-and-unified-dock.testcase.yaml) | browser 三 OS；其它业务动作继续执行原 SFTP/DB/RDP/VNC 回归 |
 | V-B50 | 保存会话目录存在，snapshot 读取失败；明确 unavailable/error；Refresh 恢复 available，5 个会话不变 | [B50](../qa-ui-auto-tests/cases/TC-SHELL-B50-restore-unavailable-recovery.testcase.yaml) | browser 三 OS；IPC 故障注入 |
 | V-B51 | 两个终端和 Home；真实按住 Control 连续 Tab，Escape 返回 origin，反向循环，不创建新终端 | [B51](../qa-ui-auto-tests/cases/TC-SHELL-B51-held-modifier-mru.testcase.yaml) | browser 三 OS；键盘 down/up finally 释放，非系统全局热键证明 |
 | V-B52 | 终端先开，工作区有 dirty 文件；批量关闭终端成功、工作区保存失败，清单精确；只重试剩余，最终仅 Home | [B52](../qa-ui-auto-tests/cases/TC-SHELL-B52-close-partial-progress-retry.testcase.yaml) | browser 三 OS；真实协调器、受控写入失败 |
-| V-N23 | 隔离真实本地 PTY 已执行唯一输出；输入未提交时进入沉浸，再退出后提交；四向 Dock/隐藏恢复后仍有同一 PTY | [N23](../qa-ui-auto-tests/cases/TC-SHELL-N23-immersive-dock-real-pty.testcase.yaml) | Linux/Windows/macOS native；真实输入、窗口布局、PTY 输出 |
+| V-N23 | 隔离真实本地 PTY 已执行唯一输出；输入未提交时进入沉浸，再退出后提交；四向 Dock/隐藏恢复后仍有同一 PTY；Settings 编辑搜索草稿后进入空分类，搜索框与终端均隐藏，Actions 返回后草稿和原 PTY 未提交输入保留并可执行 | [N23](../qa-ui-auto-tests/cases/TC-SHELL-N23-immersive-dock-real-pty.testcase.yaml) | Linux/Windows/macOS native；真实输入、窗口布局、PTY 输出 |
 | V-N06 增量 | 真实文件打开并编辑；沉浸往返后保留全文/单实例；保存实际 SHA、Undo 后原 SHA | [N06](../qa-ui-auto-tests/cases/TC-SHELL-N06-workspace-save-undo-native.testcase.yaml) | 三 native；真实磁盘和编辑器历史 |
 
 删除的 Tao 悬浮球、顶部预览按钮、分类下拉和 Project 重复条目不再要求可点击；同一业务结果转到 Tao Rail、总览、分类 Actions/并列 Dock、工作区 Navigator。原 MAIN-RAIL 的宽度/抓手上限断言使用通用 geometry verb，未放宽尺寸预算。主菜单、全局截图、语言/主题、更新、会话 detach/重连等继续在原专属用例中操作，不能仅由 B49 的显示断言代替。

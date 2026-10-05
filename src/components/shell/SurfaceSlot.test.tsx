@@ -24,4 +24,18 @@ describe("Stable business surface", () => {
     view.rerender(<Stage slot="bottom" visible />); expect(screen.getByLabelText("draft")).toBe(input); expect(input).toHaveValue("retained draft");
     expect(input.closest('[data-slot-id="bottom"]')).not.toBeNull(); expect(mounted).toHaveBeenCalledTimes(1);
   });
+  it("restores visibility before notifying retained views to measure their size", () => {
+    function Stage({ visible }: { visible: boolean }) { return <ShellSurfaceRegistry><SurfaceSlot id="work" /><StableSurface id="business" slot="work" visible={visible}><input aria-label="measured draft" defaultValue="retained" /></StableSurface></ShellSurfaceRegistry>; }
+    const view = render(<Stage visible={false} />);
+    const input = screen.getByLabelText("measured draft");
+    const resize = vi.fn(() => screen.queryByRole("textbox", { name: "measured draft" }));
+    window.addEventListener("resize", resize);
+    try {
+      view.rerender(<Stage visible />);
+      expect(resize).toHaveBeenCalledTimes(1);
+      expect(resize.mock.results[0].value).toBe(input);
+      expect(screen.getByLabelText("measured draft")).toBe(input);
+      expect(input).toHaveValue("retained");
+    } finally { window.removeEventListener("resize", resize); }
+  });
 });
