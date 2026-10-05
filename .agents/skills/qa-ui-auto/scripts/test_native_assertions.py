@@ -5,6 +5,65 @@ from qa_ui_auto.native_steps import run_native_step
 from qa_ui_auto.steps import StepError
 
 
+class NativeLayoutObservationTest(TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from types import SimpleNamespace
+        from native_build import QA_APP_ID
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name).resolve()
+        self.database = root / "native-appdata" / QA_APP_ID / "taomni.db"
+        self.database.parent.mkdir(parents=True)
+        self.ctx = SimpleNamespace(session=SimpleNamespace(_harness=SimpleNamespace(report_root=root)), case_dir=root / "case")
+        self.expected = {"navigator_width": 232, "workspace_count": 1}
+
+    def seed(self, width=232, version=2):
+        import json
+        import sqlite3
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("CREATE TABLE shell_layout(id INTEGER PRIMARY KEY, layout TEXT)")
+            connection.execute("INSERT INTO shell_layout VALUES(1, ?)", [json.dumps({"version": version,
+                "navigator": {"width": width}, "restoreSources": {"workspace:w1": {"kind": "workspace"}}})])
+
+    def evidence(self):
+        import json
+        return json.loads((self.ctx.case_dir / "native-layout-observations.jsonl").read_text())
+
+    def test_reads_committed_disk_data_without_renderer_or_ipc(self):
+        self.seed()
+        run_native_step(self.ctx, "assert_native_layout", self.expected)
+        self.assertTrue(self.evidence()["passed"])
+        self.assertEqual(self.evidence()["observed"], self.expected)
+        self.assertEqual(len(self.evidence()["raw_sha256"]), 64)
+
+    def test_wrong_width_retains_failure_observation(self):
+        self.seed(width=200)
+        with self.assertRaisesRegex(StepError, "does not match"):
+            run_native_step(self.ctx, "assert_native_layout", self.expected)
+        self.assertFalse(self.evidence()["passed"])
+        self.assertEqual(self.evidence()["observed"]["navigator_width"], 200)
+
+    def test_unknown_version_does_not_pass_or_get_rewritten(self):
+        self.seed(version=999)
+        before = self.database.read_bytes()
+        with self.assertRaises(StepError):
+            run_native_step(self.ctx, "assert_native_layout", self.expected)
+        self.assertEqual(before, self.database.read_bytes())
+
+    def test_absent_database_is_not_created(self):
+        with self.assertRaises(StepError):
+            run_native_step(self.ctx, "assert_native_layout", self.expected)
+        self.assertFalse(self.database.exists())
+        self.assertFalse(self.evidence()["passed"])
+
+    def test_requires_an_owned_native_harness(self):
+        self.ctx.session._harness = None
+        with self.assertRaisesRegex(StepError, "run-owned"):
+            run_native_step(self.ctx, "assert_native_layout", self.expected)
+
+
 class NativeAssertionsTest(TestCase):
     def test_visibility_supports_scoped_text_role_and_xpath_selectors(self):
         for selector in ('[data-testid="sftp-remote-pane"] >> text="REMOTE"',

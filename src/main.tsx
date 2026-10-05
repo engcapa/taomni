@@ -95,6 +95,14 @@ function renderStartupCrash(error: unknown): void {
 
 async function bootstrap(): Promise<void> {
   const { default: App } = await import("./App");
+  const { isTauriRuntime } = await import("./lib/runtime");
+  if (isTauriRuntime()) {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    if (getCurrentWindow().label === "main") {
+      const { useShellLayoutStore } = await import("./stores/shellLayoutStore");
+      await useShellLayoutStore.getState().initialize();
+    }
+  }
 
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

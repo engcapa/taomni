@@ -461,6 +461,9 @@ export const zhCN: DeepPartial<typeof en> = {
     promptMany: "当前有 {count} 个打开的标签页。确认退出 Taomni 并关闭它们？",
     promptManyTerminals: "当前有 {count} 个打开的标签页，其中包含 {terminals} 个终端会话。确认退出 Taomni 并关闭它们？",
     cleanupFailedTitle: "SocksCap 清理失败",
+    layoutFailedTitle: "工作区布局保存失败",
+    layoutFailedMessage: "Taomni 已保留当前窗口，请重试保存工作区布局。\n\n{error}",
+    retrySave: "重试保存",
     cleanupFailedMessage:
       "为避免遗留网络状态，Taomni 已取消退出。请重试清理，或取消退出后使用“恢复网络”。\n\n{error}",
     retryCleanup: "重试清理",

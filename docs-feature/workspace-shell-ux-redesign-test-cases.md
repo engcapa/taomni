@@ -2,7 +2,7 @@
 
 > 配套设计：[详细设计 v2](./workspace-shell-ux-redesign-design.md)。基线 `5fb098474f072f4e0c7e99407ab0d072b7d49c53`，2026-10-03。
 >
-> 设计规格与实际实施记录分开保存。以下 B/N 场景是完整验收规格；已实现 YAML 和实际执行范围见 [实施任务记录](./workspace-shell-ux-redesign-tasks.md#验证记录)，未落实的步骤仍为待实现/待执行。
+> 设计规格与实际实施记录分开保存。以下 B/N 场景是完整验收规格；初稿中的“待执行”和拟新增 fixture/verb 记录属于设计交接时状态，最新落实范围以 [当前结果](#current-execution) 和 [实施任务记录](./workspace-shell-ux-redesign-tasks.md#验证记录) 为准。尚未落实的具体分支仍为待实现/待执行。
 >
 > 规范：[qa-ui-auto authoring](../.agents/skills/qa-ui-auto/references/authoring.md#design-to-implementation-handoff)、[verb catalog](../.agents/skills/qa-ui-auto/references/verb-catalog.md)、[native testing](../.agents/skills/qa-ui-auto/references/native-testing.md)。
 >
@@ -28,7 +28,7 @@
 - **产物**：`qa-ui-auto-report/workspace-shell/<mode>/<run>/<TC-id>/` 下保留结果、screenshots、DOM/geometry、必要 IPC/service/磁盘观察；native 带 binary hash/QA identity。记录 source dirty diff、case/runner/config hash、OS/WebView、时间、selection/pass/fail/skip/unrun。原始产物不提交；文档回填路径与结论。
 - **清理**：browser 关闭独立 context，停止本 case fixture/解除 held replies；native 先取消/完成本 case jobs，关闭本次 QA 子窗口和进程，停 fixture、恢复原剪贴板/窗口设置（涉及时）。删除范围必须解析并确认在 run-root；不使用 production profile，不改变 HOME。
 - **完成**：P2/TASK-11 为每个 YAML 登记 policy、covers、fixtures、modes 和 verification；requirements 的 actions/checkpoints/results 指向 1-based 决定性步骤，semantic review 前为 pending。visual/native checklist 分别记录；手工未执行不能靠 YAML pass 抹掉。所有相关 retained cases 同批更新。
-- **命令**：每条 B 默认 CMD-B，N 自动部分 CMD-N，N 手工部分 MN-1；填入该条精确 TC ID。命令在 YAML/fixture/控件实现后才可用。本轮只核对 --help，不运行产品或拟新增用例。
+- **命令**：每条 B 默认 CMD-B，N 自动部分 CMD-N，N 手工部分 MN-1；填入该条精确 TC ID。设计交接阶段只核对 --help，没有运行产品或拟新增用例；随后实现阶段已交付 YAML/fixture/控件并执行本机与 GitHub 验证，实际结果见 §6。
 
 初始超时预算：普通 browser case 120秒；B39性能样本600秒；native本地流程300秒；N03/04/12～15/17/18的协议/窗口组合900秒。实现后按真实步骤与既有阶段预算收敛，不能通过加timeout掩盖明确性能退化；prepare-ready仍是产品10秒边界。手工OS流程记录实际耗时，不用自动YAML等待个人操作。
 
@@ -812,7 +812,7 @@
 
 共同 `modes: [native]`、验证族 V-07、CMD-N / MN-1、Windows/WebView2、macOS/WKWebView、Linux/WebKitGTK。每条同时列自动化能证明的部分与必须手工/外部观察的部分；没有通用跨窗口/重启 verb 时，不写一个只检查主窗口就“全通过”的 YAML。用例总结果要求其全部必要检查完成。
 
-真实服务必须是本轮 disposable fixtures，禁止使用个人服务器/收件箱/项目。SSH/SFTP 配置用 QA_SSH_PASSWORD；MySQL 用 TAOMNI_TEST_MYSQL_PASSWORD 和必要 root 变量；VNC 用 QA_VNC_PASSWORD。AI/邮件测试只与本地测试 endpoint 交互。本轮没有启动或调用这些服务。
+真实服务必须是本轮 disposable fixtures，禁止使用个人服务器/收件箱/项目。SSH/SFTP 配置用 QA_SSH_PASSWORD；MySQL 用 TAOMNI_TEST_MYSQL_PASSWORD 和必要 root 变量；VNC 用 QA_VNC_PASSWORD。AI/邮件测试只与本地测试 endpoint 交互。设计交接阶段未启动服务；实现阶段使用隔离 QA fixtures，执行身份及实际协议结果见 §6 与任务记录。
 
 <a id="v-n01"></a>
 
@@ -946,7 +946,7 @@
 - **拟新增文件**：`qa-ui-auto-tests/cases/TC-SHELL-N08-restart-layout-native.testcase.yaml`；不支持自动化的步骤以本条作为精确手工 runbook，YAML 的 native checklist 链接此条。
 - **前置 / fixtures**：[reset_db、project_tree、shell_native_files]。D4 legacy prefs与W1/W2两恢复entry；同一隔离QA数据目录跨两次启动保持，第二次不能reset_db。先记录原profile不在目标范围。
 - **native 必要性**：reload_window不证明应用进程退出后的storage、工作集和新backend identity恢复。
-- **模式与支持**：当前无app_restart verb；CMD-N初始化+MN-1两次QA启动，或TASK-11实现保留run-root的受验证重启支持。不得重启时重置数据。
+- **模式与支持**：设计阶段缺少重启支持；当前 YAML 使用真实平台 Exit 菜单、确认、`native_app_process` 独立 PID 观察及 `restart_native_app` 同隔离目录重启。新修复还使用 `assert_native_layout` 在退出后独立只读 SQLite，要求宽度 232 和一条 workspace 恢复记录；随后同时检查 localStorage 与实际 Navigator 232。不得重启时重置数据；广义坏 profile/W1-W2 故障恢复仍按下列规格单列未验证。
 
 1. 从legacy启动迁移；调整Navigator/Host/Tao、pin/laneOverride，保存工作集；部分panel记录detached意图；等待偏好flush。
 2. 正常退出，外部确认QA PID结束；用同QA binary/同isolation目录重启 → 先Home、合法偏好恢复，旧handle不被当活窗口。
@@ -954,7 +954,7 @@
 4. 备份本例prefs后使其截断/未知version重启 → 安全默认/保留raw，session和Notes不丢；恢复备份再次启动正常。
 5. 关闭QA，保留前后data-root/identity/文件hash；清理只限本次run-root。
 
-**证据 / 清理**：两次真实PID/启动日志、prefs前后raw、restoreRef映射、业务数据对比；页面reload结果不充当本例通过。 继承 §1 清理；CMD-N + 必要 MN-1。Windows / macOS / Linux：均待执行。
+**证据 / 清理**：两次真实PID/启动日志、SQLite 独立观察与 raw hash、prefs/restoreRef 映射、业务数据对比；页面reload结果不充当本例通过。继承 §1 清理。输入 c769812b 的 Linux/Windows N08 通过，macOS 正常重启后的 stored/rendered 200 与原预期 232 不符，旧失败保留；新耐久修复尚待统一输入三端结果，设计中其它未自动化分支不转为 pass。
 
 <a id="v-n09"></a>
 
@@ -1253,15 +1253,15 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 
 | 产物 / 范围 | 当前结果 | 证据与边界 |
 |---|---|---|
-| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）及保留回归已交付；最终 run 37247775178 三端各 190/0/0、各 8,298 步完整，B07/B17 也通过 | reviewed contract、原始步骤、receipt 与当前输入一致；历史失败保留 |
-| Native 详细规格与补充 | 17 条 Shell YAML 与 N01/N13/N14 的既有用例复用已交付；最终 run 37247775178 Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。N08 stored/rendered 精确 232、RDP 独立重连和全部录屏原断言通过 | 三份 native build 身份、实际副作用、清理记录和原始步骤已核对；下表的 OS/设备边界单列未验证 |
+| Browser 详细规格与补充 | 52 条 Shell YAML（B01～B52）及保留回归已交付；当前 run 37318695278 三端各 218/0/0、各 9,393 步完整，含 main 合并后的入口适配与空分类修复 | reviewed contract、原始步骤、receipt 与当前输入一致；历史失败保留 |
+| Native 详细规格与补充 | 18 条 Shell YAML 与 N01/N13/N14 的既有用例复用已交付；run 37318695278 为 Linux 78/0/0、Windows 72/0/0、macOS 73/1/0 | macOS N08 的正常退出/重启后宽度 232→200 仍阻塞验收；修后必须以新输入重跑，不能用旧通过覆盖失败 |
 | fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
 | 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
-| 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸的原断言通过；最终 run 的 72 张当前代表性截图已实际审阅，捕获状态未见主要控件明显遮挡/裁切 | `qa-ui-auto-report/_local/shell-visual-review-37247775178/reviewed-*.json`；读屏、OS DPI/跨屏、系统控件和像素基线仍未由这些画面证明 |
+| 视觉与可访问性 | 输入 c769812b 的 60 张 browser、53 张去重 native 代表性截图已实际审阅；B49/N23 空分类无 Settings 搜索框残留，窄视口水印控件可见；N08 失败原图保留 | `qa-ui-auto-report/_local/shell-visual-*-37318695278/reviewed-*.json` 与 native-details；读屏、OS DPI/跨屏、系统控件和像素基线仍未由这些画面证明 |
 | 性能 | 指标、负载、样本和比较方法已定；没有实测结论 | 原始baseline/candidate、噪声、p50/p95与资源，不宣称理论提速 |
-| 产品构建/协议服务 | 最终输入 98ddf018 的六份 selection/source/runner/case/receipt/config/native build 与 ZIP hashes 均匹配；严格 gate 为 pass，761/0/0、33,090 步完整 | 原始报告、独立 AI/Git/SQL/SFTP/进程观察、模块登记见实施任务的最终验收 |
+| 产品构建/协议服务 | 输入 c769812b 的 selection 为 291 ID / 878 次，实际 877 pass / 1 fail / 0 skip；六份 source/runner/case/receipt/config/native build 与 ZIP hashes 匹配 | 原始报告、独立 AI/Git/SQL/SFTP/进程观察、模块登记见实施任务；工作流绿色不能代替验收 |
 
-责任任务 TASK-01～12 已按用户确认的本轮条件全部 done；TASK-11 已交付 YAML 与目录维护，TASK-12 已核对三平台实际结果和真实缺口。最终 [run 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束，精确范围为 250 ID / 761 次；详细证据与每端步骤数见 [最终验收](./workspace-shell-ux-redesign-tasks.md#final-acceptance)。下表保留每项实际自动化与未验证边界，不把整条设计规格的每个分支都视为已覆盖。
+责任任务 TASK-01～12 当前为 verification；TASK-11 已交付 YAML 与目录维护，TASK-12 正在核对同一输入的六端结果。[当前 run 37318695278](https://github.com/engcapa/taomni/actions/runs/37318695278) 为 291 ID / 878 次；详细证据与每端步骤数见 [实施任务](./workspace-shell-ux-redesign-tasks.md)。上一批 98ddf018 的 run 37247775178 为 250 ID / 761 次全部通过，仅作历史基线。下表保留每项实际自动化与未验证边界，不把整条设计规格的每个分支都视为已覆盖。
 
 用户于 2026-10-05 明确确认：真实 OS 文件对话框、Windows/macOS 真 IME、DPI/跨屏/读屏及匹配性能基线单列后续验收，本轮以实现完成和六端自动化全部通过为 done 条件。下表的未验证边界仍保留，既不转换为自动化 pass，也不继续阻塞已满足本轮条件的开发任务。
 
@@ -1282,7 +1282,7 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 | V-N18 | [窗口中断恢复](../qa-ui-auto-tests/cases/TC-SHELL-N18-window-interruption-recovery-native.testcase.yaml) | 真实子窗口生命周期与 Notes 草稿恢复；权限/系统窗口故障的其余组合不由单一路径替代 |
 | B25 / B45 / N19（AI 强制保留范围） | [browser context/Stop](../qa-ui-auto-tests/cases/TC-SHELL-B25-tao-context-lifecycle.testcase.yaml)、[browser stream/history](../qa-ui-auto-tests/cases/TC-SHELL-B45-ai-stream-history.testcase.yaml)、[native stream/history](../qa-ui-auto-tests/cases/TC-SHELL-N19-ai-stream-history-native.testcase.yaml) | Home 无绑定会话发起对话；发送、隐藏完成通知、精确 thread 跳转、未发送多行草稿、历史重载。B25 通过声明的 IPC hold 验证 Stop 与排队发送只完成一次。N19 另有真实 OpenAI loopback 协议/Rust stream/SQLite、503、部分 SSE 后 Stop、排队恢复和真实 QA 进程重启；独立 provider receipt 要求 5 次 stream 请求均带生产 tools、3 次正常完成、1 次真实连接取消，重启只保留完整回答且不重发。browser 的 stream 是明示 IPC preview。上一完整 run 37231369098 六端相应用例通过，三份 native 独立 provider receipt 的上述字段已直接核对；早期相对 receipt 路径失败保留于任务历史。当前固定输入完整结果待收齐 |
 | N20（LAN 轻量范围） | [native LAN entry](../qa-ui-auto-tests/cases/TC-SHELL-N20-lan-entry-native.testcase.yaml)、B38 的 browser 草稿保留分支 | 原生 read-only history、拒绝开启、Home/quick-switch 回同一 owner；browser 保留草稿。上一完整 run 37231369098 相应用例六端通过，当前固定输入结果待收齐；不声称真实 peer/multicast 收发 |
-| 截图强制保留范围 | `TC-SHOT-001…027` 与 `TC-SHOT-N1…N13` | 每端 27 条 browser、13 条 native 全部纳入最终选择；native 使用实际捕获、OCR、clipboard、置顶、快捷键、scroll/recording 场景，依各 YAML 和 platform contract 验收。上一完整 run 37231369098 的这 120 次执行全部通过；当前固定输入结果待收齐。browser stub 与 native 结果分别记录 |
+| 截图强制保留范围与 main 增量 | `TC-SHOT-001…034`、`TC-SHOT-N1…N13` / `N16…N18`；macOS 另含 N14/N15/N19 | 当前选择每端 34 条 browser，native Linux/Windows 各 16、macOS 19，包含新 main 的截图回归。native 使用实际捕获、OCR、clipboard、置顶、快捷键、scroll/recording 场景，依各 YAML 和 platform contract 验收；当前固定输入 native 结果待收齐。browser stub 与 native 结果分别记录 |
 | 原生 Git 保留操作 | [N21 多仓库](../qa-ui-auto-tests/cases/TC-SHELL-N21-git-actions-native.testcase.yaml)、[N22 单仓库](../qa-ui-auto-tests/cases/TC-SHELL-N22-single-git-actions-native.testcase.yaml) | 实际 stage/unstage、取消提交/建分支、选定文件提交、Log 文件集、discard 取消/确认；独立 Git 进程核对全部分支、精确 porcelain 集合与 HEAD/index 全文，aux 仓库保持不变。上一完整 run 37231369098 三端 N05/N21/N22 通过；当前固定输入结果待收齐 |
 
 用户已授权实现、单测、推送及 GitHub browser/native 验证；当前任务状态与结果持续更新在 [实施任务](./workspace-shell-ux-redesign-tasks.md)。本稿的设计步骤保持完整，自动化数量、静态检查和单测通过均不代表全部三端桌面及人工边界已验收。
@@ -1354,9 +1354,9 @@ N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、nat
 后续执行继续使用隔离 QA binary、可追溯的 source/build/config 和原始报告；新发现的产品回归进入修复闭环。没有实测结果时保留未验证状态，不给本轮已通过的自动化用例追加假 manual/performance pass。
 
 
-## main 合并后增量验收（当前输入未验证）
+## main 合并后增量验收（当前为 verification）
 
-以下用例与设计末尾的标题栏矩阵、Dock、沉浸和恢复契约对应；动作和逐步观察以链接的可执行 YAML 为准。所有 fixture 都在隔离报告环境，browser 的 IPC fixture 不作为 native 证据。先完成本机 Windows 11 unit/browser/隔离 native 聚焦验证，再提交 GitHub 六端。历史最终通过不覆盖本批改动。
+以下用例与设计末尾的标题栏矩阵、Dock、沉浸和恢复契约对应；动作和逐步观察以链接的可执行 YAML 为准。所有 fixture 都在隔离报告环境，browser 的 IPC fixture 不作为 native 证据。输入 c769812b 的 GitHub 六端已结束：三端 browser 各 218/0/0，native Linux 78/0/0、Windows 72/0/0、macOS 73/1/0，N08 的重启布局失败仍阻塞 done。原生耐久修复及 main bc130eee 的 QA 更新已进入下一候选验证；历史通过不覆盖这些改动。
 
 | V | 场景 / 初始状态 / 关键结果 | 可执行用例 | 模式与边界 |
 |---|---|---|---|

@@ -105,7 +105,7 @@ export function useShellResumeComposer(session: UseWelcomeSessionResumeResult,
       await latest.current.session.clearRecord();
       const shell = useShellLayoutStore.getState();
       shell.updateLayout((value) => ({ ...value, restoreSources: {}, restoredTabs: {}, panelOverrides: {}, lastActiveRestoreRef: undefined }));
-      shell.flush();
+      await shell.flushDurable();
       if (useShellLayoutStore.getState().warning === "write") throw new Error("Session record cleared, but layout restore intentions could not be saved. Retry clearing.");
       candidates.current = []; setOutcomes([]); setState("empty"); setTotal(0); setError(null);
     } catch (failure) { setError(String(failure)); }

@@ -8,22 +8,22 @@
 
 | 任务 | 状态 | 依赖 | 交付 / 验证证据 |
 |---|---|---|---|
-| TASK-01 契约与纯模型 | in_progress | 无 | 类型、身份、尺寸策略、Shell store；unit 与最终六端验收 |
-| TASK-02 壳层布局集成 | in_progress | 01 | Rail / Navigator / MainLayout / ControlBar；最终六端验收 |
-| TASK-03 标签与 action 路由 | in_progress | 01,04 | lane、总览、快速切换、快捷键；最终六端验收 |
-| TASK-04 实例与关闭事务 | in_progress | 01 | stable surface、close coordinator、DB adapter；最终六端及真实 SQL 验收 |
-| TASK-05 SFTP 与任务 ownership | in_progress | 01,04 | view/job lease、后台、promotion；最终六端及独立文件/协议观察 |
-| TASK-06 Workspace / Git | in_progress | 01,04 | Project、tools、Git Host；最终六端及真实单/多仓库验收 |
-| TASK-07 Tao / 通知 | in_progress | 01,04,05 | Hub、目标解析、成功后确认；最终六端及 AI HTTP/SSE 验收 |
-| TASK-08 Home / 恢复 | in_progress | 01,03,10 | 三主动作、最近项、组合恢复；最终六端验收 |
-| TASK-09 原生窗口 | in_progress | 04,05,06,07 | Git、detach 事务、回停靠；三端实际 native 验收 |
-| TASK-10 持久化与回退 | in_progress | 01,04,07 | v2 migration、恢复 identity；最终六端及重启 stored/rendered 验收 |
-| TASK-11 用例与自动化支持 | in_progress | 随相关实现 | 本轮新增 B46～B52、N23，适配既有入口用例与 catalog/policy；新输入六端待验收 |
-| TASK-12 集成与验收 | in_progress | 02–11 | 本轮本地 unit/browser/隔离 native 与 GitHub 六端验证进行中；历史记录不代表本轮通过 |
+| TASK-01 契约与纯模型 | verification | 无 | 类型、身份、尺寸策略、Shell store；unit 与最终六端验收 |
+| TASK-02 壳层布局集成 | verification | 01 | Rail / Navigator / MainLayout / ControlBar；最终六端验收 |
+| TASK-03 标签与 action 路由 | verification | 01,04 | lane、总览、快速切换、快捷键；最终六端验收 |
+| TASK-04 实例与关闭事务 | verification | 01 | stable surface、close coordinator、DB adapter；最终六端及真实 SQL 验收 |
+| TASK-05 SFTP 与任务 ownership | verification | 01,04 | view/job lease、后台、promotion；最终六端及独立文件/协议观察 |
+| TASK-06 Workspace / Git | verification | 01,04 | Project、tools、Git Host；最终六端及真实单/多仓库验收 |
+| TASK-07 Tao / 通知 | verification | 01,04,05 | Hub、目标解析、成功后确认；最终六端及 AI HTTP/SSE 验收 |
+| TASK-08 Home / 恢复 | verification | 01,03,10 | 三主动作、最近项、组合恢复；最终六端验收 |
+| TASK-09 原生窗口 | verification | 04,05,06,07 | Git、detach 事务、回停靠；三端实际 native 验收 |
+| TASK-10 持久化与回退 | verification | 01,04,07 | v2 migration、SQLite 确认保存、恢复 identity；本机 N08 精确重启恢复通过，待新输入六端验证 |
+| TASK-11 用例与自动化支持 | verification | 随相关实现 | 本轮新增 B46～B52、N23，适配既有入口用例与 catalog/policy；新输入六端待验收 |
+| TASK-12 集成与验收 | verification | 02–11 | 本机 5301 项前端 unit、1603 项 Rust unit、聚焦 browser/native 已通过；新输入 GitHub 六端待完整验收 |
 
 ## main 合并与审阅补齐（当前批次）
 
-当前任务重新进入实施与验收：合并 `origin/main` 的 `a90a0bd3`，补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口。用户明确要求同步移除本地终端 Rail Git 入口，并将窗口抓手恢复到右上角系统区（以用户最后要求为准）。新输入必须重新通过本地 unit、Windows 11 聚焦 browser/native 和 GitHub 六端验证，以下旧输入通过记录仅作历史基线，不能证明合并后完成。
+本批先合并 `origin/main` 的 `a90a0bd3`，随后合并截图增量 `307c6322`；冲突和功能整合已完成。补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口；按用户要求移除本地终端 Rail Git、Tao 悬浮球、旧顶部 Tab 预览与左上角展开入口，窗口抓手放在右上角系统区。四向 Dock/隐藏、完整沉浸、统一 Project 入口、按能力展示标题栏及 Java 工作区切换复用已实现。输入 `c769812b71ed9c49cb36a6d1a7190dc9ccd2f131` 的 [291 ID / 878 次六端回归](https://github.com/engcapa/taomni/actions/runs/37318695278) 已结束，**877 pass / 1 fail / 0 skip**；macOS N08 在正常退出/重启后宽度 232 变为 200。正在修复原生布局耐久保存；当前批次尚未 done，旧通过记录仅作历史基线。
 
 ## 上一批次实施进度（历史）
 
@@ -379,3 +379,13 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - 本机修后收尾：完整前端 `498` 为 **532 files / 5288 passed / 0 failed**；聚焦 `493` 为 61/0。类型与 catalog/开发契约检查通过。Rust 源码本批没有变动，保留完整 `479` 的 1599/0/16 ignored 结果；隔离 QA build `497` 成功。native `502` 的 N02/N06/N23 为 **3/0/0**，真实 PTY 输入、磁盘保存/撤销及 90 步空分类往返全部通过，7 张实际截图已审阅。
 - browser `499` 为 5/0/0，但截图发现长期运行 Vite 缓存了合并前版本号常量。确认该 QA 服务的 PID/仓库/端口后重启为 `504`，读取 runtime defines 确认为 0.4.32；补跑 `506` 的 B07/B17/B46/B47/B49 为 **5/0/0**。8 张新截图已实际审阅。`_local/shell-empty-current-evidence-507.json` 核对两个实际报告的 current/stable identity、case/config、receipt、native build 与完整产物 hashes；没有用 dry-run 代替执行。
 - 旧输入 `37309271341` 三端 browser 各 218/0/0，Linux native 78/0/0；Windows/macOS native 此时仍执行。即使最终自动断言全部通过，旧 B49 视觉失败仍保留，本批完成条件继续由新修复输入的六端回归证明。
+
+### 正常重启布局耐久保存与最新 main QA 合并
+
+- 输入 `c769812b` 的 [run 37318695278](https://github.com/engcapa/taomni/actions/runs/37318695278) 六份报告已收齐：browser 三端各 218/0/0，native Linux 78/0/0、Windows 72/0/0、macOS 73/1/0，共 **877 pass / 1 fail / 0 skip**。六份 selection/source/runner/case/config/receipt/native build 与全部 ZIP hashes 匹配；macOS N08 原第 27 步重启后的 stored/rendered 均为 200，原预期 232。原第 14、16、17 步退出前均为 232；不把差异解释成已经证实的某个 WebKit 内部原因，也不以一次重跑抹掉失败。
+- 60 张 browser 和 53 张去重 native 代表性画面已实际审阅，三端 B49/N23 空分类没有 Settings 搜索框残留；macOS N08 失败原图另存。三原生 AI/Git/SQL/SFTP 独立观察和 N5～N8 录屏几何/像素/时间校验满足原断言，保留慢样本及满队列未编码样本，不宣称性能改善。当前唯一自动化失败仍阻塞 done。
+- 修复增加原生 SQLite 布局来源、旧 profile 一次迁移、串行确认/比较写入、主窗口挂载前读取、Exit 关闭标签前保存等待和失败重试；清除恢复意图等待原生确认。browser 保留 localStorage；两处未知版本/损坏输入均保留，显式 Reset 才覆盖。N08 增加进程退出后的独立只读 SQLite 宽度/恢复记录观察，并等待实际 restore available 后操作，现 38 步，原精确 232 断言与 300 秒预算保持。
+- 聚焦前端 `520` 为 **5 files / 77 tests 全部通过**，完整前端 `522` 为 **534 files / 5301 pass / 0 fail**；完整 Rust `521` 为 **1603 pass / 0 fail / 16 既有 ignored**，TypeScript `523` 通过。原生 QA build `525` 成功。catalog `531` 通过。全量 `cargo fmt --check` 有 main 既有格式差异；新增模块及 lib.rs 单文件格式检查通过，未批量格式化无关模块。
+- 本机 native `529` 的独立磁盘/重启 232 检查通过，但 Restore 在 snapshot available 前点击，后续工作区等待失败，原失败保留。加 available checkpoint 后 `534` 的 N07/N08/N23 为 **3 pass / 0 fail / 0 skip**，42/38/90 步完整；`535` 的 B17/B34/B35/B42/B46 为 **5/0/0**。两份报告输入 stable、source/case/config/receipt/全产物 hashes 匹配，`shell-durable-local-evidence-537.json` 保留检查时的 current identity；16 张实际截图已审阅。`529/532` 还因测试过程中 helper 关闭句柄调整被判输入不稳定，不冒充完成证据。随后只修改 main CI 单测的 Path subclass mock，不改变产品与 native runtime；最终 runner 输入仍须由 GitHub 统一重跑。
+- runner `528` 的 42 项 unit 通过。main 合并后的 `530` 为 54 pass / 1 error，唯一错误是 Windows concrete Path 没有命中基类 is_mount mock；改用 concrete subclass mock，定向 `539` 复验。真实 Linux teardown 和卸载断言保持。
+- 再次拉取 main 至 `bc130eee`，通过 merge `5f509399` 合入可选 Linux 桌面环境与 setup/teardown 诊断。仅 workflow 的相邻步骤冲突，保留 main 的 Linux VNC/Wayland 分支及本分支 macOS display helper 退出后的显示尺寸核对。默认 Ubuntu 24.04/Xvfb 不变，本轮仍选择六个 browser/native 平台组合；产品代码没有新增 main 差异。

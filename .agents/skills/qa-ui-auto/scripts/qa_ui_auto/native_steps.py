@@ -3343,6 +3343,13 @@ def _do_native_app_process(ctx, args):
     return "observed the exact run-owned QA application process " + args["state"]
 
 
+@_verb("assert_native_layout")
+def _do_assert_native_layout(ctx, args):
+    from .native_layout_observation import observe
+    observe(ctx, args)
+    return "independent SQLite read observed committed layout preferences and restore intentions"
+
+
 @_verb("click_app_exit")
 def _do_click_app_exit(ctx, args):
     from .native_processes import click_exit

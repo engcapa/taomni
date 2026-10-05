@@ -2,6 +2,8 @@ import { create } from "zustand";
 import type { BusinessLane, NavigatorArea, PanelInstance, PersistedShellLayoutV2, TabLane, ShellRestoreSource } from "../lib/shell/types";
 import { defaultShellLayout, loadShellLayout, SHELL_LAYOUT_KEY, validateShellLayout } from "../lib/shell/shellLayoutPersistence";
 import { ownerMatches } from "../lib/shell/tabPresentation";
+import { isTauriRuntime } from "../lib/runtime";
+import { NativeLayoutPersistence } from "../lib/shell/nativeLayoutPersistence";
 
 interface ShellState {
   layout: PersistedShellLayoutV2;
@@ -28,10 +30,11 @@ interface ShellState {
   activePanelByEdge: Partial<Record<"right" | "bottom", string>>;
   restoreRefByTab: Record<string, string>;
   bindRestoreSource(tabId: string, source: ShellRestoreSource, order: number, active?: boolean): void;
-  initialize(): void;
+  initialize(): void | Promise<void>;
   updateLayout(update: (layout: PersistedShellLayoutV2) => PersistedShellLayoutV2): void;
   resetLayout(): void;
   flush(): void;
+  flushDurable(): Promise<void>;
   visitTab(id: string): void;
   pruneTabs(ids: string[]): void;
   selectLane(lane: TabLane | null): void;
@@ -52,6 +55,10 @@ interface ShellState {
 }
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let lastStoredLayout: string | null = null;
+let nativePersistence: NativeLayoutPersistence | null = null;
+let initialization: Promise<void> | undefined;
+let resetNativeRecord = false;
+let saveAttempt = 0;
 function ownsRestorePreference(refs: Record<string, string>, tabId: string, ref: string): boolean {
   return Object.entries(refs).find(([, value]) => value === ref)?.[0] === tabId;
 }
@@ -83,6 +90,34 @@ export const useShellLayoutStore = create<ShellState>((set, get) => ({
   },
   initialize: () => {
     if (get().initialized) return;
+    if (initialization) return initialization;
+    if (isTauriRuntime()) {
+      nativePersistence ??= new NativeLayoutPersistence();
+      initialization = (async () => {
+        const durable = await nativePersistence!.load();
+        const storage = window.localStorage;
+        const local = loadShellLayout(storage, window.innerWidth);
+        // Preserve corrupt/unknown input until the user explicitly resets it.
+        // Otherwise the acknowledged desktop record wins over a WebView cache
+        // that may have lost its last writes during process exit.
+        const loaded = durable !== null && local.writable
+          ? loadShellLayout({ getItem: (key) => key === SHELL_LAYOUT_KEY ? durable : storage.getItem(key),
+            setItem: (key, value) => storage.setItem(key, value), removeItem: (key) => storage.removeItem(key) }, window.innerWidth)
+          : local;
+        lastStoredLayout = storage.getItem(SHELL_LAYOUT_KEY);
+        set({ ...loaded, initialized: true });
+        get().flush();
+        await nativePersistence!.settled();
+      })().catch((error: unknown) => {
+        // Keep the app usable without overwriting a record we could not read.
+        if (!get().initialized) {
+          const local = loadShellLayout(window.localStorage, window.innerWidth);
+          lastStoredLayout = window.localStorage.getItem(SHELL_LAYOUT_KEY);
+          set({ ...local, initialized: true, writable: false, warning: "read" });
+        } else set({ warning: String(error).includes("SHELL_LAYOUT_CHANGED") ? "changed" : "write" });
+      }).finally(() => { initialization = undefined; });
+      return initialization;
+    }
     try {
       const loaded = loadShellLayout(window.localStorage, window.innerWidth);
       lastStoredLayout = window.localStorage.getItem(SHELL_LAYOUT_KEY);
@@ -98,6 +133,7 @@ export const useShellLayoutStore = create<ShellState>((set, get) => ({
   },
   flush: () => {
     clearTimeout(saveTimer);
+    const attempt = ++saveAttempt;
     if (!get().initialized || !get().writable) return;
     try {
       // Preserve a newer document's preferences (or recovery input) instead of
@@ -109,10 +145,26 @@ export const useShellLayoutStore = create<ShellState>((set, get) => ({
       const value = JSON.stringify(validateShellLayout(get().layout) ?? defaultShellLayout());
       window.localStorage.setItem(SHELL_LAYOUT_KEY, value);
       lastStoredLayout = value;
+      if (nativePersistence) {
+        const reset = resetNativeRecord; resetNativeRecord = false;
+        void nativePersistence.save(value, reset).then(() => {
+          if (attempt === saveAttempt && get().warning === "write") set({ warning: null });
+        }).catch((error: unknown) => {
+          if (attempt !== saveAttempt) return;
+          const changed = String(error).includes("SHELL_LAYOUT_CHANGED");
+          set({ warning: changed ? "changed" : "write", ...(changed ? { writable: false } : {}) });
+        });
+      } else if (get().warning === "write") set({ warning: null });
     }
     catch { set({ warning: "write" }); }
   },
-  resetLayout: () => { const old = get().layout; try { lastStoredLayout = window.localStorage.getItem(SHELL_LAYOUT_KEY); } catch { /* flush reports storage errors */ } set({ layout: { ...defaultShellLayout(), restoreSources: old.restoreSources, restoredTabs: old.restoredTabs, lastActiveRestoreRef: old.lastActiveRestoreRef }, warning: null, writable: true, initialized: true, navigatorOverlay: false }); get().flush(); },
+  flushDurable: async () => {
+    await initialization;
+    get().flush();
+    await nativePersistence?.settled();
+    if (get().writable && get().warning === "write") throw new Error("Could not save workspace layout");
+  },
+  resetLayout: () => { const old = get().layout; try { lastStoredLayout = window.localStorage.getItem(SHELL_LAYOUT_KEY); } catch { /* flush reports storage errors */ } resetNativeRecord = true; set({ layout: { ...defaultShellLayout(), restoreSources: old.restoreSources, restoredTabs: old.restoredTabs, lastActiveRestoreRef: old.lastActiveRestoreRef }, warning: null, writable: true, initialized: true, navigatorOverlay: false }); get().flush(); },
   visitTab: (id) => { set((s) => ({ laneSelection: null, ...(s.mruCycling ? {} : { mru: [id, ...s.mru.filter((item) => item !== id)] }) })); const s = get(), ref = s.restoreRefByTab[id]; if (!s.mruCycling && ref && s.layout.lastActiveRestoreRef !== ref) s.updateLayout((layout) => ({ ...layout, lastActiveRestoreRef: ref })); },
   pruneTabs: (ids) => { const live = new Set(ids), removed = Object.entries(get().restoreRefByTab).filter(([id]) => !live.has(id)).map(([, ref]) => ref); set((s) => ({ mru: s.mru.filter((id) => live.has(id)),
     restoreRefByTab: Object.fromEntries(Object.entries(s.restoreRefByTab).filter(([id]) => live.has(id))),

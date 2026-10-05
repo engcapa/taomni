@@ -463,6 +463,9 @@ const dict = {
     promptMany: "There are {count} open tabs. Exit Taomni and close them?",
     promptManyTerminals: "There are {count} open tabs, including {terminals} terminal sessions. Exit Taomni and close them?",
     cleanupFailedTitle: "SocksCap cleanup failed",
+    layoutFailedTitle: "Workspace layout could not be saved",
+    layoutFailedMessage: "Taomni stayed open so you can retry saving the workspace layout.\n\n{error}",
+    retrySave: "Retry save",
     cleanupFailedMessage:
       "Taomni stayed open because SocksCap could not safely restore the network. Retry cleanup, or cancel exit and use Recover network.\n\n{error}",
     retryCleanup: "Retry cleanup",

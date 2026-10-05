@@ -64,7 +64,7 @@ class DesktopTests(unittest.TestCase):
 
     def test_cleanup_detaches_private_document_portal_mount_before_removing_runtime(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.sys.platform', 'linux'), \
-             patch('ci_desktop.Path.is_mount', return_value=True), \
+             patch.object(type(Path(d)), 'is_mount', return_value=True), \
              patch('ci_desktop.subprocess.run') as unmount:
             desktop = Desktop(Path(d), [], 'ubuntu-26.04-wayland')
             desktop.temporary = Mock()

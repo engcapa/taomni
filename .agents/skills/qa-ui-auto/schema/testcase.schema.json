@@ -560,6 +560,16 @@
             "timeout_sec": { "type": "number", "minimum": 0.1, "maximum": 60 }
           }
         },
+        "assert_native_layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["navigator_width", "workspace_count"],
+          "properties": {
+            "navigator_width": { "type": "number", "minimum": 200, "maximum": 400 },
+            "workspace_count": { "type": "integer", "minimum": 0, "maximum": 200 }
+          },
+          "description": "Native only. Independently opens the exact run-owned QA SQLite database read-only and verifies its committed layout, retaining success/failure observations. Never reads personal profiles or product IPC state."
+        },
         "assert_visible": {
           "$ref": "#/$defs/selector"
         },

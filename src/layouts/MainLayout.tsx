@@ -1665,8 +1665,18 @@ export function MainLayout() {
         if (!(await prepareSftpWindowsBeforeExit())) return;
         try { await returnNotesWindowBeforeExit(); await returnGitWindowsBeforeExit(); await returnSftpWindowsBeforeExit(); await returnSessionWindowsBeforeExit(); }
         catch (error) { setStatusMessage(String(error)); return; }
-        useShellLayoutStore.getState().flush();
         useShellLayoutStore.setState({ exiting: true });
+        for (;;) {
+          try { await useShellLayoutStore.getState().flushDurable(); break; }
+          catch (error) {
+            const retry = await confirmAppExit({
+              title: tr("exit.layoutFailedTitle"),
+              message: tr("exit.layoutFailedMessage", { error: String(error) }),
+              confirmLabel: tr("exit.retrySave"), cancelLabel: tr("exit.cancelExit"),
+            });
+            if (!retry) return;
+          }
+        }
         const closeResult = await requestTabClose(useAppStore.getState().tabs.filter((tab) => tab.closable).map((tab) => tab.id), true);
         if (closeResult.status !== "closed") return;
         for (;;) {

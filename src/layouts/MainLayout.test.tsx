@@ -775,6 +775,42 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
   });
 
+  it("waits for layout durability before closing tabs and exiting the process", async () => {
+    let saved!: () => void;
+    const acknowledgment = new Promise<void>((resolve) => { saved = resolve; });
+    const original = useShellLayoutStore.getState().flushDurable;
+    const flush = vi.fn(() => acknowledgment);
+    useShellLayoutStore.setState({ flushDurable: flush });
+    try {
+      render(<MainLayout />);
+      fireEvent.click(screen.getByTestId("window-close"));
+      fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+      await waitFor(() => expect(flush).toHaveBeenCalledTimes(1));
+      expect(exitApp).not.toHaveBeenCalled();
+      expect(useAppStore.getState().tabs.some((tab) => tab.id === "ssh-tab")).toBe(true);
+      await act(async () => { saved(); await acknowledgment; });
+      await waitFor(() => expect(exitApp).toHaveBeenCalledTimes(1));
+    } finally { saved(); useShellLayoutStore.setState({ flushDurable: original }); }
+  });
+
+  it("retains tabs on a layout save failure and retries after explicit confirmation", async () => {
+    const original = useShellLayoutStore.getState().flushDurable;
+    const flush = vi.fn().mockRejectedValueOnce(new Error("Disk full")).mockResolvedValue(undefined);
+    useShellLayoutStore.setState({ flushDurable: flush });
+    try {
+      render(<MainLayout />);
+      fireEvent.click(screen.getByTestId("window-close"));
+      fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+      expect(await screen.findByText("Workspace layout could not be saved")).toBeInTheDocument();
+      expect(screen.getByTestId("confirm-dialog-message")).toHaveTextContent("Disk full");
+      expect(exitApp).not.toHaveBeenCalled();
+      expect(useAppStore.getState().tabs.some((tab) => tab.id === "ssh-tab")).toBe(true);
+      fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+      await waitFor(() => expect(exitApp).toHaveBeenCalledTimes(1));
+      expect(flush).toHaveBeenCalledTimes(2);
+    } finally { useShellLayoutStore.setState({ flushDurable: original }); }
+  });
+
   it("opens a local terminal from Ctrl+Shift+T outside the welcome tab", async () => {
     window.localStorage.setItem("taomni.terminalDefaultProfile.v1", JSON.stringify({
       ...DEFAULT_TERMINAL_PROFILE,

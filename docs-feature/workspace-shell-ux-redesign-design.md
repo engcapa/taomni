@@ -495,13 +495,15 @@ restoreSources 只在业务打开/恢复成功、workspace roots 成功更新时
 
 保存时机：resize/drag 提交立即；其他明确偏好变更合并到 200 ms debounce，pagehide best-effort flush。写失败保持内存行为，显示一次非阻塞“布局偏好未能保存”，不得清会话数据。读入做类型、enum、finite 数值和范围检查；非法字段回默认，未知 version 整份不覆盖，使用内存默认并允许显式重置。
 
+桌面耐久保存：`taomni.db` 的 `shell_layout` 单行记录作为原生布局来源，browser 继续使用上述 localStorage key。桌面首次没有该记录时才从现有 localStorage/legacy 偏好迁移；之后主窗口挂载前读取已确认记录并同步 WebView 缓存，避免正常退出时 WebView 未落盘的旧缓存覆盖新布局。写入经顺序队列发送 `save_shell_layout(layout, expectedLayout)`，SQLite 事务比较最后确认值并提交后才响应；旧文档不得覆盖新记录。未识别版本/损坏 raw 在任一存储中都保留并禁写，只有明确 Reset 才重新读取当前原生记录并替换。I/O 失败保持内存和标签、显示原保存警告；正常 Exit 在关闭标签前等待 `flushDurable()`，失败提供重试/取消退出。清除恢复意图也等待原生确认后才报告完成。不新增密码或业务正文存储。
+
 ### 8.4 首次迁移、重启与回退
 
 首次无有效 v2：读取 legacy taomni.sidebarCollapsed 和 taomni.sidebarCollapsedByGroup.v1；Connect 取 terminal，Build 取 code-workspace，Home/Communicate/Utility 取 other。旧 group 缺失使用现有 defaults。旧宽度读取 taomni.resizable-panels.v4.main-layout 的 sidebar 百分比，按首次有效 body 宽计算并 clamp。mergeToolWindowRail、stripe 名称/宽度保留原 key。
 
 Tao 从 taomni.chatDrawer.layout.v1 的 position→edge、width→width、height→height、pinned→pinned、floatingOpacity→opacity 显式转换，透明度继续 clamp 到 0.65～1；不能读取不存在的旧 edge/pin/opacity 字段。Hub lastTab 延续旧 key。迁移校验完成后单次写 v2，写入失败下次可重试；旧 key 不删除。之后 Shell 是布局单写者，旧 setter 只委托，不双向 effect 循环写入。
 
-启动先显示 Home，再异步加载偏好；等待实际工作集恢复成功后才解析 lastActiveRestoreRef 和 owner panels。恢复失败不会制造幽灵 tab 或自动打开失效窗口；展示“可恢复面板”。上次 detached 只恢复位置意图及“重新弹出”入口，用户显式恢复工作集、认证成功后可重建窗口，旧 OS handle 不可能跨进程复用。连接恢复成功、布局恢复成功分别计数。
+启动先进入 Home；桌面主窗口在挂载前完成一次原生布局读取，避免迟到读取覆盖用户刚操作的布局，读取错误降级为可用界面和保留原记录的警告。工作集仍按用户显式操作异步恢复，成功后才解析 lastActiveRestoreRef 和 owner panels。恢复失败不会制造幽灵 tab 或自动打开失效窗口；展示“可恢复面板”。上次 detached 只恢复位置意图及“重新弹出”入口，用户显式恢复工作集、认证成功后可重建窗口，旧 OS handle 不可能跨进程复用。连接恢复成功、布局恢复成功分别计数。
 
 useShellResumeComposer 读取原RunSnapshotRecord和合法workspace restoreSources，冻结本次候选集合后顺序恢复；原会话先按现有顺序执行，workspace按保存order接续。向原hook传递/观察本次operation的开始、取消、outcome，逐entry合并，不能把两个相互独立的“恢复”按钮同时启动。workspace opener接收明确workspaceInstanceId并返回ready/partial/failed/cancelled及新tabId；只在项目模型就绪后ready。找到同instance存活tab则定位，同路径不同instance须独立打开。clear record取消时两份均不动，确认后分别清原快照和Shell恢复意图，任何存储失败明确报告未清部分；不声称跨两个存储原子提交。正在传输的进程内任务不承诺跨应用退出/重启继续；恢复只恢复可重建工作面和布局。
 
@@ -693,7 +695,7 @@ TASK-11 的 fixture/用例设计可先做，具体生产入口 case 必须跟随
 
 设计交接阶段只检查了文档链接、ID、映射、路径、命令参数与源码事实，该阶段未执行产品验证。随后用户已授权领取全部任务、实现、单测、推送及 GitHub 三平台循环验证。当前代码、用例、历史失败与最新结果统一登记在 [实施任务](./workspace-shell-ux-redesign-tasks.md)，具体规格与自动化/人工边界见 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。本节的设计阶段记录不作为实现阶段的通过证据。
 
-最终固定产品/runner/用例输入 `98ddf0182c74e53dbeb8b3c196e0ff02169020c2` 的 [完整六端验收 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束：250 ID / 761 次实际执行为 **761 pass / 0 fail / 0 skip**，33,090 步全部完整。browser 三端各 190/0/0；native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。六份 source/runner/case/config/receipt/native build/原始 ZIP hashes 与严格 gate 均核对通过；72 张当前 Shell 代表性截图已实际审阅，独立 AI/Git/SQL/SFTP/进程观察满足原断言。TASK-01～12 按用户确认的本轮条件全部 done，详见 [最终验收](./workspace-shell-ux-redesign-tasks.md#final-acceptance)。本地前端 unit 526 文件 / 5244 项和 TypeScript 通过；前序 Rust full unit 为 1590 pass / 16 既有 ignored，后续诊断相关 Rust unit 52/52、日志观察 unit 5/5 通过。OS picker/IME/DPI/跨屏/读屏及 AC-20 匹配性能基线在用例 §7 继续单列后续验收。
+上一批历史输入 `98ddf0182c74e53dbeb8b3c196e0ff02169020c2` 的 [完整六端验收 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束：250 ID / 761 次实际执行为 **761 pass / 0 fail / 0 skip**，33,090 步全部完整。browser 三端各 190/0/0；native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。六份 source/runner/case/config/receipt/native build/原始 ZIP hashes 与严格 gate 均核对通过；72 张该输入的 Shell 代表性截图已实际审阅，独立 AI/Git/SQL/SFTP/进程观察满足原断言。该批 TASK-01～12 已 done；随后 main 合并与新需求重新打开任务，当前状态见 [实施任务](./workspace-shell-ux-redesign-tasks.md)。历史本地前端 unit 526 文件 / 5244 项和 TypeScript 通过；当时 Rust full unit 为 1590 pass / 16 既有 ignored，后续诊断相关 Rust unit 52/52、日志观察 unit 5/5 通过。此旧结果不能证明 main 合并后的当前输入；OS picker/IME/DPI/跨屏/读屏及 AC-20 匹配性能基线在用例 §7 继续单列后续验收。
 
 历史完整 [run 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943) 的 759/2/0 保留；其 macOS RDP 回环与 GIF 时间轴失败由后续原始日志和采集诊断分析。最终三端 RDP 在最新连接生命周期释放后完成原独立协议探针，录屏原像素/nonce/顺序/时间轴/生命周期断言全通过。旧 GIF 缺帧与 N08 的 248px 失败未在最终输入复现，根因仍未确定；未把后续通过追记为已证明产品根因修复。B07/B17 的修正和最终完整通过也保留相应历史证据。
 
@@ -724,7 +726,7 @@ TASK-11 的 fixture/用例设计可先做，具体生产入口 case 必须跟随
 
 ### 2026-10-05 合并后补充设计与验收契约
 
-本节覆盖旧稿中与用户后续要求冲突的布局。main 已通过 `b690bcda` 合并（远端输入 `a90a0bd3`），保留截图、MFA、窗口抓手与统一 Rail resize 的更新；抓手最终位置为右上角。TASK-01～12 已重新打开，新输入尚未取得六端证据，旧 done 只属于历史输入。
+本节覆盖旧稿中与用户后续要求冲突的布局。main 已通过 `b690bcda` 合并远端 `a90a0bd3`，再通过 `8a05db84` 合并截图增量 `307c6322`；冲突已解决，保留截图、MFA、窗口抓手、统一 Rail resize、Linux GTK 显示器枚举和原生保存修复，并整合 macOS 区域捕获与窄视口水印。随后通过 `5f509399` 合入 main `bc130eee` 的可选 Linux 测试环境，保留默认 Ubuntu 24.04/Xvfb 和 macOS 显示尺寸复核。抓手最终位置为右上角。输入 `c769812b` 的六端结果为 877 pass / 1 fail / 0 skip，macOS N08 正常重启后的布局丢失正在按 §8.3 补充耐久保存；当前批次尚未 done，最新证据见任务记录。
 
 **统一标题栏审查**：按当前可见内容判断，空分类不得借用后台保留标签的上下文。所有入口使用同一真实操作；收起或隐藏不会销毁 PTY、编辑器或传输任务。
 

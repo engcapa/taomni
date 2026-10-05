@@ -36,6 +36,7 @@ mod sdk;
 mod serial;
 mod servers;
 pub mod session;
+mod shell_layout;
 pub mod sockscap;
 mod state;
 mod tab;
@@ -215,6 +216,7 @@ pub fn run() {
             let db_path = app_data.join("taomni.db");
             let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
             session::db::init_db(&conn).expect("failed to init database");
+            shell_layout::init_tables(&conn).expect("failed to init shell layout storage");
             terminal::local_directories::init_tables(&conn)
                 .expect("failed to init local directory tables");
             servers::db::init_server_tables(&conn).expect("init server tables");
@@ -1208,6 +1210,8 @@ pub fn run() {
             backup::backup_delete_item,
             backup::backup_get_default_dir,
             exit_app,
+            shell_layout::load_shell_layout,
+            shell_layout::save_shell_layout,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

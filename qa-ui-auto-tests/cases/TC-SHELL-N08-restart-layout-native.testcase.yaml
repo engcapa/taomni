@@ -1,11 +1,15 @@
 id: TC-SHELL-N08
 title: Real QA process restart keeps layout and explicit workspace restore
-description: Isolated packaged Tauri boundary. A clean workspace and its child panels exit after one app confirmation;
-  no redundant bulk-close prompt may stop the process. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n08 records
-  the complete scenario and any remaining manual boundary. Exit through the real platform menu, confirm close, independently
-  observe the owned PID exit, then reopen the same profile. This is a normal close/reopen contract; corrupt-profile
-  recovery is separately unverified. After startup, check the stored and rendered Navigator width together before
-  the original exact width assertion; this distinguishes storage loss from unfinished UI restoration.
+description: Isolated packaged Tauri boundary. A clean workspace and its child panels exit after one app confirmation; no
+  redundant bulk-close prompt may stop the process. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n08 records the
+  complete scenario and any remaining manual boundary. Exit through the real platform menu, confirm close, independently observe
+  the owned PID exit, then reopen the same profile. This is a normal close/reopen contract; corrupt-profile recovery is separately
+  unverified. After startup, check the stored and rendered Navigator width together before the original exact width assertion;
+  this distinguishes storage loss from unfinished UI restoration. Desktop layout writes now require an acknowledged SQLite
+  commit before Exit closes any tabs. Restart restores that durable record over a stale WebView cache; browser localStorage
+  and existing-profile migration retain their separate coverage. An independent host SQLite read after the PID exits verifies
+  committed width 232 and one workspace restore intention before starting the new process. Wait for the restored working-set
+  action to reach available before clicking it; Home visibility alone does not mean the asynchronous snapshot read is ready.
 covers:
 - F1.6
 - F-SHELL-1
@@ -30,8 +34,8 @@ steps:
 - seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell", "name": "shell", "path": "${fixture.shell_root}",
-      "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind":
-      "root", "rootId": "shell", "path": "README.md"}}]'
+      "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind": "root", "rootId":
+      "shell", "path": "README.md"}}]'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
@@ -67,6 +71,9 @@ steps:
 - native_app_process:
     state: exited
     timeout_sec: 30
+- assert_native_layout:
+    navigator_width: 232
+    workspace_count: 1
 - restart_native_app: null
 - wait_for: '[data-testid="welcome-panel"]'
 - set_viewport:
@@ -74,9 +81,9 @@ steps:
     height: 800
 - wait_for: '[data-testid="shell-root"][data-mode="wide"]'
 - eval_readonly:
-    expression: >-
-      JSON.stringify({storedWidth: JSON.parse(localStorage.getItem('taomni.shellLayout.v2') ?? 'null')?.navigator?.width ?? null,
-      renderedWidth: document.querySelector('[data-testid\x3d"main-sidebar-resize-handle"]')?.getAttribute('aria-valuenow') ?? null})
+    expression: 'JSON.stringify({storedWidth: JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'') ?? ''null'')?.navigator?.width
+      ?? null, renderedWidth: document.querySelector(''[data-testid\x3d"main-sidebar-resize-handle"]'')?.getAttribute(''aria-valuenow'')
+      ?? null})'
     contains: '{"storedWidth":232,"renderedWidth":"232"}'
     expect_truthy: true
     timeout_sec: 5
@@ -84,6 +91,7 @@ steps:
     selector: '[data-testid="main-sidebar-resize-handle"]'
     name: aria-valuenow
     equals: '232'
+- wait_for: '[data-testid="welcome-restore-status"][data-state="available"]'
 - click: '[data-testid="welcome-restore-last-session"]'
 - wait_for:
     selector: '[data-testid="code-workspace-tab"]'
@@ -121,8 +129,7 @@ verification:
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
-        60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec": 60}}'
     - step: 14
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]", "name": "aria-valuenow",
         "equals": "232"}}'
@@ -139,8 +146,8 @@ verification:
     - 16
     - 17
   - id: R-EXIT
-    requirement: A real UI Exit confirms the clean workspace close and ends the previously observed owned QA process
-      before restart.
+    requirement: A real UI Exit confirms the clean workspace close and ends the previously observed owned QA process before
+      restart.
     actions:
     - 19
     - 21
@@ -153,44 +160,60 @@ verification:
       expectation: '{"native_app_process": {"state": "exited", "timeout_sec": 30}}'
     results:
     - 22
-  - id: R2
-    requirement: A new QA process using the same isolated profile starts at Home with saved preferences and restores
-      exactly one workspace.
+  - id: R-DURABLE
+    requirement: After the exact QA process exits, an independent read-only SQLite connection observes committed width 232
+      and exactly one workspace restore intention; renderer/IPC state is not the oracle.
     actions:
-    - 23
-    - 25
-    - 29
-    - 31
-    - 34
+    - 19
+    - 21
     checkpoints:
-    - step: 24
+    - step: 23
+      expectation: '{"assert_native_layout": {"navigator_width": 232, "workspace_count": 1}}'
+    results:
+    - 23
+  - id: R2
+    requirement: A new QA process using the same isolated profile starts at Home with saved preferences and restores exactly
+      one workspace.
+    actions:
+    - 24
+    - 26
+    - 31
+    - 33
+    - 36
+    checkpoints:
+    - step: 25
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"shell-root\"][data-mode=\"wide\"]"}'
     - step: 27
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify({storedWidth: JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'') ?? ''null'')?.navigator?.width ?? null, renderedWidth: document.querySelector(''[data-testid\\x3d\"main-sidebar-resize-handle\"]'')?.getAttribute(''aria-valuenow'') ?? null})", "contains": "{\"storedWidth\":232,\"renderedWidth\":\"232\"}", "expect_truthy": true, "timeout_sec": 5}}'
+      expectation: '{"wait_for": "[data-testid=\"shell-root\"][data-mode=\"wide\"]"}'
     - step: 28
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify({storedWidth: JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')
+        ?? ''null'')?.navigator?.width ?? null, renderedWidth: document.querySelector(''[data-testid\\x3d\"main-sidebar-resize-handle\"]'')?.getAttribute(''aria-valuenow'')
+        ?? null})", "contains": "{\"storedWidth\":232,\"renderedWidth\":\"232\"}", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 29
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"main-sidebar-resize-handle\"]", "name": "aria-valuenow",
         "equals": "232"}}'
     - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]"}'
     - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state",
-        "equals": "succeeded"}}'
-    - step: 33
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 1}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]", "timeout_sec": 60}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state", "equals":
+        "succeeded"}}'
     - step: 35
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]",
-        "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 1}}'
+    - step: 37
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"code-workspace\"]", "equal":
+        1}}'
     results:
-    - 24
-    - 26
+    - 25
     - 27
     - 28
+    - 29
     - 30
     - 32
-    - 33
+    - 34
     - 35
+    - 37
   visual:
   - check: Read final screenshot for clipped controls and retained content
     method: manual
