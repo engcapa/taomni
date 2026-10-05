@@ -168,9 +168,38 @@ pub fn save_png(image: &RgbaImage, prefix: &str) -> anyhow::Result<(PathBuf, u32
 // ---------------------------------------------------------------------------
 
 pub fn list_displays(app: &AppHandle) -> anyhow::Result<Vec<DisplayInfo>> {
+    #[cfg(target_os = "linux")]
+    let mut displays = {
+        // Tauri's AppHandle monitor APIs access GDK directly on the caller's
+        // thread. In particular, reading the work area performs Xlib requests.
+        // Snapshot them on GTK's main thread before capture/recording workers
+        // use the values, otherwise GTK's X11 reply queue can be corrupted.
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let main_app = app.clone();
+        app.run_on_main_thread(move || {
+            let _ = tx.send(read_displays(&main_app));
+        })
+        .context("dispatch monitor enumeration to GTK")?;
+        rx.recv_timeout(Duration::from_secs(5))
+            .context("wait for GTK monitor enumeration")??
+    };
+    #[cfg(not(target_os = "linux"))]
+    let mut displays = read_displays(app)?;
+
+    // Starting a capture backend can block; keep the fallback off GTK's thread.
+    if displays.is_empty() {
+        displays = fallback_displays(app)?;
+    }
+    if !displays.iter().any(|d| d.primary) {
+        displays[0].primary = true;
+    }
+    Ok(displays)
+}
+
+fn read_displays(app: &AppHandle) -> anyhow::Result<Vec<DisplayInfo>> {
     let monitors = app.available_monitors().context("enumerate monitors")?;
     let primary = app.primary_monitor().ok().flatten().map(|m| *m.position());
-    let mut displays: Vec<DisplayInfo> = monitors
+    Ok(monitors
         .iter()
         .map(|m| {
             let pos = *m.position();
@@ -187,14 +216,7 @@ pub fn list_displays(app: &AppHandle) -> anyhow::Result<Vec<DisplayInfo>> {
             }
         })
         .filter(|d| d.width > 0 && d.height > 0)
-        .collect();
-    if displays.is_empty() {
-        displays = fallback_displays(app)?;
-    }
-    if !displays.iter().any(|d| d.primary) {
-        displays[0].primary = true;
-    }
-    Ok(displays)
+        .collect())
 }
 
 /// Some Linux sessions report no monitors through GDK; fall back to the
