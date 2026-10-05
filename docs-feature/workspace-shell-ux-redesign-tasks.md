@@ -23,7 +23,7 @@
 
 ## main 合并与审阅补齐（当前批次）
 
-本批先合并 `origin/main` 的 `a90a0bd3`，随后合并截图增量 `307c6322`；冲突和功能整合已完成。补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口；按用户要求移除本地终端 Rail Git、Tao 悬浮球、旧顶部 Tab 预览与左上角展开入口，窗口抓手放在右上角系统区。四向 Dock/隐藏、完整沉浸、统一 Project 入口、按能力展示标题栏及 Java 工作区切换复用已实现。输入 `c769812b71ed9c49cb36a6d1a7190dc9ccd2f131` 的 [291 ID / 878 次六端回归](https://github.com/engcapa/taomni/actions/runs/37318695278) 已结束，**877 pass / 1 fail / 0 skip**；macOS N08 在正常退出/重启后宽度 232 变为 200。正在修复原生布局耐久保存；当前批次尚未 done，旧通过记录仅作历史基线。
+本批已合入 `origin/main` 的 `a90a0bd3`、截图增量 `307c6322` 和 QA 桌面增量 `bc130eee`；冲突和功能整合已完成。补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口；按用户要求移除本地终端 Rail Git、Tao 悬浮球、旧顶部 Tab 预览与左上角展开入口，窗口抓手放在右上角系统区。四向 Dock/隐藏、完整沉浸、统一 Project 入口、按能力展示标题栏及 Java 工作区切换复用已实现。历史输入 `c769812b` 的 [六端回归 37318695278](https://github.com/engcapa/taomni/actions/runs/37318695278) 为 **877 pass / 1 fail / 0 skip**，macOS N08 重启宽度 232→200 的原失败保留。SQLite 耐久保存修复的单测与本机 N08 已通过；统一输入 `8bc412669261d6f25d38b4a27f6e82c6e89d553e` 的 [291 ID / 878 次完整六端回归 37342130547](https://github.com/engcapa/taomni/actions/runs/37342130547) 已启动，当前批次继续 verification，旧结果仅作历史基线。
 
 ## 上一批次实施进度（历史）
 
@@ -390,3 +390,8 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - runner `528` 的 42 项 unit 通过。main 合并后的 `530` 为 54 pass / 1 error，唯一错误是 Windows concrete Path 没有命中基类 is_mount mock；改用 concrete subclass mock。定向 `539` 为 9 pass / 1 error：未模拟架构查询，Windows 的 `ver` 消耗了本应供 Linux XTEST 探针使用的模拟输出；补齐架构模拟后 `541` 的全部 10 项通过。真实 Linux XTEST 检查、teardown 和卸载断言保持，原失败日志保留；本批只调整 unit 的环境模拟，不改变用户行为，原 N08 重启及原生 workflow 继续保护真实边界。
 - 再次拉取 main 至 `bc130eee`，通过 merge `5f509399` 合入可选 Linux 桌面环境与 setup/teardown 诊断。仅 workflow 的相邻步骤冲突，保留 main 的 Linux VNC/Wayland 分支及本分支 macOS display helper 退出后的显示尺寸核对。默认 Ubuntu 24.04/Xvfb 不变，本轮仍选择六个 browser/native 平台组合；产品代码没有新增 main 差异。
 - 最终 catalog audit `542`、development contract `543` 通过，精确 selection `544` 为 **291 ID / 878 次**：browser 三端各 218，native Linux 78 / Windows 72 / macOS 74；gaps/unreviewed 均为空。TASK-01～12 继续 verification，待统一新输入的完整六端结果与实际证据。
+- 统一输入 `8bc41266` 的 [run 37342130547](https://github.com/engcapa/taomni/actions/runs/37342130547) 三端 browser 已收齐，各 **218 pass / 0 fail / 0 skip**，每端 9,393 步，共 654 次执行 / 28,179 步完整；source/runner/case/config/receipt 和全部原始 ZIP hashes 匹配。60 张当前代表性画面已实际审阅，B47/B49/SHOT-017 原尺寸另行查看；空分类无 Settings 残留，沉浸内容和窄视口控件正常。原件与 `evidence-review.json`、`step-review.json`、`shell-visual-review-37342130547/reviewed-*.json` 保留；三个 native 端仍在运行，不用 browser 结果替代 native 验收。
+- 随后该运行六份报告全部收齐：native Linux **76/2/0**、Windows **71/1/0**、macOS **72/2/0**，六端合计 **873 pass / 5 fail / 0 skip**。六份身份、stable input、selection、receipt、config、native build 及全部原始 ZIP hashes 匹配。N08 在三 native 端均完成 38 步；独立 SQLite 观察均为宽度 232 / 1 个 workspace，真实进程退出与重启记录通过，见 `durable-oracle-review.json`。这些通过不抵消其余失败，全部 TASK 仍为 verification。
+- 三端同一 IDE-027 原第 22 步树宽 247，源于旧用例用 localStorage 缓存覆盖 native SQLite 来源；适配为公开分隔条 Home 后五次 Shift+ArrowRight，精确断言 360，并在最终 reload 后再次断言 360。保留树宽 300～500、全部 stripe ownership / Navigator 操作结果及 300 秒预算，1-based verification 同批更新；待实际复验。
+- Linux N6 的 29 帧录屏只有 decoded frame 19 的空间像素失败（8 个 tile），其 id 64 / nonce 45686 / 顺序 / 时间轴通过；失败原图可见移动方块与对应完整原图的位置差异。macOS N12 未达到至少四帧及长于 native preview 的真实源位移要求。根因尚未确证，新增有界 pre-encoder 原始像素保留和 scroll status/sourceTop 采样诊断，保留原 oracle、150 次轮询、20 秒脚本期限及用例预算；诊断不筛除采集帧或改变编码输入。原失败与差分图完整保留，下一轮先做远程精准复验，再执行统一六端验收。
+- 诊断与用例适配的本机 `571` 截图 Rust 单测为 **61 pass / 0 fail**；`572` catalog gate、`573` 三份 YAML/schema/reviewed verification 和 `574` 三端 6 ID / 18 次 native 精确选择通过。再次 fetch main，远端仍为已合入的 `bc130eee`。Linux 当前 14 张 native 代表图已实际审阅，终端、SFTP、Notes、Git、AI 与空分类未见新布局残留；这些图不替代修复输入的最终画面。

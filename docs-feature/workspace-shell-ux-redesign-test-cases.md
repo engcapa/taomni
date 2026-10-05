@@ -1253,15 +1253,15 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 
 | 产物 / 范围 | 当前结果 | 证据与边界 |
 |---|---|---|
-| Browser 详细规格与补充 | 52 条 Shell YAML（B01～B52）及保留回归已交付；当前 run 37318695278 三端各 218/0/0、各 9,393 步完整，含 main 合并后的入口适配与空分类修复 | reviewed contract、原始步骤、receipt 与当前输入一致；历史失败保留 |
-| Native 详细规格与补充 | 18 条 Shell YAML 与 N01/N13/N14 的既有用例复用已交付；run 37318695278 为 Linux 78/0/0、Windows 72/0/0、macOS 73/1/0 | macOS N08 的正常退出/重启后宽度 232→200 仍阻塞验收；修后必须以新输入重跑，不能用旧通过覆盖失败 |
-| fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
+| Browser 详细规格与补充 | 52 条 Shell YAML（B01～B52）及保留回归已交付；当前 run 37342130547 三端各 218/0/0、各 9,393 步完整 | 新输入 source/runner/case/config/receipt 与原始 ZIP hashes 匹配；654 次执行 / 28,179 步通过，不能替代 native 结果 |
+| Native 详细规格与补充 | 18 条 Shell YAML 与 N01/N13/N14 的既有用例复用已交付；run 37342130547 为 Linux 76/2/0、Windows 71/1/0、macOS 72/2/0 | N08 三端的 38 步、独立 SQLite 232 / 1 workspace、进程退出与恢复均通过；旧宽度 setup、Linux N6 和 macOS N12 仍须修复复验 |
+| fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板及 SQLite 独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | catalog 542、development contract 543 通过，gaps/unreviewed 为空；静态与 runner 单测不能替代 GitHub case 实际运行 |
 | 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
-| 视觉与可访问性 | 输入 c769812b 的 60 张 browser、53 张去重 native 代表性截图已实际审阅；B49/N23 空分类无 Settings 搜索框残留，窄视口水印控件可见；N08 失败原图保留 | `qa-ui-auto-report/_local/shell-visual-*-37318695278/reviewed-*.json` 与 native-details；读屏、OS DPI/跨屏、系统控件和像素基线仍未由这些画面证明 |
+| 视觉与可访问性 | 新输入三端 browser 的 60 张代表性画面已实际审阅，空分类无 Settings 残留；本机修后 16 张、native 失败原图与 Linux N6 失败帧差分已检查；其余当前 native 代表性画面待评审 | `shell-visual-review-37342130547/reviewed-*.json` 与本机/历史平台记录；读屏、OS DPI/跨屏、系统控件和像素基线仍未由这些画面证明 |
 | 性能 | 指标、负载、样本和比较方法已定；没有实测结论 | 原始baseline/candidate、噪声、p50/p95与资源，不宣称理论提速 |
-| 产品构建/协议服务 | 输入 c769812b 的 selection 为 291 ID / 878 次，实际 877 pass / 1 fail / 0 skip；六份 source/runner/case/receipt/config/native build 与 ZIP hashes 匹配 | 原始报告、独立 AI/Git/SQL/SFTP/进程观察、模块登记见实施任务；工作流绿色不能代替验收 |
+| 产品构建/协议服务 | 输入 8bc41266 的 selection 为 291 ID / 878 次，实际 873 pass / 5 fail / 0 skip；本机前端 5301 项、Rust 1603 项 unit 通过，native QA build 525 成功 | 六份报告身份、稳定输入、receipt、配置、native build 与全部 ZIP hashes 匹配；SQLite/进程独立观察通过，其余独立业务观察与当前画面待评审；工作流绿色不能代替验收 |
 
-责任任务 TASK-01～12 当前为 verification；TASK-11 已交付 YAML 与目录维护，TASK-12 正在核对同一输入的六端结果。[当前 run 37318695278](https://github.com/engcapa/taomni/actions/runs/37318695278) 为 291 ID / 878 次；详细证据与每端步骤数见 [实施任务](./workspace-shell-ux-redesign-tasks.md)。上一批 98ddf018 的 run 37247775178 为 250 ID / 761 次全部通过，仅作历史基线。下表保留每项实际自动化与未验证边界，不把整条设计规格的每个分支都视为已覆盖。
+责任任务 TASK-01～12 当前为 verification；TASK-11 已交付 YAML 与目录维护，TASK-12 正在核对同一输入的六端结果。[当前 run 37342130547](https://github.com/engcapa/taomni/actions/runs/37342130547) 绑定 8bc41266，为 291 ID / 878 次；详细证据与每端步骤数见 [实施任务](./workspace-shell-ux-redesign-tasks.md)。历史 c769812b 的 877/1/0 和上一批 98ddf018 的 761/0/0 均保留，不能替代新输入。下表保留每项实际自动化与未验证边界，不把整条设计规格的每个分支都视为已覆盖。
 
 用户于 2026-10-05 明确确认：真实 OS 文件对话框、Windows/macOS 真 IME、DPI/跨屏/读屏及匹配性能基线单列后续验收，本轮以实现完成和六端自动化全部通过为 done 条件。下表的未验证边界仍保留，既不转换为自动化 pass，也不继续阻塞已满足本轮条件的开发任务。
 

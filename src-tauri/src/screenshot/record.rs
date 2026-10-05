@@ -93,10 +93,27 @@ struct TimedFrame {
 struct CaptureTrace {
     samples: Vec<serde_json::Value>,
     truncated: bool,
+    raw_frames: Vec<(u64, RgbaImage)>,
+    raw_bytes: usize,
+    raw_truncated: bool,
 }
 
 #[cfg(debug_assertions)]
 impl CaptureTrace {
+    // Keep pre-encoder pixels in memory during sampling, then save them after
+    // the loop. Diagnostics must not insert PNG encoding into the hot path.
+    fn retain_raw(&mut self, image: &RgbaImage, at_ms: u64) -> Option<usize> {
+        let bytes = image.as_raw().len();
+        if self.raw_frames.len() >= 64 || self.raw_bytes.saturating_add(bytes) > 64 * 1024 * 1024 {
+            self.raw_truncated = true;
+            return None;
+        }
+        let index = self.raw_frames.len();
+        self.raw_frames.push((at_ms, image.clone()));
+        self.raw_bytes += bytes;
+        Some(index)
+    }
+
     fn push(&mut self, sample: serde_json::Value) {
         if self.samples.len() < 1800 {
             self.samples.push(sample);
@@ -109,8 +126,21 @@ impl CaptureTrace {
 #[cfg(debug_assertions)]
 impl Drop for CaptureTrace {
     fn drop(&mut self) {
+        let raw_frames: Vec<_> = self
+            .raw_frames
+            .iter()
+            .enumerate()
+            .map(|(index, (at_ms, image))| {
+                serde_json::json!({
+                    "index": index,
+                    "atMs": at_ms,
+                    "artifact": super::qa::keep_image(image, &format!("record-captured-{index}.png")),
+                })
+            })
+            .collect();
         match super::qa::keep_json(
-            &serde_json::json!({"samples": self.samples, "truncated": self.truncated}),
+            &serde_json::json!({"samples": self.samples, "truncated": self.truncated,
+                "rawFrames": raw_frames, "rawFramesTruncated": self.raw_truncated}),
             "record-capture-timeline.json",
         ) {
             Ok(path) => log::info!("screenshot recording capture diagnostics: {path}"),
@@ -476,13 +506,14 @@ fn capture_loop(
                 };
                 #[cfg(debug_assertions)]
                 {
-                    if trace.is_some() {
+                    if let Some(trace) = &mut trace {
                         captured_sample = Some(serde_json::json!({
                             "atMs": at_ms,
                             "frameCode": super::qa_oracle::decode_code(
                                 &image, (region.2 as f64 / scale, region.3 as f64 / scale), 12, 64.0,
                             ),
                             "pixels": [image.width(), image.height()],
+                            "rawFrame": trace.retain_raw(&image, at_ms),
                         }));
                     }
                 }

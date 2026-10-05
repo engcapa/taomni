@@ -1,5 +1,6 @@
 id: TC-SHOT-N12
 title: Native current window, scroll stop and cancel, visible range and exclusion
+description: Retain bounded production scroll status and actual source displacement samples on success or failure without changing the long-preview requirement or polling budget.
 covers:
 - F27.1
 tags:

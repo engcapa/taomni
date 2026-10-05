@@ -76,7 +76,7 @@ fn keep_artifact(src: &std::path::Path, name: &str) -> Option<String> {
     Some(dest.to_string_lossy().into_owned())
 }
 
-fn keep_image(image: &RgbaImage, name: &str) -> Option<String> {
+pub(super) fn keep_image(image: &RgbaImage, name: &str) -> Option<String> {
     let dir = artifact_dir();
     std::fs::create_dir_all(&dir).ok()?;
     let dest = evidence_path(name);
@@ -1619,20 +1619,32 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         &fixture,
         &format!(r#"
       const page = document.querySelector('[data-testid="screenshot-qa-fixture-ready"]');
+      const samples = [];
+      let last;
       for (let i = 0; i < 150; i++) {{
         const status = await window.__TAURI_INTERNALS__.invoke('screenshot_scroll_status');
+        last = {{poll:i, status, sourceTop:page.scrollTop, sourceEnd:page.scrollHeight-page.clientHeight,
+          sourceHeight:page.scrollHeight, viewportHeight:page.clientHeight}};
+        if (i % 10 === 0) samples.push(last);
         if (status?.frames >= 4 && page.scrollTop * {scale} + {region_height} > {preview_height} + 160) {{
           await new Promise(r => setTimeout(r, 700));
-          return {{...status, sourceTop:page.scrollTop, sourceEnd:page.scrollHeight-page.clientHeight}};
+          return {{ready:true, ...status, ...last, samples}};
         }}
         await new Promise(r => setTimeout(r, 100));
       }}
-      throw new Error('scroll did not capture enough original content for a long preview');
+      return {{ready:false, ...last, samples, scale:{scale}, regionHeight:{region_height}, previewHeight:{preview_height}}};
     "#, scale=source.scale, region_height=region.3),
         Duration::from_secs(20),
     )
     .await
     .map_err(|e| format!("scroll progress: {e}"))?;
+    let progress_artifact = keep_json(&progress, "scroll-controls-progress.json")
+        .map_err(|e| format!("retain scroll progress: {e}"))?;
+    if progress["ready"] != json!(true) {
+        return Err(format!(
+            "scroll did not capture enough original content for a long preview: {progress}; see {progress_artifact}"
+        ));
+    }
     let geometry = capture_surfaces(&app, &display, region, super::surfaces::SCROLL_LABEL, true)
         .await
         .map_err(|e| e.to_string())?;
