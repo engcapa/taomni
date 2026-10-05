@@ -24,6 +24,9 @@ use tokio::sync::{Mutex, Notify, RwLock, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 const REQUEST_TIMEOUT_SECS: u64 = 8;
+/// Deferred refactor resolution computes AST changes after the user selects an
+/// action. Cold JDT LS resolution can exceed the hover/completion budget.
+const REFACTOR_RESOLVE_TIMEOUT_SECS: u64 = 60;
 /// Project-scope jdtls `executeCommand`s (java-debug's `resolveMainClass` /
 /// `resolveClasspath` / `startDebugSession`, java-test discovery) search or
 /// resolve the whole project and activate an OSGi bundle on first use, so they
@@ -8408,8 +8411,14 @@ pub async fn lsp_code_action_resolve(
             });
         }
     };
+    let timeout_secs = match action.get("kind").and_then(Value::as_str) {
+        Some(kind) if kind == "refactor" || kind.starts_with("refactor.") => {
+            REFACTOR_RESOLVE_TIMEOUT_SECS
+        }
+        _ => REQUEST_TIMEOUT_SECS,
+    };
     let resolved = session
-        .request("codeAction/resolve", action.clone())
+        .request_with_timeout("codeAction/resolve", action.clone(), timeout_secs)
         .await?;
     let merged = if resolved.is_null() {
         action
