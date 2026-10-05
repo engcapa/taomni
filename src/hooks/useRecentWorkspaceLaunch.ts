@@ -4,14 +4,24 @@ import { selectFolderPath } from "../lib/ipc";
 import type { RecentWorkspace } from "../types";
 
 export interface RecentWorkspaceLaunch { state: "opening" | "ready" | "failed"; error?: string; rootPath?: string }
-export function useRecentWorkspaceLaunch(openReady: (workspace: RecentWorkspace) => Promise<void>, replace: (workspace: RecentWorkspace) => void) {
+export function useRecentWorkspaceLaunch(
+  openReady: (workspace: RecentWorkspace) => Promise<void>,
+  replace: (workspace: RecentWorkspace) => void,
+  activateExisting?: (workspace: RecentWorkspace) => boolean,
+) {
   const [launches, setLaunches] = useState<Record<string, RecentWorkspaceLaunch>>({});
   const pending = useRef(new Map<string, Promise<void>>());
   const picking = useRef(new Set<string>());
-  const latest = useRef({ openReady, replace }); latest.current = { openReady, replace };
+  const latest = useRef({ openReady, replace, activateExisting }); latest.current = { openReady, replace, activateExisting };
   const open = (workspace: RecentWorkspace): Promise<void> => {
     if (picking.current.has(workspace.id)) return Promise.resolve();
     const existing = pending.current.get(workspace.id); if (existing) return existing;
+    // An already mounted editor owns its readiness and unsaved buffers. Do not
+    // wait for another filesystem preflight simply to bring it to the front.
+    if (latest.current.activateExisting?.(workspace)) {
+      setLaunches((s) => ({ ...s, [workspace.id]: { state: "ready" } }));
+      return Promise.resolve();
+    }
     setLaunches((s) => ({ ...s, [workspace.id]: { state: "opening" } }));
     let rootPath: string | undefined;
     const run = (async () => {

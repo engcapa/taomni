@@ -38,7 +38,6 @@
 - `button[title="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
 - `button[aria-label="Copy entire conversation"]` — interactive [optional] — F-AI-2.4.ai-chat-copy-all
 - `[data-testid="ai-chat-drawer-hide"]` — interactive [optional] — F-AI-2.4.ai-chat-close
-- `[data-testid="ai-chat-drawer-ribbon"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-ribbon
 - `[data-testid="ai-chat-drawer-position"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-position
 - `[data-testid="ai-chat-drawer-pin"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-pin
 - `[data-testid="ai-chat-drawer-opacity"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-opacity
@@ -1369,7 +1368,6 @@
 - `[data-testid="new-tab-launch-menu"]` — interactive — F1.5.new-tab-launch-menu
 - `[data-testid="launch-menu-new-session"]` — interactive [optional] — F1.5.launch-menu-new-session
 - `[data-testid="tab-more"]` — interactive — F1.5.tabs-more
-- `[data-testid="tab-details-hover"]` — interactive — F1.5.tab-details-hover
 - `[data-testid="tab-details-overlay"]` — display [optional] — F1.5.tab-details-overlay
 - `[data-testid^="tab-details-card-"]` — display [optional] — F1.5.tab-details-card
 - `[data-testid^="tab-details-program-"]` — display [optional] — F1.5.tab-details-program
@@ -1498,7 +1496,6 @@
 - `[data-testid="shell-keymap-save"]` — interactive — F-SHELL-1.shell-keymap-save
 - `[data-testid="shell-lane-empty"]` — display — F-SHELL-1.shell-lane-empty
 - `[data-testid="shell-lane-empty-home"]` — interactive — F-SHELL-1.shell-lane-empty-home
-- `[data-testid="shell-lane-select"]` — interactive — F-SHELL-1.shell-lane-select
 - `[data-testid="shell-layout-warning"]` — interactive — F-SHELL-1.shell-layout-warning
 - `[data-testid="shell-navigator"]` — display — F-SHELL-1.shell-navigator
 - `[data-testid="shell-navigator-hide"]` — interactive — F-SHELL-1.shell-navigator-hide
@@ -1627,6 +1624,33 @@
 - `[data-testid="sidebar-tool-lanchat"]` — interactive [optional] — F-SHELL-1.shell-lan-entry
 - `[data-testid="lanchat-enable-prompt"]` — display [optional] — F-SHELL-1.shell-lan-enable-prompt
 - `[data-testid="lanchat-enable-prompt"] button:nth-of-type(1)` — interactive [optional] — F-SHELL-1.shell-lan-enable-decline
+- `[data-testid="shell-action-palette"]` — display — F-SHELL-1.shell-action-palette
+- `[data-testid="shell-action-search"]` — interactive — F-SHELL-1.shell-action-search
+- `[data-testid="shell-action-result"]` — interactive — F-SHELL-1.shell-action-result
+- `[data-testid="shell-action-empty"]` — display — F-SHELL-1.shell-action-empty
+- `[data-testid="shell-close-summary"]` — display — F-SHELL-1.shell-close-summary
+- `[data-testid="shell-close-result"]` — display — F-SHELL-1.shell-close-result
+- `[data-testid="shell-close-retry-remaining"]` — interactive — F-SHELL-1.shell-close-retry-remaining
+- `[data-testid="shell-restore-refresh"]` — interactive — F-SHELL-1.shell-restore-refresh
+- `[data-testid="shell-rail-more"]` — interactive — F-SHELL-1.shell-rail-more
+- `[data-testid="shell-rail-communicate"]` — interactive — F-SHELL-1.shell-rail-communicate
+- `[data-testid="shell-rail-utility"]` — interactive — F-SHELL-1.shell-rail-utility
+- `[data-testid="shell-rail-more-communicate"]` — interactive — F-SHELL-1.shell-rail-more-communicate
+- `[data-testid="shell-rail-more-utility"]` — interactive — F-SHELL-1.shell-rail-more-utility
+- `[data-testid="shell-rail-move-left"]` — interactive — F-SHELL-1.shell-rail-move-left
+- `[data-testid="shell-rail-move-top"]` — interactive — F-SHELL-1.shell-rail-move-top
+- `[data-testid="shell-rail-move-right"]` — interactive — F-SHELL-1.shell-rail-move-right
+- `[data-testid="shell-rail-move-bottom"]` — interactive — F-SHELL-1.shell-rail-move-bottom
+- `[data-testid="shell-rail-hide"]` — interactive — F-SHELL-1.shell-rail-hide
+- `[data-testid="shell-fallback-home"]` — interactive — F-SHELL-1.shell-fallback-home
+- `[data-testid="shell-fallback-actions"]` — interactive — F-SHELL-1.shell-fallback-actions
+- `[data-testid="shell-fallback-tab"]` — interactive — F-SHELL-1.shell-fallback-tab
+- `[data-testid="shell-lane-empty-create"]` — interactive — F-SHELL-1.shell-lane-empty-create
+- `[data-testid="shell-tao-badge"]` — display — F-SHELL-1.shell-tao-badge
+- `[data-testid="code-workspace-toolbar"]` — display — F-SHELL-1.code-workspace-toolbar
+- `[data-testid="shell-panel-toggle"]` — interactive — F-SHELL-1.shell-panel-toggle
+- `[data-testid="shell-tao-toggle"]` — interactive — F-SHELL-1.shell-tao-toggle
+- `[data-testid="tab-actions-more"]` — interactive — F-SHELL-1.tab-actions-more
 
 ## network/sockscap (F-Sockscap-1)
 
@@ -1711,7 +1735,6 @@
 - `[data-testid="notes-floating-toggle"]` — interactive [optional] — F-TAO-1.notes-floating-toggle
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
 - `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
-- `[data-testid="tao-ribbon-badge"]` — display [optional] — F-TAO-1.tao-ribbon-badge
 - `[data-testid="shell-tao-context"]` — display [optional] — F-TAO-1.shell-tao-context
 - `[data-testid="shell-tao-context-pin"]` — interactive [optional] — F-TAO-1.shell-tao-context-pin
 - `[data-testid="shell-tao-error"]` — display [optional] — F-TAO-1.shell-tao-error

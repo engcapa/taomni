@@ -1,11 +1,11 @@
 id: TC-IDE-PARITY-019-01
 title: Three-platform shortcut, focus, 200% zoom, theme, role/state and restore closure
-description: 'ED-PARITY-019 A2 native closure case run on Linux WebKitGTK, Windows WebView2 and macOS WKWebView: role/name/state of the editor, rail and tabs; the platform Find Action chord and Esc focus return; 200% editor zoom with the high-contrast scheme (shortcuts and focus still work); and window reload restoring appearance and the active tab. IME is covered by TC-IDE-IMPROVE-008 on Linux only.
-
-
-  Mode: native.
-
-  '
+description: "ED-PARITY-019 A2 native closure case run on Linux WebKitGTK, Windows WebView2 and macOS WKWebView:\
+  \ role/name/state of the editor, rail and tabs; the platform Find Action chord and Esc focus return; 200% editor\
+  \ zoom with the high-contrast scheme (shortcuts and focus still work); and window reload restoring appearance\
+  \ and the active tab. IME is covered by TC-IDE-IMPROVE-008 on Linux only.\n\nMode: native.\n Classification now\
+  \ uses dock/Actions; Project uses the unified Workspaces entry. Existing workspace content, shortcut and state\
+  \ assertions remain."
 covers:
 - F25.5
 tags:
@@ -47,7 +47,7 @@ steps:
     name: aria-multiline
     equals: 'true'
 - assert_attribute:
-    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    selector: '[data-testid="shell-rail-workspaces"]'
     name: aria-pressed
     equals: 'true'
 - assert_visible: '[data-testid="code-workspace-editor-tab-strip"] [role="tab"][aria-selected="true"]'
@@ -134,16 +134,20 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A2 role/name/state：编辑器 role=textbox + aria-multiline，Project rail aria-pressed，活动编辑器 tab role=tab + aria-selected。
+    requirement: A2 role/name/state：编辑器 role=textbox + aria-multiline，Project rail aria-pressed，活动编辑器 tab role=tab
+      + aria-selected。
     actions:
     - 9
     checkpoints:
     - step: 10
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name": "role", "equals": "textbox"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "role", "equals": "textbox"}}'
     - step: 11
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name": "aria-multiline", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "aria-multiline", "equals": "true"}}'
     - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "name": "aria-pressed",
+        "equals": "true"}}'
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"] [role=\"tab\"][aria-selected=\"true\"]"}'
     results:
@@ -158,13 +162,16 @@ verification:
     - 17
     checkpoints:
     - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
+        15}}'
     - step: 16
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-search-everywhere\"] [role=\"tab\"][aria-selected=\"true\"]"}'
     - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached",
+        "timeout_sec": 5}}'
     - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content:focus", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content:focus", "timeout_sec":
+        5}}'
     results:
     - 15
     - 16
@@ -181,13 +188,17 @@ verification:
     - step: 25
       expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
     - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]",
+        "timeout_sec": 10}}'
     - step: 31
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize", "contains": "26px"}}'
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize",
+        "contains": "26px"}}'
     - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
+        15}}'
     - step: 37
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content:focus", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content:focus", "timeout_sec":
+        5}}'
     results:
     - 30
     - 31
@@ -199,9 +210,11 @@ verification:
     - 38
     checkpoints:
     - step: 41
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]",
+        "timeout_sec": 60}}'
     - step: 42
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize", "contains": "26px"}}'
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize",
+        "contains": "26px"}}'
     - step: 43
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"] [role=\"tab\"][aria-selected=\"true\"]"}'
     results:

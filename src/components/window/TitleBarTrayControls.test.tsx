@@ -95,4 +95,15 @@ describe("TitleBarTrayControls responsive layout", () => {
     });
     expect(screen.queryByTestId("titlebar-tray")).not.toBeInTheDocument();
   });
+  it.each([800, 1280])("hides terminal actions outside terminal context at width %s", (width) => {
+    window.innerWidth = width;
+    const { rerender } = render(<TitleBarTrayControls showTerminalActions={false} />);
+    if (width <= 960) fireEvent.click(screen.getByTestId("titlebar-actions-more"));
+    expect(screen.queryByTestId("tab-split-view")).toBeNull();
+    expect(screen.queryByTestId("tab-multiexec-toggle")).toBeNull();
+    expect(screen.getByTestId("theme-cycle")).toBeInTheDocument();
+    rerender(<TitleBarTrayControls showTerminalActions />);
+    expect(screen.getByTestId("tab-multiexec-toggle")).toBeInTheDocument();
+  });
+
 });

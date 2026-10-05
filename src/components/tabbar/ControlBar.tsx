@@ -9,8 +9,6 @@ import {
   Monitor,
   MoreHorizontal,
   Network,
-  PanelsTopLeft,
-  Info,
   KeyRound,
   PanelLeft,
   Plus,
@@ -31,11 +29,12 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { TabBar } from "./TabBar";
+import { ContextActionsSlot } from "./ContextActionsSlot";
 import { useAppStore } from "../../stores/appStore";
 import { useShellLayoutStore } from "../../stores/shellLayoutStore";
 import { tabLane } from "../../lib/shell/tabPresentation";
-import { TAB_LANES } from "../../lib/shell/types";
 import { dispatchShellAction } from "../../lib/shell/shellActions";
+import { contextPanelTarget } from "../../lib/shell/contextPanel";
 import { OpenTabsMenu } from "./OpenTabsMenu";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
@@ -100,7 +99,8 @@ export function ControlBar({
   const shell = useShellLayoutStore();
   const tabs = useAppStore((s) => s.tabs), activeId = useAppStore((s) => s.activeTabId);
   const active = tabs.find((tab) => tab.id === activeId), lane = shell.laneSelection ?? (active ? tabLane(active, shell.laneOverrides[active.id]) : "home");
-  const [detailsRevealHovered, setDetailsRevealHovered] = useState(false);
+  const terminalActionsAvailable = lane === "connect" && !shell.laneSelection && active?.type === "terminal";
+  const panelAvailable = !shell.laneSelection && !!contextPanelTarget(active, shell.panels);
   const {
     hasSessions,
     importJson,
@@ -148,7 +148,7 @@ export function ControlBar({
       { label: t("menu.newLocalTerminal"), testId: "context-menu-item-new-local-terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
       { label: t("menu.newRemoteSession"), testId: "context-menu-item-new-remote-session", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
       { label: t("ribbon.newSftp"), testId: "context-menu-item-new-sftp", icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("new-sftp") },
-      { label: t("menu.closeActiveTab"), testId: "context-menu-item-close-active-tab", icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
+      { label: t("menu.closeActiveTab"), testId: "context-menu-item-close-active-tab", icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable || !!shell.laneSelection },
       { label: "", separator: true, onClick: () => {} },
       {
         label: t("menu.sessions"),
@@ -168,14 +168,16 @@ export function ControlBar({
         testId: "context-menu-item-view",
         icon: <PanelLeft className="w-3 h-3" />,
         children: [
+          { label: t("shell.actions"), testId: "shell-menu-actions", shortcut: "F1", onClick: () => dispatchShellAction("shell.actions") },
+          { label: t("shell.immersive"), testId: "shell-menu-immersive", onClick: () => dispatchShellAction("shell.immersive.toggle") },
           { label: t("shell.overview"), testId: "shell-menu-overview", onClick: () => dispatchShellAction("shell.overview") },
           { label: t("shell.quickSwitch"), testId: "shell-menu-quick-switch", onClick: () => dispatchShellAction("shell.quickSwitch") },
           { label: t("shell.recentPanels"), testId: "shell-menu-recent-panels", onClick: () => dispatchShellAction("shell.panels.recent") },
           { label: t("shell.reset"), testId: "shell-menu-reset-layout", onClick: () => dispatchShellAction("shell.layout.reset") },
           { label: t("sidebar.headerTitle"), testId: "context-menu-item-toggle-sidebar", icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebar },
           { label: t("menu.quickConnectToolbar"), testId: "context-menu-item-toggle-quick-connect", icon: <Search className="w-3 h-3" />, checked: quickConnectVisible, onClick: () => onCommand("toggle-quick-connect") },
-          { label: t("menu.splitTerminal"), testId: "context-menu-item-split-terminal", icon: <SplitSquareVertical className="w-3 h-3" />, onClick: () => onCommand("split") },
-          { label: t("ribbon.multiExec"), testId: "context-menu-item-multiexec", icon: <Users className="w-3 h-3" />, onClick: () => onCommand("multiexec") },
+          { label: t("menu.splitTerminal"), testId: "context-menu-item-split-terminal", disabled: !terminalActionsAvailable, icon: <SplitSquareVertical className="w-3 h-3" />, onClick: () => onCommand("split") },
+          { label: t("ribbon.multiExec"), disabled: !terminalActionsAvailable, testId: "context-menu-item-multiexec", icon: <Users className="w-3 h-3" />, onClick: () => onCommand("multiexec") },
         ],
         onClick: () => {},
       },
@@ -189,7 +191,7 @@ export function ControlBar({
           { label: t("menu.sockscap"), testId: "context-menu-item-sockscap", icon: <Shield className="w-3 h-3" />, onClick: () => onCommand("sockscap") },
           { label: t("menu.gitRepository"), testId: "context-menu-item-git-repository", icon: <GitBranch className="w-3 h-3" />, onClick: () => onCommand("git") },
           { label: t("menu.codeWorkspace"), testId: "context-menu-item-code-workspace", icon: <FileText className="w-3 h-3" />, onClick: () => onCommand("code-workspace") },
-          ...(workspaceCommands.length > 0 ? [{
+          ...(!shell.laneSelection && active?.type === "code-workspace" && workspaceCommands.length > 0 ? [{
             label: t("menu.codeWorkspaceActions"),
             testId: "context-menu-workspace-actions",
             icon: <Braces className="w-3 h-3" />,
@@ -231,15 +233,7 @@ export function ControlBar({
         {!nativeMenu && (
           <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
-        <BarButton testId="shell-navigator-toggle" title={t("shell.navigator")} icon={<PanelLeft className="w-4 h-4" />} onClick={onToggleSidebar} />
       </div>
-      <WindowDragHandle />
-      <select data-testid="shell-lane-select" data-lane={lane} aria-label={t("shell.lane")} value={lane} className="shell-titlebar-lane taomni-input shrink-0 text-xs w-[96px]"
-        onChange={(e) => { const nextLane = e.target.value as typeof lane; const target = shell.mru.map((id) => tabs.find((tab) => tab.id === id)).find((tab) => tab && tabLane(tab, shell.laneOverrides[tab.id]) === nextLane)
-          ?? tabs.find((tab) => tabLane(tab, shell.laneOverrides[tab.id]) === nextLane);
-          if (target) { useAppStore.getState().setActiveTab(target.id); shell.visitTab(target.id); } else shell.selectLane(nextLane); }}>
-        {TAB_LANES.map((value) => <option key={value} data-testid="shell-lane-option" value={value}>{t(`shell.lanes.${value}`)}</option>)}
-      </select>
       <div className="shell-titlebar-tabs min-w-0 flex-1 self-stretch">
         <TabBar
           shellMode
@@ -247,46 +241,31 @@ export function ControlBar({
           onConnectSession={onConnectSession}
           onOpenSessionEditor={onOpenSessionEditor}
           onDuplicateTab={onDuplicateTab}
-          detailsRevealExternal={detailsRevealHovered}
         />
       </div>
       <div className="shell-titlebar-actions flex items-center shrink-0 gap-1">
         <BarButton testId="shell-quick-switch" title={t("shell.quickSwitch")} icon={<Search className="w-4 h-4" />} onClick={() => dispatchShellAction("shell.quickSwitch")} />
-        <BarButton testId="shell-panel-toggle" title={t("shell.panel")} icon={<PanelLeft className="w-4 h-4" />} onClick={() => dispatchShellAction("shell.panel.open")} />
+        {panelAvailable && <BarButton testId="shell-panel-toggle" title={t(panelAvailable ? "shell.panel" : "shell.panelUnavailable")} icon={<PanelLeft className="w-4 h-4" />} onClick={() => dispatchShellAction("shell.panel.open")} />}
         <BarButton testId="shell-tao-toggle" title={t("shell.tao")} icon={<MessageSquare className="w-4 h-4" />} onClick={() => dispatchShellAction("shell.tao.toggle")} />
         <button type="button" data-testid="shell-overview-trigger" className="text-xs h-8 px-1 rounded hover:bg-[var(--taomni-hover)]" onClick={() => dispatchShellAction("shell.overview")}>{t("shell.overview")} <span>{tabs.length}</span></button>
       {/* Update hint sits just left of the tab-action group (centre-right of the
           bar). It only appears once a new version is staged. */}
-      <span className="shell-titlebar-secondary"><UpdateHint /></span>
+      <UpdateHint />
       {/* Per-tab contextual actions portal in here (SFTP / Chat / detach …). */}
-      <div ref={slotRef} data-testid="tab-action-slot" hidden={!!shell.laneSelection} inert={!!shell.laneSelection} style={shell.laneSelection ? { display: "none" } : undefined} className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" />
-      <button
-        type="button"
-        data-testid="tab-details-hover"
-        className="shell-titlebar-secondary taomni-tab-details-button relative h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
-        aria-label={t("tabs.detailsShortcutHint", { shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H" })}
-        title={t("tabs.detailsShortcutHint", { shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H" })}
-        data-active={detailsRevealHovered || undefined}
-        onMouseEnter={() => setDetailsRevealHovered(true)}
-        onMouseLeave={() => setDetailsRevealHovered(false)}
-        onFocus={() => setDetailsRevealHovered(true)}
-        onBlur={() => setDetailsRevealHovered(false)}
-      >
-        <PanelsTopLeft className="w-4 h-4" />
-        <Info className="absolute right-0.5 bottom-0.5 w-2.5 h-2.5 rounded-full" style={{ background: "var(--taomni-chrome-bg)" }} />
-      </button>
+      <ContextActionsSlot slotRef={slotRef} hidden={!!shell.laneSelection || !active || !["terminal", "database", "redis", "hbase-shell", "rdp", "vnc"].includes(active.type)} owner={activeId} />
       {/* Open-tabs `⋯` overflow — also hosts the Screenshot actions. Sits at the
           right end of the tab-action group. */}
-      <TabMore onDetachActiveTab={onDetachActiveTab} />
+      <TabMore onDetachActiveTab={shell.laneSelection ? undefined : onDetachActiveTab} />
       </div>
       <div className="shell-titlebar-system flex shrink-0 items-center self-stretch">
       <div className={IS_MAC ? "w-2 self-stretch shrink-0" : "w-3 self-stretch shrink-0"} />
       {/* Divider between the tab-related buttons and the main-window controls. */}
       <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />
+      <WindowDragHandle />
       {/* System screenshot: independent of any tab — global window chrome.
           Click captures immediately; the chevron offers timed (delayed) capture
           Flameshot-style. Clicking during a countdown cancels it. */}
-      <span className="shell-titlebar-legacy flex items-center"><ScreenshotMenuButton /><TitleBarTrayControls /></span>
+      <span className="shell-titlebar-legacy flex items-center"><ScreenshotMenuButton /><TitleBarTrayControls showTerminalActions={terminalActionsAvailable} /></span>
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
       </div>
     </div>
@@ -351,15 +330,18 @@ function BarButton({
   title,
   onClick,
   testId,
+  disabled,
 }: {
   icon: React.ReactNode;
   title: string;
   onClick?: (event: React.MouseEvent) => void;
   testId?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       data-testid={testId}
+      disabled={disabled}
       type="button"
       title={title}
       aria-label={title}

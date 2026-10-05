@@ -1,0 +1,293 @@
+id: TC-SHELL-N23
+title: Native immersive and dock changes preserve the real PTY
+description: Shell redesign follow-up acceptance. User actions use production controls and commands. Browser stubs
+  do not establish native side effects.
+covers:
+- F-SHELL-1
+- F2.1
+tags:
+- workspace-shell
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- shell_native_files
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_IMMERSIVE_BEFORE
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_IMMERSIVE_BEFORE\s*$
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_IMMERSIVE_RETAINED
+    submit: false
+- press: F1
+- wait_for: '[data-testid="shell-action-search"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.immersive.toggle
+- click: '[data-testid="shell-action-result"][data-action-id="shell.immersive.toggle"]'
+- assert_not_visible: '[data-testid="app-titlebar"]'
+- assert_not_visible: '[data-testid="shell-rail"]'
+- assert_not_visible: '[data-testid="status-bar"]'
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    key: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_IMMERSIVE_RETAINED\s*$
+    timeout_sec: 20
+- press: F1
+- wait_for: '[data-testid="shell-action-search"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.immersive.toggle
+- click: '[data-testid="shell-action-result"][data-action-id="shell.immersive.toggle"]'
+- assert_visible: '[data-testid="app-titlebar"]'
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_IMMERSIVE_BEFORE\s*$
+    timeout_sec: 20
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- press: F1
+- wait_for: '[data-testid="shell-action-search"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.rail.top
+- click: '[data-testid="shell-action-result"][data-action-id="shell.rail.top"]'
+- assert_attribute:
+    selector: '[data-testid="shell-rail"]'
+    name: data-edge
+    equals: top
+- &id001
+  assert_element_geometry:
+    selector: '[data-testid="shell-rail"] > button:not([data-testid="shell-rail-communicate"]):not([data-testid="shell-rail-utility"]):not([data-testid="shell-rail-more"])'
+    min_count: 5
+    min_width: 32
+    min_height: 32
+    within_viewport: true
+    hit_center: true
+- screenshot: native-dock-top.png
+- press: F1
+- wait_for: '[data-testid="shell-action-search"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.rail.right
+- click: '[data-testid="shell-action-result"][data-action-id="shell.rail.right"]'
+- assert_attribute:
+    selector: '[data-testid="shell-rail"]'
+    name: data-edge
+    equals: right
+- *id001
+- screenshot: native-dock-right.png
+- press: F1
+- wait_for: '[data-testid="shell-action-search"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.rail.bottom
+- click: '[data-testid="shell-action-result"][data-action-id="shell.rail.bottom"]'
+- assert_attribute:
+    selector: '[data-testid="shell-rail"]'
+    name: data-edge
+    equals: bottom
+- *id001
+- screenshot: native-dock-bottom.png
+- press: F1
+- wait_for: '[data-testid="shell-action-search"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.rail.left
+- click: '[data-testid="shell-action-result"][data-action-id="shell.rail.left"]'
+- assert_attribute:
+    selector: '[data-testid="shell-rail"]'
+    name: data-edge
+    equals: left
+- *id001
+- screenshot: native-dock-left.png
+- press: F1
+- wait_for: '[data-testid="shell-action-search"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.rail.toggle
+- click: '[data-testid="shell-action-result"][data-action-id="shell.rail.toggle"]'
+- assert_not_visible: '[data-testid="shell-rail"]'
+- press: F1
+- wait_for: '[data-testid="shell-action-search"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.rail.toggle
+- click: '[data-testid="shell-action-result"][data-action-id="shell.rail.toggle"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_DOCK_AFTER
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_DOCK_AFTER\s*$
+    timeout_sec: 20
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A real native PTY accepts input before immersive mode.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
+    - step: 7
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
+        "regex": "(?m)^QA_IMMERSIVE_BEFORE\s*$", "timeout_sec": 20}}'
+    results:
+    - 3
+    - 5
+    - 7
+  - id: R2
+    requirement: Native F1 enters and exits immersive mode without restarting the PTY or losing pending input.
+    actions:
+    - 8
+    - 9
+    - 11
+    - 12
+    - 16
+    - 18
+    - 20
+    - 21
+    checkpoints:
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"shell-action-search\"]"}'
+    - step: 13
+      expectation: '{"assert_not_visible": "[data-testid=\"app-titlebar\"]"}'
+    - step: 14
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-rail\"]"}'
+    - step: 15
+      expectation: '{"assert_not_visible": "[data-testid=\"status-bar\"]"}'
+    - step: 17
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
+        "regex": "(?m)^QA_IMMERSIVE_RETAINED\s*$", "timeout_sec": 20}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"shell-action-search\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"app-titlebar\"]"}'
+    - step: 23
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
+        "regex": "(?m)^QA_IMMERSIVE_BEFORE\s*$", "timeout_sec": 20}}'
+    - step: 24
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    results:
+    - 10
+    - 13
+    - 14
+    - 15
+    - 17
+    - 19
+    - 22
+    - 23
+    - 24
+  - id: R3
+    requirement: Native WebViews preserve real PTY use through all dock edges and hidden-dock recovery.
+    actions:
+    - 25
+    - 27
+    - 28
+    - 32
+    - 34
+    - 35
+    - 39
+    - 41
+    - 42
+    - 46
+    - 48
+    - 49
+    - 53
+    - 55
+    - 56
+    - 58
+    - 60
+    - 61
+    - 62
+    checkpoints:
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"shell-action-search\"]"}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail\"]", "name": "data-edge", "equals":
+        "top"}}'
+    - step: 30
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button", "min_count":
+        5, "min_width": 32, "min_height": 32, "within_viewport": true, "hit_center": true}}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"shell-action-search\"]"}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail\"]", "name": "data-edge", "equals":
+        "right"}}'
+    - step: 37
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button", "min_count":
+        5, "min_width": 32, "min_height": 32, "within_viewport": true, "hit_center": true}}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"shell-action-search\"]"}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail\"]", "name": "data-edge", "equals":
+        "bottom"}}'
+    - step: 44
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button", "min_count":
+        5, "min_width": 32, "min_height": 32, "within_viewport": true, "hit_center": true}}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"shell-action-search\"]"}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail\"]", "name": "data-edge", "equals":
+        "left"}}'
+    - step: 51
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button", "min_count":
+        5, "min_width": 32, "min_height": 32, "within_viewport": true, "hit_center": true}}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"shell-action-search\"]"}'
+    - step: 57
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-rail\"]"}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"shell-action-search\"]"}'
+    - step: 63
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
+        "regex": "(?m)^QA_DOCK_AFTER\s*$", "timeout_sec": 20}}'
+    results:
+    - 26
+    - 29
+    - 30
+    - 33
+    - 36
+    - 37
+    - 40
+    - 43
+    - 44
+    - 47
+    - 50
+    - 51
+    - 54
+    - 57
+    - 59
+    - 63
+  visual:
+  - check: Dock, palette and content stay readable with no clipped controls.
+    method: manual
+    reason: Review retained screenshots from each engine.
+  native:
+  - check: Packaged WebView, PTY and native lifecycle boundaries.
+    method: external
+    reason: Native cases retain actual backend effects; browser cases prove renderer behavior only.

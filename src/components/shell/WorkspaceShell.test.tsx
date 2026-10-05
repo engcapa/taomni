@@ -13,7 +13,7 @@ beforeEach(() => {
   layout.tao = { ...layout.tao, edge: "top", pinned: false };
   useAppStore.setState({ tabs: [{ id: "welcome", title: "Home", type: "welcome", closable: false }], activeTabId: "welcome" });
   useShellLayoutStore.setState({ layout, taoOpen: true, panels: {}, laneSelection: null,
-    overlay: null, overlayTarget: null, navigatorOverlay: false, transfersOpen: false,
+    immersive: false, immersiveReveal: null, overlay: null, overlayTarget: null, navigatorOverlay: false, transfersOpen: false,
     restoreRefByTab: {}, pinnedTabs: {}, laneOverrides: {}, mru: [], mruCycling: false, exiting: false });
 });
 afterEach(cleanup);
@@ -92,6 +92,31 @@ it.each([
   fireEvent.pointerDown(more);
   fireEvent.click(more);
   expect(screen.getByTestId(`shell-panel-move-${source}`)).toBeInTheDocument();
+  // Outside click first dismisses the topmost context menu, then the Host.
+  fireEvent.mouseDown(document.body);
+  expect(screen.queryByTestId("context-menu")).toBeNull();
   fireEvent.pointerDown(document.body);
   expect(useShellLayoutStore.getState().panels.files.requestedOpen).toBe(false);
+});
+
+
+it("keeps the business instance and draft usable when Navigator throws, including reset", () => {
+  useShellLayoutStore.setState({ taoOpen: false });
+  const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+  let broken = false;
+  function Navigator() { if (broken) throw new Error("Navigator render failed"); return <div>Navigator</div>; }
+  const tree = () => <ShellSurfaceRegistry><ShellFrame navigator={<Navigator />}><textarea aria-label="Business draft" defaultValue="unsaved" /></ShellFrame></ShellSurfaceRegistry>;
+  try {
+    const { rerender } = render(tree());
+    const draft = screen.getByLabelText("Business draft");
+    fireEvent.change(draft, { target: { value: "edited before failure" } });
+    broken = true; rerender(tree());
+    expect(screen.getByTestId("shell-fallback")).toBeInTheDocument();
+    expect(screen.getByLabelText("Business draft")).toBe(draft);
+    fireEvent.change(draft, { target: { value: "edited during fallback" } });
+    broken = false; fireEvent.click(screen.getByTestId("shell-fallback-reset"));
+    expect(screen.queryByTestId("shell-fallback")).toBeNull();
+    expect(screen.getByLabelText("Business draft")).toBe(draft);
+    expect(draft).toHaveValue("edited during fallback");
+  } finally { errorLog.mockRestore(); }
 });

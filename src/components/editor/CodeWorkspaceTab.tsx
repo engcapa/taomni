@@ -1,4 +1,5 @@
 import { WorkspaceToolSurface } from "../shell/WorkspaceToolSurface";
+import { useShellLayoutStore } from "../../stores/shellLayoutStore";
 import { registerCloseAdapter } from "../../lib/shell/closeCoordinator";
 import {
   Fragment,
@@ -2053,10 +2054,11 @@ export function CodeWorkspaceTab({
   const toolWindowLayoutRef = useRef(toolWindowLayout);
   toolWindowLayoutRef.current = toolWindowLayout;
   const toolWindowNodes = useToolWindowNodes();
-  const leftToolAreaOpen = shellHosted
+  const immersiveWorkspace = useShellLayoutStore((state) => shellHosted && state.immersive && state.immersiveReveal !== "workspace");
+  const leftToolAreaOpen = !immersiveWorkspace && (shellHosted
     ? [toolWindowLayout.visibleAt("left-top"), toolWindowLayout.visibleAt("left-bottom")].some((id) => id && !["project", "git", "problems", "terminal"].includes(id))
-    : toolWindowLayout.sideOpen("left");
-  const rightToolAreaOpen = toolWindowLayout.sideOpen("right");
+    : toolWindowLayout.sideOpen("left"));
+  const rightToolAreaOpen = !immersiveWorkspace && toolWindowLayout.sideOpen("right");
   /** A routed tab request suppresses the dock open that accompanies it. */
   const routedDockRequestRef = useRef<{ tab: string; dockWasOpen: boolean } | null>(null);
   const pendingDockOpenRef = useRef<{ tab: string; dockWasOpen: boolean } | null>(null);
@@ -12811,6 +12813,7 @@ export function CodeWorkspaceTab({
   }, [leftToolAreaOpen]);
 
   const handleProjectPanelResize = useCallback((size: PanelSize) => {
+    if (shellHosted && useShellLayoutStore.getState().immersive) return;
     const pixels = size.inPixels > 0 ? Math.round(size.inPixels) : 0;
     if (pixels > 40) {
       // Only record the live width here. Writing it to the store on every
@@ -12905,6 +12908,24 @@ export function CodeWorkspaceTab({
     const layout = toolWindowLayoutRef.current;
     const pane = toolWindowElement(toolId);
     const hasFocus = !!pane && pane.contains(document.activeElement);
+    if (shellHosted && toolId === "project") {
+      const shell = useShellLayoutStore.getState();
+      const shown = shell.layout.navigator.lastArea === "workspaces" && shell.navigatorPage === "project"
+        && !shell.layout.navigator.collapsedByLane.build
+        && (shell.immersive ? shell.immersiveReveal === "navigator" : window.innerWidth >= 1200 || shell.navigatorOverlay);
+      if (shown && hasFocus) {
+        shell.setNavigatorCollapsed("build", true);
+        useShellLayoutStore.setState({ immersiveReveal: null });
+        handleReturnToEditor();
+      } else {
+        layout.show("project");
+        shell.updateLayout((value) => ({ ...value, navigator: { ...value.navigator, lastArea: "workspaces", collapsedByLane: { ...value.navigator.collapsedByLane, build: false } } }));
+        shell.setNavigatorPage("project");
+        useShellLayoutStore.setState({ navigatorOverlay: true, overlayTarget: "navigator", ...(shell.immersive ? { immersiveReveal: "navigator" } : {}) });
+        focusToolWindowSoon(toolId);
+      }
+      return;
+    }
     if (!layout.isVisible(toolId)) {
       if (toolId === "structure") rightPaneTabRef.current = "outline";
       if (toolId === "documentation") rightPaneTabRef.current = "documentation";
@@ -12916,7 +12937,7 @@ export function CodeWorkspaceTab({
     } else {
       focusToolWindowSoon(toolId);
     }
-  }, [focusToolWindowSoon, handleReturnToEditor, toolWindowElement]);
+  }, [focusToolWindowSoon, handleReturnToEditor, toolWindowElement, shellHosted]);
 
   const handleRestoreToolWindowLayout = useCallback(() => {
     // IDEA Window | Restore Default Layout: default anchors, Project only.
@@ -13061,6 +13082,7 @@ export function CodeWorkspaceTab({
   }, [rightToolAreaOpen]);
 
   const handleRightPanelResize = useCallback((size: PanelSize) => {
+    if (shellHosted && useShellLayoutStore.getState().immersive) return;
     const percentage = size.asPercentage;
     if (percentage > 2) {
       lastRightPanelSizeRef.current = percentage;
@@ -22467,6 +22489,9 @@ export function CodeWorkspaceTab({
     toolWindowLayout.show(id);
   };
   const stripeItem = (id: string): ToolWindowRailItem | null => {
+    // Shell Navigator owns Project, including its recent-workspaces page.
+    // Keep the workspace Action/shortcut, but do not expose a second Rail button.
+    if (shellHosted && id === "project") return null;
     const meta = stripeMeta.get(id);
     if (!meta || !toolWindowLayout.onStripe(id)) return null;
     const bottomTool = bottomDockTabs.some((tab) => tab.id === id);
@@ -22530,6 +22555,7 @@ export function CodeWorkspaceTab({
         ref={rootRef}
         bridge={observationBridge}
         data-testid="code-workspace-tab"
+        data-immersive-workspace={immersiveWorkspace}
         data-layout-revision={layoutRevision}
         data-clipboard-revision={clipboardSnapshot.revision}
         data-clipboard-history-revision={clipboardSnapshot.historyRevision}
@@ -22621,7 +22647,7 @@ export function CodeWorkspaceTab({
         >
           {clipboardAnnouncement}
         </div>
-      <header className="h-10 shrink-0 flex items-center gap-2 overflow-x-auto px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
+      <header data-testid="code-workspace-toolbar" className="h-10 shrink-0 flex items-center gap-2 overflow-x-auto px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
         <Braces className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div className="min-w-0">
           <div className="font-semibold leading-4 truncate">Code · {title}</div>

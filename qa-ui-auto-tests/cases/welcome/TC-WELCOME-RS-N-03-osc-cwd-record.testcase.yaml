@@ -6,52 +6,94 @@ tags:
 - welcome
 - native-gate
 - p1
-- needs-review
 modes:
 - native
 fixtures:
 - reset_db
+- shell_native_files
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-gate-password
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
-- wait_for:
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: cd "${fixture.shell_root}"
+    submit: true
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: echo QA_CWD_CHANGED
+    submit: true
+- assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    timeout_sec: 30
-- wait: 8
+    regex: (?m)^QA_CWD_CHANGED\s*$
+    timeout_sec: 20
 - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-directories"]'
 - wait_for: '[data-testid="welcome-local-directories"]'
 - assert_visible: '[data-testid="welcome-local-directory"]'
 - screenshot: F1.6-native-osc-cwd.png
+- fill:
+    selector: '[data-testid="welcome-local-directory-filter"]'
+    value: ${fixture.shell_dir_name}
+- assert_count:
+    selector: '[data-testid="welcome-local-directory"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="welcome-local-directory"][data-last-used-at-ms]:not([data-last-used-at-ms=""])'
+    equal: 1
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 'Native: plain local terminal OSC 7 cwd records local-cwd directory use：按步骤执行后，所有声明的可观察结果均满足。'
+    requirement: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+      named directory with a confirmed-use timestamp visible in Home.
     actions:
     - 1
     - 2
     - 4
+    - 6
     - 7
     - 9
+    - 11
+    - 15
     checkpoints:
     - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+      expectation: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+        named directory with a confirmed-use timestamp visible in Home.
     - step: 5
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+      expectation: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+        named directory with a confirmed-use timestamp visible in Home.
     - step: 8
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+      expectation: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+        named directory with a confirmed-use timestamp visible in Home.
     - step: 10
-      expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
-    - step: 11
-      expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory\"]"}'
+      expectation: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+        named directory with a confirmed-use timestamp visible in Home.
+    - step: 12
+      expectation: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+        named directory with a confirmed-use timestamp visible in Home.
+    - step: 13
+      expectation: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+        named directory with a confirmed-use timestamp visible in Home.
+    - step: 16
+      expectation: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+        named directory with a confirmed-use timestamp visible in Home.
+    - step: 17
+      expectation: A real terminal changes to the isolated fixture directory; shell integration records that uniquely
+        named directory with a confirmed-use timestamp visible in Home.
     results:
+    - 3
+    - 5
+    - 8
     - 10
-    - 11
+    - 12
+    - 13
+    - 16
+    - 17
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

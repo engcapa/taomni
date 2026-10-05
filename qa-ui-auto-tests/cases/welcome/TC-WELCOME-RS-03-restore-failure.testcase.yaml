@@ -12,10 +12,8 @@ description: 'Fixture seeds a confirmed snapshot whose entry is a saved LocalShe
 covers:
 - F1.6
 tags:
-- auto-generated
 - p1
 - welcome
-- needs-review
 modes:
 - browser
 fixtures:
@@ -25,65 +23,75 @@ timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- wait_for:
-    selector: '[data-testid="welcome-restore-status"][data-state="available"]'
-    timeout_sec: 15
+- wait_for: '[data-testid="welcome-restore-status"][data-state="available"]'
 - click: '[data-testid="welcome-restore-last-session"]'
-- wait_for:
-    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
-    timeout_sec: 15
-- wait: 1
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-- wait: 1
 - wait_for:
     selector: '[data-testid="welcome-restore-status"][data-state="failed"]'
     timeout_sec: 30
-- wait_for: '[data-testid="welcome-restore-retry"]'
-- click: '[data-testid="welcome-restore-retry"]'
-- wait: 4
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-- wait: 1
 - assert_count:
     selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    equal: 0
+- assert_visible: '[data-testid="shell-restore-entry"][data-status="failed"]'
+- click: '[data-testid="welcome-restore-retry"]'
+- wait_for: '[data-testid="welcome-restore-status"][data-state="failed"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="shell-restore-entry"][data-status="failed"]'
     equal: 1
-- wait_for:
-    selector: '[data-testid="welcome-restore-status"][data-state="failed"], [data-testid="welcome-restore-status"][data-state="partial"]'
-    timeout_sec: 15
 - screenshot: F1.6-welcome-restore-failure.png
+- assert_localstorage:
+    key: taomni.welcome.sessionResume.v1
+    contains: '"savedSessionId":"sess-local-shell"'
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Local-shell restore fails honestly in browser mode and retries without stacking tabs：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+      the failed tab; retry does not stack tabs.
     actions:
     - 1
     - 4
-    - 7
-    - 11
-    - 13
+    - 8
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
     - step: 3
-      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]",
-        "timeout_sec": 15}}'
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
     - step: 5
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "timeout_sec":
-        15}}'
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
+    - step: 6
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
+    - step: 7
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"failed\"]",
-        "timeout_sec": 30}}'
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
     - step: 10
-      expectation: '{"wait_for": "[data-testid=\"welcome-restore-retry\"]"}'
-    - step: 15
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "equal":
-        1}}'
-    - step: 16
-      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"failed\"],
-        [data-testid=\"welcome-restore-status\"][data-state=\"partial\"]", "timeout_sec": 15}}'
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
+    - step: 11
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
+    - step: 13
+      expectation: Failed local-shell restore reports one failed outcome, retains its saved descriptor and removes
+        the failed tab; retry does not stack tabs.
     results:
-    - 15
-    - 16
+    - 2
+    - 3
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 11
+    - 13
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

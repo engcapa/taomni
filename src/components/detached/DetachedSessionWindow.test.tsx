@@ -64,7 +64,6 @@ vi.mock("../../stores/chatStore", () => ({
 
 vi.mock("../terminal/TerminalPanel", () => ({ TerminalPanel: () => null }));
 vi.mock("../chat/ChatDrawer", () => ({ ChatDrawer: () => null }));
-vi.mock("../tao/TaoRibbon", () => ({ TaoRibbon: () => null }));
 vi.mock("../agent/CcAgentBridge", () => ({ CcAgentBridge: () => null }));
 vi.mock("../vnc/VncPanel", () => ({
   default: ({ host, port, viewerOptions }: { host: string; port: number; viewerOptions?: unknown }) => (

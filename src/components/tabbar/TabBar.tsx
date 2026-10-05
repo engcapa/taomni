@@ -88,8 +88,6 @@ interface TabBarProps {
    * action (no cwd handling) when not provided.
    */
   onDuplicateTab?: (id: string) => void;
-  /** External hover/focus trigger from the title-bar details button. */
-  detailsRevealExternal?: boolean;
 }
 
 export function TabBar({
@@ -97,7 +95,6 @@ export function TabBar({
   onConnectSession,
   onOpenSessionEditor,
   onDuplicateTab,
-  detailsRevealExternal = false,
   shellMode = false,
 }: TabBarProps) {
   const shell = useShellLayoutStore();
@@ -129,7 +126,7 @@ export function TabBar({
   const [draftTitle, setDraftTitle] = useState("");
   const [detailsRevealShortcut, setDetailsRevealShortcut] = useState(false);
   const [hoveredDetailsTabId, setHoveredDetailsTabId] = useState<string | null>(null);
-  const detailsReveal = detailsRevealShortcut || detailsRevealExternal;
+  const detailsReveal = detailsRevealShortcut;
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [wslDistros, setWslDistros] = useState<{ name: string; isDefault: boolean }[]>([]);
   const [shellsLoaded, setShellsLoaded] = useState(false);
@@ -664,7 +661,8 @@ export function TabBar({
           style={{ paddingRight: 4, borderTopRightRadius: 0 }}
           data-active={false}
           onClick={handleQuickLaunch}
-          title={t("tabs.newTab")}
+          title={t("menu.newLocalTerminal")}
+          aria-label={t("menu.newLocalTerminal")}
         >
           <Plus className="w-3 h-3" />
         </button>

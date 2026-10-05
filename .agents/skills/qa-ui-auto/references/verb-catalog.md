@@ -300,3 +300,12 @@ Relative paths resolve from the repository root.
 | `interrupt_detached_window` | `#notes= \| #git= \| #sftp=` | Native three platforms. Verifies the selected child route, then destroys that real isolated QA window through its native command, bypassing cooperative close. Assert recovery and actual window count separately. |
 | `assert_native_window_count` | `{equal, timeout_sec?}` | Native three platforms. Counts W3C WebDriver window handles, including hidden live windows. Success and failure samples remain in native-window-counts.jsonl. |
 `scroll-manual` exercises real wheel input with pauses and manual Finish/Cancel; `colors` checks fixed native clipboard stroke pixels for expanded presets and HEX. `pin-tools` checks native drag/topmost, zoom geometry, compositor transparency, thumbnail collapse/restore, original Copy/Save through the native file dialog, and persistent favorite reopen after temporary files are deleted.
+
+
+### keyboard_sequence (browser)
+
+Send an ordered list of real browser keyboard events, keeping modifiers held
+between steps. Example: `[{down: Control}, {press: Tab}, {press: Tab}, {up: Control}]`.
+Use for held-modifier MRU cycling or Escape cancellation. Maximum 32 events;
+all held keys are released on failure. It does not establish OS-global input
+and is deliberately browser-only. `press` remains the normal single-chord verb.

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
-import type { ClosePlanItem, CloseResult } from "../../lib/shell/closeCoordinator";
+import type { ClosePlanItem, CloseResult, CloseProgress } from "../../lib/shell/closeCoordinator";
 import type { CloseChoice } from "../../lib/shell/types";
 
-export function ShellCloseDialog({ items, errors, onFinish }: { items: ClosePlanItem[]; errors: CloseResult["failed"]; onFinish(choices: Record<string, CloseChoice> | null): void }) {
+export function ShellCloseDialog({ items, errors, progress, onFinish }: { items: ClosePlanItem[]; errors: CloseResult["failed"]; progress?: CloseProgress; onFinish(choices: Record<string, CloseChoice> | null): void }) {
   const t = useT();
   const [choices, setChoices] = useState<Record<string, CloseChoice>>({});
   const ref = useRef<HTMLDivElement>(null);
@@ -25,6 +25,10 @@ export function ShellCloseDialog({ items, errors, onFinish }: { items: ClosePlan
         }
       }}>
       <h2 id="shell-close-title" className="font-semibold mb-3">{t("shell.closeTitle")}</h2>
+      {progress && <div data-testid="shell-close-summary" data-closed-count={progress.closed.length} data-remaining-count={progress.remaining.length} className="mb-3 text-sm">
+        <p role="status">{t("shell.closeProgress", { closed: progress.closed.length, remaining: progress.remaining.length })}</p>
+        {(["closed", "remaining"] as const).map((state) => <ul key={state}>{progress[state].map((target) => <li key={target.id} data-testid="shell-close-result" data-state={state} data-target-id={target.id}>{t(`shell.closeResult.${state}`)} · {target.title}</li>)}</ul>)}
+      </div>}
       {!!items.length && <p data-testid="shell-close-count" className="mb-3 text-sm">{t("shell.closeCount", { count: items.length })}</p>}
       {items.map((item) => <section key={item.target.id} data-target-id={item.target.id} className="mb-3">
         <p className="font-medium">{item.target.title}</p>
@@ -37,6 +41,7 @@ export function ShellCloseDialog({ items, errors, onFinish }: { items: ClosePlan
       </section>)}
       {errors.map((error) => <p key={error.id} role="alert" data-testid="shell-close-error" data-target-id={error.id} className="mb-3 text-red-500">{error.error}</p>)}
       <div className="flex justify-end gap-2">
+        {!!progress?.remaining.length && <button type="button" data-testid="shell-close-retry-remaining" className="taomni-button px-3 py-1" onClick={() => onFinish({ "$remaining": "retry" })}>{t("shell.retryRemaining")}</button>}
         <button type="button" data-testid="shell-close-cancel" className="taomni-button px-3 py-1" onClick={() => onFinish(null)}>{t("common.cancel")}</button>
         <button type="button" data-testid="shell-close-confirm" className="taomni-button px-3 py-1" disabled={risks.some((risk) => !choices[risk.id])}
           onClick={() => onFinish(choices)}>{t(errors.length ? "common.ok" : "shell.closeConfirm")}</button>

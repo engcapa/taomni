@@ -54,6 +54,7 @@ export function WorkspaceToolSurface({ tabId, workspaceInstanceId, tool, nodes, 
       const s = useShellLayoutStore.getState();
       s.updateLayout((l) => ({ ...l, navigator: { ...l.navigator, lastArea: "workspaces", collapsedByLane: { ...l.navigator.collapsedByLane, build: false } } }));
       s.setNavigatorPage("project");
+      useShellLayoutStore.setState({ navigatorOverlay: true, overlayTarget: "navigator", ...(s.immersive ? { immersiveReveal: "navigator" } : {}) });
     } });
     const off = registerPanelActions(id, {
       open: () => callback.current(true),

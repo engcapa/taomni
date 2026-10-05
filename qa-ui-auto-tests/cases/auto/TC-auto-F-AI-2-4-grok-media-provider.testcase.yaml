@@ -43,7 +43,7 @@ steps:
 - click: '[data-testid="tab-item"][data-tab-id="welcome"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
-- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- click: '[data-testid="shell-rail-tao"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="chat-mode-image"]'
 - wait_for: select[aria-label="Thread LLM provider"]

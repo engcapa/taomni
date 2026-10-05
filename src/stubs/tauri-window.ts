@@ -9,6 +9,7 @@ class MockWindow {
   }
   async scaleFactor(): Promise<number> { return 1; }
   async setResizable(_resizable: boolean): Promise<void> { return undefined; }
+  async setDecorations(_decorations: boolean): Promise<void> { return undefined; }
   async onCloseRequested(_handler: (event: CloseRequestedEvent) => void | Promise<void>): Promise<() => void> {
     return () => {};
   }

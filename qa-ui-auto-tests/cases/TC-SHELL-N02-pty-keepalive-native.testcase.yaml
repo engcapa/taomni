@@ -1,7 +1,8 @@
 id: TC-SHELL-N02
 title: Real PTY survives Shell lane and Tao switches
-description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n02
-  records the complete scenario and any remaining manual boundary.
+description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n02 records
+  the complete scenario and any remaining manual boundary. Classification now uses dock/Actions; Project uses the
+  unified Workspaces entry. Existing workspace content, shortcut and state assertions remain.
 covers:
 - F1.6
 - F1.5
@@ -34,146 +35,226 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo QA_SHELL_KEEP
     submit: false
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - wait_for: '[data-testid="shell-lane-empty"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
 - click: '[data-testid="shell-rail-tao"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="shell-rail-tao"]'
@@ -203,122 +284,121 @@ verification:
     - 5
     - 7
   - id: R2
-    requirement: An unsubmitted command remains in the same PTY after 20 lane switches
-      and Hub show/hide.
+    requirement: An unsubmitted command remains in the same PTY after 20 lane switches and Hub show/hide.
     actions:
     - 8
-    - 9
     - 11
-    - 12
-    - 14
     - 15
-    - 17
     - 18
-    - 20
-    - 21
-    - 23
-    - 24
-    - 26
-    - 27
+    - 22
+    - 25
     - 29
-    - 30
     - 32
-    - 33
-    - 35
     - 36
-    - 38
     - 39
-    - 41
-    - 42
-    - 44
-    - 45
-    - 47
-    - 48
+    - 43
+    - 46
     - 50
-    - 51
     - 53
-    - 54
-    - 56
     - 57
-    - 59
     - 60
-    - 62
-    - 63
-    - 65
-    - 66
-    - 68
-    - 69
+    - 64
+    - 67
     - 71
-    - 72
+    - 74
+    - 78
+    - 81
+    - 85
+    - 88
+    - 92
+    - 95
+    - 99
+    - 102
+    - 106
+    - 109
+    - 113
+    - 116
+    - 120
+    - 123
+    - 127
+    - 130
+    - 134
+    - 137
+    - 141
+    - 144
+    - 148
+    - 149
+    - 151
+    - 152
     checkpoints:
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 13
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 16
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
     - step: 19
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 22
+    - step: 26
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 25
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 31
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 34
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 37
+    - step: 33
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
     - step: 40
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 43
+    - step: 47
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 46
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 52
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 55
-      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 58
+    - step: 54
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
     - step: 61
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 64
+    - step: 68
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 67
+    - step: 75
       expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 70
+    - step: 82
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 89
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 96
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 103
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 110
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 117
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 124
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 131
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 138
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 145
+      expectation: '{"wait_for": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 150
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
-    - step: 73
+    - step: 153
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
         "regex": "(?m)^QA_SHELL_KEEP\\s*$", "timeout_sec": 20}}'
     results:
-    - 10
-    - 13
-    - 16
+    - 12
     - 19
-    - 22
-    - 25
-    - 28
-    - 31
-    - 34
-    - 37
+    - 26
+    - 33
     - 40
-    - 43
-    - 46
-    - 49
-    - 52
-    - 55
-    - 58
+    - 47
+    - 54
     - 61
-    - 64
-    - 67
-    - 70
-    - 73
+    - 68
+    - 75
+    - 82
+    - 89
+    - 96
+    - 103
+    - 110
+    - 117
+    - 124
+    - 131
+    - 138
+    - 145
+    - 150
+    - 153
   visual:
   - check: Read final screenshot for clipped controls and retained content
     method: manual

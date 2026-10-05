@@ -7537,7 +7537,7 @@ describe("CodeWorkspaceTab", () => {
     expect(secondaryView!.state.selection.ranges).toHaveLength(2);
   });
 
-  it("keeps the hosted Project live and hides the same tree through its stripe", async () => {
+  it("keeps the hosted Project live through the unified workspace dock", async () => {
     workspaceMocks.workspaceListDir.mockResolvedValue([entry("notes.txt", "notes.txt")]);
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app", workspaceId: "ws-hosted-tree", workspaceInstanceId: "instance-hosted-tree",
@@ -7548,16 +7548,19 @@ describe("CodeWorkspaceTab", () => {
     useAppStore.setState({ activeTabId: "tab-code", tabs: [{ id: "tab-code", type: "code-workspace", title: "Hosted Tree", closable: true, codeWorkspace: workspace }] });
     useShellLayoutStore.setState({ navigatorPage: "project", layout: { ...previousShell.layout, navigator: { ...previousShell.layout.navigator, lastArea: "workspaces" } } });
     try {
-      render(<ShellSurfaceRegistry><SurfaceSlot id="navigator-project" /><SurfaceSlot id="parking" />
+      render(<ShellSurfaceRegistry><ShellFrame navigator={<SurfaceSlot id="navigator-project" />}>
         <CodeWorkspaceTab tabId="tab-code" workspace={workspace} visible shellHosted />
-      </ShellSurfaceRegistry>);
+      </ShellFrame></ShellSurfaceRegistry>);
       const tree = await screen.findByTestId("code-workspace-tree-pane");
       await screen.findAllByTestId("code-workspace-tree-file");
       expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-hosted-tree").languagePanelOpen).toBe(true);
-      fireEvent.click(screen.getByTestId("code-workspace-tool-rail-project"));
-      await waitFor(() => expect(tree.closest("[data-surface-id]")).toHaveAttribute("aria-hidden", "true"));
-      fireEvent.click(screen.getByTestId("code-workspace-tool-rail-project"));
-      await waitFor(() => expect(tree.closest("[data-surface-id]")).toHaveAttribute("aria-hidden", "false"));
+      expect(screen.queryByTestId("code-workspace-tool-rail-project")).toBeNull();
+      // jsdom is a narrow viewport: reveal the overlay before testing hide.
+      if (window.innerWidth < 1200) fireEvent.click(screen.getByTestId("shell-rail-workspaces"));
+      fireEvent.click(screen.getByTestId("shell-rail-workspaces"));
+      await waitFor(() => expect(useShellLayoutStore.getState().layout.navigator.collapsedByLane.build).toBe(true));
+      fireEvent.click(screen.getByTestId("shell-rail-workspaces"));
+      await waitFor(() => expect(useShellLayoutStore.getState().layout.navigator.collapsedByLane.build).toBe(false));
       expect(screen.getByTestId("code-workspace-tree-pane")).toBe(tree);
     } finally {
       cleanup();
@@ -7632,6 +7635,13 @@ describe("CodeWorkspaceTab", () => {
       fireEvent.click(screen.getByTestId("shell-host-hide"));
       await waitFor(() => expect(document.activeElement).toBe(editor));
       expect(view.state.doc.toString()).toBe(editedText);
+      act(() => useShellLayoutStore.getState().toggleImmersive());
+      expect(screen.getByTestId("code-workspace-tab")).toHaveAttribute("data-immersive-workspace", "true");
+      expect(EditorView.findFromDOM(editor)).toBe(view);
+      expect(view.state.doc.toString()).toBe(editedText);
+      act(() => useShellLayoutStore.getState().toggleImmersive());
+      expect(screen.getByTestId("code-workspace-tab")).toHaveAttribute("data-immersive-workspace", "false");
+      expect(EditorView.findFromDOM(editor)).toBe(view);
       fireEvent.keyDown(editor, { key: "z", ctrlKey: true });
       await waitFor(() => expect(view.state.doc.toString()).toBe(originalText));
       expect(editor.textContent).toBe("retained editor text");

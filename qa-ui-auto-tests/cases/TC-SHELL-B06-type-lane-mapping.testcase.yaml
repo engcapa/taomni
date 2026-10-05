@@ -1,7 +1,8 @@
 id: TC-SHELL-B06
 title: Every known TabKind opens through UI in its default lane; unknown restore stays safe
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b06.
-  Browser IPC fixtures prove renderer outcomes only.'
+  Browser IPC fixtures prove renderer outcomes only. Classification now uses dock/Actions; Project uses the unified
+  Workspaces entry. Existing workspace content, shortcut and state assertions remain.'
 covers:
 - F1.5
 - F-SHELL-1
@@ -20,8 +21,8 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
     key: taomni.shellLayout.v2
-    value: '{"version": 2, "restoreSources": {"unsupported:future": {"kind": "future-protocol", "identity":
-      "future", "title": "Future view", "password": "DISCARD-ME", "payload": {"token": "DISCARD-ME"}}}}'
+    value: '{"version": 2, "restoreSources": {"unsupported:future": {"kind": "future-protocol", "identity": "future",
+      "title": "Future view", "password": "DISCARD-ME", "payload": {"token": "DISCARD-ME"}}}}'
 - seed_storage:
     key: taomni.welcome.sessionResumeCleared.v1
     value: 'true'
@@ -38,7 +39,7 @@ steps:
     selector: '[data-testid="shell-unavailable-view"]'
     contains: future-protocol
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: utility
 - click: '[data-testid="shell-overview-trigger"]'
@@ -62,7 +63,7 @@ steps:
     selector: '[data-testid="welcome-panel"]'
     equal: 1
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - screenshot: tc-shell-b06.png
@@ -71,7 +72,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-s"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="sftp"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - click: '[data-testid="shell-rail-home"]'
@@ -79,7 +80,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-f"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - click: '[data-testid="shell-rail-home"]'
@@ -87,7 +88,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-rdp"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="rdp"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - click: '[data-testid="shell-rail-home"]'
@@ -95,7 +96,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-vnc"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="vnc"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - click: '[data-testid="shell-rail-home"]'
@@ -103,7 +104,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-object"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="object-storage"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - click: '[data-testid="shell-rail-home"]'
@@ -111,7 +112,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-d"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="database"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: build
 - click: '[data-testid="shell-rail-home"]'
@@ -119,7 +120,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-redis"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="redis"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: build
 - click: '[data-testid="shell-rail-home"]'
@@ -127,7 +128,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-hbase"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="hbase-shell"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: build
 - click: '[data-testid="shell-rail-home"]'
@@ -135,7 +136,7 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-mail"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="mail"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: communicate
 - click: '[data-testid="shell-rail-home"]'
@@ -143,42 +144,42 @@ steps:
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-proxy"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="proxy-test"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: utility
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-tunneling"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="nettools"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: utility
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-sockscap"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="sockscap"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: utility
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-mail-unified"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="mail-unified"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: communicate
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-lan-chat"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="lan-chat"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: communicate
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-network-tools"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="placeholder"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: utility
 - shell_navigate: tools
@@ -187,13 +188,13 @@ steps:
 - vault_first_run: qa-shell-types-password
 - wait_for: '[data-testid="mfa-panel"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: utility
 - click: '[data-testid="shell-rail-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: utility
 - click: '[data-testid="shell-rail-home"]'
@@ -201,7 +202,7 @@ steps:
 - click: '[data-testid="welcome-recent-workspace-row"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: build
 - click: '[data-testid="code-workspace-git-panel-toggle"]'
@@ -210,7 +211,7 @@ steps:
 - click: '[data-testid="shell-panel-promote"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="git"][data-active="true"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: build
 - click: '[data-testid="shell-overview-trigger"]'
@@ -283,16 +284,18 @@ steps:
 - press:
     selector: '[data-testid="shell-tab-search"]'
     key: Escape
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: build
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.build
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.build"]'
 - click: '[data-testid="tab-item"][data-tab-type="database"]'
 - right_click: '[data-testid="tab-item"][data-tab-type="database"]'
 - click: '[data-testid="shell-tab-move-lane"]'
 - hover: '[data-testid="shell-tab-move-lane"]'
 - click: '[data-testid="shell-tab-move-utility"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: utility
 - assert_attribute:
@@ -302,7 +305,7 @@ steps:
 - right_click: '[data-testid="tab-item"][data-tab-type="database"]'
 - click: '[data-testid="shell-tab-default-lane"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: build
 - screenshot: tc-shell-b06-all-types.png
@@ -310,8 +313,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The persistence decoder preserves a safe unknown-view descriptor and explicit restore
-      opens a readable Utility fallback.
+    requirement: The persistence decoder preserves a safe unknown-view descriptor and explicit restore opens a readable
+      Utility fallback.
     actions:
     - 3
     - 4
@@ -326,19 +329,17 @@ verification:
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"shell-unavailable-view\"]"}'
     - step: 12
-      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-unavailable-view\"]", "contains":
-        "future-protocol"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-unavailable-view\"]", "contains": "future-protocol"}}'
     - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "utility"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
     results:
     - 6
     - 11
     - 12
     - 13
   - id: R2
-    requirement: Closing the unknown view removes only it and sanitizes arbitrary secrets; Connect remains
-      operational.
+    requirement: Closing the unknown view removes only it and sanitizes arbitrary secrets; Connect remains operational.
     actions:
     - 14
     - 16
@@ -360,8 +361,8 @@ verification:
     - step: 23
       expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-panel\"]", "equal": 1}}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "connect"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
     results:
     - 15
     - 17
@@ -370,8 +371,7 @@ verification:
     - 23
     - 24
   - id: R3
-    requirement: The saved sftp UI opener creates its primary view in connect; this is renderer routing
-      evidence.
+    requirement: The saved sftp UI opener creates its primary view in connect; this is renderer routing evidence.
     actions:
     - 26
     - 27
@@ -380,14 +380,14 @@ verification:
     - step: 29
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"sftp\"][data-active=\"true\"]"}'
     - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "connect"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
     results:
     - 29
     - 30
   - id: R4
-    requirement: The saved file-browser UI opener creates its primary view in connect; this is renderer
-      routing evidence.
+    requirement: The saved file-browser UI opener creates its primary view in connect; this is renderer routing
+      evidence.
     actions:
     - 31
     - 32
@@ -396,14 +396,13 @@ verification:
     - step: 34
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"][data-active=\"true\"]"}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "connect"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
     results:
     - 34
     - 35
   - id: R5
-    requirement: The saved rdp UI opener creates its primary view in connect; this is renderer routing
-      evidence.
+    requirement: The saved rdp UI opener creates its primary view in connect; this is renderer routing evidence.
     actions:
     - 36
     - 37
@@ -412,14 +411,13 @@ verification:
     - step: 39
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"rdp\"][data-active=\"true\"]"}'
     - step: 40
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "connect"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
     results:
     - 39
     - 40
   - id: R6
-    requirement: The saved vnc UI opener creates its primary view in connect; this is renderer routing
-      evidence.
+    requirement: The saved vnc UI opener creates its primary view in connect; this is renderer routing evidence.
     actions:
     - 41
     - 42
@@ -428,14 +426,14 @@ verification:
     - step: 44
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"vnc\"][data-active=\"true\"]"}'
     - step: 45
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "connect"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
     results:
     - 44
     - 45
   - id: R7
-    requirement: The saved object-storage UI opener creates its primary view in connect; this is renderer
-      routing evidence.
+    requirement: The saved object-storage UI opener creates its primary view in connect; this is renderer routing
+      evidence.
     actions:
     - 46
     - 47
@@ -444,14 +442,13 @@ verification:
     - step: 49
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"object-storage\"][data-active=\"true\"]"}'
     - step: 50
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "connect"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
     results:
     - 49
     - 50
   - id: R8
-    requirement: The saved database UI opener creates its primary view in build; this is renderer routing
-      evidence.
+    requirement: The saved database UI opener creates its primary view in build; this is renderer routing evidence.
     actions:
     - 51
     - 52
@@ -460,14 +457,13 @@ verification:
     - step: 54
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"database\"][data-active=\"true\"]"}'
     - step: 55
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "build"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
     results:
     - 54
     - 55
   - id: R9
-    requirement: The saved redis UI opener creates its primary view in build; this is renderer routing
-      evidence.
+    requirement: The saved redis UI opener creates its primary view in build; this is renderer routing evidence.
     actions:
     - 56
     - 57
@@ -476,14 +472,13 @@ verification:
     - step: 59
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"redis\"][data-active=\"true\"]"}'
     - step: 60
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "build"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
     results:
     - 59
     - 60
   - id: R10
-    requirement: The saved hbase-shell UI opener creates its primary view in build; this is renderer routing
-      evidence.
+    requirement: The saved hbase-shell UI opener creates its primary view in build; this is renderer routing evidence.
     actions:
     - 61
     - 62
@@ -492,14 +487,13 @@ verification:
     - step: 64
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"hbase-shell\"][data-active=\"true\"]"}'
     - step: 65
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "build"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
     results:
     - 64
     - 65
   - id: R11
-    requirement: The saved mail UI opener creates its primary view in communicate; this is renderer routing
-      evidence.
+    requirement: The saved mail UI opener creates its primary view in communicate; this is renderer routing evidence.
     actions:
     - 66
     - 67
@@ -508,14 +502,13 @@ verification:
     - step: 69
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mail\"][data-active=\"true\"]"}'
     - step: 70
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "communicate"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "communicate"}}'
     results:
     - 69
     - 70
   - id: R12
-    requirement: The saved proxy-test UI opener creates its primary view in utility; this is renderer
-      routing evidence.
+    requirement: The saved proxy-test UI opener creates its primary view in utility; this is renderer routing evidence.
     actions:
     - 71
     - 72
@@ -524,8 +517,8 @@ verification:
     - step: 74
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"proxy-test\"][data-active=\"true\"]"}'
     - step: 75
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "utility"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
     results:
     - 74
     - 75
@@ -538,8 +531,8 @@ verification:
     - step: 78
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"nettools\"][data-active=\"true\"]"}'
     - step: 79
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "utility"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
     results:
     - 78
     - 79
@@ -552,8 +545,8 @@ verification:
     - step: 82
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"sockscap\"][data-active=\"true\"]"}'
     - step: 83
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "utility"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
     results:
     - 82
     - 83
@@ -566,8 +559,8 @@ verification:
     - step: 86
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"mail-unified\"][data-active=\"true\"]"}'
     - step: 87
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "communicate"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "communicate"}}'
     results:
     - 86
     - 87
@@ -580,8 +573,8 @@ verification:
     - step: 90
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"lan-chat\"][data-active=\"true\"]"}'
     - step: 91
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "communicate"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "communicate"}}'
     results:
     - 90
     - 91
@@ -594,8 +587,8 @@ verification:
     - step: 94
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"placeholder\"][data-active=\"true\"]"}'
     - step: 95
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "utility"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
     results:
     - 94
     - 95
@@ -611,15 +604,14 @@ verification:
     - step: 100
       expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
     - step: 101
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "utility"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
     results:
     - 98
     - 100
     - 101
   - id: R19
-    requirement: Settings and a workspace open through their actual entries; Git promotion preserves the
-      Build default.
+    requirement: Settings and a workspace open through their actual entries; Git promotion preserves the Build default.
     actions:
     - 102
     - 105
@@ -631,20 +623,20 @@ verification:
     - step: 103
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 104
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "utility"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
     - step: 108
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 109
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "build"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
     - step: 111
       expectation: '{"wait_for": "[data-testid=\"shell-host\"]"}'
     - step: 114
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"git\"][data-active=\"true\"]"}'
     - step: 115
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "build"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
     results:
     - 103
     - 104
@@ -654,19 +646,19 @@ verification:
     - 114
     - 115
   - id: R20
-    requirement: Overview contains exactly all 21 TabKind values in their declared lanes; changing a database
-      display group preserves its type.
+    requirement: Overview contains exactly all 21 TabKind values in their declared lanes; changing a database display
+      group preserves its type.
     actions:
     - 116
     - 139
-    - 140
-    - 141
     - 142
     - 143
     - 144
     - 145
-    - 148
-    - 149
+    - 146
+    - 147
+    - 150
+    - 151
     checkpoints:
     - step: 117
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 21}}'
@@ -733,15 +725,15 @@ verification:
     - step: 138
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"][data-tab-type=\"placeholder\"][data-lane=\"utility\"]",
         "equal": 1}}'
-    - step: 146
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "utility"}}'
-    - step: 147
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]",
-        "name": "data-tab-type", "equals": "database"}}'
-    - step: 150
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "build"}}'
+    - step: 148
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
+    - step: 149
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name":
+        "data-tab-type", "equals": "database"}}'
+    - step: 152
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
     results:
     - 117
     - 118
@@ -765,9 +757,9 @@ verification:
     - 136
     - 137
     - 138
-    - 146
-    - 147
-    - 150
+    - 148
+    - 149
+    - 152
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual

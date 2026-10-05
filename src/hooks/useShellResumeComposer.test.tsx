@@ -37,6 +37,21 @@ function ready(workspace: CodeWorkspaceTabInfo): ShellRestoreOutcome {
 }
 
 describe("Shell working-set restoration", () => {
+  it("preserves unavailable snapshots while independent workspaces restore and refresh permits recovery", async () => {
+    const saved = session({ view: { state: "unavailable", reason: "schema", message: "Unsupported snapshot" } });
+    const { result, rerender } = renderHook(() => useShellResumeComposer(saved, async (workspace) => ready(workspace)));
+    expect(result.current.state).toBe("unavailable");
+    expect(result.current.error).toBe("Unsupported snapshot");
+    await act(async () => { await result.current.start(); });
+    expect(result.current.outcomes).toHaveLength(2);
+    expect(result.current.state).toBe("partial");
+    expect(saved.startRestore).not.toHaveBeenCalled();
+    act(() => result.current.refresh());
+    expect(saved.refresh).toHaveBeenCalledOnce();
+    saved.view = { state: "empty" }; rerender();
+    expect(result.current.error).toBeNull();
+    expect(result.current.state).toBe("available");
+  });
   beforeEach(() => {
     localStorage.clear();
     useAppStore.setState({ tabs: [{ id: "welcome", type: "welcome", title: "Home", closable: false }], activeTabId: "welcome" });

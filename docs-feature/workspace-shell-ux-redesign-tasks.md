@@ -8,20 +8,24 @@
 
 | 任务 | 状态 | 依赖 | 交付 / 验证证据 |
 |---|---|---|---|
-| TASK-01 契约与纯模型 | done | 无 | 类型、身份、尺寸策略、Shell store；unit 与最终六端验收 |
-| TASK-02 壳层布局集成 | done | 01 | Rail / Navigator / MainLayout / ControlBar；最终六端验收 |
-| TASK-03 标签与 action 路由 | done | 01,04 | lane、总览、快速切换、快捷键；最终六端验收 |
-| TASK-04 实例与关闭事务 | done | 01 | stable surface、close coordinator、DB adapter；最终六端及真实 SQL 验收 |
-| TASK-05 SFTP 与任务 ownership | done | 01,04 | view/job lease、后台、promotion；最终六端及独立文件/协议观察 |
-| TASK-06 Workspace / Git | done | 01,04 | Project、tools、Git Host；最终六端及真实单/多仓库验收 |
-| TASK-07 Tao / 通知 | done | 01,04,05 | Hub、目标解析、成功后确认；最终六端及 AI HTTP/SSE 验收 |
-| TASK-08 Home / 恢复 | done | 01,03,10 | 三主动作、最近项、组合恢复；最终六端验收 |
-| TASK-09 原生窗口 | done | 04,05,06,07 | Git、detach 事务、回停靠；三端实际 native 验收 |
-| TASK-10 持久化与回退 | done | 01,04,07 | v2 migration、恢复 identity；最终六端及重启 stored/rendered 验收 |
-| TASK-11 用例与自动化支持 | done | 随相关实现 | 已交付 62 条 Shell YAML（45 browser / 17 native）、受影响回归与 catalog/policy；250 ID 最终验收 |
-| TASK-12 集成与验收 | done | 02–11 | 本地 unit/static、六端 761/0/0、33,090 步完整、72 张截图审阅；见下方最终验收 |
+| TASK-01 契约与纯模型 | in_progress | 无 | 类型、身份、尺寸策略、Shell store；unit 与最终六端验收 |
+| TASK-02 壳层布局集成 | in_progress | 01 | Rail / Navigator / MainLayout / ControlBar；最终六端验收 |
+| TASK-03 标签与 action 路由 | in_progress | 01,04 | lane、总览、快速切换、快捷键；最终六端验收 |
+| TASK-04 实例与关闭事务 | in_progress | 01 | stable surface、close coordinator、DB adapter；最终六端及真实 SQL 验收 |
+| TASK-05 SFTP 与任务 ownership | in_progress | 01,04 | view/job lease、后台、promotion；最终六端及独立文件/协议观察 |
+| TASK-06 Workspace / Git | in_progress | 01,04 | Project、tools、Git Host；最终六端及真实单/多仓库验收 |
+| TASK-07 Tao / 通知 | in_progress | 01,04,05 | Hub、目标解析、成功后确认；最终六端及 AI HTTP/SSE 验收 |
+| TASK-08 Home / 恢复 | in_progress | 01,03,10 | 三主动作、最近项、组合恢复；最终六端验收 |
+| TASK-09 原生窗口 | in_progress | 04,05,06,07 | Git、detach 事务、回停靠；三端实际 native 验收 |
+| TASK-10 持久化与回退 | in_progress | 01,04,07 | v2 migration、恢复 identity；最终六端及重启 stored/rendered 验收 |
+| TASK-11 用例与自动化支持 | in_progress | 随相关实现 | 本轮新增 B46～B52、N23，适配既有入口用例与 catalog/policy；新输入六端待验收 |
+| TASK-12 集成与验收 | in_progress | 02–11 | 本轮本地 unit/static 与 GitHub 六端验证进行中；历史记录不代表本轮通过 |
 
-## 本轮实施进度
+## main 合并与审阅补齐（当前批次）
+
+当前任务重新进入实施与验收：合并 `origin/main` 的 `a90a0bd3`，补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口。用户明确要求同步移除本地终端 Rail Git 入口，并将窗口抓手恢复到右上角系统区（以用户最后要求为准）。新输入必须重新通过本地 unit/static 和 GitHub 六端验证，以下旧输入通过记录仅作历史基线，不能证明合并后完成。
+
+## 上一批次实施进度（历史）
 
 TASK-01～12 已全部 done。最终产品/runner/用例输入为 `98ddf0182c74e53dbeb8b3c196e0ff02169020c2`；[完整六端 run 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束，250 ID / 761 次实际执行为 **761 pass / 0 fail / 0 skip**，33,090 步全部完整通过。三个 browser 端各 190/0/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。六份原始报告与源码、runner、用例、配置、receipt、native build 及 ZIP hashes 匹配，严格 gate 通过；72 张当前 Shell 截图已实际审阅。本地前端 526 文件 / 5244 项已按原始全量报告和完整编辑器重跑核对通过；前序 Rust full unit 为 1590 pass / 0 fail / 16 既有 ignored，本轮截图诊断相关 Rust unit 52/52 与日志观察 unit 5/5 通过，TypeScript 与相关静态检查通过。历史失败和未验证边界完整保留。
 
@@ -35,7 +39,7 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 
 输入 `bc8b06f1bbde025683514b4d8aab99dbcfc801a8` 的 [macOS 精准复验 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 为 4/1/0。N5～N8 四条录屏通过；RDP 的第 62 步误把“释放日志必须是最后一行”作为条件，实际释放后还持续输出延迟统计。随后改为观察最新连接生命周期记录的断开状态，5 个 jsdom 单元观察样本通过，原独立协议探针、63 步和 480 秒预算保持；最终三端 native 复验通过。
 
-## 最终六端验收
+## 上一批次六端验收（历史）
 
 <a id="final-acceptance"></a>
 
@@ -325,3 +329,19 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - `shell-rdp-release-unit-367.json` 保留从原始失败 DOM 建立的五个 jsdom 单元样本：统计行后的已释放状态通过；当前活动连接、释放后新连接、只有统计行和空日志均拒绝。reviewed checkpoint 与真实 YAML 逐项一致，仍 63 步 / 480 秒。
 - N5～N8 的采集队列均无满队列样本，采集到的 frame code 全部出现在解码结果，四条逐帧原图比对和生命周期通过。N7 最长 unexplained gap 为 150 ms（原 700 ms 上限），像素、顺序及 nonce 均通过；四张 source/actual/difference contact sheet 已实际查看。旧 N7 的 865 ms 失败未复现，根因仍未确定，不声称完成了产品缺帧修复。证据 `run-37243895415/recording-review.json` 与 `shell-mac-record-review-366/` 保留。
 - 本批只修正 YAML 观察条件并更新记录，产品源码、runner、录屏诊断、原断言与预算保持；本地未运行 browser/native。下一轮在统一固定输入验证完整 250 ID / 761 次六端范围。
+
+
+### 当前补齐实现与检查（2026-10-05）
+
+- 标题栏全部入口已按全局/上下文/状态/窄屏逐项审阅，具体决策见设计末尾矩阵。空分类不再把 close、detach、Panel 或工作区命令送给后台保留标签；菜单的 split/multiexec 条件与标题栏一致。
+- Dock 分类与四方向、沉浸模式、Project 合并、Tao 悬浮球移除、Java discovery/最近工作区切换、恢复错误、部分关闭摘要和剩余重试已实施。
+- 本地聚焦 `shell-followup-unit-411`：20 files / 91 tests 通过；`shell-followup-types-410` 两类类型错误已修正，后续完整检查进行中。`shell-followup-audit-412` 发现继承的 readonly selector 字符串校验问题和三处新 contract 末步映射缺失，已按实际观察修正，保留全部行为断言与原时间预算。
+- 本地仅执行 unit/static；browser/native 未启动。GitHub 新输入尚未验证，任务不标 done。
+
+### 合并后候选本地验证收尾
+
+- main 合并提交为 `b690bcda`（合入 `a90a0bd3`）；后续改动按用户最终要求采用右上角抓手、四方向 Dock、全隐藏沉浸模式和统一标题栏上下文规则。
+- Rust 全量 lib 单测 `shell-followup-rust-unit-416`：1598 passed / 0 failed / 16 ignored。前端全量 `shell-followup-full-unit-413`：529 files、5275 passed / 1 failed；唯一失败为删除 Project stripe 后的旧入口。更新该用例并加入沉浸往返的完整草稿、EditorView 与 undo 断言后，`shell-editor-final-427` 两项相关测试全部通过（248 项为名称过滤未选中）。保留原失败日志，不将补跑描述为再次全量通过。
+- 新增 ContextActionsSlot/PanelRegistry/CloseCoordinator 单测 `424` 为 3 files / 10 tests 通过，keyboard runner 单测 `415` 为 16 项通过。类型检查 `422` 通过，后续沉浸 Action 路由调整继续由 `428` 检查。静态 audit `426` 通过，coverage baseline 未变；最后批次复核为 `430`。
+- Welcome 恢复及 native cwd/PTY 用例重新语义审阅，加入恢复后的真实命令输出、唯一隔离目录及持久化结果；八条旧 needs-review 已按真实断言更新，未把语法审查当作运行通过。
+- 本批本地仅 unit/static，无 browser/native 执行或应用构建。六端验证尚未通过，TASK-01～12 继续 in_progress。

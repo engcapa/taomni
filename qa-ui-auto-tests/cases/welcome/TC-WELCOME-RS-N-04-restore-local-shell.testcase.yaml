@@ -6,7 +6,6 @@ tags:
 - welcome
 - native-gate
 - p1
-- needs-review
 modes:
 - native
 fixtures:
@@ -16,7 +15,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-gate-password
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="welcome-new-session"]'
+- shell_navigate: sessions
+- click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-shell"]'
 - wait_for: '[data-testid="session-proto-shell"][data-active="true"]'
@@ -26,61 +26,95 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-native-shell
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-native-shell"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-native-shell"]'
-- wait_for:
-    selector: '[data-testid="terminal-pane"]'
-    timeout_sec: 30
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
 - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - wait_for:
     selector: '[data-testid="welcome-restore-status"][data-state="available"]'
     timeout_sec: 20
 - click: '[data-testid="welcome-restore-last-session"]'
-- wait: 2
-- eval_readonly:
-    expression: document.querySelectorAll('[data-tab-type]').length === 2
-    expect_truthy: true
+- wait_for: '[data-testid="tab-item"][data-tab-type="terminal"][data-active="true"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    equal: 1
 - screenshot: F1.6-native-restore-localshell.png
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: echo QA_RESTORED_LOCAL
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_RESTORED_LOCAL\s*$
+    timeout_sec: 20
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 'Native: saved LocalShell run snapshot restores and locates the live tab：按步骤执行后，所有声明的可观察结果均满足。'
+    requirement: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+      and that PTY executes a new command.
     actions:
     - 1
     - 2
     - 4
+    - 5
+    - 7
+    - 9
+    - 11
+    - 12
+    - 13
+    - 15
+    - 17
+    - 20
+    - 24
+    checkpoints:
+    - step: 3
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 6
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 8
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 10
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 14
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 16
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 18
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 19
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 21
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 22
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    - step: 25
+      expectation: UI-created LocalShell commits a restore candidate; restore locates exactly one active terminal
+        and that PTY executes a new command.
+    results:
+    - 3
     - 6
     - 8
     - 10
-    - 11
-    - 13
-    - 15
+    - 14
+    - 16
     - 18
-    checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 5
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"session-proto-shell\"][data-active=\"true\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-native-shell\"]"}'
-    - step: 14
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]",
-        "timeout_sec": 20}}'
-    - step: 20
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type]'').length ===
-        2", "expect_truthy": true}}'
-    results:
-    - 20
+    - 19
+    - 21
+    - 22
+    - 25
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

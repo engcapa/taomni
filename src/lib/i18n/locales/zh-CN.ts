@@ -6,6 +6,8 @@ type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } 
 
 export const zhCN: DeepPartial<typeof en> = {
   shell: {
+    titlebarActions: "标题栏操作",
+    contextActions: "当前内容操作",
     notesWindowRecovered: "便签窗口意外关闭，已在此恢复最近收到的草稿。",
     panelWindowRecovered: "独立窗口意外关闭，已在此恢复最近收到的状态。",
     missingPanelOwner: "原连接或工作区已不可用，请选择所属连接或工作区来重新打开面板。",
@@ -15,9 +17,11 @@ export const zhCN: DeepPartial<typeof en> = {
     panelLabels: { sftp: "SFTP", git: "Git", problems: "问题", "workspace-terminal": "终端" },
     pinContext: "将当前对话固定到此工作面",
     details: "详情", dirty: "未保存更改", attentionStates: { none: "无提醒", unread: "新动态", busy: "正在运行", error: "错误" },
+    closeProgress: "已关闭 {closed} 项，剩余 {remaining} 项", closeResult: { closed: "已关闭", remaining: "仍打开" }, retryRemaining: "重试剩余项目", panelUnavailable: "此视图没有上下文面板",
+    actions: "搜索操作", immersive: "进入沉浸模式", exitImmersive: "退出沉浸模式", actionUnavailable: "当前上下文不可用", rail: "工具栏", hideRail: "隐藏工具栏", showRail: "显示工具栏", newSftp: "新建 SFTP 会话", mail: "邮件", lanChat: "局域网聊天", mfa: "身份验证器", screenshot: "截图",
     closeCount: "将关闭 {count} 个所选项目", closeIncludingPinned: "关闭全部（包含固定标签）", ownerUnavailable: "原所属标签已关闭，请保留此标签或关闭实例。",
     fallback: "工作台布局暂时无法显示。", reload: "重新加载窗口",
-    restoreWorkingSet: "恢复工作集", restoreStates: { loading: "加载中", empty: "暂无可恢复工作集", available: "可恢复", restoring: "恢复中", "awaiting-auth": "等待认证", succeeded: "已就绪", partial: "部分恢复", failed: "失败", cancelled: "已取消" },
+    restoreWorkingSet: "恢复工作集", restoreStates: { unavailable: "暂不可用", loading: "加载中", empty: "暂无可恢复工作集", available: "可恢复", restoring: "恢复中", "awaiting-auth": "等待认证", succeeded: "已就绪", partial: "部分恢复", failed: "失败", cancelled: "已取消" },
     workspaceDescription: "打开目录或保存的工作区，编辑、搜索、运行和管理 Git。", recentMail: "最近邮件",
     closePromoted: "将此视图回到停靠面板，或关闭实例？",
     transfers: "传输", notificationCount: "{count} 条未确认通知", targetUnavailable: "通知目标暂不可用。", aiDisabled: "AI 已关闭，可继续使用便签和通知。",
@@ -25,7 +29,7 @@ export const zhCN: DeepPartial<typeof en> = {
     queryCloseRisk: "仍有 {count} 个查询正在执行，请先取消查询再关闭。",
     transactionCloseRisk: "有 {count} 条未提交语句，请选择提交或回滚。",
     home: "首页", sessions: "会话", workspaces: "工作区", tao: "Tao", settings: "设置",
-    lane: "工作组", lanes: { home: "首页", connect: "连接", build: "开发", communicate: "沟通", utility: "工具" },
+    lane: "工作组", lanes: { home: "首页", connect: "终端与连接", build: "工作区", communicate: "沟通", utility: "工具" },
     navigator: "导航", project: "项目", tools: "工具", quickSwitch: "快速切换", overview: "所有标签", panel: "上下文面板",
     search: "搜索标签", all: "全部", attention: "仅有提醒", sort: "排序", recent: "最近使用", name: "名称", type: "类型",
     tabCount: "{count} 个标签", currentExcluded: "当前标签不在结果中", locateCurrent: "定位当前", empty: "没有匹配的标签", emptyLane: "此工作组还没有标签",

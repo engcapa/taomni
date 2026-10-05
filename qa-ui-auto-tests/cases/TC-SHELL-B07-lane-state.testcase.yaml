@@ -1,7 +1,8 @@
 id: TC-SHELL-B07
 title: Lane selection and empty lane retain the previous real surface
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b07.
-  Browser IPC fixtures prove renderer outcomes only.'
+  Browser IPC fixtures prove renderer outcomes only. Classification now uses dock/Actions; Project uses the unified
+  Workspaces entry. Existing workspace content, shortcut and state assertions remain.'
 covers:
 - F1.5
 tags:
@@ -19,9 +20,11 @@ steps:
 - click: '[data-testid="shell-rail-home"]'
 - click: '[data-testid="welcome-recent-session-row"][data-session-id="shell-a"] [data-testid="welcome-recent-open"]'
 - wait_for: '[data-testid="terminal-pane"]:visible'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: communicate
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.communicate
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.communicate"]'
 - assert_visible: '[data-testid="shell-lane-empty"]'
 - assert_attribute:
     selector: '[data-testid="shell-work-area"]'
@@ -34,7 +37,7 @@ steps:
     expect_truthy: true
     timeout_sec: 5
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: communicate
 - assert_attribute:
@@ -43,12 +46,14 @@ steps:
     equals: ''
 - click: '[data-testid="shell-lane-empty-home"]'
 - assert_visible: '[data-testid="welcome-panel"]'
-- select_option:
-    selector: '[data-testid="shell-lane-select"]'
-    value: connect
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.lane.connect
+- click: '[data-testid="shell-action-result"][data-action-id="shell.lane.connect"]'
 - assert_visible: '[data-testid="terminal-pane"]:visible'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - screenshot: tc-shell-b07.png
@@ -56,50 +61,50 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Connect resolves the same terminal; an empty Communicate lane has its own inert surface
-      and Home return. Delayed restore binding preserves the explicit empty lane and Home action while
-      the retained terminal finishes connecting.
+    requirement: Connect resolves the same terminal; an empty Communicate lane has its own inert surface and Home
+      return. Delayed restore binding preserves the explicit empty lane and Home action while the retained terminal
+      finishes connecting.
     actions:
     - 3
     - 4
-    - 6
-    - 12
+    - 8
     - 14
+    - 18
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]:visible"}'
-    - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"shell-lane-empty\"]"}'
-    - step: 8
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-work-area\"]", "name": "inert",
-        "equals": ""}}'
     - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"shell-lane-empty\"]"}'
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-work-area\"]", "name": "inert", "equals":
+        ""}}'
+    - step: 11
       expectation: '{"eval_readonly": {"expression": "JSON.stringify(JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')
         ?? ''null'')?.lastActiveRestoreRef ?? null)", "contains": "\"run-entry:saved:shell-a\"", "expect_truthy":
         true, "timeout_sec": 5}}'
-    - step: 10
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "communicate"}}'
-    - step: 11
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-work-area\"]", "name": "inert",
-        "equals": ""}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "communicate"}}'
     - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-work-area\"]", "name": "inert", "equals":
+        ""}}'
     - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 19
       expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"]:visible"}'
-    - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "connect"}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
     results:
     - 5
-    - 7
-    - 8
     - 9
     - 10
     - 11
+    - 12
     - 13
     - 15
-    - 16
+    - 19
+    - 20
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-immersive",
+  "description": "Main workspace can hide native macOS traffic lights in immersive mode.",
+  "windows": ["main"],
+  "permissions": ["core:window:allow-set-decorations"]
+}

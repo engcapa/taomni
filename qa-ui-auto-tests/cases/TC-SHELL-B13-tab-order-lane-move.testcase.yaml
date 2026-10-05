@@ -1,7 +1,8 @@
 id: TC-SHELL-B13
 title: Explicit ordering and lane overrides preserve terminal identity
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b13.
-  Browser IPC fixtures prove renderer outcomes only.'
+  Browser IPC fixtures prove renderer outcomes only. Classification now uses dock/Actions; Project uses the unified
+  Workspaces entry. Existing workspace content, shortcut and state assertions remain.'
 covers:
 - F1.5
 tags:
@@ -41,7 +42,7 @@ steps:
 - hover: '[data-testid="shell-tab-move-lane"]'
 - click: '[data-testid="shell-tab-move-build"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: build
 - assert_shell_backend:
@@ -51,7 +52,7 @@ steps:
 - right_click: '[data-testid="tab-item"]:has-text("qa-beta")'
 - click: '[data-testid="shell-tab-default-lane"]'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - assert_shell_backend:
@@ -63,8 +64,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Moving Beta first gives the exact strip order, and the edge move
-      is disabled.
+    requirement: Moving Beta first gives the exact strip order, and the edge move is disabled.
     actions:
     - 3
     - 4
@@ -76,20 +76,15 @@ verification:
     - 14
     checkpoints:
     - step: 5
-      expectation: Moving Beta first gives the exact strip order, and the edge move
-        is disabled.
+      expectation: Moving Beta first gives the exact strip order, and the edge move is disabled.
     - step: 8
-      expectation: Moving Beta first gives the exact strip order, and the edge move
-        is disabled.
+      expectation: Moving Beta first gives the exact strip order, and the edge move is disabled.
     - step: 11
-      expectation: Moving Beta first gives the exact strip order, and the edge move
-        is disabled.
+      expectation: Moving Beta first gives the exact strip order, and the edge move is disabled.
     - step: 13
-      expectation: Moving Beta first gives the exact strip order, and the edge move
-        is disabled.
+      expectation: Moving Beta first gives the exact strip order, and the edge move is disabled.
     - step: 15
-      expectation: Moving Beta first gives the exact strip order, and the edge move
-        is disabled.
+      expectation: Moving Beta first gives the exact strip order, and the edge move is disabled.
     results:
     - 5
     - 8
@@ -97,8 +92,8 @@ verification:
     - 13
     - 15
   - id: R2
-    requirement: A lane override changes presentation without recreating the business
-      terminal; restoring default returns to Connect.
+    requirement: A lane override changes presentation without recreating the business terminal; restoring default
+      returns to Connect.
     actions:
     - 16
     - 17
@@ -108,30 +103,27 @@ verification:
     - 23
     checkpoints:
     - step: 20
-      expectation: A lane override changes presentation without recreating the business
-        terminal; restoring default returns to Connect.
+      expectation: A lane override changes presentation without recreating the business terminal; restoring default
+        returns to Connect.
     - step: 21
-      expectation: A lane override changes presentation without recreating the business
-        terminal; restoring default returns to Connect.
+      expectation: A lane override changes presentation without recreating the business terminal; restoring default
+        returns to Connect.
     - step: 24
-      expectation: A lane override changes presentation without recreating the business
-        terminal; restoring default returns to Connect.
+      expectation: A lane override changes presentation without recreating the business terminal; restoring default
+        returns to Connect.
     - step: 25
-      expectation: A lane override changes presentation without recreating the business
-        terminal; restoring default returns to Connect.
+      expectation: A lane override changes presentation without recreating the business terminal; restoring default
+        returns to Connect.
     results:
     - 20
     - 21
     - 24
     - 25
   visual:
-  - check: Inspect the final screenshot for readable controls, clipping and overlay
-      placement.
+  - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual
-    reason: Screenshots require a visual verdict; geometry assertions are recorded
-      separately.
+    reason: Screenshots require a visual verdict; geometry assertions are recorded separately.
   native:
   - check: Tauri, OS window, physical input and real service effects
     method: not-applicable
-    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover
-      native boundaries.
+    reason: This case is browser renderer coverage; paired TC-SHELL-N cases cover native boundaries.

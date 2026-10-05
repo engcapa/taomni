@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "../../stores/appStore";
+import { useShellLayoutStore } from "../../stores/shellLayoutStore";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
 
@@ -41,7 +43,7 @@ vi.mock("../window/WindowControls", () => ({
 }));
 
 vi.mock("../window/TitleBarTrayControls", () => ({
-  TitleBarTrayControls: () => <div data-testid="titlebar-tray" />,
+  TitleBarTrayControls: ({ showTerminalActions }: { showTerminalActions: boolean }) => <div data-testid="titlebar-tray" data-terminal-actions={showTerminalActions} />,
 }));
 
 vi.mock("../menubar/useSessionImportExport", () => ({
@@ -97,6 +99,10 @@ function renderControlBar(
 }
 
 describe("ControlBar settings button", () => {
+  beforeEach(() => {
+    useAppStore.setState({ tabs: [{ id: "home", type: "welcome", title: "Home", closable: false }], activeTabId: "home" });
+    useShellLayoutStore.setState({ laneSelection: null, laneOverrides: {}, panels: {} });
+  });
   it("hides windows by default and offers an explicit current-window capture", () => {
     renderControlBar(vi.fn());
     fireEvent.click(screen.getByTestId("system-screenshot"));
@@ -127,7 +133,6 @@ describe("ControlBar settings button", () => {
     expect(leftGroup).toBeTruthy();
     expect(within(leftGroup!).getAllByRole("button").map((button) => button.getAttribute("data-testid"))).toEqual([
       "app-main-menu",
-      "shell-navigator-toggle",
     ]);
     expect(screen.queryByTestId("sidebar-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ribbon-settings")).not.toBeInTheDocument();
@@ -135,6 +140,7 @@ describe("ControlBar settings button", () => {
   });
 
   it("exposes commands contributed by the active Code Workspace", () => {
+    useAppStore.setState({ tabs: [{ id: "code", type: "code-workspace", title: "Code", closable: true }], activeTabId: "code" });
     const onWorkspaceCommand = vi.fn();
     renderControlBar(vi.fn(), {
       commands: [
@@ -150,15 +156,12 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
-  it("uses the button before More to reveal tab details on hover", () => {
+  it("keeps one drag grip in the right system group and removes duplicate navigation and preview buttons", () => {
     renderControlBar(vi.fn());
-    const button = screen.getByTestId("tab-details-hover");
-
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
-    fireEvent.mouseEnter(button);
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(true);
-    fireEvent.mouseLeave(button);
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
+    expect(screen.queryByTestId("tab-details-hover")).toBeNull();
+    expect(screen.queryByTestId("shell-navigator-toggle")).toBeNull();
+    expect(screen.getByTestId("window-drag-handle").closest(".shell-titlebar-system")).toBeTruthy();
+    expect(screen.getByTestId("shell-overview-trigger")).toBeInTheDocument();
   });
 
   it("preserves dragging and maximize gestures in the tab strip filler", () => {
@@ -173,6 +176,28 @@ describe("ControlBar settings button", () => {
 
     fireEvent.mouseDown(screen.getByTestId("app-main-menu"), { button: 0, detail: 1 });
     expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["welcome", "terminal", "database", "code-workspace", "sftp", "rdp", "vnc", "settings"] as const)("limits terminal layout actions in %s context", (type) => {
+    useAppStore.setState({ tabs: [{ id: "active", type, title: type, closable: type !== "welcome" }], activeTabId: "active" });
+    renderControlBar(vi.fn());
+    expect(screen.getByTestId("titlebar-tray")).toHaveAttribute("data-terminal-actions", String(type === "terminal"));
+    fireEvent.click(screen.getByTestId("app-main-menu"));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-view"));
+    for (const id of ["context-menu-item-split-terminal", "context-menu-item-multiexec"]) {
+      if (type === "terminal") expect(screen.getByTestId(id)).not.toBeDisabled();
+      else expect(screen.getByTestId(id)).toBeDisabled();
+    }
+  });
+
+  it("does not target the retained terminal from an empty lane", () => {
+    useAppStore.setState({ tabs: [{ id: "term", type: "terminal", title: "Terminal", closable: true }], activeTabId: "term" });
+    useShellLayoutStore.setState({ laneSelection: "build" });
+    renderControlBar(vi.fn(), {}, vi.fn());
+    expect(screen.getByTestId("titlebar-tray")).toHaveAttribute("data-terminal-actions", "false");
+    expect(openTabsMocks.props.at(-1)?.onDetachActiveTab).toBeUndefined();
+    fireEvent.click(screen.getByTestId("app-main-menu"));
+    expect(screen.getByTestId("context-menu-item-close-active-tab")).toBeDisabled();
   });
 
   it("forwards the active detach action into the More menu", () => {

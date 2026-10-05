@@ -18,7 +18,7 @@ const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
   { mode: "system", icon: <Monitor className="w-[16px] h-[16px]" /> },
 ];
 
-export function TitleBarTrayControls() {
+export function TitleBarTrayControls({ showTerminalActions = true }: { showTerminalActions?: boolean }) {
   const { mode, resolvedTheme, setMode } = useAppTheme();
   const terminalSplitActive = useAppStore((s) => s.terminalSplitActive);
   const multiExecActive = useAppStore((s) => s.multiExecActive);
@@ -41,6 +41,7 @@ export function TitleBarTrayControls() {
   });
   const { width } = useViewportSize();
   const trayProps: TrayProps = {
+    showTerminalActions,
     terminalSplitActive,
     multiExecActive,
     toggleTerminalSplit,
@@ -59,7 +60,7 @@ export function TitleBarTrayControls() {
     : (
     <div className="taomni-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
       {/* Terminal layout group */}
-      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
+      {showTerminalActions && <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <TrayButton
           testId="tab-split-view"
           title={splitTitle}
@@ -78,7 +79,7 @@ export function TitleBarTrayControls() {
         >
           <Users className="w-[16px] h-[16px]" />
         </TrayButton>
-      </div>
+      </div>}
 
       {!aiFullyDisabled && (
         <>
@@ -109,6 +110,7 @@ export function TitleBarTrayControls() {
 }
 
 interface TrayProps {
+  showTerminalActions: boolean;
   terminalSplitActive: boolean;
   multiExecActive: boolean;
   toggleTerminalSplit: () => void;
@@ -123,6 +125,7 @@ interface TrayProps {
 }
 
 function CompactTitleBarTray({
+  showTerminalActions,
   terminalSplitActive,
   multiExecActive,
   toggleTerminalSplit,
@@ -224,6 +227,7 @@ function CompactTitleBarTray({
             color: "var(--taomni-text)",
           }}
         >
+          {showTerminalActions && <>
           <CompactActionButton
             testId="tab-split-view"
             title={splitTitle}
@@ -238,6 +242,7 @@ function CompactTitleBarTray({
             icon={<Users className="w-4 h-4" />}
             onClick={() => run(toggleMultiExec)}
           />
+          </>}
           {!aiFullyDisabled && (
             <div className="flex items-center justify-between gap-3 px-3 py-1">
               <span className="truncate">{t("ptt.holdToSpeak")}</span>

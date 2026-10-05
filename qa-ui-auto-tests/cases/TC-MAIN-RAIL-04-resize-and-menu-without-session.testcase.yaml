@@ -2,7 +2,8 @@ id: TC-MAIN-RAIL-04
 title: Main sidebar owns resizing and the names menu in every tab and panel state
 description: Main resize ownership migrated to the permanent Shell Rail, including Home, collapsed Navigator, workspace
   and terminal. Shell labels require a 68px minimum; embedded tools never add a second resize edge. Width and names
-  persist across switches and reload.
+  persist across switches and reload. Classification now uses dock/Actions; Project uses the unified Workspaces
+  entry. Existing workspace content, shortcut and state assertions remain.
 covers:
 - F1.2
 - F1.9
@@ -38,54 +39,68 @@ steps:
     equals: ''
 - right_click: '[data-testid="shell-rail-settings"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      68
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 67.51
+    min_height: 1
+    tolerance: 0
+    max_width: 68.49
 - drag_to:
     from: '[data-testid="sidebar-rail-resize"]'
     by:
       dx: 20
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      88
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 87.51
+    min_height: 1
+    tolerance: 0
+    max_width: 88.49
 - press:
     selector: '[data-testid="sidebar-rail-resize"]'
     key: ArrowRight
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      92
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 91.51
+    min_height: 1
+    tolerance: 0
+    max_width: 92.49
 - shell_navigate: sessions
 - click: '[data-testid="shell-rail-sessions"]'
 - assert_not_visible: '[data-testid="session-tree"]'
-- eval_readonly:
-    expression: document.querySelector('[data-testid="sidebar-rail-resize"]').getBoundingClientRect().height > 500
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="sidebar-rail-resize"]'
+    min_width: 1
+    min_height: 500.01
+    tolerance: 0
 - drag_to:
     from: '[data-testid="sidebar-rail-resize"]'
     by:
       dx: 100
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      100
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 99.51
+    min_height: 1
+    tolerance: 0
+    max_width: 100.49
 - drag_to:
     from: '[data-testid="sidebar-rail-resize"]'
     by:
       dx: -200
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      68
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 67.51
+    min_height: 1
+    tolerance: 0
+    max_width: 68.49
 - press:
     selector: '[data-testid="sidebar-rail-resize"]'
     key: ArrowRight
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      72
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 71.51
+    min_height: 1
+    tolerance: 0
+    max_width: 72.49
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -95,7 +110,7 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
     equal: 0
-- right_click: '[data-testid="code-workspace-tool-rail-project"]'
+- right_click: '[data-testid="code-workspace-bottom-tab-problems"]'
 - assert_count:
     selector: '[data-testid="sidebar-rail-menu-show-names"]'
     equal: 0
@@ -106,10 +121,12 @@ steps:
 - right_click: '[data-testid="shell-rail-settings"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
 - click: '[data-testid="shell-rail-home"]'
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      72
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 71.51
+    min_height: 1
+    tolerance: 0
+    max_width: 72.49
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - assert_count:
@@ -119,21 +136,43 @@ steps:
     from: '[data-testid="sidebar-rail-resize"]'
     by:
       dx: 12
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      84
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 83.51
+    min_height: 1
+    tolerance: 0
+    max_width: 84.49
 - click: '[data-testid="shell-rail-home"]'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
-- eval_readonly:
-    expression: Math.round(document.querySelector('[data-testid="shell-rail"]').getBoundingClientRect().width) ===
-      84
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 83.51
+    min_height: 1
+    tolerance: 0
+    max_width: 84.49
 - assert_localstorage:
     key: taomni.codeWorkspace.toolWindowStripes.v1
     contains: '"showNames":true'
 - screenshot: main-rail-restored.png
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-tool-rail-right-resize"]'
+- press:
+    selector: '[data-testid="code-workspace-tool-rail-right-resize"]'
+    key: End
+- assert_element_geometry:
+    selector: '[data-testid="code-workspace-tool-rail-right"]'
+    min_width: 100
+    max_width: 100
+    min_height: 32
+    tolerance: 0.5
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"rightWidth":100'
+- assert_count:
+    selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
+    equal: 0
 verification:
   review: reviewed
   requirements:
@@ -268,6 +307,27 @@ verification:
     - 48
     - 49
     - 50
+  - id: R-retained-controls
+    requirement: The workspace retains an independent right stripe resize handle while the merged left stripe uses
+      only the outer handle.
+    actions:
+    - 52
+    - 53
+    - 55
+    checkpoints:
+    - step: 56
+      expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
+        uses only the outer handle.
+    - step: 57
+      expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
+        uses only the outer handle.
+    - step: 58
+      expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
+        uses only the outer handle.
+    results:
+    - 56
+    - 57
+    - 58
   visual:
   - check: 欢迎页的整高边缘以及调整后的名称布局。
     method: automated

@@ -22,6 +22,7 @@ export function TabNavigator({ onNewSession }: { onNewSession(): void }) {
   const [attention, setAttention] = useState(false), [sort, setSort] = useState("recent"), [index, setIndex] = useState(0), [details, setDetails] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null), dialogRef = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null), frozenMru = useRef(shell.mru);
+  const locatePending = useRef(false);
   const isOpen = shell.overlay === "overview" || shell.overlay === "quick", quick = shell.overlay === "quick";
   useEffect(() => {
     if (!isOpen) return;
@@ -56,13 +57,25 @@ export function TabNavigator({ onNewSession }: { onNewSession(): void }) {
     const rank = (id: string) => frozenMru.current.includes(id) ? frozenMru.current.indexOf(id) : tabs.length;
     return rows.filter(({ tab, presentation }) => {
       const session = sessions.find((item) => item.id === tab.sessionId);
-      return allowed.has(tab.id) && matchesTabSearch(tab, query, [session?.name ?? "", session?.group_path ?? ""])
+      return allowed.has(tab.id) && matchesTabSearch(tab, query, [session?.name ?? "", session?.group_path ?? "", presentation.preview.secondary ?? ""])
         && (lane === "all" || presentation.lane === lane) && (!attention || presentation.attention !== "none");
     }).sort((a, b) => (sort === "name" ? a.tab.title.localeCompare(b.tab.title) : sort === "type" ? a.tab.type.localeCompare(b.tab.type) : rank(a.tab.id) - rank(b.tab.id))
       || tabs.indexOf(a.tab) - tabs.indexOf(b.tab) || a.tab.id.localeCompare(b.tab.id));
   }, [tabs, sessions, app.tabFilter, rows, query, lane, attention, sort]);
   useEffect(() => { setIndex((old) => Math.min(old, Math.max(0, results.length - 1))); }, [results.length]);
-  useEffect(() => { dialogRef.current?.querySelector<HTMLElement>(`[data-result-index="${index}"]`)?.scrollIntoView({ block: "nearest" }); }, [index]);
+  useEffect(() => {
+    if (locatePending.current) {
+      const current = results.findIndex((row) => row.tab.id === activeId);
+      if (current >= 0) {
+        locatePending.current = false;
+        setIndex(current);
+        dialogRef.current?.querySelector<HTMLElement>(`[data-result-index="${current}"] [data-testid="shell-tab-card-open"]`)?.focus();
+        dialogRef.current?.querySelector<HTMLElement>(`[data-result-index="${current}"]`)?.scrollIntoView({ block: "nearest" });
+        return;
+      }
+    }
+    dialogRef.current?.querySelector<HTMLElement>(`[data-result-index="${index}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [index, results, activeId, isOpen]);
   if (!isOpen) return null;
   const clear = () => { setQuery(""); setLane("all"); setAttention(false); useAppStore.getState().setTabFilter(null); };
   const activate = (id: string) => { useAppStore.getState().setActiveTab(id); shell.visitTab(id); shell.setOverlay(null); };
@@ -113,7 +126,7 @@ export function TabNavigator({ onNewSession }: { onNewSession(): void }) {
           <select data-testid="shell-tab-sort" aria-label={t("shell.sort")} value={sort} onChange={(e) => setSort(e.target.value)} className="taomni-input">{["recent", "name", "type"].map((s) => <option value={s} key={s}>{t(`shell.${s}`)}</option>)}</select>
           <span data-testid="shell-tab-count" data-total={tabs.length} data-results={results.length}>{t("shell.tabCount", { count: tabs.length })}</span>
         </div>}
-        {!results.some(({ tab }) => tab.id === activeId) && <div className="text-xs mt-2"><span>{t("shell.currentExcluded")}</span><button data-testid="shell-tab-current" onClick={clear}>{t("shell.locateCurrent")}</button></div>}
+        {!results.some(({ tab }) => tab.id === activeId) && <div className="text-xs mt-2"><span>{t("shell.currentExcluded")}</span><button data-testid="shell-tab-current" onClick={() => { locatePending.current = true; clear(); }}>{t("shell.locateCurrent")}</button></div>}
       </div>
       <div id="shell-quick-results" role={quick ? "listbox" : undefined} className={quick ? "overflow-auto p-2" : "overflow-auto p-3 grid gap-3 shell-tab-grid"}>
         {results.map(({ tab, presentation: p }, i) => quick

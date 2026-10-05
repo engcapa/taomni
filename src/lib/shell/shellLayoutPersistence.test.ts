@@ -21,7 +21,7 @@ describe("Shell layout compatibility", () => {
       "taomni.chatDrawer.layout.v1": JSON.stringify({ position: "bottom", width: 470, height: 300, pinned: false, floatingOpacity: .8, ribbonOffsetRatio: .2 }) });
     const result = loadShellLayout(s, 1280);
     expect(result.layout.navigator).toMatchObject({ width: 307, collapsedByLane: { home: false, connect: false, build: true } });
-    expect(result.layout.tao).toMatchObject({ edge: "bottom", width: 470, height: 300, pinned: false, opacity: .8, ribbonOffsetRatio: .2 });
+    expect(result.layout.tao).toMatchObject({ edge: "bottom", width: 470, height: 300, pinned: false, opacity: .8 });
     expect(s.values["taomni.chatDrawer.layout.v1"]).toBeTruthy();
     s.values["taomni.sidebarCollapsed"] = "true";
     expect(loadShellLayout(s, 1280).layout.navigator.collapsedByLane.home).toBe(false);
@@ -39,7 +39,7 @@ describe("Shell layout compatibility", () => {
     const validated = validateShellLayout({ ...layout, tao: { width: Infinity, opacity: 0, ribbonOffsetRatio: 9 } })!;
     expect(Object.keys(validated.restoreSources)).toHaveLength(2);
     expect(JSON.stringify(validated)).not.toContain("secret");
-    expect(validated.tao).toMatchObject({ width: 360, opacity: .65, ribbonOffsetRatio: 1 });
+    expect(validated.tao).toMatchObject({ width: 360, opacity: .65 });
   });
   it("keeps the twenty most recent distinct panels, including unavailable owners", () => {
     const recentPanels = Array.from({ length: 25 }, (_, i) => ({ kind: "sftp", restoreRef: `missing:${i}`, preferredPlacement: "dock", lastUsedAt: i }));

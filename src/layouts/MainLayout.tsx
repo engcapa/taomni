@@ -1,12 +1,16 @@
+import { useNativeImmersive } from "../hooks/useNativeImmersive";
+import { contextPanelTarget } from "../lib/shell/contextPanel";
+import { getPanelActions } from "../lib/shell/panelActions";
+import type { ShellCommand } from "../components/shell/ShellActionPalette";
+import { openScreenshotOverlay } from "../lib/screenshot";
 import { detachSftpPanel, prepareSftpWindowsBeforeExit, returnSftpWindowsBeforeExit } from "../lib/shell/sftpPanelWindow";
 import { returnGitWindowsBeforeExit } from "../lib/shell/gitPanelWindow";
 import { returnNotesWindowBeforeExit } from "../lib/shell/notesPanelWindow";
-import { getPanelActions } from "../lib/shell/panelActions";
 import { openSessionWindow, installSessionWindowReceiver, returnSessionWindowsBeforeExit } from "../lib/shell/sessionWindow";
 import { waitShellReady } from "../lib/shell/readiness";
 import { PrimaryGitSurface } from "../components/shell/PrimaryGitSurface";
 import { SftpShellSurface } from "../components/shell/SftpShellSurface";
-import { WorkspaceShell, ShellFrame } from "../components/shell/WorkspaceShell";
+import { WorkspaceShell, ShellFrame, ShellBoundary } from "../components/shell/WorkspaceShell";
 import { ShellNavigator } from "../components/shell/ShellNavigator";
 import { StableSurface, SurfaceSlot } from "../components/shell/SurfaceSlot";
 import { RetainedPrimaryView } from "../components/shell/RetainedPrimaryView";
@@ -81,8 +85,6 @@ import { effectiveFileType, openExternalUrl, sftpOpenPath, sftpStat } from "../l
 import { writeTerminal } from "../lib/ipc";
 import { encodeBase64 } from "../lib/ipc";
 import {
-} from "../components/filebrowser/SftpDetachedWindow";
-import {
   subscribeReattach,
   drainPendingReattach,
   clearReattachHandoff,
@@ -148,7 +150,7 @@ import {
   commitWelcomeRunSnapshot,
 } from "../lib/welcomeSessionResume";
 import { useWelcomeSessionResume, type OpenEntryResult } from "../hooks/useWelcomeSessionResume";
-import { ChatDrawer, ChatDrawerRibbon } from "../components/chat/ChatDrawer";
+import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { FloatingNotesPanel } from "../components/notes/FloatingNotesPanel";
 import { ShellNotesSurface } from "../components/shell/ShellNotesSurface";
 import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
@@ -772,6 +774,29 @@ export function MainLayout() {
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const laneSelection = useShellLayoutStore((state) => state.laneSelection);
   const activeTab = laneSelection ? undefined : tabs.find((t) => t.id === activeTabId);
+  const immersive = useShellLayoutStore((state) => state.immersive);
+  const immersiveToolbar = useShellLayoutStore((state) => state.immersive && state.immersiveReveal === "toolbar");
+  useEffect(() => {
+    if (!immersiveToolbar) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const dismiss = () => {
+      useShellLayoutStore.setState({ immersiveReveal: null });
+      if (opener?.isConnected && !opener.closest("[hidden],[inert]")) opener.focus();
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || document.querySelector('[data-taomni-context-menu],[aria-modal="true"]')) return;
+      event.preventDefault(); dismiss();
+    };
+    const outside = (event: PointerEvent) => {
+      if ((event.target as Element)?.closest('[data-testid="app-titlebar"],[data-taomni-context-menu],[role="dialog"],[data-testid="open-tabs-menu"]')) return;
+      dismiss();
+    };
+    document.querySelector<HTMLElement>('[data-testid="app-titlebar"] button:not(:disabled)')?.focus();
+    document.addEventListener("keydown", key);
+    document.addEventListener("pointerdown", outside);
+    return () => { document.removeEventListener("keydown", key); document.removeEventListener("pointerdown", outside); };
+  }, [immersiveToolbar]);
+  const nativeImmersiveError = useNativeImmersive(immersive);
   const shellPanels = useShellLayoutStore((state) => state.panels);
   const terminalProfilesBySessionId = useMemo(() => {
     const profiles = new Map<string, TerminalProfile | undefined>();
@@ -2156,11 +2181,11 @@ export function MainLayout() {
     }
   }, [removeTab, tabs]);
 
-  const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
+  const findOpenCodeWorkspace = useCallback((workspace: CodeWorkspaceTabInfo) => {
     const roots = workspace.roots ?? [];
     const looseFiles = workspace.looseFiles ?? [];
     const identity = recentWorkspaceIdFromParts(roots, looseFiles);
-    const existing = tabsRef.current.find(
+    return tabsRef.current.find(
       (tab) => {
         if (tab.type !== "code-workspace" || !tab.codeWorkspace) return false;
         if (workspace.workspaceInstanceId) return tab.codeWorkspace.workspaceInstanceId === workspace.workspaceInstanceId;
@@ -2172,6 +2197,13 @@ export function MainLayout() {
         return recentWorkspaceIdFromParts(tabRoots, tabLooseFiles) === identity;
       },
     );
+  }, []);
+
+  const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
+    const roots = workspace.roots ?? [];
+    const looseFiles = workspace.looseFiles ?? [];
+    const identity = recentWorkspaceIdFromParts(roots, looseFiles);
+    const existing = findOpenCodeWorkspace(workspace);
     if (existing) {
       setActiveTab(existing.id);
       return existing.id;
@@ -2200,7 +2232,7 @@ export function MainLayout() {
       },
     });
     return tabId;
-  }, [addTab, setActiveTab]);
+  }, [addTab, setActiveTab, findOpenCodeWorkspace]);
 
   const openCodeWorkspaceTab = useCallback((repoRoot: string, initialPath?: string | null) => {
     const normalized = repoRoot.trim();
@@ -2233,7 +2265,13 @@ export function MainLayout() {
     });
     if (tabId) await waitShellReady(() => useAppStore.getState().codeWorkspaceByTab[tabId]);
   }, [openCodeWorkspaceInfo]);
-  const recentWorkspaceLaunch = useRecentWorkspaceLaunch(openReadyRecentCodeWorkspace, useAppStore.getState().upsertRecentWorkspace);
+  const activateRecentCodeWorkspace = useCallback((workspace: RecentWorkspace) => {
+    const existing = findOpenCodeWorkspace({ repoRoot: workspace.roots[0]?.path ?? "", workspaceId: workspace.id, roots: workspace.roots, looseFiles: workspace.looseFiles });
+    if (!existing) return false;
+    setActiveTab(existing.id);
+    return true;
+  }, [findOpenCodeWorkspace, setActiveTab]);
+  const recentWorkspaceLaunch = useRecentWorkspaceLaunch(openReadyRecentCodeWorkspace, useAppStore.getState().upsertRecentWorkspace, activateRecentCodeWorkspace);
   const openRecentCodeWorkspace = recentWorkspaceLaunch.open;
 
   const openEmptyCodeWorkspaceTab = useCallback(() => {
@@ -3626,9 +3664,11 @@ export function MainLayout() {
         setSidebarCollapsed(false);
         break;
       case "split":
+        if (useShellLayoutStore.getState().laneSelection || activeTab?.type !== "terminal") break;
         toggleTerminalSplit();
         break;
       case "multiexec":
+        if (useShellLayoutStore.getState().laneSelection || activeTab?.type !== "terminal") break;
         toggleMultiExec();
         break;
       case "exit":
@@ -4053,22 +4093,58 @@ export function MainLayout() {
     "shell.overview": () => useShellLayoutStore.getState().setOverlay("overview"),
     "shell.quickSwitch": () => useShellLayoutStore.getState().setOverlay("quick"),
     "shell.panels.recent": () => useShellLayoutStore.getState().setOverlay("panels"),
-    "shell.navigator.toggle": () => toggleSidebar(),
-    "shell.tao.toggle": () => { const chat = useChatStore.getState(); chat.setDrawerOpen(!chat.drawerOpen); },
-    "shell.panel.open": () => { if (activeTab?.type === "terminal" && activeTab.ssh) toggleTerminalSftp(activeTab); },
+    "shell.navigator.toggle": () => {
+      const state = useShellLayoutStore.getState();
+      if (state.immersive) useShellLayoutStore.setState({ immersiveReveal: state.immersiveReveal === "navigator" ? null : "navigator", navigatorOverlay: true, overlayTarget: "navigator" });
+      else toggleSidebar();
+    },
+    "shell.tao.toggle": () => {
+      const state = useShellLayoutStore.getState(), chat = useChatStore.getState();
+      if (state.immersive) { const show = state.immersiveReveal !== "tao"; useShellLayoutStore.setState({ immersiveReveal: show ? "tao" : null, overlayTarget: "tao" }); if (show) chat.setDrawerOpen(true); }
+      else chat.setDrawerOpen(!chat.drawerOpen);
+    },
+    "shell.panel.open": () => {
+      const state = useShellLayoutStore.getState(), id = contextPanelTarget(state.laneSelection ? undefined : activeTab, state.panels);
+      if (!id) return;
+      if (state.immersive) useShellLayoutStore.setState({ immersiveReveal: "panel", overlayTarget: id });
+      if (activeTab?.type === "terminal" && activeTab.ssh && !state.panels[id]) toggleTerminalSftp(activeTab);
+      else { getPanelActions(id)?.open?.(); state.openPanel(id); }
+    },
     "shell.layout.reset": async () => { if (await confirmAppExit({ title: tr("shell.reset"), message: tr("shell.resetConfirm") })) useShellLayoutStore.getState().resetLayout(); },
   }), [activeTab, toggleSidebar, setActiveTab, confirmAppExit]);
 
+  const paletteCommands: ShellCommand[] = [
+    ...([
+      ["new-session", "menu.newSession"], ["new-terminal", "welcome.localTerminal"], ["new-sftp", "shell.newSftp"],
+      ["code-workspace", "shell.workspaces"], ["git", "shell.panelLabels.git"], ["mail-unified", "shell.mail"],
+      ["lan-chat", "shell.lanChat"], ["mfa", "shell.mfa"], ["settings", "menu.settings"],
+      ["toggle-quick-connect", "menu.quickConnect"], ["help", "menu.help"], ["exit", "menu.quit"],
+    ] as const).map(([command, key]) => ({ id: `app.${command}`, title: tr(key), keywords: command, run: () => handleCommand(command) })),
+    { id: "app.titlebar", title: tr("shell.titlebarActions"), run: () => { const state = useShellLayoutStore.getState(); if (state.immersive) useShellLayoutStore.setState({ immersiveReveal: "toolbar" }); else document.querySelector<HTMLElement>('[data-testid="app-titlebar"] button')?.focus(); } },
+    { id: "app.screenshot", title: tr("shell.screenshot"), run: () => openScreenshotOverlay() },
+    ...(useShellLayoutStore.getState().laneSelection ? [] : activeWorkspaceCommandRegistration?.items ?? []).map((command) => ({ id: command.id, title: command.title, keywords: command.category,
+      disabledReason: command.enabled ? undefined : tr("shell.actionUnavailable"), run: async () => {
+        const result = await activeWorkspaceCommandRegistration?.executeAction(command.id);
+        const state = useShellLayoutStore.getState();
+        if (state.immersive && command.id !== "workspace.toggleProjectTree") {
+          if (["workspace.toggleTerminal", "workspace.showProblems", "workspace.gitToolWindow", "workspace.commitToolWindow"].includes(command.id)) useShellLayoutStore.setState({ immersiveReveal: "panel" });
+          else if (/^workspace\.(show|findInFiles|findReferences|callHierarchy|typeHierarchy|toggleDocumentationPane|toggleTodosPane|activateNavigationBar|build|recompile|run|rerun|debug)/.test(command.id)) useShellLayoutStore.setState({ immersiveReveal: "workspace" });
+        }
+        return result;
+      } })),
+  ];
   return (
-    <WorkspaceShell onNewSession={handleNewSession} onReopenPanel={reopenRecentPanel}>
+    <WorkspaceShell commands={paletteCommands} onNewSession={handleNewSession} onReopenPanel={reopenRecentPanel}>
     <TabActionSlotProvider slot={tabActionSlot}>
     <div
+      data-immersive={immersive}
       className="taomni-main-window relative w-full h-full flex flex-col"
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
       {!isMac && <WindowResizeHandles />}
-      <div data-testid="app-titlebar" className="min-w-0">
-        <ControlBar
+      {nativeImmersiveError && <div role="alert" className="absolute top-2 right-2 z-[100] rounded border p-2 bg-[var(--taomni-sidebar-bg)]">{nativeImmersiveError}</div>}
+      <div data-testid="app-titlebar" hidden={immersive && !immersiveToolbar} className={immersiveToolbar ? "absolute inset-x-0 top-0 z-[85] min-w-0 shadow-lg" : "min-w-0"}>
+        <ShellBoundary><ControlBar
           activeTabClosable={!!activeTab?.closable}
           nativeMenu={nativeMenu}
           xServerEnabled={xServerEnabled}
@@ -4096,9 +4172,9 @@ export function MainLayout() {
           }
           onCloseWindow={requestAppExit}
           slotRef={setTabActionSlot}
-        />
+        /></ShellBoundary>
       </div>
-      {quickConnectVisible && (
+      {quickConnectVisible && !immersive && (
         <QuickConnect
           onConnectInput={handleQuickConnect}
           onConnectSession={handleConnectSession}
@@ -4106,14 +4182,13 @@ export function MainLayout() {
         />
       )}
 
-      <ShellFrame quickConnectHeight={quickConnectVisible ? 32 : 0}
+      <ShellFrame quickConnectHeight={quickConnectVisible && !immersive ? 32 : 0} onCreateLane={(lane) => handleCommand(lane === "build" ? "code-workspace" : lane === "communicate" ? "mail-unified" : lane === "utility" ? "tools" : "new-session")}
         navigator={<ShellNavigator onOpenWorkspace={openRecentCodeWorkspace} workspaceLaunches={recentWorkspaceLaunch.launches} onRelocateWorkspace={recentWorkspaceLaunch.relocate}>
           <Sidebar navigatorOnly onNewSession={handleNewSession} onNewSftpSession={handleNewSftpSession}
             onEditSession={handleEditSession} onConnectSession={handleConnectSession}
             onOpenSettings={() => handleCommand("settings")} onCommand={handleCommand} />
         </ShellNavigator>}
         extras={<><FloatingNotesPanel shellHosted /><TaoAlertPoller />
-          <div className="shell-legacy-tao-ribbon absolute inset-0 pointer-events-none"><ChatDrawerRibbon /></div>
         </>}
       >
         {terminalRailMerged && mainRailHost && terminalRailItems.length > 0 && createPortal(
@@ -4130,6 +4205,7 @@ export function MainLayout() {
         )}
         <div className="h-full flex flex-col min-w-0 min-h-0">
               {multiExecActive && (
+                <div hidden={immersive || activeTab?.type !== "terminal"}>
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
                   totalTerminalCount={tabs.filter((t) => t.type === "terminal").length}
@@ -4138,6 +4214,7 @@ export function MainLayout() {
                   onClearSelection={clearMultiExecSelection}
                   onClose={toggleMultiExec}
                 />
+                </div>
               )}
               <div className="flex-1 min-h-0 overflow-hidden relative">
                 {Object.values(shellPanels).filter((panel) => panel.kind === "sftp").map((panel) => {
@@ -4795,7 +4872,7 @@ export function MainLayout() {
       {chatDrawerKeepAlive && <StableSurface id="tao" slot="tao" visible={chatDrawerOpen}><ChatDrawer shellHosted /></StableSurface>}
       <ShellNotesSurface />
 
-      <StatusBar />
+      <div hidden={immersive}><StatusBar /></div>
 
       <CcAgentBridge />
 

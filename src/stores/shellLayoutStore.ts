@@ -15,7 +15,10 @@ interface ShellState {
   mru: string[];
   mruCycling: boolean;
   overlayTarget: string | null;
-  overlay: "overview" | "quick" | "panels" | null;
+  overlay: "overview" | "quick" | "panels" | "actions" | null;
+  immersive: boolean;
+  immersiveReveal: "navigator" | "panel" | "tao" | "toolbar" | "workspace" | null;
+  toggleImmersive(): void;
   navigatorOverlay: boolean;
   navigatorPage: "recent" | "project" | "tools";
   taoOpen: boolean;
@@ -54,6 +57,8 @@ function ownsRestorePreference(refs: Record<string, string>, tabId: string, ref:
 }
 export const useShellLayoutStore = create<ShellState>((set, get) => ({
   layout: defaultShellLayout(), initialized: false, writable: true, exiting: false, warning: null,
+  immersive: false, immersiveReveal: null,
+  toggleImmersive: () => { set((state) => ({ immersive: !state.immersive, immersiveReveal: null, overlay: null, navigatorOverlay: false, overlayTarget: null })); window.dispatchEvent(new Event("resize")); },
   laneSelection: null, laneOverrides: {}, pinnedTabs: {}, mru: [], overlay: null,
   mruCycling: false, overlayTarget: null, navigatorOverlay: false, navigatorPage: "recent", taoOpen: false, transfersOpen: false, transferTarget: null, panels: {}, activePanelByEdge: {}, restoreRefByTab: {},
   bindRestoreSource: (tabId, source, order, active = false) => {
@@ -131,6 +136,7 @@ export const useShellLayoutStore = create<ShellState>((set, get) => ({
     set({ navigatorOverlay: !collapsed, overlay: null, overlayTarget: collapsed ? null : "navigator" });
   },
   setNavigatorCollapsed: (lane, collapsed) => {
+    if (get().immersive) { set({ immersiveReveal: collapsed ? null : "navigator", navigatorOverlay: !collapsed }); return; }
     get().updateLayout((layout) => ({ ...layout, navigator: { ...layout.navigator, collapsedByLane: { ...layout.navigator.collapsedByLane, [lane]: collapsed } } }));
     set({ navigatorOverlay: false });
   },

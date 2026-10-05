@@ -1,8 +1,7 @@
 id: TC-MAIN-RAIL-03
 title: Three positions of the Shell title-bar grip move the real Linux window
-description: Adapted for Workspace Shell v2. The permanent Rail, per-lane Navigator
-  and merged workspace stripes replace the old expanded/collapsed sidebar wrappers.
-  Retained results are declared in each requirement.
+description: Adapted for Workspace Shell v2. The permanent Rail, per-lane Navigator and merged workspace stripes
+  replace the old expanded/collapsed sidebar wrappers. Retained results are declared in each requirement.
 covers:
 - F1.2
 - F1.3
@@ -23,10 +22,12 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-shell-retained-password
 - wait_for: '[data-testid="welcome-panel"]'
-- eval_readonly:
-    expression: document.querySelector('.taomni-control-bar [data-testid="window-drag-handle"]').getBoundingClientRect().height <= 32
-    expect_truthy: true
-    timeout_sec: 5
+- assert_element_geometry:
+    selector: '[data-testid="window-drag-handle"]'
+    min_width: 1
+    min_height: 1
+    tolerance: 0
+    max_height: 32
 - native_window_drag:
     selector: '[data-testid="window-drag-handle"]'
     y_fraction: 0.35
@@ -60,8 +61,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Independent X11 geometry confirms all three title-bar grip positions
-      move rather than resize the window.
+    requirement: Independent X11 geometry confirms all three title-bar grip positions move rather than resize the
+      window.
     actions:
     - 5
     - 6
@@ -72,29 +73,26 @@ verification:
     - 13
     checkpoints:
     - step: 4
-      expectation: Independent X11 geometry confirms all three title-bar grip positions
-        move rather than resize the window.
+      expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
+        the window.
     - step: 8
-      expectation: Independent X11 geometry confirms all three title-bar grip positions
-        move rather than resize the window.
+      expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
+        the window.
     - step: 12
-      expectation: Independent X11 geometry confirms all three title-bar grip positions
-        move rather than resize the window.
+      expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
+        the window.
     - step: 14
-      expectation: Independent X11 geometry confirms all three title-bar grip positions
-        move rather than resize the window.
+      expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
+        the window.
     - step: 15
-      expectation: Independent X11 geometry confirms all three title-bar grip positions
-        move rather than resize the window.
+      expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
+        the window.
     - step: 5
-      expectation: Independent OS geometry matches the requested displacement without
-        resizing.
+      expectation: Independent OS geometry matches the requested displacement without resizing.
     - step: 6
-      expectation: Independent OS geometry matches the requested displacement without
-        resizing.
+      expectation: Independent OS geometry matches the requested displacement without resizing.
     - step: 9
-      expectation: Independent OS geometry matches the requested displacement without
-        resizing.
+      expectation: Independent OS geometry matches the requested displacement without resizing.
     results:
     - 4
     - 8

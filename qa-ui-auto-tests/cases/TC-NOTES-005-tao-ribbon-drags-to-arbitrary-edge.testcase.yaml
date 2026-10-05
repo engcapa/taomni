@@ -1,81 +1,85 @@
 id: TC-NOTES-005
-title: Tao Ribbon drags to an arbitrary edge and persists
-description: "Verifies the unified Tao Ribbon placement (F-TAO-1, plan §7.1): dragging
-  the\nedge-docked ribbon toward the bottom of the window re-docks it to the bottom\nedge
-  and persists the placement (edge + offsetRatio) to localStorage so it\nsurvives
-  reload. The offset math + clamping are unit-tested in\nsrc/lib/tao/ribbonPlacement.test.ts;
-  this case exercises the live drag.\n Shell v2 retains the draggable Ribbon on wide
-  windows and stores its placement through the single Shell writer. Rail and titlebar
-  remain the narrow-window entrances."
+title: Permanent Tao entries replace the removed floating ribbon
+description: Shell redesign follow-up acceptance. User actions use production controls and commands. Browser stubs
+  do not establish native side effects.
 covers:
 - F-TAO-1
 tags:
-- notes
-- tao
-- ribbon
-- p2
+- workspace-shell
+- p1
 modes:
 - browser
 fixtures:
 - reset_db
-timeout_sec: 45
+timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="status-bar"]'
-- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-- drag_to:
-    from: '[data-testid="ai-chat-drawer-ribbon"]'
-    to: '[data-testid="status-bar"]'
-- wait: 0.5
-- assert_attribute:
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_count:
     selector: '[data-testid="ai-chat-drawer-ribbon"]'
-    name: data-position
-    equals: bottom
-- assert_localstorage:
-    key: taomni.shellLayout.v2
-    contains: bottom
-- hover: '[data-testid="welcome-panel"]'
-- reload: null
-- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-- assert_attribute:
+    equal: 0
+- click: '[data-testid="shell-rail-tao"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor-title"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: Permanent Tao draft
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="shell-tao-toggle"]'
+- assert_value:
+    selector: '[data-testid="note-editor-title"]'
+    equals: Permanent Tao draft
+- assert_count:
+    selector: '[data-testid="ai-chat-drawer"]'
+    equal: 1
+- assert_count:
     selector: '[data-testid="ai-chat-drawer-ribbon"]'
-    name: data-position
-    equals: bottom
-- screenshot: notes-005-ribbon-drag.png
+    equal: 0
+- screenshot: notes-005-permanent-tao.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Tao Ribbon drags to an arbitrary edge and persists：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Rail and titlebar open one shared Hub; closing and reopening preserve Notes.
     actions:
     - 1
     - 4
-    - 8
+    - 6
+    - 7
     - 9
-    checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
-    - step: 6
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]",
-        "name": "data-position", "equals": "bottom"}}'
-    - step: 7
-      expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains":
-        "bottom"}}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
-    - step: 11
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]",
-        "name": "data-position", "equals": "bottom"}}'
-    results:
     - 10
     - 11
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 3
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"note-editor-title\"]"}'
+    - step: 12
+      expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-title\"]", "equals": "Permanent Tao
+        draft"}}'
+    - step: 13
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer\"]", "equal": 1}}'
+    - step: 14
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
+    results:
+    - 2
+    - 3
+    - 5
+    - 8
+    - 12
+    - 13
+    - 14
   visual:
-  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+  - check: Dock, palette and content stay readable with no clipped controls.
     method: manual
-    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+    reason: Review retained screenshots from each engine.
   native:
-  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
-    method: external
-    reason: 明确记录执行边界和未验证平台。
+  - check: Packaged WebView, PTY and native lifecycle boundaries.
+    method: not-applicable
+    reason: Native cases retain actual backend effects; browser cases prove renderer behavior only.

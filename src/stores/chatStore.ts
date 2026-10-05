@@ -149,7 +149,6 @@ interface ChatDrawerLayoutPrefs {
   height: number;
   floatingOpacity: number;
   /** Tao Ribbon offset along its docked edge, 0..1. */
-  ribbonOffsetRatio: number;
 }
 
 export function isChatCapableTabType(type: string | null | undefined): boolean {
@@ -233,7 +232,6 @@ function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
     width: 380,
     height: 420,
     floatingOpacity: 1,
-    ribbonOffsetRatio: 0.5,
   };
   if (typeof window === "undefined") return fallback;
   try {
@@ -244,10 +242,7 @@ function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
       parsed.position === "left" || parsed.position === "right" || parsed.position === "top" || parsed.position === "bottom"
         ? parsed.position
         : fallback.position;
-    const ribbonOffsetRatio =
-      typeof parsed.ribbonOffsetRatio === "number" && Number.isFinite(parsed.ribbonOffsetRatio)
-        ? Math.min(1, Math.max(0, parsed.ribbonOffsetRatio))
-        : fallback.ribbonOffsetRatio;
+
     const floatingOpacity =
       typeof parsed.floatingOpacity === "number"
         ? clampDrawerFloatingOpacity(parsed.floatingOpacity)
@@ -261,7 +256,6 @@ function readDrawerLayoutPrefs(): ChatDrawerLayoutPrefs {
       width: clampDrawerWidth(Number(parsed.width) || fallback.width),
       height: clampDrawerHeight(Number(parsed.height) || fallback.height),
       floatingOpacity,
-      ribbonOffsetRatio,
     };
   } catch {
     return fallback;
@@ -339,7 +333,6 @@ interface ChatStore {
   drawerFloatingOpacity: number;
   /// Tao Ribbon offset along its docked edge (0..1); the edge itself mirrors
   /// `drawerPosition`.
-  ribbonOffsetRatio: number;
   /// Text the Composer should pick up next render (e.g. `@selection ...`).
   /// Cleared by the Composer once consumed.
   pendingComposerText: string;
@@ -418,7 +411,6 @@ interface ChatStore {
   setDrawerFloatingOpacity: (opacity: number) => void;
   /// Set the Tao Ribbon's docked edge + offset in one shot. The edge updates
   /// `drawerPosition` (and pinned defaults) so the drawer opens from that edge.
-  setRibbonPlacement: (position: ChatDrawerPosition, offsetRatio: number) => void;
 }
 
 function latestTabThread(threads: ChatThread[], tabId: string): ChatThread | undefined {
@@ -564,7 +556,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   drawerPosition: initialDrawerLayoutPrefs.position,
   drawerPinned: initialDrawerLayoutPrefs.pinned,
   drawerFloatingOpacity: initialDrawerLayoutPrefs.floatingOpacity,
-  ribbonOffsetRatio: initialDrawerLayoutPrefs.ribbonOffsetRatio,
   pendingComposerText: "",
   composerDrafts: {},
 
@@ -1115,14 +1106,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     writeDrawerLayoutPrefs({ floatingOpacity });
     set({ drawerFloatingOpacity: floatingOpacity });
   },
-  setRibbonPlacement: (position, offsetRatio) => {
-    const pinned = position === "left" || position === "right";
-    const ribbonOffsetRatio = Math.min(1, Math.max(0, offsetRatio));
-    const bridge = shellTaoBridge(); if (bridge) { bridge.update({ edge: position, pinned, ribbonOffsetRatio }); return; }
-    writeDrawerLayoutPrefs({ position, pinned, ribbonOffsetRatio });
-    set({ drawerPosition: position, drawerPinned: pinned, ribbonOffsetRatio });
-  },
-
   openTabChat: async (tabId: string) => {
     if (!tabId) return;
     if (!get().threadsLoaded) {

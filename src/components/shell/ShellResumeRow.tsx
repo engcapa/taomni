@@ -11,6 +11,7 @@ export function ShellResumeRow({ resume }: { resume: ShellResumeState }) {
       <span data-testid="welcome-restore-status" data-state={resume.state} role="status">{t(`shell.restoreStates.${resume.state}`)} · {resume.outcomes.length}/{resume.total}</span>
       {busy && resume.state !== "loading" && <button data-testid="welcome-restore-cancel" onClick={resume.cancel}>{t("common.cancel")}</button>}
       {!busy && resume.outcomes.some((o) => ["failed", "cancelled"].includes(o.status)) && <button data-testid="welcome-restore-retry" onClick={() => void resume.retry()}>{t("shell.retry")}</button>}
+      {!busy && resume.error && <button data-testid="shell-restore-refresh" onClick={resume.refresh}>{t("common.refresh")}</button>}
       {!busy && !!resume.total && <button data-testid="welcome-restore-clear" onClick={async () => {
         if (await confirm.confirm({ title: t("welcome.restoreClearTitle"), message: t("welcome.restoreClearMessage"), danger: true })) await resume.clear();
       }}>{t("welcome.restoreClearConfirm")}</button>}

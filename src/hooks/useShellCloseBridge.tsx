@@ -1,19 +1,19 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useAppStore } from "../stores/appStore";
 import { useShellLayoutStore } from "../stores/shellLayoutStore";
-import { CloseCoordinator, getCloseAdapter, getSurfaceCloseTarget, listSurfaceCloseTargets, installTabCloseHandler, type CloseAdapter, type ClosePlanItem, type CloseResult } from "../lib/shell/closeCoordinator";
+import { CloseCoordinator, getCloseAdapter, getSurfaceCloseTarget, listSurfaceCloseTargets, installTabCloseHandler, type CloseAdapter, type ClosePlanItem, type CloseResult, type CloseProgress } from "../lib/shell/closeCoordinator";
 import { closeSuccessor } from "../lib/shell/tabPresentation";
 import { getQueryTab } from "../lib/queryRegistry";
 import { promotedCloseTarget } from "../lib/shell/promotedSurfaceClose";
 import type { CloseChoice } from "../lib/shell/types";
 import { ShellCloseDialog } from "../components/shell/ShellCloseDialog";
 
-interface DialogState { items: ClosePlanItem[]; errors: CloseResult["failed"]; resolve(choices: Record<string, CloseChoice> | null): void }
+interface DialogState { items: ClosePlanItem[]; errors: CloseResult["failed"]; progress?: CloseProgress; resolve(choices: Record<string, CloseChoice> | null): void }
 export function useShellCloseBridge() {
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const dialogRef = useRef(dialog); dialogRef.current = dialog;
   useLayoutEffect(() => {
-    const coordinator = new CloseCoordinator((items, errors) => new Promise((resolve) => setDialog({ items, errors, resolve })));
+    const coordinator = new CloseCoordinator((items, errors, progress) => new Promise((resolve) => setDialog({ items, errors, progress, resolve })));
     const uninstall = installTabCloseHandler((ids, exit = false) => {
       const state = useAppStore.getState();
       if (exit) ids = [...new Set([...ids, ...listSurfaceCloseTargets().filter((target) => {
@@ -63,5 +63,5 @@ export function useShellCloseBridge() {
     return () => { uninstall(); dialogRef.current?.resolve(null); };
   }, []);
   const finish = (choices: Record<string, CloseChoice> | null) => { const pending = dialog; setDialog(null); pending?.resolve(choices); };
-  return dialog ? <ShellCloseDialog items={dialog.items} errors={dialog.errors} onFinish={finish} /> : null;
+  return dialog ? <ShellCloseDialog key={dialog.items.map((item) => item.target.id + item.risks.map((risk) => risk.revision).join()).join()} items={dialog.items} errors={dialog.errors} progress={dialog.progress} onFinish={finish} /> : null;
 }

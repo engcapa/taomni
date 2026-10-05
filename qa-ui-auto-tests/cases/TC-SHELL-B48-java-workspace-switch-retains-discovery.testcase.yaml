@@ -1,0 +1,153 @@
+id: TC-SHELL-B48
+title: Java workspace switching reuses discovery and live editors
+description: Production entry regression after main merge and Shell simplification. Browser IPC faults are controlled
+  external-boundary fixtures, not native evidence.
+covers:
+- F-SHELL-1
+tags:
+- workspace-shell
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="project-facts-discovery-status"]'
+    contains: Maven Discovered
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - class Main { static String draft = "retained"; }
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: // unsaved Java draft
+- click: '[data-testid="shell-rail-home"]'
+- seed_storage:
+    key: taomni.qa.shell.observations
+    value: '[]'
+    raw: true
+- shell_backend_scenario:
+    action: hold
+    command: workspace_list_dir
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - class Main { static String draft = "retained"; }
+    - // unsaved Java draft
+- assert_shell_backend:
+    command: workspace_list_dir
+    count: 0
+- assert_shell_backend:
+    command: workspace_read_file
+    count: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- assert_text:
+    selector: '[data-testid="project-facts-discovery-status"]'
+    contains: Maven Discovered
+- assert_shell_backend:
+    command: workspace_read_file
+    count: 0
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - class Main { static String draft = "retained"; }
+    - // unsaved Java draft
+- shell_backend_scenario:
+    action: release
+- screenshot: java-switch-retained.png
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - class Main { static String draft = "retained"; }
+    - // unsaved Java draft
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Initial multi-module Maven discovery and complete source are visible.
+    actions:
+    - 3
+    - 4
+    checkpoints:
+    - step: 6
+      expectation: '{"assert_text": {"selector": "[data-testid=\"project-facts-discovery-status\"]", "contains":
+        "Maven Discovered"}}'
+    - step: 7
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
+        ["class Main { static String draft = \"retained\"; }", ""]}}'
+    results:
+    - 6
+    - 7
+  - id: R2
+    requirement: Home recent-workspace activation does not wait on a held filesystem preflight or reread descriptors;
+      the draft and instance survive.
+    actions:
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    checkpoints:
+    - step: 17
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
+        ["class Main { static String draft = \"retained\"; }", "// unsaved Java draft"]}}'
+    - step: 18
+      expectation: '{"assert_shell_backend": {"command": "workspace_list_dir", "count": 0}}'
+    - step: 19
+      expectation: '{"assert_shell_backend": {"command": "workspace_read_file", "count": 0}}'
+    - step: 20
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    results:
+    - 17
+    - 18
+    - 19
+    - 20
+  - id: R3
+    requirement: Already-open tab switching also retains discovery and the complete unsaved buffer.
+    actions:
+    - 21
+    - 22
+    - 26
+    checkpoints:
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"project-facts-discovery-status\"]", "contains":
+        "Maven Discovered"}}'
+    - step: 24
+      expectation: '{"assert_shell_backend": {"command": "workspace_read_file", "count": 0}}'
+    - step: 25
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
+        ["class Main { static String draft = \"retained\"; }", "// unsaved Java draft"]}}'
+    - step: 28
+      expectation: Releasing the IPC hold preserves the complete Java draft.
+    results:
+    - 23
+    - 24
+    - 25
+    - 28
+  visual:
+  - check: Review captured layout for clipped controls and content.
+    method: manual
+    reason: DOM visibility does not prove visual quality.
+  native:
+  - check: Native boundaries
+    method: not-applicable
+    reason: This case establishes renderer routing only.

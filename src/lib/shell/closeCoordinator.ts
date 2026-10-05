@@ -8,7 +8,8 @@ export interface CloseAdapter {
 export interface CloseTarget { id: string; title: string; adapter: CloseAdapter; commit(): void | Promise<void> }
 export interface ClosePlanItem { target: CloseTarget; risks: CloseRisk[] }
 export interface CloseResult { status: "closed" | "cancelled" | "partial" | "failed"; closed: string[]; failed: Array<{ id: string; error: string }> }
-export type ClosePrompt = (items: ClosePlanItem[], errors: CloseResult["failed"]) => Promise<Record<string, CloseChoice> | null>;
+export interface CloseProgress { closed: Array<{ id: string; title: string }>; remaining: Array<{ id: string; title: string }> }
+export type ClosePrompt = (items: ClosePlanItem[], errors: CloseResult["failed"], progress?: CloseProgress) => Promise<Record<string, CloseChoice> | null>;
 export class CloseCoordinator {
   private inFlight = new Map<string, Promise<CloseResult>>();
   private queue: Promise<unknown> = Promise.resolve();
@@ -25,22 +26,35 @@ export class CloseCoordinator {
     void pending.then(release, release);
     return pending;
   }
-  private async execute(targets: CloseTarget[], exit: boolean): Promise<CloseResult> {
+  private async execute(targets: CloseTarget[], exit: boolean, completed: CloseProgress["closed"] = []): Promise<CloseResult> {
     const signal = new AbortController().signal;
-    const closed: string[] = [], failed: CloseResult["failed"] = [];
+    const closed = completed.map((target) => target.id), failed: CloseResult["failed"] = [];
+    const report = async (status: CloseResult["status"]): Promise<CloseResult> => {
+      const remaining = targets.filter((target) => !closed.includes(target.id));
+      const progressClosed = [...completed, ...targets.filter((target) => closed.includes(target.id)).map(({ id, title }) => ({ id, title }))];
+      const answer = await this.prompt([], failed, {
+        closed: progressClosed,
+        remaining: remaining.map(({ id, title }) => ({ id, title })),
+      });
+      if (answer?.["$remaining"] === "retry") {
+        // Re-plan only live, uncommitted targets; every revision is read again.
+        return this.execute(remaining, exit, progressClosed);
+      }
+      return { status, closed, failed };
+    };
     let items: ClosePlanItem[];
     try { items = await Promise.all(targets.map(async (target) => ({ target, risks: await target.adapter.getRisks(exit) }))); }
-    catch (error) { return { status: "failed", closed, failed: [{ id: "prepare", error: String(error) }] }; }
+    catch (error) { failed.push({ id: "prepare", error: String(error) }); return report(closed.length ? "partial" : "failed"); }
     let choices: Record<string, CloseChoice> = {};
     // App exit has already confirmed the working set. Only unresolved business
     // risks need a second decision; ordinary bulk tab close still reviews its targets.
     if ((!exit && items.length > 1) || items.some((item) => item.risks.length)) {
       const answer = await this.prompt(items, []);
-      if (!answer || Object.values(answer).includes("cancel")) return { status: "cancelled", closed, failed };
+      if (!answer || Object.values(answer).includes("cancel")) return { status: closed.length ? "partial" : "cancelled", closed, failed };
       choices = answer;
       // Reject incomplete/invalid plans before any irreversible save or commit.
       if (items.some((item) => item.risks.some((risk) => !risk.choices.includes(choices[risk.id] as never) || (exit && choices[risk.id] === "background"))))
-        return { status: "cancelled", closed, failed };
+        return { status: closed.length ? "partial" : "cancelled", closed, failed };
     }
     for (const item of items) {
       try {
@@ -49,7 +63,7 @@ export class CloseCoordinator {
         if (current.some((risk) => !item.risks.some((old) => old.id === risk.id && old.revision === risk.revision))) {
           const answer = await this.prompt([{ ...item, risks: current }], []);
           if (!answer || current.some((r) => answer[r.id] === "cancel" || !r.choices.includes(answer[r.id] as never) || (exit && answer[r.id] === "background")))
-            return { status: closed.length ? "partial" : "cancelled", closed, failed };
+            return closed.length ? report("partial") : { status: "cancelled", closed, failed };
           choices = { ...choices, ...answer };
         }
         for (const risk of current) await item.target.adapter.resolve(risk, choices[risk.id], signal);
@@ -59,7 +73,7 @@ export class CloseCoordinator {
             throw new Error("The selected action did not resolve the close risk. Retry after correcting the error.");
           const answer = await this.prompt([{ target: item.target, risks: next }], []);
           if (!answer || next.some((r) => !r.choices.includes(answer[r.id] as never) || answer[r.id] === "cancel" || (exit && answer[r.id] === "background")))
-            return { status: closed.length ? "partial" : "cancelled", closed, failed };
+            return closed.length ? report("partial") : { status: "cancelled", closed, failed };
           for (const risk of next) await item.target.adapter.resolve(risk, answer[risk.id], signal);
           next = await item.target.adapter.getRisks(exit);
         }
@@ -74,8 +88,8 @@ export class CloseCoordinator {
         break;
       }
     }
-    if (failed.length) await this.prompt([], failed);
-    return { status: failed.length ? (closed.length ? "partial" : "failed") : "closed", closed, failed };
+    if (failed.length) return report(closed.length ? "partial" : "failed");
+    return { status: "closed", closed, failed };
   }
 }
 const adapters = new Map<string, CloseAdapter>();

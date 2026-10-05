@@ -1,8 +1,9 @@
 id: TC-IDE-PARITY-010-04-tool-windows-native
 title: Native tool window rail keeps the terminal session across hide/show
-description: 'ED-PARITY-010 A2/A3 native case: in the isolated QA app the Terminal rail button opens a real PTY; hiding the tool window with — and reopening it keeps the session output; Alt+1 toggles Project through the packaged WebView.
-
-  '
+description: "ED-PARITY-010 A2/A3 native case: in the isolated QA app the Terminal rail button opens a real PTY;\
+  \ hiding the tool window with — and reopening it keeps the session output; Alt+1 toggles Project through the packaged\
+  \ WebView.\n Classification now uses dock/Actions; Project uses the unified Workspaces entry. Existing workspace\
+  \ content, shortcut and state assertions remain."
 covers:
 - F25.5
 tags:
@@ -65,7 +66,7 @@ steps:
     macos_key: Meta+1
     selector: '[data-testid="code-workspace-editor"] .cm-content'
 - assert_attribute:
-    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    selector: '[data-testid="shell-rail-workspaces"]'
     name: aria-pressed
     equals: 'true'
 - wait_for:
@@ -76,7 +77,7 @@ steps:
     macos_key: Meta+1
     selector: '[data-testid="code-workspace-tree-pane"]'
 - assert_attribute:
-    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    selector: '[data-testid="shell-rail-workspaces"]'
     name: aria-pressed
     equals: 'false'
 - press:
@@ -84,7 +85,7 @@ steps:
     macos_key: Meta+1
     selector: '[data-testid="code-workspace-editor"] .cm-content'
 - assert_attribute:
-    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    selector: '[data-testid="shell-rail-workspaces"]'
     name: aria-pressed
     equals: 'true'
 verification:
@@ -99,13 +100,17 @@ verification:
     - 16
     checkpoints:
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]",
+        "timeout_sec": 60}}'
     - step: 13
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED010_MARK\\r?$", "timeout_sec": 30}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
+        "regex": "(?m)^QA_ED010_MARK\\r?$", "timeout_sec": 30}}'
     - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state":
+        "detached", "timeout_sec": 5}}'
     - step: 18
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED010_MARK\\r?$", "timeout_sec": 10}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
+        "regex": "(?m)^QA_ED010_MARK\\r?$", "timeout_sec": 10}}'
     results:
     - 13
     - 15
@@ -118,13 +123,17 @@ verification:
     - 25
     checkpoints:
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "name": "aria-pressed",
+        "equals": "true"}}'
     - step: 22
-      expectation: "{\"wait_for\": {\"selector\": \"[data-testid=\\\"code-workspace-tree-pane\\\"]:focus-within\", \"timeout_sec\": 5}}"
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-pane\"]:focus-within", "timeout_sec":
+        5}}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "name": "aria-pressed",
+        "equals": "false"}}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "name": "aria-pressed",
+        "equals": "true"}}'
     results:
     - 21
     - 22

@@ -2,8 +2,8 @@ import { create } from "zustand";
 import type { ShellAction } from "./shellActions";
 import { getAppPlatform } from "../runtime";
 export const SHELL_KEYMAP_KEY = "taomni.shellKeymap.v1";
-export const SHELL_BINDABLE_ACTIONS = ["shell.quickSwitch", "shell.overview", "shell.home", "shell.navigator.toggle", "shell.tao.toggle", "shell.panel.open"] as const;
-const defaults: Partial<Record<ShellAction, string>> = { "shell.quickSwitch": "Mod+K" };
+export const SHELL_BINDABLE_ACTIONS = ["shell.quickSwitch", "shell.overview", "shell.home", "shell.navigator.toggle", "shell.tao.toggle", "shell.panel.open", "shell.actions", "shell.immersive.toggle"] as const;
+const defaults: Partial<Record<ShellAction, string>> = { "shell.quickSwitch": "Mod+K", "shell.actions": "F1" };
 export function normalizeShellKey(event: Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "altKey" | "shiftKey" | "key">): string {
   const mods = [event.ctrlKey ? "Control" : "", event.metaKey ? "Meta" : "", event.altKey ? "Alt" : "", event.shiftKey ? "Shift" : ""].filter(Boolean);
   return [...mods, event.key.length === 1 ? event.key.toUpperCase() : event.key].join("+");

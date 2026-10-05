@@ -106,7 +106,7 @@
 | 区域 | 默认 / 范围 | 布局、溢出、职责 |
 |---|---|---|
 | 标题栏 | 默认高 42；W<560 时两行共 84；按钮命中区至少 32×32，图标 16 | app menu、Navigator toggle、Quick Switch、lane、tab strip、面板、Tao、所有标签、更多、系统区；Windows/Linux 系统按钮保留每个宽 40 |
-| 全高拖拽带 | 复用 WindowDragHandle 的现有宽度，位于 Rail 外侧 | 保留上中下拖拽；交互元素不落入 drag region；不以整个标题栏覆盖式拖动 |
+| 窗口抓手 | 右上角标题栏系统区的独立 WindowDragHandle | 按最新用户决定移至右上角，删除左上角 Navigator 展开按钮；原生拖动与窗口缩放互不干扰 |
 | Rail | 图标模式宽 52，命中区 40×40；显示名称时宽至少 68、按钮高 48，名称位于图标下方；上下间距 4 | Home / Sessions / Workspaces / Tao，底部 Settings；沿用原名称/宽度偏好，英文主入口完整可读，窄屏也不消失 |
 | Navigator | 默认 248，最小 200，最大 min(400, W×0.32) | 独立纵向滚动，标题固定；折叠不占宽度；splitter 6 |
 | 主工作面 | flex 1，min-width/min-height:0；普通停靠时尽量保留 480×240 | 业务自己处理内部溢出；Shell 不给整个页面加横向滚动 |
@@ -475,7 +475,7 @@ interface PersistedShellLayoutV2 {
   };
   panelDefaults: Record<PanelKind, { edge: "right" | "bottom"; size: number; pinned: boolean }>;
   panelOverrides: Record<string, { edge: "right" | "bottom"; size: number; pinned: boolean }>;
-  tao: { edge: DockEdge; width: number; height: number; pinned: boolean; opacity: number; ribbonOffsetRatio: number };
+  tao: { edge: DockEdge; width: number; height: number; pinned: boolean; opacity: number };
   restoreSources: Record<string, ShellRestoreSource>;
   restoredTabs: Record<string, { laneOverride?: Exclude<TabLane, "home">; pinned: boolean; order: number }>;
   lastActiveRestoreRef?: string;
@@ -499,7 +499,7 @@ restoreSources 只在业务打开/恢复成功、workspace roots 成功更新时
 
 首次无有效 v2：读取 legacy taomni.sidebarCollapsed 和 taomni.sidebarCollapsedByGroup.v1；Connect 取 terminal，Build 取 code-workspace，Home/Communicate/Utility 取 other。旧 group 缺失使用现有 defaults。旧宽度读取 taomni.resizable-panels.v4.main-layout 的 sidebar 百分比，按首次有效 body 宽计算并 clamp。mergeToolWindowRail、stripe 名称/宽度保留原 key。
 
-Tao 从 taomni.chatDrawer.layout.v1 的 position→edge、width→width、height→height、pinned→pinned、floatingOpacity→opacity、ribbonOffsetRatio→ribbonOffsetRatio 显式转换，透明度继续 clamp 到 0.65～1，ribbonOffsetRatio clamp 到0～1；不能读取不存在的旧 edge/pin/opacity 字段。Hub lastTab 延续旧 key。迁移校验完成后单次写 v2，写入失败下次可重试；旧 key 不删除。之后 Shell 是布局单写者，旧 setter 只委托，不双向 effect 循环写入。
+Tao 从 taomni.chatDrawer.layout.v1 的 position→edge、width→width、height→height、pinned→pinned、floatingOpacity→opacity 显式转换，透明度继续 clamp 到 0.65～1；不能读取不存在的旧 edge/pin/opacity 字段。Hub lastTab 延续旧 key。迁移校验完成后单次写 v2，写入失败下次可重试；旧 key 不删除。之后 Shell 是布局单写者，旧 setter 只委托，不双向 effect 循环写入。
 
 启动先显示 Home，再异步加载偏好；等待实际工作集恢复成功后才解析 lastActiveRestoreRef 和 owner panels。恢复失败不会制造幽灵 tab 或自动打开失效窗口；展示“可恢复面板”。上次 detached 只恢复位置意图及“重新弹出”入口，用户显式恢复工作集、认证成功后可重建窗口，旧 OS handle 不可能跨进程复用。连接恢复成功、布局恢复成功分别计数。
 
@@ -590,7 +590,7 @@ reattach：子窗口请求、主窗口校验 owner → 准备 slot/接收最新 
 
 | 控件组 | 现有可复用 testid | 拟新增 testid / 可读状态 | 维护者 / 用例 |
 ---|---|---|---|
-| Shell / Rail / Navigator | app-titlebar、control-bar、sidebar、session-tree、session-search、main-sidebar-resize-handle | shell-root、shell-rail-home/sessions/workspaces/tao/settings、shell-navigator、shell-navigator-toggle、shell-navigator-page；data-area/data-mode | TASK-02；B01/05/22/30/43 |
+| Shell / Rail / Navigator | app-titlebar、control-bar、sidebar、session-tree、session-search、main-sidebar-resize-handle | shell-root、shell-rail-home/sessions/workspaces/tao/settings、shell-navigator、shell-navigator-page；data-area/data-mode | TASK-02；B01/05/22/30/43 |
 | 标题/系统区 | window-drag-handle、window-controls、window-min/max/close、tab-action-slot、titlebar-actions-more | shell-context-menu、shell-global-menu、shell-panel-toggle | TASK-02；B33/40/44、N01/16 |
 | lane / 标签 | tab-bar、tab-item、tab-title-input、tab-close、tab-filter-chip、new-tab-launch-menu | shell-lane-select、shell-lane-option、shell-lane-empty；tab-item 的 data-lane/data-pinned | TASK-03；B06～08/12/13 |
 | 总览 | tab-details-overlay / card 保留详情 | shell-overview-trigger、shell-overview、shell-tab-search、shell-tab-lane-filter、shell-tab-attention-filter、shell-tab-sort、shell-tab-card、shell-tab-card-close/pin/more、shell-tab-clear、shell-tab-current、shell-tab-empty-home/new | TASK-03；B09/10/14/39 |
@@ -715,3 +715,44 @@ TASK-11 的 fixture/用例设计可先做，具体生产入口 case 必须跟随
 | 覆盖层与macOS原生菜单/交通灯、Windows高DPI不同 | 纯CSS先B30/44，稳定后N01/16；三端分别记录，已有已知不兼容须修 | TASK-02/12；当前端必要边界必须实际通过 |
 
 这些是有明确处理任务的实施风险，不是待用户审批项。若实施中发现需要改变已确定的产品范围，再按具体证据修订DEC/AC；不能悄悄降级关键断言。
+
+
+### 本轮入口精简决定（2026-10-05）
+
+用户要求移除本地终端 Rail Git 入口、Tao 悬浮球及其专用拖动/位置存储代码、旧标题栏 Tab 预览按钮和左上角 Navigator 展开按钮。窗口移动抓手放在右上角系统区。Tao 由 Rail 与顶部按钮进入；Navigator 由 Rail 和快捷键进入；Tab 使用总览/快速切换。工作区 Git Panel 与其他 Git 入口继续按原设计运行。旧悬浮球字段作为未知历史数据忽略，不写入 v2。
+
+
+### 2026-10-05 合并后补充设计与验收契约
+
+本节覆盖旧稿中与用户后续要求冲突的布局。main 已通过 `b690bcda` 合并（远端输入 `a90a0bd3`），保留截图、MFA、窗口抓手与统一 Rail resize 的更新；抓手最终位置为右上角。TASK-01～12 已重新打开，新输入尚未取得六端证据，旧 done 只属于历史输入。
+
+**统一标题栏审查**：按当前可见内容判断，空分类不得借用后台保留标签的上下文。所有入口使用同一真实操作；收起或隐藏不会销毁 PTY、编辑器或传输任务。
+
+| 入口 | 展示 / 可用条件 | 窄屏与沉浸模式 |
+|---|---|---|
+| 应用菜单 | Windows/Linux 自绘；macOS 原生菜单 | 全局 F1 Actions；沉浸时可搜索 `app.titlebar` 临时显示同一标题栏 |
+| 标签、滚动、关闭、重命名 | 当前分类；关闭受业务风险协调器保护；Home 不可关闭 | 总览和快速切换保留所有标签；不再有单独预览按钮，单标签 hover/快捷预览保留 |
+| 加号 / 启动菜单 | 明确标为“新建本地终端”，菜单提供 Shell 与远程会话 | 全局创建捷径，不假装是当前分类的新建；空分类提供对应类型的创建按钮 |
+| 快速切换 / 总览 | 全局导航，前者快速选中，后者筛选/预览/批量管理 | 保持可达，F1 同名动作；小于 560px 分两行 |
+| Context Panel | 当前 owner 确有面板；SSH 对应 SFTP，Workspace 对应工具面板 | 其它类型隐藏；空分类不可分发给后台标签；通过 Actions 调用同一解析器 |
+| Tao | 全局入口，Rail 和标题栏共享同一 Drawer | 删除悬浮球及位置存储；全局 Actions 可临时显示 Drawer |
+| 当前内容操作 | Terminal / DB / Redis / HBase / RDP / VNC 各组件按能力提供；非活动内容不展示 | 小于 1200px 显示一个展开按钮，保留同一个 portal host；展开聚焦首个可用操作，Escape 回焦触发器 |
+| SFTP / 会话 Chat | 由终端能力提供；合并 Rail 时不重复展示 | 与全局 Tao 区分为会话绑定操作；通过原业务操作保持上下文 |
+| 分屏 / 多发送 | 仅可见的终端内容，非终端与空分类隐藏；菜单禁用规则一致 | 小于 960px 进入系统操作菜单；不会清除已有分屏/发送状态 |
+| Detach / Reattach / 远程桌面操作 | 只由支持能力的活动内容提供；空分类移除 Detach | 当前内容展开区与 More 的上下文副本使用同一处理器；子窗口生命周期保留 |
+| 更新提示 | 仅 available / ready；窄屏不再直接隐藏提示 | 临时标题栏仍可打开更新窗口 |
+| 截图 / 语言 / 主题 | 全局能力，与标签类型无关 | 截图保留直达；语言和主题进入系统操作菜单；沉浸时 F1 截图或临时标题栏 |
+| PTT | AI 未完全禁用时展示，实际录音状态仍由 PTT 组件管理 | 与系统操作菜单一起收纳，不因切分类修改录音状态 |
+| 抓手 / 最小化 / 最大化 / 关闭 | 右上角系统区；macOS 使用原生交通灯 | 沉浸模式隐藏壳层；macOS 同步隐藏 native decorations，失败明确展示，不把 CSS 隐藏当原生成功 |
+
+**Dock 分类**：顶部分类下拉移除，Home、终端与连接、工作区、通信、工具与 Tao 在 Dock 中并列。Sessions 的完整说明为“终端与连接”，包含本地 Shell。选择分类激活该分类 MRU，空分类显示创建入口；再次点击当前工作区或会话切换 Navigator。工作区 Project 不再有第二个 Rail 按钮，统一工作区入口和 Project 页。横向宽度不足或纵向高度不足时，通信/工具进入 More；四方向分别适配横排/竖排，支持持久隐藏，F1 可以恢复。
+
+**沉浸**：隐藏标题栏、Dock、Navigator、Context Host、Tao、状态栏和附属工具，不卸载内容。Workspace 的工具栏、内部工具条和侧/底工具也隐藏，编辑标签仍属于主内容。F1 / 沉浸内 Mod+Shift+P 打开全局 Actions；打开的面板临时显示，Escape 恢复内容。Workspace Action 可以临时展开工具，Escape 收回；`app.titlebar` 临时展示原操作条，解决远程桌面、更新、语言、窗口操作的可达性，避免维护第二套命令处理器。退出沉浸恢复原布局，沉浸状态本身不持久化。
+
+**Java 切换**：descriptor discovery 的可见性只控制每个 root 的首次扫描。隐藏不取消已开始的扫描，返回不重扫；root 变化/卸载使旧请求失效，显式 Refresh 仍重扫；descriptor 读取并发上限为 4，输出顺序确定。Home 点击已存在的工作区先按实例/保存身份匹配并激活，不重复等待 filesystem preflight；新实例仍检查路径并报告错误。Git/LSP 自身刷新契约保留。B48 使用多模块 Maven 文件、未保存 Java 内容及被 hold 的外部文件系统请求检验此路径；未进行匹配实机性能测量，不宣称具体加速倍数。
+
+**关闭与恢复**：批量关闭返回真实 closed/remaining 清单；失败后仅重试剩余目标并重新读取 revision，累计成功不会重放已提交的保存。会话 snapshot 错误不会变成空记录；刷新可恢复，工作区独立恢复允许部分成功。恢复的并发上限为 4，每项 identity、结果和最终焦点保持对应。
+
+**扩展契约**：生产 `panelActions` 统一由 `PanelRegistry` 管理，不维护平行的演示 adapter registry。注册返回按 adapter identity 检查的清理函数，旧 surface 清理不得移除新 owner 的注册。业务 controller 继续持有真实状态与资源，Shell 只管理 placement、owner、visibility、close 协调及 Actions，未来 AI surface 复用相同边界。壳层异常边界与稳定业务容器为兄弟节点；fallback 保留 Home、Actions、标签、重置/重载入口，业务实例与未保存草稿不重挂载。任意 React render fault 通过 mounted unit 注入，避免给产品增加可随意触发异常的测试后门；浏览器正常布局及 native keepalive 由现有 B/N 用例验证。
+
+验收增量：B46 四向/隐藏持久化、B47 沉浸编辑器与临时标题栏、B48 Java 工作区两条切换路径、B49 全部标题栏上下文分组/窄屏操作/空分类创建、B50 恢复 unavailable→refresh、B51 held Control MRU、B52 部分关闭→剩余重试、N23 三平台真实 PTY/沉浸/Dock；N06 增加原生沉浸往返后真实磁盘保存/撤销。既有标题栏、Project、Tao、恢复、MFA 和截图用例随新入口更新。详细动作/初始状态/checkpoints 位于对应 YAML，policy 注册；native 子窗口异常继续执行 N18，stale 消息由协议 unit 精确隔离。当前执行状态见任务板，本节本身不是通过证据。

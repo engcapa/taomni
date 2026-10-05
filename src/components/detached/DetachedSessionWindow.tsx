@@ -56,7 +56,6 @@ import { useAiStore } from "../../stores/aiStore";
 import { useChatStore } from "../../stores/chatStore";
 import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
 import { ChatDrawer } from "../chat/ChatDrawer";
-import { TaoRibbon } from "../tao/TaoRibbon";
 import { CcAgentBridge } from "../agent/CcAgentBridge";
 import type { SessionWindowMetadata } from "../../lib/shell/sessionWindow";
 import { sessionTabReady } from "../../lib/shell/sessionWindow";
@@ -556,7 +555,6 @@ export default function DetachedSessionWindow({
           <div className="flex-1 relative min-h-0">
             {inner}
             {detachedChatTab && chatDrawerOpen && !aiFullyDisabled && !chatDrawerInline && <ChatDrawer />}
-            {detachedChatTab && !aiFullyDisabled && <TaoRibbon />}
           </div>
           {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
         </div>

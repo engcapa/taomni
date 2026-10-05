@@ -9,6 +9,7 @@ const terminals = new Map<string, { output?: { onmessage(data: number[]): void }
 const sftp = new Map<string, string>();
 const sftpOwners = new Map<string, string>();
 let sequence = 0;
+let javaFixture: Promise<void> | undefined;
 export const SHELL_SCENARIO_COMMANDS = ["create_local_terminal", "create_ssh_terminal", "save_session", "sftp_attach", "sftp_cancel_transfer", "workspace_list_dir", "workspace_write_file", "workspace_write_file_encoded", "workspace_write_loose_file_encoded", "db_save_query_workspace", "open_detached_window", "get_welcome_run_snapshot", "notes_list", "notes_get", "notes_update", "notes_list_alerts", "notes_ack_alert", "chat_list_threads", "chat_list_messages", "mail_list_cached_folders", "mail_list_cached_messages", "chat_stream", "test_proxy_connection"] as const;
 export function shellScenarioEnabled() { return localStorage.getItem(`${PREFIX}enabled`) === "true"; }
 function observe(command: string, owner: string, status: string) {
@@ -17,6 +18,15 @@ function observe(command: string, owner: string, status: string) {
 }
 export async function shellScenarioBefore(command: string, args: Record<string, unknown> = {}) {
   if (!shellScenarioEnabled()) return;
+  if (localStorage.getItem(`${PREFIX}javaFixture`) === "true" && command.startsWith("workspace_")) {
+    javaFixture ??= (async () => {
+      await vfsWriteText("/preview/pom.xml", "<project><modelVersion>4.0.0</modelVersion><groupId>qa</groupId><artifactId>shell-java</artifactId><version>1</version><modules><module>service</module></modules></project>");
+      await vfsMkdir("/preview/service");
+      await vfsWriteText("/preview/service/pom.xml", "<project><artifactId>service</artifactId></project>");
+      await vfsWriteText("/preview/Main.java", "class Main { static String draft = \"retained\"; }\n");
+    })();
+    await javaFixture;
+  }
   const owner = String(args.host ?? args.repoRoot ?? args.sessionId ?? "");
   const key = `${PREFIX}fault`, rule = JSON.parse(localStorage.getItem(key) ?? "null") as { command: string; owner?: string; mode: string; once?: boolean; claimed?: boolean } | null;
   observe(command, owner, "requested");

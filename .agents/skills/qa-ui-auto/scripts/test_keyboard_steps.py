@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import Mock
 
 from qa_ui_auto.steps import StepContext, StepError
-from qa_ui_auto.steps.keyboard import step_blur, step_send_keys, step_terminal_input, step_type
+from qa_ui_auto.steps.keyboard import step_keyboard_sequence, step_blur, step_send_keys, step_terminal_input, step_type
 
 
 class KeyboardStepsTest(TestCase):
@@ -172,3 +172,27 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class KeyboardSequenceTest(TestCase):
+    def test_preserves_held_modifier_until_release(self):
+        page = Mock()
+        ctx = StepContext(page, "TC-sequence", Path("."), {}, {})
+        step_keyboard_sequence(ctx, [{"down": "Control"}, {"press": "Tab"}, {"press": "Tab"}, {"up": "Control"}])
+        self.assertEqual([(c[0], c.args) for c in page.keyboard.mock_calls],
+                         [("down", ("Control",)), ("press", ("Tab",)), ("press", ("Tab",)), ("up", ("Control",))])
+
+    def test_releases_modifier_after_dispatch_failure(self):
+        page = Mock()
+        page.keyboard.press.side_effect = RuntimeError("lost browser")
+        ctx = StepContext(page, "TC-sequence", Path("."), {}, {})
+        with self.assertRaisesRegex(RuntimeError, "lost browser"):
+            step_keyboard_sequence(ctx, [{"down": "Control"}, {"press": "Tab"}])
+        page.keyboard.up.assert_called_once_with("Control")
+
+    def test_rejects_invalid_action_before_dispatch(self):
+        page = Mock()
+        ctx = StepContext(page, "TC-sequence", Path("."), {}, {})
+        with self.assertRaises(StepError):
+            step_keyboard_sequence(ctx, [{"down": "Control"}, {"invalid": "Tab"}])
+        page.keyboard.down.assert_not_called()

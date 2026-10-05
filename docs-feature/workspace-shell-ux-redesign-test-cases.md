@@ -1350,3 +1350,24 @@ N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、nat
 | 扩展故障组合 | 依 V-N13～N15/18 与 §6 的明确边界 | 尚未由当前 YAML 覆盖的邮件草稿/断线、系统权限/窗口中断和清理重试等组合；沿原 owner、关闭保护、取消/恢复要求逐项保存证据 | 未验证；已执行的有序分支仍按原 case 结果登记 |
 
 后续执行继续使用隔离 QA binary、可追溯的 source/build/config 和原始报告；新发现的产品回归进入修复闭环。没有实测结果时保留未验证状态，不给本轮已通过的自动化用例追加假 manual/performance pass。
+
+
+## main 合并后增量验收（当前输入未验证）
+
+以下用例与设计末尾的标题栏矩阵、Dock、沉浸和恢复契约对应；动作和逐步观察以链接的可执行 YAML 为准。所有 fixture 都在隔离报告环境，browser 的 IPC fixture 不作为 native 证据。本地只运行 unit/static，UI 执行统一提交 GitHub 六端。历史最终通过不覆盖本批改动。
+
+| V | 场景 / 初始状态 / 关键结果 | 可执行用例 | 模式与边界 |
+|---|---|---|---|
+| V-B46 | 空 Home，800×1100；右键 Dock 四方向，检查主按钮尺寸/命中、存储值；隐藏并刷新，通过 F1 恢复 | [B46](../qa-ui-auto-tests/cases/TC-SHELL-B46-dock-orientations-and-recovery.testcase.yaml) | browser 三 OS；真实壳层 renderer |
+| V-B47 | 真实编辑器 fixture 中修改完整文本；F1 进入沉浸，Tao 临时打开/Escape，恢复后同一编辑器；搜索无结果不能执行；Actions 临时标题栏并收回 | [B47](../qa-ui-auto-tests/cases/TC-SHELL-B47-immersive-actions-editor.testcase.yaml) | browser 三 OS；无 OS decoration 结论 |
+| V-B48 | 多模块 Maven + Main.java；初始 discovery 后修改草稿，阻塞后续目录访问；Home 最近项与已有标签切换均保留草稿/单实例且不重新扫描 | [B48](../qa-ui-auto-tests/cases/TC-SHELL-B48-java-workspace-switch-retains-discovery.testcase.yaml) | browser 三 OS；检测重复工作，不宣称实机延迟基线达标 |
+| V-B49 | Home/Workspace/本地终端/Settings；按能力显示，Project 单入口；竖屏 More 选空分类并实际创建；窄屏内容操作展开、Escape 回焦，系统多发送实际打开 | [B49](../qa-ui-auto-tests/cases/TC-SHELL-B49-contextual-titlebar-and-unified-dock.testcase.yaml) | browser 三 OS；其它业务动作继续执行原 SFTP/DB/RDP/VNC 回归 |
+| V-B50 | 保存会话目录存在，snapshot 读取失败；明确 unavailable/error；Refresh 恢复 available，5 个会话不变 | [B50](../qa-ui-auto-tests/cases/TC-SHELL-B50-restore-unavailable-recovery.testcase.yaml) | browser 三 OS；IPC 故障注入 |
+| V-B51 | 两个终端和 Home；真实按住 Control 连续 Tab，Escape 返回 origin，反向循环，不创建新终端 | [B51](../qa-ui-auto-tests/cases/TC-SHELL-B51-held-modifier-mru.testcase.yaml) | browser 三 OS；键盘 down/up finally 释放，非系统全局热键证明 |
+| V-B52 | 终端先开，工作区有 dirty 文件；批量关闭终端成功、工作区保存失败，清单精确；只重试剩余，最终仅 Home | [B52](../qa-ui-auto-tests/cases/TC-SHELL-B52-close-partial-progress-retry.testcase.yaml) | browser 三 OS；真实协调器、受控写入失败 |
+| V-N23 | 隔离真实本地 PTY 已执行唯一输出；输入未提交时进入沉浸，再退出后提交；四向 Dock/隐藏恢复后仍有同一 PTY | [N23](../qa-ui-auto-tests/cases/TC-SHELL-N23-immersive-dock-real-pty.testcase.yaml) | Linux/Windows/macOS native；真实输入、窗口布局、PTY 输出 |
+| V-N06 增量 | 真实文件打开并编辑；沉浸往返后保留全文/单实例；保存实际 SHA、Undo 后原 SHA | [N06](../qa-ui-auto-tests/cases/TC-SHELL-N06-workspace-save-undo-native.testcase.yaml) | 三 native；真实磁盘和编辑器历史 |
+
+删除的 Tao 悬浮球、顶部预览按钮、分类下拉和 Project 重复条目不再要求可点击；同一业务结果转到 Tao Rail、总览、分类 Actions/并列 Dock、工作区 Navigator。原 MAIN-RAIL 的宽度/抓手上限断言使用通用 geometry verb，未放宽尺寸预算。主菜单、全局截图、语言/主题、更新、会话 detach/重连等继续在原专属用例中操作，不能仅由 B49 的显示断言代替。
+
+精确异步边界由 unit 补充：root 改变后的旧扫描、关闭 revision 变化/累计重试、旧 adapter 清理、Action rejected promise、macOS decorations 顺序、React chrome render fault。注入任意 React 异常采用 mounted component 回归而非产品中的异常开关；它只证明该边界实例/草稿保留，browser/native 正常工作流和 N18 真实子窗口中断继续执行。独立 OS picker/IME/DPI/读屏/性能范围仍按用户决定另行验收。

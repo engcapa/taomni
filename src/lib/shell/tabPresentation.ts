@@ -29,12 +29,17 @@ const typeAliases: Record<string, string> = {
   "code-workspace": "code workspace project 工作区 项目 代码", git: "git version changes 版本 更改",
   database: "database sql 数据库 查询", mail: "mail email 邮件 邮箱", "mail-unified": "mail inbox 邮件 收件箱",
   settings: "settings preferences 设置", "lan-chat": "chat 聊天", welcome: "home welcome 首页 欢迎",
+  rdp: "remote desktop 远程 桌面", vnc: "remote desktop 远程 桌面", redis: "database cache 数据库 缓存",
+  "hbase-shell": "database hbase shell 数据库 终端", "file-browser": "files directory 文件 目录",
+  "object-storage": "s3 oss cos bucket 对象 存储", nettools: "network tools 网络 工具",
+  sockscap: "proxy tunnel 代理 隧道", "proxy-test": "proxy network 代理 测试", mfa: "otp totp authentication 验证 口令",
 };
 export function tabSearchText(tab: Tab, displayFields: string[] = []): string {
   // Deliberately select display fields: serializing a connection would expose credentials.
   return [tab.title, tab.type, tab.ssh?.host, tab.sftp?.host, tab.rdp?.host, tab.vnc?.host,
     tab.git?.repoRoot, tab.git?.workspaceName, tab.codeWorkspace?.repoRoot,
     ...(tab.codeWorkspace?.roots?.map((root) => `${root.name} ${root.path}`) ?? []),
+    ...(tab.codeWorkspace?.looseFiles?.map((file) => file.path) ?? []), tab.db?.host, tab.db?.engine,
     tab.fileBrowser?.initialPath, tab.mail?.imap.host, tab.mail?.emailAddress, typeAliases[tab.type], ...displayFields].map(clean).join(" ").normalize("NFC").toLocaleLowerCase();
 }
 export function matchesTabSearch(tab: Tab, query: string, displayFields: string[] = []): boolean {

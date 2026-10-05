@@ -54,4 +54,15 @@ describe("recent workspace launch and repair", () => {
     expect(replace).not.toHaveBeenCalled(); expect(opener).not.toHaveBeenCalled();
     expect(result.current.launches.recent).toMatchObject({ state: "failed", rootPath: "/old" });
   });
+  it("activates an existing workspace without waiting for unavailable filesystem access", async () => {
+    ipc.list.mockImplementation(() => new Promise(() => {}));
+    const opener = vi.fn(), activate = vi.fn(() => true);
+    const { result } = renderHook(() => useRecentWorkspaceLaunch(opener, vi.fn(), activate));
+    await act(async () => result.current.open(workspace));
+    expect(activate).toHaveBeenCalledWith(workspace);
+    expect(ipc.list).not.toHaveBeenCalled();
+    expect(opener).not.toHaveBeenCalled();
+    expect(result.current.launches.recent.state).toBe("ready");
+  });
+
 });

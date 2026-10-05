@@ -12,4 +12,4 @@ def setup(ctx):
     (root / "中文 目录").mkdir()
     payload = root / "transfer-16m.bin"
     payload.write_bytes(bytes(range(256)) * 65536)
-    ctx.values.update(shell_root=root.as_posix(), shell_readme=(root / "README.md").as_posix(), shell_readme_sha256=hashlib.sha256(b"alpha\nbeta\ngamma\n").hexdigest(), shell_edited_sha256=hashlib.sha256(b"alpha\nbeta\ngamma\nz").hexdigest(), shell_transfer=payload.as_posix(), shell_transfer_sha256=hashlib.sha256(payload.read_bytes()).hexdigest())
+    ctx.values.update(shell_root=root.as_posix(), shell_dir_name=root.name, shell_readme=(root / "README.md").as_posix(), shell_readme_sha256=hashlib.sha256(b"alpha\nbeta\ngamma\n").hexdigest(), shell_edited_sha256=hashlib.sha256(b"alpha\nbeta\ngamma\nz").hexdigest(), shell_transfer=payload.as_posix(), shell_transfer_sha256=hashlib.sha256(payload.read_bytes()).hexdigest())

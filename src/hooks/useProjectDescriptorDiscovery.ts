@@ -58,8 +58,10 @@ export function useProjectDescriptorDiscovery(
   const [reason, setReason] = useState<string | null>(null);
   const requestSequenceRef = useRef(0);
   const generationRef = useRef(0);
+  const startedRef = useRef(false);
 
   const refresh = useCallback(async () => {
+    startedRef.current = true;
     const requestSequence = ++requestSequenceRef.current;
     const generation = ++generationRef.current;
     if (!workspaceRoot) {
@@ -78,7 +80,7 @@ export function useProjectDescriptorDiscovery(
       "",
       DISCOVERY_MAX_DEPTH,
       DISCOVERY_MAX_FILES,
-    );
+    ).catch((error: unknown) => ({ state: "failed" as const, message: errorMessage(error) }));
     if (requestSequence !== requestSequenceRef.current) return;
     if (fileResult.state !== "ready") {
       if (fileResult.state === "cancelled") return;
@@ -88,24 +90,27 @@ export function useProjectDescriptorDiscovery(
       return;
     }
 
-    const inputs: BuildDescriptorInput[] = [];
-    const readErrors: string[] = [];
-    for (const entry of fileResult.entries) {
-      if (entry.fileType !== "file" || !DESCRIPTOR_NAMES.has(entry.name)) continue;
-      if (requestSequence !== requestSequenceRef.current) return;
-      try {
-        const file = await workspaceReadFile(workspaceRoot, entry.path, DESCRIPTOR_MAX_BYTES);
-        inputs.push({
-          path: absoluteWorkspacePath(workspaceRoot, entry.path),
-          content: file.text,
-        });
-      } catch (error) {
-        readErrors.push(`${entry.path}: ${errorMessage(error)}`);
+    const descriptors = fileResult.entries.filter((entry) => entry.fileType === "file" && DESCRIPTOR_NAMES.has(entry.name));
+    const inputs: Array<BuildDescriptorInput | undefined> = new Array(descriptors.length);
+    const readErrors: Array<string | undefined> = new Array(descriptors.length);
+    let cursor = 0;
+    // Bound filesystem work for large Maven/Gradle multi-module projects while
+    // retaining deterministic descriptor order and per-file diagnostics.
+    await Promise.all(Array.from({ length: Math.min(4, descriptors.length) }, async () => {
+      while (cursor < descriptors.length && requestSequence === requestSequenceRef.current) {
+        const index = cursor++;
+        const entry = descriptors[index];
+        try {
+          const file = await workspaceReadFile(workspaceRoot, entry.path, DESCRIPTOR_MAX_BYTES);
+          inputs[index] = { path: absoluteWorkspacePath(workspaceRoot, entry.path), content: file.text };
+        } catch (error) {
+          readErrors[index] = `${entry.path}: ${errorMessage(error)}`;
+        }
       }
-    }
+    }));
 
     if (requestSequence !== requestSequenceRef.current) return;
-    let nextDiscovery = discoverProjectDescriptors(inputs, generation);
+    let nextDiscovery = discoverProjectDescriptors(inputs.filter((input): input is BuildDescriptorInput => !!input), generation);
     if (fileResult.truncated) {
       nextDiscovery = {
         ...nextDiscovery,
@@ -115,10 +120,10 @@ export function useProjectDescriptorDiscovery(
         ],
       };
     }
-    if (readErrors.length > 0) {
+    if (readErrors.some(Boolean)) {
       nextDiscovery = {
         ...nextDiscovery,
-        diagnostics: [...nextDiscovery.diagnostics, `Descriptor reads failed: ${readErrors.join("; ")}`],
+        diagnostics: [...nextDiscovery.diagnostics, `Descriptor reads failed: ${readErrors.filter(Boolean).join("; ")}`],
       };
     }
 
@@ -128,18 +133,19 @@ export function useProjectDescriptorDiscovery(
   }, [workspaceRoot]);
 
   useEffect(() => {
-    if (!options.autoRefresh || !workspaceRoot) {
-      if (!workspaceRoot) {
-        setStatus("idle");
-        setDiscovery(null);
-        setReason(null);
-      }
-      return;
-    }
-    void refresh();
+    startedRef.current = false;
+    setStatus("idle");
+    setDiscovery(null);
+    setReason(null);
     return () => {
       requestSequenceRef.current += 1;
     };
+  }, [workspaceRoot]);
+
+  useEffect(() => {
+    // Visibility gates initial work only. Switching tabs must neither discard
+    // in-flight discovery nor recursively scan the same project again.
+    if (options.autoRefresh && workspaceRoot && !startedRef.current) void refresh();
   }, [options.autoRefresh, refresh, workspaceRoot]);
 
   return { status, discovery, reason, refresh };

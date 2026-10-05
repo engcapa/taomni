@@ -1,0 +1,71 @@
+id: TC-SHELL-B50
+title: Unavailable session snapshot remains actionable and refresh recovers
+description: Production entry regression after main merge and Shell simplification. Browser IPC faults are controlled
+  external-boundary fixtures, not native evidence.
+covers:
+- F-SHELL-1
+tags:
+- workspace-shell
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- shell_backend_scenario:
+    action: fail-next
+    command: get_welcome_run_snapshot
+- reload_window: null
+- wait_for: '[data-testid="shell-restore-error"]'
+- assert_attribute:
+    selector: '[data-testid="welcome-restore-status"]'
+    name: data-state
+    equals: unavailable
+- assert_text:
+    selector: '[data-testid="shell-restore-error"]'
+    contains: QA fixture rejected
+- click: '[data-testid="shell-restore-refresh"]'
+- wait_for: '[data-testid="welcome-restore-status"][data-state="available"]'
+- assert_not_visible: '[data-testid="shell-restore-error"]'
+- assert_count:
+    selector: '[data-testid="welcome-recent-session-row"]'
+    equal: 5
+- screenshot: restore-unavailable-recovered.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Backend read failure stays unavailable with its concrete error, then refresh recovers the unchanged
+      saved session catalog.
+    actions:
+    - 3
+    - 4
+    - 8
+    checkpoints:
+    - step: 6
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state",
+        "equals": "unavailable"}}'
+    - step: 7
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-restore-error\"]", "contains": "QA fixture
+        rejected"}}'
+    - step: 10
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-restore-error\"]"}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-recent-session-row\"]", "equal": 5}}'
+    results:
+    - 6
+    - 7
+    - 10
+    - 11
+  visual:
+  - check: Review captured layout for clipped controls and content.
+    method: manual
+    reason: DOM visibility does not prove visual quality.
+  native:
+  - check: Native boundaries
+    method: not-applicable
+    reason: This case establishes renderer routing only.

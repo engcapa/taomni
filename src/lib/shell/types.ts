@@ -35,10 +35,11 @@ export type ShellRestoreSource =
 export interface PanelPreference { edge: "right" | "bottom"; size: number; pinned: boolean }
 export interface PersistedShellLayoutV2 {
   version: 2;
+  rail: { edge: DockEdge; visible: boolean };
   navigator: { width: number; collapsedByLane: Record<TabLane, boolean>; lastArea: NavigatorArea };
   panelDefaults: Record<PanelKind, PanelPreference>;
   panelOverrides: Record<string, PanelPreference>;
-  tao: { edge: DockEdge; width: number; height: number; pinned: boolean; opacity: number; ribbonOffsetRatio: number };
+  tao: { edge: DockEdge; width: number; height: number; pinned: boolean; opacity: number };
   restoreSources: Record<string, ShellRestoreSource>;
   restoredTabs: Record<string, { laneOverride?: BusinessLane; pinned: boolean; order: number }>;
   lastActiveRestoreRef?: string;
@@ -52,15 +53,6 @@ export type CloseRisk =
   | (RiskBase & { kind: "transaction"; choices: readonly ("commit" | "rollback" | "cancel")[] })
   | (RiskBase & { kind: "job"; choices: readonly ("background" | "cancel-job" | "cancel")[] })
   | (RiskBase & { kind: "flush-error"; choices: readonly ("retry" | "cancel")[] });
-export interface MoveTicket {
-  operationId: string;
-  panelId: string;
-  generation: number;
-  source: PanelPlacement;
-  destination: PanelPlacement;
-  snapshotRef?: string;
-  ready: boolean;
-}
 export type RevealResult = { status: "revealed"; targetKey: string } | { status: "cancelled" }
   | { status: "failed"; code: "missing" | "auth" | "unavailable"; message: string };
 export type ShellTarget =
@@ -70,18 +62,22 @@ export type ShellTarget =
   | { kind: "note"; noteId: string }
   | { kind: "mail"; accountId: string; messageId?: string }
   | { kind: "transfer"; jobId: string; panelId?: string };
+/** Business adapters retain their own preparation/commit/rollback protocol.
+ * Shell reads capabilities from supported commands and never duplicates IPC. */
 export interface ShellSurfaceAdapter {
   id: string;
-  owner: PanelOwner;
-  capabilities: { dock: boolean; promote: boolean; detach: boolean; duplicate: boolean };
-  reveal(signal: AbortSignal): Promise<RevealResult>;
-  getCloseRisks(): Promise<CloseRisk[]>;
-  resolveCloseRisk(risk: CloseRisk, choice: CloseChoice, signal: AbortSignal): Promise<void>;
-  flush(signal: AbortSignal): Promise<void>;
-  prepareMove(destination: PanelPlacement, operationId: string): Promise<MoveTicket>;
-  commitMove(ticket: MoveTicket): Promise<void>;
-  rollbackMove(ticket: MoveTicket): Promise<void>;
-  releaseView(): Promise<void>;
+  getInstance(): PanelInstance | undefined;
+  actions: {
+    open?(): void;
+    promote?(): void | Promise<void>;
+    detach?(): void | Promise<void>;
+    reattach?(): void | Promise<void>;
+    close?(): void | Promise<void>;
+    retry?(): void | Promise<void>;
+    focus?(): void | Promise<void>;
+    hide?(): void;
+    move?(edge: "right" | "bottom"): void;
+  };
 }
 export interface PanelWindowEnvelope {
   version: 1;

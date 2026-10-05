@@ -156,101 +156,102 @@ controls:
 id: F1.5
 status: done
 area: main/tabs
-components: [TabBar, ControlBar, OpenTabsMenu, TabDetailsOverlay]
+components:
+- TabBar
+- ControlBar
+- OpenTabsMenu
+- TabDetailsOverlay
 files:
-  - src/components/tabbar/TabBar.tsx
-  - src/components/tabbar/ControlBar.tsx
-  - src/components/tabbar/OpenTabsMenu.tsx
-  - src/components/tabbar/TabDetailsOverlay.tsx
-  - src/lib/customDnD.ts
-  - src/lib/tabDetails.ts
-  - src/lib/terminalActivity.ts
-  - src/lib/terminalCwd.ts
-  - src/stores/appStore.ts
+- src/components/tabbar/TabBar.tsx
+- src/components/tabbar/ControlBar.tsx
+- src/components/tabbar/OpenTabsMenu.tsx
+- src/components/tabbar/TabDetailsOverlay.tsx
+- src/lib/customDnD.ts
+- src/lib/tabDetails.ts
+- src/lib/terminalActivity.ts
+- src/lib/terminalCwd.ts
+- src/stores/appStore.ts
 controls:
-  - id: tab-bar
-    selector: '[data-testid="tab-bar"]'
-    kind: display
-  - id: tab-item               # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
-    selector: '[data-testid="tab-item"]'
-    kind: interactive
-  - id: tab-title              # the title span inside a tab; double-click to rename
-    selector: '[data-testid="tab-title"]'
-    kind: interactive
-  - id: tab-title-input        # inline rename input; only present while editing
-    selector: '[data-testid="tab-title-input"]'
-    kind: interactive
-    optional: true
-  - id: new-local-terminal     # the "+" plus tab button
-    selector: '[data-testid="new-local-terminal"]'
-    kind: interactive
-  - id: new-tab-split          # the "+ ▾" split-button container (Windows Terminal style)
-    selector: '[data-testid="new-tab-split"]'
-    kind: display
-  - id: new-tab-launch-menu    # the "▾" chevron that opens the quick-launch context menu
-    selector: '[data-testid="new-tab-launch-menu"]'
-    kind: interactive
-  - id: launch-menu-new-session  # "New session…" leaf in the quick-launch menu
-    selector: '[data-testid="launch-menu-new-session"]'
-    kind: interactive
-    optional: true       # only after opening the launch menu
-  - id: tabs-more
-    selector: '[data-testid="tab-more"]'
-    kind: interactive
-  - id: tab-details-hover
-    selector: '[data-testid="tab-details-hover"]'
-    kind: interactive
-  - id: tab-details-overlay
-    selector: '[data-testid="tab-details-overlay"]'
-    kind: display
-    optional: true
-  - id: tab-details-card
-    selector: '[data-testid^="tab-details-card-"]'
-    kind: display
-    optional: true
-  - id: tab-details-program
-    selector: '[data-testid^="tab-details-program-"]'
-    kind: display
-    optional: true
-  - id: open-tabs-menu
-    selector: '[data-testid="open-tabs-menu"]'
-    kind: display
-    optional: true
-  - id: open-tabs-detach-active
-    selector: '[data-testid="open-tabs-detach-active"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-first
-    selector: '[data-testid="context-menu-item-move-to-first"]'
-    kind: interactive
-    optional: true       # only visible in a tab context menu
-  - id: tab-menu-move-left
-    selector: '[data-testid="context-menu-item-move-left"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-right
-    selector: '[data-testid="context-menu-item-move-right"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-last
-    selector: '[data-testid="context-menu-item-move-to-last"]'
-    kind: interactive
-    optional: true
-  - id: tab-new-output-dot
-    selector: 'span[aria-label="New output"]'
-    kind: display
-    optional: true
-  - id: context-menu-item-tools
-    selector: '[data-testid="context-menu-item-tools"]'
-    kind: interactive
-    optional: true
-  - id: context-menu-item-tunneling
-    selector: '[data-testid="context-menu-item-tunneling"]'
-    kind: interactive
-    optional: true
-  - id: tab-context-copy-session-info
-    selector: '[data-testid="tab-context-copy-session-info"]'
-    kind: interactive
+- id: tab-bar
+  selector: '[data-testid="tab-bar"]'
+  kind: display
+- id: tab-item
+  selector: '[data-testid="tab-item"]'
+  kind: interactive
+- id: tab-title
+  selector: '[data-testid="tab-title"]'
+  kind: interactive
+- id: tab-title-input
+  selector: '[data-testid="tab-title-input"]'
+  kind: interactive
+  optional: true
+- id: new-local-terminal
+  selector: '[data-testid="new-local-terminal"]'
+  kind: interactive
+- id: new-tab-split
+  selector: '[data-testid="new-tab-split"]'
+  kind: display
+- id: new-tab-launch-menu
+  selector: '[data-testid="new-tab-launch-menu"]'
+  kind: interactive
+- id: launch-menu-new-session
+  selector: '[data-testid="launch-menu-new-session"]'
+  kind: interactive
+  optional: true
+- id: tabs-more
+  selector: '[data-testid="tab-more"]'
+  kind: interactive
+- id: tab-details-overlay
+  selector: '[data-testid="tab-details-overlay"]'
+  kind: display
+  optional: true
+- id: tab-details-card
+  selector: '[data-testid^="tab-details-card-"]'
+  kind: display
+  optional: true
+- id: tab-details-program
+  selector: '[data-testid^="tab-details-program-"]'
+  kind: display
+  optional: true
+- id: open-tabs-menu
+  selector: '[data-testid="open-tabs-menu"]'
+  kind: display
+  optional: true
+- id: open-tabs-detach-active
+  selector: '[data-testid="open-tabs-detach-active"]'
+  kind: interactive
+  optional: true
+- id: tab-menu-move-first
+  selector: '[data-testid="context-menu-item-move-to-first"]'
+  kind: interactive
+  optional: true
+- id: tab-menu-move-left
+  selector: '[data-testid="context-menu-item-move-left"]'
+  kind: interactive
+  optional: true
+- id: tab-menu-move-right
+  selector: '[data-testid="context-menu-item-move-right"]'
+  kind: interactive
+  optional: true
+- id: tab-menu-move-last
+  selector: '[data-testid="context-menu-item-move-to-last"]'
+  kind: interactive
+  optional: true
+- id: tab-new-output-dot
+  selector: span[aria-label="New output"]
+  kind: display
+  optional: true
+- id: context-menu-item-tools
+  selector: '[data-testid="context-menu-item-tools"]'
+  kind: interactive
+  optional: true
+- id: context-menu-item-tunneling
+  selector: '[data-testid="context-menu-item-tunneling"]'
+  kind: interactive
+  optional: true
+- id: tab-context-copy-session-info
+  selector: '[data-testid="tab-context-copy-session-info"]'
+  kind: interactive
 -->
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
@@ -3700,138 +3701,142 @@ controls:
 id: F-AI-2.4
 status: done
 area: ai/chat
-components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble, SearchProgressChip, CodeBlockToolbar, CcAgentBridge]
+components:
+- ChatDrawer
+- ChatThreadList
+- Composer
+- AttachmentChip
+- MessageBubble
+- SearchProgressChip
+- CodeBlockToolbar
+- CcAgentBridge
 files:
-  - src/components/chat/ChatDrawer.tsx
-  - src/components/chat/ChatThreadList.tsx
-  - src/components/chat/Composer.tsx
-  - src/components/chat/AttachmentChip.tsx
-  - src/components/chat/MessageBubble.tsx
-  - src/components/chat/SearchProgressChip.tsx
-  - src/components/chat/CodeBlockToolbar.tsx
-  - src/components/agent/CcAgentBridge.tsx
-  - src/lib/chat/attachments.ts
-  - src/lib/chat/composerRefs.ts
-  - src/lib/chat/renderFormatted.ts
-  - src/stores/chatStore.ts
+- src/components/chat/ChatDrawer.tsx
+- src/components/chat/ChatThreadList.tsx
+- src/components/chat/Composer.tsx
+- src/components/chat/AttachmentChip.tsx
+- src/components/chat/MessageBubble.tsx
+- src/components/chat/SearchProgressChip.tsx
+- src/components/chat/CodeBlockToolbar.tsx
+- src/components/agent/CcAgentBridge.tsx
+- src/lib/chat/attachments.ts
+- src/lib/chat/composerRefs.ts
+- src/lib/chat/renderFormatted.ts
+- src/stores/chatStore.ts
 controls:
-  - id: ai-chat-drawer
-    selector: '[data-testid="ai-chat-drawer"]'
-    kind: display
-    optional: true       # only mounted when drawerOpen
-  - id: ai-chat-drawer-textarea
-    selector: '[data-testid="ai-chat-drawer"] textarea'
-    kind: interactive
-    optional: true
-  - id: ai-chat-composer
-    selector: '[data-testid="ai-chat-composer"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-attach-button
-    selector: '[data-testid="ai-chat-attach-button"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-composer-resize
-    selector: '[data-testid="ai-chat-composer-resize"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-attachment-error
-    selector: '[data-testid="ai-chat-attachment-error"]'
-    kind: display
-    optional: true
-  - id: ai-chat-new
-    selector: 'button[title="New chat"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-history
-    selector: 'button[title="History"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-copy-all
-    selector: 'button[aria-label="Copy entire conversation"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-close
-    selector: '[data-testid="ai-chat-drawer-hide"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-drawer-ribbon
-    selector: '[data-testid="ai-chat-drawer-ribbon"]'
-    kind: interactive
-    optional: true       # shown when a chat-capable active tab has drawer hidden
-  - id: ai-chat-drawer-position
-    selector: '[data-testid="ai-chat-drawer-position"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-drawer-pin
-    selector: '[data-testid="ai-chat-drawer-pin"]'
-    kind: interactive
-    optional: true
-  - id: ai-chat-drawer-opacity
-    selector: '[data-testid="ai-chat-drawer-opacity"]'
-    kind: interactive
-    optional: true       # only top/bottom floating drawer
-  - id: ai-chat-drawer-opacity-menu
-    selector: '[data-testid="ai-chat-drawer-opacity-menu"]'
-    kind: display
-    optional: true       # only while opacity popover is open
-  - id: ai-chat-drawer-opacity-slider
-    selector: '[data-testid="ai-chat-drawer-opacity-slider"]'
-    kind: interactive
-    optional: true       # only while opacity popover is open
-  - id: ai-chat-safety-gate
-    selector: '[data-testid="ai-chat-safety-gate"]'
-    kind: display
-    optional: true       # only while a local-agent permission prompt is pending
-  - id: ai-chat-acp-permission-card
-    selector: '[data-testid="ai-chat-acp-permission-card"]'
-    kind: display
-    optional: true       # only while an ACP agent requests a native-tool permission
-  - id: ai-chat-acp-permission-cancel
-    selector: '[data-testid="ai-chat-acp-permission-cancel"]'
-    kind: interactive
-    optional: true       # only while an ACP native-tool permission is pending
-  - id: ai-chat-provider-select
-    selector: 'select[aria-label="Thread LLM provider"]'
-    kind: interactive
-    optional: true       # rendered only when an active thread + at least one provider configured
-  - id: ai-chat-mode-image
-    selector: '[data-testid="chat-mode-image"]'
-    kind: interactive
-    optional: true       # disabled when no image-capable provider is configured
-  - id: ai-chat-mode-video
-    selector: '[data-testid="chat-mode-video"]'
-    kind: interactive
-    optional: true       # disabled when no video-capable provider is configured
-  - id: ai-chat-output-format
-    selector: 'select[aria-label="Thread output format"]'
-    kind: interactive
-    optional: true       # locked into a span once the thread has any messages
-  - id: ai-chat-format-cycle
-    selector: 'button[aria-label="Convert visible transcript to another format"]'
-    kind: interactive
-    optional: true
-  - id: attachment-chip
-    selector: '[data-testid="attachment-chip"]'
-    kind: display
-    optional: true       # only when composer text contains a parseable @ref
-  - id: ai-message-assistant
-    selector: '[data-chat-role="assistant"]'
-    kind: display
-    optional: true
-  - id: ai-message-user
-    selector: '[data-chat-role="user"]'
-    kind: display
-    optional: true
-  - id: ai-thread-row
-    selector: '[data-chat-thread-id]'
-    kind: interactive
-    optional: true
+- id: ai-chat-drawer
+  selector: '[data-testid="ai-chat-drawer"]'
+  kind: display
+  optional: true
+- id: ai-chat-drawer-textarea
+  selector: '[data-testid="ai-chat-drawer"] textarea'
+  kind: interactive
+  optional: true
+- id: ai-chat-composer
+  selector: '[data-testid="ai-chat-composer"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-attach-button
+  selector: '[data-testid="ai-chat-attach-button"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-composer-resize
+  selector: '[data-testid="ai-chat-composer-resize"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-attachment-error
+  selector: '[data-testid="ai-chat-attachment-error"]'
+  kind: display
+  optional: true
+- id: ai-chat-new
+  selector: button[title="New chat"]
+  kind: interactive
+  optional: true
+- id: ai-chat-history
+  selector: button[title="History"]
+  kind: interactive
+  optional: true
+- id: ai-chat-copy-all
+  selector: button[aria-label="Copy entire conversation"]
+  kind: interactive
+  optional: true
+- id: ai-chat-close
+  selector: '[data-testid="ai-chat-drawer-hide"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-drawer-position
+  selector: '[data-testid="ai-chat-drawer-position"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-drawer-pin
+  selector: '[data-testid="ai-chat-drawer-pin"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-drawer-opacity
+  selector: '[data-testid="ai-chat-drawer-opacity"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-drawer-opacity-menu
+  selector: '[data-testid="ai-chat-drawer-opacity-menu"]'
+  kind: display
+  optional: true
+- id: ai-chat-drawer-opacity-slider
+  selector: '[data-testid="ai-chat-drawer-opacity-slider"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-safety-gate
+  selector: '[data-testid="ai-chat-safety-gate"]'
+  kind: display
+  optional: true
+- id: ai-chat-acp-permission-card
+  selector: '[data-testid="ai-chat-acp-permission-card"]'
+  kind: display
+  optional: true
+- id: ai-chat-acp-permission-cancel
+  selector: '[data-testid="ai-chat-acp-permission-cancel"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-provider-select
+  selector: select[aria-label="Thread LLM provider"]
+  kind: interactive
+  optional: true
+- id: ai-chat-mode-image
+  selector: '[data-testid="chat-mode-image"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-mode-video
+  selector: '[data-testid="chat-mode-video"]'
+  kind: interactive
+  optional: true
+- id: ai-chat-output-format
+  selector: select[aria-label="Thread output format"]
+  kind: interactive
+  optional: true
+- id: ai-chat-format-cycle
+  selector: button[aria-label="Convert visible transcript to another format"]
+  kind: interactive
+  optional: true
+- id: attachment-chip
+  selector: '[data-testid="attachment-chip"]'
+  kind: display
+  optional: true
+- id: ai-message-assistant
+  selector: '[data-chat-role="assistant"]'
+  kind: display
+  optional: true
+- id: ai-message-user
+  selector: '[data-chat-role="user"]'
+  kind: display
+  optional: true
+- id: ai-thread-row
+  selector: '[data-chat-thread-id]'
+  kind: interactive
+  optional: true
 -->
 
 - 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope/tabId` + `drawerPosition` 控制状态机；线程始终绑定到 tab
-- **打开方式**：Welcome 的 `Chat Tao` 卡片、当前 tab 的 `tab-chat-toggle` / `Ctrl+Shift+L`、或隐藏态 `ai-chat-drawer-ribbon` 打开 tab-bound drawer
-- **抽屉头部**：位置切换 / 固定切换 / 顶部或底部悬浮透明度 / 复制全部对话 / 新对话 / 历史对话 / 隐藏到 ribbon
+- **打开方式**：Welcome 的 `Chat Tao` 卡片、当前 tab 的 `tab-chat-toggle` / `Ctrl+Shift+L`、或常驻 `shell-rail-tao` 打开 tab-bound drawer
+- **抽屉头部**：位置切换 / 固定切换 / 顶部或底部悬浮透明度 / 复制全部对话 / 新对话 / 历史对话 / 隐藏面板
 - **Thread badge 区**：显示 thread 绑定的 tab (`Link2` 图标 + tab 标题)；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
 - **Composer**：`Ctrl+Enter` 发送、附件按钮（paperclip）/ 拖拽文件到输入区 / 粘贴剪贴板图片添加本地附件，最多 10 个文件且总计最多 100 MiB；`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`，其中 `@file` 在发送前转为结构化文件附件
 - **附件分发**：Claude Code / Codex 分支收到本地文件路径清单并按需读取；普通 LLM 分支不会收到本机路径，文本附件转为内容片段，图片附件转为多模态图片 block，其他二进制仅发送文件名/类型/大小摘要
@@ -5390,7 +5395,6 @@ id: F-TAO-1
 status: done
 area: notes
 components:
-- TaoRibbon
 - NotesPanel
 - NotesList
 - NoteEditor
@@ -5406,7 +5410,6 @@ files:
 - src/stores/notesStore.ts
 - src/stores/taoHubStore.ts
 - src/stores/taoAlertStore.ts
-- src/lib/tao/ribbonPlacement.ts
 - src/lib/tao/taoAlerts.ts
 - src/lib/notes/notesTheme.ts
 - src/lib/chat/chatDock.ts
@@ -5416,7 +5419,6 @@ files:
 - src/components/notes/NoteFilters.tsx
 - src/components/notes/NoteThemeSettings.tsx
 - src/components/notes/FloatingNotesPanel.tsx
-- src/components/tao/TaoRibbon.tsx
 - src/components/tao/TaoAlertInbox.tsx
 - src/components/tao/TaoAlertPoller.tsx
 - src/components/notes/NotesDetachedWindow.tsx
@@ -5537,10 +5539,6 @@ controls:
   selector: '[data-testid="floating-notes-dock"]'
   kind: interactive
   optional: true
-- id: tao-ribbon-badge
-  selector: '[data-testid="tao-ribbon-badge"]'
-  kind: display
-  optional: true
 - id: shell-tao-context
   selector: '[data-testid="shell-tao-context"]'
   kind: display
@@ -5619,13 +5617,13 @@ controls:
   kind: display
 -->
 
-- 统一 `TaoRibbon` 四边任意位置悬浮入口，拖动落点决定 edge + offsetRatio（`localStorage: taomni.chatDrawer.layout.v1`），带节制的临期/过期/AI 完成 badge 与跳动提示
+- 统一 Rail / 顶部 Tao 入口，删除悬浮 Ribbon 及偏移存储；通知 badge 与历史保留
 - `Tao Hub`：单一抽屉三个主 tab（`Chat` / `便签` / `通知`），记住上次非通知 tab（`localStorage: taomni.taoHub.lastTab.v1`）
 - `便签`：独立 `notes.db` + 统一便签模型（完成 / 置顶 / 归档 / 颜色 / 优先级 / due / reminder / 步骤 / 标签）；默认「最近未完成」视图；搜索、过滤视图；主题 taomni/system/light/dark/paper/compact
 - 单例 `FloatingNotesPanel`：hub ↔ floating 模式切换，可拖拽 / 调整大小，Taomni 内部置顶（层级低于 vault / 认证弹窗）
 - `TaoAlertInbox` + `TaoAlertPoller`：便签临期(黄)/过期(红) + AI 后台完成(ai_done) + 邮件新消息汇聚，点击跳转目标或打开事件列表；通知历史默认隐藏，可搜索查询，支持 30/300 条保留上限与手工清空（`localStorage: taomni.taoAlerts.history.v1` / `taomni.taoAlerts.historyLimit.v1`）
 - Chat 抽屉四边可 pinned：左右为侧栏、上/下为横向条（窄窗自动回退浮动，见 `resolveChatDock`）
-- **e2e 测试限制**：Tauri 命令在浏览器模式走 stub（localStorage 模拟 notes.db）；真实持久化、跨进程提醒调度、原生窗口置顶不在浏览器冒烟覆盖，由 Rust / Vitest 单测承担。Ribbon 拖动、上/下 pin、告警优先级与跳转的判定逻辑分别由 `ribbonPlacement`/`chatDock`/`taoAlerts` 单测覆盖
+- **e2e 测试限制**：Tauri 命令在浏览器模式走 stub（localStorage 模拟 notes.db）；真实持久化、跨进程提醒调度、原生窗口置顶不在浏览器冒烟覆盖，由 Rust / Vitest 单测承担。四向 Rail、上/下 pin、告警优先级与跳转分别由 Shell 布局 / `chatDock` / `taoAlerts` 单测支撑
 
 ---
 
@@ -11189,6 +11187,11 @@ files:
 - src/lib/shell/panelWindowLifecycle.ts
 - src/lib/shell/sftpWindowState.ts
 - src/lib/sftpTransferTracking.ts
+- src/components/shell/ShellActionPalette.tsx
+- src/components/tabbar/ContextActionsSlot.tsx
+- src/lib/shell/contextPanel.ts
+- src/lib/shell/laneActions.ts
+- src/hooks/useNativeImmersive.ts
 controls:
 - id: shell-close-cancel
   selector: '[data-testid="shell-close-cancel"]'
@@ -11291,9 +11294,6 @@ controls:
   kind: display
 - id: shell-lane-empty-home
   selector: '[data-testid="shell-lane-empty-home"]'
-  kind: interactive
-- id: shell-lane-select
-  selector: '[data-testid="shell-lane-select"]'
   kind: interactive
 - id: shell-layout-warning
   selector: '[data-testid="shell-layout-warning"]'
@@ -11649,6 +11649,87 @@ controls:
   selector: '[data-testid="lanchat-enable-prompt"] button:nth-of-type(1)'
   kind: interactive
   optional: true
+- id: shell-action-palette
+  selector: '[data-testid="shell-action-palette"]'
+  kind: display
+- id: shell-action-search
+  selector: '[data-testid="shell-action-search"]'
+  kind: interactive
+- id: shell-action-result
+  selector: '[data-testid="shell-action-result"]'
+  kind: interactive
+- id: shell-action-empty
+  selector: '[data-testid="shell-action-empty"]'
+  kind: display
+- id: shell-close-summary
+  selector: '[data-testid="shell-close-summary"]'
+  kind: display
+- id: shell-close-result
+  selector: '[data-testid="shell-close-result"]'
+  kind: display
+- id: shell-close-retry-remaining
+  selector: '[data-testid="shell-close-retry-remaining"]'
+  kind: interactive
+- id: shell-restore-refresh
+  selector: '[data-testid="shell-restore-refresh"]'
+  kind: interactive
+- id: shell-rail-more
+  selector: '[data-testid="shell-rail-more"]'
+  kind: interactive
+- id: shell-rail-communicate
+  selector: '[data-testid="shell-rail-communicate"]'
+  kind: interactive
+- id: shell-rail-utility
+  selector: '[data-testid="shell-rail-utility"]'
+  kind: interactive
+- id: shell-rail-more-communicate
+  selector: '[data-testid="shell-rail-more-communicate"]'
+  kind: interactive
+- id: shell-rail-more-utility
+  selector: '[data-testid="shell-rail-more-utility"]'
+  kind: interactive
+- id: shell-rail-move-left
+  selector: '[data-testid="shell-rail-move-left"]'
+  kind: interactive
+- id: shell-rail-move-top
+  selector: '[data-testid="shell-rail-move-top"]'
+  kind: interactive
+- id: shell-rail-move-right
+  selector: '[data-testid="shell-rail-move-right"]'
+  kind: interactive
+- id: shell-rail-move-bottom
+  selector: '[data-testid="shell-rail-move-bottom"]'
+  kind: interactive
+- id: shell-rail-hide
+  selector: '[data-testid="shell-rail-hide"]'
+  kind: interactive
+- id: shell-fallback-home
+  selector: '[data-testid="shell-fallback-home"]'
+  kind: interactive
+- id: shell-fallback-actions
+  selector: '[data-testid="shell-fallback-actions"]'
+  kind: interactive
+- id: shell-fallback-tab
+  selector: '[data-testid="shell-fallback-tab"]'
+  kind: interactive
+- id: shell-lane-empty-create
+  selector: '[data-testid="shell-lane-empty-create"]'
+  kind: interactive
+- id: shell-tao-badge
+  selector: '[data-testid="shell-tao-badge"]'
+  kind: display
+- id: code-workspace-toolbar
+  selector: '[data-testid="code-workspace-toolbar"]'
+  kind: display
+- id: shell-panel-toggle
+  selector: '[data-testid="shell-panel-toggle"]'
+  kind: interactive
+- id: shell-tao-toggle
+  selector: '[data-testid="shell-tao-toggle"]'
+  kind: interactive
+- id: tab-actions-more
+  selector: '[data-testid="tab-actions-more"]'
+  kind: interactive
 -->
 
 - 统一 Rail/Navigator、五个意图 lane、总览/快速切换、Context Host、Tao 和 Notes 稳定实例。

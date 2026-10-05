@@ -133,10 +133,6 @@
   --taomni-ribbon-from: #f8fafc;
   --taomni-ribbon-to: #e2e8f0;
   --taomni-ribbon-border: #cbd5e1;
-  --taomni-tao-ribbon-bg: #dff7f3;
-  --taomni-tao-ribbon-text: #0f5f63;
-  --taomni-tao-ribbon-border: #8bd8d1;
-  --taomni-tao-ribbon-shadow: 0 8px 20px rgba(20, 184, 166, 0.18);
 
   /* Warning banner tokens — readable on the light panel surface */
   --taomni-warning-bg: #fef3c7;
@@ -298,10 +294,6 @@ html[data-app-theme="dark"] {
   --taomni-ribbon-from: #24262b;
   --taomni-ribbon-to: #1e1f22;
   --taomni-ribbon-border: #303238;
-  --taomni-tao-ribbon-bg: #24363b;
-  --taomni-tao-ribbon-text: #d9f0ec;
-  --taomni-tao-ribbon-border: #5aa3a3;
-  --taomni-tao-ribbon-shadow: 0 8px 22px rgba(90, 163, 163, 0.2);
 
   /* Warning banner tokens — readable on the dark panel surface */
   --taomni-warning-bg: rgba(245, 158, 11, 0.18);

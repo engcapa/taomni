@@ -1,7 +1,7 @@
 id: TC-SHELL-N06
 title: Project rehosting retains editor history and saves real bytes
-description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n06
-  records the complete scenario and any remaining manual boundary.
+description: Isolated packaged Tauri boundary. docs-feature/workspace-shell-ux-redesign-test-cases.md#v-n06 records
+  the complete scenario and any remaining manual boundary.
 covers:
 - F25.5
 - F-SHELL-1
@@ -21,10 +21,9 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
     key: taomni.recentWorkspaces.v1
-    value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell",
-      "name": "shell", "path": "${fixture.shell_root}", "kind": "folder"}], "looseFiles":
-      [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind": "root",
-      "rootId": "shell", "path": "README.md"}}]'
+    value: '[{"id": "shell-native", "name": "Shell Native", "roots": [{"id": "shell", "name": "shell", "path": "${fixture.shell_root}",
+      "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 3000, "isGitRepo": false, "lastActiveFile": {"kind":
+      "root", "rootId": "shell", "path": "README.md"}}]'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
@@ -66,6 +65,29 @@ steps:
     - beta
     - gamma
     - z
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.immersive.toggle
+- click: '[data-testid="shell-action-result"][data-action-id="shell.immersive.toggle"]'
+- assert_not_visible: '[data-testid="app-titlebar"]'
+- assert_not_visible: '[data-testid="shell-rail"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - alpha
+    - beta
+    - gamma
+    - z
+- press: F1
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.immersive.toggle
+- click: '[data-testid="shell-action-result"][data-action-id="shell.immersive.toggle"]'
+- assert_visible: '[data-testid="app-titlebar"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
 - press:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     key: Mod+s
@@ -96,18 +118,18 @@ verification:
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]
-        .cm-content", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
+        60}}'
     - step: 10
-      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
-        .cm-line", "equals": ["alpha", "beta", "gamma", ""]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
+        ["alpha", "beta", "gamma", ""]}}'
     results:
     - 6
     - 9
     - 10
   - id: R2
-    requirement: Rehosting preserves the full buffer; save writes the expected SHA-256,
-      undo and save restore original bytes.
+    requirement: Rehosting preserves the full buffer; save writes the expected SHA-256, undo and save restore original
+      bytes.
     actions:
     - 11
     - 12
@@ -127,23 +149,48 @@ verification:
     - 26
     - 27
     - 28
-    - 30
-    - 32
-    - 33
+    - 41
+    - 43
+    - 44
     checkpoints:
     - step: 29
-      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"]
-        .cm-line", "equals": ["alpha", "beta", "gamma", "z"]}}'
-    - step: 31
-      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_readme}", "equals":
-        "${fixture.shell_edited_sha256}"}}'
-    - step: 34
-      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_readme}", "equals":
-        "${fixture.shell_readme_sha256}"}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
+        ["alpha", "beta", "gamma", "z"]}}'
+    - step: 42
+      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_readme}", "equals": "${fixture.shell_edited_sha256}"}}'
+    - step: 45
+      expectation: '{"assert_file_sha256": {"path": "${fixture.shell_readme}", "equals": "${fixture.shell_readme_sha256}"}}'
     results:
     - 29
+    - 42
+    - 45
+  - id: R-immersive
+    requirement: Native immersive mode hides chrome; returning retains one editor and its complete dirty content
+      before real disk save and undo.
+    actions:
+    - 30
     - 31
+    - 32
+    - 36
+    - 37
+    - 38
+    checkpoints:
+    - step: 33
+      expectation: Immersive chrome visibility and editor content match the requested state.
+    - step: 34
+      expectation: Immersive chrome visibility and editor content match the requested state.
+    - step: 35
+      expectation: Immersive chrome visibility and editor content match the requested state.
+    - step: 39
+      expectation: Immersive chrome visibility and editor content match the requested state.
+    - step: 40
+      expectation: Immersive chrome visibility and editor content match the requested state.
+    results:
+    - 33
     - 34
+    - 35
+    - 39
+    - 40
   visual:
   - check: Read final screenshot for clipped controls and retained content
     method: manual

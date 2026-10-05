@@ -1,7 +1,8 @@
 id: TC-SHELL-B42
 title: Restore identities remain independent; missing recent-panel owners require explicit rebinding
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b42.
-  Browser IPC fixtures prove renderer outcomes only.'
+  Browser IPC fixtures prove renderer outcomes only. Classification now uses dock/Actions; Project uses the unified
+  Workspaces entry. Existing workspace content, shortcut and state assertions remain.'
 covers:
 - F1.6
 - F25.5
@@ -22,18 +23,17 @@ steps:
 - seed_storage:
     key: taomni.shellLayout.v2
     value: '{"version": 2, "restoreSources": {"workspace:restore-A": {"kind": "workspace", "workspaceInstanceId":
-      "restore-A", "workspace": {"repoRoot": "/preview/parity008", "workspaceId": "same-directory", "name":
-      "同路径甲", "roots": [{"id": "root-restore-A", "name": "parity008", "path": "/preview/parity008", "kind":
-      "folder"}], "looseFiles": [], "initialFile": {"kind": "root", "rootId": "root-restore-A", "path":
-      "repo-a/same.txt"}}}, "workspace:restore-B": {"kind": "workspace", "workspaceInstanceId": "restore-B",
-      "workspace": {"repoRoot": "/preview/parity008", "workspaceId": "same-directory", "name": "同路径乙",
-      "roots": [{"id": "root-restore-B", "name": "parity008", "path": "/preview/parity008", "kind": "folder"}],
-      "looseFiles": [], "initialFile": {"kind": "root", "rootId": "root-restore-B", "path": "repo-a/same.txt"}}}},
-      "restoredTabs": {"workspace:restore-A": {"pinned": true, "order": 1, "laneOverride": "connect"},
-      "workspace:restore-B": {"pinned": false, "order": 0}}, "panelOverrides": {"workspace:restore-A:git":
-      {"edge": "right", "size": 350, "pinned": true}, "workspace:restore-B:git": {"edge": "bottom", "size":
-      280, "pinned": true}}, "lastActiveRestoreRef": "workspace:restore-A", "recentPanels": [{"kind":
-      "git", "restoreRef": "workspace:restore-A", "preferredPlacement": "detached", "lastUsedAt": 1},
+      "restore-A", "workspace": {"repoRoot": "/preview/parity008", "workspaceId": "same-directory", "name": "同路径甲",
+      "roots": [{"id": "root-restore-A", "name": "parity008", "path": "/preview/parity008", "kind": "folder"}],
+      "looseFiles": [], "initialFile": {"kind": "root", "rootId": "root-restore-A", "path": "repo-a/same.txt"}}},
+      "workspace:restore-B": {"kind": "workspace", "workspaceInstanceId": "restore-B", "workspace": {"repoRoot":
+      "/preview/parity008", "workspaceId": "same-directory", "name": "同路径乙", "roots": [{"id": "root-restore-B",
+      "name": "parity008", "path": "/preview/parity008", "kind": "folder"}], "looseFiles": [], "initialFile": {"kind":
+      "root", "rootId": "root-restore-B", "path": "repo-a/same.txt"}}}}, "restoredTabs": {"workspace:restore-A":
+      {"pinned": true, "order": 1, "laneOverride": "connect"}, "workspace:restore-B": {"pinned": false, "order":
+      0}}, "panelOverrides": {"workspace:restore-A:git": {"edge": "right", "size": 350, "pinned": true}, "workspace:restore-B:git":
+      {"edge": "bottom", "size": 280, "pinned": true}}, "lastActiveRestoreRef": "workspace:restore-A", "recentPanels":
+      [{"kind": "git", "restoreRef": "workspace:restore-A", "preferredPlacement": "detached", "lastUsedAt": 1},
       {"kind": "sftp", "restoreRef": "run-entry:saved:deleted-owner", "preferredPlacement": "dock", "lastUsedAt":
       0}]}'
 - reload_window: null
@@ -57,7 +57,7 @@ steps:
     command: workspace_list_dir
 - wait_for: '[data-testid="tab-item"][data-active="true"]:has-text("同路径甲")'
 - assert_attribute:
-    selector: '[data-testid="shell-lane-select"]'
+    selector: '[data-testid="shell-root"]'
     name: data-lane
     equals: connect
 - assert_not_visible: '[data-testid="shell-detached-placeholder"]'
@@ -76,9 +76,8 @@ steps:
     - workspace:restore-B
     - workspace:restore-A
 - eval_readonly:
-    expression: JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).recentPanels[0].restoreRef ===
-      'workspace:restore-A' && JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).recentPanels[0].preferredPlacement
-      === 'detached'
+    expression: JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).recentPanels[0].restoreRef === 'workspace:restore-A'
+      && JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).recentPanels[0].preferredPlacement === 'detached'
     expect_truthy: true
     timeout_sec: 5
 - click: '[data-testid="shell-overview-trigger"]'
@@ -163,8 +162,8 @@ steps:
     selector: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"]'
     equal: 2
 - eval_readonly:
-    expression: Object.keys(JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).restoreSources).length
-      === 2
+    expression: Object.keys(JSON.parse(localStorage.getItem('taomni.shellLayout.v2')).restoreSources).length ===
+      2
     expect_truthy: true
     timeout_sec: 5
 - screenshot: tc-shell-b42.png
@@ -264,8 +263,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Explicit restore opens two same-directory workspaces in saved order, selects the saved
-      active identity and preserves detached intent without inventing a live window.
+    requirement: Explicit restore opens two same-directory workspaces in saved order, selects the saved active identity
+      and preserves detached intent without inventing a live window.
     actions:
     - 3
     - 4
@@ -281,18 +280,18 @@ verification:
     - step: 13
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-active=\"true\"]:has-text(\"同路径甲\")"}'
     - step: 14
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-lane-select\"]", "name": "data-lane",
-        "equals": "connect"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
     - step: 15
       expectation: '{"assert_not_visible": "[data-testid=\"shell-detached-placeholder\"]"}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name":
-        "data-state", "equals": "succeeded"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state",
+        "equals": "succeeded"}}'
     - step: 18
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-restore-entry\"]", "equal": 2}}'
     - step: 19
-      expectation: '{"assert_items": {"selector": "[data-testid=\"shell-restore-entry\"]", "attribute":
-        "data-entry-id", "equals": ["workspace:restore-B", "workspace:restore-A"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"shell-restore-entry\"]", "attribute": "data-entry-id",
+        "equals": ["workspace:restore-B", "workspace:restore-A"]}}'
     - step: 20
       expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).recentPanels[0].restoreRef
         === ''workspace:restore-A'' && JSON.parse(localStorage.getItem(''taomni.shellLayout.v2'')).recentPanels[0].preferredPlacement
@@ -376,8 +375,7 @@ verification:
     - 44
     - 46
   - id: R4
-    requirement: Returning to the first identity preserves its draft and never merges the two logical
-      workspaces.
+    requirement: Returning to the first identity preserves its draft and never merges the two logical workspaces.
     actions:
     - 47
     - 48
@@ -407,8 +405,8 @@ verification:
     - 55
     - 56
   - id: R5
-    requirement: Recent panels stay independent of primary tabs. A deleted owner requires an explicit
-      selection; cancel creates no connection or SFTP channel and never binds to another live owner.
+    requirement: Recent panels stay independent of primary tabs. A deleted owner requires an explicit selection;
+      cancel creates no connection or SFTP channel and never binds to another live owner.
     actions:
     - 63
     - 64
@@ -423,20 +421,17 @@ verification:
     - step: 69
       expectation: '{"wait_for": "[data-testid=\"shell-recent-panel-owner-choice\"]"}'
     - step: 70
-      expectation: '{"assert_value": {"selector": "[data-testid=\"shell-recent-panel-owner\"]", "equals":
-        ""}}'
+      expectation: '{"assert_value": {"selector": "[data-testid=\"shell-recent-panel-owner\"]", "equals": ""}}'
     - step: 71
       expectation: '{"assert_disabled": "[data-testid=\"shell-recent-panel-bind\"]"}'
     - step: 72
-      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 1, "status":
-        "requested"}}'
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 1, "status": "requested"}}'
     - step: 73
       expectation: '{"assert_shell_backend": {"command": "sftp_attach", "count": 0, "status": "requested"}}'
     - step: 75
       expectation: '{"assert_not_visible": "[data-testid=\"shell-recent-panel-owner-choice\"]"}'
     - step: 76
-      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 1, "status":
-        "requested"}}'
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 1, "status": "requested"}}'
     results:
     - 66
     - 67
@@ -448,8 +443,8 @@ verification:
     - 75
     - 76
   - id: R6
-    requirement: Explicitly choosing Alpha creates its own ready connection and SFTP surface, replaces
-      only the orphan metadata and leaves Beta's connection untouched.
+    requirement: Explicitly choosing Alpha creates its own ready connection and SFTP surface, replaces only the
+      orphan metadata and leaves Beta's connection untouched.
     actions:
     - 77
     - 79
@@ -469,18 +464,17 @@ verification:
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-recent-panel\"][data-restore-ref=\"run-entry:saved:shell-a\"]",
         "equal": 1}}'
     - step: 92
-      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count":
-        2, "status": "requested"}}'
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count": 2, "status":
+        "requested"}}'
     - step: 93
-      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "beta.invalid", "count":
-        0, "status": "requested"}}'
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "beta.invalid", "count": 0, "status":
+        "requested"}}'
     - step: 95
       expectation: '{"wait_for": "[data-testid=\"shell-host\"][data-panel-id$=\":sftp\"][data-phase=\"ready\"]"}'
     - step: 96
       expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host-owner\"]", "contains": "qa-alpha"}}'
     - step: 97
-      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status":
-        "requested"}}'
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status": "requested"}}'
     results:
     - 78
     - 88
@@ -493,8 +487,8 @@ verification:
     - 96
     - 97
   - id: R7
-    requirement: Failed attachment retains the orphan and selected connection; UI retry attaches exactly
-      once more without creating a duplicate SSH connection.
+    requirement: Failed attachment retains the orphan and selected connection; UI retry attaches exactly once more
+      without creating a duplicate SSH connection.
     actions:
     - 80
     - 81
@@ -503,23 +497,21 @@ verification:
     - step: 82
       expectation: '{"wait_for": "[data-testid=\"shell-recent-panel-retry\"]"}'
     - step: 83
-      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-recent-panel-error\"]", "contains":
-        "QA fixture rejected sftp_attach"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-recent-panel-error\"]", "contains": "QA fixture
+        rejected sftp_attach"}}'
     - step: 84
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-recent-panel\"][data-restore-ref=\"run-entry:saved:deleted-owner\"]",
         "equal": 1}}'
     - step: 85
-      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status":
-        "requested"}}'
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status": "requested"}}'
     - step: 86
-      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count":
-        1, "status": "failed"}}'
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count": 1, "status":
+        "failed"}}'
     - step: 92
-      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count":
-        2, "status": "requested"}}'
-    - step: 97
-      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status":
+      expectation: '{"assert_shell_backend": {"command": "sftp_attach", "owner": "alpha.invalid", "count": 2, "status":
         "requested"}}'
+    - step: 97
+      expectation: '{"assert_shell_backend": {"command": "create_ssh_terminal", "count": 2, "status": "requested"}}'
     results:
     - 82
     - 83
@@ -529,8 +521,8 @@ verification:
     - 92
     - 97
   - id: R8
-    requirement: Independent same-directory instances become ready out of order; Home retains focus until
-      all restore outcomes settle.
+    requirement: Independent same-directory instances become ready out of order; Home retains focus until all restore
+      outcomes settle.
     actions:
     - 7
     - 8

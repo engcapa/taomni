@@ -64,8 +64,8 @@ steps:
 - screenshot: ai-001-drawer.png
 - click: '[data-testid="ai-chat-drawer-hide"]'
 - assert_not_visible: '[data-testid="ai-chat-drawer"]'
-- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 verification:
   review: reviewed
@@ -122,7 +122,7 @@ verification:
     - step: 28
       expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
     - step: 29
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-tao\"]"}'
     - step: 31
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     results:

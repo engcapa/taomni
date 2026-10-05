@@ -8,10 +8,11 @@ const panelKinds = ["sftp", "git", "problems", "workspace-terminal"] as const;
 export function defaultShellLayout(): PersistedShellLayoutV2 {
   return {
     version: 2,
+    rail: { edge: "left", visible: true },
     navigator: { width: 248, collapsedByLane: { home: false, connect: true, build: true, communicate: false, utility: false }, lastArea: "sessions" },
     panelDefaults: { sftp: { edge: "right", size: 330, pinned: true }, git: { edge: "bottom", size: 280, pinned: true },
       problems: { edge: "bottom", size: 280, pinned: true }, "workspace-terminal": { edge: "bottom", size: 280, pinned: true } },
-    panelOverrides: {}, tao: { edge: "right", width: 360, height: 280, pinned: true, opacity: 1, ribbonOffsetRatio: .5 },
+    panelOverrides: {}, tao: { edge: "right", width: 360, height: 280, pinned: true, opacity: 1 },
     restoreSources: {}, restoredTabs: {}, recentPanels: [],
   };
 }
@@ -85,14 +86,15 @@ export function validateShellLayout(raw: unknown): PersistedShellLayoutV2 | null
     seenPanels.add(key); return true;
   }).slice(0, 20) : [];
   const lastActiveRestoreRef = string(value.lastActiveRestoreRef);
-  return { version: 2, navigator: { width: number(nav.width, 248, 200, 400),
+  const rail = object(value.rail);
+  return { version: 2, rail: { edge: ["left", "right", "top", "bottom"].includes(String(rail.edge)) ? rail.edge as PersistedShellLayoutV2["rail"]["edge"] : "left", visible: bool(rail.visible, true) }, navigator: { width: number(nav.width, 248, 200, 400),
     collapsedByLane: Object.fromEntries(TAB_LANES.map((lane) => [lane, bool(collapsed[lane], defaults.navigator.collapsedByLane[lane])])) as Record<TabLane, boolean>,
     lastArea: nav.lastArea === "home" || nav.lastArea === "workspaces" ? nav.lastArea : "sessions" },
     panelDefaults, panelOverrides, restoreSources, restoredTabs, recentPanels,
     ...(lastActiveRestoreRef && Object.hasOwn(restoreSources, lastActiveRestoreRef) ? { lastActiveRestoreRef } : {}),
     tao: { edge: ["left", "right", "top", "bottom"].includes(String(tao.edge)) ? tao.edge as PersistedShellLayoutV2["tao"]["edge"] : "right",
       width: number(tao.width, 360, 300, 600), height: number(tao.height, 280, 220, 600), pinned: bool(tao.pinned, true),
-      opacity: number(tao.opacity, 1, .65, 1), ribbonOffsetRatio: number(tao.ribbonOffsetRatio, .5, 0, 1) } };
+      opacity: number(tao.opacity, 1, .65, 1) } };
 }
 export function loadShellLayout(storage: LayoutStorage, viewportWidth: number): { layout: PersistedShellLayoutV2; warning: string | null; writable: boolean } {
   const defaults = defaultShellLayout();
@@ -115,7 +117,7 @@ export function loadShellLayout(storage: LayoutStorage, viewportWidth: number): 
     const oldTao = parseLegacy("taomni.chatDrawer.layout.v1");
     defaults.tao = validateShellLayout({ ...defaults, tao: { ...defaults.tao,
       edge: oldTao.position ?? "right", width: oldTao.width ?? 360, height: oldTao.height ?? 280,
-      pinned: oldTao.pinned ?? true, opacity: oldTao.floatingOpacity ?? 1, ribbonOffsetRatio: oldTao.ribbonOffsetRatio ?? .5 } })!.tao;
+      pinned: oldTao.pinned ?? true, opacity: oldTao.floatingOpacity ?? 1 } })!.tao;
     try { storage.setItem(SHELL_LAYOUT_KEY, JSON.stringify(defaults)); }
     catch { return { layout: defaults, warning: "write", writable: true }; }
     return { layout: defaults, warning: null, writable: true };

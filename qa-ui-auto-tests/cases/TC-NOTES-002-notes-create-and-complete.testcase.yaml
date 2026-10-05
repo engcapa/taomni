@@ -25,8 +25,8 @@ timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
-- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="shell-rail-tao"]'
+- click: '[data-testid="shell-rail-tao"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="tao-hub-tab-notes"]'
 - wait_for: '[data-testid="notes-panel"]'
@@ -61,7 +61,7 @@ verification:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
     - step: 3
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"shell-rail-tao\"]"}'
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     - step: 7

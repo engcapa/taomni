@@ -11,6 +11,35 @@ from typing import Any
 from . import StepContext, StepError, verb
 
 
+@verb("keyboard_sequence")
+def step_keyboard_sequence(ctx: StepContext, args: Any) -> None:
+    """Real browser key events with modifiers held across multiple chords."""
+    if not isinstance(args, list) or not args or len(args) > 32:
+        raise StepError("keyboard_sequence: expected 1–32 down/up/press steps")
+    for step in args:
+        if not isinstance(step, dict) or len(step) != 1 or next(iter(step)) not in {"down", "up", "press"}:
+            raise StepError("keyboard_sequence: expected {down|up|press: key}")
+        if not isinstance(next(iter(step.values())), str) or not next(iter(step.values())).strip():
+            raise StepError("keyboard_sequence: key must not be empty")
+    if ctx.dry_run:
+        return
+    held = []
+    try:
+        for step in args:
+            action, key = next(iter(step.items()))
+            # Mark down before dispatch: release even if an injected failure
+            # happens after the browser accepted the physical key event.
+            if action == "down" and key not in held:
+                held.append(key)
+            getattr(ctx.page.keyboard, action)(key)
+            if action == "up" and key in held:
+                held.remove(key)
+    finally:
+        for key in reversed(held):
+            with suppress(Exception):
+                ctx.page.keyboard.up(key)
+
+
 @verb("fill")
 def step_fill(ctx: StepContext, args: Any) -> None:
     if not isinstance(args, dict):

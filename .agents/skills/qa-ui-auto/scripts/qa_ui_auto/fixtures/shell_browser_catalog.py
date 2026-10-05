@@ -53,6 +53,10 @@ def setup(ctx):
         recents = []
     seed = {"taomni.qa.shell.enabled": "true", "taomni.codeWorkspace.toolWindowStripes.v1": '{"showNames":false,"leftWidth":59,"rightWidth":59}', "taomni.sessions.v1": json.dumps(sessions, ensure_ascii=False),
             "taomni.recentWorkspaces.v1": json.dumps(recents, ensure_ascii=False), "taomni.welcomeRecentSessionLimit": "100"}
+    if case == "TC-SHELL-B48":
+        seed["taomni.qa.shell.javaFixture"] = "true"
+        recents[0]["lastActiveFile"] = {"kind": "root", "rootId": "root-shell", "path": "Main.java"}
+        seed["taomni.recentWorkspaces.v1"] = json.dumps(recents, ensure_ascii=False)
     if case in {"TC-SHELL-B04", "TC-SHELL-B42"}:
         # This scenario restores only its two workspace descriptors. Saved
         # sessions remain available for the later explicit orphan-owner choice.

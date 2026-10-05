@@ -50,6 +50,19 @@ describe("Close transactions", () => {
     expect(b.commit).not.toHaveBeenCalled();
     expect(c.commit).not.toHaveBeenCalled();
   });
+  it("reports exact closed/remaining identities and retries without repeating committed saves", async () => {
+    let fail = true;
+    const a = target("a"), b = target("b", { flush: async () => { if (fail) throw new Error("disk full"); } }), c = target("c");
+    const prompt = vi.fn<import("./closeCoordinator").ClosePrompt>(async (_items, _errors, progress): ReturnType<import("./closeCoordinator").ClosePrompt> => {
+      if (progress) {
+        expect(progress).toEqual({ closed: [{ id: "a", title: "a" }], remaining: [{ id: "b", title: "b" }, { id: "c", title: "c" }] });
+        fail = false; return { "$remaining": "retry" as const };
+      }
+      return {};
+    });
+    expect(await new CloseCoordinator(prompt).request([a, b, c])).toMatchObject({ status: "closed", closed: ["a", "b", "c"], failed: [] });
+    [a, b, c].forEach((item) => expect(item.commit).toHaveBeenCalledOnce());
+  });
   it("rechecks changed revisions and rejects background at process exit", async () => {
     let revision = "1";
     const a = target("a", { getRisks: async () => [{ id: "job", ownerId: "a", kind: "job", detail: "Transfer", revision, choices: ["background", "cancel-job", "cancel"] }] });

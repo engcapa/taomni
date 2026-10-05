@@ -17,8 +17,8 @@ export function useShellLayoutBridge() {
       const activeSideTab = s.layout.navigator.lastArea === "sessions" ? "sessions" : app.activeSideTab;
       if (collapsed !== app.sidebarCollapsed || activeSideTab !== app.activeSideTab) useAppStore.setState({ sidebarCollapsed: collapsed, activeSideTab });
       const tao = s.layout.tao;
-      if (chat.drawerPosition !== tao.edge || chat.drawerWidth !== tao.width || chat.drawerHeight !== tao.height || chat.drawerPinned !== tao.pinned || chat.drawerFloatingOpacity !== tao.opacity || chat.ribbonOffsetRatio !== tao.ribbonOffsetRatio)
-        useChatStore.setState({ drawerPosition: tao.edge, drawerWidth: tao.width, drawerHeight: tao.height, drawerPinned: tao.pinned, drawerFloatingOpacity: tao.opacity, ribbonOffsetRatio: tao.ribbonOffsetRatio });
+      if (chat.drawerPosition !== tao.edge || chat.drawerWidth !== tao.width || chat.drawerHeight !== tao.height || chat.drawerPinned !== tao.pinned || chat.drawerFloatingOpacity !== tao.opacity)
+        useChatStore.setState({ drawerPosition: tao.edge, drawerWidth: tao.width, drawerHeight: tao.height, drawerPinned: tao.pinned, drawerFloatingOpacity: tao.opacity });
       if (chat.drawerOpen !== s.taoOpen) useChatStore.setState({ drawerOpen: s.taoOpen });
     };
     const offSidebar = installSidebarBridge({ setCollapsed: (collapsed) => useShellLayoutStore.getState().setNavigatorCollapsed(lane(), collapsed),

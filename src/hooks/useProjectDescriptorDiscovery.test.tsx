@@ -107,4 +107,48 @@ describe("useProjectDescriptorDiscovery", () => {
     expect(result.current.discovery?.descriptors).toHaveLength(0);
     expect(result.current.reason).toContain("No build descriptors found");
   });
+  it("keeps an in-flight Java scan through tab switches and rescans only on explicit refresh", async () => {
+    let resolve!: (value: WorkspaceTreeLoadResult<WorkspaceEntry>) => void;
+    listFilesMock.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    readFileMock.mockResolvedValue(file("pom.xml", "<project><artifactId>app</artifactId></project>"));
+    const { result, rerender } = renderHook(
+      ({ visible }) => useProjectDescriptorDiscovery("/repo/app", { autoRefresh: visible }),
+      { initialProps: { visible: true } },
+    );
+    rerender({ visible: false }); rerender({ visible: true });
+    expect(listFilesMock).toHaveBeenCalledTimes(1);
+    await act(async () => resolve(ready([entry("pom.xml", "pom.xml")])));
+    await waitFor(() => expect(result.current.status).toBe("descriptor-only"));
+    const discovery = result.current.discovery;
+    rerender({ visible: false }); rerender({ visible: true });
+    expect(result.current.discovery).toBe(discovery);
+    expect(listFilesMock).toHaveBeenCalledTimes(1);
+    await act(async () => result.current.refresh());
+    expect(listFilesMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears old project data on a hidden root change and starts the new scan only when visible", async () => {
+    const { result, rerender } = renderHook(
+      ({ root, visible }) => useProjectDescriptorDiscovery(root, { autoRefresh: visible }),
+      { initialProps: { root: "/repo/first", visible: true } },
+    );
+    await waitFor(() => expect(result.current.status).toBe("unresolved"));
+    rerender({ root: "/repo/second", visible: false });
+    expect(result.current.discovery).toBeNull();
+    expect(result.current.status).toBe("idle");
+    expect(listFilesMock).toHaveBeenCalledTimes(1);
+    rerender({ root: "/repo/second", visible: true });
+    await waitFor(() => expect(result.current.status).toBe("unresolved"));
+    expect(listFilesMock).toHaveBeenLastCalledWith("/repo/second", "", 16, 2000);
+  });
+
+  it("reports a thrown scan failure and supports explicit retry", async () => {
+    listFilesMock.mockRejectedValueOnce(new Error("Filesystem disconnected"));
+    const { result } = renderHook(() => useProjectDescriptorDiscovery("/repo/app", { autoRefresh: true }));
+    await waitFor(() => expect(result.current.status).toBe("failed"));
+    expect(result.current.reason).toBe("Filesystem disconnected");
+    await act(async () => result.current.refresh());
+    expect(result.current.status).toBe("unresolved");
+  });
+
 });

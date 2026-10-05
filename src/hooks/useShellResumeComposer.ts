@@ -10,9 +10,10 @@ export interface ShellRestoreOutcome {
   identity: string; name: string; status: "ready" | "partial" | "failed" | "cancelled"; tabId: string | null; error?: string;
 }
 export interface ShellResumeState {
-  state: "loading" | "empty" | "available" | "restoring" | "awaiting-auth" | "succeeded" | "partial" | "failed";
+  state: "loading" | "empty" | "unavailable" | "available" | "restoring" | "awaiting-auth" | "succeeded" | "partial" | "failed";
   total: number; outcomes: ShellRestoreOutcome[]; error: string | null;
   start(): Promise<void>; retry(): Promise<void>; cancel(): void; clear(): Promise<void>;
+  refresh(): void;
 }
 type LocalSource = Exclude<ShellRestoreSource, { kind: "run-entry" }>;
 type UnsupportedSource = Extract<ShellRestoreSource, { kind: "unsupported" }>;
@@ -80,15 +81,19 @@ export function useShellResumeComposer(session: UseWelcomeSessionResumeResult,
       let sessionFailure: unknown;
       const restoreSessions = async () => {
         try {
+          if (latest.current.session.view.state === "unavailable") {
+            sessionFailure = latest.current.session.view.message;
+            return;
+          }
           const sessionResults = retry ? await latest.current.session.retryFailed() : await latest.current.session.startRestore();
           for (const result of sessionResults) publish(fromSession(result));
         } catch (failure) { sessionFailure = failure; }
       };
       await Promise.all([restoreSessions(), ...Array.from({ length: Math.min(4, wanted.length) }, worker)]);
       if (operation.current !== controller) return;
-      const failures = results.filter((o) => ["failed", "cancelled"].includes(o.status)).length;
+      const failures = results.filter((o) => o.status !== "ready").length;
       if (sessionFailure) setError(String(sessionFailure));
-      setState(sessionFailure ? results.some((outcome) => outcome.status === "ready") ? "partial" : "failed" : failures === 0 ? "succeeded" : failures === results.length ? "failed" : "partial");
+      setState(sessionFailure ? results.some((outcome) => ["ready", "partial"].includes(outcome.status)) ? "partial" : "failed" : failures === 0 ? "succeeded" : results.every((o) => ["failed", "cancelled"].includes(o.status)) ? "failed" : "partial");
       const active = results.find((o) => o.identity === lastActiveRef && ["ready", "partial"].includes(o.status)) ?? results.find((o) => o.status === "ready");
       if (releaseFocus() && !controller.signal.aborted && active?.tabId) useAppStore.getState().setActiveTab(active.tabId);
     } catch (failure) { if (operation.current === controller) { setState("failed"); setError(String(failure)); } }
@@ -105,7 +110,8 @@ export function useShellResumeComposer(session: UseWelcomeSessionResumeResult,
       candidates.current = []; setOutcomes([]); setState("empty"); setTotal(0); setError(null);
     } catch (failure) { setError(String(failure)); }
   };
-  return { state: operation.current && session.view.state === "awaiting-auth" ? "awaiting-auth" : state ?? (session.view.state === "loading" ? "loading" : sessionCount + sources.length ? "available" : "empty"),
-    total: total ?? sessionCount + sources.length, outcomes, error, start: () => run(false), retry: () => run(true),
+  return { state: operation.current && session.view.state === "awaiting-auth" ? "awaiting-auth" : state ?? (session.view.state === "loading" ? "loading" : session.view.state === "unavailable" ? "unavailable" : sessionCount + sources.length ? "available" : "empty"),
+    total: total ?? sessionCount + sources.length, outcomes, error: error ?? (session.view.state === "unavailable" ? session.view.message : null), start: () => run(false), retry: () => run(true),
+    refresh: () => { if (!operation.current) { setError(null); setState(null); setTotal(null); latest.current.session.refresh(); } },
     cancel: () => { operation.current?.abort(); latest.current.session.cancelRestore(); }, clear };
 }

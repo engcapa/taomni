@@ -1,23 +1,13 @@
 id: TC-WELCOME-RS-N-01-native-smoke
-title: 'Linux native smoke: restore empty state, real local PTY launch, snapshot commit'
-description: 'V-10 Linux slice (design docs-feature/welcome-recents-session-restore-design.md
-
-  §8). Fresh isolated app-data: the restore entry starts empty/disabled;
-
-  opening a real host local terminal through the Welcome directory entry
-
-  produces a genuine WebKitGTK/PTY tab; the run-snapshot collector commits the
-
-  saved LocalShell tab into taomni.db, verified on disk after the case.
-
-  '
+title: Native Home launch executes a real PTY and commits a restorable working set
+description: Fresh isolated app data; real PTY output proves execution and a native app restart proves the saved
+  run snapshot survives. No direct SQLite inspection is claimed.
 covers:
 - F1.6
 tags:
 - welcome
 - native-gate
 - p1
-- needs-review
 modes:
 - native
 fixtures:
@@ -35,9 +25,15 @@ steps:
     name: disabled
     equals: ''
 - click: '[data-testid="welcome-open-local-terminal"]'
-- wait_for:
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: echo QA_HOME_NATIVE_PTY
+    submit: true
+- assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    timeout_sec: 30
+    regex: (?m)^QA_HOME_NATIVE_PTY\s*$
+    timeout_sec: 20
 - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-directories"]'
@@ -48,43 +44,75 @@ steps:
 - wait: 2
 - assert_visible: '[data-testid="welcome-restore-status"]'
 - screenshot: F1.6-native-restore-state.png
+- wait_for:
+    selector: '[data-testid="welcome-restore-status"][data-state="available"]'
+    timeout_sec: 20
+- restart_native_app: null
+- wait_for: '[data-testid="welcome-restore-status"][data-state="available"]'
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 'Linux native smoke: restore empty state, real local PTY launch, snapshot commit：按步骤执行后，所有声明的可观察结果均满足。'
+    requirement: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+      directories are shown, and the available working set survives native restart.
     actions:
     - 1
     - 2
     - 6
     - 8
     - 10
+    - 12
+    - 21
     checkpoints:
     - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
     - step: 4
-      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"empty\"]",
-        "timeout_sec": 30}}'
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
     - step: 5
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-last-session\"]", "name":
-        "disabled", "equals": ""}}'
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
     - step: 7
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
     - step: 9
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
     - step: 11
-      expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
-    - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory\"]"}'
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
     - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory-filter\"]"}'
-    - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"welcome-restore-status\"]"}'
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
+    - step: 14
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
+    - step: 15
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
+    - step: 18
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
+    - step: 20
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
+    - step: 22
+      expectation: Fresh Home has an empty disabled restore entry; local terminal produces anchored command output,
+        directories are shown, and the available working set survives native restart.
     results:
+    - 3
+    - 4
+    - 5
+    - 7
+    - 9
     - 11
-    - 12
     - 13
-    - 16
+    - 14
+    - 15
+    - 18
+    - 20
+    - 22
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
