@@ -9,8 +9,12 @@ case "$profile" in
 esac
 
 sudo apt-get update
+webdriver_package=webkit2gtk-driver
+if [[ "$profile" == ubuntu-26.04-wayland ]]; then
+  webdriver_package=webkitgtk-webdriver
+fi
 sudo apt-get install -y \
-  libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev \
+  libwebkit2gtk-4.1-dev "$webdriver_package" libappindicator3-dev librsvg2-dev \
   patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev \
   libdbus-1-dev libudev-dev libgbm-dev nasm python3-tk python3-gi gir1.2-gtk-3.0 \
   fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim \
