@@ -23,6 +23,8 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow};
 use super::capture::{self, DisplayInfo};
 use super::qa_oracle;
 pub mod colors;
+#[cfg(target_os = "macos")]
+mod macos_save_dialog;
 pub mod pin_tools;
 pub mod scroll_manual;
 #[cfg(target_os = "windows")]

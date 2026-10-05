@@ -24,21 +24,24 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
             // Hosted macOS uses the US keyboard. Physical ANSI A/G keycodes
             // avoid Enigo querying HIToolbox's main-thread-only input-source
             // APIs from this blocking worker (which traps on macOS 15).
+            let filename = destination.file_name().unwrap().to_string_lossy();
+            let directory = destination.parent().unwrap().to_string_lossy();
             chord(&mut input, &[Key::Meta], Key::Other(0))?;
-            std::thread::sleep(Duration::from_millis(150));
             input
-                .text(destination.file_name().unwrap().to_string_lossy().as_ref())
+                .text(filename.as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
+            super::macos_save_dialog::wait_value(&filename)?;
             chord(&mut input, &[Key::Meta, Key::Shift], Key::Other(5))?;
-            std::thread::sleep(Duration::from_millis(700));
+            super::macos_save_dialog::wait_folder_field(&filename)?;
             chord(&mut input, &[Key::Meta], Key::Other(0))?;
             input
-                .text(destination.parent().unwrap().to_string_lossy().as_ref())
+                .text(directory.as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
+            super::macos_save_dialog::wait_value(&directory)?;
             input
                 .key(Key::Return, Direction::Click)
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
-            std::thread::sleep(Duration::from_millis(1200));
+            super::macos_save_dialog::wait_value(&filename)?;
         }
         #[cfg(target_os = "linux")]
         {
@@ -152,7 +155,11 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-save\"]').click()")
         .map_err(|e| e.to_string())?;
     #[cfg(target_os = "windows")]
-    let save_dialog_ready = match super::windows_save_dialog::wait_ready().await {
+    let readiness = super::windows_save_dialog::wait_ready().await;
+    #[cfg(target_os = "macos")]
+    let readiness = super::macos_save_dialog::wait_ready().await;
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    let save_dialog_ready = match readiness {
         Ok(state) => state,
         Err(error) => {
             if let Ok(desktop) = capture::capture_display(&app, &display) {
@@ -161,7 +168,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
             return Err(format!("{error:#}"));
         }
     };
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     let save_dialog_ready = {
         tokio::time::sleep(Duration::from_millis(1500)).await;
         json!({"waitedMs":1500})
@@ -173,9 +180,12 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     if let Ok(desktop) = capture::capture_display(&app, &display) {
         keep_image(&desktop, "pin-save-dialog-open.png");
     }
-    choose_save_destination(destination.clone())
-        .await
-        .map_err(|e| e.to_string())?;
+    if let Err(error) = choose_save_destination(destination.clone()).await {
+        if let Ok(desktop) = capture::capture_display(&app, &display) {
+            keep_image(&desktop, "pin-save-dialog-input-failed.png");
+        }
+        return Err(format!("{error:#}"));
+    }
     trace.mark("save-dialog-input-sent", json!(true));
     for _ in 0..60 {
         if destination.exists() {
