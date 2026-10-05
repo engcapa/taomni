@@ -86,6 +86,20 @@ macOS 两项后续修改完成后重新构建、在本机原始 LXQt/Openbox 桌
 
 本机 QA/Vite 已退出，用户 PID 167582 的 `/usr/bin/taomni` 保持运行。
 
+## 最终本机复核（9a017a7a 的源码）
+
+目录整段粘贴修改后重新构建并复测本机实际桌面，QA ID 仍为 `com.taomni.app.qa`。源码指纹为 `2924444891fcc391e823a88cc37174ee9c4afd4367a21c4e4b79cf205519e2a6`，runner 指纹不变；二进制 SHA-256 为 `380a74699dd8518970c4d1b2e17e98e48fa533b824b6f9ce85016aa8941be60b`。`pnpm build` 和原生编译均通过，见 [构建日志](../qa-ui-auto-report/_local/screenshot-x11/final-native-build.log)。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| Browser：001/002/004/017/020/023/028/030 | 8/8、零失败跳过；[报告](../qa-ui-auto-report/screenshot-x11/browser-final/run-20261005-140509-315089325/summary.md) |
+| 原始无合成器 LXQt Native：N10/N12/N3/N7/N8 | 5/5、零失败跳过；同进程连续两次截图/标注/剪贴板、窗口截图、长图、GIF/MP4 及实际 WebKit MP4 播放均通过；[报告](../qa-ui-auto-report/screenshot-x11/native-final/run-20261005-140641-977746764/summary.md) |
+| 临时 xcompmgr 下的 Native：N17 | 1/1、零失败跳过；OS 拖动、64px 折叠/恢复、透明度真实 RGB `[227,137,147]`、原生 PNG 保存/复制与收藏重开通过；[报告](../qa-ui-auto-report/screenshot-x11/native-pin-final/run-20261005-140846-906104622/summary.md) |
+
+三份报告的 source/runner/case/config 与实际 QA 二进制身份、45 个 receipt 附件哈希全部一致；293 个原生输出归档并核对，见 `qa-ui-auto-report/_local/screenshot-x11/local-final-verification.json`。独立 Pillow/PyAV 检查：窗口截图和长图与原画对应区域逐 RGB 像素相同；GIF 28 帧逐像素一致，MP4 28 帧时间戳一致、最大原画 RGB 平均误差 3.73，满足原有 8.0 标准。见 `independent-final-pixels.json`。
+
+原始桌面与临时合成器条件记录在 `final-desktop-conditions.json`；结束后合成器 owner 恢复为 0，QA/Vite/临时 xcompmgr 已退出，用户老版本 PID 167582 保持运行。最新两个改动 Rust 文件格式、用例契约和 482 用例 audit gate 通过。
+
 ## GitHub 三平台回归
 
 分支 `fix/linux-x11-screenshot-crash` 已推送，使用 `.github/workflows/qa-ui-auto-platforms.yml`、`scope=selected`、`features=F27.1,F27.2`，明确选择 Linux/Windows/macOS 的 browser/native 六组。每组 browser 35 项（包含旧 session 图像入口移除），Linux/Windows native 各 16 项，macOS native 19 项；选例没有 capability gap 或未审用例。
