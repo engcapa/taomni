@@ -8,32 +8,52 @@
 
 | 任务 | 状态 | 依赖 | 交付 / 验证证据 |
 |---|---|---|---|
-| TASK-01 契约与纯模型 | verification | 无 | 已领取；类型、身份、尺寸策略、Shell store |
-| TASK-02 壳层布局集成 | verification | 01 | Rail / Navigator / MainLayout / ControlBar |
-| TASK-03 标签与 action 路由 | verification | 01,04 | lane、总览、快速切换、快捷键 |
-| TASK-04 实例与关闭事务 | verification | 01 | stable surface、close coordinator、DB adapter |
-| TASK-05 SFTP 与任务 ownership | verification | 01,04 | view/job lease、后台、promotion |
-| TASK-06 Workspace / Git | verification | 01,04 | Project、tools、Git Host |
-| TASK-07 Tao / 通知 | verification | 01,04,05 | Hub、目标解析、成功后确认 |
-| TASK-08 Home / 恢复 | verification | 01,03,10 | 三主动作、最近项、组合恢复 |
-| TASK-09 原生窗口 | verification | 04,05,06,07 | Git、detach 事务、回停靠 |
-| TASK-10 持久化与回退 | verification | 01,04,07 | v2 migration、恢复 identity |
-| TASK-11 用例与自动化支持 | verification | 随相关实现 | 已领取；62 条 Shell YAML（45 browser / 17 native）及受影响回归、catalog/policy |
-| TASK-12 集成与验收 | verification | 02–11 | 单元测试、三平台 browser/native、结果分析与修复 |
+| TASK-01 契约与纯模型 | done | 无 | 类型、身份、尺寸策略、Shell store；unit 与最终六端验收 |
+| TASK-02 壳层布局集成 | done | 01 | Rail / Navigator / MainLayout / ControlBar；最终六端验收 |
+| TASK-03 标签与 action 路由 | done | 01,04 | lane、总览、快速切换、快捷键；最终六端验收 |
+| TASK-04 实例与关闭事务 | done | 01 | stable surface、close coordinator、DB adapter；最终六端及真实 SQL 验收 |
+| TASK-05 SFTP 与任务 ownership | done | 01,04 | view/job lease、后台、promotion；最终六端及独立文件/协议观察 |
+| TASK-06 Workspace / Git | done | 01,04 | Project、tools、Git Host；最终六端及真实单/多仓库验收 |
+| TASK-07 Tao / 通知 | done | 01,04,05 | Hub、目标解析、成功后确认；最终六端及 AI HTTP/SSE 验收 |
+| TASK-08 Home / 恢复 | done | 01,03,10 | 三主动作、最近项、组合恢复；最终六端验收 |
+| TASK-09 原生窗口 | done | 04,05,06,07 | Git、detach 事务、回停靠；三端实际 native 验收 |
+| TASK-10 持久化与回退 | done | 01,04,07 | v2 migration、恢复 identity；最终六端及重启 stored/rendered 验收 |
+| TASK-11 用例与自动化支持 | done | 随相关实现 | 已交付 62 条 Shell YAML（45 browser / 17 native）、受影响回归与 catalog/policy；250 ID 最终验收 |
+| TASK-12 集成与验收 | done | 02–11 | 本地 unit/static、六端 761/0/0、33,090 步完整、72 张截图审阅；见下方最终验收 |
 
 ## 本轮实施进度
 
-TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01～12 处于 verification。固定输入 `79ab1d6b46a4d65fe7026b3d8b7da3e799f0ea0b` 的 [完整六端 run 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943) 已结束：759 pass / 2 fail / 0 skip；三个 browser 端各 190/0/0，native Linux 68/0/0、Windows 62/0/0、macOS 59/2/0。尚未建立最终通过结论。本地前端 526 文件 / 5244 项已按原始全量报告和完整编辑器重跑核对通过；Rust unit 为 1590 pass / 0 fail / 16 既有 ignored，TypeScript 通过。历史失败完整保留，不以 workflow job success 代替逐 case 通过。
+TASK-01～12 已全部 done。最终产品/runner/用例输入为 `98ddf0182c74e53dbeb8b3c196e0ff02169020c2`；[完整六端 run 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束，250 ID / 761 次实际执行为 **761 pass / 0 fail / 0 skip**，33,090 步全部完整通过。三个 browser 端各 190/0/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。六份原始报告与源码、runner、用例、配置、receipt、native build 及 ZIP hashes 匹配，严格 gate 通过；72 张当前 Shell 截图已实际审阅。本地前端 526 文件 / 5244 项已按原始全量报告和完整编辑器重跑核对通过；前序 Rust full unit 为 1590 pass / 0 fail / 16 既有 ignored，本轮截图诊断相关 Rust unit 52/52 与日志观察 unit 5/5 通过，TypeScript 与相关静态检查通过。历史失败和未验证边界完整保留。
 
-上一完整 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098) 已收齐六份原始报告：759 pass / 2 fail / 0 skip；browser Linux/Windows 各 190/0/0、macOS 188/2/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。失败为 macOS B07 延迟身份绑定抢导航与 B17 在 ready 前读取状态。两条已在当前输入的 [三端 browser 复验 37236895398](https://github.com/engcapa/taomni/actions/runs/37236895398) 各 2/0/0，17+27 步完整执行，共 132 步通过；身份、配置、receipt 与原始 ZIP hashes 匹配。N08 的 stored/rendered 精确 232 检查在三端精准 run 37233544174 通过，旧 248px 未复现，根因未确定；未据此声称完成了产品持久化修复。
+早期完整 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098) 的六份原始报告为 759 pass / 2 fail / 0 skip；browser Linux/Windows 各 190/0/0、macOS 188/2/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。失败为 macOS B07 延迟身份绑定抢导航与 B17 在 ready 前读取状态。两条在修正输入的 [三端 browser 复验 37236895398](https://github.com/engcapa/taomni/actions/runs/37236895398) 各 2/0/0，17+27 步完整执行，共 132 步通过；最终六端运行也全部通过。N08 的 stored/rendered 精确 232 检查在三端精准 run 37233544174 和最终六端运行通过，旧 248px 未复现，根因未确定；未据此声称完成了产品持久化修复。
 
 最终完整范围为 250 个独立 ID：browser 三端各 190，native Linux 68 / Windows 62 / macOS 61，共 761 次执行。范围包含 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、全部截图回归和 Git Panel；LAN Chat 为入口与草稿的轻量范围。最终列表为 `qa-ui-auto-report/_local/shell-ci-case-ids-final-307.txt`；269 的旧 249 ID 列表保留。新增一个既有 RDP Server 用例保护本轮共享 host_helper 修改，数量以固定输入的 selection 核对。按用户要求，本地只运行单元测试和静态检查，browser/native 与原生构建通过 GitHub 执行。
 
 新增用例不等于整条设计规格全部验收。N01/N13/N14 的自动化部分复用既有 case；N11 的实际 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/读屏与 N17 匹配性能基线仍有证据缺口。按用户明确确认，这些项单列后续验收，不阻塞本轮实现和六端自动化范围的 done；其自身未记为 pass 或已验收。详细映射在 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。
 
-N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既有 DB browser 用例补足离线 renderer 工作流。上述 250 ID 六端报告的 receipt、源码/runner/用例/配置和 native build 身份及 ZIP hashes 均匹配。macOS 的两项失败为 RDP 回环断开后的探针遇到尚未释放的旧连接，以及 GIF 录屏的时间轴缺帧；实际失败截图和逐步记录已检查。RDP 用例补充服务端连接释放日志检查后再执行原探针；录屏先补 QA 独立采集/排队时间轴诊断，像素和时间预算保持，尚不声称录屏缺帧已修复。
+N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既有 DB browser 用例补足离线 renderer 工作流。历史完整 [run 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943) 为 759/2/0，macOS 两项失败为 RDP 探针遇到尚未释放的旧连接，以及 GIF 录屏时间轴缺帧；原始失败截图和逐步记录保留。RDP 用例增加最新连接生命周期的释放检查，最终三端原独立协议探针均通过。录屏增加 QA 独立采集/排队诊断，最终三端全部原断言通过；旧 macOS GIF 缺帧未复现，根因仍未确定，未声称完成了产品缺帧修复。
 
-输入 `bc8b06f1bbde025683514b4d8aab99dbcfc801a8` 的 [macOS 精准复验 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 已结束：4 pass / 1 fail / 0 skip。N5～N8 四条录屏通过；RDP 的第 62 步误把“释放日志必须是最后一行”作为条件，实际释放后还持续输出延迟统计。当前改为观察最新连接生命周期记录的断开状态，5 个 jsdom 单元观察样本通过，原独立协议探针、63 步和 480 秒预算保持。此用例修正仍待新的完整六端执行，TASK-01～12 保持 verification。
+输入 `bc8b06f1bbde025683514b4d8aab99dbcfc801a8` 的 [macOS 精准复验 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 为 4/1/0。N5～N8 四条录屏通过；RDP 的第 62 步误把“释放日志必须是最后一行”作为条件，实际释放后还持续输出延迟统计。随后改为观察最新连接生命周期记录的断开状态，5 个 jsdom 单元观察样本通过，原独立协议探针、63 步和 480 秒预算保持；最终三端 native 复验通过。
+
+## 最终六端验收
+
+<a id="final-acceptance"></a>
+
+| 平台 | Browser pass/fail/skip | Native pass/fail/skip | 实际步骤数 browser / native |
+|---|---|---|---|
+| Linux | 190/0/0 | 68/0/0 | 8,298 / 2,897 |
+| Windows | 190/0/0 | 62/0/0 | 8,298 / 2,664 |
+| macOS | 190/0/0 | 61/0/0 | 8,298 / 2,635 |
+
+最终 [workflow](https://github.com/engcapa/taomni/actions/runs/37247775178) 为 completed / success；原始报告的逐 case 结果独立核对为 761/0/0。selection 的 gaps/unreviewed 为空；严格 gate 同时验证六份完整报告、250 ID、当前 source/runner/case/config、receipt 与实际 summary、native binary/build recipe 及原始产物 hashes。`step-review.json` 对照每份原始步骤与对应 YAML，33,090 步无缺失、重排或失败。
+
+证据根为 `qa-ui-auto-report/workspace-shell/github/run-37247775178/`，包含原始 ZIP 与 receipt，以及 `selection-review.json`、`evidence-review.json`、`final-automated-gate.json`、`step-review.json`、`module-review.json`、`oracle-review.json`、`recording-review.json`。模块登记覆盖 Terminal、SSH、DB、Code Workspace、SFTP、AI Chat、截图、Git Panel 与轻量 LAN Chat；其六端所选用例均没有 fail/skip/unrun，模块计数存在交叉，不相加推定额外覆盖。
+
+三端 native 的 AI HTTP/SSE provider receipts 均精确为 5 requests / 5 streamRequests / 5 toolRequests、1 cancelledStreams、3 completedStreams、最后消息 `SHELL AI recovery`。Git 的最终 HEAD/index/worktree/branches、SQL committed rows、SFTP 外部 growing/stable 文件与协议 bytes、应用退出进程观察满足各自原断言；原始 polling 的暂时不满足样本保留。
+
+72 张代表性当前截图已实际审阅（browser 每端 11，native 每端 13），记录在 `qa-ui-auto-report/_local/shell-visual-review-37247775178/reviewed-*.json`；捕获状态未见主要控件明显遮挡/裁切。macOS N7 的原图/实际/差分 contact sheet 也已查看，长停留 frame 37 进入编码，最长 unexplained gap 为 166 ms，原 700 ms 上限保持。Linux GIF 的满队列合并样本也完整保留，原逐帧和时间轴断言通过；不把所有采集帧都编码作为已建立结论。
+
+按用户明确确认，本轮 done 条件已满足；真实 OS picker/权限/UNC、Windows/macOS 真 IME、DPI/跨屏/读屏和匹配性能基线继续在 [后续独立验收](./workspace-shell-ux-redesign-test-cases.md#follow-up-acceptance) 标为未验证。本次收尾仅修改文档，产品、runner、用例及构建文件与验收输入一致，验收产品 SHA 保留为 `98ddf018`；分支交付不等于合并或发布。
 
 ## 验证记录
 

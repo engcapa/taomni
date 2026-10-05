@@ -1251,17 +1251,17 @@ contracts CLI 只有 `--cases` 没有 `--filter`；单条语义审阅直接读 Y
 
 <a id="current-execution"></a>
 
-| 产物 / 范围 | 当前结果 | 实施完成时回填 |
+| 产物 / 范围 | 当前结果 | 证据与边界 |
 |---|---|---|
-| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）已登记；完整 run 37237715943 三端各 190/0/0。B07/B17 在固定输入 79ab1d6b 的 run 37236895398 三端各 2/0/0，共 132 步全通过；新输入仍需最终复验 | reviewed contract、report/checkpoint、target/retained 结果；旧通过不覆盖后续修改 |
-| Native 详细规格与补充 | 17 条 Shell YAML 已登记，另有 N01/N13/N14 的既有用例复用。完整 run 37237715943 Linux 68/0/0、Windows 62/0/0、macOS 59/2/0；失败为 TC-RDPJ-01-client-server-loopback 和 TC-SHOT-N7。新增 stored/rendered 精确 232 检查的 run 37233544174 三端各 1/0/0，36 步全执行。旧 N08 width=248 失败保留，根因未确定 | binary identity、真实副作用、清理证据及下表列出的未自动化边界 |
+| Browser 详细规格与补充 | 45 条 Shell YAML（B01～B45）及保留回归已交付；最终 run 37247775178 三端各 190/0/0、各 8,298 步完整，B07/B17 也通过 | reviewed contract、原始步骤、receipt 与当前输入一致；历史失败保留 |
+| Native 详细规格与补充 | 17 条 Shell YAML 与 N01/N13/N14 的既有用例复用已交付；最终 run 37247775178 Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。N08 stored/rendered 精确 232、RDP 独立重连和全部录屏原断言通过 | 三份 native build 身份、实际副作用、清理记录和原始步骤已核对；下表的 OS/设备边界单列未验证 |
 | fixture / verb / control 增补 | SFTP 受控真实服务、SQL/进程/剪贴板独立 oracle、文件 chooser/download、几何与导航支持已实现；schema/catalog/policy 同批维护 | 静态与 runner 单测只能证明契约，运行效果由 GitHub case 建立 |
 | 改前基线 | 静态基线及历史运行保留；没有完整、匹配原始设计基线的三端全量结果 | 不把实现中途通过追记为改前通过；具体历史输入见任务记录 |
-| 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸已有自动化断言；run 37227772151 的 71 张六端成功画面已实际检查；当前输入画面待收齐 | 当前 SHA 画面、读屏、OS DPI/跨屏与系统控件仍按平台单列 |
+| 视觉与可访问性 | browser 几何/命中和 native WebView 两尺寸的原断言通过；最终 run 的 72 张当前代表性截图已实际审阅，捕获状态未见主要控件明显遮挡/裁切 | `qa-ui-auto-report/_local/shell-visual-review-37247775178/reviewed-*.json`；读屏、OS DPI/跨屏、系统控件和像素基线仍未由这些画面证明 |
 | 性能 | 指标、负载、样本和比较方法已定；没有实测结论 | 原始baseline/candidate、噪声、p50/p95与资源，不宣称理论提速 |
-| 产品构建/协议服务 | 上一完整 run 37231369098 六份 selection/source/runner/case/receipt/config/native build 与 ZIP hashes 均匹配；当前输入的构建与执行证据待收齐 | selection、实际执行数、服务就绪、receipt 与源码/二进制身份 |
+| 产品构建/协议服务 | 最终输入 98ddf018 的六份 selection/source/runner/case/receipt/config/native build 与 ZIP hashes 均匹配；严格 gate 为 pass，761/0/0、33,090 步完整 | 原始报告、独立 AI/Git/SQL/SFTP/进程观察、模块登记见实施任务的最终验收 |
 
-责任任务均在主设计 TASK-01～12；其中 TASK-11 将本稿转成规范 YAML 并维护目录，TASK-12 汇总三平台实际结果和真实缺口。下表链接当前可执行自动化，不把整个设计条目的每个分支都视为已覆盖。
+责任任务 TASK-01～12 已按用户确认的本轮条件全部 done；TASK-11 已交付 YAML 与目录维护，TASK-12 已核对三平台实际结果和真实缺口。最终 [run 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束，精确范围为 250 ID / 761 次；详细证据与每端步骤数见 [最终验收](./workspace-shell-ux-redesign-tasks.md#final-acceptance)。下表保留每项实际自动化与未验证边界，不把整条设计规格的每个分支都视为已覆盖。
 
 用户于 2026-10-05 明确确认：真实 OS 文件对话框、Windows/macOS 真 IME、DPI/跨屏/读屏及匹配性能基线单列后续验收，本轮以实现完成和六端自动化全部通过为 done 条件。下表的未验证边界仍保留，既不转换为自动化 pass，也不继续阻塞已满足本轮条件的开发任务。
 
@@ -1331,7 +1331,9 @@ N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、nat
 
 完整 run 37237715943 的 macOS native 留有两项失败，已逐项查看原始截图、日志和步骤。RDP 回环用例在原探针之前补充最新服务端 `disconnected after` 日志检查，保留原 59 个动作/结果与 480 秒预算，现 63 步；录屏 QA app 保留额外采集/排队时间轴，TC-SHOT-N7 的逐帧像素、顺序、nonce、时间轴和生命周期断言完整保留。诊断 unit 为 screenshot 52/52；真实行为需要 GitHub 精准复验与最终统一输入六端验证。
 
-输入 `bc8b06f1` 的 [精准 run 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 为 macOS native 4/1/0，四条 N5～N8 原始录屏比对通过；采集到的帧标记全部进入解码结果，没有满队列样本，N7 最长 unexplained gap 150 ms。四张原图/实际/差分 contact sheet 已实际查看。旧 N7 缺帧未复现，根因未确定。RDP 第 62 步的 last-child 条件误把周期统计当作连接生命周期；改为只读检查最后一次连接/断开记录为断开，既容许随后的统计，又拒绝先前握手断开后仍活动的当前连接。五个原始 DOM 单元观察样本通过，reviewed checkpoint 已同步，原 63 步、480 秒和独立协议首帧结果保持；新 YAML 仍需完整六端实际执行。
+输入 `bc8b06f1` 的 [精准 run 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 为 macOS native 4/1/0，四条 N5～N8 原始录屏比对通过；采集到的帧标记全部进入解码结果，没有满队列样本，N7 最长 unexplained gap 150 ms。四张原图/实际/差分 contact sheet 已实际查看。旧 N7 缺帧未复现，根因未确定。RDP 第 62 步的 last-child 条件误把周期统计当作连接生命周期；改为只读检查最后一次连接/断开记录为断开，既容许随后的统计，又拒绝先前握手断开后仍活动的当前连接。五个原始 DOM 单元观察样本通过，reviewed checkpoint 已同步，原 63 步、480 秒和独立协议首帧结果保持；当时新 YAML 待完整六端执行，结果见下段最终记录。
+
+最终输入 `98ddf018` 的完整六端运行已建立本轮通过结论：761 pass / 0 fail / 0 skip、33,090 步完整。原 RDP 独立探针在三端均完成 NLA 与首帧；三端 N5～N8 的原像素、nonce、顺序、时间轴和生命周期断言均通过。macOS N7 长停留 frame 37 已编码，最长 unexplained gap 为 166 ms，原 700 ms 限制保持；原图/实际/差分 contact sheet 已查看。Linux GIF 合并的满队列采集样本完整保留，其原时间轴断言通过。旧 N7 缺帧和 N08 的 248px 失败根因仍未确定，旧报告保留；最终通过不追记成已证明产品根因修复。未自动化的边界继续按 §7 单列后续验收。
 
 ## 7. 后续独立验收
 

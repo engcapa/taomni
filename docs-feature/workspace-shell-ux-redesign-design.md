@@ -693,9 +693,11 @@ TASK-11 的 fixture/用例设计可先做，具体生产入口 case 必须跟随
 
 设计交接阶段只检查了文档链接、ID、映射、路径、命令参数与源码事实，该阶段未执行产品验证。随后用户已授权领取全部任务、实现、单测、推送及 GitHub 三平台循环验证。当前代码、用例、历史失败与最新结果统一登记在 [实施任务](./workspace-shell-ux-redesign-tasks.md)，具体规格与自动化/人工边界见 [用例登记](./workspace-shell-ux-redesign-test-cases.md#current-execution)。本节的设计阶段记录不作为实现阶段的通过证据。
 
-固定输入 `79ab1d6b46a4d65fe7026b3d8b7da3e799f0ea0b` 的 [完整六端验收 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943) 已结束，250 ID / 761 次执行为 759 pass / 2 fail / 0 skip，覆盖用户指定模块及受影响保留回归。三端 browser 及 Linux/Windows native 全通过；macOS native 的 RDP 回环和 GIF 时间轴失败正在收敛。B07/B17 三端精准复验已通过全部 132 步。本地前端 unit 526 文件 / 5244 项和 TypeScript 已通过，Rust unit 1590 pass / 16 既有 ignored。最终 runtime、当前画面和任务状态仍待验收回填；OS picker/IME/DPI/读屏及 AC-20 匹配性能证据按用例文档单列，不由自动化绿色推定通过。
+最终固定产品/runner/用例输入 `98ddf0182c74e53dbeb8b3c196e0ff02169020c2` 的 [完整六端验收 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束：250 ID / 761 次实际执行为 **761 pass / 0 fail / 0 skip**，33,090 步全部完整。browser 三端各 190/0/0；native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。六份 source/runner/case/config/receipt/native build/原始 ZIP hashes 与严格 gate 均核对通过；72 张当前 Shell 代表性截图已实际审阅，独立 AI/Git/SQL/SFTP/进程观察满足原断言。TASK-01～12 按用户确认的本轮条件全部 done，详见 [最终验收](./workspace-shell-ux-redesign-tasks.md#final-acceptance)。本地前端 unit 526 文件 / 5244 项和 TypeScript 通过；前序 Rust full unit 为 1590 pass / 16 既有 ignored，后续诊断相关 Rust unit 52/52、日志观察 unit 5/5 通过。OS picker/IME/DPI/跨屏/读屏及 AC-20 匹配性能基线在用例 §7 继续单列后续验收。
 
-后续输入 `bc8b06f1` 的 [macOS 精准运行 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 为 4 pass / 1 fail / 0 skip：四条录屏用例通过，N7 原缺帧未复现，诊断未见编码排队丢帧；RDP 本次连接已释放，但其最后日志被周期统计覆盖，新增等待条件失败。当前用例观察最近的连接生命周期记录，再执行原独立协议探针；五个原始 DOM 单元样本通过，真实效果待统一输入的完整六端验证。任务仍为 verification，旧失败未覆盖。
+历史完整 [run 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943) 的 759/2/0 保留；其 macOS RDP 回环与 GIF 时间轴失败由后续原始日志和采集诊断分析。最终三端 RDP 在最新连接生命周期释放后完成原独立协议探针，录屏原像素/nonce/顺序/时间轴/生命周期断言全通过。旧 GIF 缺帧与 N08 的 248px 失败未在最终输入复现，根因仍未确定；未把后续通过追记为已证明产品根因修复。B07/B17 的修正和最终完整通过也保留相应历史证据。
+
+过程中的输入 `bc8b06f1` 的 [macOS 精准运行 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 为 4/1/0：四条录屏用例通过，RDP 本次连接已释放但其最后日志被周期统计覆盖，新增等待条件失败。随后用例观察最近的连接生命周期记录，再执行原独立协议探针；五个原始 DOM 单元样本与最终三端 native 执行通过，原 63 步、480 秒和协议首帧断言保持。此旧失败报告完整保留。
 
 本次 native 失败诊断保留原始证据：RDP 服务端在客户端 UI 已显示断开后，仍记录 single-client busy 拒绝，因此用例必须等待真实服务端释放日志，再由独立协议探针检验继续服务。GIF 所有已编码帧与原图像素一致，但 960 ms 帧间隔的时间轴检查未通过；QA 构建增加有界的原生采集与编码排队记录，用于区分采集停顿、呈现停顿和队列覆盖，不改变帧供给、原有 oracle 或预算。保留用例 TC-SHOT-N5～N8 继续保护真实 GIF/MP4 录制与预览；该诊断支持本身不新增用户行为。
 
