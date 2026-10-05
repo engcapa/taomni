@@ -2,6 +2,7 @@ use std::ffi::c_void;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
+use core_foundation::array::CFArray;
 use core_foundation::base::{CFType, CFTypeRef, TCFType};
 use core_foundation::boolean::CFBoolean;
 use core_foundation::string::{CFString, CFStringRef};
@@ -18,6 +19,7 @@ unsafe extern "C" {
         value: *mut CFTypeRef,
     ) -> i32;
     fn AXUIElementGetPid(element: AxElement, pid: *mut libc::pid_t) -> i32;
+    fn AXValueGetValue(value: CFTypeRef, value_type: i32, result: *mut c_void) -> bool;
 }
 
 fn attribute(element: AxElement, name: &str) -> Option<CFType> {
@@ -128,6 +130,98 @@ pub(super) fn wait_value(expected: &str) -> anyhow::Result<Value> {
 
 pub(super) fn wait_folder_field(filename: &str) -> anyhow::Result<Value> {
     wait_field("go-to-folder", |value| value != filename)
+}
+
+fn save_button_in_tree(root: &CFType, remaining: &mut usize) -> Option<CFType> {
+    if *remaining == 0 {
+        return None;
+    }
+    *remaining -= 1;
+    let element = root.as_CFTypeRef();
+    if text(element, "AXRole") == "AXButton" && text(element, "AXTitle") == "Save" {
+        return Some(root.clone());
+    }
+    if let Some(button) = attribute(element, "AXDefaultButton") {
+        if text(button.as_CFTypeRef(), "AXTitle") == "Save" {
+            return Some(button);
+        }
+    }
+    let children = attribute(element, "AXChildren")?.downcast::<CFArray>()?;
+    for child in children.iter() {
+        // SAFETY: the array retains each AX child; Get-rule wrapping keeps
+        // this non-null CF object alive during the recursive read.
+        if child.is_null() {
+            continue;
+        }
+        let child = unsafe { CFType::wrap_under_get_rule(*child) };
+        if let Some(button) = save_button_in_tree(&child, remaining) {
+            return Some(button);
+        }
+    }
+    None
+}
+
+fn save_button_bounds() -> Option<Value> {
+    // Start at the actual focused filename and walk its ancestors; the Save
+    // panel may be an AXDialog/AXSheet rather than expose AXWindow.
+    let system = unsafe { CFType::wrap_under_create_rule(AXUIElementCreateSystemWide()) };
+    let mut node = attribute(system.as_CFTypeRef(), "AXFocusedUIElement")?;
+    let mut remaining = 256;
+    for _ in 0..8 {
+        if let Some(button) = save_button_in_tree(&node, &mut remaining) {
+            let element = button.as_CFTypeRef();
+            let mut pid = 0;
+            let owned = unsafe { AXUIElementGetPid(element, &mut pid) == 0 } && owned_process(pid);
+            let enabled = attribute(element, "AXEnabled")
+                .and_then(|value| value.downcast::<CFBoolean>())
+                .is_some_and(|value| bool::from(value));
+            let position = attribute(element, "AXPosition")?;
+            let size = attribute(element, "AXSize")?;
+            let mut point = [0.0f64; 2];
+            let mut dimensions = [0.0f64; 2];
+            // AXValue types 1/2 are CGPoint/CGSize: two CGFloat values on
+            // supported 64-bit macOS. AX only supplies geometry, never input.
+            let bounds = unsafe {
+                AXValueGetValue(position.as_CFTypeRef(), 1, point.as_mut_ptr().cast())
+                    && AXValueGetValue(size.as_CFTypeRef(), 2, dimensions.as_mut_ptr().cast())
+            };
+            let valid = bounds
+                && point.iter().chain(dimensions.iter()).all(|v| v.is_finite())
+                && dimensions.iter().all(|v| *v > 0.0);
+            return Some(
+                json!({"processId":pid,"ownProcessTree":owned,"enabled":enabled,
+                "title":text(element,"AXTitle"),"position":point,"size":dimensions,
+                "ready":owned && enabled && valid,
+                "center":[point[0]+dimensions[0]/2.0,point[1]+dimensions[1]/2.0]}),
+            );
+        }
+        node = attribute(node.as_CFTypeRef(), "AXParent")?;
+    }
+    None
+}
+
+/// Filename focus can return before the folder sheet has finished closing.
+/// Wait for the actual enabled Save button and stable OS click geometry.
+pub(super) fn wait_save_button(filename: &str) -> anyhow::Result<Value> {
+    let started = Instant::now();
+    let mut previous = Value::Null;
+    loop {
+        let mut field = snapshot();
+        let button = save_button_bounds().unwrap_or(Value::Null);
+        let ready = field["ready"] == true && field["value"] == filename && button["ready"] == true;
+        let stable = ready && button == previous;
+        previous = if ready { button.clone() } else { Value::Null };
+        field["saveButton"] = button;
+        field["stage"] = json!("save-button");
+        field["waitedMs"] = json!(started.elapsed().as_millis());
+        if stable {
+            return Ok(field);
+        }
+        if started.elapsed() >= Duration::from_secs(20) {
+            anyhow::bail!("QA macOS Save button did not become ready: {field}");
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 /// Go to Folder's autocomplete can replace Enigo's 20-character Unicode

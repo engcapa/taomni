@@ -132,7 +132,11 @@ Windows N17 失败发生在原生保存对话框输入。阶段记录中，保�
 
 N17 记录 QA 子进程 PID 5810 的实际 AXTextField 获得焦点，默认文件名为 `Taomni-pin`，等待 1740ms；输入后的完整文件名校验也通过。但 44 字符目录在“前往文件夹”字段中只剩最后 4 字符 `acts`，20s 轮询超时。Enigo 0.6.1 的 macOS `fast_text` 将文本分成每段最多 20 字符的 Unicode keydown 事件，两次原生失败中的末段内容与此分段一致；目录自动补全/组合输入处理是该输入方式的兼容问题，继续增加固定等待无法保证整段输入。
 
-提交 `9a017a7a` 改用系统剪贴板和物理 ANSI V 的 Command+V 一次粘贴完整目录。AX 只读校验文件名、目录完整值以及返回保存面板的真实焦点；返回后恢复此前已经复制并验证的原始贴图图像，最后才确认保存。失败时也有剪贴板恢复兜底。用例保留原生保存、原 PNG 字节、收藏持久化和透明度等断言，没有设置 AX 字段或 mock 对话框。新增 helper 实际源码类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-paste-api-check.log`。定向 [run 37270272423](https://github.com/engcapa/taomni/actions/runs/37270272423) 正在真实 macOS 上验证 N17；在结果与最终六组回归完成前，不宣称全部通过。
+提交 `9a017a7a` 改用系统剪贴板和物理 ANSI V 的 Command+V 一次粘贴完整目录。AX 只读校验文件名、目录完整值以及返回保存面板的真实焦点；返回后恢复此前已经复制并验证的原始贴图图像，最后才确认保存。失败时也有剪贴板恢复兜底。用例保留原生保存、原 PNG 字节、收藏持久化和透明度等断言，没有设置 AX 字段或 mock 对话框。新增 helper 实际源码类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-paste-api-check.log`。
+
+定向 [run 37270272423](https://github.com/engcapa/taomni/actions/runs/37270272423) 的 N17 仍为 0/1、零跳过。本轮完整文件名、完整目录和返回文件名焦点均已通过：目录整段粘贴等待 408ms、返回面板等待 155ms。但发送最后的 Return 后仍未生成目标 PNG，12s 后的真实桌面图显示保存面板仍打开，目录已是 `taomni-qa-artifacts`，文件名正确且 Save 按钮启用。此结果证明目录截断已解决，但输入字段获得焦点不足以保证 Return 确认保存。12 个 receipt 附件和 5 个原生输出哈希、独立聚合均已核对，严格 `passed=false`，见 `qa-ui-auto-report/hosted-37270272423/independent-verification.json`。
+
+后续改为从实际 AX 父级/子级树读取 Save 按钮的进程归属、启用状态与屏幕位置，等待几何连续两次稳定后，通过 Enigo 真实 OS 鼠标点击按钮中心。AX 仍只读取状态和坐标，不调用 AXPress 或设置字段。记录按钮坐标与确认方式，保存 PNG 字节和后续断言保留。新增按钮查询源码的 macOS API 类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-save-button-api-check.log`；尚待真实 macOS 用例和最终六组回归。
 
 ## 实际安装命令
 

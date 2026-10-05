@@ -21,6 +21,7 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
         };
         #[cfg(target_os = "macos")]
         let stages = {
+            use enigo::{Button, Coordinate, Mouse};
             // Hosted macOS uses the US keyboard. Physical ANSI A/G keycodes
             // avoid Enigo querying HIToolbox's main-thread-only input-source
             // APIs from this blocking worker (which traps on macOS 15).
@@ -44,8 +45,21 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
             let save_panel_returned = super::macos_save_dialog::wait_value(&filename)?;
             pasteboard.restore()?;
+            let save_button = super::macos_save_dialog::wait_save_button(&filename)?;
+            let center = &save_button["saveButton"]["center"];
+            input
+                .move_mouse(
+                    center[0].as_f64().context("Save button x")?.round() as i32,
+                    center[1].as_f64().context("Save button y")?.round() as i32,
+                    Coordinate::Abs,
+                )
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            input
+                .button(Button::Left, Direction::Click)
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
             json!({"folderInput":"OS clipboard and Command+V","filenameEntered":filename_entered,
-                "folderField":folder_field,"folderEntered":folder_entered,"savePanelReturned":save_panel_returned})
+                "folderField":folder_field,"folderEntered":folder_entered,"savePanelReturned":save_panel_returned,
+                "confirmation":"OS mouse click on the enabled Save button","saveButton":save_button})
         };
         #[cfg(not(target_os = "macos"))]
         let stages = json!({"input":"OS keyboard"});
@@ -68,6 +82,7 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
                 .text(destination.to_string_lossy().as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
         }
+        #[cfg(not(target_os = "macos"))]
         input
             .key(Key::Return, Direction::Click)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
