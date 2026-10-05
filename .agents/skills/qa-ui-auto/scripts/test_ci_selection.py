@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from qa_ui_auto.ci import dependency_order, diff_paths, make_plan, selection_entry, write_json
+from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES
 
 
 def args(**overrides):
@@ -21,6 +22,40 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(len(plan['entries']), 6)
         self.assertEqual({e['arch'] for e in plan['entries']}, {'ARM64', 'X64'})
         self.assertTrue(all(e['selected_ids'] for e in plan['entries']))
+        linux = next(e for e in plan['entries'] if e['id'] == 'linux-native')
+        self.assertEqual(linux['runner'], 'ubuntu-24.04')
+        self.assertEqual(linux['linux_profile'], DEFAULT_LINUX_PROFILE)
+        self.assertEqual(linux['cache_key'], 'linux')
+
+    def test_multiple_linux_profiles_expand_only_native_and_deduplicate(self):
+        plan = make_plan(args(platforms='linux', linux_profiles=','.join(LINUX_PROFILES) + ',ubuntu-22.04-vnc'))
+        browser = [e for e in plan['entries'] if e['mode'] == 'browser']
+        native = [e for e in plan['entries'] if e['mode'] == 'native']
+        self.assertEqual([e['id'] for e in browser], ['linux-browser'])
+        self.assertEqual({e['linux_profile'] for e in native}, set(LINUX_PROFILES))
+        self.assertEqual(len({e['id'] for e in native}), 4)
+        self.assertEqual({e['runner'] for e in native}, {'ubuntu-22.04', 'ubuntu-24.04', 'ubuntu-26.04'})
+        self.assertTrue(all(e['selected_ids'] == ['TC-NATIVE-CORE-001'] for e in native))
+
+    def test_only_selected_profile_runs_without_implicit_default(self):
+        plan = make_plan(args(platforms='linux', modes='native', linux_profiles='ubuntu-22.04-vnc'))
+        self.assertEqual(len(plan['entries']), 1)
+        entry = plan['entries'][0]
+        self.assertEqual(entry['linux_profile'], 'ubuntu-22.04-vnc')
+        self.assertEqual(entry['linux_wrapper'], 'dbus')
+        self.assertEqual(entry['desktop']['display_server'], 'Xtigervnc')
+
+    def test_x11_cases_are_explicit_gaps_on_wayland_not_passes(self):
+        plan = make_plan(args(scope='selected', platforms='linux', modes='native',
+                              linux_profiles='ubuntu-24.04-xvfb,ubuntu-26.04-wayland',
+                              case_ids='TC-MAIN-RAIL-03,TC-NATIVE-CORE-001'))
+        wayland = next(e for e in plan['entries'] if e['linux_profile'] == 'ubuntu-26.04-wayland')
+        self.assertEqual(wayland['selected_ids'], ['TC-NATIVE-CORE-001'])
+        self.assertTrue(any(g['case'] == 'TC-MAIN-RAIL-03' and
+                            g['linux_profile'] == 'ubuntu-26.04-wayland' for g in plan['gaps']))
+        with self.assertRaisesRegex(ValueError, 'explicit cases unavailable'):
+            make_plan(args(scope='selected', platforms='linux', modes='native',
+                           linux_profiles='ubuntu-26.04-wayland', case_ids='TC-MAIN-RAIL-03'))
 
     def test_restore_pulls_predecessor_before_it(self):
         cid = 'TC-auto-F-DB-1-query-tab-rename-native-restore'
@@ -65,6 +100,7 @@ class SelectionTests(unittest.TestCase):
     def test_unknown_empty_and_wrong_platform_requests_fail(self):
         for override in ({'scope':'selected'}, {'scope':'selected','case_ids':'TC-NOT-REAL'},
                          {'scope':'impacted'}, {'platforms':'self-hosted'},
+                         {'linux_profiles':'ubuntu-latest'},
                          {'scope':'smoke','case_ids':'TC-001'}):
             with self.subTest(override=override), self.assertRaises(ValueError):
                 make_plan(args(**override))

@@ -104,6 +104,12 @@ credentials as mutation fixtures, redirect HOME, or erase a profile as a shortcu
 | Windows | `tauri-driver` plus matching `msedgedriver.exe`/WebView2; set `webdriver.native_driver` if needed | Ctrl/Alt shortcuts, drive/UNC paths, locking/permissions, clipboard/dialogs, WebView2 |
 | macOS | isolated `com.taomni.app.qa` binary with the in-process WKWebView WebDriver bridge; `jdtls` + JDK 21+ for Java cases | Cmd/Meta shortcuts, WKWebView, IME, case sensitivity, permissions, clipboard/dialogs/window controls |
 
+Hosted Linux native also offers named Ubuntu 22.04 X11/VNC and Ubuntu 26.04
+GNOME/Wayland profiles through `linux_profiles`; see the
+[CI runbook](../../../../qa-ui-auto-tests/ci/README.md#linux-native-desktop-profiles).
+The default remains Ubuntu 24.04/Xvfb. Wayland runs only supported assertions,
+records its desktop identity and lists X11/portal-consent gaps explicitly.
+
 Linux/Xvfb exercises Tauri/WebKitGTK but cannot prove physical input, GPU,
 compositor, IME or performance behavior for another desktop/device. The macOS
 bridge exercises the packaged WKWebView and Tauri IPC, but cannot prove
