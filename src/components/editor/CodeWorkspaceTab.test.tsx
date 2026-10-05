@@ -14947,7 +14947,10 @@ end_of_record
       expect(within(menu).queryByText("Extract to local variable")).not.toBeInTheDocument();
       expect(within(menu).queryByText(/Extract to constant/)).not.toBeInTheDocument();
 
-      fireEvent.click(candidates[0]!);
+      // Applying the resolved edit and loading the naming target both schedule
+      // React updates. Flush this user action before observing the dialog, as
+      // pressExtractChord does for the direct single-candidate path.
+      await act(async () => { fireEvent.click(candidates[0]!); });
       const input = await screen.findByTestId("text-input-dialog-input");
       await waitFor(() => expect(fixture.text()).toBe(B1));
       expect(input).toHaveValue("extracted");
