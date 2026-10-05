@@ -110,6 +110,7 @@ steps:
 - assert_visible: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="ai-chat-drawer-hide"]'
 - assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- assert_not_visible: '[data-testid="settings-search-input"]'
 verification:
   review: reviewed
   requirements:
@@ -271,11 +272,14 @@ verification:
       expectation: Titlebar Context Panel opens the active workspace terminal and Tao opens its single global drawer.
     - step: 69
       expectation: Titlebar Context Panel opens the active workspace terminal and Tao opens its single global drawer.
+    - step: 70
+      expectation: '{"assert_not_visible": "[data-testid=\"settings-search-input\"]"}'
     results:
     - 63
     - 65
     - 67
     - 69
+    - 70
   visual:
   - check: Review captured layout for clipped controls and content.
     method: manual

@@ -31,12 +31,14 @@ it("keeps empty-lane Home actionable when the retained terminal gains its restor
   </ShellSurfaceRegistry>);
   const retained = screen.getByLabelText("Retained terminal input");
   expect(screen.getByTestId("shell-work-area")).toHaveAttribute("inert");
+  expect(screen.getByTestId("shell-work-area")).toHaveStyle({ visibility: "hidden" });
   act(() => useShellLayoutStore.getState().bindRestoreSource("ssh-alpha", { kind: "run-entry", identity: "saved:alpha" }, 1, true));
   expect(screen.getByTestId("shell-lane-empty-home")).toBeInTheDocument();
   expect(screen.getByTestId("shell-work-area")).toHaveAttribute("inert");
   fireEvent.click(screen.getByTestId("shell-lane-empty-home"));
   expect(useAppStore.getState().activeTabId).toBe("welcome");
   expect(screen.queryByTestId("shell-lane-empty")).toBeNull();
+  expect(screen.getByTestId("shell-work-area")).not.toHaveStyle({ visibility: "hidden" });
   expect(screen.getByLabelText("Retained terminal input")).toBe(retained);
   expect(retained).toHaveValue("draft 中文");
 });
