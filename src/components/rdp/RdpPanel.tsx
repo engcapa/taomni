@@ -1000,8 +1000,11 @@ export default function RdpPanel({
           ref={canvasRef}
           className={canvasClass}
           data-testid="rdp-canvas"
-          width={Math.max(640, conn?.width ?? 1920)}
-          height={Math.max(480, conn?.height ?? 1080)}
+          // The connected handler owns framebuffer dimensions. React must not
+          // assign them again after the first resized frame has been drawn:
+          // even an identical canvas dimension assignment clears its pixels.
+          width={1920}
+          height={1080}
           onPointerMove={onPointer}
           onPointerDown={(e) => {
             imeInputRef.current?.focus({ preventScroll: true });
