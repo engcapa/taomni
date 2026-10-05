@@ -22,6 +22,7 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
         #[cfg(target_os = "macos")]
         let stages = {
             use enigo::{Button, Coordinate, Mouse};
+            use std::time::{Duration, Instant};
             // Hosted macOS uses the US keyboard. Physical ANSI A/G keycodes
             // avoid Enigo querying HIToolbox's main-thread-only input-source
             // APIs from this blocking worker (which traps on macOS 15).
@@ -47,19 +48,34 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
             pasteboard.restore()?;
             let save_button = super::macos_save_dialog::wait_save_button(&filename)?;
             let center = &save_button["saveButton"]["center"];
+            let target = (
+                center[0].as_f64().context("Save button x")?.round() as i32,
+                center[1].as_f64().context("Save button y")?.round() as i32,
+            );
             input
-                .move_mouse(
-                    center[0].as_f64().context("Save button x")?.round() as i32,
-                    center[1].as_f64().context("Save button y")?.round() as i32,
-                    Coordinate::Abs,
-                )
+                .move_mouse(target.0, target.1, Coordinate::Abs)
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
+            // Enigo posts the move asynchronously, and button() reads the
+            // current OS position. Wait for the move before sending a click.
+            let pointer_started = Instant::now();
+            let pointer = loop {
+                let pointer = input.location().map_err(|e| anyhow::anyhow!("{e}"))?;
+                if (pointer.0 - target.0).abs() <= 1 && (pointer.1 - target.1).abs() <= 1 {
+                    break pointer;
+                }
+                anyhow::ensure!(
+                    pointer_started.elapsed() < Duration::from_secs(2),
+                    "OS pointer did not reach Save button: target={target:?}, actual={pointer:?}"
+                );
+                std::thread::sleep(Duration::from_millis(20));
+            };
             input
                 .button(Button::Left, Direction::Click)
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
             json!({"folderInput":"OS clipboard and Command+V","filenameEntered":filename_entered,
                 "folderField":folder_field,"folderEntered":folder_entered,"savePanelReturned":save_panel_returned,
-                "confirmation":"OS mouse click on the enabled Save button","saveButton":save_button})
+                "confirmation":"OS mouse click on the enabled Save button","saveButton":save_button,
+                "pointer":pointer,"pointerWaitedMs":pointer_started.elapsed().as_millis()})
         };
         #[cfg(not(target_os = "macos"))]
         let stages = json!({"input":"OS keyboard"});

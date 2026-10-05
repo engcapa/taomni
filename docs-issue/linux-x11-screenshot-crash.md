@@ -136,7 +136,9 @@ N17 记录 QA 子进程 PID 5810 的实际 AXTextField 获得焦点，默认文�
 
 定向 [run 37270272423](https://github.com/engcapa/taomni/actions/runs/37270272423) 的 N17 仍为 0/1、零跳过。本轮完整文件名、完整目录和返回文件名焦点均已通过：目录整段粘贴等待 408ms、返回面板等待 155ms。但发送最后的 Return 后仍未生成目标 PNG，12s 后的真实桌面图显示保存面板仍打开，目录已是 `taomni-qa-artifacts`，文件名正确且 Save 按钮启用。此结果证明目录截断已解决，但输入字段获得焦点不足以保证 Return 确认保存。12 个 receipt 附件和 5 个原生输出哈希、独立聚合均已核对，严格 `passed=false`，见 `qa-ui-auto-report/hosted-37270272423/independent-verification.json`。
 
-后续改为从实际 AX 父级/子级树读取 Save 按钮的进程归属、启用状态与屏幕位置，等待几何连续两次稳定后，通过 Enigo 真实 OS 鼠标点击按钮中心。AX 仍只读取状态和坐标，不调用 AXPress 或设置字段。记录按钮坐标与确认方式，保存 PNG 字节和后续断言保留。新增按钮查询源码的 macOS API 类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-save-button-api-check.log`；尚待真实 macOS 用例和最终六组回归。
+提交 `dd0a2dab` 改为从实际 AX 父级/子级树读取 Save 按钮的进程归属、启用状态与屏幕位置，等待几何连续两次稳定后，通过 Enigo 真实 OS 鼠标点击按钮中心。AX 仍只读取状态和坐标，不调用 AXPress 或设置字段。记录按钮坐标与确认方式，保存 PNG 字节和后续断言保留。新增按钮查询源码的 macOS API 类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-save-button-api-check.log`。
+
+补查 Enigo macOS 源码：`move_mouse()` 仅向 HID 队列投递移动事件，`button()` 重新读取实际当前位置，连续调用不能保证鼠标已经移动。因此在点击前轮询真实 OS 指针，要求到达按钮中心（最多 2s，误差 1px），并记录实际位置与等待时间。完整 `choose_save_destination` 函数和 AX 模块的实际源码已用 macOS target 一起编译类型检查通过，见 `macos-complete-save-input-api-check.log`。为避免继续验证缺少指针同步的版本，定向 run 37274748639 已主动取消并替换；不将取消计为通过。尚待真实 macOS 用例和最终六组回归。
 
 ## 实际安装命令
 
