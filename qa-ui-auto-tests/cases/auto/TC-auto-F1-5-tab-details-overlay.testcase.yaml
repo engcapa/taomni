@@ -32,7 +32,7 @@ steps:
 - assert_count:
     selector: '[data-testid^="tab-details-card-"]'
     equal: 1
-- hover: '[data-testid="terminal-pane"]'
+- hover: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - assert_not_visible: '[data-testid="tab-details-overlay"]'
 - press: Mod+Shift+H
 - assert_count:
