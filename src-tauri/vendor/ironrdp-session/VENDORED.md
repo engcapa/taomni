@@ -13,3 +13,9 @@ for virtual channels, DeactivateAll and multitransport remains in the existing
 decoder. Invalid compressed lengths and compressed input without negotiation
 fail explicitly. Regression tests exercise decoded pixels, path interleaving,
 typed PDUs, history resets and uncompressed peers.
+
+Also accept the exact six-byte `DeactivateAll` Share Control header sent by
+xrdp releases during desktop resizing. The generic header decoder requires
+`shareId`, so it rejected this form before the existing optional descriptor
+handling could run. Full PDUs keep their regular decoder; malformed short PDUs
+still fail. Both valid forms trigger the normal reactivation sequence.

@@ -12,6 +12,7 @@ use ironrdp_pdu::geometry::InclusiveRectangle;
 use ironrdp_pdu::mcs::{McsMessage, SendDataIndication};
 use ironrdp_pdu::rdp::client_info::CompressionType as PduCompressionType;
 use ironrdp_pdu::rdp::headers::CompressionFlags;
+use ironrdp_pdu::rdp::headers::{ServerDeactivateAll, ShareControlHeader, ShareControlPdu};
 use ironrdp_pdu::x224::X224;
 use ironrdp_svc::StaticChannelSet;
 
@@ -245,5 +246,46 @@ fn raw_slow_path_flush_resets_history_before_the_next_fast_path_update() {
         .unwrap();
     for pixel in image.data().chunks_exact(4) {
         assert_eq!(&pixel[..3], &[255, 0, 255]);
+    }
+}
+
+#[test]
+fn short_xrdp_and_full_deactivate_all_request_reactivation() {
+    let full = encode_vec(&ShareControlHeader {
+        share_control_pdu: ShareControlPdu::ServerDeactivateAll(ServerDeactivateAll),
+        pdu_source: 1003,
+        share_id: 0x1234,
+    })
+    .unwrap();
+    for user_data in [vec![6, 0, 0x16, 0, 0xeb, 3], full] {
+        let outputs = stage(Some(PduCompressionType::Rdp61))
+            .process(
+                &mut DecodedImage::new(PixelFormat::RgbA32, 32, 32),
+                Action::X224,
+                &slow_frame(&user_data),
+            )
+            .unwrap();
+        assert_eq!(outputs.len(), 1);
+        assert!(matches!(outputs[0], ActiveStageOutput::DeactivateAll));
+    }
+}
+
+#[test]
+fn malformed_short_deactivate_all_is_rejected() {
+    for user_data in [
+        vec![5, 0, 0x16, 0, 0xeb, 3],
+        vec![6, 0, 0x17, 0, 0xeb, 3],
+        vec![6, 0, 0x26, 0, 0xeb, 3],
+        vec![7, 0, 0x16, 0, 0xeb, 3, 0],
+    ] {
+        assert!(
+            stage(Some(PduCompressionType::Rdp61))
+                .process(
+                    &mut DecodedImage::new(PixelFormat::RgbA32, 32, 32),
+                    Action::X224,
+                    &slow_frame(&user_data),
+                )
+                .is_err()
+        );
     }
 }

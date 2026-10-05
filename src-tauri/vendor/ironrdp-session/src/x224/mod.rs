@@ -173,6 +173,13 @@ impl Processor {
     ) -> SessionResult<Vec<ProcessorOutput>> {
         debug_assert_eq!(data_ctx.channel_id, self.io_channel_id);
 
+        // xrdp releases send DeactivateAll as a six-byte Share Control header,
+        // omitting shareId and sourceDescriptor. Accept only that exact form;
+        // other short or malformed headers still reach the regular decoder.
+        if data_ctx.user_data.len() == 6 && data_ctx.user_data[..4] == [6, 0, 0x16, 0] {
+            return Ok(vec![ProcessorOutput::DeactivateAll]);
+        }
+
         // Typed ShareDataHeader decoding consumes the payload immediately, so
         // normalize compression before decode_io_channel, including typed PDUs.
         let user_data = bulk::decompress_share_data(data_ctx.user_data, decompressor)?;
