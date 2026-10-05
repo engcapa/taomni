@@ -746,6 +746,25 @@ def _reap_matching_pids(
 def _capture_native_failure(session: Any, case_dir: Path) -> dict:
     """Capture the failing session before cleanup changes its state."""
     artifacts: dict[str, str] = {}
+    with suppress(Exception):
+        focus = session.execute("""
+            const describe = el => el ? {
+                tag: el.tagName, id: el.id, class: el.className,
+                testid: el.getAttribute('data-testid'), role: el.getAttribute('role'),
+                connected: el.isConnected, matches_focus: el.matches(':focus')
+            } : null;
+            return {
+                document_has_focus: document.hasFocus(), visibility: document.visibilityState,
+                active: describe(document.activeElement),
+                focused: Array.from(document.querySelectorAll(':focus')).map(describe),
+                tree_focus_within: !!document.querySelector('[data-testid="code-workspace-tree-pane"]:focus-within'),
+                editor_focus: !!document.querySelector('[data-testid="code-workspace-editor"] .cm-content:focus')
+            };
+        """)
+        if isinstance(focus, dict):
+            focus_file = case_dir / "focus-failure.json"
+            focus_file.write_text(json.dumps(focus, ensure_ascii=False), encoding="utf-8")
+            artifacts["focus"] = str(focus_file)
     try:
         shot = case_dir / "failure-native.png"
         session.screenshot(shot)
