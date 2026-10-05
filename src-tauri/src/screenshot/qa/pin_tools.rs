@@ -1,7 +1,7 @@
 use super::*;
 
-async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Result<()> {
-    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Result<Value> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
         use enigo::{Direction, Key, Keyboard};
         let mut input = enigo::Enigo::new(&enigo::Settings::default())
             .map_err(|e| anyhow::anyhow!("OS input: {e}"))?;
@@ -20,7 +20,7 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
             result
         };
         #[cfg(target_os = "macos")]
-        {
+        let stages = {
             // Hosted macOS uses the US keyboard. Physical ANSI A/G keycodes
             // avoid Enigo querying HIToolbox's main-thread-only input-source
             // APIs from this blocking worker (which traps on macOS 15).
@@ -30,19 +30,25 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
             input
                 .text(filename.as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
-            super::macos_save_dialog::wait_value(&filename)?;
+            let filename_entered = super::macos_save_dialog::wait_value(&filename)?;
             chord(&mut input, &[Key::Meta, Key::Shift], Key::Other(5))?;
-            super::macos_save_dialog::wait_folder_field(&filename)?;
+            let folder_field = super::macos_save_dialog::wait_folder_field(&filename)?;
+            let mut pasteboard = super::macos_save_dialog::PathPasteboard::new(&directory)?;
             chord(&mut input, &[Key::Meta], Key::Other(0))?;
-            input
-                .text(directory.as_ref())
-                .map_err(|e| anyhow::anyhow!("{e}"))?;
-            super::macos_save_dialog::wait_value(&directory)?;
+            // ANSI V: a single real paste avoids Go to Folder's handling of
+            // separate Unicode chunks. AX only reads the resulting field.
+            chord(&mut input, &[Key::Meta], Key::Other(9))?;
+            let folder_entered = super::macos_save_dialog::wait_value(&directory)?;
             input
                 .key(Key::Return, Direction::Click)
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
-            super::macos_save_dialog::wait_value(&filename)?;
-        }
+            let save_panel_returned = super::macos_save_dialog::wait_value(&filename)?;
+            pasteboard.restore()?;
+            json!({"folderInput":"OS clipboard and Command+V","filenameEntered":filename_entered,
+                "folderField":folder_field,"folderEntered":folder_entered,"savePanelReturned":save_panel_returned})
+        };
+        #[cfg(not(target_os = "macos"))]
+        let stages = json!({"input":"OS keyboard"});
         #[cfg(target_os = "linux")]
         {
             chord(&mut input, &[Key::Control], Key::Unicode('l'))?;
@@ -65,7 +71,7 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
         input
             .key(Key::Return, Direction::Click)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
-        Ok(())
+        Ok(stages)
     })
     .await
     .context("native save dialog input")?
@@ -180,13 +186,16 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     if let Ok(desktop) = capture::capture_display(&app, &display) {
         keep_image(&desktop, "pin-save-dialog-open.png");
     }
-    if let Err(error) = choose_save_destination(destination.clone()).await {
-        if let Ok(desktop) = capture::capture_display(&app, &display) {
-            keep_image(&desktop, "pin-save-dialog-input-failed.png");
+    let save_dialog_input = match choose_save_destination(destination.clone()).await {
+        Ok(state) => state,
+        Err(error) => {
+            if let Ok(desktop) = capture::capture_display(&app, &display) {
+                keep_image(&desktop, "pin-save-dialog-input-failed.png");
+            }
+            return Err(format!("{error:#}"));
         }
-        return Err(format!("{error:#}"));
-    }
-    trace.mark("save-dialog-input-sent", json!(true));
+    };
+    trace.mark("save-dialog-input-sent", save_dialog_input.clone());
     for _ in 0..60 {
         if destination.exists() {
             break;
@@ -205,7 +214,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         }
         return Ok(report(
             false,
-            json!({"nativeSaveDialog":"did not save original PNG","destination":destination,"readiness":save_dialog_ready,"controls":controls,"drag":drag}),
+            json!({"nativeSaveDialog":"did not save original PNG","destination":destination,"readiness":save_dialog_ready,"input":save_dialog_input,"controls":controls,"drag":drag}),
         ));
     }
     run_js(&pin, "document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').click(); for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed')!=='true';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
@@ -282,6 +291,6 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         && favorite_artifact.is_some();
     Ok(report(
         ok,
-        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"saveDialogReady":save_dialog_ready,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
+        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"saveDialogReady":save_dialog_ready,"saveDialogInput":save_dialog_input,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
     ))
 }

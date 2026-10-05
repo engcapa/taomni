@@ -1,6 +1,7 @@
 use std::ffi::c_void;
 use std::time::{Duration, Instant};
 
+use anyhow::Context;
 use core_foundation::base::{CFType, CFTypeRef, TCFType};
 use core_foundation::boolean::CFBoolean;
 use core_foundation::string::{CFString, CFStringRef};
@@ -122,8 +123,51 @@ pub(super) async fn wait_ready() -> anyhow::Result<Value> {
 /// the focused field also catches truncated typing in a cold native panel.
 pub(super) fn wait_value(expected: &str) -> anyhow::Result<Value> {
     wait_field("typed-value", |value| value == expected)
+        .with_context(|| format!("waiting for OS input value {expected:?}"))
 }
 
 pub(super) fn wait_folder_field(filename: &str) -> anyhow::Result<Value> {
     wait_field("go-to-folder", |value| value != filename)
+}
+
+/// Go to Folder's autocomplete can replace Enigo's 20-character Unicode
+/// chunks. Use a real OS paste for the whole path and restore the image that
+/// the scenario already copied and checked before opening the dialog.
+pub(super) struct PathPasteboard {
+    clipboard: arboard::Clipboard,
+    original: Option<arboard::ImageData<'static>>,
+}
+
+impl PathPasteboard {
+    pub(super) fn new(text: &str) -> anyhow::Result<Self> {
+        let mut clipboard = arboard::Clipboard::new().context("open path pasteboard")?;
+        let original = clipboard.get_image().context("preserve copied pin image")?;
+        let mut board = Self {
+            clipboard,
+            original: Some(original),
+        };
+        board
+            .clipboard
+            .set_text(text)
+            .context("stage folder path")?;
+        Ok(board)
+    }
+
+    pub(super) fn restore(&mut self) -> anyhow::Result<()> {
+        if let Some(image) = self.original.as_ref() {
+            self.clipboard
+                .set_image(image.clone())
+                .context("restore copied pin image")?;
+            self.original = None;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for PathPasteboard {
+    fn drop(&mut self) {
+        if let Err(error) = self.restore() {
+            log::warn!("QA path pasteboard cleanup: {error:#}");
+        }
+    }
 }
