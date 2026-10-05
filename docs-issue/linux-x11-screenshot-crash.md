@@ -86,7 +86,7 @@ macOS 两项后续修改完成后重新构建、在本机原始 LXQt/Openbox 桌
 
 本机 QA/Vite 已退出，用户 PID 167582 的 `/usr/bin/taomni` 保持运行。
 
-## 最终本机复核（9a017a7a 的源码）
+## 目录粘贴版本本机复核（9a017a7a 的源码）
 
 目录整段粘贴修改后重新构建并复测本机实际桌面，QA ID 仍为 `com.taomni.app.qa`。源码指纹为 `2924444891fcc391e823a88cc37174ee9c4afd4367a21c4e4b79cf205519e2a6`，runner 指纹不变；二进制 SHA-256 为 `380a74699dd8518970c4d1b2e17e98e48fa533b824b6f9ce85016aa8941be60b`。`pnpm build` 和原生编译均通过，见 [构建日志](../qa-ui-auto-report/_local/screenshot-x11/final-native-build.log)。
 
@@ -99,6 +99,18 @@ macOS 两项后续修改完成后重新构建、在本机原始 LXQt/Openbox 桌
 三份报告的 source/runner/case/config 与实际 QA 二进制身份、45 个 receipt 附件哈希全部一致；293 个原生输出归档并核对，见 `qa-ui-auto-report/_local/screenshot-x11/local-final-verification.json`。独立 Pillow/PyAV 检查：窗口截图和长图与原画对应区域逐 RGB 像素相同；GIF 28 帧逐像素一致，MP4 28 帧时间戳一致、最大原画 RGB 平均误差 3.73，满足原有 8.0 标准。见 `independent-final-pixels.json`。
 
 原始桌面与临时合成器条件记录在 `final-desktop-conditions.json`；结束后合成器 owner 恢复为 0，QA/Vite/临时 xcompmgr 已退出，用户老版本 PID 167582 保持运行。最新两个改动 Rust 文件格式、用例契约和 482 用例 audit gate 通过。
+
+## 最终本机复核（c4be1dfe）
+
+保存按钮和实际指针同步修改提交后，本机重新编译同一源码，使用独立 QA ID `com.taomni.app.qa`。源码指纹为 `a7d4b2a61d15c7d3226843be14465c8ff5ab22b0857b43ed1ca3819eb75a6510`，runner 指纹不变，二进制 SHA-256 为 `a7cf052a7c099ae48848192c2b7cd843cf8dd0f8eeab51ed6e4ca8b68361a3c1`；构建含 `pnpm build`，见 [日志](../qa-ui-auto-report/_local/screenshot-x11/c4-native-build.log)。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| 本机 browser：001/002/004/017/020/023/028/030 | 8/8、零失败跳过；[报告](../qa-ui-auto-report/screenshot-x11/browser-c4/run-20261005-150614-778038942/summary.md) |
+| 原始无合成器 LXQt native：N10/N12/N3/N7/N8 | 5/5、零失败跳过；连续两次截图/标注/剪贴板、窗口截图、长图、GIF/MP4 与实际 WebKit MP4 播放通过；[报告](../qa-ui-auto-report/screenshot-x11/native-c4/run-20261005-150756-767544361/summary.md) |
+| 临时合成器 native：N17 | 1/1、零失败跳过；拖动、折叠/恢复、透明度、原 PNG 保存/复制与收藏重开通过；[报告](../qa-ui-auto-report/screenshot-x11/native-pin-c4/run-20261005-151005-750016911/summary.md) |
+
+三个报告的源码/runner/用例/config、QA 二进制身份和 45 个 receipt 附件哈希一致，293 个原生输出归档核验，见 `qa-ui-auto-report/_local/screenshot-x11/local-c4-verification.json`。独立 Pillow/PyAV 核对窗口截图与长图的逐 RGB 像素完全相同、GIF 28 帧逐像素一致、MP4 28 帧时间戳一致且最大原画 RGB 平均误差 3.76≤8.0；另外，保存 PNG、复制图像和收藏重开图像的 800×600 RGBA 像素完全一致，见 `independent-c4-pixels.json`。桌面条件记录在 `c4-desktop-conditions.json`，测试后合成器 owner 回到 0、QA/Vite/临时 xcompmgr 均退出，用户老版本 PID 167582 仍在运行。
 
 ## GitHub 三平台回归
 
@@ -138,7 +150,9 @@ N17 记录 QA 子进程 PID 5810 的实际 AXTextField 获得焦点，默认文�
 
 提交 `dd0a2dab` 改为从实际 AX 父级/子级树读取 Save 按钮的进程归属、启用状态与屏幕位置，等待几何连续两次稳定后，通过 Enigo 真实 OS 鼠标点击按钮中心。AX 仍只读取状态和坐标，不调用 AXPress 或设置字段。记录按钮坐标与确认方式，保存 PNG 字节和后续断言保留。新增按钮查询源码的 macOS API 类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-save-button-api-check.log`。
 
-补查 Enigo macOS 源码：`move_mouse()` 仅向 HID 队列投递移动事件，`button()` 重新读取实际当前位置，连续调用不能保证鼠标已经移动。因此在点击前轮询真实 OS 指针，要求到达按钮中心（最多 2s，误差 1px），并记录实际位置与等待时间。完整 `choose_save_destination` 函数和 AX 模块的实际源码已用 macOS target 一起编译类型检查通过，见 `macos-complete-save-input-api-check.log`。为避免继续验证缺少指针同步的版本，定向 run 37274748639 已主动取消并替换；不将取消计为通过。尚待真实 macOS 用例和最终六组回归。
+补查 Enigo macOS 源码：`move_mouse()` 仅向 HID 队列投递移动事件，`button()` 重新读取实际当前位置，连续调用不能保证鼠标已经移动。因此提交 `c4be1dfe` 在点击前轮询真实 OS 指针，要求到达按钮中心（最多 2s，误差 1px），并记录实际位置与等待时间。完整 `choose_save_destination` 函数和 AX 模块的实际源码已用 macOS target 一起编译类型检查通过，见 `macos-complete-save-input-api-check.log`。为避免继续验证缺少指针同步的版本，定向 run 37274748639 已主动取消并替换；不将取消计为通过。
+
+短 SHA 定向 run 37275261095 在 checkout 阶段失败：`A branch or tag with the name 'c4be1dfe' could not be found`，未进入任何用例执行。已保留 `hosted-37275261095-checkout.log`，并改用完整 40 位 SHA 启动最终六组 [run 37275451453](https://github.com/engcapa/taomni/actions/runs/37275451453)，被测提交为 `c4be1dfe23cbdb4d3a6c1951c5b9ae863c7669bf`。其选例清单确认 browser 每端 35、Linux/Windows native 各 16、macOS native 19，共 156 项，零 capability gap、零未审用例。当前 Linux/macOS browser 各 35/35，其余组结果待返回；尚不宣称全部通过。
 
 ## 实际安装命令
 
