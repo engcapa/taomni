@@ -379,6 +379,9 @@ export function ScreenshotOverlay() {
   const recordMenuRef = useRef<HTMLDivElement | null>(null);
   const recordButtonRef = useRef<HTMLDivElement | null>(null);
   const [recordPos, setRecordPos] = useState({ left: 8, top: 8 });
+  const watermarkPanelRef = useRef<HTMLDivElement | null>(null);
+  const watermarkButtonRef = useRef<HTMLDivElement | null>(null);
+  const [watermarkPos, setWatermarkPos] = useState({ left: 8, top: 8 });
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   /** Region-select / move / resize drag in progress. */
   const dragRef = useRef<{
@@ -898,6 +901,20 @@ export function ScreenshotOverlay() {
     setRecordPos({ left, top });
   }, [recordOpen, toolbarPos, viewport]);
 
+  useLayoutEffect(() => {
+    if (!watermarkOpen) return;
+    const button = watermarkButtonRef.current?.getBoundingClientRect();
+    const panel = watermarkPanelRef.current;
+    if (!button || !panel) return;
+    const left = Math.max(8, Math.min(button.right - panel.offsetWidth, viewport.w - panel.offsetWidth - 8));
+    const above = button.top - panel.offsetHeight - 8;
+    const below = button.bottom + 8;
+    const top = scrollResult && below + panel.offsetHeight <= viewport.h - 8
+      ? below
+      : above >= 8 ? above : Math.max(8, Math.min(below, viewport.h - panel.offsetHeight - 8));
+    setWatermarkPos({ left, top });
+  }, [watermarkOpen, toolbarPos, viewport, scrollResult, tool, textSelected]);
+
   useEffect(() => {
     if (!recordOpen) return;
     const onDown = (event: MouseEvent) => {
@@ -1102,7 +1119,7 @@ export function ScreenshotOverlay() {
         <ToolButton testid="screenshot-auto-redact" title={t("screenshot.autoRedact")} onClick={() => void handleAutoRedact()}>
           <ShieldAlert size={16} />
         </ToolButton>
-        <div className="relative">
+        <div ref={watermarkButtonRef} className="relative">
           <ToolButton
             testid="screenshot-watermark"
             title={t("screenshot.watermark")}
@@ -1116,9 +1133,10 @@ export function ScreenshotOverlay() {
           </ToolButton>
           {watermarkOpen && (
             <div
+              ref={watermarkPanelRef}
               data-testid="screenshot-watermark-panel"
-              className={`absolute ${scrollResult ? "top-full mt-2" : "bottom-full mb-2"} right-0 rounded-lg shadow-2xl p-3 w-56`}
-              style={{ zIndex: 10, ...panelStyle }}
+              className="fixed rounded-lg shadow-2xl p-3 overflow-y-auto"
+              style={{ zIndex: 65, width: Math.min(224, viewport.w - 16), maxHeight: viewport.h - 16, ...watermarkPos, ...panelStyle }}
             >
               <input
                 type="text"
@@ -1138,7 +1156,7 @@ export function ScreenshotOverlay() {
                   max={80}
                   value={Math.round(watermarkOpacity * 100)}
                   onChange={(e) => setWatermarkOpacity(Number(e.target.value) / 100)}
-                  className="flex-1"
+                  className="min-w-0 flex-1"
                 />
                 <span className="w-8 text-right font-mono">{Math.round(watermarkOpacity * 100)}%</span>
               </label>

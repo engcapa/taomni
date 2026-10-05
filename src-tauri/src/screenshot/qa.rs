@@ -23,8 +23,12 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow};
 use super::capture::{self, DisplayInfo};
 use super::qa_oracle;
 pub mod colors;
+#[cfg(target_os = "macos")]
+mod macos_save_dialog;
 pub mod pin_tools;
 pub mod scroll_manual;
+#[cfg(target_os = "windows")]
+mod windows_save_dialog;
 
 /// Window label of the QA content fixture (scrollable page / animation).
 pub const QA_WINDOW_LABEL: &str = "screenshot-qa-fixture";
@@ -1068,6 +1072,13 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
       if (menu.width < 280 || hint.height > 180 || menu.left < 0 || menu.top < 0 || menu.right > innerWidth || menu.bottom > innerHeight)
         throw new Error('record menu cramped or outside viewport: ' + JSON.stringify({menu:menu.toJSON(), hint:hint.toJSON()}));
       window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true})); await sleep(100);
+      q('[data-testid="screenshot-watermark"]').click(); await sleep(150);
+      const watermarkPanel = q('[data-testid="screenshot-watermark-panel"]').getBoundingClientRect();
+      const watermarkSlider = q('[data-testid="screenshot-watermark-opacity"]').getBoundingClientRect();
+      if ([watermarkPanel, watermarkSlider].some((r) => r.left < 8 || r.top < 8 || r.right > innerWidth - 8 || r.bottom > innerHeight - 8))
+        throw new Error('watermark panel or slider outside viewport: ' + JSON.stringify({panel:watermarkPanel.toJSON(),slider:watermarkSlider.toJSON()}));
+      window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true})); await sleep(100);
+      if (q('[data-testid="screenshot-watermark-panel"]')) throw new Error('Escape did not close watermark panel');
       q('[data-testid="screenshot-tool-text"]').click(); await sleep(100);
       const font = q('[data-testid="screenshot-font-family"]');
       font.value = 'monospace'; font.dispatchEvent(new Event('change',{bubbles:true}));
@@ -1087,6 +1098,7 @@ pub async fn screenshot_qa_overlay_copy(app: AppHandle) -> Result<String, String
       if (q('[data-testid="screenshot-text-input"]')) throw new Error('Ctrl+Enter did not commit text');
       const info = {
         textFont: 'monospace', textSize: 24, textLines: 2, recordMenuWidth: menu.width,
+        watermarkPanel: watermarkPanel.toJSON(), watermarkSlider: watermarkSlider.toJSON(),
         naturalWidth: img().naturalWidth, naturalHeight: img().naturalHeight,
         innerWidth: window.innerWidth, innerHeight: window.innerHeight,
         undoEnabled: !q('[data-testid="screenshot-undo"]').disabled,

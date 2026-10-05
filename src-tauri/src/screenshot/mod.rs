@@ -861,15 +861,13 @@ fn open_pin(
     height: u32,
     favorite_id: Option<String>,
 ) -> Result<String, String> {
-    let scale = tool_state()
-        .overlay
-        .as_ref()
-        .map(|o| o.scale_factor)
+    let overlay_scale = tool_state().overlay.as_ref().map(|o| o.scale_factor);
+    // Release the session lock before waiting for GTK monitor enumeration.
+    let scale = overlay_scale
         .or_else(|| {
-            app.primary_monitor()
+            capture::resolve_display(app, None)
                 .ok()
-                .flatten()
-                .map(|m| m.scale_factor())
+                .map(|display| display.scale_factor)
         })
         .unwrap_or(1.0)
         .max(0.5);

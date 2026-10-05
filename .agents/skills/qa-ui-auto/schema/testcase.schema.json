@@ -553,6 +553,7 @@
             "min_count": {"type": "integer", "minimum": 1},
             "same_width": {"type": "boolean"},
             "icon_size": {"type": "number", "minimum": 1},
+            "viewport_margin": {"type": "number", "minimum": 0},
             "tolerance": {"type": "number", "minimum": 0, "maximum": 2}
           }
         },

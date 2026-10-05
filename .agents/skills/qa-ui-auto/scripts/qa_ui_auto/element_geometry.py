@@ -22,6 +22,14 @@ def assert_geometry(args: dict, measurements: list[dict]) -> None:
                 raise StepError(f"{prefix}: {label} {dimension} {value} < {minimum}")
         if args.get("same_width") and abs(item["width"] - measurements[0]["width"]) > tolerance:
             raise StepError(f"{prefix}: {label} width {item['width']} differs from {measurements[0]['width']}")
+        if "viewport_margin" in args:
+            margin = args["viewport_margin"]
+            for edge, bound, minimum in (("left", margin, True), ("top", margin, True),
+                                          ("right", item["viewport_width"] - margin, False),
+                                          ("bottom", item["viewport_height"] - margin, False)):
+                value = item[edge]
+                if not math.isfinite(value) or not math.isfinite(bound) or (value < bound if minimum else value > bound):
+                    raise StepError(f"{prefix}: {label} {edge} {value} outside viewport margin {margin}")
         if "icon_size" in args:
             icon = item.get("icon")
             if not icon or any(not math.isfinite(icon[key]) or abs(icon[key] - args["icon_size"]) > tolerance
@@ -36,6 +44,8 @@ def run_geometry(args: dict, evaluate, case_dir: Path) -> str:
       const icon = element.querySelector('svg')?.getBoundingClientRect();
       return {{id: element.getAttribute('data-testid') || element.id || element.tagName,
         width: rect.width, height: rect.height,
+        left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+        viewport_width: window.innerWidth, viewport_height: window.innerHeight,
         icon: icon ? {{width: icon.width, height: icon.height}} : null}};
     }})"""
     measurements = evaluate(expression)

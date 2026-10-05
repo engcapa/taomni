@@ -46,4 +46,5 @@ verification:
   native:
   - check: WebView MP4 support
     method: automated
-    reason: Real WebView2/WebKitGTK/WKWebView video element must decode and play; VIDEO tag presence alone cannot pass.
+    reason: Real WebView2/WebKitGTK/WKWebView video element must decode and play. Every frame retains the native capture time,
+      including macOS region snapshots before buffer conversion; VIDEO tag presence alone cannot pass.
