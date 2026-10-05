@@ -881,6 +881,9 @@ class NativeSession:
             else:
                 raise WebDriverError(f"contenteditable did not receive focus: {selector}")
             self.press_combo("Control+a")
+            if not text:
+                self.press_combo("Backspace")
+                return f"filled contenteditable {selector}"
             lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
             for index, line in enumerate(lines):
                 if index:
@@ -903,6 +906,18 @@ class NativeSession:
         else:
             self.press_combo("Mod+a")
         self.press_combo("Backspace")
+        if not text:
+            # Empty password /value requests are rejected by WebKitWebDriver.
+            # The real select-all/backspace path already clears the control;
+            # observe completion without sending another text request.
+            probe = (f"const el = document.querySelector({json.dumps(selector)});"
+                     "return !!el && el.value === ''; ")
+            end = time.monotonic() + 5
+            while self.execute(probe) is not True:
+                if time.monotonic() >= end:
+                    raise WebDriverError(f"input did not clear its existing value: {selector}")
+                time.sleep(0.05)
+            return f"filled {selector}"
         password_input = platform.system() == "Linux" and self.execute(
             f"const el = document.querySelector({json.dumps(selector)});"
             "return el instanceof HTMLInputElement && el.type === 'password';"
@@ -1097,6 +1112,8 @@ class NativeSession:
 
     def type_text(self, text: str) -> str:
         """Type text into the focused element, one paced key pair per char."""
+        if not text:
+            return "typed 0 chars"
         if platform.system() == "Darwin":
             # The macOS in-process bridge dispatches a whole /actions
             # sequence inside one synchronous JS task. MutationObserver

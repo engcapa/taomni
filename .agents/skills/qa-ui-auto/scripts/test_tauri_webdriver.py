@@ -390,6 +390,32 @@ class NativeSessionFillTest(TestCase):
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_called_once_with("Taomni")
 
+    def test_empty_password_fill_deletes_and_observes_value_without_empty_value_request(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, False, True])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}), patch("tauri_webdriver.time.sleep"):
+            session.fill('input[type=password]', '')
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
+        self.assertTrue(all(request.args[1].endswith('/click') for request in session.request.call_args_list))
+        session.type_text.assert_not_called()
+
+    def test_empty_fill_rejects_a_control_that_retains_its_old_value(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(return_value=False)
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 6]):
+            with self.assertRaisesRegex(WebDriverError, 'did not clear'):
+                session.fill('input[type=password]', '')
+        session.type_text.assert_not_called()
+
+    def test_empty_contenteditable_fill_deletes_the_selection(self) -> None:
+        session = self.session(True)
+        session.fill('.cm-content', '')
+        session.press_combo.assert_has_calls([call("Control+a"), call("Backspace")])
+        session.type_text.assert_not_called()
+
     def test_wayland_fill_retries_select_all_before_deleting_old_prefix(self) -> None:
         session = self.session(False)
         session.execute = Mock(side_effect=[False, False, True, False])
