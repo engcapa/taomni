@@ -1,7 +1,7 @@
 use super::*;
 
-async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Result<()> {
-    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Result<Value> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
         use enigo::{Direction, Key, Keyboard};
         let mut input = enigo::Enigo::new(&enigo::Settings::default())
             .map_err(|e| anyhow::anyhow!("OS input: {e}"))?;
@@ -20,26 +20,65 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
             result
         };
         #[cfg(target_os = "macos")]
-        {
+        let stages = {
+            use enigo::{Button, Coordinate, Mouse};
+            use std::time::{Duration, Instant};
             // Hosted macOS uses the US keyboard. Physical ANSI A/G keycodes
             // avoid Enigo querying HIToolbox's main-thread-only input-source
             // APIs from this blocking worker (which traps on macOS 15).
+            let filename = destination.file_name().unwrap().to_string_lossy();
+            let directory = destination.parent().unwrap().to_string_lossy();
             chord(&mut input, &[Key::Meta], Key::Other(0))?;
-            std::thread::sleep(Duration::from_millis(150));
             input
-                .text(destination.file_name().unwrap().to_string_lossy().as_ref())
+                .text(filename.as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
+            let filename_entered = super::macos_save_dialog::wait_value(&filename)?;
             chord(&mut input, &[Key::Meta, Key::Shift], Key::Other(5))?;
-            std::thread::sleep(Duration::from_millis(700));
+            let folder_field = super::macos_save_dialog::wait_folder_field(&filename)?;
+            let mut pasteboard = super::macos_save_dialog::PathPasteboard::new(&directory)?;
             chord(&mut input, &[Key::Meta], Key::Other(0))?;
-            input
-                .text(destination.parent().unwrap().to_string_lossy().as_ref())
-                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            // ANSI V: a single real paste avoids Go to Folder's handling of
+            // separate Unicode chunks. AX only reads the resulting field.
+            chord(&mut input, &[Key::Meta], Key::Other(9))?;
+            let folder_entered = super::macos_save_dialog::wait_value(&directory)?;
             input
                 .key(Key::Return, Direction::Click)
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
-            std::thread::sleep(Duration::from_millis(1200));
-        }
+            let save_panel_returned = super::macos_save_dialog::wait_value(&filename)?;
+            pasteboard.restore()?;
+            let save_button = super::macos_save_dialog::wait_save_button(&filename)?;
+            let center = &save_button["saveButton"]["center"];
+            let target = (
+                center[0].as_f64().context("Save button x")?.round() as i32,
+                center[1].as_f64().context("Save button y")?.round() as i32,
+            );
+            input
+                .move_mouse(target.0, target.1, Coordinate::Abs)
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            // Enigo posts the move asynchronously, and button() reads the
+            // current OS position. Wait for the move before sending a click.
+            let pointer_started = Instant::now();
+            let pointer = loop {
+                let pointer = input.location().map_err(|e| anyhow::anyhow!("{e}"))?;
+                if (pointer.0 - target.0).abs() <= 1 && (pointer.1 - target.1).abs() <= 1 {
+                    break pointer;
+                }
+                anyhow::ensure!(
+                    pointer_started.elapsed() < Duration::from_secs(2),
+                    "OS pointer did not reach Save button: target={target:?}, actual={pointer:?}"
+                );
+                std::thread::sleep(Duration::from_millis(20));
+            };
+            input
+                .button(Button::Left, Direction::Click)
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            json!({"folderInput":"OS clipboard and Command+V","filenameEntered":filename_entered,
+                "folderField":folder_field,"folderEntered":folder_entered,"savePanelReturned":save_panel_returned,
+                "confirmation":"OS mouse click on the enabled Save button","saveButton":save_button,
+                "pointer":pointer,"pointerWaitedMs":pointer_started.elapsed().as_millis()})
+        };
+        #[cfg(not(target_os = "macos"))]
+        let stages = json!({"input":"OS keyboard"});
         #[cfg(target_os = "linux")]
         {
             chord(&mut input, &[Key::Control], Key::Unicode('l'))?;
@@ -59,10 +98,11 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
                 .text(destination.to_string_lossy().as_ref())
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
         }
+        #[cfg(not(target_os = "macos"))]
         input
             .key(Key::Return, Direction::Click)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
-        Ok(())
+        Ok(stages)
     })
     .await
     .context("native save dialog input")?
@@ -151,15 +191,42 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     pin.set_focus().map_err(|e| e.to_string())?;
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-save\"]').click()")
         .map_err(|e| e.to_string())?;
-    tokio::time::sleep(Duration::from_millis(1500)).await;
-    trace.mark("save-dialog-open", json!({"destination":destination}));
+    #[cfg(target_os = "windows")]
+    let readiness = super::windows_save_dialog::wait_ready().await;
+    #[cfg(target_os = "macos")]
+    let readiness = super::macos_save_dialog::wait_ready().await;
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    let save_dialog_ready = match readiness {
+        Ok(state) => state,
+        Err(error) => {
+            if let Ok(desktop) = capture::capture_display(&app, &display) {
+                keep_image(&desktop, "pin-save-dialog-not-ready.png");
+            }
+            return Err(format!("{error:#}"));
+        }
+    };
+    #[cfg(target_os = "linux")]
+    let save_dialog_ready = {
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        json!({"waitedMs":1500})
+    };
+    trace.mark(
+        "save-dialog-open",
+        json!({"destination":destination,"readiness":save_dialog_ready}),
+    );
     if let Ok(desktop) = capture::capture_display(&app, &display) {
         keep_image(&desktop, "pin-save-dialog-open.png");
     }
-    choose_save_destination(destination.clone())
-        .await
-        .map_err(|e| e.to_string())?;
-    trace.mark("save-dialog-input-sent", json!(true));
+    let save_dialog_input = match choose_save_destination(destination.clone()).await {
+        Ok(state) => state,
+        Err(error) => {
+            if let Ok(desktop) = capture::capture_display(&app, &display) {
+                keep_image(&desktop, "pin-save-dialog-input-failed.png");
+            }
+            return Err(format!("{error:#}"));
+        }
+    };
+    trace.mark("save-dialog-input-sent", save_dialog_input.clone());
     for _ in 0..60 {
         if destination.exists() {
             break;
@@ -178,7 +245,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         }
         return Ok(report(
             false,
-            json!({"nativeSaveDialog":"did not save original PNG","destination":destination,"controls":controls,"drag":drag}),
+            json!({"nativeSaveDialog":"did not save original PNG","destination":destination,"readiness":save_dialog_ready,"input":save_dialog_input,"controls":controls,"drag":drag}),
         ));
     }
     run_js(&pin, "document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').click(); for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed')!=='true';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
@@ -255,6 +322,6 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         && favorite_artifact.is_some();
     Ok(report(
         ok,
-        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
+        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"saveDialogReady":save_dialog_ready,"saveDialogInput":save_dialog_input,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
     ))
 }

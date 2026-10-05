@@ -29,6 +29,10 @@ use tauri::AppHandle;
 
 use crate::servers::rdp::capture::{Capturer, Frame};
 
+#[cfg(target_os = "macos")]
+#[path = "mac_snapshot.rs"]
+mod mac_snapshot;
+
 #[derive(Clone, Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayInfo {
@@ -168,9 +172,38 @@ pub fn save_png(image: &RgbaImage, prefix: &str) -> anyhow::Result<(PathBuf, u32
 // ---------------------------------------------------------------------------
 
 pub fn list_displays(app: &AppHandle) -> anyhow::Result<Vec<DisplayInfo>> {
+    #[cfg(target_os = "linux")]
+    let mut displays = {
+        // Tauri's AppHandle monitor APIs access GDK directly on the caller's
+        // thread. In particular, reading the work area performs Xlib requests.
+        // Snapshot them on GTK's main thread before capture/recording workers
+        // use the values, otherwise GTK's X11 reply queue can be corrupted.
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let main_app = app.clone();
+        app.run_on_main_thread(move || {
+            let _ = tx.send(read_displays(&main_app));
+        })
+        .context("dispatch monitor enumeration to GTK")?;
+        rx.recv_timeout(Duration::from_secs(5))
+            .context("wait for GTK monitor enumeration")??
+    };
+    #[cfg(not(target_os = "linux"))]
+    let mut displays = read_displays(app)?;
+
+    // Starting a capture backend can block; keep the fallback off GTK's thread.
+    if displays.is_empty() {
+        displays = fallback_displays(app)?;
+    }
+    if !displays.iter().any(|d| d.primary) {
+        displays[0].primary = true;
+    }
+    Ok(displays)
+}
+
+fn read_displays(app: &AppHandle) -> anyhow::Result<Vec<DisplayInfo>> {
     let monitors = app.available_monitors().context("enumerate monitors")?;
     let primary = app.primary_monitor().ok().flatten().map(|m| *m.position());
-    let mut displays: Vec<DisplayInfo> = monitors
+    Ok(monitors
         .iter()
         .map(|m| {
             let pos = *m.position();
@@ -187,14 +220,7 @@ pub fn list_displays(app: &AppHandle) -> anyhow::Result<Vec<DisplayInfo>> {
             }
         })
         .filter(|d| d.width > 0 && d.height > 0)
-        .collect();
-    if displays.is_empty() {
-        displays = fallback_displays(app)?;
-    }
-    if !displays.iter().any(|d| d.primary) {
-        displays[0].primary = true;
-    }
-    Ok(displays)
+        .collect())
 }
 
 /// Some Linux sessions report no monitors through GDK; fall back to the
@@ -513,6 +539,8 @@ fn rgba_from_bgra_rows(
 enum Backend {
     Persistent(Box<dyn Capturer>),
     OneShot,
+    #[cfg(target_os = "macos")]
+    MacRegion(anyhow::Result<mac_snapshot::RegionSnapshot>),
 }
 
 /// A display frame source. Not `Send`: create it on the thread that uses it.
@@ -584,18 +612,32 @@ impl FrameSource {
     }
 
     /// Recording retains only the requested region. Persistent backends crop
-    /// before BGRA conversion; macOS snapshots are cropped after capture.
+    /// before BGRA conversion; macOS snapshots request only this region.
     pub fn for_region(app: &AppHandle, display: DisplayInfo, region: (u32, u32, u32, u32)) -> Self {
         // Select this before opening any persistent stream: WindowServer can
         // crash after a successful start, so an error-based fallback is too late.
         #[cfg(target_os = "macos")]
-        let mut source = {
+        let source = {
             log::info!("screenshot recording: using CoreGraphics snapshots on macOS");
-            Self::one_shot(app, display)
+            let mut source = Self::one_shot(app, display);
+            // Resolve the display once. Enumerating every monitor for every
+            // frame adds WindowServer work unrelated to the requested pixels.
+            source.backend = Backend::MacRegion((|| {
+                let monitor = xcap_monitor_for(&source.display)?;
+                mac_snapshot::RegionSnapshot::new(
+                    monitor.id().context("recording display id")?,
+                    (source.display.width, source.display.height),
+                    region,
+                )
+            })());
+            source
         };
         #[cfg(not(target_os = "macos"))]
         let mut source = Self::open(app, display);
-        source.region = Some(region);
+        #[cfg(not(target_os = "macos"))]
+        {
+            source.region = Some(region);
+        }
         source
     }
 
@@ -628,49 +670,10 @@ impl FrameSource {
         frame_region_to_rgba(frame, rect)
     }
 
-    fn decode_one_shot(&mut self) -> anyhow::Result<RgbaImage> {
+    fn decode_one_shot(&self) -> anyhow::Result<RgbaImage> {
         #[cfg(all(debug_assertions, target_os = "macos"))]
         QA_SNAPSHOT_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        #[cfg(target_os = "macos")]
-        if let Some(region) = self.region {
-            // Read only the selected rectangle. Converting an entire Retina
-            // display before cropping stalls recording and timestamps old pixels
-            // as if they arrived after conversion.
-            ensure_capture_permission()?;
-            let monitor = xcap_monitor_for(&self.display)?;
-            let scale = self.display.scale_factor;
-            let rect = objc2_core_foundation::CGRect {
-                origin: objc2_core_foundation::CGPoint {
-                    x: monitor.x()? as f64 + region.0 as f64 / scale,
-                    y: monitor.y()? as f64 + region.1 as f64 / scale,
-                },
-                size: objc2_core_foundation::CGSize {
-                    width: region.2 as f64 / scale,
-                    height: region.3 as f64 / scale,
-                },
-            };
-            use objc2_core_graphics::{
-                CGDataProvider, CGImage, CGWindowImageOption, CGWindowListCreateImage,
-                CGWindowListOption,
-            };
-            let image = CGWindowListCreateImage(
-                rect,
-                CGWindowListOption::OptionAll,
-                0,
-                CGWindowImageOption::Default,
-            )
-            .context("capture recording region")?;
-            self.captured_at = Some(Instant::now());
-            let width = CGImage::width(Some(&image));
-            let height = CGImage::height(Some(&image));
-            let stride = CGImage::bytes_per_row(Some(&image));
-            let provider = CGImage::data_provider(Some(&image));
-            let data = CGDataProvider::data(provider.as_deref())
-                .context("read recording region pixels")?;
-            return rgba_from_bgra_rows(&data.to_vec(), width, height, stride);
-        }
         let full = capture_one_shot(&self.app, &self.display)?;
-        self.captured_at = Some(Instant::now());
         match self.region {
             None => Ok(full),
             Some(region) => {
@@ -717,6 +720,19 @@ impl FrameSource {
             },
             Backend::OneShot => {
                 let image = self.decode_one_shot()?;
+                self.captured_at = Some(Instant::now());
+                Some(image)
+            }
+            #[cfg(target_os = "macos")]
+            Backend::MacRegion(snapshot) => {
+                ensure_capture_permission()?;
+                #[cfg(debug_assertions)]
+                QA_SNAPSHOT_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let (image, captured_at) = snapshot
+                    .as_ref()
+                    .map_err(|error| anyhow::anyhow!("{error:#}"))?
+                    .capture()?;
+                self.captured_at = Some(captured_at);
                 Some(image)
             }
         };
@@ -736,7 +752,12 @@ impl FrameSource {
                     }
                     Backend::OneShot => {
                         let image = self.decode_one_shot()?;
+                        self.captured_at = Some(Instant::now());
                         image
+                    }
+                    #[cfg(target_os = "macos")]
+                    Backend::MacRegion(_) => {
+                        unreachable!("region snapshots always return an image")
                     }
                 };
                 self.last = Some(image);

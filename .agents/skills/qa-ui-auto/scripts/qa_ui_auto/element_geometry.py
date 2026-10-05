@@ -30,6 +30,14 @@ def assert_geometry(args: dict, measurements: list[dict]) -> None:
             raise StepError(f"{prefix}: {label} is outside the viewport: {item}")
         if args.get("hit_center") and not item.get("hit_center"):
             raise StepError(f"{prefix}: {label} center is blocked or inert")
+        if "viewport_margin" in args:
+            margin = args["viewport_margin"]
+            for edge, bound, minimum in (("left", margin, True), ("top", margin, True),
+                                          ("right", item["viewport_width"] - margin, False),
+                                          ("bottom", item["viewport_height"] - margin, False)):
+                value = item[edge]
+                if not math.isfinite(value) or not math.isfinite(bound) or (value < bound if minimum else value > bound):
+                    raise StepError(f"{prefix}: {label} {edge} {value} outside viewport margin {margin}")
         if "icon_size" in args:
             icon = item.get("icon")
             if not icon or any(not math.isfinite(icon[key]) or abs(icon[key] - args["icon_size"]) > tolerance

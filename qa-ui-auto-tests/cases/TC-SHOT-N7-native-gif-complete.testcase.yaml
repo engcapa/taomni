@@ -42,7 +42,8 @@ verification:
   visual:
   - check: Recorded original content
     method: automated
-    reason: Per-frame source pixel/timeline comparison is mandatory; multiple frames and image load alone never pass. Inspect
+    reason: Per-frame source pixel/timeline comparison is mandatory, including request-time timestamps for macOS region snapshots;
+      multiple frames and image load alone never pass. Inspect
       paired source/decoded/difference contact sheet alongside the retained GIF.
   native:
   - check: Recorder lifecycle

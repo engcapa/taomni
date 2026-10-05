@@ -1,32 +1,45 @@
 id: TC-SHOT-017
 title: Watermark apply clear and OCR display copy expose actual renderer state
-description: Watermark applied and cleared UI state plus deterministic OCR text; no exported watermark-pixel or
-  genuine OCR-engine pass is claimed.
-covers:
-- F27.1
-tags:
-- screenshot
-- watermark
-- ocr
-- p2
-modes:
-- browser
-fixtures:
-- reset_db
+description: Watermark applied and cleared UI state plus deterministic OCR text; no exported watermark-pixel or genuine OCR-engine pass is claimed.
+covers: [F27.1]
+tags: [screenshot, watermark, ocr, p2]
+modes: [browser]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}#screenshot-overlay
-- set_viewport:
-    width: 1000
-    height: 750
+- set_viewport: {width: 1000, height: 750}
 - wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - click: '[data-testid="screenshot-fullscreen"]'
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - click: '[data-testid="screenshot-watermark"]'
 - wait_for: '[data-testid="screenshot-watermark-panel"]'
 - assert_element_geometry:
-    selector: '[data-testid="screenshot-watermark-panel"]'
-    min_width: 200
-    min_height: 100
+    selector: '[data-testid="screenshot-watermark-panel"], [data-testid="screenshot-watermark-opacity"]'
+    min_width: 1
+    min_height: 1
+    min_count: 2
+    viewport_margin: 8
+    within_viewport: true
+    hit_center: true
+- set_viewport: {width: 520, height: 420}
+- wait_for: '[data-testid="screenshot-watermark-panel"][style*="max-height: 404px"]'
+- assert_element_geometry:
+    selector: '[data-testid="screenshot-watermark-panel"], [data-testid="screenshot-watermark-opacity"]'
+    min_width: 1
+    min_height: 1
+    min_count: 2
+    viewport_margin: 8
+    within_viewport: true
+    hit_center: true
+- screenshot: watermark-panel-narrow.png
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-watermark-panel"][style*="max-height: 734px"]'
+- assert_element_geometry:
+    selector: '[data-testid="screenshot-watermark-panel"], [data-testid="screenshot-watermark-opacity"]'
+    min_width: 1
+    min_height: 1
+    min_count: 2
+    viewport_margin: 8
     within_viewport: true
     hit_center: true
 - fill:
@@ -79,16 +92,13 @@ steps:
 - assert_attribute:
     selector: '[data-testid="screenshot-ocr-text"]'
     name: value
-    equals: 'Taomni stub OCR
-
-      user@example.com'
+    equals: "Taomni stub OCR\nuser@example.com"
 - assert_attribute:
     selector: '[data-testid="screenshot-ocr-text"]'
     name: readonly
     equals: ''
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_ocr" && window.__taomniStubScreenshotCalls.at(-1).args.path
-      === window.__taomniStubScreenshotCalls.at(-2).args.path
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_ocr" && window.__taomniStubScreenshotCalls.at(-1).args.path === window.__taomniStubScreenshotCalls.at(-2).args.path
 - seed_clipboard: screenshot-ocr-before
 - click: '[data-testid="screenshot-ocr-copy"]'
 - assert_text_equals:
@@ -112,102 +122,42 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Watermark text and opacity survive apply and reopen; Clear removes the applied state and text;
-      Escape closes only the panel.
-    actions:
-    - 1
-    - 2
-    - 4
-    - 6
-    - 9
-    - 10
-    - 11
-    - 13
-    - 14
-    - 17
-    - 21
-    - 24
-    - 27
+    requirement: The watermark panel and opacity control remain inside the viewport after toolbar wrapping and live resizing; watermark text and opacity survive apply and reopen; Clear removes the applied state and text; Escape closes only the panel.
+    actions: [1, 2, 4, 6, 9, 13, 16, 17, 18, 20, 21, 24, 28, 31, 34]
     checkpoints:
-    - step: 8
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"screenshot-watermark-panel\"]", "min_width":
-        200, "min_height": 100, "within_viewport": true, "hit_center": true}}'
-    - step: 12
-      expectation: Keyboard slider input changes opacity to eleven percent.
-    - step: 15
-      expectation: Apply closes the watermark panel.
-    - step: 16
-      expectation: Applied watermark keeps the action selected.
-    - step: 19
-      expectation: Reopen preserves the entered text.
-    - step: 20
-      expectation: Reopen preserves opacity.
-    - step: 22
-      expectation: Clear closes the panel.
-    - step: 23
-      expectation: Clear removes applied watermark state.
-    - step: 26
-      expectation: Cleared watermark text is empty on reopen.
-    - step: 28
-      expectation: Escape dismisses the panel.
-    - step: 29
-      expectation: The underlying crop remains selected.
-    results:
-    - 8
-    - 15
-    - 16
-    - 19
-    - 20
-    - 22
-    - 23
-    - 26
-    - 28
-    - 29
+    - {step: 8, expectation: Watermark panel and slider stay inside the 1000px viewport even when the toolbar wraps.}
+    - {step: 11, expectation: The open panel and slider reposition within a 520 by 420 viewport.}
+    - {step: 15, expectation: The open panel and slider remain within bounds after restoring the viewport.}
+    - {step: 19, expectation: Keyboard slider input changes opacity to eleven percent.}
+    - {step: 22, expectation: Apply closes the watermark panel.}
+    - {step: 23, expectation: Applied watermark keeps the action selected.}
+    - {step: 26, expectation: Reopen preserves the entered text.}
+    - {step: 27, expectation: Reopen preserves opacity.}
+    - {step: 29, expectation: Clear closes the panel.}
+    - {step: 30, expectation: Clear removes applied watermark state.}
+    - {step: 33, expectation: Cleared watermark text is empty on reopen.}
+    - {step: 35, expectation: Escape dismisses the panel.}
+    - {step: 36, expectation: The underlying crop remains selected.}
+    results: [8, 11, 15, 22, 23, 26, 27, 29, 30, 33, 35, 36]
   - id: R2
-    requirement: OCR displays the exact returned fixture text including its email, copies that text, and closes
-      its panel without creating annotations.
-    actions:
-    - 30
-    - 35
-    - 36
-    - 39
-    - 43
+    requirement: OCR displays the exact returned fixture text including its email, copies that text, and closes its panel without creating annotations.
+    actions: [37, 42, 43, 46, 50]
     checkpoints:
-    - step: 32
-      expectation: OCR text is the actual deterministic stub result rather than an assumed error.
-    - step: 33
-      expectation: Recognized text is read-only.
-    - step: 34
-      expectation: OCR consumes the renderer export path.
-    - step: 37
-      expectation: Copy reports a successful text result.
-    - step: 38
-      expectation: Browser clipboard equals the complete OCR result with platform LF or CRLF line endings.
-    - step: 40
-      expectation: The OCR panel closes.
-    - step: 41
-      expectation: The capture selection stays in annotate phase.
-    - step: 42
-      expectation: OCR adds no annotation shapes.
-    - step: 44
-      expectation: Capture remains cancelable.
-    results:
-    - 32
-    - 33
-    - 34
-    - 37
-    - 38
-    - 40
-    - 41
-    - 42
-    - 44
+    - {step: 39, expectation: OCR text is the actual deterministic stub result rather than an assumed error.}
+    - {step: 40, expectation: Recognized text is read-only.}
+    - {step: 41, expectation: OCR consumes the renderer export path.}
+    - {step: 44, expectation: Copy reports a successful text result.}
+    - {step: 45, expectation: Browser clipboard equals the complete OCR result with platform LF or CRLF line endings.}
+    - {step: 47, expectation: The OCR panel closes.}
+    - {step: 48, expectation: The capture selection stays in annotate phase.}
+    - {step: 49, expectation: OCR adds no annotation shapes.}
+    - {step: 51, expectation: Capture remains cancelable.}
+    results: [39, 40, 41, 44, 45, 47, 48, 49, 51]
   visual:
   - check: Applied and cleared watermark state plus exact OCR content.
     method: automated
-    reason: UI state and text are asserted; exported watermark pixel appearance is not asserted or passed by this
-      case.
+    reason: UI state and text are asserted; exported watermark pixel appearance is not asserted or passed by this case.
   native:
   - check: Watermark output pixels and genuine OCR recognition against a captured image.
     method: external
-    reason: Browser OCR is deterministic stub text; actual watermark export pixels and OCR engine accuracy require
-      canvas/unit or native evidence separately.
+    reason: Browser OCR is deterministic stub text; actual watermark export pixels and OCR engine accuracy require canvas/unit or native evidence separately.

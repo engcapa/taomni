@@ -707,6 +707,7 @@
             "min_height"
           ],
           "properties": {
+            "viewport_margin": {"type": "number", "minimum": 0},
             "selector": {
               "type": "string",
               "minLength": 1
