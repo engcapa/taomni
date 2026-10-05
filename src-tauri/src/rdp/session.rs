@@ -1727,6 +1727,12 @@ where
                 }
             }
             ActiveStageOutput::GraphicsUpdate(rect) => {
+                tracing::debug!(
+                    ?rect,
+                    width = image.width(),
+                    height = image.height(),
+                    "Forwarding decoded RDP graphics"
+                );
                 if let Some(tile) = tile_from_image(image, rect) {
                     tile.validate()?;
                     let payload = frame_payload_with_header(tile.header, &tile.rgba);
@@ -1833,6 +1839,11 @@ where
             ..
         } = sequence.connection_activation_state()
         {
+            tracing::debug!(
+                width = desktop_size.width,
+                height = desktop_size.height,
+                "RDP desktop reactivation finalized"
+            );
             active_stage.set_enable_server_pointer(enable_server_pointer);
             *image =
                 IronDecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);

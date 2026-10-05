@@ -114,6 +114,7 @@ def setup(ctx: Any) -> None:
         _export(ctx, "QA_XRDP_PASSWORD", password)
         _export(ctx, "QA_XRDP_PORT", str(port))
         _export(ctx, "QA_RDP_XRDP_DIR", str(state_dir))
+        _export(ctx, "TAOMNI_QA_RDP_TRACE", "1")
     except BaseException:
         teardown(ctx)
         raise
