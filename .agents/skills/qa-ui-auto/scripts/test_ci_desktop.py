@@ -76,6 +76,7 @@ class DesktopTests(unittest.TestCase):
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '26.04'}), \
              patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
              patch.object(Desktop, 'start'), patch.object(Desktop, '_wait'), \
+             patch('ci_desktop.subprocess.run'), \
              patch('ci_desktop.subprocess.check_output', side_effect=['wl_compositor xdg_wm_base wl_output', 'GdkX11Display\n1\n']):
             with self.assertRaisesRegex(RuntimeError, 'GTK did not use a Wayland display'):
                 with Desktop(Path(d), ['display'], 'ubuntu-26.04-wayland'):
@@ -89,9 +90,29 @@ class DesktopTests(unittest.TestCase):
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '26.04'}), \
              patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
              patch.object(Desktop, 'start') as start, patch.object(Desktop, '_wait'), \
-             patch('ci_desktop.subprocess.run'), \
+             patch('ci_desktop.subprocess.run') as run, \
              patch('ci_desktop.subprocess.check_output', side_effect=[
                  'wl_compositor xdg_wm_base wl_output', 'GdkWaylandDisplay\n1\n', portal, 'GNOME Shell 50']):
+            activation_env = {}
+            started = []
+
+            def activate(command, **kwargs):
+                self.assertEqual(command[0], 'dbus-update-activation-environment')
+                activation_env.update({key: os.environ[key] for key in command[1:]})
+
+            def launch(command, **kwargs):
+                if command[0] == 'gnome-shell':
+                    # Shell may activate the portal before the explicit probe:
+                    # that process must inherit the Wayland/PipeWire session.
+                    self.assertEqual(activation_env['XDG_CURRENT_DESKTOP'], 'ubuntu:GNOME')
+                    self.assertEqual(activation_env['GDK_BACKEND'], 'wayland')
+                    self.assertEqual(activation_env['XDG_RUNTIME_DIR'], os.environ['XDG_RUNTIME_DIR'])
+                    self.assertIn('pipewire', started)
+                started.append(command[0])
+                return Mock()
+
+            run.side_effect = activate
+            start.side_effect = launch
             with Desktop(Path(d), ['display'], 'ubuntu-26.04-wayland') as desktop:
                 self.assertNotIn('DISPLAY', os.environ)
                 self.assertEqual(os.environ['GDK_BACKEND'], 'wayland')

@@ -81,6 +81,15 @@ class Desktop:
                           XDG_SESSION_TYPE="wayland", XDG_CURRENT_DESKTOP="ubuntu:GNOME",
                           GDK_BACKEND="wayland", LIBGL_ALWAYS_SOFTWARE="1",
                           WEBKIT_DISABLE_DMABUF_RENDERER="1")
+        # Shell startup can activate portals itself. Publish the new session
+        # environment first, otherwise DBus selects the GTK/X11 fallback and
+        # those services keep the old runtime directory for the whole run.
+        subprocess.run(["dbus-update-activation-environment", "XDG_RUNTIME_DIR", "WAYLAND_DISPLAY",
+                        "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "GDK_BACKEND",
+                        "LIBGL_ALWAYS_SOFTWARE", "WEBKIT_DISABLE_DMABUF_RENDERER"], check=True, timeout=20)
+        pipewire = self.start(["pipewire"])
+        self._wait(pipewire, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire")
+        self.start(["wireplumber"])
         shell = self.start(["gnome-shell", "--wayland", "--headless", "--virtual-monitor=1920x1080",
                             "--wayland-display=wayland-qa", "--mode=ubuntu"])
         self._wait(shell, lambda: (runtime / "wayland-qa").is_socket(), "GNOME Wayland compositor")
@@ -98,11 +107,6 @@ class Desktop:
             "print(d.get_n_monitors()); w.destroy()"], text=True, timeout=20).splitlines()
         if not probe or probe[0] != "GdkWaylandDisplay" or int(probe[1]) < 1:
             raise RuntimeError(f"GTK did not use a Wayland display: {probe}")
-        subprocess.run(["dbus-update-activation-environment", "XDG_RUNTIME_DIR", "WAYLAND_DISPLAY",
-                        "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "GDK_BACKEND"], check=True, timeout=20)
-        pipewire = self.start(["pipewire"])
-        self._wait(pipewire, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire")
-        self.start(["wireplumber"])
         portal = subprocess.check_output(["gdbus", "introspect", "--session", "--dest",
                    "org.freedesktop.portal.Desktop", "--object-path", "/org/freedesktop/portal/desktop"],
                    text=True, timeout=60)
