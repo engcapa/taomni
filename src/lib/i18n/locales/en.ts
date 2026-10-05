@@ -30,7 +30,7 @@ const dict = {
     queryCloseRisk: "{count} query(s) are still running. Cancel them before closing.",
     transactionCloseRisk: "{count} uncommitted statement(s). Choose commit or rollback.",
     home: "Home", sessions: "Sessions", workspaces: "Workspaces", tao: "Tao", settings: "Settings",
-    lane: "Workspace group", lanes: { home: "Home", connect: "Terminals & connections", build: "Workspaces", communicate: "Communicate", utility: "Utility" },
+    lane: "Workspace group", lanes: { home: "Home", connect: "Terminals & connections", build: "Workspaces", communicate: "Messages", utility: "Utility" },
     navigator: "Navigator", project: "Project", tools: "Tools", quickSwitch: "Quick switch", overview: "All tabs", panel: "Context panel",
     search: "Search tabs", all: "All", attention: "With alerts", sort: "Sort", recent: "Recently used", name: "Name", type: "Type",
     tabCount: "{count} tabs", currentExcluded: "The current tab is outside these results", locateCurrent: "Locate current",

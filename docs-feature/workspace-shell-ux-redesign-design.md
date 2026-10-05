@@ -753,6 +753,8 @@ TASK-11 的 fixture/用例设计可先做，具体生产入口 case 必须跟随
 
 **关闭与恢复**：批量关闭返回真实 closed/remaining 清单；失败后仅重试剩余目标并重新读取 revision，累计成功不会重放已提交的保存。会话 snapshot 错误不会变成空记录；刷新可恢复，工作区独立恢复允许部分成功。恢复的并发上限为 4，每项 identity、结果和最终焦点保持对应。
 
+恢复记录的后台采集与“清除”共享顺序约束：清除先暂停采集并等待已发送保存结束，成功后保留当前标签但不因旧 debounce 重建刚清除的记录；后续工作集变化才能产生新记录。清除失败解除暂停并显示错误。异步读取按请求代次生效，离开首页、重新读取或清除使旧响应失效；首页停留期间新保存完成后更新可恢复状态。显式激活后台标签即使 ID 未变，也必须退出空分类；恢复中的焦点保护仍优先。
+
 **扩展契约**：生产 `panelActions` 统一由 `PanelRegistry` 管理，不维护平行的演示 adapter registry。注册返回按 adapter identity 检查的清理函数，旧 surface 清理不得移除新 owner 的注册。业务 controller 继续持有真实状态与资源，Shell 只管理 placement、owner、visibility、close 协调及 Actions，未来 AI surface 复用相同边界。壳层异常边界与稳定业务容器为兄弟节点；fallback 保留 Home、Actions、标签、重置/重载入口，业务实例与未保存草稿不重挂载。任意 React render fault 通过 mounted unit 注入，避免给产品增加可随意触发异常的测试后门；浏览器正常布局及 native keepalive 由现有 B/N 用例验证。
 
 验收增量：B46 四向/隐藏持久化、B47 沉浸编辑器与临时标题栏、B48 Java 工作区两条切换路径、B49 全部标题栏上下文分组/窄屏操作/空分类创建、B50 恢复 unavailable→refresh、B51 held Control MRU、B52 部分关闭→剩余重试、N23 三平台真实 PTY/沉浸/Dock；N06 增加原生沉浸往返后真实磁盘保存/撤销。既有标题栏、Project、Tao、恢复、MFA 和截图用例随新入口更新。详细动作/初始状态/checkpoints 位于对应 YAML，policy 注册；native 子窗口异常继续执行 N18，stale 消息由协议 unit 精确隔离。当前执行状态见任务板，本节本身不是通过证据。

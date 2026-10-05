@@ -39,6 +39,8 @@ steps:
     dx: 24
     dy: 18
 - click: '[data-testid="shell-rail-sessions"]'
+- assert_visible: '[data-testid="session-tree"]'
+- click: '[data-testid="shell-rail-sessions"]'
 - assert_not_visible: '[data-testid="session-tree"]'
 - native_window_drag:
     selector: '[data-testid="window-drag-handle"]'
@@ -66,42 +68,52 @@ verification:
     actions:
     - 5
     - 6
-    - 7
     - 9
-    - 10
     - 11
+    - 12
     - 13
+    - 15
     checkpoints:
     - step: 4
       expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
         the window.
-    - step: 8
-      expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
-        the window.
-    - step: 12
+    - step: 10
       expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
         the window.
     - step: 14
       expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
         the window.
-    - step: 15
+    - step: 16
+      expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
+        the window.
+    - step: 17
       expectation: Independent X11 geometry confirms all three title-bar grip positions move rather than resize
         the window.
     - step: 5
       expectation: Independent OS geometry matches the requested displacement without resizing.
     - step: 6
       expectation: Independent OS geometry matches the requested displacement without resizing.
-    - step: 9
+    - step: 11
       expectation: Independent OS geometry matches the requested displacement without resizing.
     results:
     - 4
-    - 8
-    - 12
+    - 10
     - 14
-    - 15
+    - 16
+    - 17
     - 5
     - 6
-    - 9
+    - 11
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
+    - 7
+    results:
+    - 8
+    checkpoints:
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
   visual:
   - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual

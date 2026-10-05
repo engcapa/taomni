@@ -9,7 +9,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useMainRailHostStore } from "../stores/mainRailHostStore";
 import { useShellLayoutStore } from "../stores/shellLayoutStore";
 import { defaultShellLayout } from "../lib/shell/shellLayoutPersistence";
-import { commitWelcomeRunSnapshot, exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
+import { clearWelcomeRunSnapshot, getWelcomeRunSnapshot, commitWelcomeRunSnapshot, exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
 
 const terminalLifecycle = vi.hoisted(() => ({
@@ -2010,6 +2010,22 @@ describe("MainLayout run-snapshot collector (V-06)", () => {
     sort_order: 0,
   };
 
+  it("dismisses temporary titlebar after nested menu Escape and restores content focus", async () => {
+    const opener = screen.getByTestId("welcome-open-local-terminal");
+    opener.focus();
+    act(() => useShellLayoutStore.setState({ immersive: true, immersiveReveal: "toolbar", navigatorOverlay: true }));
+    expect(screen.getByTestId("app-titlebar")).not.toHaveAttribute("hidden");
+    const menu = document.createElement("div");
+    menu.setAttribute("data-taomni-context-menu", "true"); document.body.append(menu);
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(screen.getByTestId("app-titlebar")).not.toHaveAttribute("hidden");
+    menu.remove();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(screen.getByTestId("app-titlebar")).toHaveAttribute("hidden");
+    expect(opener).toHaveFocus();
+    act(() => useShellLayoutStore.setState({ immersive: false, immersiveReveal: null, navigatorOverlay: false }));
+  });
+
   it("commits an ordered snapshot for eligible saved-session tabs", async () => {
     useSessionStore.setState({ sessions: [sshSession] });
     await act(async () => {
@@ -2045,6 +2061,31 @@ describe("MainLayout run-snapshot collector (V-06)", () => {
   it("never writes an empty snapshot when only Welcome is open", async () => {
     await new Promise((resolve) => setTimeout(resolve, 700));
     expect(commitWelcomeRunSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("refreshes Home after a delayed save and does not recreate a cleared working set", async () => {
+    let finishCommit!: (response: Awaited<ReturnType<typeof commitWelcomeRunSnapshot>>) => void;
+    vi.mocked(commitWelcomeRunSnapshot).mockImplementationOnce(() => new Promise((resolve) => { finishCommit = resolve; }));
+    act(() => {
+      useSessionStore.setState({ sessions: [sshSession] });
+      useAppStore.getState().addTab({ id: "saved-ssh", type: "terminal", title: "SSH", sessionId: sshSession.id, closable: true });
+    });
+    await waitFor(() => expect(commitWelcomeRunSnapshot).toHaveBeenCalled());
+    act(() => useAppStore.getState().setActiveTab("welcome"));
+    const saved = { schemaVersion: 1 as const, revision: 1, runSequence: 1, batchId: "saved", committedAtMs: 1,
+      entries: [{ kind: "saved-session" as const, identity: "saved:sess-1", savedSessionId: "sess-1", savedSessionType: "SSH", displayName: "prod" }], activeIdentity: null };
+    vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({ record: saved, legacyCandidate: null, issue: null });
+    await act(async () => finishCommit({ record: saved, applied: true }));
+    await waitFor(() => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "available"));
+    fireEvent.click(screen.getByTestId("welcome-restore-clear"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(clearWelcomeRunSnapshot).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "empty"));
+    const commits = vi.mocked(commitWelcomeRunSnapshot).mock.calls.length;
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 650)); });
+    expect(commitWelcomeRunSnapshot).toHaveBeenCalledTimes(commits);
+    expect(useAppStore.getState().tabs.some((tab) => tab.id === "saved-ssh")).toBe(true);
+    vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({ record: null, legacyCandidate: null, issue: null });
   });
 
   it("keeps whitelist local terminals with a confirmed cwd in the snapshot", async () => {

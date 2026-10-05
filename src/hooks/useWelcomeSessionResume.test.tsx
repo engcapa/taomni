@@ -104,6 +104,43 @@ describe("useWelcomeSessionResume (V-07)", () => {
     }
   });
 
+  it("ignores a stale load that completes after refresh or clear", async () => {
+    let finishOld!: (value: unknown) => void;
+    resumeIpcMocks.getWelcomeRunSnapshot.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
+    resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({ record: null, issue: { code: "storage", message: "disk unavailable" } });
+    const { result } = renderHook(() => useWelcomeSessionResume(true, makeCallbacks()));
+    await act(async () => result.current.refresh());
+    expect(result.current.view.state).toBe("unavailable");
+    await act(async () => finishOld({ record: record([savedEntry("stale")]), issue: null }));
+    expect(result.current.view.state).toBe("unavailable");
+    resumeIpcMocks.getWelcomeRunSnapshot.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
+    act(() => result.current.refresh());
+    await act(async () => result.current.clearRecord());
+    await act(async () => finishOld({ record: record([savedEntry("stale")]), issue: null }));
+    expect(result.current.view.state).toBe("empty");
+  });
+
+  it("drains pending collection before clearing and releases it on failure", async () => {
+    let finishCommit!: () => void;
+    const beforeClearRecord = vi.fn(() => new Promise<void>((resolve) => { finishCommit = resolve; }));
+    const afterClearRecord = vi.fn();
+    resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({ record: record([savedEntry("a")]), issue: null });
+    const callbacks = { ...makeCallbacks(), beforeClearRecord, afterClearRecord };
+    const { result } = renderHook(() => useWelcomeSessionResume(true, callbacks));
+    await waitFor(() => expect(result.current.view.state).toBe("available"));
+    let clearing!: Promise<void>;
+    act(() => { clearing = result.current.clearRecord(); });
+    expect(resumeIpcMocks.clearWelcomeRunSnapshot).not.toHaveBeenCalled();
+    await act(async () => { finishCommit(); await clearing; });
+    expect(afterClearRecord).toHaveBeenCalledWith(true);
+    expect(result.current.view.state).toBe("empty");
+    beforeClearRecord.mockResolvedValueOnce();
+    resumeIpcMocks.clearWelcomeRunSnapshot.mockRejectedValueOnce(new Error("disk read only"));
+    await act(async () => { await expect(result.current.clearRecord()).rejects.toThrow("disk read only"); });
+    expect(afterClearRecord).toHaveBeenLastCalledWith(false);
+    expect(result.current.view.state).toBe("unavailable");
+  });
+
   it("maps an unknown schema issue to the unavailable/schema state", async () => {
     resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({
       record: null,

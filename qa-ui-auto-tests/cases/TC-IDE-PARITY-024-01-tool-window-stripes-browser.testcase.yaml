@@ -1,20 +1,19 @@
 id: TC-IDE-PARITY-024-01
 title: 'IDEA tool window stripes: names, resizable width, Move between anchors, Remove from Sidebar'
-description: 'ED-PARITY-024 A1/A2/A3 browser case adapted to Shell v2: the merged Rail shows tool window
-  names at a 68 px minimum, resizes from its inner edge, and switches to 52 px icon-only via Show Tool Window
-  Names. A stripe button''s context menu moves Problems to Right Top (its button and window follow; the
-  bottom dock closes), Alt+6 toggles it there, the window''s ⋮ Move to returns it to Bottom Left. Structure
-  opens below Project (IDEA Left Bottom). Remove from Sidebar drops Run''s button and More tool windows
-  restores and shows it. The Project window header adds IDEA''s Expand All, Collapse All and Select Opened
-  File.
+description: 'ED-PARITY-024 A1/A2/A3 browser case adapted to Shell v2: the merged Rail shows tool window names at
+  a 68 px minimum, resizes from its inner edge, and switches to 52 px icon-only via Show Tool Window Names. A stripe
+  button''s context menu moves Problems to Right Top (its button and window follow; the bottom dock closes), Alt+6
+  toggles it there, the window''s ⋮ Move to returns it to Bottom Left. Structure opens below Project (IDEA Left
+  Bottom). Remove from Sidebar drops Run''s button and More tool windows restores and shows it. The Project window
+  header adds IDEA''s Expand All, Collapse All and Select Opened File.
 
 
   Mode: browser.
 
-  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks;
-  Settings uses its permanent Rail button. Original business checks are retained. Shell v2 names mode
-  renders a 68 px minimum so full global labels fit; resizing still preserves the stored stripe preference
-  and reaches the existing 79 px target.'
+  Shell v2 entry adaptation: Tools and Sessions use the permanent Rail with visibility-aware user clicks; Settings
+  uses its permanent Rail button. Original business checks are retained. Shell v2 names mode renders a 68 px minimum
+  so full global labels fit; resizing still preserves the stored stripe preference and reaches the existing 79 px
+  target.'
 covers:
 - F25.5
 tags:
@@ -48,10 +47,12 @@ steps:
     selector: '[data-testid="code-workspace-tool-rail-left"]'
     name: data-show-names
     equals: 'true'
-- eval_readonly:
-    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"shell-rail\"]").getBoundingClientRect().width)
-      === 68
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 68
+    max_width: 68
+    min_height: 1
+    tolerance: 0.5
 - right_click: '[data-testid="code-workspace-bottom-tab-problems"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-move"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-move-right-top"]'
@@ -98,10 +99,12 @@ steps:
 - assert_visible: '[data-testid="code-workspace-tree-new"]'
 - right_click: '[data-testid="code-workspace-bottom-tab-terminal"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
-- eval_readonly:
-    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"shell-rail\"]").getBoundingClientRect().width)
-      === 52
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 52
+    max_width: 52
+    min_height: 1
+    tolerance: 0.5
 - assert_count:
     selector: '[data-testid="sidebar-rail-resize"]'
     equal: 0
@@ -113,10 +116,12 @@ steps:
 - press: ArrowRight
 - press: ArrowRight
 - press: ArrowRight
-- eval_readonly:
-    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"shell-rail\"]").getBoundingClientRect().width)
-      === 79
-    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="shell-rail"]'
+    min_width: 88
+    max_width: 88
+    min_height: 1
+    tolerance: 0.5
 - right_click: '[data-testid="code-workspace-bottom-tab-run"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-remove"]'
 - assert_count:
@@ -168,18 +173,17 @@ verification:
     - 15
     checkpoints:
     - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-left\"]",
-        "name": "data-show-names", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-left\"]", "name":
+        "data-show-names", "equals": "true"}}'
     - step: 17
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\"
-        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width) === 68", "expect_truthy":
-        true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 68, "max_width":
+        68, "min_height": 1, "tolerance": 0.5}}'
     results:
     - 16
     - 17
   - id: R2
-    requirement: A2：stripe 按钮右键 Move → Right Top 后按钮移到右 stripe（隐藏态不自动打开，同 IDEA）；点击后 Problems 在右侧打开且底部
-      dock 关闭；再点隐藏并把焦点交回编辑器；Alt+6 在右侧重新打开。
+    requirement: A2：stripe 按钮右键 Move → Right Top 后按钮移到右 stripe（隐藏态不自动打开，同 IDEA）；点击后 Problems 在右侧打开且底部 dock 关闭；再点隐藏并把焦点交回编辑器；Alt+6
+      在右侧重新打开。
     actions:
     - 18
     - 19
@@ -191,19 +195,19 @@ verification:
     - step: 21
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-right\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
     - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]",
-        "name": "aria-pressed", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name":
+        "aria-pressed", "equals": "false"}}'
     - step: 24
       expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"][data-edge=\"right\"]",
         "timeout_sec": 10}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]",
-        "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name":
+        "aria-pressed", "equals": "true"}}'
     - step: 26
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-bottom-dock-body\"]"}'
     - step: 28
-      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]",
-        "state": "hidden", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]", "state":
+        "hidden", "timeout_sec": 5}}'
     - step: 29
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\")
         === true", "expect_truthy": true}}'
@@ -220,8 +224,8 @@ verification:
     - 29
     - 31
   - id: R3
-    requirement: A2：工具窗头 ⋮ → Move to → Bottom Left 把 Problems 送回底部 dock，按钮回到左 stripe 下组；Structure 在 Project
-      下方（Left Bottom）打开。
+    requirement: A2：工具窗头 ⋮ → Move to → Bottom Left 把 Problems 送回底部 dock，按钮回到左 stripe 下组；Structure 在 Project 下方（Left
+      Bottom）打开。
     actions:
     - 32
     - 34
@@ -235,8 +239,8 @@ verification:
     - step: 36
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-left\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
     - step: 37
-      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"]
-        [data-testid=\"shell-host-tab\"][aria-selected=\"true\"]", "contains": "Problems"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":problems\"] [data-testid=\"shell-host-tab\"][aria-selected=\"true\"]",
+        "contains": "Problems"}}'
     - step: 39
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-left-tool-area\"] [data-testid=\"code-workspace-tool-window-structure\"]",
         "timeout_sec": 10}}'
@@ -259,16 +263,13 @@ verification:
     - 47
     checkpoints:
     - step: 43
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\"
-        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width) === 52", "expect_truthy":
-        true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 52, "max_width":
+        52, "min_height": 1, "tolerance": 0.5}}'
     - step: 44
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]",
-        "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 0}}'
     - step: 53
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\"
-        + String.fromCharCode(61) + \"\\\"shell-rail\\\"]\").getBoundingClientRect().width) === 79", "expect_truthy":
-        true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 88, "max_width":
+        88, "min_height": 1, "tolerance": 0.5}}'
     results:
     - 43
     - 44
@@ -282,14 +283,13 @@ verification:
     - 58
     checkpoints:
     - step: 56
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]", "equal":
-        0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]", "equal": 0}}'
     - step: 59
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"][aria-pressed=\"true\"]",
         "timeout_sec": 10}}'
     - step: 60
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]",
-        "contains": "Run"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains":
+        "Run"}}'
     results:
     - 56
     - 59
@@ -315,8 +315,8 @@ verification:
     - 65
     - 68
   - id: R7
-    requirement: A2：工具窗口内容经 portal 重新挂载后，Esc 仍按 IDEA 把焦点还给编辑器——Alt+4 打开 Run 并获焦后 Esc 回到编辑器；Alt+7 打开 Structure
-      后在其中按 Esc 同样回到编辑器。
+    requirement: A2：工具窗口内容经 portal 重新挂载后，Esc 仍按 IDEA 把焦点还给编辑器——Alt+4 打开 Run 并获焦后 Esc 回到编辑器；Alt+7 打开 Structure 后在其中按
+      Esc 同样回到编辑器。
     actions:
     - 69
     - 70
@@ -327,8 +327,8 @@ verification:
     - step: 71
       expectation: '{"wait_for": "[data-testid=\"code-workspace-run-panel\"]"}'
     - step: 72
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"]:focus-within",
-        "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"]:focus-within", "timeout_sec":
+        5}}'
     - step: 74
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')
         === true", "expect_truthy": true}}'

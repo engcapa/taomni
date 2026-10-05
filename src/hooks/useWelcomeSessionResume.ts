@@ -87,6 +87,9 @@ export interface RestoreCallbacks {
   cancelPendingAuth: (operationId: string) => void;
   /** Whether the snapshot collector currently suppresses an identity. */
   isIdentitySuppressed?: (identity: string) => boolean;
+  /** Drain the collector before clearing; resume only after storage is settled. */
+  beforeClearRecord?: () => Promise<void>;
+  afterClearRecord?: (cleared: boolean) => void;
 }
 
 export interface UseWelcomeSessionResumeResult {
@@ -126,6 +129,8 @@ export function useWelcomeSessionResume(
   const suppressedIdentitiesRef = useRef<Set<string>>(new Set());
   const recordRef = useRef<RunSnapshotRecord | null>(null);
   const revisionRef = useRef<number>(0);
+  const loadGenerationRef = useRef(0);
+  const clearingRef = useRef(false);
 
   const isIdentitySuppressed = useCallback((identity: string): boolean => {
     return (
@@ -136,8 +141,11 @@ export function useWelcomeSessionResume(
   }, []);
 
   const load = useCallback(async (force = false) => {
+    if (clearingRef.current) return;
+    const generation = ++loadGenerationRef.current;
     try {
       const response = await getWelcomeRunSnapshot();
+      if (generation !== loadGenerationRef.current) return;
       if (response.issue) {
         // Storage/schema problems are always surfaced, but never clobber a
         // running operation mid-flight.
@@ -199,12 +207,14 @@ export function useWelcomeSessionResume(
       recordRef.current = null;
       setView({ state: "empty" });
     } catch (error) {
+      if (generation !== loadGenerationRef.current) return;
       setView({ state: "unavailable", reason: "storage", message: String(error) });
     }
   }, []);
 
   useEffect(() => {
     if (active) void load();
+    return () => { loadGenerationRef.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
@@ -416,7 +426,12 @@ export function useWelcomeSessionResume(
   }, []);
 
   const clearRecord = useCallback(async () => {
+    if (clearingRef.current) return;
+    clearingRef.current = true;
+    loadGenerationRef.current += 1;
+    let cleared = false;
     try {
+      await callbacksRef.current.beforeClearRecord?.();
       let expectedRevision = revisionRef.current || undefined;
       for (let attempt = 0; ; attempt += 1) {
         try {
@@ -442,11 +457,17 @@ export function useWelcomeSessionResume(
         }
       }
       recordRef.current = null;
+      revisionRef.current = 0;
+      cleared = true;
       setOutcomes([]);
       setView({ state: "empty" });
     } catch (error) {
       setView({ state: "unavailable", reason: "storage", message: String(error) });
       throw error;
+    } finally {
+      loadGenerationRef.current += 1;
+      clearingRef.current = false;
+      callbacksRef.current.afterClearRecord?.(cleared);
     }
   }, []);
 

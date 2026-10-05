@@ -17,6 +17,7 @@ modes:
 - browser
 fixtures:
 - reset_db
+- local_terminal_preview
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
@@ -65,6 +66,8 @@ steps:
     tolerance: 0
     max_width: 92.49
 - shell_navigate: sessions
+- click: '[data-testid="shell-rail-sessions"]'
+- assert_visible: '[data-testid="session-tree"]'
 - click: '[data-testid="shell-rail-sessions"]'
 - assert_not_visible: '[data-testid="session-tree"]'
 - assert_element_geometry:
@@ -200,14 +203,14 @@ verification:
     - step: 10
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
     - step: 13
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 68", "expect_truthy": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 67.51,
+        "min_height": 1, "tolerance": 0, "max_width": 68.49}}'
     - step: 15
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 88", "expect_truthy": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 87.51,
+        "min_height": 1, "tolerance": 0, "max_width": 88.49}}'
     - step: 17
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 92", "expect_truthy": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 91.51,
+        "min_height": 1, "tolerance": 0, "max_width": 92.49}}'
     results:
     - 2
     - 5
@@ -221,113 +224,123 @@ verification:
     requirement: Collapsed Navigator retains a full-height resize edge clamped to 68–100.
     actions:
     - 18
-    - 19
-    - 22
+    - 21
     - 24
     - 26
+    - 28
     checkpoints:
-    - step: 20
+    - step: 22
       expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 21
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid=\"sidebar-rail-resize\"]'').getBoundingClientRect().height
-        > 500", "expect_truthy": true}}'
     - step: 23
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 100", "expect_truthy": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "min_width":
+        1, "min_height": 500.01, "tolerance": 0}}'
     - step: 25
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 68", "expect_truthy": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 99.51,
+        "min_height": 1, "tolerance": 0, "max_width": 100.49}}'
     - step: 27
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 72", "expect_truthy": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 67.51,
+        "min_height": 1, "tolerance": 0, "max_width": 68.49}}'
+    - step: 29
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 71.51,
+        "min_height": 1, "tolerance": 0, "max_width": 72.49}}'
     results:
-    - 20
-    - 21
+    - 22
     - 23
     - 25
     - 27
+    - 29
   - id: R3
     requirement: Workspace shares the main edge; tool context menu preserves its own actions.
     actions:
-    - 28
-    - 29
-    - 33
-    - 35
-    - 37
-    - 38
-    - 39
-    checkpoints:
-    - step: 30
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 31
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'
-    - step: 32
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-left-resize\"]", "equal":
-        0}}'
-    - step: 34
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-menu-show-names\"]", "equal": 0}}'
-    - step: 36
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
-    - step: 40
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 72", "expect_truthy": true}}'
-    results:
     - 30
     - 31
+    - 35
+    - 37
+    - 39
+    - 40
+    - 41
+    checkpoints:
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 33
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'
+    - step: 34
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-left-resize\"]", "equal":
+        0}}'
+    - step: 36
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-menu-show-names\"]", "equal": 0}}'
+    - step: 38
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
+    - step: 42
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 71.51,
+        "min_height": 1, "tolerance": 0, "max_width": 72.49}}'
+    results:
     - 32
+    - 33
     - 34
     - 36
-    - 40
+    - 38
+    - 42
   - id: R4
     requirement: Local terminal and Home preserve width and names across reload.
     actions:
-    - 41
-    - 44
-    - 46
-    - 47
-    checkpoints:
-    - step: 42
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 43
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'
-    - step: 45
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 84", "expect_truthy": true}}'
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 49
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(''[data-testid=\"shell-rail\"]'').getBoundingClientRect().width)
-        === 84", "expect_truthy": true}}'
-    - step: 50
-      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
-    results:
-    - 42
     - 43
-    - 45
+    - 46
     - 48
     - 49
+    checkpoints:
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 45
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'
+    - step: 47
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 83.51,
+        "min_height": 1, "tolerance": 0, "max_width": 84.49}}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 51
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 83.51,
+        "min_height": 1, "tolerance": 0, "max_width": 84.49}}'
+    - step: 52
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
+    results:
+    - 44
+    - 45
+    - 47
     - 50
+    - 51
+    - 52
   - id: R-retained-controls
     requirement: The workspace retains an independent right stripe resize handle while the merged left stripe uses
       only the outer handle.
     actions:
-    - 52
-    - 53
+    - 54
     - 55
+    - 57
     checkpoints:
-    - step: 56
-      expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
-        uses only the outer handle.
-    - step: 57
-      expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
-        uses only the outer handle.
     - step: 58
       expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
         uses only the outer handle.
+    - step: 59
+      expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
+        uses only the outer handle.
+    - step: 60
+      expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
+        uses only the outer handle.
     results:
-    - 56
-    - 57
     - 58
+    - 59
+    - 60
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
+    - 19
+    results:
+    - 20
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
   visual:
   - check: 欢迎页的整高边缘以及调整后的名称布局。
     method: automated

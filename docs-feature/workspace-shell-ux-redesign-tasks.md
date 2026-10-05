@@ -345,3 +345,11 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - 新增 ContextActionsSlot/PanelRegistry/CloseCoordinator 单测 `424` 为 3 files / 10 tests 通过，keyboard runner 单测 `415` 为 16 项通过。类型检查 `422` 通过，后续沉浸 Action 路由调整继续由 `428` 检查。静态 audit `426` 通过，coverage baseline 未变；最后批次复核为 `430`。
 - Welcome 恢复及 native cwd/PTY 用例重新语义审阅，加入恢复后的真实命令输出、唯一隔离目录及持久化结果；八条旧 needs-review 已按真实断言更新，未把语法审查当作运行通过。
 - 本批本地仅 unit/static，无 browser/native 执行或应用构建。六端验证尚未通过，TASK-01～12 继续 in_progress。
+
+### 合并后首轮六端失败分析与修复（2026-10-05）
+
+- 固定提交 `cf97768738f0ece095d01282b20d2fe90c9a6e13` 的 [run 37265774830](https://github.com/engcapa/taomni/actions/runs/37265774830)：291 个唯一 ID / 878 次执行，806 passed / 72 failed / 0 skipped。Linux/Windows/macOS browser 各 199/19/0；native 分别 73/5/0、68/4/0、68/6/0。六份 selection/source/runner/case/config/receipt/native build 身份和 ZIP hashes 已核对。工作流绿色只表示报告完整，不能用作产品验收通过。
+- 失败原件保留于 `qa-ui-auto-report/workspace-shell/github/run-37265774830/`，诊断汇总为 `_local/shell-failures-436.json`。新版 Dock 先切换分类再切换导航显隐，旧用例必须明确当前分类；通过实际 Dock/Overview 操作更新路径，保留分屏、多发送、终端输出、Git 独立磁盘检查、恢复复用及布局持久化断言。浏览器本地终端使用已有显式 `local_terminal_preview` fixture，不伪装为原生 PTY。
+- 产品修复：同 ID 的显式标签激活退出空分类；临时标题栏优先拥有 Escape；水印弹层按视口限制位置；恢复记录读取忽略过期响应，清除前暂停并等待后台保存，清除后将当前保留工作集作为已处理状态，新的工作集变化才再次保存；首页在后台保存完成后刷新候选。
+- macOS N7 诊断为 12 个采集样本全部进入编码、无满队列，最长 poll 818 ms / 帧间隔 819 ms；原图比对仍有 1 帧时间不匹配，原失败不撤销。针对整屏快照转换后裁剪及转换后时间戳，改为 CoreGraphics 区域快照、在像素转换前记录时间戳。继续使用兼容快照路径，不开启曾触发 WindowServer 故障的流采集；700 ms 上限、原图像素/nonce/时间轴断言保持。实际改善等待 GitHub macOS 结果，不宣称已测得性能提升。
+- 本地聚焦单测 `shell-focused-unit-443`：5 files / 89 tests 通过；包含过期恢复读取、清除与保存竞态、同标签激活、Escape 所有权、水印视口边界。Rust `shell-capture-unit-441`：8 passed，包含有 padding 的区域像素转换和截断输入拒绝；类型 `444` 通过。后续完整单测和静态用例检查仍在进行。任务保持 in_progress，下一轮六端验证前不标 done。

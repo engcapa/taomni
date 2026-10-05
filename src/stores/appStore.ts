@@ -14,7 +14,7 @@ import { detectXServer, type XServerStatus } from "../lib/ipc";
 import type { TabFilter } from "../lib/tabFilter";
 import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
 import { routeTabClose } from "../lib/shell/closeCoordinator";
-import { shellSidebarBridge } from "../lib/shell/layoutBridge";
+import { shellSidebarBridge, notifyShellTabActivation } from "../lib/shell/layoutBridge";
 import {
   readMergeToolWindowRail,
   readSidebarCollapsedByGroup,
@@ -1207,7 +1207,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
-  setActiveTab: (id) =>
+  setActiveTab: (id) => {
+    if (!shellTabActivationAllowed() || !get().tabs.some((tab) => tab.id === id)) return;
+    const unchanged = get().activeTabId === id;
     set((s) => {
       if (!shellTabActivationAllowed() || !s.tabs.some((tab) => tab.id === id)) return s;
       const tab = s.tabs.find((item) => item.id === id);
@@ -1228,7 +1230,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         terminalSplitActive: tab?.type === "terminal" ? s.terminalSplitActive : false,
       };
-    }),
+    });
+    // An explicit activation also exits an empty category when the retained
+    // background tab already has this id (and no active-id subscription fires).
+    if (unchanged) notifyShellTabActivation(id);
+  },
 
   moveTab: (fromId, targetId, position) =>
     set((s) => {

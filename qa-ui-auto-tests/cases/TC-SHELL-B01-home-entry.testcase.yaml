@@ -1,8 +1,8 @@
 id: TC-SHELL-B01
 title: Unique Home and three primary launch entries
 description: 'Production renderer acceptance. Specification: docs-feature/workspace-shell-ux-redesign-test-cases.md#v-b01.
-  Browser IPC fixtures prove renderer outcomes only. The named and icon Rail states include exact label count,
-  text containment and real control hit geometry; screenshots are retained for visual review.'
+  Browser IPC fixtures prove renderer outcomes only. The named and icon Rail states include exact label count, text
+  containment and real control hit geometry; screenshots are retained for visual review.'
 covers:
 - F1.2
 - F1.6
@@ -88,7 +88,7 @@ steps:
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
 - assert_count:
     selector: '[data-testid="shell-rail"] button > span'
-    equal: 4
+    equal: 6
 - eval_readonly:
     expression: document.querySelector('nav[aria-label] > button:nth-of-type(1) > span').scrollWidth <= document.querySelector('nav[aria-label]
       > button:nth-of-type(1) > span').clientWidth
@@ -104,6 +104,14 @@ steps:
 - eval_readonly:
     expression: document.querySelector('nav[aria-label] > button:nth-of-type(4) > span').scrollWidth <= document.querySelector('nav[aria-label]
       > button:nth-of-type(4) > span').clientWidth
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('nav[aria-label] > button:nth-of-type(5) > span').scrollWidth <= document.querySelector('nav[aria-label]
+      > button:nth-of-type(5) > span').clientWidth
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('nav[aria-label] > button:nth-of-type(6) > span').scrollWidth <= document.querySelector('nav[aria-label]
+      > button:nth-of-type(6) > span').clientWidth
     expect_truthy: true
 - assert_element_geometry:
     selector: '[data-testid="shell-rail-home"], [data-testid="shell-rail-sessions"], [data-testid="shell-rail-workspaces"],
@@ -163,8 +171,8 @@ verification:
     - 10
     - 11
   - id: R2
-    requirement: Opening a local terminal and repeatedly returning through both Home entries creates no extra
-      Home or terminal.
+    requirement: Opening a local terminal and repeatedly returning through both Home entries creates no extra Home
+      or terminal.
     actions:
     - 12
     - 14
@@ -217,11 +225,11 @@ verification:
     actions:
     - 30
     - 31
-    - 39
-    - 40
+    - 41
+    - 42
     checkpoints:
     - step: 32
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"] button > span", "equal": 4}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"] button > span", "equal": 6}}'
     - step: 33
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav[aria-label] > button:nth-of-type(1)
         > span'').scrollWidth <= document.querySelector(''nav[aria-label] > button:nth-of-type(1) > span'').clientWidth",
@@ -238,24 +246,44 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav[aria-label] > button:nth-of-type(4)
         > span'').scrollWidth <= document.querySelector(''nav[aria-label] > button:nth-of-type(4) > span'').clientWidth",
         "expect_truthy": true}}'
-    - step: 37
+    - step: 39
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail-home\"], [data-testid=\"shell-rail-sessions\"],
         [data-testid=\"shell-rail-workspaces\"], [data-testid=\"shell-rail-tao\"]", "min_count": 4, "min_width":
         40, "min_height": 40, "within_viewport": true, "hit_center": true}}'
-    - step: 41
+    - step: 43
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"] button > span", "equal": 0}}'
-    - step: 42
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 52,
-        "max_width": 52, "min_height": 1, "within_viewport": true}}'
+    - step: 44
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 52, "max_width":
+        52, "min_height": 1, "within_viewport": true}}'
     results:
     - 32
     - 33
     - 34
     - 35
     - 36
+    - 39
+    - 43
+    - 44
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
+    - 31
+    results:
+    - 32
     - 37
-    - 41
-    - 42
+    - 38
+    checkpoints:
+    - step: 32
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"] button > span", "equal": 6}}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav[aria-label] > button:nth-of-type(5)
+        > span'').scrollWidth <= document.querySelector(''nav[aria-label] > button:nth-of-type(5) > span'').clientWidth",
+        "expect_truthy": true}}'
+    - step: 38
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav[aria-label] > button:nth-of-type(6)
+        > span'').scrollWidth <= document.querySelector(''nav[aria-label] > button:nth-of-type(6) > span'').clientWidth",
+        "expect_truthy": true}}'
   visual:
   - check: Inspect the final screenshot for readable controls, clipping and overlay placement.
     method: manual

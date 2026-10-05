@@ -68,6 +68,12 @@ steps:
 - click: '[data-testid="shell-overview-trigger"]'
 - click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
 - assert_visible: '[data-testid="session-tree"]'
+- click: '[data-testid="shell-rail-workspaces"]'
+- assert_visible: '[data-testid="code-workspace-tree-pane"]'
+- click: '[data-testid="shell-rail-workspaces"]'
+- assert_not_visible: '[data-testid="code-workspace-tree-pane"]'
+- click: '[data-testid="shell-rail-sessions"]'
+- assert_visible: '[data-testid="session-tree"]'
 - click: '[data-testid="shell-rail-sessions"]'
 - assert_not_visible: '[data-testid="session-tree"]'
 - eval_readonly:
@@ -172,7 +178,7 @@ verification:
     - 29
     - 31
     - 32
-    - 34
+    - 38
     checkpoints:
     - step: 27
       expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
@@ -183,62 +189,83 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 33
       expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 35
+    - step: 41
       expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 36
+    - step: 42
       expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.shellLayout.v2'')?.includes(\"\\\"build\\\":true\")",
         "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 37
+    - step: 43
       expectation: '{"assert_localstorage": {"key": "taomni.shellLayout.v2", "contains": "\"build\":true"}}'
     results:
     - 27
     - 28
     - 30
     - 33
-    - 35
-    - 36
-    - 37
+    - 41
+    - 42
+    - 43
   - id: R3
     requirement: Disabling merge returns the stripe to its workspace; enabling it returns the same stripe to the
       permanent Rail.
     actions:
-    - 38
-    - 39
-    - 40
-    - 42
-    - 43
+    - 44
+    - 45
     - 46
-    - 47
     - 48
     - 49
     - 52
-    checkpoints:
-    - step: 41
-      expectation: '{"assert_localstorage": {"key": "taomni.mergeToolWindowRail", "equals": "false"}}'
-    - step: 44
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 1}}'
-    - step: 45
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 0}}'
-    - step: 50
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 1}}'
-    - step: 51
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 0}}'
-    - step: 53
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 54
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    results:
-    - 41
-    - 44
-    - 45
-    - 50
-    - 51
     - 53
     - 54
+    - 55
+    - 58
+    checkpoints:
+    - step: 47
+      expectation: '{"assert_localstorage": {"key": "taomni.mergeToolWindowRail", "equals": "false"}}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+        "equal": 1}}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+        "equal": 0}}'
+    - step: 56
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+        "equal": 1}}'
+    - step: 57
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+        "equal": 0}}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    results:
+    - 47
+    - 50
+    - 51
+    - 56
+    - 57
+    - 59
+    - 60
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
+    - 34
+    - 36
+    - 40
+    results:
+    - 35
+    - 37
+    - 39
+    - 41
+    checkpoints:
+    - step: 35
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
+    - step: 37
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
+    - step: 39
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

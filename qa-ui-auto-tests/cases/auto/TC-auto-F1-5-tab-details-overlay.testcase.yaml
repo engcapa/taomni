@@ -12,6 +12,7 @@ modes:
 - browser
 fixtures:
 - reset_db
+- local_terminal_preview
 timeout_sec: 25
 steps:
 - open: ${cfg.app.base_url}

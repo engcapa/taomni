@@ -53,6 +53,8 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="shell-rail-workspaces"]'
     equals: Workspaces
+- click: '[data-testid="shell-rail-sessions"]'
+- assert_visible: '[data-testid="session-tree"]'
 - press:
     selector: '[data-testid="shell-rail-sessions"]'
     key: Enter
@@ -162,35 +164,35 @@ verification:
     - 8
     - 10
     - 11
-    - 16
-    - 19
-    - 22
-    - 23
+    - 18
+    - 21
+    - 24
+    - 25
     checkpoints:
     - step: 9
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 12
       expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"]", "equal": 1}}'
     - step: 13
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-control-bar [data-testid=\"window-drag-handle\"]'').getBoundingClientRect().height
-        <= 32", "expect_truthy": true, "timeout_sec": 5}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"window-drag-handle\"]", "min_width":
+        1, "min_height": 1, "tolerance": 0, "max_height": 32}}'
     - step: 14
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-sessions\"]", "equals": "Sessions"}}'
     - step: 15
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": "Workspaces"}}'
-    - step: 17
+    - step: 19
       expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 18
+    - step: 20
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail-sessions\"]", "name": "aria-pressed",
         "equals": "false"}}'
-    - step: 20
+    - step: 22
       expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 21
+    - step: 23
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail-sessions\"]", "name": "aria-pressed",
         "equals": "true"}}'
-    - step: 24
+    - step: 26
       expectation: '{"assert_visible": "[data-testid=\"sidebar-tools-panel\"]"}'
-    - step: 25
+    - step: 27
       expectation: '{"assert_visible": "[data-testid=\"sidebar-tool-code-workspace\"]"}'
     results:
     - 9
@@ -198,117 +200,127 @@ verification:
     - 13
     - 14
     - 15
-    - 17
-    - 18
+    - 19
     - 20
-    - 21
-    - 24
-    - 25
+    - 22
+    - 23
+    - 26
+    - 27
   - id: R2
     requirement: Global name toggles persist through reload; a single workspace stripe lives in the permanent Rail.
     actions:
-    - 26
     - 28
-    - 32
-    - 35
+    - 30
+    - 34
     - 37
     - 39
-    - 40
     - 41
-    - 45
-    - 47
-    checkpoints:
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
-    - step: 29
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-sessions\"]", "equals": ""}}'
-    - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail-sessions\"]", "name": "aria-label",
-        "equals": "Sessions"}}'
-    - step: 31
-      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":false"}}'
-    - step: 33
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 34
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
-    - step: 36
-      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
-    - step: 38
-      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
-    - step: 42
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 43
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 1}}'
-    - step: 44
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 0}}'
-    - step: 46
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
-    - step: 48
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
-    results:
-    - 27
-    - 29
-    - 30
-    - 31
-    - 33
-    - 34
-    - 36
-    - 38
     - 42
     - 43
+    - 47
+    - 49
+    checkpoints:
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
+    - step: 31
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-sessions\"]", "equals": ""}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-rail-sessions\"]", "name": "aria-label",
+        "equals": "Sessions"}}'
+    - step: 33
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":false"}}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 36
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
+    - step: 40
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 45
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+        "equal": 1}}'
+    - step: 46
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+        "equal": 0}}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
+    - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
+    results:
+    - 29
+    - 31
+    - 32
+    - 33
+    - 35
+    - 36
+    - 38
+    - 40
     - 44
+    - 45
     - 46
     - 48
+    - 50
   - id: R3
     requirement: Workspace and global context menus change the same name preference, and expanding Navigator preserves
       the single merged stripe.
     actions:
-    - 49
-    - 50
-    - 53
-    - 55
-    - 58
-    - 62
-    checkpoints:
-    - step: 51
-      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":false"}}'
-    - step: 52
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
-    - step: 54
-      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
-    - step: 56
-      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
-    - step: 57
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": "Workspaces"}}'
-    - step: 59
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 60
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 1}}'
-    - step: 61
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 0}}'
-    - step: 63
-      expectation: '{"assert_visible": "[data-testid=\"shell-rail-workspaces\"]"}'
-    - step: 64
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"]", "equal": 1}}'
-    - step: 65
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-control-bar [data-testid=\"window-drag-handle\"]'').getBoundingClientRect().height
-        <= 32", "expect_truthy": true, "timeout_sec": 5}}'
-    results:
     - 51
     - 52
+    - 55
+    - 57
+    - 60
+    - 64
+    checkpoints:
+    - step: 53
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":false"}}'
+    - step: 54
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
+    - step: 58
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
+    - step: 59
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": "Workspaces"}}'
+    - step: 61
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 62
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+        "equal": 1}}'
+    - step: 63
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+        "equal": 0}}'
+    - step: 65
+      expectation: '{"assert_visible": "[data-testid=\"shell-rail-workspaces\"]"}'
+    - step: 66
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-rail\"]", "equal": 1}}'
+    - step: 67
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"window-drag-handle\"]", "min_width":
+        1, "min_height": 1, "tolerance": 0, "max_height": 32}}'
+    results:
+    - 53
     - 54
     - 56
-    - 57
+    - 58
     - 59
-    - 60
     - 61
+    - 62
     - 63
-    - 64
     - 65
+    - 66
+    - 67
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
+    - 16
+    results:
+    - 17
+    checkpoints:
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
   visual:
   - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual

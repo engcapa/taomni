@@ -47,14 +47,14 @@ steps:
     selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
     regex: (?m)^QA_ED010_MARK\r?$
     timeout_sec: 30
-- click: '[data-testid="code-workspace-tool-window-hide"]'
+- click: '[data-testid="shell-host"][data-panel-id$=":terminal"] [data-testid="shell-host-hide"]'
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
-    state: detached
+    selector: '[data-testid="shell-host"][data-panel-id$=":terminal"]'
+    state: hidden
     timeout_sec: 5
 - click: '[data-testid="code-workspace-bottom-tab-terminal"]'
 - wait_for:
-    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    selector: '[data-testid="shell-host"][data-panel-id$=":terminal"]'
     timeout_sec: 10
 - assert_pattern:
     selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
@@ -106,8 +106,8 @@ verification:
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
         "regex": "(?m)^QA_ED010_MARK\\r?$", "timeout_sec": 30}}'
     - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state":
-        "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"shell-host\"][data-panel-id$=\":terminal\"]", "state":
+        "hidden", "timeout_sec": 5}}'
     - step: 18
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
         "regex": "(?m)^QA_ED010_MARK\\r?$", "timeout_sec": 10}}'

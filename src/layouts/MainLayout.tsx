@@ -955,6 +955,9 @@ export function MainLayout() {
   const snapshotFingerprintRef = useRef<string>("");
   const snapshotRevisionRef = useRef<number>(0);
   const snapshotCommitTimerRef = useRef<number | null>(null);
+  const snapshotCollectionPausedRef = useRef(false);
+  const snapshotCommitInFlightRef = useRef<Promise<void> | null>(null);
+  const afterSnapshotClearRef = useRef<(cleared: boolean) => void>(() => {});
   const awaitingManualAuthRef = useRef(false);
   const awaitingVaultUnlockRef = useRef(false);
   const continueConnectQueueRef = useRef<() => void>(() => undefined);
@@ -2926,8 +2929,14 @@ export function MainLayout() {
     openSavedSession: openSavedSessionForRestore,
     openLocalTerminal: openLocalTerminalForRestore,
     cancelPendingAuth: cancelPendingAuthForRestore,
+    beforeClearRecord: async () => {
+      snapshotCollectionPausedRef.current = true;
+      await snapshotCommitInFlightRef.current;
+    },
+    afterClearRecord: (cleared: boolean) => afterSnapshotClearRef.current(cleared),
   });
   restoreCallbacksRef.current = {
+    ...restoreCallbacksRef.current,
     loadSessionConfig: loadSessionConfigForRestore,
     findExistingTab: findExistingTabForEntry,
     activateTab: setActiveTab,
@@ -3024,27 +3033,52 @@ export function MainLayout() {
   }, [tabs, activeTabId, terminalCwds]);
 
   const commitRunSnapshotNow = useCallback(async () => {
-    if (exitRequestInFlightRef.current) return;
+    if (exitRequestInFlightRef.current || snapshotCollectionPausedRef.current) return;
+    if (snapshotCommitInFlightRef.current) {
+      await snapshotCommitInFlightRef.current;
+      if (snapshotCollectionPausedRef.current) return;
+    }
     const state = welcomeRestoreViewRef.current.state;
     if (state === "restoring" || state === "awaiting-auth") return; // suppression
     const { entries, activeIdentity } = buildRunSnapshotEntries();
     if (entries.length === 0) return; // never write empty snapshots
     const fingerprint = snapshotEntriesFingerprint(entries, activeIdentity);
     if (fingerprint === snapshotFingerprintRef.current) return;
-    try {
-      const response = await commitWelcomeRunSnapshot({
-        batchId: runBatchIdRef.current,
-        entries,
-        activeIdentity,
-        expectedRevision: snapshotRevisionRef.current || undefined,
-        restored: false,
-      });
-      if (response.record) snapshotRevisionRef.current = response.record.revision;
-      if (response.applied) snapshotFingerprintRef.current = fingerprint;
-    } catch (error) {
-      setStatusMessage(tr("welcome.snapshotSaveFailed", { error: String(error) }));
-    }
+    const commit = async () => {
+      try {
+        const response = await commitWelcomeRunSnapshot({
+          batchId: runBatchIdRef.current,
+          entries,
+          activeIdentity,
+          expectedRevision: snapshotRevisionRef.current || undefined,
+          restored: false,
+        });
+        if (response.record) snapshotRevisionRef.current = response.record.revision;
+        if (response.applied) {
+          snapshotFingerprintRef.current = fingerprint;
+          const app = useAppStore.getState();
+          if (!snapshotCollectionPausedRef.current && app.activeTabId === "welcome") welcomeRestoreInstanceRef.current.refresh();
+        }
+      } catch (error) {
+        setStatusMessage(tr("welcome.snapshotSaveFailed", { error: String(error) }));
+      }
+    };
+    const pending = commit();
+    snapshotCommitInFlightRef.current = pending;
+    try { await pending; }
+    finally { if (snapshotCommitInFlightRef.current === pending) snapshotCommitInFlightRef.current = null; }
   }, [buildRunSnapshotEntries, setStatusMessage, tr]);
+
+  afterSnapshotClearRef.current = (cleared) => {
+    if (cleared) {
+      // Retained tabs are not new activity. A pending debounce must not recreate
+      // the record the user just cleared; a later working-set change can save it.
+      const { entries, activeIdentity } = buildRunSnapshotEntries();
+      snapshotFingerprintRef.current = snapshotEntriesFingerprint(entries, activeIdentity);
+      snapshotRevisionRef.current = 0;
+    }
+    snapshotCollectionPausedRef.current = false;
+  };
 
   // Always execute the latest collector closure when the pending timer
   // fires, so a change committed during the debounce window is not lost.

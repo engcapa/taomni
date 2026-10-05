@@ -69,6 +69,22 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it("keeps the watermark controls inside the viewport when its anchor wraps to the left", async () => {
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+    rect.mockImplementation(function (this: HTMLElement) {
+      return { x: 0, y: 700, left: 0, right: 32, top: 700, bottom: 732, width: 32, height: 32, toJSON() {} };
+    });
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) { return this.dataset.testid === "screenshot-watermark-panel" ? 224 : 32; });
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) { return this.dataset.testid === "screenshot-watermark-panel" ? 180 : 32; });
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
+    fireEvent.click(screen.getByTestId("screenshot-watermark"));
+    const panel = screen.getByTestId("screenshot-watermark-panel");
+    expect(panel).toHaveStyle({ left: "8px", top: "512px", width: "224px" });
+    fireEvent.change(screen.getByTestId("screenshot-watermark-text"), { target: { value: "QA watermark" } });
+    fireEvent.click(screen.getByTestId("screenshot-watermark-apply"));
+    expect(screen.queryByTestId("screenshot-watermark-panel")).toBeNull();
+  });
   it("dispatches manual scrolling from the selected region", async () => {
     await open();
     drag("screenshot-select-layer", [100, 100], [500, 450]);

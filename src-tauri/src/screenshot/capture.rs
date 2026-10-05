@@ -480,6 +480,36 @@ fn frame_region_to_rgba(frame: &Frame, region: (u32, u32, u32, u32)) -> anyhow::
 // Frame sources
 // ---------------------------------------------------------------------------
 
+#[cfg(any(target_os = "macos", test))]
+fn rgba_from_bgra_rows(
+    data: &[u8],
+    width: usize,
+    height: usize,
+    stride: usize,
+) -> anyhow::Result<RgbaImage> {
+    let row_bytes = width.checked_mul(4).context("capture width overflow")?;
+    let len = row_bytes
+        .checked_mul(height)
+        .context("capture size overflow")?;
+    anyhow::ensure!(
+        width > 0 && height > 0 && stride >= row_bytes,
+        "invalid capture dimensions"
+    );
+    let mut rgba = Vec::with_capacity(len);
+    for row in 0..height {
+        let start = row.checked_mul(stride).context("capture stride overflow")?;
+        let end = start
+            .checked_add(row_bytes)
+            .context("capture row overflow")?;
+        rgba.extend_from_slice(data.get(start..end).context("truncated capture row")?);
+    }
+    for pixel in rgba.chunks_exact_mut(4) {
+        pixel.swap(0, 2);
+    }
+    RgbaImage::from_raw(u32::try_from(width)?, u32::try_from(height)?, rgba)
+        .context("build capture region")
+}
+
 enum Backend {
     Persistent(Box<dyn Capturer>),
     OneShot,
@@ -598,10 +628,49 @@ impl FrameSource {
         frame_region_to_rgba(frame, rect)
     }
 
-    fn decode_one_shot(&self) -> anyhow::Result<RgbaImage> {
+    fn decode_one_shot(&mut self) -> anyhow::Result<RgbaImage> {
         #[cfg(all(debug_assertions, target_os = "macos"))]
         QA_SNAPSHOT_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        #[cfg(target_os = "macos")]
+        if let Some(region) = self.region {
+            // Read only the selected rectangle. Converting an entire Retina
+            // display before cropping stalls recording and timestamps old pixels
+            // as if they arrived after conversion.
+            ensure_capture_permission()?;
+            let monitor = xcap_monitor_for(&self.display)?;
+            let scale = self.display.scale_factor;
+            let rect = objc2_core_foundation::CGRect {
+                origin: objc2_core_foundation::CGPoint {
+                    x: monitor.x()? as f64 + region.0 as f64 / scale,
+                    y: monitor.y()? as f64 + region.1 as f64 / scale,
+                },
+                size: objc2_core_foundation::CGSize {
+                    width: region.2 as f64 / scale,
+                    height: region.3 as f64 / scale,
+                },
+            };
+            use objc2_core_graphics::{
+                CGDataProvider, CGImage, CGWindowImageOption, CGWindowListCreateImage,
+                CGWindowListOption,
+            };
+            let image = CGWindowListCreateImage(
+                rect,
+                CGWindowListOption::OptionAll,
+                0,
+                CGWindowImageOption::Default,
+            )
+            .context("capture recording region")?;
+            self.captured_at = Some(Instant::now());
+            let width = CGImage::width(Some(&image));
+            let height = CGImage::height(Some(&image));
+            let stride = CGImage::bytes_per_row(Some(&image));
+            let provider = CGImage::data_provider(Some(&image));
+            let data = CGDataProvider::data(provider.as_deref())
+                .context("read recording region pixels")?;
+            return rgba_from_bgra_rows(&data.to_vec(), width, height, stride);
+        }
         let full = capture_one_shot(&self.app, &self.display)?;
+        self.captured_at = Some(Instant::now());
         match self.region {
             None => Ok(full),
             Some(region) => {
@@ -648,7 +717,6 @@ impl FrameSource {
             },
             Backend::OneShot => {
                 let image = self.decode_one_shot()?;
-                self.captured_at = Some(Instant::now());
                 Some(image)
             }
         };
@@ -668,7 +736,6 @@ impl FrameSource {
                     }
                     Backend::OneShot => {
                         let image = self.decode_one_shot()?;
-                        self.captured_at = Some(Instant::now());
                         image
                     }
                 };
@@ -749,6 +816,16 @@ fn crop_desktop_to_display(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn recording_region_converts_padded_rows_without_border_pixels() {
+        let image =
+            super::rgba_from_bgra_rows(&[1, 2, 3, 255, 99, 99, 4, 5, 6, 128, 99, 99], 1, 2, 6)
+                .unwrap();
+        assert_eq!(image.dimensions(), (1, 2));
+        assert_eq!(image.into_raw(), vec![3, 2, 1, 255, 6, 5, 4, 128]);
+        assert!(super::rgba_from_bgra_rows(&[0; 7], 1, 2, 4).is_err());
+        assert!(super::rgba_from_bgra_rows(&[0; 8], 2, 1, 4).is_err());
+    }
     use super::*;
 
     #[test]

@@ -56,7 +56,8 @@ steps:
     selector: '[data-testid="code-workspace-tab"]'
     equal: 1
 - click: '[data-testid="shell-rail-home"]'
-- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- click: '[data-testid="shell-overview-trigger"]'
+- click: '[data-testid="shell-tab-card"][data-tab-type="code-workspace"] [data-testid="shell-tab-card-open"]'
 - assert_text:
     selector: '[data-testid="project-facts-discovery-status"]'
     contains: Maven Discovered
@@ -125,24 +126,35 @@ verification:
     requirement: Already-open tab switching also retains discovery and the complete unsaved buffer.
     actions:
     - 21
-    - 22
-    - 26
+    - 23
+    - 27
     checkpoints:
-    - step: 23
+    - step: 24
       expectation: '{"assert_text": {"selector": "[data-testid=\"project-facts-discovery-status\"]", "contains":
         "Maven Discovered"}}'
-    - step: 24
-      expectation: '{"assert_shell_backend": {"command": "workspace_read_file", "count": 0}}'
     - step: 25
+      expectation: '{"assert_shell_backend": {"command": "workspace_read_file", "count": 0}}'
+    - step: 26
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
         ["class Main { static String draft = \"retained\"; }", "// unsaved Java draft"]}}'
-    - step: 28
+    - step: 29
       expectation: Releasing the IPC hold preserves the complete Java draft.
     results:
-    - 23
     - 24
     - 25
-    - 28
+    - 26
+    - 29
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
+    - 22
+    results:
+    - 24
+    checkpoints:
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"project-facts-discovery-status\"]", "contains":
+        "Maven Discovered"}}'
   visual:
   - check: Review captured layout for clipped controls and content.
     method: manual

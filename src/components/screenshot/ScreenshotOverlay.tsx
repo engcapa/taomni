@@ -367,6 +367,9 @@ export function ScreenshotOverlay() {
   const [pickerInfo, setPickerInfo] = useState<{ x: number; y: number; hex: string; rgb: string } | null>(null);
   const pickerCacheRef = useRef<ImageData | null>(null);
   const [watermarkOpen, setWatermarkOpen] = useState(false);
+  const watermarkAnchorRef = useRef<HTMLDivElement>(null);
+  const watermarkPanelRef = useRef<HTMLDivElement>(null);
+  const [watermarkPos, setWatermarkPos] = useState({ left: 8, top: 8 });
   const [watermark, setWatermark] = useState<WatermarkSettings | null>(null);
   const [watermarkText, setWatermarkText] = useState("");
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.5);
@@ -907,6 +910,17 @@ export function ScreenshotOverlay() {
     return () => window.removeEventListener("mousedown", onDown);
   }, [recordOpen]);
 
+  useLayoutEffect(() => {
+    if (!watermarkOpen) return;
+    const anchor = watermarkAnchorRef.current?.getBoundingClientRect();
+    const panel = watermarkPanelRef.current;
+    if (!anchor || !panel) return;
+    const left = Math.max(8, Math.min(anchor.right - panel.offsetWidth, viewport.w - panel.offsetWidth - 8));
+    const above = anchor.top - panel.offsetHeight - 8;
+    const top = above >= 8 ? above : Math.max(8, Math.min(anchor.bottom + 8, viewport.h - panel.offsetHeight - 8));
+    setWatermarkPos({ left, top });
+  }, [watermarkOpen, toolbarPos, viewport]);
+
   if (loadError) {
     return (
       <div
@@ -1102,7 +1116,7 @@ export function ScreenshotOverlay() {
         <ToolButton testid="screenshot-auto-redact" title={t("screenshot.autoRedact")} onClick={() => void handleAutoRedact()}>
           <ShieldAlert size={16} />
         </ToolButton>
-        <div className="relative">
+        <div className="relative" ref={watermarkAnchorRef}>
           <ToolButton
             testid="screenshot-watermark"
             title={t("screenshot.watermark")}
@@ -1117,8 +1131,9 @@ export function ScreenshotOverlay() {
           {watermarkOpen && (
             <div
               data-testid="screenshot-watermark-panel"
-              className={`absolute ${scrollResult ? "top-full mt-2" : "bottom-full mb-2"} right-0 rounded-lg shadow-2xl p-3 w-56`}
-              style={{ zIndex: 10, ...panelStyle }}
+              ref={watermarkPanelRef}
+              className="fixed rounded-lg shadow-2xl p-3 overflow-auto"
+              style={{ zIndex: 65, width: Math.min(224, viewport.w - 16), maxHeight: viewport.h - 16, ...watermarkPos, ...panelStyle }}
             >
               <input
                 type="text"

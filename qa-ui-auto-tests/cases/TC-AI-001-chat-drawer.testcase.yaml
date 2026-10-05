@@ -1,24 +1,7 @@
 id: TC-AI-001
 title: AI Chat Drawer opens, lists threads, and shows attachment chips
-description: 'Verifies the AI Chat Drawer surface (F-AI-2.4): Welcome exposes Chat Tao,
-
-  opening it creates a tab-bound drawer, the header exposes New / History /
-
-  position / pin / hide controls, the composer exposes attach and resize controls,
-
-  top/bottom floating mode exposes the drawer opacity slider,
-
-  the composer placeholder advertises the
-
-  @reference syntax, typing `@terminal:last-30` raises an attachment chip,
-
-  and hiding the drawer leaves a Tao ribbon that can reopen it.
-
-  Does not exercise streaming or send (those need a real LLM key);
-
-  the assertion target is UI plumbing only.
-
-  '
+description: Open contextual Tao from a terminal, retain drawer placement, opacity, terminal attachment and reopen
+  through the Dock. Browser terminal uses the explicit preview fixture.
 covers:
 - F-AI-2.4
 tags:
@@ -29,6 +12,7 @@ modes:
 - browser
 fixtures:
 - reset_db
+- local_terminal_preview
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}

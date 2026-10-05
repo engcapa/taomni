@@ -20,6 +20,9 @@ export function useShellShortcuts() {
       if (event.key === "Escape" && !event.isComposing && state.immersiveReveal === "workspace" && !document.querySelector('[aria-modal="true"],[data-taomni-context-menu]')) {
         event.preventDefault(); event.stopPropagation(); useShellLayoutStore.setState({ immersiveReveal: null }); return;
       }
+      // The temporary toolbar owns Escape and restores its opener's focus.
+      // A retained navigator overlay must not consume that key first.
+      if (event.key === "Escape" && state.immersive && state.immersiveReveal === "toolbar") return;
       if (event.defaultPrevented || event.isComposing || !cycle && shellKeyClaimed(event)) return;
       const target = event.target instanceof Element ? event.target : null;
       const shell = useShellLayoutStore.getState();

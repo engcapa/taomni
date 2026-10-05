@@ -70,7 +70,7 @@ steps:
     name: value
     equals: ${fixture.sftp_sync_test_dir}
 - assert_element_geometry:
-    selector: '[data-testid="shell-rail"] > button'
+    selector: '[data-testid="shell-rail"] > button:not([data-testid="shell-rail-more"]):not(.shell-rail-secondary)'
     min_count: 5
     min_width: 32
     min_height: 32
@@ -83,7 +83,7 @@ steps:
     expect_truthy: true
 - shell_navigate: tools
 - assert_element_geometry:
-    selector: '[data-testid="shell-rail"] > button'
+    selector: '[data-testid="shell-rail"] > button:not([data-testid="shell-rail-more"]):not(.shell-rail-secondary)'
     min_count: 5
     min_width: 32
     min_height: 32
@@ -158,17 +158,17 @@ verification:
     - 38
     checkpoints:
     - step: 36
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button", "min_count":
-        5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport": true,
-        "hit_center": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button:not([data-testid=\"shell-rail-more\"]):not(.shell-rail-secondary)",
+        "min_count": 5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport":
+        true, "hit_center": true}}'
     - step: 37
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav'').getBoundingClientRect().top
-        >= document.querySelector(''.shell-titlebar-start'').parentElement.getBoundingClientRect().bottom",
-        "expect_truthy": true}}'
+        >= document.querySelector(''.shell-titlebar-start'').parentElement.getBoundingClientRect().bottom", "expect_truthy":
+        true}}'
     - step: 39
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button", "min_count":
-        5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport": true,
-        "hit_center": true}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button:not([data-testid=\"shell-rail-more\"]):not(.shell-rail-secondary)",
+        "min_count": 5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport":
+        true, "hit_center": true}}'
     results:
     - 36
     - 37
@@ -181,6 +181,5 @@ verification:
   - check: 原生磁盘和 SFTP 链路需 native 模式的真实执行；browser 本地窗格为 VFS。
     method: automated
     reason: 按实际执行模式解释；其他平台不继承 Linux 证据。
-description: ' Permanent rail geometry now uses the Shell Rail; standalone SFTP readiness, path and transfer
-  assertions are retained. Rail geometry observes the enclosing ControlBar; a flexible drag spacer is not the
-  titlebar boundary.'
+description: ' Permanent rail geometry now uses the Shell Rail; standalone SFTP readiness, path and transfer assertions
+  are retained. Rail geometry observes the enclosing ControlBar; a flexible drag spacer is not the titlebar boundary.'

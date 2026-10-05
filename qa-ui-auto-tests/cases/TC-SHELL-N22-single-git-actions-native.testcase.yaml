@@ -77,6 +77,7 @@ steps:
 
         '
 - click: '[data-testid="git-change-row"][data-path="short.txt"]'
+- wait_for: '[data-testid="git-diff-unstage"]:not([disabled])'
 - click: '[data-testid="git-diff-unstage"]'
 - git_assert_state:
     repo: ${fixture.git_diff_repo}
@@ -93,6 +94,7 @@ steps:
 
         '
 - wait_for: '[data-testid="git-change-row"][data-path="short.txt"][data-staged="false"]'
+- wait_for: '[data-testid="git-diff-stage"]:not([disabled])'
 - click: '[data-testid="git-diff-stage"]'
 - git_assert_state:
     repo: ${fixture.git_diff_repo}
@@ -227,6 +229,7 @@ steps:
 - screenshot: shell-single-git-log.png
 - click: '[data-testid="git-changes-tab"]'
 - click: '[data-testid="git-change-row"][data-path="long-lines.txt"]'
+- wait_for: '[data-testid="git-diff-discard"]:not([disabled])'
 - click: '[data-testid="git-diff-discard"]'
 - wait_for: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="confirm-dialog-cancel"]'
@@ -235,6 +238,7 @@ steps:
     branch: shell-single-qa
     head_subject: SHELL single Git 中文
     status: *id002
+- wait_for: '[data-testid="git-diff-discard"]:not([disabled])'
 - click: '[data-testid="git-diff-discard"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
 - git_assert_state:
@@ -292,124 +296,147 @@ verification:
       worktree content are independently checked.
     actions:
     - 15
-    - 16
-    - 19
+    - 17
+    - 21
     checkpoints:
-    - step: 17
+    - step: 18
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt": " M",
         "short.txt": " M", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-003\n"}}}'
-    - step: 18
+    - step: 19
       expectation: '{"wait_for": "[data-testid=\"git-change-row\"][data-path=\"short.txt\"][data-staged=\"false\"]"}'
-    - step: 20
+    - step: 22
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt": " M",
         "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
-    - step: 21
+    - step: 23
       expectation: '{"wait_for": "[data-testid=\"git-change-row\"][data-path=\"short.txt\"][data-staged=\"true\"]"}'
     results:
-    - 17
     - 18
-    - 20
-    - 21
+    - 19
+    - 22
+    - 23
   - id: SINGLE-R3
     requirement: New Branch Cancel creates no branch and preserves the commit draft/index; Confirm creates and checks
       out exactly one new branch without a commit.
     actions:
-    - 22
-    - 23
     - 24
+    - 25
     - 26
-    - 27
+    - 28
     - 29
     - 31
-    - 32
     - 33
     - 34
+    - 35
     - 36
+    - 38
     checkpoints:
-    - step: 25
+    - step: 27
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
-    - step: 28
+    - step: 30
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "${fixture.git_diff_branch}",
         "branches": ["${fixture.git_diff_branch}"], "head": "${fixture.git_diff_commit_b}", "status": {"long-lines.txt":
         " M", "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
-    - step: 30
+    - step: 32
       expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "SHELL single
         Git 中文\n\nOnly checked short.txt"}}'
-    - step: 35
+    - step: 37
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "branches":
         ["${fixture.git_diff_branch}", "shell-single-qa"], "head": "${fixture.git_diff_commit_b}", "status": {"long-lines.txt":
         " M", "short.txt": "M ", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}}}'
-    - step: 37
+    - step: 39
       expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": "SHELL single
         Git 中文\n\nOnly checked short.txt"}}'
     results:
-    - 25
-    - 28
+    - 27
     - 30
-    - 35
+    - 32
     - 37
+    - 39
   - id: SINGLE-R4
     requirement: The real single-repository Commit writes only checked short.txt, clears its draft, and Log shows
       exactly the committed file; unchecked changes remain.
     actions:
-    - 38
-    - 39
-    - 42
-    - 46
+    - 40
+    - 41
+    - 44
     - 48
+    - 50
     checkpoints:
-    - step: 43
+    - step: 45
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "branches":
         ["${fixture.git_diff_branch}", "shell-single-qa"], "head_subject": "SHELL single Git 中文", "status": {"long-lines.txt":
         " M", "git-diff-fixture-manifest.json": "??"}, "head_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"},
         "index_files": {"short.txt": "short-001\nshort-002\nshort-staged\n"}, "timeout_sec": 30}}'
-    - step: 44
+    - step: 46
       expectation: '{"assert_value": {"selector": "textarea[placeholder=\"Commit message\"]", "equals": ""}}'
-    - step: 45
+    - step: 47
       expectation: '{"wait_for": {"selector": "[data-testid=\"git-change-row\"][data-path=\"short.txt\"]", "state":
         "detached"}}'
-    - step: 47
+    - step: 49
       expectation: '{"assert_text": {"selector": "[data-testid=\"git-log-commit\"]", "contains": "SHELL single Git
         中文", "timeout_sec": 30}}'
-    - step: 49
+    - step: 51
       expectation: '{"wait_for": {"selector": "[data-testid=\"git-log-file\"][data-path=\"short.txt\"]", "timeout_sec":
         30}}'
-    - step: 50
+    - step: 52
       expectation: '{"assert_count": {"selector": "[data-testid=\"git-log-file\"]", "equal": 1}}'
     results:
-    - 43
-    - 44
     - 45
+    - 46
     - 47
     - 49
-    - 50
+    - 51
+    - 52
   - id: SINGLE-R5
     requirement: Discard Cancel preserves the exact remaining status; Confirm discards only long-lines.txt and retains
       the committed short.txt plus untracked manifest.
     actions:
-    - 52
-    - 53
     - 54
-    - 56
-    - 58
+    - 55
+    - 57
     - 59
+    - 62
+    - 63
     checkpoints:
-    - step: 55
+    - step: 58
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 57
-      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "head_subject":
-        "SHELL single Git 中文", "status": {"long-lines.txt": " M", "git-diff-fixture-manifest.json": "??"}}}'
     - step: 60
       expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "head_subject":
+        "SHELL single Git 中文", "status": {"long-lines.txt": " M", "git-diff-fixture-manifest.json": "??"}}}'
+    - step: 64
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "branch": "shell-single-qa", "head_subject":
         "SHELL single Git 中文", "status": {"git-diff-fixture-manifest.json": "??"}, "timeout_sec": 30}}'
-    - step: 61
+    - step: 65
       expectation: '{"wait_for": {"selector": "[data-testid=\"git-change-row\"][data-path=\"long-lines.txt\"]",
         "state": "detached"}}'
     results:
-    - 55
-    - 57
+    - 58
     - 60
+    - 64
+    - 65
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
+    - 15
+    results:
+    - 16
+    - 18
+    - 20
+    - 56
     - 61
+    checkpoints:
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"git-diff-unstage\"]:not([disabled])"}'
+    - step: 18
+      expectation: '{"git_assert_state": {"repo": "${fixture.git_diff_repo}", "status": {"long-lines.txt": " M",
+        "short.txt": " M", "git-diff-fixture-manifest.json": "??"}, "index_files": {"short.txt": "short-001\nshort-002\nshort-003\n"}}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"git-diff-stage\"]:not([disabled])"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"git-diff-discard\"]:not([disabled])"}'
+    - step: 61
+      expectation: '{"wait_for": "[data-testid=\"git-diff-discard\"]:not([disabled])"}'
   visual:
   - check: Read the final Git Log and Changes screenshots for readable content and unobstructed Host controls.
     method: manual

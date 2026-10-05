@@ -16,10 +16,12 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="shell-rail-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
 - shell_backend_scenario:
     action: fail-next
     command: get_welcome_run_snapshot
-- reload_window: null
+- click: '[data-testid="shell-rail-home"]'
 - wait_for: '[data-testid="shell-restore-error"]'
 - assert_attribute:
     selector: '[data-testid="welcome-restore-status"]'
@@ -42,25 +44,39 @@ verification:
     requirement: Backend read failure stays unavailable with its concrete error, then refresh recovers the unchanged
       saved session catalog.
     actions:
+    - 5
+    - 6
+    - 10
+    checkpoints:
+    - step: 8
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state",
+        "equals": "unavailable"}}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-restore-error\"]", "contains": "QA fixture
+        rejected"}}'
+    - step: 12
+      expectation: '{"assert_not_visible": "[data-testid=\"shell-restore-error\"]"}'
+    - step: 13
+      expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-recent-session-row\"]", "equal": 5}}'
+    results:
+    - 8
+    - 9
+    - 12
+    - 13
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
     - 3
+    results:
     - 4
     - 8
     checkpoints:
-    - step: 6
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 8
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-status\"]", "name": "data-state",
         "equals": "unavailable"}}'
-    - step: 7
-      expectation: '{"assert_text": {"selector": "[data-testid=\"shell-restore-error\"]", "contains": "QA fixture
-        rejected"}}'
-    - step: 10
-      expectation: '{"assert_not_visible": "[data-testid=\"shell-restore-error\"]"}'
-    - step: 11
-      expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-recent-session-row\"]", "equal": 5}}'
-    results:
-    - 6
-    - 7
-    - 10
-    - 11
   visual:
   - check: Review captured layout for clipped controls and content.
     method: manual

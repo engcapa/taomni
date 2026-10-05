@@ -11,6 +11,7 @@ modes:
 - browser
 fixtures:
 - reset_db
+- local_terminal_preview
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="tab-bar"]'
@@ -26,9 +27,18 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-view"]'
 - assert_visible: '[data-testid="context-menu-item-split-terminal"]'
+- assert_disabled: '[data-testid="context-menu-item-split-terminal"]'
+- press: Escape
+- press: Escape
+- click: '[data-testid="shell-rail-home"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
 - assert_enabled: '[data-testid="context-menu-item-split-terminal"]'
-- press: Escape
-- press: Escape
+- click: '[data-testid="context-menu-item-split-terminal"]'
+- assert_visible: '[data-testid="terminal-split-toolbar"]'
+- app_menu_action: split
 - click: '[data-testid="app-main-menu"]'
 - wait_for: '[data-testid="context-menu"]'
 - hover: '[data-testid="context-menu-item-view"]'
@@ -60,13 +70,13 @@ verification:
     - 13
     - 16
     - 17
-    - 18
-    - 20
-    - 22
-    - 25
     - 27
     - 29
-    - 32
+    - 31
+    - 34
+    - 36
+    - 38
+    - 41
     checkpoints:
     - step: 7
       expectation: Close 入口可见。
@@ -79,12 +89,12 @@ verification:
     - step: 14
       expectation: View Split 可见。
     - step: 15
-      expectation: View Split 可用。
-    - step: 23
+      expectation: '{"assert_disabled": "[data-testid=\"context-menu-item-split-terminal\"]"}'
+    - step: 32
       expectation: 启用后 MultiExec bar 可见。
-    - step: 30
+    - step: 39
       expectation: 关闭后 MultiExec bar 隐藏。
-    - step: 34
+    - step: 43
       expectation: 更多标签打开总览。
     results:
     - 7
@@ -93,9 +103,33 @@ verification:
     - 10
     - 14
     - 15
+    - 32
+    - 39
+    - 43
+  - id: R-followup
+    requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
+      assertions.
+    actions:
+    - 18
+    - 19
+    - 21
+    - 22
+    - 24
+    - 26
+    results:
+    - 20
     - 23
-    - 30
-    - 34
+    - 25
+    - 32
+    checkpoints:
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 23
+      expectation: '{"assert_enabled": "[data-testid=\"context-menu-item-split-terminal\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"terminal-split-toolbar\"]"}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"multiexec-bar\"]"}'
   visual:
   - check: 右键菜单和更多列表无截断，激活状态可区分。
     method: manual

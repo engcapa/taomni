@@ -2,7 +2,7 @@ import { useLayoutEffect } from "react";
 import { useAppStore } from "../stores/appStore";
 import { useChatStore } from "../stores/chatStore";
 import { useShellLayoutStore } from "../stores/shellLayoutStore";
-import { installSidebarBridge, installTaoBridge } from "../lib/shell/layoutBridge";
+import { installSidebarBridge, installTaoBridge, installTabActivationBridge } from "../lib/shell/layoutBridge";
 import { tabLane } from "../lib/shell/tabPresentation";
 import { safeWorkspace } from "../lib/shell/shellLayoutPersistence";
 
@@ -26,6 +26,7 @@ export function useShellLayoutBridge() {
       select: (area) => { useAppStore.setState({ activeSideTab: area }); useShellLayoutStore.getState().toggleNavigator(area === "sessions" ? "sessions" : "workspaces", lane()); }, apply: sync });
     const offTao = installTaoBridge({ update: (patch) => useShellLayoutStore.getState().updateLayout((layout) => ({ ...layout, tao: { ...layout.tao, ...patch } })) });
     let lastActive = useAppStore.getState().activeTabId;
+    const offActivation = installTabActivationBridge((id) => useShellLayoutStore.getState().visitTab(id));
     if (lastActive) shell.visitTab(lastActive);
     const offApp = useAppStore.subscribe((state, previous) => {
       if (state.activeTabId !== lastActive) { lastActive = state.activeTabId; if (lastActive) useShellLayoutStore.getState().visitTab(lastActive); }
@@ -42,6 +43,6 @@ export function useShellLayoutBridge() {
     const offChat = useChatStore.subscribe((state, previous) => { if (state.drawerOpen !== previous.drawerOpen && state.drawerOpen !== useShellLayoutStore.getState().taoOpen) useShellLayoutStore.getState().setTaoOpen(state.drawerOpen); });
     sync();
     const flush = () => useShellLayoutStore.getState().flush(); window.addEventListener("pagehide", flush);
-    return () => { offApp(); offShell(); offChat(); offSidebar(); offTao(); useChatStore.setState({ shellContextFollowsActive: false }); window.removeEventListener("pagehide", flush); flush(); };
+    return () => { offApp(); offShell(); offChat(); offSidebar(); offTao(); offActivation(); useChatStore.setState({ shellContextFollowsActive: false }); window.removeEventListener("pagehide", flush); flush(); };
   }, []);
 }

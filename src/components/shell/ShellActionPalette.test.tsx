@@ -14,6 +14,17 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+it("leaves Escape to temporary titlebar and nested menus even when a navigator overlay is retained", () => {
+  useShellLayoutStore.setState({ immersive: true, immersiveReveal: "toolbar", navigatorOverlay: true });
+  render(<Harness />);
+  const bubble = vi.fn((event: KeyboardEvent) => { expect(event.defaultPrevented).toBe(false); });
+  document.addEventListener("keydown", bubble);
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  document.removeEventListener("keydown", bubble);
+  expect(bubble).toHaveBeenCalledOnce();
+  expect(useShellLayoutStore.getState().navigatorOverlay).toBe(true);
+});
+
 it("opens from an editor, enters immersive mode and always offers an exit without replacing its draft", () => {
   render(<Harness />);
   const editor = screen.getByLabelText("Editor"); editor.focus();
