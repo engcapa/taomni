@@ -112,7 +112,13 @@ Windows N17 失败发生在原生保存对话框输入。阶段记录中，保�
 
 第三轮 macOS N8 的 14 个解码帧的像素、nonce 和顺序全部匹配，但第三帧的时间不符：画面是 source ID 39，真实原画区间为 3043–3136ms；视频时间 1052ms 相对首帧原画 2685ms 对应 3737ms，超过可见区间 601ms。另有 808ms 帧间隔、747ms 未解释漏采，均不满足原有标准。原实现每帧重新枚举显示器、读取整屏、转换并裁切，最后才记录 `Instant::now()`，将这段耗时计入旧画面的时间。提交 `8be0c5ee` 新增 [mac_snapshot.rs](../src-tauri/src/screenshot/mac_snapshot.rs)：缓存实际 CGDisplayBounds，将物理选区映射为 CoreGraphics 选区，仅读取该区域，在请求快照时记录时间，保留原来的无持久显示流兼容路径。250ms 时间漂移与 700ms 未解释漏采阈值未改。
 
-两个新增 macOS 模块的实际源码已在本机用 `aarch64-apple-darwin` 进行编译类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-api-check-installed.log`；此检查不替代真实 macOS 运行。定向 [run 37266190307](https://github.com/engcapa/taomni/actions/runs/37266190307) 测试 `8be0c5ee3f2b15d334d57de0ffdaa0edd263cac9` 的 N7/N8/N14/N17/N19，结果待返回。
+两个新增 macOS 模块的实际源码已在本机用 `aarch64-apple-darwin` 进行编译类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-api-check-installed.log`；此检查不替代真实 macOS 运行。定向 [run 37266190307](https://github.com/engcapa/taomni/actions/runs/37266190307) 测试 `8be0c5ee3f2b15d334d57de0ffdaa0edd263cac9` 的 N7/N8/N14/N17/N19，结果为 4/5、零跳过，唯一失败为 N17。针对被测提交的隔离工作树，源码/用例/config/构建身份、21 个 receipt 附件和 421 个原生输出哈希均通过；独立聚合与 hosted 相同，严格 `passed=false`，见 `qa-ui-auto-report/hosted-37266190307/independent-verification.json`。
+
+本轮 N7 的 GIF 为 16 帧、3080ms，最大漂移 27ms、未解释间隔 480ms；N8 的 MP4 为 15 帧、2698ms，最大漂移 15ms、未解释间隔 171ms，两项逐帧原画像素、nonce 和顺序均通过。N14 同时验证 GIF/MP4 的 CoreGraphics 选区快照和原画时间线，持久显示流打开计数仍为 0；N19 权限错误路径通过。
+
+N17 记录 QA 子进程 PID 5810 的实际 AXTextField 获得焦点，默认文件名为 `Taomni-pin`，等待 1740ms；输入后的完整文件名校验也通过。但 44 字符目录在“前往文件夹”字段中只剩最后 4 字符 `acts`，20s 轮询超时。Enigo 0.6.1 的 macOS `fast_text` 将文本分成每段最多 20 字符的 Unicode keydown 事件，两次原生失败中的末段内容与此分段一致；目录自动补全/组合输入处理是该输入方式的兼容问题，继续增加固定等待无法保证整段输入。
+
+提交 `9a017a7a` 改用系统剪贴板和物理 ANSI V 的 Command+V 一次粘贴完整目录。AX 只读校验文件名、目录完整值以及返回保存面板的真实焦点；返回后恢复此前已经复制并验证的原始贴图图像，最后才确认保存。失败时也有剪贴板恢复兜底。用例保留原生保存、原 PNG 字节、收藏持久化和透明度等断言，没有设置 AX 字段或 mock 对话框。新增 helper 实际源码类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-paste-api-check.log`。定向 [run 37270272423](https://github.com/engcapa/taomni/actions/runs/37270272423) 正在真实 macOS 上验证 N17；在结果与最终六组回归完成前，不宣称全部通过。
 
 ## 实际安装命令
 
