@@ -3,7 +3,7 @@
 设计：[详细设计](./workspace-shell-ux-redesign-design.md) · [用例](./workspace-shell-ux-redesign-test-cases.md)。
 
 领取者：Codex。基线：`5fb098474f072f4e0c7e99407ab0d072b7d49c53`，分支 `feat/ui-layout-refactor`。
-用户已授权实现、本地单元测试、推送及 `qa-ui-auto-platforms` browser/native 循环验证。
+用户已授权实现、本地单元测试、Windows 11 browser/隔离 native 回归、推送及 `qa-ui-auto-platforms` browser/native 循环验证。
 状态：`todo` → `in_progress` → `verification` → `done`。用户于 2026-10-05 明确确认：本轮以实现完成和同一最终输入的六端自动化全部通过为 done 条件；真实 OS 文件对话框、Windows/macOS 真 IME、DPI/跨屏/读屏及匹配性能基线单列后续验收。未自动化项保留完整规格与未验证状态，不计为自动化 pass。
 
 | 任务 | 状态 | 依赖 | 交付 / 验证证据 |
@@ -19,11 +19,11 @@
 | TASK-09 原生窗口 | in_progress | 04,05,06,07 | Git、detach 事务、回停靠；三端实际 native 验收 |
 | TASK-10 持久化与回退 | in_progress | 01,04,07 | v2 migration、恢复 identity；最终六端及重启 stored/rendered 验收 |
 | TASK-11 用例与自动化支持 | in_progress | 随相关实现 | 本轮新增 B46～B52、N23，适配既有入口用例与 catalog/policy；新输入六端待验收 |
-| TASK-12 集成与验收 | in_progress | 02–11 | 本轮本地 unit/static 与 GitHub 六端验证进行中；历史记录不代表本轮通过 |
+| TASK-12 集成与验收 | in_progress | 02–11 | 本轮本地 unit/browser/隔离 native 与 GitHub 六端验证进行中；历史记录不代表本轮通过 |
 
 ## main 合并与审阅补齐（当前批次）
 
-当前任务重新进入实施与验收：合并 `origin/main` 的 `a90a0bd3`，补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口。用户明确要求同步移除本地终端 Rail Git 入口，并将窗口抓手恢复到右上角系统区（以用户最后要求为准）。新输入必须重新通过本地 unit/static 和 GitHub 六端验证，以下旧输入通过记录仅作历史基线，不能证明合并后完成。
+当前任务重新进入实施与验收：合并 `origin/main` 的 `a90a0bd3`，补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口。用户明确要求同步移除本地终端 Rail Git 入口，并将窗口抓手恢复到右上角系统区（以用户最后要求为准）。新输入必须重新通过本地 unit、Windows 11 聚焦 browser/native 和 GitHub 六端验证，以下旧输入通过记录仅作历史基线，不能证明合并后完成。
 
 ## 上一批次实施进度（历史）
 
@@ -356,3 +356,12 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - 收尾：`shell-followup-unit-439` 前端全量为 532 files、5281 passed / 1 failed；唯一失败是 Extract Method 多候选点击后的异步 React 更新尚未完成就观察命名对话框。该用例采用与单候选路径一致的异步 `act` 等待，不改生产期限或断言；`shell-extract-suite-454` 整个 ED-PARITY-007 组 24 项通过（226 项名称过滤未运行）。原失败日志保留，不把全量 439 改写为通过。最终标题栏完整挂载回归 `447` 为 50 项通过；Rust 全量 `446` 为 1599 passed / 16 ignored；类型 `450`、审计 `449`、开发契约 `451` 通过，coverage baseline 不变。
 - `58abf9de` 的精准 [run 37280422134](https://github.com/engcapa/taomni/actions/runs/37280422134) 选择 40 ID / 124 次；计划身份一致且 gaps/unreviewed 为空。三端 browser 均 25/3/0；native 此时仍执行中。B47 暴露第二层 Escape 捕获：可见 Code Workspace 抢先执行工作区命令。将 Shell 标题栏加入表面按键所有权排除，真实 CodeWorkspace 挂载回归验证事件未被 preventDefault、焦点/EditorView/全文保持；`459` 的新用例及相邻 hosted Project/Problems 三项通过，类型 `460` 通过。
 - TC-MAIN-RAIL-04 在首次创建空工作区后通过 UI 添加目录，才具有可持久化的最近工作区；TC-auto-F1-5 创建两个真实预览终端，验证同分类多卡快捷预览（固定 Home 不属于内容卡），原单卡悬停、Overview、detach 菜单断言保留。上述新修改待远端再验，旧失败不删除。
+
+### 2026-10-05 第二次 main 合并与本机回归
+
+- 按用户新要求拉取 main 到 `307c6322`，合并提交 `8a05db84`。5 处文本冲突已解决；保留 Linux GTK 主线程显示器枚举、原生保存对话框修复与截图用例。macOS 统一为 main 的缓存 CoreGraphics 区域快照及请求时间戳，复用本分支有 padding/截断输入单测的 BGRA 转换函数，移除重复区域捕获路径。水印采用 main 的窄视口/滚动结果定位与滑块最小宽度处理；几何工具兼容 viewport_margin、within_viewport、hit_center 和最大尺寸断言。
+- 用户明确允许本机 Windows 11 browser/native 验证，先本机稳定后再 GitHub 三 OS。构建 `472` 在新 main 合并前停止，未生成有效验收结果；保留日志和增量缓存。最终本机 native 仍用隔离 QA ID、独立报告数据和匹配构建身份。
+- 聚焦远端 `37280422134` 最终：三端 browser 各 25/3/0；Linux native 14/0/0、macOS native 13/0/0、Windows native 12/1/0。六份身份/receipt/config/build/ZIP hashes 匹配。N5～N8 均通过，macOS N7/N8 原始采集仍有约 1 秒间隔，不宣称性能改善；原始失败和慢样本保留。
+- 远端 `37282347150` 三端 browser 均 2/1/0，B47 和 Tab 预览已通过；MAIN-RAIL-04 进一步发现右侧条的 End 调宽未实现。本批补齐可访问 separator 的 Home/End 边界调宽，保留箭头与拖动。MAIN-RAIL-01 在点击 Sessions 前明确回 Home，消除不同视口/菜单关闭后 Navigator 状态差异，后续 Enter/Space 显隐断言保持。
+- 本机 browser `471`：3 pass / 1 fail，失败同为 End 调宽；B47、B49、Tab 预览通过。B49 实际截图确认空 Messages 分类不再泄露保留 Settings 的 sticky 搜索框（修复 `15223ac7`），仍保留原设置实例。修后 `475`：MAIN-RAIL-01、MAIN-RAIL-04、SHOT-017 全部 3/0/0，含窄视口、持久化、键盘和实际命中区域。
+- 聚焦前端 `474`：3 files / 31 tests 通过；几何工具 8 项 unit 通过，修改的两份 capture Rust 文件 rustfmt 检查通过。完整前端 `478`、Rust `479`、catalog `480`、隔离 native build `477` 继续执行；9 条 native dry-run `476` 通过，仅证明语法/平台能力，不算 native 执行。所有 TASK 仍为 in_progress，待最终同输入六端验收。

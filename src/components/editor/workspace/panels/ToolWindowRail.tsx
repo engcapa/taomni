@@ -214,6 +214,9 @@ export function ToolWindowRailResizeHandle({
     if (event.key === grow || event.key === shrink) {
       event.preventDefault();
       onResize(Math.max(minWidth, clampStripeWidth(width + (event.key === grow ? 4 : -4))));
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      onResize(event.key === "Home" ? minWidth : STRIPE_MAX_WIDTH);
     }
   };
 

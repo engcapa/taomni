@@ -67,6 +67,12 @@ describe("ED-PARITY-010 tool window rail", () => {
     fireEvent.pointerDown(handle, { button: 0, clientX: 100 });
     fireEvent.pointerMove(window, { clientX: side === "left" ? 120 : 80 });
     expect(screen.getByTestId(`code-workspace-tool-rail-${side}`)).toHaveStyle({ width: "83px" });
+    fireEvent.keyDown(handle, { key: "End" });
+    expect(handle).toHaveAttribute("aria-valuenow", "100");
+    expect(screen.getByTestId(`code-workspace-tool-rail-${side}`)).toHaveStyle({ width: "100px" });
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(handle).toHaveAttribute("aria-valuenow", "40");
+    expect(screen.getByTestId(`code-workspace-tool-rail-${side}`)).toHaveStyle({ width: "40px" });
     unmount();
     onResize.mockClear();
     fireEvent.pointerMove(window, { clientX: 130 });

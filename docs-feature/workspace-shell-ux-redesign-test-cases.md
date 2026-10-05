@@ -1165,7 +1165,7 @@
 
 ## 5. 实施后的运行命令与三端手册
 
-当前批次按用户要求，本地只完成单元测试与静态检查，browser/native 在 GitHub 的 `qa-ui-auto-platforms.yml` 执行。下列本地 CMD-B/CMD-N 保留为维护和手工边界的操作手册，不是本批次已运行或计划启动的本地回归。CI 的精确范围、SHA 与报告以 [实施任务](./workspace-shell-ux-redesign-tasks.md) 最新记录为准。
+用户于 2026-10-05 更新执行策略：允许先在本机 Windows 11 跑 browser 与隔离 native 聚焦回归，单元测试和本机回归通过后，再通过 GitHub 的 `qa-ui-auto-platforms.yml` 执行三 OS / 六端验收。下列 CMD-B/CMD-N 可用于本机回归；native 仍必须使用匹配源码的 `com.taomni.app.qa` 与独立目录。CI 的精确范围、SHA 与报告以 [实施任务](./workspace-shell-ux-redesign-tasks.md) 最新记录为准。
 
 ### CMD-B：browser
 
@@ -1356,7 +1356,7 @@ N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、nat
 
 ## main 合并后增量验收（当前输入未验证）
 
-以下用例与设计末尾的标题栏矩阵、Dock、沉浸和恢复契约对应；动作和逐步观察以链接的可执行 YAML 为准。所有 fixture 都在隔离报告环境，browser 的 IPC fixture 不作为 native 证据。本地只运行 unit/static，UI 执行统一提交 GitHub 六端。历史最终通过不覆盖本批改动。
+以下用例与设计末尾的标题栏矩阵、Dock、沉浸和恢复契约对应；动作和逐步观察以链接的可执行 YAML 为准。所有 fixture 都在隔离报告环境，browser 的 IPC fixture 不作为 native 证据。先完成本机 Windows 11 unit/browser/隔离 native 聚焦验证，再提交 GitHub 六端。历史最终通过不覆盖本批改动。
 
 | V | 场景 / 初始状态 / 关键结果 | 可执行用例 | 模式与边界 |
 |---|---|---|---|
