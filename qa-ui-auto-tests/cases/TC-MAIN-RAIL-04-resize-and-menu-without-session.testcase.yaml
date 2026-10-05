@@ -107,6 +107,10 @@ steps:
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
 - assert_count:
     selector: '[data-testid="sidebar-rail-resize"]'
     equal: 1
@@ -191,6 +195,8 @@ verification:
     - 12
     - 14
     - 16
+    - 33
+    - 35
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -211,6 +217,10 @@ verification:
     - step: 17
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 91.51,
         "min_height": 1, "tolerance": 0, "max_width": 92.49}}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     results:
     - 2
     - 5
@@ -220,6 +230,8 @@ verification:
     - 13
     - 15
     - 17
+    - 34
+    - 36
   - id: R2
     requirement: Collapsed Navigator retains a full-height resize edge clamped to 68–100.
     actions:
@@ -254,83 +266,83 @@ verification:
     actions:
     - 30
     - 31
-    - 35
-    - 37
     - 39
-    - 40
     - 41
+    - 43
+    - 44
+    - 45
     checkpoints:
     - step: 32
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 33
+    - step: 37
       expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'
-    - step: 34
+    - step: 38
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-left-resize\"]", "equal":
         0}}'
-    - step: 36
+    - step: 40
       expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-menu-show-names\"]", "equal": 0}}'
-    - step: 38
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
     - step: 42
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"shell-rail-workspaces\"]", "equals": ""}}'
+    - step: 46
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 71.51,
         "min_height": 1, "tolerance": 0, "max_width": 72.49}}'
     results:
     - 32
-    - 33
-    - 34
-    - 36
+    - 37
     - 38
+    - 40
     - 42
+    - 46
   - id: R4
     requirement: Local terminal and Home preserve width and names across reload.
     actions:
-    - 43
-    - 46
-    - 48
-    - 49
+    - 47
+    - 50
+    - 52
+    - 53
     checkpoints:
-    - step: 44
+    - step: 48
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 45
+    - step: 49
       expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'
-    - step: 47
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 83.51,
-        "min_height": 1, "tolerance": 0, "max_width": 84.49}}'
-    - step: 50
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 51
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 83.51,
         "min_height": 1, "tolerance": 0, "max_width": 84.49}}'
-    - step: 52
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 55
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"]", "min_width": 83.51,
+        "min_height": 1, "tolerance": 0, "max_width": 84.49}}'
+    - step: 56
       expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
     results:
-    - 44
-    - 45
-    - 47
-    - 50
+    - 48
+    - 49
     - 51
-    - 52
+    - 54
+    - 55
+    - 56
   - id: R-retained-controls
     requirement: The workspace retains an independent right stripe resize handle while the merged left stripe uses
       only the outer handle.
     actions:
-    - 54
-    - 55
-    - 57
+    - 58
+    - 59
+    - 61
     checkpoints:
-    - step: 58
+    - step: 62
       expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
         uses only the outer handle.
-    - step: 59
+    - step: 63
       expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
         uses only the outer handle.
-    - step: 60
+    - step: 64
       expectation: The workspace retains an independent right stripe resize handle while the merged left stripe
         uses only the outer handle.
     results:
-    - 58
-    - 59
-    - 60
+    - 62
+    - 63
+    - 64
   - id: R-followup
     requirement: Navigate the current Shell categories and wait for actionable controls while retaining all business-result
       assertions.

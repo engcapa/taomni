@@ -16621,6 +16621,9 @@ export function CodeWorkspaceTab({
       + ', [data-testid="structural-search-dialog"]'
       // ED-PARITY-017: the in-place naming session owns Esc/Enter/Shift+F6/Alt+Shift+O.
       + ', [data-testid="code-workspace-inline-rename"]'
+      // Shell chrome owns its keys, including Escape on the temporary
+      // immersive titlebar. A visible editor must not consume them in capture.
+      + ', [data-testid="app-titlebar"]'
       // Debugger popups/dialogs own their fields, Esc and Delete.
       + ', [data-testid="debug-breakpoint-popup"], [data-testid="debug-breakpoints-dialog"], [data-testid="debug-evaluate-dialog"]',
     ));

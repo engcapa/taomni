@@ -19,6 +19,11 @@ steps:
 - wait_for: '[data-testid="tab-bar"]'
 - click: '[data-testid="new-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 2
 - assert_count:
     selector: '[data-testid="tab-item"]'
     min: 2
@@ -49,7 +54,7 @@ steps:
 - assert_not_visible: '[data-testid="open-tabs-menu"]'
 - assert_count:
     selector: '[data-testid="terminal-pane"]'
-    equal: 1
+    equal: 2
 verification:
   review: reviewed
   requirements:
@@ -59,14 +64,15 @@ verification:
     actions:
     - 1
     - 3
-    - 6
+    - 5
     - 9
-    - 11
-    - 13
-    - 15
+    - 12
+    - 14
+    - 16
     - 18
-    - 19
-    - 23
+    - 21
+    - 22
+    - 26
     checkpoints:
     - step: 2
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
@@ -74,57 +80,62 @@ verification:
     - step: 4
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
-    - step: 5
-      expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
-        tabs; browser detach closes the menu and retains the source terminal.
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 7
-      expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
-        tabs; browser detach closes the menu and retains the source terminal.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 2}}'
     - step: 8
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
     - step: 10
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
-    - step: 12
+    - step: 11
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
-    - step: 14
+    - step: 13
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
-    - step: 16
+    - step: 15
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
     - step: 17
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
+    - step: 19
+      expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
+        tabs; browser detach closes the menu and retains the source terminal.
     - step: 20
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
-    - step: 21
+    - step: 23
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
     - step: 24
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
-    - step: 25
+    - step: 27
       expectation: Per-tab hover shows one preview; the shortcut shows all previews and toggles off; Overview lists
         tabs; browser detach closes the menu and retains the source terminal.
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 2}}'
     results:
     - 2
     - 4
-    - 5
+    - 6
     - 7
     - 8
     - 10
-    - 12
-    - 14
-    - 16
+    - 11
+    - 13
+    - 15
     - 17
+    - 19
     - 20
-    - 21
+    - 23
     - 24
-    - 25
+    - 27
+    - 28
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

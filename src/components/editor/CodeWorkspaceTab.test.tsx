@@ -7652,6 +7652,32 @@ describe("CodeWorkspaceTab", () => {
     }
   });
 
+  it("leaves temporary Shell titlebar Escape to its owner while the workspace stays visible", async () => {
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("notes.txt", "retained draft"));
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-shell-escape", workspaceInstanceId: "instance-shell-escape",
+      name: "Escape", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }], looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "notes.txt" },
+    };
+    const titlebar = document.createElement("div");
+    titlebar.dataset.testid = "app-titlebar";
+    const trigger = document.createElement("button"); titlebar.append(trigger); document.body.append(titlebar);
+    const bubble = vi.fn((event: KeyboardEvent) => { expect(event.defaultPrevented).toBe(false); });
+    document.addEventListener("keydown", bubble);
+    try {
+      renderWorkspace(workspace);
+      await screen.findByTitle("app / notes.txt");
+      const editor = screen.getByTestId("code-workspace-editor").querySelector<HTMLElement>(".cm-content")!;
+      const view = EditorView.findFromDOM(editor)!;
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key: "Escape", code: "Escape" });
+      expect(bubble).toHaveBeenCalledOnce();
+      expect(trigger).toHaveFocus();
+      expect(EditorView.findFromDOM(editor)).toBe(view);
+      expect(view.state.doc.toString()).toBe("retained draft");
+    } finally { document.removeEventListener("keydown", bubble); titlebar.remove(); }
+  });
+
   it("toggles the project tree from the panel-local collapse control and collapsed rail", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
