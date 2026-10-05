@@ -2,8 +2,9 @@
 
 `.github/workflows/qa-ui-auto-platforms.yml` is independent of the existing E2E,
 native and release workflows. Its failures remain visible; it does not add a PR
-or release dependency. Runners are Ubuntu 24.04 x64, Windows 2025 x64 and macOS 15
-ARM64. Each can run browser and native cases.
+or release dependency. Default runners are Ubuntu 24.04 x64, Windows 2025 x64
+and macOS 15 ARM64. Each can run browser and native cases. Linux native supports
+the optional desktop profiles below; release builds and packaging are unchanged.
 
 ## Trigger and select
 
@@ -17,6 +18,9 @@ gh workflow run qa-ui-auto-platforms.yml --ref YOUR_BRANCH \
   -f case_ids=TC-012,TC-027
 gh workflow run qa-ui-auto-platforms.yml --ref YOUR_BRANCH \
   -f scope=impacted -f base=BASE_SHA -f head=HEAD_SHA
+gh workflow run qa-ui-auto-platforms.yml --ref YOUR_BRANCH \
+  -f scope=smoke -f platforms=linux -f modes=native \
+  -f linux_profiles=ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland
 ```
 
 GitHub only registers `workflow_dispatch` on the default branch. Publishing the
@@ -85,6 +89,61 @@ issue publisher receives write permission and it never checks out tested code.
 Nightly runs use `all` at 19:17 UTC. Issue sync defaults off; enable its dispatch
 input or repository variable `QA_UI_AUTO_PUBLISH_ISSUES=true` for nightly runs.
 
+### Linux native desktop profiles
+
+`linux_profiles` is a comma-separated multi-selection in both dispatch and
+reusable calls; the CLI equivalent is `--linux-profiles` (or
+`QA_LINUX_PROFILES`). Omitted/empty input selects `ubuntu-24.04-xvfb`, preserving
+the default runner, `linux-native` job/artifact name, smoke scope and nightly
+behavior. Supplying other profiles replaces that selection: include the default
+explicitly to run it as well. Duplicate names are collapsed; unknown names fail
+planning. The field only expands Linux native jobs. Browser still runs once on
+Ubuntu 24.04, and Windows/macOS are unaffected.
+
+| Profile | Runner / session | Desktop | Purpose |
+|---|---|---|---|
+| `ubuntu-24.04-xvfb` (default) | Ubuntu 24.04 / X11 Xvfb | Openbox + xcompmgr | Existing CI baseline |
+| `ubuntu-22.04-x11` | Ubuntu 22.04 / X11 Xvfb | LXQt + Openbox, no compositor | Older library/desktop compatibility; uncomposited screenshot regressions |
+| `ubuntu-22.04-vnc` | Ubuntu 22.04 / X11 Xtigervnc | LXQt + Openbox, no compositor | The app runs inside a real VNC-served desktop |
+| `ubuntu-26.04-wayland` | Ubuntu 26.04 LTS / native Wayland | Ubuntu GNOME Shell/Mutter, virtual 1920×1080 monitor, software rendering | Current LTS Wayland startup, WebKitGTK and app workflows |
+
+Versioned runner labels fix the Ubuntu release family, not an immutable image:
+GitHub updates runner images and apt packages. Reports retain `VERSION_ID`,
+`PRETTY_NAME`, runner image version and desktop readiness. Upgrading the latest
+Desktop target requires a new explicit profile, not silently changing an
+existing name. These are hosted virtual desktops; physical GPU, mixed DPI,
+multiple monitors and exact reproduction of a real-machine Xorg driver remain
+separate acceptance targets.
+
+Ubuntu 22.04 QA installs a checksum-pinned PipeWire 1.0.9 development/runtime
+overlay because pipewire-rs needs headers newer than stock Jammy. That overlay
+is part of the test environment, not evidence for stock Jammy PipeWire. The
+release workflow's existing independent recipe is not changed.
+
+The VNC desktop binds loopback, uses a disposable VNCAuth password outside
+uploaded reports, and authenticates an actual RFB handshake before launch.
+It does not expose a public VNC endpoint. It is independent of `vnc_required`:
+that service fixture is the programmable RFB server the Taomni VNC client
+connects to. The profile currently establishes hosted-desktop operation; remote
+viewer reconnect/input/clipboard integration needs additional focused cases.
+
+Wayland preparation starts GNOME/Mutter, PipeWire/WirePlumber and real GNOME
+desktop portals on the job's private DBus session. It verifies compositor
+protocols, a GTK `GdkWaylandDisplay` and Screenshot/ScreenCast/RemoteDesktop
+portal interfaces. `GDK_BACKEND=wayland` prevents an X11 fallback. Existing
+X11/XTEST/clipboard-owner and portal-consent-dependent capture/RDP cases are
+listed as profile-specific capability gaps during planning. They are not
+silently run with weaker assertions or counted as Wayland passes. Explicitly
+selecting a case unavailable in all requested combinations fails. Portal
+interface readiness alone does not prove user authorization or screen capture.
+
+Selection entries, cache keys and artifact directories identify the profile.
+The runner receipt binds `desktop_identity` in the native summary; aggregation
+rejects a different OS release/session/profile even when the binary matches.
+Inspect `desktop/desktop-readiness.json` and `desktop/desktop-failure.json`
+alongside the native report. The native smoke `TC-NATIVE-CORE-001` proves app
+startup and a real local PTY roundtrip; it does not claim all Wayland features.
+
 ## Runner-local dependencies
 
 Only selected capabilities are provisioned. Linux owns uniquely named local
@@ -128,8 +187,9 @@ whole debug/test extension server directories are retained. Product semantics
 and debugging still require the actual native cases; preparation alone is not
 product coverage.
 
-Linux native uses Xvfb, Openbox, DBus and, when required, fcitx5/wbpy. Python/Tk
-and XTEST are probed in that session. Windows requires a nonzero interactive
+Default Linux native uses Xvfb, Openbox, DBus and, when required, fcitx5/wbpy.
+X11 profiles probe Python/Tk and XTEST in their session; additional Linux
+profiles are described above. Windows requires a nonzero interactive
 session and an input desktop. macOS requires an Aqua session and uses
 WKWebView's own snapshot, without asking for Screen Recording. These images are
 WebView captures; they do not establish full desktop capture or OS permission

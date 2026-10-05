@@ -105,7 +105,8 @@ def main():
         if architecture != entry["arch"]:
             raise RuntimeError(f"runner architecture {platform.machine()} differs from selected {entry['arch']}")
         write_json(args.report / "environment.json", {"platform": platform.system(), "architecture": architecture,
-                   "python": platform.python_version(), "head": manifest["head"], "capabilities": entry["capabilities"]})
+                   "python": platform.python_version(), "head": manifest["head"], "capabilities": entry["capabilities"],
+                   "linux_profile": entry.get("linux_profile", ""), "desktop": entry.get("desktop", {})})
         with ExitStack() as stack:
             # The SSH account, the VNC fixture's per-case event log and the
             # macOS console session behind Screen Sharing are shared.
@@ -138,10 +139,13 @@ def main():
                 wrapper.write_text(f'@echo off\n"{driver}" --verbose "--log-path={log_path}" %*\n', encoding="utf-8")
                 config["webdriver"] = {"native_driver": str(wrapper)}
             cfg_path = args.report / "config.yaml"
-            cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
             if entry["mode"] == "native":
                 from ci_desktop import Desktop
-                stack.enter_context(Desktop(args.report / "desktop", entry["capabilities"]))
+                from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE
+                desktop = stack.enter_context(Desktop(args.report / "desktop", entry["capabilities"],
+                                                       entry.get("linux_profile") or DEFAULT_LINUX_PROFILE))
+                if entry.get("desktop"):
+                    config["desktop"] = desktop.facts
                 outcome["stage"] = "build"
                 write_json(args.report / "ci-outcome.json", outcome)
                 build_log = stack.enter_context((args.report / "build.log").open("w", encoding="utf-8"))
@@ -177,6 +181,7 @@ def main():
                         time.sleep(1)
                 else:
                     raise RuntimeError("Vite not ready in 90s")
+            cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
             outcome["stage"] = "cases"
             write_json(args.report / "ci-outcome.json", outcome)
             command = [sys.executable, "-m", "qa_ui_auto", "run", "--selection", str(args.selection),
