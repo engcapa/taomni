@@ -88,9 +88,15 @@ macOS `TC-SHOT-N7` 的 13 个 GIF 解码帧全部匹配原画/nonce/时间顺序
 
 Windows N17 失败发生在原生保存对话框输入。阶段记录中，保存按钮点击后仅固定等待 1.5s，在 8794ms 标记对话框打开、9493ms 发送全局键盘输入，但 [当时桌面图](../qa-ui-auto-report/hosted-37258337972/artifacts/qa-windows-native-f4d9247436f94cf1b252749590f0a70a/screenshot-outputs/windows-8351a522-3ced-4c51-9f30-d240bc51775c-8-pin-save-dialog-open.png) 尚无保存对话框。[失败时桌面图](../qa-ui-auto-report/hosted-37258337972/artifacts/qa-windows-native-f4d9247436f94cf1b252749590f0a70a/screenshot-outputs/windows-8351a522-3ced-4c51-9f30-d240bc51775c-9-pin-save-dialog-failed.png) 对话框已打开，文件名仍是默认 `Taomni-pin`，说明输入送早了；不是文件内容断言错误。
 
-修复 QA 输入时序：[windows_save_dialog.rs](../src-tauri/src/screenshot/qa/windows_save_dialog.rs) 读取实际 Win32 前台窗口及 GUI 线程焦点，等待当前 QA PID 的 `#32770` 对话框和默认文件名 Edit 字段获得焦点（最多 20s）后再输入。成功/失败证据记录 PID、类名、焦点控件、默认文件名和等待时间。仍通过真实 Enigo 键盘输入操作原生对话框、验证指定目标文件与原 PNG 字节完全相同，后续收藏持久化断言保留。Windows 专用模块已在本机使用 `x86_64-pc-windows-gnu` 对实际源码进行编译类型检查；完整原生运行仍需 hosted Windows 复测。
+修复 QA 输入时序：[windows_save_dialog.rs](../src-tauri/src/screenshot/qa/windows_save_dialog.rs) 读取实际 Win32 前台窗口及 GUI 线程焦点，等待当前 QA PID 的 `#32770` 对话框和默认文件名 Edit 字段获得焦点（最多 20s）后再输入。成功/失败证据记录 PID、类名、焦点控件、默认文件名和等待时间。仍通过真实 Enigo 键盘输入操作原生对话框、验证指定目标文件与原 PNG 字节完全相同，后续收藏持久化断言保留。Windows 专用模块已在本机使用 `x86_64-pc-windows-gnu` 对实际源码进行编译类型检查。第三轮 Windows native 16/16 通过；N17 记录 QA PID 6868、`#32770`、焦点 `Edit` / control ID 1001、默认值 `Taomni-pin`，等待 568ms 后输入，目标 PNG 与原始文件字节完全一致。
 
-第三轮完整 [run 37262106144](https://github.com/engcapa/taomni/actions/runs/37262106144) 测试提交 `a11cdc07207957c6ffa3e00019a647ba48353a66`，继续选择上述六组 156 执行项。该轮已启动，结果待返回，原始报告下载到 `qa-ui-auto-report/hosted-37262106144/`。
+第三轮完整 [run 37262106144](https://github.com/engcapa/taomni/actions/runs/37262106144) 测试提交 `a11cdc07207957c6ffa3e00019a647ba48353a66`，继续选择上述六组 156 执行项。三端 browser 各 35/35、Linux/Windows native 各 16/16、macOS native 17/19，合计 154/156、零跳过。独立审核针对该提交的隔离只读工作树，六组源码/runner/case/config、QA 二进制身份、232 个 receipt 附件和 1911 个原生输出附件哈希全部一致；严格聚合 `passed=false`，见 `qa-ui-auto-report/hosted-37262106144/independent-verification.json`。
+
+第三轮 macOS N17 在 9466ms 标记对话框打开，但当时桌面截图尚无保存面板；12467ms 标记输入完成，失败截图中“前往文件夹”字段只剩路径末尾 `acts`。与 Windows 首次失败一样，固定等待并不保证真实输入焦点就绪。提交 `e7fb44c7` 新增 [macos_save_dialog.rs](../src-tauri/src/screenshot/qa/macos_save_dialog.rs)，只读取真实 AX 焦点与字段值，要求所有者是 QA 进程或其子进程（系统保存面板由 `osascript` 子进程打开）。等待默认文件名、前往文件夹字段、完整输入值以及返回保存面板后，再发送下一步 Enigo 键盘输入。PNG 字节、收藏持久化和桌面像素标准均保留。
+
+第三轮 macOS N8 的 14 个解码帧的像素、nonce 和顺序全部匹配，但第三帧的时间不符：画面是 source ID 39，真实原画区间为 3043–3136ms；视频时间 1052ms 相对首帧原画 2685ms 对应 3737ms，超过可见区间 601ms。另有 808ms 帧间隔、747ms 未解释漏采，均不满足原有标准。原实现每帧重新枚举显示器、读取整屏、转换并裁切，最后才记录 `Instant::now()`，将这段耗时计入旧画面的时间。提交 `8be0c5ee` 新增 [mac_snapshot.rs](../src-tauri/src/screenshot/mac_snapshot.rs)：缓存实际 CGDisplayBounds，将物理选区映射为 CoreGraphics 选区，仅读取该区域，在请求快照时记录时间，保留原来的无持久显示流兼容路径。250ms 时间漂移与 700ms 未解释漏采阈值未改。
+
+两个新增 macOS 模块的实际源码已在本机用 `aarch64-apple-darwin` 进行编译类型检查通过，见 `qa-ui-auto-report/_local/screenshot-x11/macos-api-check-installed.log`；此检查不替代真实 macOS 运行。定向 [run 37266190307](https://github.com/engcapa/taomni/actions/runs/37266190307) 测试 `8be0c5ee3f2b15d334d57de0ffdaa0edd263cac9` 的 N7/N8/N14/N17/N19，结果待返回。
 
 ## 实际安装命令
 
@@ -103,11 +109,14 @@ sudo apt-get install -y meson
 python qa-ui-auto-report/_local/screenshot-x11/install-pipewire.py
 rustup target add x86_64-pc-windows-gnu
 sudo apt-get install -y xcompmgr
+RUSTUP_DIST_SERVER=https://rsproxy.cn rustup target add aarch64-apple-darwin
 ```
 
 ALSA 开发包用于编译，xdotool 用于当前 X11 桌面操作。系统 PipeWire 0.3.48 缺少 pipewire-rs 所需的 `pw_buffer.requested`；安装脚本下载 PipeWire 1.0.5 到本地 QA 目录，编译并安装头文件与运行库到 `qa-ui-auto-report/_local/screenshot-x11/pipewire-prefix`。系统 PipeWire 服务和安装目录未替换。源码地址为 `https://codeload.github.com/PipeWire/pipewire/tar.gz/refs/tags/1.0.5`。
 
 Windows Rust 标准库 target 用于在 Linux 本机检查 Windows 对话框查询源码的 API 与类型，不替代真实 Windows native 验证。检查日志为 `qa-ui-auto-report/_local/screenshot-x11/windows-dialog-api-check.log`。
+
+macOS Rust 标准库 target 用于检查新增 AX 与 CoreGraphics 模块。官方源下载缓慢，停止该下载后通过 rsproxy 镜像完成安装，Rustup 校验组件；未安装或更改 macOS SDK。
 
 本机 LXQt/Openbox 默认没有 X11 合成器（`_NET_WM_CM_S0` owner 为 0）。扩展的 N17 本机检查中，PNG 保存与收藏均通过，但 50% 透明度的桌面混色断言失败：底图 `[255,255,255,255]`，期待 `[227,137,147]`，捕获到未合成的 `[100,10,20,128]`。该失败报告保存在 `qa-ui-auto-report/screenshot-x11/native-dialog/`。`xcompmgr` 仅用于后续贴图透明度检查，临时执行 `xcompmgr -n`，测试结束关闭；与不依赖合成器的截图崩溃修复分开记录，桌面条件保存在 `qa-ui-auto-report/_local/screenshot-x11/dialog-compositor-conditions.json`。原始未合成环境的 N3/N10/N12 三项均通过。
 
