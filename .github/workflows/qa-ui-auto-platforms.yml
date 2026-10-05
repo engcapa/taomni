@@ -188,11 +188,22 @@ jobs:
         with:
           workspaces: src-tauri -> target/qa-ui-auto
           shared-key: qa-platforms-${{ matrix.cache_key }}
-          # Save changed workspace crates for this revision; an exact hit on
-          # the old static key otherwise rebuilds them on every follow-up run.
-          key: hosted-services-v3-${{ needs.plan.outputs.head }}
+          # Keep the shared dependency/tool cache independent of the QA app.
+          # rust-cache ignores `key` when `shared-key` is also supplied.
+          cache-targets: false
           cache-on-failure: true
-          cache-workspace-crates: true
+      - name: Native QA workspace cache
+        if: matrix.mode == 'native'
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target/qa-ui-auto
+          # A new revision saves its workspace crates instead of hitting an
+          # immutable dependency cache. Separate debug/release workloads so
+          # a quick debug run cannot prevent saving the RDP release build.
+          key: qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ needs.plan.outputs.head }}
+          restore-keys: |
+            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
+            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
       - name: Windows build tools and WebView2 driver
         if: runner.os == 'Windows' && matrix.mode == 'native'
         shell: pwsh
