@@ -861,7 +861,10 @@ class NativeSession:
         # (path breadcrumbs, rename fields) disappear before /value arrives.
         # Select and replace through keyboard input while retaining focus.
         self.request("POST", self.element_path(element, "/click"), {})
-        self.press_combo("Mod+a")
+        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND") == "wayland":
+            self._select_wayland_fill_input(selector)
+        else:
+            self.press_combo("Mod+a")
         self.press_combo("Backspace")
         password_input = platform.system() == "Linux" and self.execute(
             f"const el = document.querySelector({json.dumps(selector)});"
@@ -884,6 +887,28 @@ class NativeSession:
             self.type_text(text)
         return f"filled {selector}"
 
+    def _select_wayland_fill_input(self, selector: str) -> None:
+        # A successful /actions response can precede GTK's focus/selection
+        # update on Wayland. Backspace then deletes only the character before
+        # the caret, leaving an old prefix in ports, paths and passwords.
+        # Observe the real selection before proceeding; never rewrite values.
+        probe = (
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "if (!el || document.activeElement !== el) return false;"
+            "if (el.selectionStart === null) return true;"
+            "return el.selectionStart === 0 && el.selectionEnd === el.value.length;"
+        )
+        for _ in range(3):
+            self.press_combo("Mod+a")
+            deadline = time.monotonic() + 0.5
+            while True:
+                if self.execute(probe) is True:
+                    return
+                if time.monotonic() >= deadline:
+                    break
+                time.sleep(0.05)
+        raise WebDriverError(f"Wayland input did not select its existing value: {selector}")
+
     def _paste_linux_password(self, element: str, selector: str, text: str, check: str) -> None:
         from qa_ui_auto import host_clipboard
 
@@ -892,7 +917,10 @@ class NativeSession:
             previous = host_clipboard.get_text()
         try:
             self.request("POST", self.element_path(element, "/click"), {})
-            self.press_combo("Mod+a")
+            if os.environ.get("GDK_BACKEND") == "wayland":
+                self._select_wayland_fill_input(selector)
+            else:
+                self.press_combo("Mod+a")
             self.press_combo("Backspace")
             host_clipboard.set_text(text)
             self.press_combo("Control+v")

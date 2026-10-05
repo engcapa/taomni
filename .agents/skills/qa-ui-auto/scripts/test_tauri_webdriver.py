@@ -348,6 +348,30 @@ class NativeSessionFillTest(TestCase):
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_called_once_with("Taomni")
 
+    def test_wayland_fill_retries_select_all_before_deleting_old_prefix(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, False, True, False])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 0.6, 1]):
+            session.fill('input[name=title]', 'Taomni')
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Mod+a"), call("Backspace")])
+        session.type_text.assert_called_once_with("Taomni")
+        self.assertIn("selectionEnd === el.value.length", session.execute.call_args_list[1].args[0])
+
+    def test_wayland_fill_rejects_unselected_password_before_modifying_it(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(return_value=False)
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 1, 2, 3, 4, 5]):
+            with self.assertRaisesRegex(WebDriverError, "did not select its existing value") as error:
+                session.fill('input[type=password]', 'private-secret')
+        self.assertNotIn('private-secret', str(error.exception))
+        self.assertNotIn(call("Backspace"), session.press_combo.call_args_list)
+        self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
+        session.type_text.assert_not_called()
+
     def test_macos_fill_replaces_value_without_synthetic_backspace(self) -> None:
         session = self.session(False)
         with patch("tauri_webdriver.platform.system", return_value="Darwin"):
