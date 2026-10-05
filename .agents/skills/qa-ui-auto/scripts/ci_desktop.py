@@ -104,6 +104,13 @@ class Desktop:
         shell = self.start(["gnome-shell", "--wayland", "--headless", "--virtual-monitor=1920x1080",
                             "--wayland-display=wayland-qa", "--mode=ubuntu"])
         self._wait(shell, lambda: (runtime / "wayland-qa").is_socket(), "GNOME Wayland compositor")
+        # The Wayland socket appears before Mutter publishes its DBus APIs.
+        # Wait for the owner instead of racing CreateSession against startup.
+        self._wait(shell, lambda: subprocess.check_output([
+            "gdbus", "call", "--session", "--dest", "org.freedesktop.DBus",
+            "--object-path", "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.NameHasOwner",
+            "org.gnome.Mutter.RemoteDesktop"], text=True, timeout=5).strip() == "(true,)",
+            "Mutter RemoteDesktop service")
         input_owner = self.start(["/usr/bin/python3", str(Path(__file__).with_name("ci_wayland_input.py")),
                                   "--ready", str(self.root / "virtual-input-ready.json")])
 

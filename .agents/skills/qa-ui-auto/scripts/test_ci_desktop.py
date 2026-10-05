@@ -104,7 +104,7 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '26.04'}), \
              patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
-             patch.object(Desktop, 'start'), patch.object(Desktop, '_wait', side_effect=[None, None, WAYLAND_PROTOCOLS]), \
+             patch.object(Desktop, 'start'), patch.object(Desktop, '_wait', side_effect=[None, None, None, WAYLAND_PROTOCOLS]), \
              patch('ci_desktop.subprocess.run'), \
              patch('ci_desktop.subprocess.check_output', return_value='GdkX11Display\n1\n'):
             with self.assertRaisesRegex(RuntimeError, 'GTK did not use a Wayland display'):
@@ -119,7 +119,7 @@ class DesktopTests(unittest.TestCase):
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '26.04'}), \
              patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
              patch.object(Desktop, 'start') as start, \
-             patch.object(Desktop, '_wait', side_effect=[None, None, WAYLAND_PROTOCOLS]), \
+             patch.object(Desktop, '_wait', side_effect=[None, None, None, WAYLAND_PROTOCOLS]) as wait, \
              patch('ci_desktop.subprocess.run') as run, \
              patch('ci_desktop.subprocess.check_output', side_effect=[
                  'GdkWaylandDisplay\n1\n', portal, 'GNOME Shell 50']):
@@ -151,6 +151,10 @@ class DesktopTests(unittest.TestCase):
                 self.assertEqual(desktop.facts['input_devices'], ['keyboard', 'pointer'])
                 self.assertEqual(desktop.facts['portal_interfaces'], ['Screenshot', 'ScreenCast', 'RemoteDesktop'])
                 self.assertTrue(desktop.facts['ready'])
+                self.assertEqual([call.args[2] for call in wait.call_args_list], [
+                    'PipeWire', 'GNOME Wayland compositor', 'Mutter RemoteDesktop service',
+                    'Wayland keyboard and pointer',
+                ])
                 self.assertFalse(any('openbox' in call.args[0] for call in start.call_args_list))
             self.assertEqual(os.environ['DISPLAY'], ':99')
 
@@ -166,13 +170,50 @@ class DesktopTests(unittest.TestCase):
              patch.dict(os.environ, {'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
              patch.object(Desktop, 'start') as start, patch('ci_desktop.Path.is_socket', return_value=True), \
              patch('ci_desktop.subprocess.run'), patch('ci_desktop.time.sleep'), \
-             patch('ci_desktop.subprocess.check_output', return_value=WAYLAND_PROTOCOLS.replace('pointer keyboard', '')) as probe:
+             patch('ci_desktop.subprocess.check_output', side_effect=lambda cmd, **kw:
+                   WAYLAND_PROTOCOLS.replace('pointer keyboard', '') if cmd == ['wayland-info'] else '(true,)') as probe:
             start.return_value.poll.return_value = None
             with self.assertRaisesRegex(RuntimeError, 'Wayland keyboard and pointer did not become ready'):
                 with Desktop(Path(d), ['display'], 'ubuntu-26.04-wayland'):
                     pass
-            self.assertTrue(all(call.args[0] == ['wayland-info'] for call in probe.call_args_list))
+            self.assertEqual(probe.call_args_list[0].args[0][0], 'gdbus')
+            self.assertTrue(all(call.args[0] == ['wayland-info'] for call in probe.call_args_list[1:]))
             self.assertFalse((Path(d) / 'desktop-readiness.json').exists())
+
+    def test_wayland_waits_for_mutter_dbus_owner_after_its_socket_appears(self):
+        calls = []
+        owner_checks = []
+        portal = '\n'.join('org.freedesktop.portal.' + name for name in ('Screenshot', 'ScreenCast', 'RemoteDesktop'))
+
+        def probe(command, **kwargs):
+            if command[-1] == 'org.gnome.Mutter.RemoteDesktop':
+                owner_checks.append(command)
+                return '(false,)' if len(owner_checks) == 1 else '(true,)'
+            if command == ['wayland-info']:
+                return WAYLAND_PROTOCOLS
+            if command[0] == '/usr/bin/python3':
+                return 'GdkWaylandDisplay\n1\n'
+            if command[0] == 'gdbus':
+                return portal
+            return 'GNOME Shell 50'
+
+        def launch(command, **kwargs):
+            if command[0] == '/usr/bin/python3':
+                self.assertEqual(len(owner_checks), 2)
+            calls.append(command)
+            process = Mock()
+            process.poll.return_value = None
+            return process
+
+        with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
+             patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '26.04'}), \
+             patch.dict(os.environ, {'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
+             patch.object(Desktop, 'start', side_effect=launch), patch('ci_desktop.Path.is_socket', return_value=True), \
+             patch('ci_desktop.subprocess.run'), patch('ci_desktop.time.sleep'), \
+             patch('ci_desktop.subprocess.check_output', side_effect=probe):
+            with Desktop(Path(d), ['display'], 'ubuntu-26.04-wayland') as desktop:
+                self.assertTrue(desktop.facts['ready'])
+            self.assertTrue(any(command[0] == '/usr/bin/python3' for command in calls))
 
     def test_old_x11_profile_preserves_uncomposited_desktop(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
