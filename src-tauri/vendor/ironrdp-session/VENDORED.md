@@ -19,3 +19,9 @@ xrdp releases during desktop resizing. The generic header decoder requires
 `shareId`, so it rejected this form before the existing optional descriptor
 handling could run. Full PDUs keep their regular decoder; malformed short PDUs
 still fail. Both valid forms trigger the normal reactivation sequence.
+
+RemoteFX regions are intersected with the surface destination and current
+desktop before applying tiles. A padded capture region must not cause the
+entire repaint to be discarded after resizing to a non-tile-aligned desktop.
+The regression decodes a real RLGR tile in a padded frame and checks visible
+RGBA pixels and update bounds.

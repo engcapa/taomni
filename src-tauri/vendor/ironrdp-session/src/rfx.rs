@@ -160,8 +160,19 @@ impl DecodingContext {
         trace!(channels = ?self.channels);
         trace!(?region);
 
+        // A peer may describe its 64-pixel-aligned capture buffer, which can
+        // extend past the surface and the newly negotiated desktop. Clip the
+        // region before applying tiles; otherwise DecodedImage rejects every
+        // tile because the region's overall extents exceed its bounds.
         let clipping_rectangles =
-            clipping_rectangles(region.rectangles.as_slice(), destination, width, height);
+            clipping_rectangles(region.rectangles.as_slice(), destination, width, height)
+                .intersect_rectangle(destination)
+                .intersect_rectangle(&InclusiveRectangle {
+                    left: 0,
+                    top: 0,
+                    right: image.width().saturating_sub(1),
+                    bottom: image.height().saturating_sub(1),
+                });
         trace!("Clipping rectangles: {:?}", clipping_rectangles);
 
         let mut final_update_rectangle = clipping_rectangles.extents.clone();
@@ -307,6 +318,79 @@ fn map_tiles_data<'a>(tiles: &[Tile<'a>], quants: &[Quant]) -> Vec<TileData<'a>>
             data: [t.y_data, t.cb_data, t.cr_data],
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ironrdp_core::encode_vec;
+
+    #[test]
+    fn padded_remote_fx_frame_paints_pixels_after_desktop_resize() {
+        let mut encoded_component = vec![0; 4096];
+        let length =
+            rlgr::encode(EntropyAlgorithm::Rlgr1, &[0; 4096], &mut encoded_component).unwrap();
+        encoded_component.truncate(length);
+        let blocks = [
+            rfx::Block::Sync(rfx::SyncPdu),
+            rfx::Block::CodecVersions(rfx::CodecVersionsPdu),
+            rfx::Block::Channels(rfx::ChannelsPdu(vec![rfx::RfxChannel {
+                width: 1536,
+                height: 1088,
+            }])),
+            rfx::Block::CodecChannel(rfx::CodecChannel::Context(rfx::ContextPdu {
+                flags: rfx::OperatingMode::IMAGE_MODE,
+                entropy_algorithm: EntropyAlgorithm::Rlgr1,
+            })),
+            rfx::Block::CodecChannel(rfx::CodecChannel::FrameBegin(rfx::FrameBeginPdu {
+                index: 1,
+                number_of_regions: 1,
+            })),
+            rfx::Block::CodecChannel(rfx::CodecChannel::Region(rfx::RegionPdu {
+                rectangles: vec![RfxRectangle {
+                    x: 0,
+                    y: 0,
+                    width: 1536,
+                    height: 1088,
+                }],
+            })),
+            rfx::Block::CodecChannel(rfx::CodecChannel::TileSet(rfx::TileSetPdu {
+                entropy_algorithm: EntropyAlgorithm::Rlgr1,
+                quants: vec![Quant::default()],
+                tiles: vec![Tile {
+                    y_quant_index: 0,
+                    cb_quant_index: 0,
+                    cr_quant_index: 0,
+                    x: 4,
+                    y: 3,
+                    y_data: &encoded_component,
+                    cb_data: &encoded_component,
+                    cr_data: &encoded_component,
+                }],
+            })),
+            rfx::Block::CodecChannel(rfx::CodecChannel::FrameEnd(rfx::FrameEndPdu)),
+        ];
+        let encoded: Vec<u8> = blocks
+            .iter()
+            .flat_map(|block| encode_vec(block).unwrap())
+            .collect();
+        let mut image = DecodedImage::new(PixelFormat::RgbA32, 1492, 1030);
+        let (_, updated) = DecodingContext::new()
+            .decode(
+                &mut image,
+                &InclusiveRectangle {
+                    left: 0,
+                    top: 0,
+                    right: 1491,
+                    bottom: 1029,
+                },
+                &mut ReadCursor::new(&encoded),
+            )
+            .unwrap();
+        let offset = (240 * 1492 + 280) * 4;
+        assert_eq!(&image.data()[offset..offset + 4], &[128, 128, 128, 255]);
+        assert!(updated.right < image.width() && updated.bottom < image.height());
+    }
 }
 
 struct TileData<'a> {
