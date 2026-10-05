@@ -62,6 +62,32 @@ class DesktopTests(unittest.TestCase):
             names=[c[0] for c in parent.mock_calls]
             self.assertLess(names.index('second.terminate'),names.index('first.terminate'))
 
+    def test_cleanup_detaches_private_document_portal_mount_before_removing_runtime(self):
+        with tempfile.TemporaryDirectory() as d, patch('ci_desktop.sys.platform', 'linux'), \
+             patch('ci_desktop.Path.is_mount', return_value=True), \
+             patch('ci_desktop.subprocess.run') as unmount:
+            desktop = Desktop(Path(d), [], 'ubuntu-26.04-wayland')
+            desktop.temporary = Mock()
+            desktop.temporary.name = str(Path(d) / 'owned-runtime')
+            parent = Mock()
+            parent.attach_mock(unmount, 'unmount')
+            parent.attach_mock(desktop.temporary.cleanup, 'remove')
+            desktop.__exit__(None, None, None)
+            unmount.assert_called_once_with(
+                ['fusermount3', '-uz', str(Path(d) / 'owned-runtime/runtime/doc')], check=True, timeout=15)
+            self.assertEqual([call[0] for call in parent.mock_calls], ['unmount', 'remove'])
+
+    def test_cleanup_failure_restores_original_display_environment(self):
+        with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {'DISPLAY': ':99'}):
+            desktop = Desktop(Path(d), [])
+            desktop.temporary = Mock()
+            desktop.temporary.name = d
+            desktop.temporary.cleanup.side_effect = PermissionError('portal mount')
+            os.environ['DISPLAY'] = ':100'
+            with self.assertRaises(PermissionError):
+                desktop.__exit__(None, None, None)
+            self.assertEqual(os.environ['DISPLAY'], ':99')
+
     def test_profile_os_mismatch_fails_before_starting_any_desktop(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
              patch.object(Desktop, 'start') as start:

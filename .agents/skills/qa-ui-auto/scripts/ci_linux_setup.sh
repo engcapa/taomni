@@ -30,7 +30,7 @@ if [[ "$profile" == *wayland ]]; then
   # printer/scanner/office packages unrelated to this virtual QA session.
   install_packages --no-install-recommends gnome-shell ubuntu-session gnome-settings-daemon yaru-theme-gnome-shell \
     xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
-    pipewire wireplumber wayland-utils wl-clipboard
+    pipewire wireplumber wayland-utils wl-clipboard fuse3
 else
   install_packages xvfb xauth openbox xcompmgr wmctrl xdotool x11-utils \
     x11-xserver-utils libxtst6 xclip imagemagick fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons

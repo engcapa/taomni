@@ -274,14 +274,22 @@ class Desktop:
                 process.wait()
         for log in self.logs:
             log.close()
-        if self.temporary:
-            self.temporary.cleanup()
-        # The wrapper owns its original bus/display; only restore keys this
-        # Desktop changed, without discarding unrelated service variables.
-        for key in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE",
-                    "XDG_CURRENT_DESKTOP", "GDK_BACKEND", "LIBGL_ALWAYS_SOFTWARE",
-                    "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_IM_MODULE", "QT_IM_MODULE", "XMODIFIERS"):
-            if key in self.environment_before:
-                os.environ[key] = self.environment_before[key]
-            else:
-                os.environ.pop(key, None)
+        try:
+            if self.temporary:
+                # The DBus-activated document portal mounts FUSE inside this
+                # private runtime. Detach only that owned mount before rmtree;
+                # its daemon lives until the enclosing DBus session ends.
+                documents = Path(self.temporary.name) / "runtime" / "doc"
+                if sys.platform == "linux" and documents.is_mount():
+                    subprocess.run(["fusermount3", "-uz", str(documents)], check=True, timeout=15)
+                self.temporary.cleanup()
+        finally:
+            # The wrapper owns its original bus/display; only restore keys this
+            # Desktop changed, without discarding unrelated service variables.
+            for key in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE",
+                        "XDG_CURRENT_DESKTOP", "GDK_BACKEND", "LIBGL_ALWAYS_SOFTWARE",
+                        "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_IM_MODULE", "QT_IM_MODULE", "XMODIFIERS"):
+                if key in self.environment_before:
+                    os.environ[key] = self.environment_before[key]
+                else:
+                    os.environ.pop(key, None)
