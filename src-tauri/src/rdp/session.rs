@@ -1297,7 +1297,7 @@ async fn drive_ironrdp_connection(
                 }
                 let outputs = active_stage
                     .process(&mut image, action, &payload)
-                    .map_err(|e| format!("rdp active stage: {}", e))?;
+                    .map_err(|e| format!("rdp active stage: {}", e.report()))?;
                 match handle_active_outputs(&mut framed, &image, outputs, &out_tx).await? {
                     ActiveOutputFlow::Continue => {}
                     ActiveOutputFlow::Terminate => break,
