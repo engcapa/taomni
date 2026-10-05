@@ -1331,6 +1331,8 @@ N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、nat
 
 完整 run 37237715943 的 macOS native 留有两项失败，已逐项查看原始截图、日志和步骤。RDP 回环用例在原探针之前补充最新服务端 `disconnected after` 日志检查，保留原 59 个动作/结果与 480 秒预算，现 63 步；录屏 QA app 保留额外采集/排队时间轴，TC-SHOT-N7 的逐帧像素、顺序、nonce、时间轴和生命周期断言完整保留。诊断 unit 为 screenshot 52/52；真实行为需要 GitHub 精准复验与最终统一输入六端验证。
 
+输入 `bc8b06f1` 的 [精准 run 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 为 macOS native 4/1/0，四条 N5～N8 原始录屏比对通过；采集到的帧标记全部进入解码结果，没有满队列样本，N7 最长 unexplained gap 150 ms。四张原图/实际/差分 contact sheet 已实际查看。旧 N7 缺帧未复现，根因未确定。RDP 第 62 步的 last-child 条件误把周期统计当作连接生命周期；改为只读检查最后一次连接/断开记录为断开，既容许随后的统计，又拒绝先前握手断开后仍活动的当前连接。五个原始 DOM 单元观察样本通过，reviewed checkpoint 已同步，原 63 步、480 秒和独立协议首帧结果保持；新 YAML 仍需完整六端实际执行。
+
 ## 7. 后续独立验收
 
 <a id="follow-up-acceptance"></a>

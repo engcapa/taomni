@@ -695,6 +695,8 @@ TASK-11 的 fixture/用例设计可先做，具体生产入口 case 必须跟随
 
 固定输入 `79ab1d6b46a4d65fe7026b3d8b7da3e799f0ea0b` 的 [完整六端验收 37237715943](https://github.com/engcapa/taomni/actions/runs/37237715943) 已结束，250 ID / 761 次执行为 759 pass / 2 fail / 0 skip，覆盖用户指定模块及受影响保留回归。三端 browser 及 Linux/Windows native 全通过；macOS native 的 RDP 回环和 GIF 时间轴失败正在收敛。B07/B17 三端精准复验已通过全部 132 步。本地前端 unit 526 文件 / 5244 项和 TypeScript 已通过，Rust unit 1590 pass / 16 既有 ignored。最终 runtime、当前画面和任务状态仍待验收回填；OS picker/IME/DPI/读屏及 AC-20 匹配性能证据按用例文档单列，不由自动化绿色推定通过。
 
+后续输入 `bc8b06f1` 的 [macOS 精准运行 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 为 4 pass / 1 fail / 0 skip：四条录屏用例通过，N7 原缺帧未复现，诊断未见编码排队丢帧；RDP 本次连接已释放，但其最后日志被周期统计覆盖，新增等待条件失败。当前用例观察最近的连接生命周期记录，再执行原独立协议探针；五个原始 DOM 单元样本通过，真实效果待统一输入的完整六端验证。任务仍为 verification，旧失败未覆盖。
+
 本次 native 失败诊断保留原始证据：RDP 服务端在客户端 UI 已显示断开后，仍记录 single-client busy 拒绝，因此用例必须等待真实服务端释放日志，再由独立协议探针检验继续服务。GIF 所有已编码帧与原图像素一致，但 960 ms 帧间隔的时间轴检查未通过；QA 构建增加有界的原生采集与编码排队记录，用于区分采集停顿、呈现停顿和队列覆盖，不改变帧供给、原有 oracle 或预算。保留用例 TC-SHOT-N5～N8 继续保护真实 GIF/MP4 录制与预览；该诊断支持本身不新增用户行为。
 
 本轮实现完成条件依 DEC-11：实现已集成；对应 AC 的自动化目标及受影响保留结果在同一最终输入的六端全部通过，零 fail/skip；源码、用例、runner、配置、receipt 和 native build 身份匹配，实际画面审阅完成，已知本轮回归已处理。用户已明确将真实 OS 对话框、Windows/macOS 真 IME、DPI/跨屏/读屏和 AC-20/N17 匹配性能基线单列后续验收。这些项保留完整规格和未验证状态，本轮 done 不表示这些边界已通过，也不声明性能无退化。

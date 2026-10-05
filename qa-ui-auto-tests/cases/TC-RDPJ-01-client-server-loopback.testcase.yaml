@@ -184,9 +184,10 @@ steps:
 - open_route: ?servers=main
 - wait_for: '[data-testid="servers-dialog"]'
 - click: '[data-testid="server-row-rdp"]'
-- assert_text:
-    selector: '[data-testid="server-log"] > div:last-child'
-    contains: disconnected after
+- eval_readonly:
+    expression: >-
+      (document.querySelector('[data-testid\x3d"server-log"]')?.textContent.match(/RDP client (?:connection from \S+|\S+ disconnected after)/g) ?? []).at(-1)?.includes('disconnected after')
+    expect_truthy: true
     timeout_sec: 20
 - rdp_probe:
     scenario: connect
@@ -235,8 +236,8 @@ verification:
     - 45
   - id: R3
     requirement: In OS full screen the connection bar shows the server-measured connection quality, comes
-      back from the top edge, restores the window and disconnects the session. The server confirms release
-      before an independent client verifies that it still serves the desktop.
+      back from the top edge, restores the window and disconnects the session. The latest server connection
+      lifecycle entry confirms release before an independent client verifies that it still serves the desktop.
     actions:
     - 46
     - 49
@@ -271,7 +272,7 @@ verification:
     - step: 60
       expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
     - step: 62
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"] > div:last-child", "contains": "disconnected after", "timeout_sec": 20}}'
+      expectation: '{"eval_readonly": {"expression": "(document.querySelector(''[data-testid\\x3d\"server-log\"]'')?.textContent.match(/RDP client (?:connection from \\S+|\\S+ disconnected after)/g) ?? []).at(-1)?.includes(''disconnected after'')", "expect_truthy": true, "timeout_sec": 20}}'
     - step: 63
       expectation: '{"rdp_probe": {"scenario": "connect", "artifact": "still-serving", "args": {"seconds":
         2}, "expect": {"first_graphics_ms": {"exists": true}}}}'

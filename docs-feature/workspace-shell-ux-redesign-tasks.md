@@ -33,6 +33,8 @@ TASK-01～10 已集成，TASK-11 的用例和 runner 支持已实现；TASK-01�
 
 N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既有 DB browser 用例补足离线 renderer 工作流。上述 250 ID 六端报告的 receipt、源码/runner/用例/配置和 native build 身份及 ZIP hashes 均匹配。macOS 的两项失败为 RDP 回环断开后的探针遇到尚未释放的旧连接，以及 GIF 录屏的时间轴缺帧；实际失败截图和逐步记录已检查。RDP 用例补充服务端连接释放日志检查后再执行原探针；录屏先补 QA 独立采集/排队时间轴诊断，像素和时间预算保持，尚不声称录屏缺帧已修复。
 
+输入 `bc8b06f1bbde025683514b4d8aab99dbcfc801a8` 的 [macOS 精准复验 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 已结束：4 pass / 1 fail / 0 skip。N5～N8 四条录屏通过；RDP 的第 62 步误把“释放日志必须是最后一行”作为条件，实际释放后还持续输出延迟统计。当前改为观察最新连接生命周期记录的断开状态，5 个 jsdom 单元观察样本通过，原独立协议探针、63 步和 480 秒预算保持。此用例修正仍待新的完整六端执行，TASK-01～12 保持 verification。
+
 ## 验证记录
 
 以下按批次保留当时的输入、结果和失败；早期计数与状态是历史记录，当前状态以上面的进度及后续最新验收为准。
@@ -295,3 +297,11 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - macOS TC-RDPJ-01 在原第 59 步失败；客户端 UI 已断开，服务端仍记录旧 session active 并拒绝新连接。用例保留原 59 步、独立协议/首帧结果和 480 秒预算，补 4 步打开 Local servers 并等待最新一条日志确认释放，现 63 步；避免用证书确认阶段的旧断开日志作为当前释放证据。
 - macOS TC-SHOT-N7 的 13 帧像素/顺序/nonce 均匹配，但 960 ms 间隔导致时间轴失败。QA app 增加有界采集/排队记录，保留 sampled marker、native timestamp、poll 耗时和 pending 发送状态，帮助区分 OS 画面、采集与编码队列；生产录制流程及原 oracle/预算未调整。精准 GitHub 验证尚待启动，不能声称根因已确定或产品缺帧已修复。
 - 本地 screenshot Rust unit 362 为 52 pass / 0 fail，包含真实 GIF/MP4 编解码和丢失原图帧的拒绝检查；TypeScript/前端输入未改变，复用 353 核对的 5244 项。catalog audit 和 development contract 通过；改动两份 Rust 文件的 rustfmt 检查通过，全仓 rustfmt 显示既有文件格式差异，不把它记为全仓通过。本批没有本地 browser/native 启动或 native build。
+
+### macOS 精准复验与连接生命周期观察
+
+- [run 37243895415](https://github.com/engcapa/taomni/actions/runs/37243895415) 的 selection、source/runner/case/config、receipt、native build 和原始 ZIP hashes 均匹配；精确 5 条实际为 4/1/0，失败报告与未执行的末步完整保留。
+- RDP 原始 DOM 显示本次 peer `127.0.0.1:49356` 在 00:16:40 已释放，后面仍每 5 秒输出 latency；第 62 步等待 last-child 必然被统计行覆盖。修正后的只读条件取最近的 `RDP client connection from` / `RDP client ... disconnected after` 记录，再确认最近一条为断开；后续新连接会使条件恢复为 false，旧证书握手断开不会冒充当前释放。未改产品 RDP 实现或独立探针结果。
+- `shell-rdp-release-unit-367.json` 保留从原始失败 DOM 建立的五个 jsdom 单元样本：统计行后的已释放状态通过；当前活动连接、释放后新连接、只有统计行和空日志均拒绝。reviewed checkpoint 与真实 YAML 逐项一致，仍 63 步 / 480 秒。
+- N5～N8 的采集队列均无满队列样本，采集到的 frame code 全部出现在解码结果，四条逐帧原图比对和生命周期通过。N7 最长 unexplained gap 为 150 ms（原 700 ms 上限），像素、顺序及 nonce 均通过；四张 source/actual/difference contact sheet 已实际查看。旧 N7 的 865 ms 失败未复现，根因仍未确定，不声称完成了产品缺帧修复。证据 `run-37243895415/recording-review.json` 与 `shell-mac-record-review-366/` 保留。
+- 本批只修正 YAML 观察条件并更新记录，产品源码、runner、录屏诊断、原断言与预算保持；本地未运行 browser/native。下一轮在统一固定输入验证完整 250 ID / 761 次六端范围。
