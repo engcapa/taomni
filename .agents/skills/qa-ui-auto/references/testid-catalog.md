@@ -1302,6 +1302,7 @@
   ↳ `[data-testid="sidebar-rail"]` — alias
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
 - `[data-testid="sidebar-rail-menu-show-names"]` — interactive [optional] — F1.2.sidebar-rail-menu-show-names
+- `[data-testid="sidebar-rail-resize"]` — interactive [optional] — F1.2.sidebar-rail-resize
 
 ## main/commands (F1.9)
 
@@ -1761,6 +1762,20 @@
 
 ## screenshot/screen-record (F27.1)
 
+- `[data-testid="screenshot-text-style"]` — display — F27.1.screenshot-text-style
+- `[data-testid="screenshot-font-family"]` — interactive — F27.1.screenshot-font-family
+- `[data-testid="screenshot-font-size"]` — interactive — F27.1.screenshot-font-size
+- `[data-testid="screenshot-text-hint"]` — display — F27.1.screenshot-text-hint
+- `[data-testid="screenshot-scroll-result"]` — display — F27.1.screenshot-scroll-result
+- `[data-testid="screenshot-scroll-result-meta"]` — display — F27.1.screenshot-scroll-result-meta
+- `[data-testid="screenshot-scroll-result-viewport"]` — display — F27.1.screenshot-scroll-result-viewport
+- `[data-testid="screenshot-scroll-result-image"]` — display — F27.1.screenshot-scroll-result-image
+- `[data-testid="screenshot-scroll-fit"]` — interactive — F27.1.screenshot-scroll-fit
+- `[data-testid="screenshot-scroll-actual"]` — interactive — F27.1.screenshot-scroll-actual
+- `[data-testid="screenshot-scroll-result-close"]` — interactive — F27.1.screenshot-scroll-result-close
+- `[data-testid="screenshot-scroll-result-pin"]` — interactive — F27.1.screenshot-scroll-result-pin
+- `[data-testid="screenshot-scroll-result-save"]` — interactive — F27.1.screenshot-scroll-result-save
+- `[data-testid="screenshot-scroll-result-copy"]` — interactive — F27.1.screenshot-scroll-result-copy
 - `[data-testid="system-screenshot"]` — interactive — F27.1.system-screenshot
 - `[data-testid="system-screenshot-delay-toggle"]` — interactive — F27.1.system-screenshot-delay-toggle
 - `[data-testid="system-screenshot-delay-menu"]` — display — F27.1.system-screenshot-delay-menu
@@ -1874,6 +1889,7 @@
 - `[data-testid="screenshot-scroll-stop"]` — interactive — F27.1.screenshot-scroll-stop
 - `[data-testid="screenshot-scroll-cancel"]` — interactive — F27.1.screenshot-scroll-cancel
 - `[data-testid="screenshot-scroll-error"]` — display [optional] — F27.1.screenshot-scroll-error
+- `[data-testid="screenshot-scroll-error-close"]` — interactive — F27.1.screenshot-scroll-error-close
 - `[data-testid="screenshot-record-hint"]` — display — F27.1.screenshot-record-hint
 - `[data-testid="screenshot-recorder-range-hint"]` — display — F27.1.screenshot-recorder-range-hint
 - `[data-testid="screenshot-recording-boundary"]` — display [optional] — F27.1.screenshot-recording-boundary
@@ -1881,6 +1897,46 @@
 - `[data-testid="screenshot-annotation-resize-ne"]` — interactive — F27.1.screenshot-annotation-resize-ne
 - `[data-testid="screenshot-annotation-resize-sw"]` — interactive — F27.1.screenshot-annotation-resize-sw
 - `[data-testid="screenshot-annotation-resize-se"]` — interactive — F27.1.screenshot-annotation-resize-se
+- `[data-testid="screenshot-scroll-mode-auto"]` — interactive — F27.1.screenshot-scroll-mode-auto
+- `[data-testid="screenshot-scroll-mode-manual"]` — interactive — F27.1.screenshot-scroll-mode-manual
+- `[data-testid="screenshot-scroll-switch-mode"]` — interactive — F27.1.screenshot-scroll-switch-mode
+- `[data-testid="screenshot-color-orange"]` — interactive — F27.1.screenshot-color-orange
+- `[data-testid="screenshot-color-cyan"]` — interactive — F27.1.screenshot-color-cyan
+- `[data-testid="screenshot-color-purple"]` — interactive — F27.1.screenshot-color-purple
+- `[data-testid="screenshot-color-pink"]` — interactive — F27.1.screenshot-color-pink
+- `[data-testid="screenshot-color-gray"]` — interactive — F27.1.screenshot-color-gray
+- `[data-testid="screenshot-color-black"]` — interactive — F27.1.screenshot-color-black
+- `[data-testid="screenshot-color-custom"]` — interactive — F27.1.screenshot-color-custom
+- `[data-testid="screenshot-color-hex"]` — interactive — F27.1.screenshot-color-hex
+- `[data-testid="screenshot-pin-copy"]` — interactive — F27.1.screenshot-pin-copy
+- `[data-testid="screenshot-pin-save"]` — interactive — F27.1.screenshot-pin-save
+- `[data-testid="screenshot-pin-favorite"]` — interactive — F27.1.screenshot-pin-favorite
+- `[data-testid="screenshot-pin-collapse"]` — interactive — F27.1.screenshot-pin-collapse
+- `[data-testid="screenshot-pin-expand"]` — interactive — F27.1.screenshot-pin-expand
+- `[data-testid="screenshot-pin-menu-toggle"]` — interactive — F27.1.screenshot-pin-menu-toggle
+- `[data-testid="screenshot-pin-close"]` — interactive — F27.1.screenshot-pin-close
+- `[data-testid="screenshot-pin-zoom-out"]` — interactive — F27.1.screenshot-pin-zoom-out
+- `[data-testid="screenshot-pin-zoom-in"]` — interactive — F27.1.screenshot-pin-zoom-in
+- `[data-testid="screenshot-pin-reset"]` — interactive — F27.1.screenshot-pin-reset
+- `[data-testid="screenshot-pin-opacity"]` — interactive — F27.1.screenshot-pin-opacity
+- `[data-testid="system-screenshot-favorites"]` — interactive — F27.1.system-screenshot-favorites
+- `[data-testid="screenshot-favorites-refresh"]` — interactive — F27.1.screenshot-favorites-refresh
+- `[data-testid="screenshot-favorites-close"]` — interactive — F27.1.screenshot-favorites-close
+- `[data-testid="screenshot-favorite-open"]` — interactive — F27.1.screenshot-favorite-open
+- `[data-testid="screenshot-favorite-remove"]` — interactive — F27.1.screenshot-favorite-remove
+- `[data-testid="screenshot-scroll-mode-description"]` — display — F27.1.screenshot-scroll-mode-description
+- `[data-testid="screenshot-scroll-mode-hint"]` — display — F27.1.screenshot-scroll-mode-hint
+- `[data-testid="screenshot-pin-surface"]` — display — F27.1.screenshot-pin-surface
+- `[data-testid="screenshot-pin-toolbar"]` — display — F27.1.screenshot-pin-toolbar
+- `[data-testid="screenshot-pin-menu"]` — display — F27.1.screenshot-pin-menu
+- `[data-testid="screenshot-pin-zoom"]` — display — F27.1.screenshot-pin-zoom
+- `[data-testid="screenshot-pin-help"]` — display — F27.1.screenshot-pin-help
+- `[data-testid="screenshot-pin-notice"]` — display — F27.1.screenshot-pin-notice
+- `[data-testid="screenshot-favorites"]` — display — F27.1.screenshot-favorites
+- `[data-testid="screenshot-favorites-empty"]` — display — F27.1.screenshot-favorites-empty
+- `[data-testid="screenshot-favorite-item"]` — display — F27.1.screenshot-favorite-item
+- `[data-testid="screenshot-favorite-thumbnail"]` — display — F27.1.screenshot-favorite-thumbnail
+- `[data-testid="screenshot-favorites-error"]` — display — F27.1.screenshot-favorites-error
 
 ## screenshot/settings (F27.2)
 
@@ -2568,6 +2624,7 @@
 - `[data-testid="mfa-account-group"]` — display — F-MFA-1.group-pill
 - `[data-testid="mfa-account-issuer"]` — display [optional] — F-MFA-1.issuer-label
 - `[data-testid="mfa-account-name"]` — display [optional] — F-MFA-1.account-label
+- `[data-testid="mfa-account-avatar"]` — display [optional] — F-MFA-1.avatar
 - `[data-testid="mfa-account-hotp-next"]` — interactive — F-MFA-1.hotp-next
 - `[data-testid="mfa-account-copy"]` — interactive — F-MFA-1.copy
 - `[data-testid="mfa-account-pin"]` — interactive — F-MFA-1.pin
@@ -2575,6 +2632,7 @@
 - `[data-testid="mfa-account-drag"]` — interactive — F-MFA-1.drag
 - `[data-testid="mfa-menu-edit"]` — interactive — F-MFA-1.menu-edit
 - `[data-testid="mfa-menu-qr"]` — interactive — F-MFA-1.menu-qr
+- `[data-testid="mfa-menu-copy-secret"]` — interactive — F-MFA-1.menu-copy-secret
 - `[data-testid="mfa-menu-pin"]` — interactive — F-MFA-1.menu-pin
 - `[data-testid="mfa-menu-move-up"]` — interactive — F-MFA-1.menu-move-up
 - `[data-testid="mfa-menu-move-down"]` — interactive — F-MFA-1.menu-move-down
@@ -2591,6 +2649,10 @@
 - `[data-testid="mfa-qr-password"]` — interactive — F-MFA-1.qr-password
 - `[data-testid="mfa-qr-reveal"]` — interactive — F-MFA-1.qr-reveal
 - `[data-testid="mfa-qr-image"]` — display — F-MFA-1.qr-image
+- `[data-testid="mfa-qr-secret"]` — display [optional] — F-MFA-1.qr-secret
+- `[data-testid="mfa-qr-toggle-secret"]` — interactive [optional] — F-MFA-1.qr-toggle-secret
+- `[data-testid="mfa-qr-copy-secret"]` — interactive [optional] — F-MFA-1.qr-copy-secret
+- `[data-testid="mfa-qr-copy-uri"]` — interactive [optional] — F-MFA-1.qr-copy-uri
 - `[data-testid="mfa-qr-error"]` — display — F-MFA-1.qr-error
 - `[data-testid="mfa-qr-close"]` — interactive — F-MFA-1.qr-close
 - `[data-testid="mfa-error"]` — display [optional] — F-MFA-1.error-banner

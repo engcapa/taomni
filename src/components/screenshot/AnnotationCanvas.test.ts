@@ -99,9 +99,14 @@ describe("shapeHitTest", () => {
   });
 
   it("hits text by its rendered extent", () => {
-    const text: Shape = { id: 1, kind: "text", color: "#f00", lineWidth: 2, x: 10, y: 10, text: "hello world", fontSize: 18 };
+    const ctx = document.createElement("canvas").getContext("2d")!;
+    vi.mocked(ctx.measureText).mockImplementation((text) => ({ width: text.length * 10 } as TextMetrics));
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx);
+    const text: Shape = { id: 1, kind: "text", color: "#f00", lineWidth: 2, x: 10, y: 10, text: "hello world\nsecond line", fontSize: 18 };
     expect(shapeHitTest(text, { x: 70, y: 20 }, 2)).toBe(true);
+    expect(shapeHitTest(text, { x: 70, y: 42 }, 2)).toBe(true);
     expect(shapeHitTest(text, { x: 10, y: 60 }, 2)).toBe(false);
+    getContext.mockRestore();
   });
 });
 

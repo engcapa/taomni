@@ -58,6 +58,7 @@
 | AC-16 | `mfa.db` 有密文但保险库缺数据密钥或密钥不匹配 | 打开 MFA | 显示明确错误，不改动数据；“清空 MFA 数据”需二次确认后重建 | 三端 |
 | AC-17 | 可访问性与语言 | 键盘操作、读屏、切换语言 | 控件有可访问名称；搜索框 ↓ 进入列表、↑/↓ 在验证码间移动；状态 aria-live；中英文文案完整 | 三端 |
 | AC-18 | 已有账户 | 行菜单“显示二维码…”；输入主密码（空/错误/正确）；关闭后再次打开 | 显示风险提示；空或错误密码给出错误且不渲染任何码；正确密码后显示 `otpauth://` 二维码（标签 `issuer:account`，含 secret、issuer、algorithm、digits，TOTP 带 period、HOTP 带当前 counter），其他验证器可扫码添加同一账户；关闭即清除，再次打开需重新输入密码；Esc 关闭 | 三端；第三方 App 扫码为人工项 |
+| AC-19 | 已有账户 | 行菜单“复制密钥…”；输入主密码（空/错误/正确）；关闭后再次打开 | 显示主密码验证；空或错误密码提示错误且不暴露任何密钥；正确密码后将 Base32 密钥自动复制到系统剪贴板并提示已复制，弹窗显示分段格式化的 Base32 密钥、脱敏切换眼睛按钮、手动复制密钥按钮与复制 URI 按钮；Esc 关闭 | 三端 |
 
 失败与恢复：截屏失败也必须恢复窗口；摄像头异常必须停止全部 track；导入失败保留预览；IPC 返回 `VAULT_LOCKED` 时刷新保险库状态回到门禁。性能：单次截屏解码（两块 4K 显示器）目标 < 3 秒，摄像头帧解码循环 ≥ 5 fps（默认 120 ms 间隔）；无既有基线，本轮只记录观测值，不作通过门禁。
 
@@ -79,6 +80,8 @@
 | DEC-10 测试设施 | 只写 Vitest；或补 runner 动词让 browser/native 用例观察真实路径 | 新增 `seed_clipboard_image`（夹具或元素截图）、`browser_fake_camera`、`native_clipboard_image`、`native_show_image_window`、`assert_totp_code` | agent 自决 | 用户要求 browser/native 全部用例；native 不支持 `upload_file` | TASK-08；V-10～V-29 |
 | DEC-12 Linux 截屏后端 | A xcap（三端统一，但 Linux Wayland 后端链接 libgbm/EGL，首轮 GitHub Linux native 构建因缺 `-lgbm` 失败，发布构建同样受影响）；B x11rb（已依赖）+ 门户 Screenshot（ashpd 已依赖） | B：不新增系统依赖，Windows/macOS 仍用 xcap | agent 自决 | GitHub run 36822701149 linux-native `build.log`：`rust-lld: error: unable to find library -lgbm` | AC-06；TASK-02；V-24/V-27 |
 | DEC-11 二维码导出的保护与渲染 | A 保险库已解锁即可显示；B 每次显示前重新输入主密码；渲染：后端出图 vs 渲染层用 `qr` 编码器出 SVG | B：唯一把已存密钥交给渲染层的命令 `mfa_export_uri` 先 `verify_master_password`，防止已解锁机器被他人导出；`qr` 编码器（已依赖、按需加载）在本地生成内联 SVG（不用 innerHTML），关闭即丢弃；HOTP 导出当前计数 | agent 自决（可按用户意见改为 A） | 导出的是长期凭据，风险高于查看一次性验证码；与备份恢复需主密码一致 | AC-18；TASK-10；V-28/V-29/V-30 |
+| DEC-13 复制与查看密钥防护 | 与二维码导出同等防护：输入主密码验证通过后方可导出与复制 | 用户已定 | 统一凭据鉴权弹窗，解密后呈现二维码与 Base32 格式化密钥，支持复制密钥与 URI | 2026-10-04 用户要求与二维码一致需输入 master 密码 | AC-19；TC-MFA-012/108 |
+| DEC-14 验证码展示大气化 | A 紧凑密集单行；B 现代卡片流（Modern Card List，带 Brand Badge、大号等宽代码、倒计时平滑动效、点击验证码即复制） | B：现代卡片流，采用圆角卡片、彩色品牌首字母徽章、24px 等宽代码、点击直达复制、丝滑倒计时环与下轮预告胶囊 | 用户已定 | 2026-10-04 学习 1Password / Ente Auth 等现代 MFA 优点 | AC-09/10；TC-MFA-012 |
 
 ### 用户流程与交互
 

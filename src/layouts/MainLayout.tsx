@@ -45,7 +45,6 @@ import { parseMailIdentities } from "../lib/mailIdentities";
 import { parseSpecialFolders } from "../lib/mailFolders";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
-import { WindowDragHandle } from "../components/window/WindowDragHandle";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
 import { ControlBar } from "../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
@@ -99,7 +98,7 @@ import {
   writeVncViewerOptions,
 } from "../lib/vncOptions";
 import type { VncSessionProperties } from "../components/vnc/VncPropertiesDialog";
-import { Bot, Columns2, FolderOpen, GitBranch, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import { Bot, Columns2, FolderOpen, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
@@ -943,7 +942,6 @@ export function MainLayout() {
   const mainRailHost = useMainRailHostStore((s) => s.host);
   const stripeSettings = useToolWindowStripeStore((s) => s.settings);
   const toggleStripeNames = useToolWindowStripeStore((s) => s.toggleShowNames);
-  const setStripeWidth = useToolWindowStripeStore((s) => s.setWidth);
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
@@ -2297,35 +2295,6 @@ export function MainLayout() {
       await alertAppDialog({ title: "Git Repository", message });
     }
   }, [openGitTab, setStatusMessage]);
-
-  const activeTerminalGitAction = useMemo(() => {
-    const tab = activeTab;
-    if (
-      !tab ||
-      tab.type !== "terminal" ||
-      tab.ssh ||
-      tab.commandTerminal ||
-      tab.sockscapTerminal
-    ) {
-      return undefined;
-    }
-    const cwd = terminalCwds[tab.id] ?? null;
-    return {
-      label: cwd ? `Git · ${cwd}` : "Git Repository",
-      title: cwd ? `Open Git panel for ${cwd}` : "Open Git panel for the current terminal directory",
-      onOpen: async () => {
-        const latestCwd = terminalCwdsRef.current[tab.id] ?? await queryTerminalCwd(tab.id);
-        if (!latestCwd) {
-          await alertAppDialog({
-            title: "Git Repository",
-            message: "The current terminal directory is not available yet.",
-          });
-          return;
-        }
-        await openGitRepository(latestCwd);
-      },
-    };
-  }, [activeTab, openGitRepository, queryTerminalCwd, terminalCwds]);
 
   const openBrowserSession = useCallback((session: SessionConfig) => {
     const url = browserUrlFromSession(session);
@@ -3931,8 +3900,6 @@ export function MainLayout() {
   const terminalRailItems: ToolWindowRailItem[] = [];
   if (terminalRailMerged && activeTab) {
     const railTab = activeTab;
-    if (activeTerminalGitAction) terminalRailItems.push({ id: "git", label: activeTerminalGitAction.label, icon: <GitBranch />, active: false,
-      testId: "ribbon-git", onSelect: () => void activeTerminalGitAction.onOpen() });
     if (railTab.ssh) {
       terminalRailItems.push({
         id: "sftp",
@@ -4100,7 +4067,6 @@ export function MainLayout() {
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
       {!isMac && <WindowResizeHandles />}
-      <WindowDragHandle />
       <div data-testid="app-titlebar" className="min-w-0">
         <ControlBar
           activeTabClosable={!!activeTab?.closable}
@@ -4140,11 +4106,11 @@ export function MainLayout() {
         />
       )}
 
-      <ShellFrame quickConnectHeight={quickConnectVisible ? 32 : 0} gitAction={terminalRailMerged ? undefined : activeTerminalGitAction}
+      <ShellFrame quickConnectHeight={quickConnectVisible ? 32 : 0}
         navigator={<ShellNavigator onOpenWorkspace={openRecentCodeWorkspace} workspaceLaunches={recentWorkspaceLaunch.launches} onRelocateWorkspace={recentWorkspaceLaunch.relocate}>
           <Sidebar navigatorOnly onNewSession={handleNewSession} onNewSftpSession={handleNewSftpSession}
             onEditSession={handleEditSession} onConnectSession={handleConnectSession}
-            onOpenSettings={() => handleCommand("settings")} onCommand={handleCommand} gitAction={activeTerminalGitAction} />
+            onOpenSettings={() => handleCommand("settings")} onCommand={handleCommand} />
         </ShellNavigator>}
         extras={<><FloatingNotesPanel shellHosted /><TaoAlertPoller />
           <div className="shell-legacy-tao-ribbon absolute inset-0 pointer-events-none"><ChatDrawerRibbon /></div>
@@ -4158,7 +4124,6 @@ export function MainLayout() {
             width={effectiveStripeWidth(stripeSettings, "left")}
             showNames={stripeSettings.showNames}
             onToggleShowNames={toggleStripeNames}
-            onResize={(width) => setStripeWidth("left", width)}
             onHide={(id) => terminalRailItems.find((item) => item.id === id)?.onSelect()}
           />,
           mainRailHost,

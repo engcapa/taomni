@@ -1,0 +1,45 @@
+id: TC-SHOT-N15
+title: macOS scroll Accessibility denial remains visible and closeable
+covers:
+- F27.1
+tags:
+- screenshot
+- scroll-capture
+- macos
+- native
+- p1
+modes:
+- native
+native_platforms:
+- macOS
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: scroll-permission-error
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: macos-scroll-permission
+    requirement: A denied Accessibility check leaves the native overlay selection and annotation intact, presents a persistent explanatory error, and closes through both the explicit production control and Escape.
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: QA evidence reports Accessibility remediation text, unchanged selection geometry and annotation, no scroll controls or running capture, and a closed overlay after both close-button and Escape exits. The error is rechecked after 3.5 seconds and the actual desktop screenshot is retained.
+    - step: 4
+      expectation: Main screenshot entry is usable again.
+    results:
+    - 3
+    - 4
+  visual:
+  - check: Permission failure surface
+    method: automated
+    reason: Native DOM evidence checks the persistent alert and retained editor state.
+  native:
+  - check: Accessibility boundary
+    method: automated
+    reason: The denial is injected only in the isolated debug QA app; no host TCC database is modified.

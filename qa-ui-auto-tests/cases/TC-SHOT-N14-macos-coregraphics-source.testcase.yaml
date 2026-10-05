@@ -1,0 +1,52 @@
+id: TC-SHOT-N14
+title: macOS recording uses CoreGraphics snapshots for GIF and MP4
+covers:
+- F27.1
+tags:
+- screenshot
+- recording
+- macos
+- native
+- p1
+modes:
+- native
+native_platforms:
+- macOS
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: macos-capture-source
+    format: gif
+- native_screenshot_scenario:
+    scenario: macos-capture-source
+    format: mp4
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: macos-coregraphics
+    requirement: macOS GIF and MP4 recordings use repeated CoreGraphics one-shot snapshots, produce changing source-matched
+      frames, and never open a persistent display stream.
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: GIF evidence reports zero persistent stream opens, at least two snapshot reads and source-matched changing
+        frames.
+    - step: 4
+      expectation: MP4 evidence reports zero persistent stream opens, at least two snapshot reads and source-matched changing
+        frames.
+    results:
+    - 3
+    - 4
+  visual:
+  - check: Recorded source fidelity
+    method: automated
+    reason: Decoded frames are compared with the retained animated fixture source.
+  native:
+  - check: macOS capture backend
+    method: automated
+    reason: Debug-only counters observe the production FrameSource path and reject display stream construction.

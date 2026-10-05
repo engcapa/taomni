@@ -17,7 +17,7 @@ verification:
     requirement: Real captured image loads without canvas taint, region and rectangle commit, copy closes overlay and restores main.
     actions: [1]
     checkpoints:
-    - {step: 3, expectation: "Main hidden during capture, one rectangle committed, clipboard crop matches independent physical x/y scaling and red stroke at expected edge; PNG retained."}
+    - {step: 3, expectation: "Main hidden during capture, rectangle and two-line 24px monospace text committed, clipboard crop matches independent physical x/y scaling and red stroke at expected edge and green glyph pixels on both text rows; recording menu width and viewport bounds verified; PNG retained."}
     - {step: 4, expectation: Main window usable after copy.}
     results: [3, 4]
   visual:

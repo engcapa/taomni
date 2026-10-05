@@ -47,6 +47,14 @@ class Desktop:
                 else:
                     raise RuntimeError("window manager did not register EWMH")
                 facts.update(display=os.environ["DISPLAY"], wm=wm.strip(), input_transport="X11/WebDriver")
+                if "display" in self.capabilities:
+                    # Openbox alone does not composite transparent windows.
+                    # Native screenshot cases inspect real desktop pixels.
+                    compositor = self.start(["xcompmgr", "-n"])
+                    time.sleep(0.25)
+                    if compositor.poll() is not None:
+                        raise RuntimeError("desktop compositor exited during startup")
+                    facts["compositor"] = "xcompmgr"
                 # Validate the actual Python used by clipboard-owner helpers.
                 subprocess.run([sys.executable, "-c", "import tkinter as t; w=t.Tk(); w.update(); w.destroy()"], check=True)
                 if "ime" in self.capabilities:

@@ -40,8 +40,7 @@ steps:
     selector: '[data-testid="shell-rail"]'
     equal: 1
 - eval_readonly:
-    expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height -
-      innerHeight) < 1
+    expression: document.querySelector('.taomni-control-bar [data-testid="window-drag-handle"]').getBoundingClientRect().height <= 32
     expect_truthy: true
     timeout_sec: 5
 - assert_text_equals:
@@ -139,8 +138,7 @@ steps:
     selector: '[data-testid="shell-rail"]'
     equal: 1
 - eval_readonly:
-    expression: Math.abs(document.querySelector('[data-window-drag]').getBoundingClientRect().height -
-      innerHeight) < 1
+    expression: document.querySelector('.taomni-control-bar [data-testid="window-drag-handle"]').getBoundingClientRect().height <= 32
     expect_truthy: true
     timeout_sec: 5
 - screenshot: main-rail-shell-v2.png
@@ -317,7 +315,7 @@ verification:
     - 64
     - 65
   visual:
-  - check: 检查对应截图的图标、名称、选中态、全高拖拽带以及点击区域无缩小、遮挡或截断。
+  - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual
     reason: 实际尺寸断言辅助视觉评审；CI 图片在下载后评审。
   native:

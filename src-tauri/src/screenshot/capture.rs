@@ -7,8 +7,11 @@
 //! - Windows / macOS stills: `xcap::Monitor::capture_image` (one shot).
 //! - Linux stills: the RDP server's X11 SHM / Wayland portal capturer, which
 //!   grabs the whole virtual desktop; the target display is cropped out.
-//! - Recording (all platforms): the RDP server's persistent [`Capturer`]
-//!   (WGC on Windows, ScreenCaptureKit on macOS, X11/PipeWire on Linux)
+//! - macOS recording: one-shot CoreGraphics snapshots, avoiding the display
+//!   stream / selective-sharing path implicated in a macOS 14 WindowServer
+//!   crash on a VMware display. Both GIF and MP4 use this compatibility path.
+//! - Windows / Linux recording: the RDP server's persistent [`Capturer`]
+//!   (WGC on Windows, X11/PipeWire on Linux)
 //!   through [`FrameSource`], so the backend is not re-initialised per frame.
 //!   A backend that fails to start falls back to one-shot capture.
 //!
@@ -305,8 +308,82 @@ fn native_display_id(display: &DisplayInfo) -> Option<String> {
     }
 }
 
-/// Capture a whole display (physical pixels).
+/// Denial-only fault at the permission boundary. It cannot grant OS access and
+/// is available only to an isolated debug QA scenario.
+#[cfg(all(debug_assertions, target_os = "macos"))]
+static QA_DENY_CAPTURE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub(super) struct QaPermissionDenial;
+
+#[cfg(all(debug_assertions, target_os = "macos"))]
+impl QaPermissionDenial {
+    pub(super) fn new(app: &AppHandle) -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            app.config().identifier == crate::QA_APP_ID,
+            "permission fault requires isolated QA app"
+        );
+        QA_DENY_CAPTURE.store(true, std::sync::atomic::Ordering::SeqCst);
+        Ok(Self)
+    }
+}
+
+#[cfg(all(debug_assertions, target_os = "macos"))]
+impl Drop for QaPermissionDenial {
+    fn drop(&mut self) {
+        QA_DENY_CAPTURE.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub(super) fn capture_permission_granted() -> bool {
+    #[cfg(debug_assertions)]
+    if QA_DENY_CAPTURE.load(std::sync::atomic::Ordering::SeqCst) {
+        return false;
+    }
+    crate::servers::rdp::capture::mac::permission_granted()
+}
+
+/// CoreGraphics can return a valid image containing only wallpaper and our
+/// own windows without Screen Recording access. A successful image read is
+/// therefore insufficient evidence that the whole display was captured.
+pub(super) fn ensure_capture_permission() -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    if !capture_permission_granted() {
+        anyhow::bail!(
+            "Screenshot requires macOS Screen Recording permission. Open System Settings > Privacy & Security > Screen Recording and enable Taomni. After an update, re-add the current Taomni.app if the existing authorization no longer works. Quit and reopen the app after granting permission. If macOS names a terminal as the requester, enable and restart that terminal instead."
+        );
+    }
+    Ok(())
+}
+
+/// Request consent while the invoking windows remain visible. Prompts belong
+/// on the main thread; capturing/recording workers only check permission.
+pub(super) async fn request_capture_permission(app: &AppHandle) -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    if !capture_permission_granted() {
+        #[cfg(debug_assertions)]
+        if QA_DENY_CAPTURE.load(std::sync::atomic::Ordering::SeqCst) {
+            return ensure_capture_permission();
+        }
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        app.run_on_main_thread(move || {
+            let _ = tx.send(crate::servers::rdp::capture::mac::request_permission());
+        })
+        .context("request Screen Recording permission")?;
+        let _ = rx
+            .await
+            .context("Screen Recording permission request cancelled")?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+    // macOS may require a restart even after the user accepts the prompt.
+    ensure_capture_permission()
+}
+
+/// Capture a whole display (physical pixels), without prompting from workers.
 pub fn capture_display(app: &AppHandle, display: &DisplayInfo) -> anyhow::Result<RgbaImage> {
+    ensure_capture_permission()?;
     #[cfg(not(target_os = "linux"))]
     {
         let _ = app;
@@ -420,9 +497,25 @@ pub struct FrameSource {
     desktop_origin: (i32, i32),
 }
 
+// Observe actual constructors/reads in debug QA without replacing capture pixels.
+#[cfg(all(debug_assertions, target_os = "macos"))]
+static QA_STREAM_OPENS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+#[cfg(all(debug_assertions, target_os = "macos"))]
+static QA_SNAPSHOT_READS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub(super) fn qa_source_counts() -> (u64, u64) {
+    use std::sync::atomic::Ordering;
+    (
+        QA_STREAM_OPENS.load(Ordering::Relaxed),
+        QA_SNAPSHOT_READS.load(Ordering::Relaxed),
+    )
+}
+
 impl FrameSource {
     /// Persistent backend when available (Linux always needs it for stills).
     pub fn open(app: &AppHandle, display: DisplayInfo) -> Self {
+        #[cfg(all(debug_assertions, target_os = "macos"))]
+        QA_STREAM_OPENS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let log =
             crate::servers::engine::LogEmitter::new(app.clone(), crate::servers::ServerType::Rdp);
         let native_id = native_display_id(&display);
@@ -460,9 +553,17 @@ impl FrameSource {
         }
     }
 
-    /// Recording crops before BGRA conversion and retains only the region,
-    /// instead of copying/converting the whole desktop on every tick.
+    /// Recording retains only the requested region. Persistent backends crop
+    /// before BGRA conversion; macOS snapshots are cropped after capture.
     pub fn for_region(app: &AppHandle, display: DisplayInfo, region: (u32, u32, u32, u32)) -> Self {
+        // Select this before opening any persistent stream: WindowServer can
+        // crash after a successful start, so an error-based fallback is too late.
+        #[cfg(target_os = "macos")]
+        let mut source = {
+            log::info!("screenshot recording: using CoreGraphics snapshots on macOS");
+            Self::one_shot(app, display)
+        };
+        #[cfg(not(target_os = "macos"))]
         let mut source = Self::open(app, display);
         source.region = Some(region);
         source
@@ -498,6 +599,8 @@ impl FrameSource {
     }
 
     fn decode_one_shot(&self) -> anyhow::Result<RgbaImage> {
+        #[cfg(all(debug_assertions, target_os = "macos"))]
+        QA_SNAPSHOT_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let full = capture_one_shot(&self.app, &self.display)?;
         match self.region {
             None => Ok(full),

@@ -7,7 +7,7 @@ import { useShellCloseBridge } from "../../hooks/useShellCloseBridge";
 import { useShellShortcuts } from "../../hooks/useShellShortcuts";
 import { solveShellLayout } from "../../lib/shell/layoutPolicy";
 import { tabLane } from "../../lib/shell/tabPresentation";
-import { GlobalRail, type RailGitAction } from "./GlobalRail";
+import { GlobalRail } from "./GlobalRail";
 import { ShellSurfaceRegistry, SurfaceSlot } from "./SurfaceSlot";
 import { ContextPanelHost } from "./ContextPanelHost";
 import { ShellRecentPanels, type ReopenRecentPanel } from "./ShellRecentPanels";
@@ -40,7 +40,7 @@ function useViewport() {
   useEffect(() => { const resize = () => setSize({ width: window.innerWidth, height: window.innerHeight }); window.addEventListener("resize", resize); return () => window.removeEventListener("resize", resize); }, []);
   return size;
 }
-export function ShellFrame({ children, navigator, quickConnectHeight = 0, extras, gitAction }: { children: ReactNode; navigator: ReactNode; quickConnectHeight?: number; extras?: ReactNode; gitAction?: RailGitAction }) {
+export function ShellFrame({ children, navigator, quickConnectHeight = 0, extras }: { children: ReactNode; navigator: ReactNode; quickConnectHeight?: number; extras?: ReactNode }) {
   const shell = useShellLayoutStore(), activeTabId = useAppStore((s) => s.activeTabId), tabs = useAppStore((s) => s.tabs), size = useViewport(), t = useT();
   const [preview, setPreview] = useState<Partial<Record<"navigator" | "right" | "bottom", number>>>({});
   const stripe = useToolWindowStripeStore((s) => s.settings);
@@ -98,7 +98,7 @@ export function ShellFrame({ children, navigator, quickConnectHeight = 0, extras
       left: edge === "right" ? undefined : 0, right: edge === "left" ? undefined : 0, width, height, maxWidth: "calc(100% - 8px)", maxHeight: "100%" };
   const taoFrame = <div data-shell-overlay={layout.tao === "overlay" ? "true" : undefined} role={layout.tao === "overlay" ? "dialog" : undefined} aria-modal={layout.tao === "overlay" || undefined} aria-label={t("shell.tao")} style={frame(layout.tao, shell.layout.tao.edge, taoSide ? layout.taoSize : undefined, taoSide ? undefined : layout.taoSize)}><SurfaceSlot id="tao" /></div>;
   return <div ref={frameRef} data-testid="shell-root" data-mode={layout.mode} data-overlay={winner ?? ""} data-navigator-placement={layout.navigator} className="relative flex-1 flex min-h-0 min-w-0 isolate">
-    <GlobalRail gitAction={gitAction} width={railWidth} />
+    <GlobalRail width={railWidth} />
     <div className="relative flex flex-1 min-w-0 min-h-0">
       <div data-shell-overlay={layout.navigator === "overlay" ? "true" : undefined} role={layout.navigator === "overlay" ? "dialog" : undefined} aria-modal={layout.navigator === "overlay" || undefined} aria-label={t("shell.navigator")} style={frame(layout.navigator === "overlay" && !shell.navigatorOverlay ? "hidden" : layout.navigator, "left", layout.navigatorWidth)}>{navigator}</div>
       {layout.navigator === "dock" && <ShellResizeHandle kind="navigator" value={shell.layout.navigator.width} min={200} max={400} onPreview={(value) => setPreview((p) => ({ ...p, navigator: value }))} onChange={(width) => shell.updateLayout((l) => ({ ...l, navigator: { ...l.navigator, width } }))} />}

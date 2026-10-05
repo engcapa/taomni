@@ -809,39 +809,23 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   max-width: min(220px, 28vw);
 }
 
-/* Reserve a slim full-height grip beside the main tool window bar. The first
-   6px belong to native edge resizing; the grip stays independently hittable. */
 .taomni-main-window {
-  padding-left: 18px;
   /* Fractional borders and overlays must stay inside the fixed window frame. */
   overflow-x: clip;
 }
+/* Keep a visible, stable window-move target outside the scrollable tab strip. */
 .taomni-window-drag-handle {
-  position: absolute;
-  inset: 0 auto 0 6px;
-  z-index: 20;
-  width: 12px;
+  width: 48px;
   color: var(--taomni-text-muted);
   cursor: grab;
   user-select: none;
+  border-left: 1px solid color-mix(in srgb, var(--taomni-divider) 55%, transparent);
   border-right: 1px solid color-mix(in srgb, var(--taomni-divider) 55%, transparent);
   transition: var(--taomni-transition);
-}
-.taomni-window-drag-handle::before {
-  content: "";
-  position: absolute;
-  inset: 16px 3px;
-  pointer-events: none;
-  background-image: radial-gradient(circle, currentColor 0.8px, transparent 1px);
-  background-size: 3px 7px;
-  opacity: 0.4;
 }
 .taomni-window-drag-handle:hover {
   color: var(--taomni-text);
   background: var(--taomni-hover);
-}
-.taomni-window-drag-handle:hover::before {
-  opacity: 0.8;
 }
 .taomni-window-drag-handle:active {
   cursor: grabbing;
@@ -1415,6 +1399,13 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
    FitAddon accounts for this padding when calculating the terminal width. */
 .terminal-host > .xterm {
   padding-left: 8px;
+}
+/* The viewport spans the gutter. Carry the session background through its
+   wrappers so xterm's default black viewport does not show beside the text. */
+.terminal-host,
+.terminal-host > .xterm,
+.terminal-host > .xterm > .xterm-viewport {
+  background-color: inherit;
 }
 
 .terminal-hide-scrollbar .xterm-viewport {

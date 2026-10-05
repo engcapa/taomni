@@ -4,6 +4,7 @@ import { useT } from "../../lib/i18n";
 import { useAppDialogs, formatUnknownError } from "../../lib/appDialogs";
 import { openScreenshotOverlay } from "../../lib/screenshot";
 import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
+import { ScreenshotFavorites } from "./ScreenshotFavorites";
 
 /** Unified screen capture entry shared by the main and detached windows. */
 export function ScreenshotMenuButton() {
@@ -12,6 +13,7 @@ export function ScreenshotMenuButton() {
   const [screenshotBusy, setScreenshotBusy] = useState(false);
   const [screenshotDelayMenu, setScreenshotDelayMenu] = useState(false);
   const [screenshotCountdown, setScreenshotCountdown] = useState<number | null>(null);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const countdownTimer = useRef<number | null>(null);
   const delayMenuRef = useRef<HTMLDivElement | null>(null);
   const shortcutLabel = screenshotShortcutLabel(useScreenshotShortcutStore((s) => s.status));
@@ -143,8 +145,11 @@ export function ScreenshotMenuButton() {
                 {t("screenshot.delaySeconds", { count: s })}
               </button>
             ))}
+            <button type="button" data-testid="system-screenshot-favorites" role="menuitem" onClick={() => { setScreenshotDelayMenu(false); setFavoritesOpen(true); }}
+              className="block w-full border-t border-[var(--taomni-divider)] px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]">{t("screenshot.favorites")}</button>
           </div>
         )}
+        {favoritesOpen && <ScreenshotFavorites onClose={() => setFavoritesOpen(false)} />}
       </div>
   );
 }

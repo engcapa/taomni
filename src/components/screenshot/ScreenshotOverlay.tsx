@@ -33,6 +33,8 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { listSystemFonts } from "../../lib/ipc";
+import { ScrollCaptureResult } from "./ScrollCaptureResult";
 import { useT } from "../../lib/i18n";
 import { formatUnknownError } from "../../lib/appDialogs";
 import {
@@ -55,18 +57,20 @@ import {
   type OverlayInit,
   type RecordFormat,
   type ScreenshotPoint,
+  type ScrollMode,
 } from "../../lib/screenshot";
 import { contourBounds, contourPath, maskContour, pointInContour, transformContour, validContour } from "../../lib/screenshotSelection";
 import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
 import {
   AnnotationCanvas,
+  FONT_STACK,
   type AnnotationCanvasHandle,
   type AnnotationTool,
   type CssRect,
   type Shape,
 } from "./AnnotationCanvas";
 
-type Phase = "loading" | "select" | "annotate" | "busy";
+type Phase = "loading" | "select" | "annotate" | "busy" | "preview";
 
 /** Selections smaller than this (CSS px) are treated as a click. */
 const MIN_SEL = 6;
@@ -74,9 +78,15 @@ const HANDLE = 8;
 
 const COLORS: { value: string; testid: string; titleKey: string }[] = [
   { value: "#ff4d4f", testid: "screenshot-color-red", titleKey: "screenshot.colorRed" },
+  { value: "#fa8c16", testid: "screenshot-color-orange", titleKey: "screenshot.colorOrange" },
   { value: "#faad14", testid: "screenshot-color-yellow", titleKey: "screenshot.colorYellow" },
   { value: "#52c41a", testid: "screenshot-color-green", titleKey: "screenshot.colorGreen" },
+  { value: "#13c2c2", testid: "screenshot-color-cyan", titleKey: "screenshot.colorCyan" },
   { value: "#1677ff", testid: "screenshot-color-blue", titleKey: "screenshot.colorBlue" },
+  { value: "#722ed1", testid: "screenshot-color-purple", titleKey: "screenshot.colorPurple" },
+  { value: "#eb2f96", testid: "screenshot-color-pink", titleKey: "screenshot.colorPink" },
+  { value: "#8c8c8c", testid: "screenshot-color-gray", titleKey: "screenshot.colorGray" },
+  { value: "#000000", testid: "screenshot-color-black", titleKey: "screenshot.colorBlack" },
   { value: "#ffffff", testid: "screenshot-color-white", titleKey: "screenshot.colorWhite" },
 ];
 
@@ -328,19 +338,30 @@ export function ScreenshotOverlay() {
   const [contour, setContour] = useState<ScreenshotPoint[] | null>(null);
   const [tool, setTool] = useState<AnnotationTool>("select");
   const [color, setColor] = useState(COLORS[0].value);
+  const [colorDraft, setColorDraft] = useState(COLORS[0].value);
+  useEffect(() => setColorDraft(color), [color]);
   const [lineWidth, setLineWidth] = useState(4);
+  const [fontFamily, setFontFamily] = useState(FONT_STACK);
+  const [fontSize, setFontSize] = useState(18);
+  const [systemFonts, setSystemFonts] = useState<string[]>([]);
+  const [textSelected, setTextSelected] = useState(false);
+  const [scrollResult, setScrollResult] = useState<{ frames: number; w: number; h: number } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [annotationSelected, setAnnotationSelected] = useState(false);
   const [scrollConfirm, setScrollConfirm] = useState(false);
+  const [scrollMode, setScrollMode] = useState<ScrollMode>("auto");
   const onAnnotationSelection = useCallback((shape: Shape | null) => {
     setAnnotationSelected(!!shape);
+    setTextSelected(shape?.kind === "text");
+    if (shape?.kind === "text") { setFontFamily(shape.fontFamily ?? FONT_STACK); setFontSize(shape.fontSize); }
     if (shape) { setColor(shape.color); setLineWidth(shape.lineWidth); }
   }, []);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [scrollError, setScrollError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [pickerMode, setPickerMode] = useState(false);
   const [pickerInfo, setPickerInfo] = useState<{ x: number; y: number; hex: string; rgb: string } | null>(null);
@@ -355,6 +376,9 @@ export function ScreenshotOverlay() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(null);
   const canvasRef = useRef<AnnotationCanvasHandle | null>(null);
+  const recordMenuRef = useRef<HTMLDivElement | null>(null);
+  const recordButtonRef = useRef<HTMLDivElement | null>(null);
+  const [recordPos, setRecordPos] = useState({ left: 8, top: 8 });
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   /** Region-select / move / resize drag in progress. */
   const dragRef = useRef<{
@@ -367,9 +391,18 @@ export function ScreenshotOverlay() {
   const toastTimer = useRef<number | null>(null);
   const busyRef = useRef(false);
 
+  useEffect(() => {
+    if (tool !== "text" && !textSelected) return;
+    let disposed = false;
+    void listSystemFonts().then((fonts) => { if (!disposed) setSystemFonts(fonts); }).catch(() => undefined);
+    return () => { disposed = true; };
+  }, [tool, textSelected]);
+
+  const imageSize = scrollResult ?? viewport;
+
   /** CSS px -> physical px, per axis (backend image is physical pixels). */
-  const sx = img ? img.naturalWidth / Math.max(1, viewport.w) : 1;
-  const sy = img ? img.naturalHeight / Math.max(1, viewport.h) : 1;
+  const sx = img ? img.naturalWidth / Math.max(1, imageSize.w) : 1;
+  const sy = img ? img.naturalHeight / Math.max(1, imageSize.h) : 1;
   const bounds = img ? { width: img.naturalWidth, height: img.naturalHeight } : undefined;
   const toPhysical = (r: CssRect) => toPhysicalRect(r, sx, sy, bounds);
 
@@ -462,8 +495,9 @@ export function ScreenshotOverlay() {
   const handlePickerMove = (e: ReactMouseEvent) => {
     const cache = pickerCacheRef.current;
     if (!cache) return;
-    const x = Math.max(0, Math.min(cache.width - 1, Math.floor(e.clientX * sx)));
-    const y = Math.max(0, Math.min(cache.height - 1, Math.floor(e.clientY * sy)));
+    const preview = scrollResult ? document.querySelector('[data-testid="screenshot-scroll-result-image"]')?.getBoundingClientRect() : null;
+    const x = Math.max(0, Math.min(cache.width - 1, Math.floor(preview ? (e.clientX - preview.left) * cache.width / preview.width : e.clientX * sx)));
+    const y = Math.max(0, Math.min(cache.height - 1, Math.floor(preview ? (e.clientY - preview.top) * cache.height / preview.height : e.clientY * sy)));
     const i = (y * cache.width + x) * 4;
     const [r, g, b] = [cache.data[i], cache.data[i + 1], cache.data[i + 2]];
     const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
@@ -487,15 +521,16 @@ export function ScreenshotOverlay() {
   // ---------------------------------------------------------------------
 
   const fullscreenSelect = useCallback(() => {
-    setSel({ x: 0, y: 0, w: viewport.w, h: viewport.h });
+    setSel({ x: 0, y: 0, w: imageSize.w, h: imageSize.h });
     setContour(null);
     setSelectionMode("rectangle");
     setTool("select");
     setPhase("annotate");
-  }, [viewport.w, viewport.h]);
+  }, [imageSize.w, imageSize.h]);
 
   /** Drop the selection and annotations; back to region selection. */
   const resetSelection = useCallback(() => {
+    setScrollError(null);
     canvasRef.current?.clear();
     dragRef.current = null;
     setDragging(false);
@@ -739,24 +774,26 @@ export function ScreenshotOverlay() {
     runBusy(async () => {
       if (!init || !img || !sel || contour) return;
       setPhase("busy");
+      setScrollError(null);
       setRecordOpen(false);
       setScrollConfirm(false);
       try {
         // The backend hides this window while it scrolls, then shows it.
-        const res = await scrollCapture(init.displayId || undefined, toPhysical(sel));
+        const res = await scrollCapture(init.displayId || undefined, toPhysical(sel), scrollMode);
         const loaded = await loadArtifact(res.path);
         await updateOverlayImage(res).catch(() => undefined);
         canvasRef.current?.clear();
         setInit({ ...init, path: res.path, width: res.width, height: res.height });
         setImg(loaded.img);
         setImgUrl(loaded.url);
-        setSel(null);
+        const size = { w: loaded.img.naturalWidth, h: loaded.img.naturalHeight };
+        setScrollResult({ frames: res.frames, ...size });
+        setSel({ x: 0, y: 0, ...size });
         setContour(null);
-        setTool("select");
-        setPhase("select");
-        showToast(t("screenshot.scrollDone", { count: res.frames }));
+        setTool("move");
+        setPhase("preview");
       } catch (e) {
-        if (!String(e).includes("scroll capture cancelled")) showToast(t("screenshot.scrollFailed", { error: formatUnknownError(e) }));
+        if (!String(e).includes("scroll capture cancelled")) setScrollError(formatUnknownError(e));
         setPhase("annotate");
       }
     });
@@ -764,6 +801,7 @@ export function ScreenshotOverlay() {
   const handleRecord = (format: RecordFormat) =>
     runBusy(async () => {
       if (!init || !sel || contour) return;
+      setScrollError(null);
       setRecordOpen(false);
       setPhase("busy");
       try {
@@ -786,17 +824,19 @@ export function ScreenshotOverlay() {
       const mod = e.ctrlKey || e.metaKey;
       if (e.key === "Escape") {
         e.preventDefault();
-        if (scrollConfirm) setScrollConfirm(false);
+        if (scrollError) close();
+        else if (scrollConfirm) setScrollConfirm(false);
         else if (recordOpen) setRecordOpen(false);
         else if (watermarkOpen) setWatermarkOpen(false);
         else if (ocrOpen) setOcrOpen(false);
         else if (pickerMode) exitPickerMode();
         else if (phase === "annotate" && tool !== "select" && canvasRef.current?.shapeCount() === 0) setTool("select");
+        else if (scrollResult) close();
         else if (phase === "annotate") resetSelection();
         else close();
         return;
       }
-      if (typing || phase !== "annotate") return;
+      if (typing || (phase !== "annotate" && phase !== "preview")) return;
       if ((e.key === "Delete" || e.key === "Backspace") && tool === "move") {
         if (canvasRef.current?.deleteSelected()) e.preventDefault();
         return;
@@ -838,12 +878,34 @@ export function ScreenshotOverlay() {
     const h = el?.offsetHeight ?? 44;
     const gap = 8;
     let top: number;
-    if (sel.y + sel.h + gap + h <= viewport.h - 4) top = sel.y + sel.h + gap;
+    if (scrollResult) top = viewport.h - h - 12;
+    else if (sel.y + sel.h + gap + h <= viewport.h - 4) top = sel.y + sel.h + gap;
     else if (sel.y - gap - h >= 4) top = sel.y - gap - h;
     else top = Math.max(4, sel.y + sel.h - h - gap);
+    top = Math.min(Math.max(4, top), Math.max(4, viewport.h - h - 4));
     const left = Math.min(Math.max(4, sel.x + sel.w - w), Math.max(4, viewport.w - w - 4));
     setToolbarPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }));
-  }, [sel, phase, dragging, viewport.w, viewport.h, ocrOpen]);
+  }, [sel, phase, dragging, viewport.w, viewport.h, ocrOpen, tool, textSelected, scrollResult]);
+
+  useLayoutEffect(() => {
+    if (!recordOpen) return;
+    const button = recordButtonRef.current?.getBoundingClientRect();
+    const menu = recordMenuRef.current;
+    if (!button || !menu) return;
+    const left = Math.max(8, Math.min(button.right - menu.offsetWidth, viewport.w - menu.offsetWidth - 8));
+    const above = button.top - menu.offsetHeight - 8;
+    const top = above >= 8 ? above : Math.max(8, Math.min(button.bottom + 8, viewport.h - menu.offsetHeight - 8));
+    setRecordPos({ left, top });
+  }, [recordOpen, toolbarPos, viewport]);
+
+  useEffect(() => {
+    if (!recordOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (!recordButtonRef.current?.contains(event.target as Node)) setRecordOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [recordOpen]);
 
   if (loadError) {
     return (
@@ -890,6 +952,310 @@ export function ScreenshotOverlay() {
     color: "var(--taomni-text)",
   };
 
+  const annotationLayer = img && (
+    <AnnotationCanvas
+      ref={canvasRef}
+      imageWidth={imageSize.w}
+      imageHeight={imageSize.h}
+      tool={(phase === "annotate" || phase === "preview") && !pickerMode ? tool : "select"}
+      color={color}
+      lineWidth={lineWidth}
+      fontFamily={fontFamily}
+      fontSize={fontSize}
+      textHint={t("screenshot.textHint")}
+      baseImage={img}
+      selection={sel}
+      selectionContour={contour}
+      onHistoryChange={(u, r) => {
+        setCanUndo(u);
+        setCanRedo(r);
+      }}
+      onSelectionChange={onAnnotationSelection}
+      onRequestReselect={(p) => {
+        resetSelection();
+        startRegionDrag(p.x, p.y);
+      }}
+    />
+  );
+
+  const toolbar = (phase === "annotate" || phase === "preview") && sel && !dragging && (
+    <div
+      ref={toolbarRef}
+      data-testid="screenshot-toolbar"
+      className={scrollResult ? "relative z-50 shrink-0 px-4 py-2" : "fixed z-50"}
+      style={scrollResult ? panelStyle : {
+        left: toolbarPos?.left ?? -9999,
+        top: toolbarPos?.top ?? -9999,
+        maxWidth: viewport.w - 8,
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {(tool === "text" || textSelected) && <div data-testid="screenshot-text-style" className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 mb-1 text-[12px]" style={panelStyle}>
+        <label className="flex items-center gap-2">{t("screenshot.fontFamily")}
+          <select data-testid="screenshot-font-family" aria-label={t("screenshot.fontFamily")} className="taomni-input h-7 max-w-44" value={fontFamily}
+            onChange={(e) => { setFontFamily(e.target.value); if (textSelected) canvasRef.current?.updateSelectedStyle({ fontFamily: e.target.value }); }}>
+            <option value={FONT_STACK}>{t("screenshot.fontDefault")}</option>
+            <option value="serif">{t("screenshot.fontSerif")}</option>
+            <option value="monospace">{t("screenshot.fontMono")}</option>
+            {systemFonts.map((font) => <option key={font} value={`${JSON.stringify(font)}, sans-serif`}>{font}</option>)}
+          </select>
+        </label>
+        <label className="flex items-center gap-2">{t("screenshot.fontSize")}
+          <input data-testid="screenshot-font-size" aria-label={t("screenshot.fontSize")} type="number" min={8} max={144} step={1} value={fontSize}
+            className="taomni-input h-7 w-16 px-2" onChange={(e) => { const value = e.target.valueAsNumber; if (Number.isFinite(value) && value >= 8 && value <= 144) { setFontSize(value); if (textSelected) canvasRef.current?.updateSelectedStyle({ fontSize: value }); } }} />
+        </label>
+        <span data-testid="screenshot-text-hint" className="text-[var(--taomni-text-muted)]">{t("screenshot.textHint")}</span>
+      </div>}
+      <div className="flex flex-wrap items-center gap-0.5 rounded-xl px-1.5 py-1 shadow-2xl" style={panelStyle}>
+        {!scrollResult && <ToolButton testid="screenshot-selection-rectangle" title={t("screenshot.selectionRectangle")} active={selectionMode === "rectangle"} onClick={() => changeSelectionMode("rectangle")}>
+          <Square size={16} />
+        </ToolButton>}
+        {!scrollResult && <ToolButton testid="screenshot-selection-freehand" title={t("screenshot.selectionFreehand")} active={selectionMode === "freehand"} onClick={() => changeSelectionMode("freehand")}>
+          <Lasso size={16} />
+        </ToolButton>}
+        <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
+        {TOOLS.map(({ tool: name, testid, titleKey, Icon }) => (
+          <ToolButton
+            key={name}
+            testid={testid}
+            title={t(titleKey)}
+            active={tool === name}
+            onClick={() => {
+              exitPickerMode();
+              setTool((cur) => (cur === name ? "select" : name));
+            }}
+          >
+            <Icon size={16} />
+          </ToolButton>
+        ))}
+        <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
+        {COLORS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            data-testid={c.testid}
+            title={t(c.titleKey)}
+            aria-label={t(c.titleKey)}
+            aria-pressed={color === c.value}
+            onClick={() => { setColor(c.value); if (tool === "move") canvasRef.current?.updateSelectedStyle({ color: c.value }); }}
+            className="w-5 h-5 mx-0.5 rounded-full shrink-0"
+            style={{
+              background: c.value,
+              outline: color === c.value ? "2px solid var(--taomni-accent)" : "1px solid rgba(128, 128, 128, 0.45)",
+              outlineOffset: 1,
+            }}
+          />
+        ))}
+        <input type="color" data-testid="screenshot-color-custom" aria-label={t("screenshot.colorCustom")} title={t("screenshot.colorCustom")}
+          value={color} className="w-7 h-7 mx-1 shrink-0 cursor-pointer rounded border border-[var(--taomni-divider)] p-0.5"
+          onChange={(e) => { setColor(e.target.value); if (tool === "move") canvasRef.current?.updateSelectedStyle({ color: e.target.value }); }} />
+        <input type="text" data-testid="screenshot-color-hex" aria-label={t("screenshot.colorHex")} title={t("screenshot.colorHex")} value={colorDraft} maxLength={7}
+          className="taomni-input h-7 w-20 px-1 text-[11px] font-mono" spellCheck={false}
+          onChange={(e) => { const value = e.target.value; setColorDraft(value); if (/^#[0-9a-fA-F]{6}$/.test(value)) { setColor(value.toLowerCase()); if (tool === "move") canvasRef.current?.updateSelectedStyle({ color: value.toLowerCase() }); } }}
+          onBlur={() => setColorDraft(color)} />
+        {LINE_WIDTHS.map((w) => (
+          <button
+            key={w}
+            type="button"
+            data-testid={`screenshot-line-width-${w}`}
+            title={`${w}px`}
+            aria-label={`${w}px`}
+            aria-pressed={lineWidth === w}
+            onClick={() => { setLineWidth(w); if (tool === "move") canvasRef.current?.updateSelectedStyle({ lineWidth: w }); }}
+            className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+            style={{ background: lineWidth === w ? "var(--taomni-hover)" : "transparent", color: "var(--taomni-text)" }}
+          >
+            <span className="rounded-full" style={{ width: w + 3, height: w + 3, background: "currentColor" }} />
+          </button>
+        ))}
+        <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
+        <ToolButton testid="screenshot-undo" title={t("screenshot.undo")} disabled={!canUndo} onClick={() => canvasRef.current?.undo()}>
+          <Undo2 size={16} />
+        </ToolButton>
+        <ToolButton testid="screenshot-redo" title={t("screenshot.redo")} disabled={!canRedo} onClick={() => canvasRef.current?.redo()}>
+          <Redo2 size={16} />
+        </ToolButton>
+        <ToolButton testid="screenshot-annotation-delete" title={t("screenshot.deleteAnnotation")} disabled={!annotationSelected} onClick={() => { canvasRef.current?.deleteSelected(); }}>
+          <Trash2 size={16} />
+        </ToolButton>
+        <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
+        {!scrollResult && <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour || !!scrollResult} onClick={() => { setRecordOpen(false); setScrollConfirm(true); }}>
+          <ScrollText size={16} />
+        </ToolButton>}
+        <ToolButton
+          testid="screenshot-color-picker"
+          title={t("screenshot.colorPicker")}
+          active={pickerMode}
+          onClick={() => (pickerMode ? exitPickerMode() : enterPickerMode())}
+        >
+          <Pipette size={16} />
+        </ToolButton>
+        {!scrollResult && <ToolButton testid="screenshot-recrop" title={t("screenshot.recrop")} active={tool === "select"} onClick={() => setTool("select")}>
+          <Crop size={16} />
+        </ToolButton>}
+        <ToolButton testid="screenshot-pin" title={t("screenshot.pinDescription")} onClick={() => void handlePin()}>
+          <Pin size={16} />
+        </ToolButton>
+        <ToolButton testid="screenshot-ocr" title={t("screenshot.ocr")} onClick={() => void handleOcr()}>
+          <ScanText size={16} />
+        </ToolButton>
+        <ToolButton testid="screenshot-auto-redact" title={t("screenshot.autoRedact")} onClick={() => void handleAutoRedact()}>
+          <ShieldAlert size={16} />
+        </ToolButton>
+        <div className="relative">
+          <ToolButton
+            testid="screenshot-watermark"
+            title={t("screenshot.watermark")}
+            active={watermarkOpen || watermark !== null}
+            onClick={() => {
+              setRecordOpen(false);
+              setWatermarkOpen((v) => !v);
+            }}
+          >
+            <Stamp size={16} />
+          </ToolButton>
+          {watermarkOpen && (
+            <div
+              data-testid="screenshot-watermark-panel"
+              className={`absolute ${scrollResult ? "top-full mt-2" : "bottom-full mb-2"} right-0 rounded-lg shadow-2xl p-3 w-56`}
+              style={{ zIndex: 10, ...panelStyle }}
+            >
+              <input
+                type="text"
+                data-testid="screenshot-watermark-text"
+                value={watermarkText}
+                onChange={(e) => setWatermarkText(e.target.value)}
+                placeholder={t("screenshot.watermarkPlaceholder")}
+                aria-label={t("screenshot.watermarkPlaceholder")}
+                className="taomni-input w-full h-7 px-2 text-[13px] mb-2"
+              />
+              <label className="flex items-center gap-2 text-[12px] mb-2">
+                <span className="shrink-0">{t("screenshot.watermarkOpacity")}</span>
+                <input
+                  type="range"
+                  data-testid="screenshot-watermark-opacity"
+                  min={10}
+                  max={80}
+                  value={Math.round(watermarkOpacity * 100)}
+                  onChange={(e) => setWatermarkOpacity(Number(e.target.value) / 100)}
+                  className="flex-1"
+                />
+                <span className="w-8 text-right font-mono">{Math.round(watermarkOpacity * 100)}%</span>
+              </label>
+              <div className="flex items-center gap-1.5 mb-3">
+                {["#ffffff", "#000000", "#ff4444", "#ffcc00", "#00aaff"].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    data-testid={`screenshot-watermark-color-${c.slice(1)}`}
+                    aria-label={c}
+                    onClick={() => setWatermarkColor(c)}
+                    className="w-5 h-5 rounded-full shrink-0"
+                    style={{
+                      background: c,
+                      outline: watermarkColor === c ? "2px solid var(--taomni-accent)" : "1px solid rgba(128,128,128,0.45)",
+                      outlineOffset: 1,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  data-testid="screenshot-watermark-apply"
+                  onClick={() => {
+                    if (watermarkText.trim()) {
+                      setWatermark({ text: watermarkText.trim(), opacity: watermarkOpacity, color: watermarkColor });
+                    }
+                    setWatermarkOpen(false);
+                  }}
+                  className="flex-1 rounded px-2 py-1 text-[13px]"
+                  style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+                >
+                  {t("screenshot.watermarkApply")}
+                </button>
+                <button
+                  type="button"
+                  data-testid="screenshot-watermark-clear"
+                  onClick={() => {
+                    setWatermark(null);
+                    setWatermarkText("");
+                    setWatermarkOpen(false);
+                  }}
+                  className="rounded px-2 py-1 text-[13px]"
+                  style={{ border: "1px solid var(--taomni-divider)" }}
+                >
+                  {t("screenshot.watermarkClear")}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        {!scrollResult && <div ref={recordButtonRef} className="relative">
+          <ToolButton
+            testid="screenshot-record"
+            title={t(contour ? "screenshot.rectangleRequired" : "screenshot.record")}
+            disabled={!!contour || !!scrollResult}
+            active={recordOpen}
+            onClick={() => {
+              setWatermarkOpen(false);
+              setRecordOpen((v) => !v);
+            }}
+          >
+            <span className="flex items-center">
+              <Video size={16} />
+              <ChevronDown size={12} />
+            </span>
+          </ToolButton>
+          {recordOpen && (
+            <div
+              ref={recordMenuRef}
+              data-testid="screenshot-record-menu"
+              className="fixed rounded-xl p-2 shadow-2xl text-[13px] overflow-y-auto"
+              style={{ zIndex: 65, width: Math.min(320, viewport.w - 16), maxHeight: viewport.h - 16, ...recordPos, ...panelStyle }}
+            >
+              <p data-testid="screenshot-record-hint" className="px-2 py-2 leading-relaxed whitespace-normal break-words text-[var(--taomni-text-muted)]">{t("screenshot.recordHint", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
+              <button
+                type="button"
+                data-testid="screenshot-record-gif"
+                onClick={() => void handleRecord("gif")}
+                className="block w-full text-left px-4 py-1.5 hover:bg-[var(--taomni-hover)]"
+              >
+                {t("screenshot.recordGif")}
+              </button>
+              <button
+                type="button"
+                data-testid="screenshot-record-mp4"
+                onClick={() => void handleRecord("mp4")}
+                className="block w-full text-left px-4 py-1.5 hover:bg-[var(--taomni-hover)]"
+              >
+                {t("screenshot.recordMp4")}
+              </button>
+            </div>
+          )}
+        </div>}
+        <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
+        {!scrollResult && <><ToolButton testid="screenshot-cancel" title={`${t("screenshot.cancel")} (Esc)`} onClick={close}>
+          <X size={16} />
+        </ToolButton>
+        <ToolButton testid="screenshot-save" title={`${t("screenshot.save")} (Ctrl+S)`} onClick={() => void handleSave()}>
+          <Download size={16} />
+        </ToolButton>
+        <button
+          type="button"
+          data-testid="screenshot-copy"
+          title={`${t("screenshot.copy")} (Enter / Ctrl+C)`}
+          onClick={() => void handleCopy()}
+          className="ml-1 h-8 shrink-0 rounded-lg px-3 flex items-center gap-1 text-[13px] font-medium"
+          style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+        >
+          <Check size={15} />
+          {t("screenshot.done")}
+        </button></>}
+      </div>
+    </div>
+  );
+
   return (
     <div
       data-testid="screenshot-overlay"
@@ -898,14 +1264,14 @@ export function ScreenshotOverlay() {
       className="fixed inset-0 overflow-hidden select-none"
       style={{ background: "#000000" }}
     >
-      {img && imgUrl && (
+      {!scrollResult && img && imgUrl && (
         <img
           data-testid="screenshot-base-image"
           src={imgUrl}
           alt=""
           draggable={false}
           className="fixed inset-0 z-0"
-          style={{ width: "100%", height: "100%" }}
+          style={{ width: imageSize.w, height: imageSize.h }}
         />
       )}
 
@@ -922,7 +1288,7 @@ export function ScreenshotOverlay() {
           <path data-testid="screenshot-freehand-contour" d={contourPath(contour)} fill="none" stroke="#1677ff" strokeWidth={1} />
         </svg>
       )}
-      {sel && (
+      {sel && phase !== "preview" && (
         <div
           data-testid="screenshot-selection"
           className="fixed z-[35] pointer-events-none"
@@ -939,13 +1305,13 @@ export function ScreenshotOverlay() {
       )}
 
       {/* Region selection / outside-press layer. */}
-      <div
+      {!scrollResult && <div
         data-testid="screenshot-select-layer"
         className="fixed inset-0 z-20"
         style={{ cursor: phase === "select" ? "crosshair" : "default" }}
         onMouseDown={handleSelectMouseDown}
         onDoubleClick={handleDoubleClick}
-      />
+      />}
 
       {/* Move area + resize handles (no draw tool active). */}
       {showHandles && sel && (
@@ -980,29 +1346,7 @@ export function ScreenshotOverlay() {
         </>
       )}
 
-      {/* Annotation layer (above the select layer while a tool is active). */}
-      {img && (
-        <AnnotationCanvas
-          ref={canvasRef}
-          imageWidth={viewport.w}
-          imageHeight={viewport.h}
-          tool={phase === "annotate" && !pickerMode ? tool : "select"}
-          color={color}
-          lineWidth={lineWidth}
-          baseImage={img}
-          selection={sel}
-          selectionContour={contour}
-          onHistoryChange={(u, r) => {
-            setCanUndo(u);
-            setCanRedo(r);
-          }}
-          onSelectionChange={onAnnotationSelection}
-          onRequestReselect={(p) => {
-            resetSelection();
-            startRegionDrag(p.x, p.y);
-          }}
-        />
-      )}
+      {!scrollResult && annotationLayer}
 
       {/* Magnifier while choosing a region. */}
       {phase === "select" && img && cursor && (
@@ -1031,266 +1375,25 @@ export function ScreenshotOverlay() {
         </div>
       )}
 
-      {/* Toolbar after a region is selected. */}
-      {phase === "annotate" && sel && !dragging && (
-        <div
-          ref={toolbarRef}
-          data-testid="screenshot-toolbar"
-          className="fixed z-50"
-          style={{
-            left: toolbarPos?.left ?? -9999,
-            top: toolbarPos?.top ?? -9999,
-            maxWidth: viewport.w - 8,
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div className="flex flex-wrap items-center gap-0.5 rounded-xl px-1.5 py-1 shadow-2xl" style={panelStyle}>
-            <ToolButton testid="screenshot-selection-rectangle" title={t("screenshot.selectionRectangle")} active={selectionMode === "rectangle"} onClick={() => changeSelectionMode("rectangle")}>
-              <Square size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-selection-freehand" title={t("screenshot.selectionFreehand")} active={selectionMode === "freehand"} onClick={() => changeSelectionMode("freehand")}>
-              <Lasso size={16} />
-            </ToolButton>
-            <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            {TOOLS.map(({ tool: name, testid, titleKey, Icon }) => (
-              <ToolButton
-                key={name}
-                testid={testid}
-                title={t(titleKey)}
-                active={tool === name}
-                onClick={() => {
-                  exitPickerMode();
-                  setTool((cur) => (cur === name ? "select" : name));
-                }}
-              >
-                <Icon size={16} />
-              </ToolButton>
-            ))}
-            <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            {COLORS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                data-testid={c.testid}
-                title={t(c.titleKey)}
-                aria-label={t(c.titleKey)}
-                aria-pressed={color === c.value}
-                onClick={() => { setColor(c.value); if (tool === "move") canvasRef.current?.updateSelectedStyle({ color: c.value }); }}
-                className="w-5 h-5 mx-0.5 rounded-full shrink-0"
-                style={{
-                  background: c.value,
-                  outline: color === c.value ? "2px solid var(--taomni-accent)" : "1px solid rgba(128, 128, 128, 0.45)",
-                  outlineOffset: 1,
-                }}
-              />
-            ))}
-            {LINE_WIDTHS.map((w) => (
-              <button
-                key={w}
-                type="button"
-                data-testid={`screenshot-line-width-${w}`}
-                title={`${w}px`}
-                aria-label={`${w}px`}
-                aria-pressed={lineWidth === w}
-                onClick={() => { setLineWidth(w); if (tool === "move") canvasRef.current?.updateSelectedStyle({ lineWidth: w }); }}
-                className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                style={{ background: lineWidth === w ? "var(--taomni-hover)" : "transparent", color: "var(--taomni-text)" }}
-              >
-                <span className="rounded-full" style={{ width: w + 3, height: w + 3, background: "currentColor" }} />
-              </button>
-            ))}
-            <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            <ToolButton testid="screenshot-undo" title={t("screenshot.undo")} disabled={!canUndo} onClick={() => canvasRef.current?.undo()}>
-              <Undo2 size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-redo" title={t("screenshot.redo")} disabled={!canRedo} onClick={() => canvasRef.current?.redo()}>
-              <Redo2 size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-annotation-delete" title={t("screenshot.deleteAnnotation")} disabled={!annotationSelected} onClick={() => { canvasRef.current?.deleteSelected(); }}>
-              <Trash2 size={16} />
-            </ToolButton>
-            <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour} onClick={() => { setRecordOpen(false); setScrollConfirm(true); }}>
-              <ScrollText size={16} />
-            </ToolButton>
-            <ToolButton
-              testid="screenshot-color-picker"
-              title={t("screenshot.colorPicker")}
-              active={pickerMode}
-              onClick={() => (pickerMode ? exitPickerMode() : enterPickerMode())}
-            >
-              <Pipette size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-recrop" title={t("screenshot.recrop")} active={tool === "select"} onClick={() => setTool("select")}>
-              <Crop size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-pin" title={t("screenshot.pin")} onClick={() => void handlePin()}>
-              <Pin size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-ocr" title={t("screenshot.ocr")} onClick={() => void handleOcr()}>
-              <ScanText size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-auto-redact" title={t("screenshot.autoRedact")} onClick={() => void handleAutoRedact()}>
-              <ShieldAlert size={16} />
-            </ToolButton>
-            <div className="relative">
-              <ToolButton
-                testid="screenshot-watermark"
-                title={t("screenshot.watermark")}
-                active={watermarkOpen || watermark !== null}
-                onClick={() => {
-                  setRecordOpen(false);
-                  setWatermarkOpen((v) => !v);
-                }}
-              >
-                <Stamp size={16} />
-              </ToolButton>
-              {watermarkOpen && (
-                <div
-                  data-testid="screenshot-watermark-panel"
-                  className="absolute bottom-full mb-2 right-0 rounded-lg shadow-2xl p-3 w-56"
-                  style={{ zIndex: 10, ...panelStyle }}
-                >
-                  <input
-                    type="text"
-                    data-testid="screenshot-watermark-text"
-                    value={watermarkText}
-                    onChange={(e) => setWatermarkText(e.target.value)}
-                    placeholder={t("screenshot.watermarkPlaceholder")}
-                    aria-label={t("screenshot.watermarkPlaceholder")}
-                    className="taomni-input w-full h-7 px-2 text-[13px] mb-2"
-                  />
-                  <label className="flex items-center gap-2 text-[12px] mb-2">
-                    <span className="shrink-0">{t("screenshot.watermarkOpacity")}</span>
-                    <input
-                      type="range"
-                      data-testid="screenshot-watermark-opacity"
-                      min={10}
-                      max={80}
-                      value={Math.round(watermarkOpacity * 100)}
-                      onChange={(e) => setWatermarkOpacity(Number(e.target.value) / 100)}
-                      className="flex-1"
-                    />
-                    <span className="w-8 text-right font-mono">{Math.round(watermarkOpacity * 100)}%</span>
-                  </label>
-                  <div className="flex items-center gap-1.5 mb-3">
-                    {["#ffffff", "#000000", "#ff4444", "#ffcc00", "#00aaff"].map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        data-testid={`screenshot-watermark-color-${c.slice(1)}`}
-                        aria-label={c}
-                        onClick={() => setWatermarkColor(c)}
-                        className="w-5 h-5 rounded-full shrink-0"
-                        style={{
-                          background: c,
-                          outline: watermarkColor === c ? "2px solid var(--taomni-accent)" : "1px solid rgba(128,128,128,0.45)",
-                          outlineOffset: 1,
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      data-testid="screenshot-watermark-apply"
-                      onClick={() => {
-                        if (watermarkText.trim()) {
-                          setWatermark({ text: watermarkText.trim(), opacity: watermarkOpacity, color: watermarkColor });
-                        }
-                        setWatermarkOpen(false);
-                      }}
-                      className="flex-1 rounded px-2 py-1 text-[13px]"
-                      style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
-                    >
-                      {t("screenshot.watermarkApply")}
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="screenshot-watermark-clear"
-                      onClick={() => {
-                        setWatermark(null);
-                        setWatermarkText("");
-                        setWatermarkOpen(false);
-                      }}
-                      className="rounded px-2 py-1 text-[13px]"
-                      style={{ border: "1px solid var(--taomni-divider)" }}
-                    >
-                      {t("screenshot.watermarkClear")}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <ToolButton
-                testid="screenshot-record"
-                title={t(contour ? "screenshot.rectangleRequired" : "screenshot.record")}
-                disabled={!!contour}
-                active={recordOpen}
-                onClick={() => {
-                  setWatermarkOpen(false);
-                  setRecordOpen((v) => !v);
-                }}
-              >
-                <span className="flex items-center">
-                  <Video size={16} />
-                  <ChevronDown size={12} />
-                </span>
-              </ToolButton>
-              {recordOpen && (
-                <div
-                  data-testid="screenshot-record-menu"
-                  className="absolute bottom-full mb-2 right-0 rounded-lg py-1 shadow-2xl text-[12px] whitespace-nowrap"
-                  style={{ zIndex: 10, ...panelStyle }}
-                >
-                  <p data-testid="screenshot-record-hint" className="px-4 py-2 max-w-72 whitespace-normal text-[var(--taomni-text-muted)]">{t("screenshot.recordHint", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
-                  <button
-                    type="button"
-                    data-testid="screenshot-record-gif"
-                    onClick={() => void handleRecord("gif")}
-                    className="block w-full text-left px-4 py-1.5 hover:bg-[var(--taomni-hover)]"
-                  >
-                    {t("screenshot.recordGif")}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="screenshot-record-mp4"
-                    onClick={() => void handleRecord("mp4")}
-                    className="block w-full text-left px-4 py-1.5 hover:bg-[var(--taomni-hover)]"
-                  >
-                    {t("screenshot.recordMp4")}
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            <ToolButton testid="screenshot-cancel" title={`${t("screenshot.cancel")} (Esc)`} onClick={close}>
-              <X size={16} />
-            </ToolButton>
-            <ToolButton testid="screenshot-save" title={`${t("screenshot.save")} (Ctrl+S)`} onClick={() => void handleSave()}>
-              <Download size={16} />
-            </ToolButton>
-            <button
-              type="button"
-              data-testid="screenshot-copy"
-              title={`${t("screenshot.copy")} (Enter / Ctrl+C)`}
-              onClick={() => void handleCopy()}
-              className="ml-1 h-8 shrink-0 rounded-lg px-3 flex items-center gap-1 text-[13px] font-medium"
-              style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
-            >
-              <Check size={15} />
-              {t("screenshot.done")}
-            </button>
-          </div>
-        </div>
-      )}
+      {!scrollResult && toolbar}
+
+      {phase === "preview" && scrollResult && img && imgUrl && <ScrollCaptureResult url={imgUrl} width={img.naturalWidth} height={img.naturalHeight}
+        frames={scrollResult.frames} toolbar={toolbar} onCopy={() => void handleCopy()} onSave={() => void handleSave()}
+        onPin={() => void handlePin()} onClose={close}>{annotationLayer}</ScrollCaptureResult>}
 
       {/* Busy state (scroll capture / recording start). */}
       {scrollConfirm && <div data-testid="screenshot-scroll-confirm" role="dialog" aria-label={t("screenshot.scrollCapture")}
         className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 80, background: "rgba(0,0,0,0.25)" }}>
         <div className="rounded-xl shadow-2xl p-5 w-96 text-[13px]" style={panelStyle}>
           <p className="font-medium mb-2">{t("screenshot.scrollCapture")}</p>
+          <fieldset className="flex gap-4 mb-3">
+            <legend className="sr-only">{t("screenshot.scrollMode")}</legend>
+            {(["auto", "manual"] as const).map((mode) => <label key={mode} className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="scroll-mode" data-testid={`screenshot-scroll-mode-${mode}`} checked={scrollMode === mode} onChange={() => setScrollMode(mode)} />
+              {t(mode === "auto" ? "screenshot.scrollAuto" : "screenshot.scrollManual")}
+            </label>)}
+          </fieldset>
+          <p data-testid="screenshot-scroll-mode-description" className="mb-3">{t(scrollMode === "auto" ? "screenshot.scrollRunningHint" : "screenshot.scrollManualHint")}</p>
           <p data-testid="screenshot-scroll-instructions" className="mb-4">{t("screenshot.scrollInstructions", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
           <div className="flex justify-end gap-2">
             <button data-testid="screenshot-scroll-confirm-cancel" type="button" className="px-3 py-2 rounded-lg" onClick={() => setScrollConfirm(false)}>{t("screenshot.cancel")}</button>
@@ -1339,7 +1442,7 @@ export function ScreenshotOverlay() {
         <div
           data-testid="screenshot-picker-layer"
           className="fixed inset-0"
-          style={{ zIndex: 40, cursor: "crosshair" }}
+          style={{ zIndex: scrollResult ? 85 : 40, cursor: "crosshair" }}
           onMouseMove={handlePickerMove}
           onMouseLeave={() => setPickerInfo(null)}
           onClick={() => void handlePickerPick()}
@@ -1350,7 +1453,7 @@ export function ScreenshotOverlay() {
           data-testid="screenshot-picker-popup"
           className="fixed pointer-events-none flex items-center gap-2 rounded-lg px-2.5 py-1.5 shadow-2xl"
           style={{
-            zIndex: 45,
+            zIndex: scrollResult ? 86 : 45,
             left: Math.min(pickerInfo.x + 18, viewport.w - 200),
             top: Math.min(pickerInfo.y + 18, viewport.h - 60),
             background: "rgba(20, 20, 20, 0.92)",
@@ -1371,7 +1474,7 @@ export function ScreenshotOverlay() {
         <div
           data-testid="screenshot-ocr-panel"
           className="fixed rounded-xl shadow-2xl p-4 w-80"
-          style={{ zIndex: 60, right: 16, top: 16, ...panelStyle }}
+          style={{ zIndex: 80, right: 16, top: 16, ...panelStyle }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-2">
@@ -1417,13 +1520,27 @@ export function ScreenshotOverlay() {
         </div>
       )}
 
+      {scrollError && (
+        <div
+          data-testid="screenshot-scroll-error"
+          role="alert"
+          className="fixed left-1/2 -translate-x-1/2 bottom-20 w-[min(640px,90vw)] rounded-lg px-4 py-3 text-[13px] shadow-2xl"
+          style={{ zIndex: 70, ...panelStyle }}
+        >
+          <p className="break-words">{t("screenshot.scrollFailed", { error: scrollError })}</p>
+          <button type="button" data-testid="screenshot-scroll-error-close" className="mt-2 rounded px-3 py-2" onClick={close}>
+            {t("screenshot.cancel")} (Esc)
+          </button>
+        </div>
+      )}
+
       {/* Toast. */}
       {toast && (
         <div
           data-testid="screenshot-toast"
           role="status"
           className="fixed left-1/2 -translate-x-1/2 bottom-20 rounded-full px-4 py-2 text-[13px] shadow-2xl"
-          style={{ zIndex: 70, background: "rgba(20, 20, 20, 0.92)", color: "#ffffff" }}
+          style={{ zIndex: 90, background: "rgba(20, 20, 20, 0.92)", color: "#ffffff" }}
         >
           {toast}
         </div>

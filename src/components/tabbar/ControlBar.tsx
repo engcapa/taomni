@@ -39,6 +39,7 @@ import { dispatchShellAction } from "../../lib/shell/shellActions";
 import { OpenTabsMenu } from "./OpenTabsMenu";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
+import { WindowDragHandle } from "../window/WindowDragHandle";
 import { startWindowDrag } from "../../lib/windowDrag";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
 import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
@@ -232,6 +233,7 @@ export function ControlBar({
         )}
         <BarButton testId="shell-navigator-toggle" title={t("shell.navigator")} icon={<PanelLeft className="w-4 h-4" />} onClick={onToggleSidebar} />
       </div>
+      <WindowDragHandle />
       <select data-testid="shell-lane-select" data-lane={lane} aria-label={t("shell.lane")} value={lane} className="shell-titlebar-lane taomni-input shrink-0 text-xs w-[96px]"
         onChange={(e) => { const nextLane = e.target.value as typeof lane; const target = shell.mru.map((id) => tabs.find((tab) => tab.id === id)).find((tab) => tab && tabLane(tab, shell.laneOverrides[tab.id]) === nextLane)
           ?? tabs.find((tab) => tabLane(tab, shell.laneOverrides[tab.id]) === nextLane);

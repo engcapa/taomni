@@ -14,7 +14,7 @@ verification:
   review: reviewed
   requirements:
   - id: long-image
-    requirement: Real OS wheel scroll captures the entire original page with matching text, shapes, colored rows and separators, without duplicates, gaps, reordering or squashing.
+    requirement: Automatic real OS wheel scroll completes without falling back to manual mode and captures the entire original page with matching text, shapes, colored rows and separators, without duplicates, gaps, reordering or squashing.
     actions: [1]
     checkpoints:
     - {step: 3, expectation: "A real scrollbar stays outside the original canvas/capture gutter; full output dimensions and all 24x24 spatial tiles match the retained original page crop; mean RGB error <=2, no bad tile above 5 and <=1 percent materially different pixels. Original full page, expected crop, stitched PNG and amplified difference are retained. Row order/heights and output growth also pass."}

@@ -2,8 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScrollCaptureBar } from "./ScrollCaptureBar";
 
-const api = vi.hoisted(() => ({ status: vi.fn(), stop: vi.fn(), listen: vi.fn(), unlisten: vi.fn() }));
-vi.mock("../../lib/screenshot", () => ({ SCROLL_PROGRESS_EVENT: "screenshot://scroll-progress", scrollStatus: api.status, stopScrollCapture: api.stop }));
+const api = vi.hoisted(() => ({ status: vi.fn(), stop: vi.fn(), mode: vi.fn(), listen: vi.fn(), unlisten: vi.fn() }));
+vi.mock("../../lib/screenshot", () => ({ SCROLL_PROGRESS_EVENT: "screenshot://scroll-progress", scrollStatus: api.status, stopScrollCapture: api.stop, setScrollMode: api.mode }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: api.listen }));
 vi.mock("../../lib/i18n", () => ({ useT: () => (key: string, params?: { count: number }) => params ? `${key}:${params.count}` : key }));
 
@@ -11,11 +11,24 @@ beforeEach(() => {
   vi.resetAllMocks();
   api.status.mockResolvedValue({ frames: 2 });
   api.stop.mockResolvedValue(undefined);
+  api.mode.mockResolvedValue(undefined);
   api.listen.mockResolvedValue(api.unlisten);
 });
 afterEach(cleanup);
 
 describe("scroll capture controls", () => {
+  it("allows manual takeover and retains the current mode if switching fails", async () => {
+    api.status.mockResolvedValue({ frames: 3, mode: "manual", needsOverlap: false });
+    render(<ScrollCaptureBar />);
+    await waitFor(() => expect(screen.getByTestId("screenshot-scroll-mode-hint")).toHaveTextContent("screenshot.scrollManualHint"));
+    api.mode.mockRejectedValueOnce(new Error("permission denied"));
+    fireEvent.click(screen.getByTestId("screenshot-scroll-switch-mode"));
+    await screen.findByTestId("screenshot-scroll-error");
+    expect(screen.getByTestId("screenshot-scroll-switch-mode")).toHaveTextContent("screenshot.scrollUseAuto");
+    fireEvent.click(screen.getByTestId("screenshot-scroll-switch-mode"));
+    await waitFor(() => expect(screen.getByTestId("screenshot-scroll-switch-mode")).toHaveTextContent("screenshot.scrollUseManual"));
+    expect(api.mode).toHaveBeenLastCalledWith("auto");
+  });
   it("shows live progress and requests a single finish that keeps the captured content", async () => {
     const view = render(<ScrollCaptureBar />);
     await waitFor(() => expect(screen.getByTestId("screenshot-scroll-progress")).toHaveTextContent(":2"));

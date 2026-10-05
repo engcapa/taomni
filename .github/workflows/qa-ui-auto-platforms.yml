@@ -113,7 +113,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_rdp_host_target test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_rdp_host_target test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -170,7 +170,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.mode == 'native'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev libgbm-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip imagemagick python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim gstreamer1.0-libav gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
+          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev libgbm-dev nasm xvfb xauth openbox xcompmgr wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip imagemagick python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim gstreamer1.0-libav gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
           # RDP audio cases (rdp_audio_required): a per-session PipeWire graph
           # with a null sink; pipewire-alsa routes cpal/ALSA tones into it.
           if [[ ",${{ join(matrix.capabilities, ',') }}," == *",audio,"* ]]; then
@@ -345,6 +345,7 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/stage_screenshot_artifacts.py
           --source "$RUNNER_TEMP/taomni-qa-artifacts"
           --report "qa-ui-auto-report/$QA_ENTRY"
+          --macos-crash-reports
       - uses: actions/upload-artifact@v4
         if: always()
         with:
