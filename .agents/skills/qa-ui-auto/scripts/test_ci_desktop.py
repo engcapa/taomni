@@ -13,6 +13,11 @@ class DesktopTests(unittest.TestCase):
                         return_value={'ID': 'ubuntu', 'VERSION_ID': '24.04'})
         release.start()
         self.addCleanup(release.stop)
+        # Keep platform.machine() from invoking Windows `ver` through the
+        # subprocess mock reserved for the selected desktop's probes.
+        machine = patch('ci_desktop.platform.machine', return_value='x86_64')
+        machine.start()
+        self.addCleanup(machine.stop)
 
     def test_linux_display_owns_a_compositor_for_transparent_windows(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
