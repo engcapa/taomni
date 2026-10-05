@@ -102,7 +102,9 @@ class Desktop:
         self._wait(pipewire, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire")
         self.start(["wireplumber"])
         shell = self.start(["gnome-shell", "--wayland", "--headless", "--virtual-monitor=1920x1080",
-                            "--wayland-display=wayland-qa", "--mode=ubuntu"])
+                            "--wayland-display=wayland-qa", "--mode=ubuntu", "--unsafe-mode"])
+        # Eval is limited to this disposable compositor on the job's private
+        # session bus. It lets the helper inspect and activate OS windows.
         self._wait(shell, lambda: (runtime / "wayland-qa").is_socket(), "GNOME Wayland compositor")
         # The Wayland socket appears before Mutter publishes its DBus APIs.
         # Wait for the owner instead of racing CreateSession against startup.

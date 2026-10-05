@@ -494,22 +494,25 @@ class NativeSession:
         # Headless Wayland can create a visible WebView whose page is not
         # focused. DOM focus() still changes activeElement, but :focus and
         # :focus-within correctly remain false. Activate the toplevel through
-        # the owned desktop's keyboard, then focus its WebDriver context.
+        # the owned desktop's window manager, then focus its WebDriver context.
         if self.execute("return document.hasFocus();") is not True:
             input_socket = os.environ.get("QA_WAYLAND_INPUT_SOCKET")
             if input_socket:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
                     connection.settimeout(10)
                     connection.connect(input_socket)
-                    connection.sendall(b"activate\n")
+                    connection.sendall(json.dumps({"command": "activate", "application":
+                                                   str(self.application.resolve())}).encode() + b"\n")
                     response = b""
                     while not response.endswith(b"\n") and len(response) < 4096:
                         chunk = connection.recv(4096)
                         if not chunk:
                             break
                         response += chunk
-                if json.loads(response).get("ok") is not True:
-                    raise WebDriverError("Wayland desktop did not activate the QA app window")
+                result = json.loads(response)
+                if result.get("ok") is not True:
+                    raise WebDriverError("Wayland desktop did not activate the QA app window: "
+                                         + str(result.get("error", "missing acknowledgement")))
         handle = self.request("GET", self.endpoint("/window"))
         if not isinstance(handle, str) or not handle:
             raise WebDriverError("Wayland driver did not return a window handle")

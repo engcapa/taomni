@@ -123,7 +123,8 @@ class NativeSessionTransportTest(TestCase):
             connection.recv.return_value = b'{"ok":true}\n'
             session.activate_wayland_window()
         connection.connect.assert_called_once_with("/qa/private/input.sock")
-        connection.sendall.assert_called_once_with(b"activate\n")
+        request = json.loads(connection.sendall.call_args.args[0])
+        self.assertEqual(request, {"command": "activate", "application": str(Path("/tmp/taomni").resolve())})
         session.request.assert_called_with("POST", "/session/session-1/window", {"handle": "window-qa"})
 
     def test_right_click_uses_right_button_and_releases_on_failure(self):

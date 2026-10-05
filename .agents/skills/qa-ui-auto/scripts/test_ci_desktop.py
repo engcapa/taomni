@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 from ci_desktop import Desktop, wayland_has_input
-from ci_wayland_input import activate_window
+from ci_wayland_input import activate_window, owned_window_pid
 
 
 WAYLAND_PROTOCOLS = "wl_compositor xdg_wm_base wl_output\ninterface: 'wl_seat', version: 10, name: 16\n\tname: seat0\n\tcapabilities: pointer keyboard\n"
@@ -18,14 +18,45 @@ class DesktopTests(unittest.TestCase):
         release.start()
         self.addCleanup(release.stop)
 
-    def test_wayland_window_activation_uses_a_balanced_native_alt_tab_chord(self):
-        call = Mock()
-        with patch('ci_wayland_input.time.sleep'):
-            activate_window(call, '/owned-session', 'Mutter.Session', lambda signature, args: args)
-        self.assertEqual([request.args[3] for request in call.call_args_list],
-                         [(56, True), (15, True), (15, False), (56, False)])
-        self.assertTrue(all(request.args[:3] == ('/owned-session', 'Mutter.Session', 'NotifyKeyboardKeycode')
-                            for request in call.call_args_list))
+    def test_wayland_window_identity_rejects_other_executables_and_desktops(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            application = root / 'taomni-qa'
+            application.touch()
+            other = root / 'other-app'
+            other.touch()
+            for pid, executable, runtime in ((1, application, '/owned/runtime'),
+                                             (2, other, '/owned/runtime'),
+                                             (3, application, '/personal/runtime')):
+                directory = root / str(pid)
+                directory.mkdir()
+                (directory / 'exe').symlink_to(executable)
+                (directory / 'environ').write_bytes(f'XDG_RUNTIME_DIR={runtime}\0'.encode())
+            windows = [{'pid': pid} for pid in (1, 2, 3)]
+            self.assertEqual(owned_window_pid(windows, application, Path('/owned/runtime'), root), 1)
+            with self.assertRaisesRegex(RuntimeError, 'found 0'):
+                owned_window_pid(windows[1:], application, Path('/owned/runtime'), root)
+            with self.assertRaisesRegex(RuntimeError, 'found 2'):
+                owned_window_pid([windows[0], windows[0]], application, Path('/owned/runtime'), root)
+
+    def test_wayland_activation_requires_observed_os_focus_and_retains_before_after(self):
+        before = {'overview': True, 'windows': [{'pid': 42, 'focused': False}]}
+        after = {'overview': False, 'windows': [{'pid': 42, 'focused': True}]}
+        evaluate = Mock(side_effect=[before, True, before, after])
+        diagnostics = {}
+        with patch('ci_wayland_input.owned_window_pid', return_value=42), patch('ci_wayland_input.time.sleep'):
+            activate_window(evaluate, Path('/qa/taomni'), Path('/owned/runtime'), diagnostics)
+        self.assertEqual(diagnostics, {'pid': 42, 'before': before, 'after': after})
+
+    def test_wayland_activation_does_not_accept_focusing_another_window(self):
+        state = {'overview': False, 'windows': [{'pid': 42, 'focused': False}, {'pid': 99, 'focused': True}]}
+        evaluate = Mock(side_effect=[state, True, state])
+        diagnostics = {}
+        with patch('ci_wayland_input.owned_window_pid', return_value=42), \
+                patch('ci_wayland_input.time.monotonic', side_effect=[0, 6]):
+            with self.assertRaisesRegex(RuntimeError, 'did not focus'):
+                activate_window(evaluate, Path('/qa/taomni'), Path('/owned/runtime'), diagnostics)
+        self.assertEqual(diagnostics['after'], state)
 
     def test_linux_display_owns_a_compositor_for_transparent_windows(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
@@ -148,6 +179,7 @@ class DesktopTests(unittest.TestCase):
                     self.assertEqual(activation_env['GDK_BACKEND'], 'wayland')
                     self.assertEqual(activation_env['XDG_RUNTIME_DIR'], os.environ['XDG_RUNTIME_DIR'])
                     self.assertIn('pipewire', started)
+                    self.assertIn('--unsafe-mode', command)
                 started.append(command[0])
                 return Mock()
 
