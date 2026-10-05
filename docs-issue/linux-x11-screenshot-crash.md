@@ -70,6 +70,22 @@ Windows 对话框时序修复后再次编译同一个隔离 QA 目标。源码�
 
 N17 的原始失败和合成器条件都保留，详见安装说明。测试后 QA/Vite/xcompmgr 均已退出，合成器 selection owner 回到 0，用户手工启动的 `/usr/bin/taomni` 保持运行。改动 Rust 文件格式、用例契约和 482 用例 audit gate 通过。
 
+## 最新 Linux 复核（8be0c5ee）
+
+macOS 两项后续修改完成后重新构建、在本机原始 LXQt/Openbox 桌面复测，未启用合成器。源码指纹为 `a75c93744d7364f1398aa239959c28c70c9b5c7f60be036fb3af2a57d045527e`，runner 指纹不变；QA 二进制 SHA-256 为 `f6bad1f92d55d25924c19822b63e75a3b96dcdb520d3701ee0d8b9c1305e3a82`。构建含 `pnpm build`，见 `qa-ui-auto-report/_local/screenshot-x11/macos-followup-native-build.log`。
+
+| 验证 | 结果与证据 |
+| --- | --- |
+| Browser：001/002/004/017/020/023/028/030 | 8/8、零失败跳过；[报告](../qa-ui-auto-report/screenshot-x11/browser-macos-followup/run-20261005-130725-013883548/summary.md) |
+| Native：N10/N12/N3/N7/N8 | 首批 4/5，N10 窗口截图、N12 长图、N3 同进程两次标注/剪贴板、N7 GIF 均通过；额外 N8 因本机 WebKit 无 H.264 解码插件失败；[保留失败的报告](../qa-ui-auto-report/screenshot-x11/native-macos-followup/run-20261005-131140-174807052/summary.md) |
+| Native：补装 libav 后单项 N8 | 原用例 1/1 通过，同一二进制不重建；实际 WebKit 视频 508×428、28 帧、2815ms，真实播放推进，最大漂移 43ms、未解释间隔 70ms、零不匹配；[报告](../qa-ui-auto-report/screenshot-x11/native-mp4-libav/run-20261005-131743-398014803/summary.md) |
+
+失败时的 MP4 可被独立 PyAV 解码为 28 帧 H.264，系统仅有 GStreamer base/good，没有 libav。执行 `sudo apt-get install -y gstreamer1.0-libav` 后 `avdec_h264` 工厂可用，原用例真实预览通过；没有安装 bad/ugly/GL 插件。保存原失败及包安装日志，见 `qa-ui-auto-report/_local/screenshot-x11/gstreamer-libav-install.log` 和 `gstreamer-decoders-after-libav.json`。
+
+三个本机报告的 source/case/config、QA 二进制身份和 49 个 receipt 附件哈希均通过，按当前源码每项最新执行，8 个 browser 与 5 个 native 均通过。561 个实际原生输出（包含解码失败时的录制文件和原画）归档并哈希核验，见 `qa-ui-auto-report/_local/screenshot-x11/local-followup-verification.json`。独立 Pillow/PyAV 检查：N10 的 500×428 与裁切原画逐 RGB 像素相同，N12 的 500×1283 与完整原画 `(6,6)` 裁切完全相同；GIF 28 帧与保留的解码 PNG 及原画逐像素相同；MP4 的 28 帧时间戳与报告一致，逐帧相对原画的最大 RGB 平均误差 3.78，满足原有 8.0 标准。见 `independent-followup-pixels.json`。
+
+本机 QA/Vite 已退出，用户 PID 167582 的 `/usr/bin/taomni` 保持运行。
+
 ## GitHub 三平台回归
 
 分支 `fix/linux-x11-screenshot-crash` 已推送，使用 `.github/workflows/qa-ui-auto-platforms.yml`、`scope=selected`、`features=F27.1,F27.2`，明确选择 Linux/Windows/macOS 的 browser/native 六组。每组 browser 35 项（包含旧 session 图像入口移除），Linux/Windows native 各 16 项，macOS native 19 项；选例没有 capability gap 或未审用例。
@@ -110,6 +126,7 @@ python qa-ui-auto-report/_local/screenshot-x11/install-pipewire.py
 rustup target add x86_64-pc-windows-gnu
 sudo apt-get install -y xcompmgr
 RUSTUP_DIST_SERVER=https://rsproxy.cn rustup target add aarch64-apple-darwin
+sudo apt-get install -y gstreamer1.0-libav
 ```
 
 ALSA 开发包用于编译，xdotool 用于当前 X11 桌面操作。系统 PipeWire 0.3.48 缺少 pipewire-rs 所需的 `pw_buffer.requested`；安装脚本下载 PipeWire 1.0.5 到本地 QA 目录，编译并安装头文件与运行库到 `qa-ui-auto-report/_local/screenshot-x11/pipewire-prefix`。系统 PipeWire 服务和安装目录未替换。源码地址为 `https://codeload.github.com/PipeWire/pipewire/tar.gz/refs/tags/1.0.5`。
