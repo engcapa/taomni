@@ -1001,6 +1001,8 @@ def main(argv: list[str] | None = None) -> int:
         "cases": results,
     }
     if mode == "native":
+        if ci_entry and ci_entry.get("desktop"):
+            summary["desktop_identity"] = cfg.get("desktop", {})
         isolation_path = report_root / "native-isolation.json"
         if isolation_path.exists():
             summary["native_identity"] = json.loads(isolation_path.read_text(encoding="utf-8"))

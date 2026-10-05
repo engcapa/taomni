@@ -14,6 +14,7 @@ import tempfile
 import yaml
 
 from .feature_catalog import load_features
+from .linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES, profile_support
 from .provenance import execution_identity, input_digest
 from .testcase import discover
 from .verification import browser_support, native_support, plan as impact_plan
@@ -146,6 +147,9 @@ def make_plan(args) -> dict:
         raise ValueError("platforms must contain linux, windows and/or macos")
     if not modes or set(modes) - {"browser", "native"}:
         raise ValueError("modes must contain browser and/or native")
+    linux_profiles = csv(getattr(args, "linux_profiles", "") or DEFAULT_LINUX_PROFILE)
+    if not linux_profiles or set(linux_profiles) - LINUX_PROFILES.keys():
+        raise ValueError("linux_profiles must contain: " + ", ".join(LINUX_PROFILES))
     features = load_features()
     feature_ids = {f.id for f in features}
     tags = {tag for case in cases for tag in case.tags}
@@ -194,43 +198,60 @@ def make_plan(args) -> dict:
         reasons.setdefault(cid, ["prerequisite"])
     entries, gaps, not_applicable, reachable = [], [], [], set()
     for platform_key in platforms:
-        target, runner, arch = PLATFORMS[platform_key]
+        target, default_runner, arch = PLATFORMS[platform_key]
         for mode in modes:
-            eligible = []
-            for cid in ordered:
-                case = by_id[cid]
-                if mode not in case.modes:
-                    not_applicable.append({"case": cid, "platform": platform_key, "mode": mode,
-                                           "reason": "case does not declare this mode"})
+            # Only native desktops expand: browser retains its existing runner.
+            profiles = linux_profiles if platform_key == "linux" and mode == "native" else [""]
+            for profile_name in profiles:
+                profile = LINUX_PROFILES.get(profile_name)
+                runner = profile.runner if profile else default_runner
+                combination = {"platform": platform_key, "mode": mode}
+                if profile:
+                    combination["linux_profile"] = profile_name
+                eligible = []
+                for cid in ordered:
+                    case = by_id[cid]
+                    if mode not in case.modes:
+                        not_applicable.append({"case": cid, **combination,
+                                               "reason": "case does not declare this mode"})
+                        continue
+                    reason = native_support(case, target) if mode == "native" else browser_support(case, target)
+                    if reason:
+                        not_applicable.append({"case": cid, **combination, "reason": reason})
+                        continue
+                    if case.skip:
+                        reason = f"case declares skip: {case.skip}"
+                    unavailable = policy.get("unavailable", {}).get(cid, {})
+                    reason = reason or unavailable.get(f"{platform_key}/{mode}")
+                    if profile:
+                        reason = reason or profile_support(case, profile_name)
+                    if reason:
+                        gaps.append({"case": cid, **combination, "reason": reason})
+                        continue
+                    eligible.append(case)
+                ids = [c.id for c in eligible]
+                for cid in ids:
+                    if set(dependencies.get(cid, [])) - set(ids):
+                        raise ValueError(f"prerequisite unavailable for {platform_key}/{profile_name}/{mode}/{cid}")
+                if not ids:
                     continue
-                reason = native_support(case, target) if mode == "native" else browser_support(case, target)
-                if reason:
-                    not_applicable.append({"case": cid, "platform": platform_key, "mode": mode, "reason": reason})
-                    continue
-                if case.skip:
-                    reason = f"case declares skip: {case.skip}"
-                unavailable = policy.get("unavailable", {}).get(cid, {})
-                reason = reason or unavailable.get(f"{platform_key}/{mode}")
-                if reason:
-                    gaps.append({"case": cid, "platform": platform_key, "mode": mode, "reason": reason})
-                    continue
-                eligible.append(case)
-            ids = [c.id for c in eligible]
-            for cid in ids:
-                if set(dependencies.get(cid, [])) - set(ids):
-                    raise ValueError(f"prerequisite unavailable for {platform_key}/{mode}/{cid}")
-            if not ids:
-                continue
-            reachable.update(ids)
-            entries.append({"id": f"{platform_key}-{mode}", "platform": target, "platform_key": platform_key,
-                            "runner": runner, "arch": arch, "mode": mode, "selected_ids": ids,
-                            "capabilities": capabilities(eligible, mode),
-                            "case_digests": {c.id: input_digest(c.source_path) for c in eligible}})
+                reachable.update(ids)
+                entry_id = f"{platform_key}-{mode}"
+                if profile_name and profile_name != DEFAULT_LINUX_PROFILE:
+                    entry_id = f"linux-{profile_name}-{mode}"
+                entries.append({"id": entry_id, "platform": target, "platform_key": platform_key,
+                                "runner": runner, "arch": arch, "mode": mode, "selected_ids": ids,
+                                "linux_profile": profile_name, "linux_wrapper": profile.wrapper if profile else "",
+                                "desktop": profile.identity(profile_name) if profile else {},
+                                "cache_key": profile_name if profile_name and profile_name != DEFAULT_LINUX_PROFILE else platform_key,
+                                "capabilities": capabilities(eligible, mode),
+                                "case_digests": {c.id: input_digest(c.source_path) for c in eligible}})
     if explicit - reachable:
         raise ValueError(f"explicit cases unavailable in requested combinations: {sorted(explicit-reachable)}")
     if not entries and args.scope != "impacted":
         raise ValueError("selection contains no runnable cases")
     return {"schema": "qa-ui-auto.ci-selection.v1", "head": head, "base": base,
+            "linux_profiles": linux_profiles,
             "merge_base": ancestor, "scope": args.scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
@@ -304,6 +325,11 @@ def aggregate(manifest: dict, root: Path) -> dict:
                             or identity.get("binary_sha256") != build.get("binary_sha256")
                             or identity.get("source_sha256") != manifest["identity"]["source_sha256"]):
                         raise ValueError("native binary identity differs from build/source")
+                    if entry.get("desktop"):
+                        desktop = summary.get("desktop_identity", {})
+                        if desktop.get("ready") is not True or any(
+                                desktop.get(key) != value for key, value in entry["desktop"].items()):
+                            raise ValueError("native desktop profile/session differs from selection")
                 ids = [c["id"] for c in summary["cases"]]
                 counts = Counter(c["status"] for c in summary["cases"])
                 expected_totals = {"total": len(ids), **{k: counts[k] for k in ("passed", "failed", "skipped")}}
@@ -343,6 +369,7 @@ def aggregate(manifest: dict, root: Path) -> dict:
             errors.append("missing execution outcome (build/setup/cancellation)")
         failures.extend({"entry": entry["id"], "case": "infrastructure", "message": e[:2500]} for e in errors)
         entries.append({"id": entry["id"], "selected": len(entry["selected_ids"]),
+                        "linux_profile": entry.get("linux_profile", ""), "desktop": entry.get("desktop", {}),
                         "counts": dict(totals), "errors": errors})
     infrastructure_errors = [
         {"entry": entry["id"], "message": error}
@@ -367,6 +394,7 @@ def main(argv=None):
     plan = subs.add_parser("plan")
     for name, default in [("scope", "smoke"), ("head", ""), ("base", ""),
                           ("platforms", "linux,windows,macos"), ("modes", "browser,native"),
+                          ("linux_profiles", DEFAULT_LINUX_PROFILE),
                           ("case_ids", ""), ("features", ""), ("tags", "")]:
         plan.add_argument("--" + name.replace("_", "-"), default=os.environ.get("QA_" + name.upper()) or default)
     plan.add_argument("--output", type=Path, default=Path("qa-ui-auto-report/selection.json"))
@@ -380,7 +408,8 @@ def main(argv=None):
                 raise ValueError("unknown scope")
             result = make_plan(args)
             write_json(args.output, result)
-            matrix = {"include": [{k: e[k] for k in ("id", "runner", "arch", "mode", "platform_key", "capabilities")} for e in result["entries"]]}
+            matrix = {"include": [{k: e[k] for k in ("id", "runner", "arch", "mode", "platform_key", "capabilities",
+                                                     "linux_profile", "linux_wrapper", "cache_key")} for e in result["entries"]]}
             github_output("matrix", json.dumps(matrix, separators=(",", ":")))
             github_output("has_cases", str(bool(result["entries"])).lower())
             github_output("head", result["head"])
