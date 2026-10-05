@@ -113,22 +113,34 @@ impl DecodingContext {
             .0
             .first()
             .ok_or_else(|| general_err!("no RFX channel found"))?;
-        let width = channel.width.try_into().map_err(|_| general_err!("invalid width"))?;
-        let height = channel.height.try_into().map_err(|_| general_err!("invalid height"))?;
+        let width = channel
+            .width
+            .try_into()
+            .map_err(|_| general_err!("invalid width"))?;
+        let height = channel
+            .height
+            .try_into()
+            .map_err(|_| general_err!("invalid height"))?;
         let entropy_algorithm = self.context.entropy_algorithm;
 
-        let region: rfx::Block<'_> = decode_cursor(input).map_err(|e| custom_err!("decode region", e))?;
+        let region: rfx::Block<'_> =
+            decode_cursor(input).map_err(|e| custom_err!("decode region", e))?;
         let mut region = match region {
             rfx::Block::CodecChannel(rfx::CodecChannel::Region(region)) => region,
             _ => return Err(general_err!("unexpected block type")),
         };
-        let tile_set: rfx::Block<'_> = decode_cursor(input).map_err(|e| custom_err!("decode tile_set", e))?;
+        let tile_set: rfx::Block<'_> =
+            decode_cursor(input).map_err(|e| custom_err!("decode tile_set", e))?;
         let tile_set = match tile_set {
             rfx::Block::CodecChannel(rfx::CodecChannel::TileSet(t)) => t,
             _ => return Err(general_err!("unexpected block type")),
         };
-        let frame_end: rfx::Block<'_> = decode_cursor(input).map_err(|e| custom_err!("decode frame_end", e))?;
-        if !matches!(frame_end, rfx::Block::CodecChannel(rfx::CodecChannel::FrameEnd(_))) {
+        let frame_end: rfx::Block<'_> =
+            decode_cursor(input).map_err(|e| custom_err!("decode frame_end", e))?;
+        if !matches!(
+            frame_end,
+            rfx::Block::CodecChannel(rfx::CodecChannel::FrameEnd(_))
+        ) {
             return Err(general_err!("unexpected block type"));
         }
 
@@ -148,13 +160,17 @@ impl DecodingContext {
         trace!(channels = ?self.channels);
         trace!(?region);
 
-        let clipping_rectangles = clipping_rectangles(region.rectangles.as_slice(), destination, width, height);
+        let clipping_rectangles =
+            clipping_rectangles(region.rectangles.as_slice(), destination, width, height);
         trace!("Clipping rectangles: {:?}", clipping_rectangles);
 
         let mut final_update_rectangle = clipping_rectangles.extents.clone();
 
-        for (update_rectangle, tile_data) in tiles_to_rectangles(tile_set.tiles.as_slice(), destination)
-            .zip(map_tiles_data(tile_set.tiles.as_slice(), tile_set.quants.as_slice()))
+        for (update_rectangle, tile_data) in
+            tiles_to_rectangles(tile_set.tiles.as_slice(), destination).zip(map_tiles_data(
+                tile_set.tiles.as_slice(),
+                tile_set.quants.as_slice(),
+            ))
         {
             decode_tile(
                 &tile_data,
@@ -203,8 +219,19 @@ fn decode_tile(
     ycbcr_temp: &mut [Vec<i16>],
     temp: &mut [i16],
 ) -> SessionResult<()> {
-    for ((quant, data), ycbcr_buffer) in tile.quants.iter().zip(tile.data.iter()).zip(ycbcr_temp.iter_mut()) {
-        decode_component(quant, entropy_algorithm, data, ycbcr_buffer.as_mut_slice(), temp)?;
+    for ((quant, data), ycbcr_buffer) in tile
+        .quants
+        .iter()
+        .zip(tile.data.iter())
+        .zip(ycbcr_temp.iter_mut())
+    {
+        decode_component(
+            quant,
+            entropy_algorithm,
+            data,
+            ycbcr_buffer.as_mut_slice(),
+            temp,
+        )?;
     }
 
     let ycbcr_buffer = YCbCrBuffer {
@@ -213,7 +240,8 @@ fn decode_tile(
         cr: ycbcr_temp[2].as_slice(),
     };
 
-    color_conversion::ycbcr_to_rgba(ycbcr_buffer, output).map_err(|e| custom_err!("decode_tile", e))?;
+    color_conversion::ycbcr_to_rgba(ycbcr_buffer, output)
+        .map_err(|e| custom_err!("decode_tile", e))?;
 
     Ok(())
 }
@@ -225,7 +253,8 @@ fn decode_component(
     output: &mut [i16],
     temp: &mut [i16],
 ) -> SessionResult<()> {
-    rlgr::decode(entropy_algorithm, data, output).map_err(|e| custom_err!("decode_component", e))?;
+    rlgr::decode(entropy_algorithm, data, output)
+        .map_err(|e| custom_err!("decode_component", e))?;
     subband_reconstruction::decode(&mut output[4032..]);
     quantization::decode(output, quant);
     dwt::decode(output, temp);

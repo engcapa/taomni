@@ -76,7 +76,11 @@ impl Palette {
         for i in 0..number_colors {
             let offset = i * 4;
             // TS_COLOR_QUAD: Blue, Green, Red, Pad
-            self.colors[i] = [entry_data[offset + 2], entry_data[offset + 1], entry_data[offset]];
+            self.colors[i] = [
+                entry_data[offset + 2],
+                entry_data[offset + 1],
+                entry_data[offset],
+            ];
         }
 
         debug!("Updated palette with {} colors", number_colors);

@@ -10,7 +10,11 @@ pub struct PointerCache {
 }
 
 impl PointerCache {
-    pub fn insert(&mut self, id: usize, pointer: Arc<DecodedPointer>) -> Option<Arc<DecodedPointer>> {
+    pub fn insert(
+        &mut self,
+        id: usize,
+        pointer: Arc<DecodedPointer>,
+    ) -> Option<Arc<DecodedPointer>> {
         self.cache.insert(id, pointer)
     }
 

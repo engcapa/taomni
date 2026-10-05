@@ -144,7 +144,8 @@ fn copy_cursor_data(
 
 impl DecodedImage {
     pub fn new(pixel_format: PixelFormat, width: u16, height: u16) -> Self {
-        let len = usize::from(width) * usize::from(height) * usize::from(pixel_format.bytes_per_pixel());
+        let len =
+            usize::from(width) * usize::from(height) * usize::from(pixel_format.bytes_per_pixel());
 
         Self {
             pixel_format,
@@ -190,9 +191,11 @@ impl DecodedImage {
     }
 
     pub fn data_for_rect(&self, rect: &InclusiveRectangle) -> &[u8] {
-        let start = usize::from(rect.left) * self.bytes_per_pixel() + usize::from(rect.top) * self.stride();
-        let end =
-            start + usize::from(rect.height() - 1) * self.stride() + usize::from(rect.width()) * self.bytes_per_pixel();
+        let start =
+            usize::from(rect.left) * self.bytes_per_pixel() + usize::from(rect.top) * self.stride();
+        let end = start
+            + usize::from(rect.height() - 1) * self.stride()
+            + usize::from(rect.width()) * self.bytes_per_pixel();
         &self.data[start..end]
     }
 
@@ -205,7 +208,10 @@ impl DecodedImage {
         rect.right < self.width && rect.bottom < self.height
     }
 
-    fn apply_pointer_layer(&mut self, layer: PointerLayer) -> SessionResult<Option<InclusiveRectangle>> {
+    fn apply_pointer_layer(
+        &mut self,
+        layer: PointerLayer,
+    ) -> SessionResult<Option<InclusiveRectangle>> {
         // Pointer is not hidden, but its texture is not visible on the screen, so we don't
         // need to render it
         if layer == PointerLayer::Pointer && !self.pointer_visible_on_screen {
@@ -391,7 +397,11 @@ impl DecodedImage {
         self.pointer_draw_y = draw_y;
     }
 
-    pub(crate) fn move_pointer(&mut self, x: u16, y: u16) -> SessionResult<Option<InclusiveRectangle>> {
+    pub(crate) fn move_pointer(
+        &mut self,
+        x: u16,
+        y: u16,
+    ) -> SessionResult<Option<InclusiveRectangle>> {
         self.pointer_x = x;
         self.pointer_y = y;
 
@@ -411,7 +421,10 @@ impl DecodedImage {
         }
     }
 
-    pub(crate) fn update_pointer(&mut self, pointer: Arc<DecodedPointer>) -> SessionResult<Option<InclusiveRectangle>> {
+    pub(crate) fn update_pointer(
+        &mut self,
+        pointer: Arc<DecodedPointer>,
+    ) -> SessionResult<Option<InclusiveRectangle>> {
         self.show_pointer = true;
 
         // Remove old pointer from frame buffer
@@ -483,7 +496,9 @@ impl DecodedImage {
 
         let update_rectangle = self
             .apply_pointer_layer(PointerLayer::Pointer)?
-            .map(|pointer_draw_rectangle| pointer_draw_rectangle.union(&pointer_rendering_state.update_rectangle))
+            .map(|pointer_draw_rectangle| {
+                pointer_draw_rectangle.union(&pointer_rendering_state.update_rectangle)
+            })
             .unwrap_or_else(|| pointer_rendering_state.update_rectangle);
 
         Ok(update_rectangle)
@@ -536,7 +551,10 @@ impl DecodedImage {
             };
 
             trace!("Source image region: {:?}", source_image_region.region);
-            trace!("Destination image region: {:?}", destination_image_region.region);
+            trace!(
+                "Destination image region: {:?}",
+                destination_image_region.region
+            );
 
             source_image_region
                 .copy_to(&mut destination_image_region)
@@ -585,7 +603,8 @@ impl DecodedImage {
                                 .try_into()
                                 .expect("src_pixel contains exactly two u8 elements"),
                         );
-                        let dst_idx = ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
+                        let dst_idx =
+                            ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
 
                         let [r, g, b] = rdp_16bit_to_rgb(rgb16_value);
                         self.data[dst_idx + ri] = r;
@@ -638,7 +657,8 @@ impl DecodedImage {
                                 .try_into()
                                 .expect("src_pixel contains exactly two u8 elements"),
                         );
-                        let dst_idx = ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
+                        let dst_idx =
+                            ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
 
                         let [r, g, b] = rdp_15bit_to_rgb(rgb15_value);
                         self.data[dst_idx + ri] = r;
@@ -688,7 +708,8 @@ impl DecodedImage {
                 row.chunks_exact(SRC_COLOR_DEPTH)
                     .enumerate()
                     .for_each(|(col_idx, src_pixel)| {
-                        let dst_idx = ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
+                        let dst_idx =
+                            ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
 
                         // BGR -> RGB channel swap
                         self.data[dst_idx + ri] = src_pixel[2];
@@ -735,7 +756,8 @@ impl DecodedImage {
             .enumerate()
             .for_each(|(row_idx, row)| {
                 row.iter().enumerate().for_each(|(col_idx, &index)| {
-                    let dst_idx = ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
+                    let dst_idx =
+                        ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
                     let [r, g, b] = palette[usize::from(index)];
                     self.data[dst_idx + ri] = r;
                     self.data[dst_idx + gi] = g;
@@ -779,7 +801,8 @@ impl DecodedImage {
             row.chunks_exact(SRC_COLOR_DEPTH)
                 .enumerate()
                 .for_each(|(col_idx, src_pixel)| {
-                    let dst_idx = ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
+                    let dst_idx =
+                        ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
 
                     self.data[dst_idx + ri] = src_pixel[0];
                     self.data[dst_idx + gi] = src_pixel[1];
@@ -840,7 +863,8 @@ impl DecodedImage {
             row.chunks_exact(SRC_COLOR_DEPTH)
                 .enumerate()
                 .for_each(|(col_idx, src_pixel)| {
-                    let dst_idx = ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
+                    let dst_idx =
+                        ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
 
                     self.data[dst_idx + ri] = src_pixel[0];
                     self.data[dst_idx + gi] = src_pixel[1];
@@ -901,13 +925,15 @@ impl DecodedImage {
                 .rev()
                 .enumerate()
                 .for_each(|(row_idx, row)| {
-                    row.chunks_exact(SRC_COLOR_DEPTH)
-                        .enumerate()
-                        .for_each(|(col_idx, src_pixel)| {
-                            let dst_idx = ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
+                    row.chunks_exact(SRC_COLOR_DEPTH).enumerate().for_each(
+                        |(col_idx, src_pixel)| {
+                            let dst_idx =
+                                ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
 
-                            self.data[dst_idx..dst_idx + SRC_COLOR_DEPTH].copy_from_slice(src_pixel);
-                        })
+                            self.data[dst_idx..dst_idx + SRC_COLOR_DEPTH]
+                                .copy_from_slice(src_pixel);
+                        },
+                    )
                 });
         } else {
             let [ri, gi, bi, ai] = self.pixel_format.channel_offsets();
@@ -916,10 +942,10 @@ impl DecodedImage {
                 .rev()
                 .enumerate()
                 .try_for_each(|(row_idx, row)| {
-                    row.chunks_exact(SRC_COLOR_DEPTH)
-                        .enumerate()
-                        .try_for_each(|(col_idx, src_pixel)| {
-                            let dst_idx = ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
+                    row.chunks_exact(SRC_COLOR_DEPTH).enumerate().try_for_each(
+                        |(col_idx, src_pixel)| {
+                            let dst_idx =
+                                ((top + row_idx) * image_width + left + col_idx) * DST_COLOR_DEPTH;
 
                             let c = format
                                 .read_color(src_pixel)
@@ -931,7 +957,8 @@ impl DecodedImage {
                             self.data[dst_idx + ai] = c.a;
 
                             Ok(())
-                        })?;
+                        },
+                    )?;
 
                     Ok(())
                 })?;
