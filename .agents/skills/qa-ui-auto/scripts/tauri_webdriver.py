@@ -486,7 +486,26 @@ class NativeSession:
         # race that navigation; transient evaluation failures are retryable,
         # but the case deadline remains authoritative.
         self.wait_for_app_ready()
+        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND") == "wayland":
+            self.activate_wayland_window()
         self.install_console_hook()
+
+    def activate_wayland_window(self, timeout: float = 5.0) -> None:
+        # Headless Wayland can create a visible WebView whose page is not
+        # focused. DOM focus() still changes activeElement, but :focus and
+        # :focus-within correctly remain false. Switch through the driver's
+        # native window endpoint before exercising app focus/shortcuts.
+        handle = self.request("GET", self.endpoint("/window"))
+        if not isinstance(handle, str) or not handle:
+            raise WebDriverError("Wayland driver did not return a window handle")
+        self.request("POST", self.endpoint("/window"), {"handle": handle})
+        end = time.monotonic() + timeout
+        while True:
+            if self.execute("return document.hasFocus();") is True:
+                return
+            if time.monotonic() >= end:
+                raise WebDriverError("Wayland WebView window did not receive focus")
+            time.sleep(0.05)
 
     def wait_for_app_ready(self, timeout: float = 20.0) -> None:
         """Wait until the QA WebView has a mounted application root."""

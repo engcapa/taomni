@@ -85,6 +85,32 @@ class NativeSessionTransportTest(TestCase):
         self.assertEqual(options["webviewOptions"]["userDataFolder"],
                          str(Path("/qa/run/native-appdata/com.taomni.app.qa/webview")))
 
+    def test_wayland_start_activates_the_actual_webdriver_window(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.request = Mock(side_effect=[{"sessionId": "session-1"}, "window-qa", None])
+        session.wait_for_app_ready = Mock()
+        session.install_console_hook = Mock()
+        session.execute = Mock(side_effect=[False, True])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
+                patch("tauri_webdriver.time.sleep"):
+            session.start()
+        self.assertEqual(session.request.call_args_list[-2:], [
+            call("GET", "/session/session-1/window"),
+            call("POST", "/session/session-1/window", {"handle": "window-qa"}),
+        ])
+        session.execute.assert_called_with("return document.hasFocus();")
+        session.install_console_hook.assert_called_once_with()
+
+    def test_wayland_unfocused_document_fails_before_starting_app_steps(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock(side_effect=["window-qa", None])
+        session.execute = Mock(return_value=False)
+        with self.assertRaisesRegex(WebDriverError, "window did not receive focus"):
+            session.activate_wayland_window(timeout=0)
+        session.execute.assert_called_once_with("return document.hasFocus();")
+
     def test_right_click_uses_right_button_and_releases_on_failure(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
