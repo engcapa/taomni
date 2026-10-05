@@ -3329,6 +3329,13 @@
         "points"
       ],
       "properties": {
+        "match_viewport": {
+          "type": "boolean"
+        },
+        "resized_from": {
+          "type": "string",
+          "minLength": 1
+        },
         "selector": {
           "type": "string",
           "minLength": 1

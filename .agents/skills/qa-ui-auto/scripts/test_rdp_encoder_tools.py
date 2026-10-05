@@ -287,6 +287,34 @@ class EncoderToolsTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "WebView capture failed"):
             steps._do_rdp_canvas_assert(self.ctx, {"points": [{"x": 60, "y": 100, "rgb": [255, 0, 255]}]})
 
+    def test_canvas_resize_waits_for_new_viewport_dimensions_and_repaint(self):
+        (self.case / "before.json").write_text('{"width":994,"height":750}', encoding="utf-8")
+        viewport = {"width": 1492, "height": 1030}
+        self.ctx.session.execute.side_effect = [
+            {"width": 994, "height": 750, "viewport_size": {"width": 994, "height": 750}, "pixels": [[255, 255, 255, 255]]},
+            {"width": 994, "height": 750, "viewport_size": viewport, "pixels": [[255, 255, 255, 255]]},
+            {"width": 1492, "height": 1030, "viewport_size": viewport, "pixels": [[0, 0, 0, 0]]},
+            {"width": 1492, "height": 1030, "viewport_size": viewport, "pixels": [[255, 255, 255, 255]]},
+        ]
+        with patch.object(steps.time, "sleep"):
+            steps._do_rdp_canvas_assert(self.ctx, {
+                "points": [{"x": 280, "y": 240, "rgb": [255, 255, 255]}],
+                "match_viewport": True, "resized_from": "before.json",
+            })
+        self.assertEqual(self.ctx.session.execute.call_count, 4)
+        self.assertEqual(json.loads((self.case / "client-pixels.json").read_text())["width"], 1492)
+        self.ctx.session.screenshot.assert_called_once_with(self.case / "client-pixels.png")
+
+    def test_canvas_matching_pixels_without_viewport_geometry_do_not_pass_resize(self):
+        self.ctx.session.execute.return_value = {"width": 1492, "height": 1030, "pixels": [[255, 255, 255, 255]]}
+        with patch.object(steps.time, "time", side_effect=[0, 11]):
+            with self.assertRaisesRegex(StepError, "decoded client pixels"):
+                steps._do_rdp_canvas_assert(self.ctx, {
+                    "points": [{"x": 280, "y": 240, "rgb": [255, 255, 255]}],
+                    "match_viewport": True, "timeout_sec": 10,
+                })
+        self.ctx.session.screenshot.assert_not_called()
+
     def test_photo_target_noise_is_deterministic_and_changes_each_frame(self):
         self.assertEqual(photo_noise(20, 12, 0), photo_noise(20, 12, 0))
         self.assertNotEqual(photo_noise(20, 12, 0), photo_noise(20, 12, 1))
