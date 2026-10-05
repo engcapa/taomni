@@ -139,6 +139,7 @@ def main():
                 wrapper.write_text(f'@echo off\n"{driver}" --verbose "--log-path={log_path}" %*\n', encoding="utf-8")
                 config["webdriver"] = {"native_driver": str(wrapper)}
             cfg_path = args.report / "config.yaml"
+            cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
             if entry["mode"] == "native":
                 from ci_desktop import Desktop
                 from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE
@@ -146,6 +147,7 @@ def main():
                                                        entry.get("linux_profile") or DEFAULT_LINUX_PROFILE))
                 if entry.get("desktop"):
                     config["desktop"] = desktop.facts
+                    cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
                 outcome["stage"] = "build"
                 write_json(args.report / "ci-outcome.json", outcome)
                 build_log = stack.enter_context((args.report / "build.log").open("w", encoding="utf-8"))
@@ -181,7 +183,6 @@ def main():
                         time.sleep(1)
                 else:
                     raise RuntimeError("Vite not ready in 90s")
-            cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
             outcome["stage"] = "cases"
             write_json(args.report / "ci-outcome.json", outcome)
             command = [sys.executable, "-m", "qa_ui_auto", "run", "--selection", str(args.selection),

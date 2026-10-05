@@ -136,6 +136,10 @@ listed as profile-specific capability gaps during planning. They are not
 silently run with weaker assertions or counted as Wayland passes. Explicitly
 selecting a case unavailable in all requested combinations fails. Portal
 interface readiness alone does not prove user authorization or screen capture.
+CI installs the Ubuntu GNOME session, theme and portal components explicitly
+with `--no-install-recommends`; provisioning runs noninteractively with a
+20-minute dependency timeout. Desktop application metapackages are unnecessary
+for the virtual monitor and add substantial downloads.
 
 Selection entries, cache keys and artifact directories identify the profile.
 The runner receipt binds `desktop_identity` in the native summary; aggregation

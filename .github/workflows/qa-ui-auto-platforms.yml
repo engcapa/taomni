@@ -172,6 +172,7 @@ jobs:
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
       - name: Linux native and service dependencies
         if: runner.os == 'Linux' && matrix.mode == 'native'
+        timeout-minutes: 20
         env:
           QA_LINUX_PROFILE: ${{ matrix.linux_profile }}
           QA_CAPABILITIES: ${{ join(matrix.capabilities, ',') }}
