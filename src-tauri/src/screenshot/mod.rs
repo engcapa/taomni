@@ -1221,7 +1221,7 @@ pub async fn screenshot_start_recording(
     if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
         let _ = window.hide();
     }
-    if let Err(error) = open_recorder_bar(&app, &display, bounded) {
+    if let Err(error) = open_recorder_bar(&app, &display, bounded).await {
         surfaces::close_borders(&app);
         if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
             let _ = window.close();
@@ -1233,6 +1233,9 @@ pub async fn screenshot_start_recording(
             restore_app_windows(&app);
         }
         return Err(error);
+    }
+    if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
+        return Err("screen recording start was cancelled".into());
     }
     let worker = app.clone();
     let started = blocking("start recording", move || {
@@ -1382,7 +1385,7 @@ pub(crate) fn recording_ended(app: &AppHandle, id: &str) {
     }
 }
 
-fn open_recorder_bar(
+async fn open_recorder_bar(
     app: &AppHandle,
     display: &DisplayInfo,
     region: (u32, u32, u32, u32),
@@ -1399,6 +1402,8 @@ fn open_recorder_bar(
     );
     let position = capture_control_position(app, display, rect)?;
     surfaces::open_borders(app, display, rect)?;
+    let (loaded_tx, loaded_rx) = tokio::sync::oneshot::channel();
+    let loaded_tx = Mutex::new(Some(loaded_tx));
     let window = window_builder(app, RECORDER_LABEL, url)
         .title("Recording")
         .inner_size(lw, lh)
@@ -1408,6 +1413,13 @@ fn open_recorder_bar(
         .always_on_top(true)
         .skip_taskbar(true)
         .content_protected(surfaces::PROTECT_CAPTURE_SURFACES)
+        .on_page_load(move |_, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                if let Some(tx) = loaded_tx.lock().unwrap().take() {
+                    let _ = tx.send(());
+                }
+            }
+        })
         .build()
         .map_err(|e| format!("open recorder bar: {e}"))?;
     watch_session_window(&window);
@@ -1426,6 +1438,16 @@ fn open_recorder_bar(
     window
         .set_size(PhysicalSize::new(pw as u32, ph as u32))
         .map_err(|e| format!("size recording controls: {e}"))?;
+    // Finish loading and mapping the controls before the first recording
+    // snapshot. Creating a hidden WebView does not finish its navigation;
+    // showing it after capture starts can stall WindowServer and lose motion.
+    if position.is_some() {
+        window.show().map_err(|e| format!("show recording controls: {e}"))?;
+    }
+    tokio::time::timeout(Duration::from_secs(15), loaded_rx)
+        .await
+        .map_err(|_| "recording controls did not load within 15 s".to_string())?
+        .map_err(|_| "recording controls closed before loading".to_string())?;
     Ok(())
 }
 

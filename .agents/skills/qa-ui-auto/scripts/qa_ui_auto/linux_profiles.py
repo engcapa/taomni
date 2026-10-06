@@ -52,6 +52,6 @@ def profile_support(case, name: str) -> str | None:
             return f"{verb} currently uses X11 OS automation; a Wayland helper is required"
         if verb == "native_keys" and (not isinstance(args, dict) or args.get("transport", "x11") == "x11"):
             return "native_keys selects the X11/XTEST transport"
-        if verb == "native_screenshot_scenario":
+        if verb == "native_screenshot_scenario" and args.get("scenario") != "pin-arrangement":
             return "Wayland capture scenarios require portal consent automation; not provided by this profile yet"
     return None

@@ -26,6 +26,7 @@ pub mod colors;
 #[cfg(target_os = "macos")]
 mod macos_save_dialog;
 pub mod pin_tools;
+pub mod pin_arrangement;
 pub mod scroll_manual;
 #[cfg(target_os = "windows")]
 mod windows_save_dialog;
@@ -816,18 +817,18 @@ pub async fn screenshot_qa_annotation_tools(app: AppHandle) -> Result<String, St
       q('screenshot-fullscreen').click(); await sleep(120);
       const fire=(el,type,x,y,extra={})=>el.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,buttons:type==='mouseup'?0:1,clientX:x,clientY:y,...extra}));
       const layer=q('screenshot-annotation-layer');
-      q('screenshot-tool-rect').click(); q('screenshot-fill').click();
+      q('screenshot-tool-rect').click(); await sleep(80); q('screenshot-fill').click(); await sleep(80);
       fire(layer,'mousedown',80,80); fire(window,'mousemove',180,160); fire(window,'mouseup',180,160); await sleep(80);
       const filledRect=q('screenshot-fill').getAttribute('aria-pressed')==='true';
-      q('screenshot-tool-ellipse').click(); fire(layer,'mousedown',220,80); fire(window,'mousemove',320,180); fire(window,'mouseup',320,180); await sleep(80);
-      q('screenshot-tool-pen').click(); fire(layer,'mousedown',100,250); fire(window,'mousemove',150,200); fire(window,'mousemove',200,250); fire(window,'mouseup',200,250); await sleep(80);
+      q('screenshot-tool-ellipse').click(); await sleep(80); fire(layer,'mousedown',220,80); fire(window,'mousemove',320,180); fire(window,'mouseup',320,180); await sleep(80);
+      q('screenshot-tool-pen').click(); await sleep(80); fire(layer,'mousedown',100,250); fire(window,'mousemove',150,200); fire(window,'mousemove',200,250); fire(window,'mouseup',200,250); await sleep(80);
       const beforeErase=Number(q('screenshot-annotation-canvas').dataset.shapes);
-      q('screenshot-tool-eraser').click();
+      q('screenshot-tool-eraser').click(); await sleep(80);
       fire(layer,'mousedown',145,200); fire(window,'mousemove',155,205); fire(window,'mouseup',155,205); await sleep(100);
       const afterErase=Number(q('screenshot-annotation-canvas').dataset.shapes);
       return {filledRect,beforeErase,afterErase,eraseMode:q('screenshot-eraser-mode').value,fill:q('screenshot-fill').getAttribute('aria-pressed')};
     "#, Duration::from_secs(25)).await.map_err(|e| e.to_string())?;
-    overlay.eval("document.querySelector('[data-testid=\\\"screenshot-cancel\\\"]')?.click()").map_err(|e| e.to_string())?;
+    overlay.eval("document.querySelector('[data-testid=\"screenshot-cancel\"]')?.click()").map_err(|e| e.to_string())?;
     let closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
     Ok(report(
         result["filledRect"] == json!(true)

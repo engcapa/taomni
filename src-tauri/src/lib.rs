@@ -1142,6 +1142,7 @@ pub fn run() {
             screenshot::qa::screenshot_qa_full_recorder,
             screenshot::qa::screenshot_qa_pin,
             screenshot::qa::pin_tools::screenshot_qa_pin_tools,
+            screenshot::qa::pin_arrangement::screenshot_qa_pin_arrangement,
             screenshot::qa::scroll_manual::screenshot_qa_scroll_manual,
             screenshot::qa::colors::screenshot_qa_colors,
             screenshot::qa::screenshot_qa_freehand,
