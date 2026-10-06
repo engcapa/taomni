@@ -43,7 +43,12 @@ else
 fi
 
 if [[ ",${QA_CAPABILITIES:-}," == *",audio,"* ]]; then
-  install_packages pipewire wireplumber pipewire-pulse pipewire-alsa pulseaudio-utils
+  pipewire_alsa_package=pipewire-alsa
+  if [[ "$profile" == ubuntu-22.04-* ]]; then
+    # Jammy bundles its ALSA plugin in the audio client libraries package.
+    pipewire_alsa_package=pipewire-audio-client-libraries
+  fi
+  install_packages pipewire wireplumber pipewire-pulse "$pipewire_alsa_package" pulseaudio-utils
 fi
 
 # pipewire-rs v0_3_49 needs pw_buffer.requested, absent in Jammy's headers.

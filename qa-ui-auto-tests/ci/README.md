@@ -119,6 +119,8 @@ Ubuntu 22.04 QA installs a checksum-pinned PipeWire 1.0.9 development/runtime
 overlay because pipewire-rs needs headers newer than stock Jammy. That overlay
 is part of the test environment, not evidence for stock Jammy PipeWire. The
 release workflow's existing independent recipe is not changed.
+Audio cases use Jammy's `pipewire-audio-client-libraries` package for the ALSA
+plugin; later Ubuntu profiles use the separate `pipewire-alsa` package.
 
 The VNC desktop binds loopback, uses a disposable VNCAuth password outside
 uploaded reports, and authenticates an actual RFB handshake before launch.
