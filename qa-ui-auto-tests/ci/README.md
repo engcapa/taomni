@@ -108,8 +108,8 @@ Ubuntu 24.04, and Windows/macOS are unaffected.
 | Profile | Runner / session | Desktop | Purpose |
 |---|---|---|---|
 | `ubuntu-24.04-xvfb` (default) | Ubuntu 24.04 / X11 Xvfb | Openbox + xcompmgr | Existing CI baseline |
-| `ubuntu-22.04-x11` | Ubuntu 22.04 / X11 Xvfb | LXQt + Openbox, no compositor | Older library/desktop compatibility; uncomposited screenshot regressions |
-| `ubuntu-22.04-vnc` | Ubuntu 22.04 / X11 Xtigervnc | LXQt + Openbox, no compositor | The app runs inside a real VNC-served desktop |
+| `ubuntu-22.04-x11` | Ubuntu 22.04 / X11 Xvfb | LXQt + Openbox + xcompmgr | Older library/desktop compatibility with transparent-window compositing |
+| `ubuntu-22.04-vnc` | Ubuntu 22.04 / X11 Xtigervnc | LXQt + Openbox + xcompmgr | The app runs inside a real VNC-served desktop with transparent-window compositing |
 | `ubuntu-26.04-wayland` | Ubuntu 26.04 LTS / native Wayland | Ubuntu GNOME Shell/Mutter, virtual 1920×1080 monitor, software rendering | Current LTS Wayland startup, WebKitGTK and app workflows |
 
 Versioned runner labels fix the Ubuntu release family, not an immutable image:

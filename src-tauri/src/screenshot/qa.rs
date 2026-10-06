@@ -815,9 +815,16 @@ pub async fn screenshot_qa_annotation_tools(app: AppHandle) -> Result<String, St
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
       for(let i=0;i<100&&!q('screenshot-hint');i++) await sleep(80);
       q('screenshot-fullscreen').click(); await sleep(120);
+      for(let i=0;i<100&&(!q('screenshot-toolbar')||!q('screenshot-tool-rect'));i++) await sleep(80);
+      if(!q('screenshot-toolbar')||!q('screenshot-tool-rect')) throw new Error('annotation toolbar did not load');
+      for(let i=0;i<100&&!q('screenshot-annotation-layer');i++) await sleep(80);
+      if(!q('screenshot-annotation-layer')) throw new Error('annotation layer did not load');
       const fire=(el,type,x,y,extra={})=>el.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,buttons:type==='mouseup'?0:1,clientX:x,clientY:y,...extra}));
       const layer=q('screenshot-annotation-layer');
-      q('screenshot-tool-rect').click(); await sleep(80); q('screenshot-fill').click(); await sleep(80);
+      q('screenshot-tool-rect').click();
+      for(let i=0;i<100&&!q('screenshot-fill');i++) await sleep(80);
+      if(!q('screenshot-fill')) throw new Error('fill control did not load after selecting rectangle');
+      q('screenshot-fill').click(); await sleep(80);
       fire(layer,'mousedown',80,80); fire(window,'mousemove',180,160); fire(window,'mouseup',180,160); await sleep(80);
       const filledRect=q('screenshot-fill').getAttribute('aria-pressed')==='true';
       q('screenshot-tool-ellipse').click(); await sleep(80); fire(layer,'mousedown',220,80); fire(window,'mousemove',320,180); fire(window,'mouseup',320,180); await sleep(80);
