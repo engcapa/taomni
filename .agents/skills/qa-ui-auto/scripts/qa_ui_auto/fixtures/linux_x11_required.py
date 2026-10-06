@@ -15,7 +15,7 @@ def setup(ctx: Any) -> None:
         raise FixtureSkip("requires a Linux X11 display")
     missing = [
         command
-        for command in ("xprop", "wmctrl", "fcitx5-remote", "gdbus")
+        for command in ("xprop", "wmctrl", "xdotool", "fcitx5-remote", "gdbus")
         if shutil.which(command) is None
     ]
     if missing:

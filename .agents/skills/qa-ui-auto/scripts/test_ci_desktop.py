@@ -17,6 +17,45 @@ AUDIO_CLIENTS = json.dumps([{'type': 'PipeWire:Interface:Client',
 
 
 class LinuxImeTests(unittest.TestCase):
+    def test_x11_activation_verifies_keyboard_focus_even_when_wm_says_active(self):
+        from qa_ui_auto.native_steps import _activate_x11_application
+        from qa_ui_auto.steps import StepError
+
+        identity = f'WM_CLASS(STRING) = "Taomni QA"\n_NET_WM_PID(CARDINAL) = {os.getpid()}'
+        for focus in ('2097155', '0x200003', '4194304', 'invalid'):
+            with self.subTest(focus=focus), \
+                 patch('qa_ui_auto.native_steps._command_output', side_effect=[
+                     '_NET_CLIENT_LIST_STACKING(WINDOW): window id # 0x200003', identity,
+                     '_NET_ACTIVE_WINDOW(WINDOW): window id # 0x200003', '', focus]) as command:
+                if focus in ('2097155', '0x200003'):
+                    self.assertEqual(_activate_x11_application(Path(sys.executable)), ('0x200003', identity))
+                else:
+                    with self.assertRaisesRegex(StepError, 'keyboard focus'):
+                        _activate_x11_application(Path(sys.executable))
+                self.assertIn(['xdotool', 'windowfocus', '--sync', '0x200003'], [call.args[0] for call in command.call_args_list])
+
+    def test_ime_does_not_inject_into_an_unfocused_native_document(self):
+        from qa_ui_auto.native_steps import NativeStepContext, _do_native_ime_keys
+        from qa_ui_auto.steps import StepError
+
+        with tempfile.TemporaryDirectory() as d, \
+             patch.dict(os.environ, {'DISPLAY': ':99'}), \
+             patch('qa_ui_auto.native_steps.platform.system', return_value='Linux'), \
+             patch('qa_ui_auto.native_steps.time.sleep'), \
+             patch('qa_ui_auto.native_steps.time.monotonic', side_effect=[0, 4]), \
+             patch('qa_ui_auto.native_steps._activate_x11_application', return_value=('0x1', 'taomni')), \
+             patch('qa_ui_auto.native_steps.current_fcitx_engine') as engine, \
+             patch('qa_ui_auto.native_steps._inject_x11_keys') as inject:
+            session = Mock()
+            # DOM activeElement can remain the editor after the native window
+            # loses focus. That is insufficient evidence for physical input.
+            session.execute.side_effect = [True, False]
+            ctx = NativeStepContext(session, Path(d), {})
+            with self.assertRaisesRegex(StepError, 'no native document focus'):
+                _do_native_ime_keys(ctx, {'selector': '.cm-content', 'expected_engine': 'wbpy', 'keys': ['n']})
+            engine.assert_not_called()
+            inject.assert_not_called()
+
     def test_engine_observation_uses_the_api_available_before_remote_n(self):
         with patch('qa_ui_auto.linux_ime.subprocess.check_output', return_value="('wbpy',)\n") as call:
             self.assertEqual(current_fcitx_engine(env={'DBUS_SESSION_BUS_ADDRESS': 'qa-bus'}), 'wbpy')
