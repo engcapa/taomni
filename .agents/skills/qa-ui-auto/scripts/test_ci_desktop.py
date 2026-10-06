@@ -8,11 +8,62 @@ import unittest
 from unittest.mock import Mock, patch
 from ci_desktop import Desktop, wayland_has_input
 from ci_wayland_input import activate_window, owned_window_pid
+from qa_ui_auto.linux_ime import current_fcitx_engine
 
 
 WAYLAND_PROTOCOLS = "wl_compositor xdg_wm_base wl_output\ninterface: 'wl_seat', version: 10, name: 16\n\tname: seat0\n\tcapabilities: pointer keyboard\n"
 AUDIO_CLIENTS = json.dumps([{'type': 'PipeWire:Interface:Client',
                             'info': {'props': {'application.name': 'WirePlumber'}}}])
+
+
+class LinuxImeTests(unittest.TestCase):
+    def test_engine_observation_uses_the_api_available_before_remote_n(self):
+        with patch('qa_ui_auto.linux_ime.subprocess.check_output', return_value="('wbpy',)\n") as call:
+            self.assertEqual(current_fcitx_engine(env={'DBUS_SESSION_BUS_ADDRESS': 'qa-bus'}), 'wbpy')
+            command = call.call_args.args[0]
+            self.assertEqual(command[-1], 'org.fcitx.Fcitx.Controller1.CurrentInputMethod')
+            self.assertEqual(call.call_args.kwargs['env'], {'DBUS_SESSION_BUS_ADDRESS': 'qa-bus'})
+
+    def test_engine_observation_rejects_invalid_or_ambiguous_replies(self):
+        for reply in ('wbpy', "('wbpy', 'pinyin')", '(42,)', "'wbpy'", '()'):
+            with self.subTest(reply=reply), \
+                 patch('qa_ui_auto.linux_ime.subprocess.check_output', return_value=reply):
+                with self.assertRaisesRegex(RuntimeError, 'invalid fcitx5 current engine reply'):
+                    current_fcitx_engine()
+
+    def test_native_ime_checks_the_observed_engine_before_injecting_keys(self):
+        from qa_ui_auto.native_steps import NativeStepContext, _do_native_ime_keys
+        from qa_ui_auto.steps import StepError
+
+        for observed_engine in ('wbpy', 'pinyin'):
+            with self.subTest(observed_engine=observed_engine), tempfile.TemporaryDirectory() as d, \
+                 patch.dict(os.environ, {'DISPLAY': ':99'}), \
+                 patch('qa_ui_auto.native_steps.platform.system', return_value='Linux'), \
+                 patch('qa_ui_auto.native_steps.platform.platform', return_value='Linux-qa'), \
+                 patch('qa_ui_auto.native_steps.time.sleep'), \
+                 patch('qa_ui_auto.native_steps._activate_x11_application', return_value=('0x1', 'taomni')), \
+                 patch('qa_ui_auto.native_steps._command_output', side_effect=['1', '', '2']) as command, \
+                 patch('qa_ui_auto.linux_ime.subprocess.check_output',
+                       side_effect=["('keyboard-us',)", repr((observed_engine,))]), \
+                 patch('qa_ui_auto.native_steps.subprocess.run') as restore, \
+                 patch('qa_ui_auto.native_steps._inject_x11_keys') as inject:
+                session = Mock()
+                session.execute.return_value = True
+                ctx = NativeStepContext(session, Path(d), {})
+                args = {'selector': '.cm-content', 'expected_engine': 'wbpy', 'keys': ['n', 'Space']}
+                if observed_engine == 'wbpy':
+                    command.side_effect = ['1', '', '', '2']
+                    _do_native_ime_keys(ctx, args)
+                    inject.assert_called_once_with(['n', 'Space'])
+                    observation = json.loads((Path(d) / 'native-ime-observation.json').read_text())
+                    self.assertEqual(observation['engine'], 'wbpy')
+                else:
+                    with self.assertRaisesRegex(StepError, "current 'pinyin'"):
+                        _do_native_ime_keys(ctx, args)
+                    inject.assert_not_called()
+                    self.assertFalse((Path(d) / 'native-ime-observation.json').exists())
+                self.assertEqual([call.args[0] for call in restore.call_args_list], [
+                    ['fcitx5-remote', '-s', 'keyboard-us'], ['fcitx5-remote', '-c']])
 
 
 class DesktopTests(unittest.TestCase):
@@ -114,8 +165,12 @@ class DesktopTests(unittest.TestCase):
 
             def get_owner(command, **kwargs):
                 nonlocal observed_owner
-                self.assertEqual(command[-2:], ['org.freedesktop.DBus.GetConnectionUnixProcessID', 'org.fcitx.Fcitx5'])
                 self.assertEqual(kwargs['env'], environments[0])
+                if command[-1] == 'org.fcitx.Fcitx.Controller1.CurrentInputMethod':
+                    self.assertEqual(observed_owner, '(uint32 42,)')
+                    self.assertIn(gtk, desktop.processes)
+                    return repr((next(probes),))
+                self.assertEqual(command[-2:], ['org.freedesktop.DBus.GetConnectionUnixProcessID', 'org.fcitx.Fcitx5'])
                 observed_owner = next(owners)
                 return observed_owner
 
@@ -123,7 +178,8 @@ class DesktopTests(unittest.TestCase):
                 self.assertEqual(observed_owner, '(uint32 42,)')
                 self.assertIn(gtk, desktop.processes)
                 self.assertEqual(kwargs['env'], environments[0])
-                return subprocess.CompletedProcess(command, 0, next(probes) if command[-1] == '-n' else '')
+                self.assertEqual(command, ['fcitx5-remote', '-s', 'wbpy'])
+                return subprocess.CompletedProcess(command, 0, '')
 
             start.side_effect = launch
             owner.side_effect = get_owner
@@ -133,8 +189,8 @@ class DesktopTests(unittest.TestCase):
             self.assertEqual(facts['ime']['observed_engine'], 'wbpy')
             self.assertEqual(facts['ime']['pid'], 42)
             self.assertEqual(environments[0], environments[1])
-            self.assertEqual(owner.call_count, 2)
-            self.assertEqual(remote.call_count, 4)
+            self.assertEqual(owner.call_count, 4)
+            self.assertEqual(remote.call_count, 2)
             self.assertEqual(desktop.processes, [fcitx])
             gtk.terminate.assert_called_once()
 
@@ -155,7 +211,8 @@ class DesktopTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ), \
              patch('ci_desktop.Path.is_file', return_value=True), patch('ci_desktop.time.sleep'), \
              patch.object(Desktop, 'start') as start, \
-             patch('ci_desktop.subprocess.check_output', return_value='(uint32 42,)'), \
+             patch('ci_desktop.subprocess.check_output', side_effect=lambda command, **kwargs:
+                   '(uint32 42,)' if command[-1] == 'org.fcitx.Fcitx5' else "('keyboard-us',)"), \
              patch('ci_desktop.subprocess.run', return_value=subprocess.CompletedProcess([], 0, 'keyboard-us')):
             start.return_value.pid = 42
             start.return_value.poll.return_value = None

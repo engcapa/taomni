@@ -14,6 +14,7 @@ import tempfile
 import time
 
 from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES
+from qa_ui_auto.linux_ime import current_fcitx_engine
 
 
 def wayland_has_input(protocols: str) -> bool:
@@ -237,9 +238,8 @@ class Desktop:
                 raise RuntimeError("QA fcitx5 exited during engine startup")
             subprocess.run(["fcitx5-remote", "-s", "wbpy"], env=env,
                            capture_output=True, timeout=5)
-            probe = subprocess.run(["fcitx5-remote", "-n"], env=env,
-                                   capture_output=True, text=True, timeout=5)
-            return probe.stdout.strip() if probe.returncode == 0 and probe.stdout.strip() == "wbpy" else False
+            engine = current_fcitx_engine(env=env)
+            return engine if engine == "wbpy" else False
 
         engine = self._wait(gtk, engine_ready, "fcitx5 wbpy engine")
         gtk.terminate()

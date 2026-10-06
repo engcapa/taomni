@@ -47,6 +47,7 @@ from typing import Any, Callable
 
 from .steps import StepError
 from .native_assertions import assert_count, assert_menu_items
+from .linux_ime import current_fcitx_engine
 from . import save_race
 
 
@@ -2270,13 +2271,19 @@ def _do_native_ime_keys(ctx: NativeStepContext, args: Any) -> str:
     time.sleep(0.25)
     window_id, window_identity = _activate_x11_application(ctx.session.application)
     prior_state = _command_output(["fcitx5-remote"])
-    prior_engine = _command_output(["fcitx5-remote", "-n"])
+    try:
+        prior_engine = current_fcitx_engine(timeout=remaining_timeout(5))
+    except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+        raise StepError(f"native_ime_keys: could not observe the current fcitx5 engine: {exc}") from exc
 
     try:
         if prior_engine != expected_engine:
             _command_output(["fcitx5-remote", "-s", expected_engine])
             time.sleep(0.25)
-        engine = _command_output(["fcitx5-remote", "-n"])
+        try:
+            engine = current_fcitx_engine(timeout=remaining_timeout(5))
+        except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+            raise StepError(f"native_ime_keys: could not observe the current fcitx5 engine: {exc}") from exc
         if engine != expected_engine:
             raise StepError(
                 f"native_ime_keys: could not select engine {expected_engine!r}; current {engine!r}"

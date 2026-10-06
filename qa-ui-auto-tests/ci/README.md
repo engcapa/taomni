@@ -225,6 +225,10 @@ and debugging still require the actual native cases; preparation alone is not
 product coverage.
 
 Default Linux native uses Xvfb, Openbox, DBus and, when required, fcitx5/wbpy.
+IME preparation waits for the job-owned daemon to acquire its DBus name before
+opening a GTK input context. Preparation and native key injection observe the
+current engine through the DBus controller API, which also works with Jammy's
+fcitx5 5.0.14 (its `fcitx5-remote` has no `-n` option).
 X11 profiles probe Python/Tk and XTEST in their session; additional Linux
 profiles are described above. Windows requires a nonzero interactive
 session and an input desktop. macOS requires an Aqua session and uses
