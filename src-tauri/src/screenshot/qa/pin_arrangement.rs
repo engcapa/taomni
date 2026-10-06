@@ -52,8 +52,10 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         const setter=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),'value')?.set;
         if(!setter) throw new Error('pin note value setter unavailable');
         setter.call(input,'QA original A');
-        input.dispatchEvent(new Event('input',{bubbles:true})); await wait();
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        input.dispatchEvent(new Event('change',{bubbles:true})); await wait();
         q('screenshot-pin-note-save').click();
+        q('screenshot-pin-menu-toggle').click();
         for(let i=0;i<100&&q('screenshot-pin-note')?.textContent!=='QA original A';i++) await wait();
         return q('screenshot-pin-note')?.textContent;
     "#, Duration::from_secs(10)).await?;
