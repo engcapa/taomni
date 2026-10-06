@@ -1354,6 +1354,12 @@ N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、nat
 后续执行继续使用隔离 QA binary、可追溯的 source/build/config 和原始报告；新发现的产品回归进入修复闭环。没有实测结果时保留未验证状态，不给本轮已通过的自动化用例追加假 manual/performance pass。
 
 
+## 当前范围及录屏复验边界
+
+按用户最新要求，本轮不测试 LAN Chat。最终选择为 290 ID / 875 次六端执行；TC-001/B06/B38 保留非 LAN 动作与业务结果，N20 不选择。最终验收须来自同一稳定产品/runner/YAML 输入的一次完整六端运行，并核对 21 个独立业务观察、126 张实际 UI 原图和 12 张录屏差分。真实 OS picker/IME/DPI/跨屏/读屏与匹配性能基线继续单列后续验收。
+
+输入 b23f2da3 的精准 run 37393821741 为 26/1/0，macOS N7 失败；同输入区分 run 37395892565 再次 N7 失败，阻塞完整验收。全零 RGBA 原生帧与 GIF 对应 PNG bytes/hash 相同，不能归因于编码器。N7 保持每帧原图/id/nonce、250 ms drift、700 ms unexplained gap 和完整生命周期断言；QA 增加有界采集阶段耗时，用来定位编码前停顿，不作通过依据。历史失败保留；尚未完成的任务继续 verification。
+
 ## main 合并后增量验收（当前为 verification）
 
 以下用例与设计末尾的标题栏矩阵、Dock、沉浸和恢复契约对应；动作和逐步观察以链接的可执行 YAML 为准。所有 fixture 都在隔离报告环境，browser 的 IPC fixture 不作为 native 证据。输入 c769812b 的 GitHub 六端已结束：三端 browser 各 218/0/0，native Linux 78/0/0、Windows 72/0/0、macOS 73/1/0，N08 的重启布局失败仍阻塞 done。原生耐久修复及 main bc130eee 的 QA 更新已进入下一候选验证；历史通过不覆盖这些改动。

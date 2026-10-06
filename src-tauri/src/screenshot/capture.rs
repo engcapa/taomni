@@ -729,7 +729,7 @@ impl FrameSource {
                 #[cfg(debug_assertions)]
                 QA_SNAPSHOT_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 let (image, captured_at) = snapshot
-                    .as_ref()
+                    .as_mut()
                     .map_err(|error| anyhow::anyhow!("{error:#}"))?
                     .capture()?;
                 self.captured_at = Some(captured_at);
@@ -770,6 +770,17 @@ impl FrameSource {
     /// Timestamp of the native pixels, before conversion/resizing/encoding.
     pub fn captured_at(&self) -> Option<Instant> {
         self.captured_at
+    }
+
+    /// Native snapshot stages for isolated recording diagnostics. Other
+    /// platforms retain their existing capture trace without extra sampling.
+    #[cfg(debug_assertions)]
+    pub(super) fn qa_capture_stages(&self) -> Option<&serde_json::Value> {
+        #[cfg(target_os = "macos")]
+        if let Backend::MacRegion(Ok(snapshot)) = &self.backend {
+            return snapshot.qa_stages();
+        }
+        None
     }
 
     /// Latest frame (new or unchanged).

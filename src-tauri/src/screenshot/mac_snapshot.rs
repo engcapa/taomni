@@ -12,6 +12,8 @@ use objc2_core_graphics::{
 
 pub(super) struct RegionSnapshot {
     rect: CGRect,
+    #[cfg(debug_assertions)]
+    qa_stages: Option<serde_json::Value>,
 }
 
 impl RegionSnapshot {
@@ -34,14 +36,27 @@ impl RegionSnapshot {
         rect.origin.y += f64::from(region.1) * sy;
         rect.size.width = f64::from(region.2) * sx;
         rect.size.height = f64::from(region.3) * sy;
-        Ok(Self { rect })
+        Ok(Self {
+            rect,
+            #[cfg(debug_assertions)]
+            qa_stages: None,
+        })
     }
 
-    pub(super) fn capture(&self) -> anyhow::Result<(RgbaImage, Instant)> {
+    #[cfg(debug_assertions)]
+    pub(super) fn qa_stages(&self) -> Option<&serde_json::Value> {
+        self.qa_stages.as_ref()
+    }
+
+    pub(super) fn capture(&mut self) -> anyhow::Result<(RgbaImage, Instant)> {
         // CoreGraphics snapshots the requested screen state. Reading/copying
         // its provider may then block: stamping after conversion assigns old
         // pixels to a later time and stretches the preceding recorded frame.
         let captured_at = Instant::now();
+        #[cfg(debug_assertions)]
+        {
+            self.qa_stages = None;
+        }
         let image = CGWindowListCreateImage(
             self.rect,
             CGWindowListOption::OptionAll,
@@ -49,18 +64,42 @@ impl RegionSnapshot {
             CGWindowImageOption::Default,
         )
         .context("create recording region snapshot")?;
+        #[cfg(debug_assertions)]
+        let snapshot_returned = Instant::now();
         let provider = CGImage::data_provider(Some(&image)).context("snapshot data provider")?;
         let data = CGDataProvider::data(Some(&provider)).context("read snapshot pixels")?;
+        #[cfg(debug_assertions)]
+        let provider_returned = Instant::now();
         let width = CGImage::width(Some(&image));
         let height = CGImage::height(Some(&image));
         let stride = CGImage::bytes_per_row(Some(&image));
-        let image = super::rgba_from_bgra_rows(&data.to_vec(), width, height, stride)?;
+        let bytes = data.to_vec();
+        #[cfg(debug_assertions)]
+        let copied = Instant::now();
+        let rgba = super::rgba_from_bgra_rows(&bytes, width, height, stride)?;
+        #[cfg(debug_assertions)]
+        {
+            let converted = Instant::now();
+            // Bounded per-frame metadata only. No screen read, PNG encoding,
+            // pixel filtering or timestamp changes enter the capture path.
+            self.qa_stages = Some(serde_json::json!({
+                "snapshotUs": snapshot_returned.duration_since(captured_at).as_micros() as u64,
+                "providerUs": provider_returned.duration_since(snapshot_returned).as_micros() as u64,
+                "copyUs": copied.duration_since(provider_returned).as_micros() as u64,
+                "convertUs": converted.duration_since(copied).as_micros() as u64,
+                "totalUs": converted.duration_since(captured_at).as_micros() as u64,
+                "width": width, "height": height, "stride": stride,
+                "dataBytes": bytes.len(),
+                "bitsPerComponent": CGImage::bits_per_component(Some(&image)),
+                "bitsPerPixel": CGImage::bits_per_pixel(Some(&image)),
+            }));
+        }
         if captured_at.elapsed().as_millis() > 250 {
             log::warn!(
                 "screenshot: macOS region snapshot took {}ms; retaining its request timestamp",
                 captured_at.elapsed().as_millis()
             );
         }
-        Ok((image, captured_at))
+        Ok((rgba, captured_at))
     }
 }

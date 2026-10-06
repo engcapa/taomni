@@ -514,6 +514,7 @@ fn capture_loop(
                             ),
                             "pixels": [image.width(), image.height()],
                             "rawFrame": trace.retain_raw(&image, at_ms),
+                            "nativeStages": source.qa_capture_stages(),
                         }));
                     }
                 }

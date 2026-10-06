@@ -27,6 +27,12 @@
 
 本批已合入 `origin/main` 的 `a90a0bd3`、截图增量 `307c6322` 和 QA 桌面增量 `bc130eee`；冲突和功能整合已完成。补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口；按用户要求移除本地终端 Rail Git、Tao 悬浮球、旧顶部 Tab 预览与左上角展开入口，窗口抓手放在右上角系统区。四向 Dock/隐藏、完整沉浸、统一 Project 入口、按能力展示标题栏及 Java 工作区切换复用已实现。输入 `8bc41266` 的 [291 ID / 878 次完整六端回归 37342130547](https://github.com/engcapa/taomni/actions/runs/37342130547) 已结束，为 **873 pass / 5 fail / 0 skip**；SQLite N08 三 native 端真实重启与独立磁盘观察通过。后续输入 `9a10118a` 的 [三端 native 精准回归 37353593967](https://github.com/engcapa/taomni/actions/runs/37353593967) 为 **16 pass / 2 fail / 0 skip**，IDE-027 三端全部 70 步通过；Linux N5 编码前画面差异和 macOS N12 源位移不足仍待新输入复验。当前批次继续 verification，历史通过不代替最终同输入六端验收。
 
+### 当前精准复验与 macOS 录屏定位
+
+输入 `b23f2da3` 的 [六端精准 run 37393821741](https://github.com/engcapa/taomni/actions/runs/37393821741) 为 **26 pass / 1 fail / 0 skip**：browser 三端各 3/0/0、403 步；native Linux/Windows 各 6/0/0、90 步，macOS 5/1/0、89 步。身份、receipt、构建及原始 ZIP hashes 匹配；Linux 原图发布和 macOS N12 高视口验证通过。macOS N7 的 802 ms 采集停顿超出原时间断言；同输入 [区分 run 37395892565](https://github.com/engcapa/taomni/actions/runs/37395892565) 再次 5/1/0，N7 有 1068 ms 采集停顿、全零 RGBA 原始帧及两帧比对失败。GIF 与失败 raw PNG 完全一致，差异在编码前；内部原因尚未确定，不再以原样重跑作为恢复依据。
+
+候选只在 QA trace 增加 macOS 快照/provider/copy/conversion 有界阶段耗时与图像尺寸信息，不改变原像素、采集时间戳或固定断言。待定位并恢复后，执行最终 **290 ID / 875 次**统一输入六端回归，实际审阅 **126 张 UI 原图及 12 张录屏差分**；新增 12 张是 LAN 排除后 TC-001/B06/B38 的共享入口画面。LAN Chat 按用户要求排除，历史记录保留。TASK-01～12 仍为 verification。
+
 ## 上一批次实施进度（历史）
 
 TASK-01～12 已全部 done。最终产品/runner/用例输入为 `98ddf0182c74e53dbeb8b3c196e0ff02169020c2`；[完整六端 run 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束，250 ID / 761 次实际执行为 **761 pass / 0 fail / 0 skip**，33,090 步全部完整通过。三个 browser 端各 190/0/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。六份原始报告与源码、runner、用例、配置、receipt、native build 及 ZIP hashes 匹配，严格 gate 通过；72 张当前 Shell 截图已实际审阅。本地前端 526 文件 / 5244 项已按原始全量报告和完整编辑器重跑核对通过；前序 Rust full unit 为 1590 pass / 0 fail / 16 既有 ignored，本轮截图诊断相关 Rust unit 52/52 与日志观察 unit 5/5 通过，TypeScript 与相关静态检查通过。历史失败和未验证边界完整保留。
