@@ -374,6 +374,33 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/ci_execute.py
           --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
           --report "qa-ui-auto-report/$QA_ENTRY"
+      - name: Dismiss macOS virtual-audio consent dialogs
+        if: runner.os == 'macOS' && matrix.mode == 'native' && contains(matrix.capabilities, 'audio')
+        shell: bash
+        run: |
+          watcher="$RUNNER_TEMP/qa-dismiss-audio-dialog.sh"
+          cat > "$watcher" <<'SH'
+          # Background Music can request microphone access when the RDP audio
+          # fixture first opens its loopback input. The system sheet otherwise
+          # remains above the QA app and contaminates screenshot pixels/focus.
+          while true; do
+            /usr/bin/osascript <<'APPLESCRIPT' >/dev/null 2>&1 || true
+          tell application "System Events"
+            try
+              tell process "Background Music"
+                if exists (window 1) then
+                  if exists (button "Don't Allow" of window 1) then click button "Don't Allow" of window 1
+                  if exists (button "Don’t Allow" of window 1) then click button "Don’t Allow" of window 1
+                end if
+              end tell
+            end try
+          end tell
+          APPLESCRIPT
+            sleep 1
+          done
+          SH
+          bash "$watcher" &
+          echo $! > "$RUNNER_TEMP/qa-dismiss-audio-dialog.pid"
       - name: Run selected cases
         if: runner.os != 'Linux' || matrix.mode != 'native'
         env:
@@ -382,6 +409,14 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/ci_execute.py
           --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
           --report "qa-ui-auto-report/$QA_ENTRY"
+      - name: Stop macOS virtual-audio consent watcher
+        if: always() && runner.os == 'macOS' && matrix.mode == 'native' && contains(matrix.capabilities, 'audio')
+        shell: bash
+        run: |
+          pid_file="$RUNNER_TEMP/qa-dismiss-audio-dialog.pid"
+          if [[ -f "$pid_file" ]]; then
+            kill "$(cat "$pid_file")" 2>/dev/null || true
+          fi
       - name: Stage screenshot outputs under the report root
         if: always()
         env:
