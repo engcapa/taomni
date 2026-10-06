@@ -495,6 +495,7 @@ class XrdpFixtureTest(unittest.TestCase):
              patch.object(xrdp.platform, "system", return_value="Linux"), \
              patch.object(xrdp.shutil, "which", return_value="/mock/tool"), \
              patch.object(Path, "read_bytes", return_value=b"[Globals]\nport=3389\nautorun=\n"), \
+             patch.object(Path, "read_text", return_value="root:x:0:0:root:/root:/bin/bash\n"), \
              patch.object(xrdp, "_sudo", side_effect=sudo), patch.object(xrdp.secrets, "token_hex", return_value="dummy"):
             with self.assertRaisesRegex(RuntimeError, "injected password failure"):
                 xrdp.setup(SimpleNamespace())

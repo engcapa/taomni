@@ -22,7 +22,8 @@ class NativeLayoutObservationTest(TestCase):
     def seed(self, width=232, version=2):
         import json
         import sqlite3
-        with sqlite3.connect(self.database) as connection:
+        from contextlib import closing
+        with closing(sqlite3.connect(self.database)) as connection, connection:
             connection.execute("CREATE TABLE shell_layout(id INTEGER PRIMARY KEY, layout TEXT)")
             connection.execute("INSERT INTO shell_layout VALUES(1, ?)", [json.dumps({"version": version,
                 "navigator": {"width": width}, "restoreSources": {"workspace:w1": {"kind": "workspace"}}})])

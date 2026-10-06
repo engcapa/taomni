@@ -6,7 +6,7 @@
 用户已授权实现、本地单元测试、Windows 11 browser/隔离 native 回归、推送及 `qa-ui-auto-platforms` browser/native 循环验证。
 状态：`todo` → `in_progress` → `verification` → `done`。用户于 2026-10-05 明确确认：本轮以实现完成和同一最终输入的六端自动化全部通过为 done 条件；真实 OS 文件对话框、Windows/macOS 真 IME、DPI/跨屏/读屏及匹配性能基线单列后续验收。未自动化项保留完整规格与未验证状态，不计为自动化 pass。
 
-用户于 2026-10-06 排除 LAN Chat 测试。当前最终范围为 **290 ID / 875 次**：browser 三端各 218，native Linux 77 / Windows 71 / macOS 73。TC-001 的 More 改验通用容器展开/收回；B06/B38 移除 LAN 分支并保留其它动作、结果和预算；N20 不选择。旧 291 ID / 878 次报告完整保留，不作为新范围的完成证据。
+用户于 2026-10-06 排除 LAN Chat 测试。合并最新 main 后的候选完整范围为 **295 ID / 891 次**：browser 三端各 220，native Linux 82 / Windows 74 / macOS 75，精确列表为 `_local/shell-ci-case-ids-666.txt`。TC-001 的 More 改验通用容器展开/收回；B06/B38 移除 LAN 分支并保留其它动作、结果和预算；N20 不选择。旧 291 ID / 878 次及 290 ID / 875 次报告完整保留，不作为新范围的完成证据。新增范围与平台边界见本批 main 整合记录；静态计划不计为 runtime pass。
 
 | 任务 | 状态 | 依赖 | 交付 / 验证证据 |
 |---|---|---|---|
@@ -21,7 +21,7 @@
 | TASK-09 原生窗口 | verification | 04,05,06,07 | Git、detach 事务、回停靠；三端实际 native 验收 |
 | TASK-10 持久化与回退 | verification | 01,04,07 | v2 migration、SQLite 确认保存、恢复 identity；本机 N08 精确重启恢复通过，待新输入六端验证 |
 | TASK-11 用例与自动化支持 | verification | 随相关实现 | 本轮新增 B46～B52、N23，适配既有入口用例与 catalog/policy；新输入六端待验收 |
-| TASK-12 集成与验收 | verification | 02–11 | 本机前端 534 文件 / 5301 项全部通过，Rust 1603/0/16 既有 ignored；聚焦 browser 403 步通过；新输入 GitHub 六端待完整验收 |
+| TASK-12 集成与验收 | verification | 02–11 | 修复输入全量前端 535 文件 / 5306 项通过；合并后 RDP/Mail/MainLayout 110 项、Rust full 1606/0/16 既有 ignored、vendor session 11 项通过；新输入 GitHub 六端待完整验收 |
 
 ## main 合并与审阅补齐（当前批次）
 
@@ -42,6 +42,18 @@ QA trace 增加 macOS 快照/provider/copy/conversion 有界阶段耗时与图�
 该稳定输入的 [完整六端 run 37419892522](https://github.com/engcapa/taomni/actions/runs/37419892522) 已结束，为 **871 pass / 4 fail / 0 skip**，不能验收。browser Linux/Windows 各 218/0/0、macOS 217/1/0；native Linux 75/2/0、Windows 70/1/0、macOS 73/0/0。六份身份、selection、receipt、config、native build 与 ZIP 原 bytes hashes 匹配；原步骤检查明确保留四处中止和失败。
 
 四项后续修复候选：Linux `TC-BACKUP-001` 第 14 步 daily 策略未落盘，store 串行提交连续 patch 并拒绝迟到 history 读覆盖；macOS browser `IDE-025-01` 第 67 步在断点行打开了对话框，debug actions 改向注册的 live editor port 读取光标；Windows `SHOT-N12` 原图末尾混入真实任务栏，源窗口改在匹配显示器 work area 内定位（主线程读取 GDK）；Linux `SHOT-N6` 一帧蓝色形状在 native raw 中已错位、编码前后比较无新增差异，fixture 发布完整不可变 canvas，保留原 id/nonce/全图 tiles/时间检查，不过滤失败帧。备份新增两项 unit 在改前均失败；live caret 挂载回归在正确 harness 下改前失败、改后通过。聚焦 `656` 为 103/103、`657` 为 1/1；完整 units、精准 native 与最终统一输入六端仍待验收。TASK-01～12 保持 verification。
+
+### 最新 main 整合与修复输入验证
+
+四项候选提交 `ba39d072` 的全量前端 `660` 为 **535 files / 5306 pass / 0 fail / 0 pending**；Rust full `658` 为 **1606 pass / 0 fail / 16 既有 ignored**。`shell-recovery-unit-evidence-662.json` 绑定冻结产品/runner 身份及全部原报告和日志 hashes，原失败单测保留。
+
+已拉取并通过合并提交 `907d3e52` 合入 main `13f90e95` 的 51 文件增量，随后 `83ab1721` 适配新增回归入口。四处冲突为原生填写、对应单测、workflow 工具列表与 TC-011：保留本分支无重复点击的 focus、平台 Mod、Unicode paste/剪贴板还原与 Shell Rail 几何，同时合入 main 的空值完成观察、Wayland selection 就绪、profile/revision 原生缓存与 RDP trace。TC-011 合入 INPUT 就绪检查后全量重映射 verification；TC-125/xrdp 改由真实 Shell Rail 导航并保留全部业务动作、精确值、像素、尺寸、断开和原预算，TC-125 的既有 checkpoint 漂移同步修正。
+
+合并影响的最终选择新增 `TC-125`、`TC-MAIL-RECEIPT-01`（browser/native 三端）、`TC-IDE-PARITY-007-03`（真实 JDT LS + javac/java，native Linux/Windows）、`TC-RDPC-REF-02-xrdp`（真实 reference 桌面，native Linux/release）以及 `TC-IDE-PARITY-025-02-debugger-native`（按 runner 当前 `native_click` 支持范围，仅 Linux）。后两项不外推 Windows/macOS 原生结果。原 Terminal/SSH/DB/Code Workspace/SFTP/AI/截图/Git 三端模块范围继续保留。静态 `677` 的六份计划为 **295 ID / 891 次**，gaps/unreviewed 均为空；尚未建立新输入 runtime 通过。
+
+合并后本机 `668` Rust full **1606/0/16**、`674` vendor session **11/11**、`669` RDP/Mail/MainLayout **3 files / 110 pass**、`670` TypeScript 均通过。其余前端仅在核对与 `ba39d072` 的完整输入差异后复用 `660`，不称为第二次全量执行。QA 工具首次启动目录错误 `672` 完整保留；仓库根重跑 `675` 发现 Windows 环境模拟与 fixture 清理缺陷。修正 AF_UNIX mock、Linux passwd 样本和 SQLite seed 的关闭；真实 symlink 无权限时明确 tool unit skip，不计为 browser/native 通过。`676` 为 **293 项 / 288 pass / 5 平台或权限限定 skip / 0 fail/error**，GitHub planner 仍会实际执行 Linux 支持的原检查。
+
+全仓 `cargo fmt --all --check` 的失败原件保留在 `673`；`677` 核对 38 个文件的现有格式差异与 `ba39d072` 或 main 完全相同，新增 Rust 文件和本次截图改动的局部格式检查通过。没有把局部检查描述成全仓格式通过。所有任务仍为 verification；先精准验证上述修复和 main 交叉影响，再以固定最终输入完成六端和原始业务/图像证据审阅。
 
 ## 上一批次实施进度（历史）
 

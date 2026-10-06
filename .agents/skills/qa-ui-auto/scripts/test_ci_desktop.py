@@ -35,7 +35,12 @@ class DesktopTests(unittest.TestCase):
                                              (3, application, '/personal/runtime')):
                 directory = root / str(pid)
                 directory.mkdir()
-                (directory / 'exe').symlink_to(executable)
+                try:
+                    (directory / 'exe').symlink_to(executable)
+                except OSError as error:
+                    if os.name == 'nt' and error.winerror == 1314:
+                        self.skipTest('The Linux /proc identity fixture requires symlink creation permission')
+                    raise
                 (directory / 'environ').write_bytes(f'XDG_RUNTIME_DIR={runtime}\0'.encode())
             windows = [{'pid': pid} for pid in (1, 2, 3)]
             self.assertEqual(owned_window_pid(windows, application, Path('/owned/runtime'), root), 1)

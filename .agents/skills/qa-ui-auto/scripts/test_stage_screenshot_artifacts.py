@@ -45,7 +45,12 @@ class StageScreenshotArtifactsTest(unittest.TestCase):
             for name in ["Taomni QA-recent.ips", "taomni-old.crash", "Other.ips", "taomni.txt"]:
                 (crashes / name).write_bytes(b"diagnostic")
             os.utime(crashes / "taomni-old.crash", (1, 1))
-            (crashes / "taomni-symlink.ips").symlink_to(crashes / "Other.ips")
+            try:
+                (crashes / "taomni-symlink.ips").symlink_to(crashes / "Other.ips")
+            except OSError as error:
+                if os.name == "nt" and error.winerror == 1314:
+                    self.skipTest("The macOS crash symlink fixture requires symlink creation permission")
+                raise
             report = root / "report"
             result = stage_macos_crashes([crashes, root / "missing"], report, since=2)
             self.assertEqual([item["path"] for item in result["files"]], ["Taomni QA-recent.ips"])
