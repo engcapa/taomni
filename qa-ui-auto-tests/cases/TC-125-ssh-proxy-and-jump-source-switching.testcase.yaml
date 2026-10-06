@@ -19,7 +19,8 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="sidebar"]'
+- shell_navigate: sessions
+- wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -40,6 +41,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-jump-source
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-jump-source"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -62,6 +64,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-proxy-source
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-proxy-source"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -83,25 +86,25 @@ steps:
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: none
-- assert_not_visible: 'input[aria-label="Proxy host"]'
+- assert_not_visible: input[aria-label="Proxy host"]
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: http
-- assert_visible: 'input[aria-label="Proxy host"]'
+- assert_visible: input[aria-label="Proxy host"]
 - fill:
-    selector: 'input[aria-label="Proxy host"]'
+    selector: input[aria-label="Proxy host"]
     value: proxy.example.test
 - fill:
-    selector: 'input[aria-label="Proxy port"]'
+    selector: input[aria-label="Proxy port"]
     value: '8080'
 - fill:
-    selector: 'input[aria-label="Proxy username"]'
+    selector: input[aria-label="Proxy username"]
     value: proxy-user
 - fill:
-    selector: 'input[aria-label="Proxy password"]'
+    selector: input[aria-label="Proxy password"]
     value: proxy-secret-not-for-storage
 - fill:
-    selector: 'input[aria-label="Proxy password"]'
+    selector: input[aria-label="Proxy password"]
     value: ''
 - set_check:
     selector: '[data-testid="session-proxy-save-auth"]'
@@ -113,7 +116,7 @@ steps:
 - select_option:
     selector: '[data-testid="network-settings"] > div:nth-of-type(4) select'
     label: qa-ui-auto-proxy-source (127.0.0.1:3128)
-- assert_not_visible: 'input[aria-label="Proxy host"]'
+- assert_not_visible: input[aria-label="Proxy host"]
 - select_option:
     selector: '[data-testid="network-settings"] > div:nth-of-type(2) select'
     value: socks5
@@ -121,26 +124,26 @@ steps:
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: system
-- assert_not_visible: 'input[aria-label="Proxy host"]'
+- assert_not_visible: input[aria-label="Proxy host"]
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: ssh-tunnel
 - select_option:
     selector: '[data-testid="network-settings"] > div:nth-of-type(4) select'
     label: qa-ui-auto-jump-source (${cfg.ssh.host}:${cfg.ssh.port})
-- assert_not_visible: 'input[aria-label="Jump host"]'
+- assert_not_visible: input[aria-label="Jump host"]
 - select_option:
     selector: '[data-testid="network-settings"] > div:nth-of-type(4) select'
     label: Enter manually…
-- assert_visible: 'input[aria-label="Jump host"]'
+- assert_visible: input[aria-label="Jump host"]
 - fill:
-    selector: 'input[aria-label="Jump host"]'
+    selector: input[aria-label="Jump host"]
     value: manual-jump.example.test
 - fill:
-    selector: 'input[aria-label="Jump port"]'
+    selector: input[aria-label="Jump port"]
     value: '2200'
 - fill:
-    selector: 'input[aria-label="Jump user"]'
+    selector: input[aria-label="Jump user"]
     value: manual-jump-user
 - select_option:
     selector: '[data-testid="network-settings"] > div:nth-of-type(8) select'
@@ -166,6 +169,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-proxy-jump-switching
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-proxy-jump-switching"]'
 - click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-proxy-jump-switching"]'
 - click: '[data-testid="session-edit"]'
@@ -177,15 +181,15 @@ steps:
     name: value
     equals: ssh-tunnel
 - assert_attribute:
-    selector: 'input[aria-label="Jump host"]'
+    selector: input[aria-label="Jump host"]
     name: value
     equals: manual-jump.example.test
 - assert_attribute:
-    selector: 'input[aria-label="Jump port"]'
+    selector: input[aria-label="Jump port"]
     name: value
     equals: '2200'
 - assert_attribute:
-    selector: 'input[aria-label="Jump user"]'
+    selector: input[aria-label="Jump user"]
     name: value
     equals: manual-jump-user
 - assert_visible: '[data-testid="session-jump-password"]'
@@ -194,18 +198,39 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH proxy kind transitions show and hide the matching HTTP/SOCKS fields, support a saved proxy source, and restore manual SSH jump fields after switching back.
+    requirement: SSH proxy kind transitions show and hide the matching HTTP/SOCKS fields, support a saved proxy
+      source, and restore manual SSH jump fields after switching back.
     actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 14
+    - 16
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 25
+    - 26
+    - 27
+    - 29
+    - 31
     - 32
     - 33
     - 34
     - 35
     - 36
-    - 37
     - 38
-    - 39
     - 40
-    - 41
     - 42
     - 43
     - 44
@@ -213,73 +238,108 @@ verification:
     - 46
     - 47
     - 48
-    - 49
     - 50
-    - 51
     - 52
-    - 53
     - 54
-    - 55
     - 56
     - 57
-    - 58
     - 59
-    - 60
     - 61
     - 62
     - 63
     - 64
-    - 65
-    - 66
     - 67
     - 68
-    - 69
     - 70
     - 71
     - 72
-    - 73
     - 74
     - 75
     - 76
-    - 77
     - 78
     - 79
-    - 80
     - 81
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 13
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-jump-source\"]"}'
-    - step: 25
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 28
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-proxy-source\"]"}'
-    - step: 38
-      expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
-    - step: 46
-      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Proxy session saved"}}'
-    - step: 48
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 39
       expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
-    - step: 63
+    - step: 41
+      expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 49
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Proxy
+        session saved"}}'
+    - step: 51
+      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 53
+      expectation: '{"assert_visible": "[data-testid=\"network-settings\"]"}'
+    - step: 55
+      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 58
+      expectation: '{"assert_not_visible": "input[aria-label=\"Jump host\"]"}'
+    - step: 60
+      expectation: '{"assert_visible": "input[aria-label=\"Jump host\"]"}'
+    - step: 65
       expectation: '{"assert_visible": "[data-testid=\"session-jump-key\"]"}'
     - step: 66
+      expectation: '{"assert_not_visible": "[data-testid=\"session-jump-password\"]"}'
+    - step: 69
       expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
     - step: 73
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 77
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-proxy-jump-switching\"]"}'
     - step: 80
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
-    - step: 81
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "manual-jump.example.test"}}'
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 82
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
     - step: 83
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals":
+        "ssh-tunnel"}}'
+    - step: 84
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals":
+        "manual-jump.example.test"}}'
+    - step: 85
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals":
+        "2200"}}'
+    - step: 86
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals":
+        "manual-jump-user"}}'
+    - step: 87
       expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
     results:
-    - 38
-    - 46
-    - 48
-    - 63
+    - 39
+    - 41
+    - 49
+    - 51
+    - 53
+    - 55
+    - 58
+    - 60
+    - 65
     - 66
-    - 80
-    - 81
+    - 69
     - 83
+    - 84
+    - 85
+    - 86
+    - 87
   visual:
   - check: Proxy and jump source selectors, conditional fields, and restored values remain readable without overlap.
     method: manual
@@ -288,3 +348,6 @@ verification:
   - check: The packaged editor persists proxy and manual jump configuration without claiming a live proxy service.
     method: automated
     reason: This case verifies editor state and SQLite persistence; no external HTTP/SOCKS proxy is required.
+description: Open Sessions through the current Shell Rail before creating or reopening saved sessions. Keep all
+  manual/saved proxy and jump transitions, exact persisted values and empty-password input. The SSH fixture supplies
+  the concrete saved jump source; no live proxy connection is claimed.

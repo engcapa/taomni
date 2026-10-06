@@ -1,8 +1,13 @@
 id: TC-RDPC-REF-02-xrdp
 title: Taomni RDP client renders and controls a real xrdp reference desktop
 description: 'AC-E07/E08: connect the product client to a disposable reference account, confirm its certificate,
-  assert decoded magenta/cyan pixels with negotiated bulk compression and click to flip the target. Exercise full screen, quality evidence, restore
-  and disconnect, including xrdp desktop resize/reactivation, activation-time bulk history resets, and retaining RemoteFX repaint through frontend dimension updates at non-tile-aligned desktop sizes. Retain QA-only protocol/render diagnostics and bounded server packet evidence for failed resize analysis. Disable NLA in the saved session because xrdp uses TLS/Client Info logon rather than CredSSP. DEC-07 authorizes sudo xrdp provisioning only on the hosted Linux runner.'
+  assert decoded magenta/cyan pixels with negotiated bulk compression and click to flip the target. Exercise full
+  screen, quality evidence, restore and disconnect, including xrdp desktop resize/reactivation, activation-time
+  bulk history resets, and retaining RemoteFX repaint through frontend dimension updates at non-tile-aligned desktop
+  sizes. Retain QA-only protocol/render diagnostics and bounded server packet evidence for failed resize analysis.
+  Disable NLA in the saved session because xrdp uses TLS/Client Info logon rather than CredSSP. DEC-07 authorizes
+  sudo xrdp provisioning only on the hosted Linux runner. Sessions creation and saved-session reopening use the
+  current Shell Rail; retain every reference input, pixel, resize/reactivation and disconnect assertion.'
 covers:
 - F9.7
 tags:
@@ -21,7 +26,8 @@ fixtures:
 timeout_sec: 480
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="sidebar"]'
+- shell_navigate: sessions
+- wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-rdp"]'
@@ -51,6 +57,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-rdp-xrdp
 - click: '[data-testid="session-save"]'
+- shell_navigate: sessions
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-rdp-xrdp"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-rdp-xrdp"]'
 - wait_for: '[data-testid="auth-prompt"]'
@@ -155,59 +162,63 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The product client connects with bulk compression enabled and decodes the reference desktop's known target pixels.
+    requirement: The product client connects with bulk compression enabled and decodes the reference desktop's known
+      target pixels.
     actions:
+    - 2
     - 19
-    - 22
+    - 21
     - 24
+    - 26
     checkpoints:
-    - step: 25
-      expectation: Connected status after authentication/certificate confirmation.
-    - step: 26
-      expectation: The reference target reports ready in its own session.
     - step: 27
+      expectation: Connected status after authentication/certificate confirmation.
+    - step: 28
+      expectation: The reference target reports ready in its own session.
+    - step: 29
       expectation: Known colors arrived through the product decoder; pixel JSON and client WebView PNG are retained.
     results:
-    - 25
-    - 26
     - 27
+    - 28
+    - 29
   - id: R2
     requirement: Input reaches the reference session and the changed pixels return to the product client.
     actions:
-    - 28
+    - 30
     checkpoints:
-    - step: 29
+    - step: 31
       expectation: The session's own state file records a flip.
-    - step: 30
+    - step: 32
       expectation: The decoded center pixel changed from black to white; JSON and client WebView PNG are retained.
     results:
-    - 29
-    - 30
+    - 31
+    - 32
   - id: R3
     requirement: Full screen, quality indicator, restore and disconnect work with the reference server.
     actions:
-    - 31
-    - 36
+    - 33
     - 38
-    - 39
+    - 40
     - 41
+    - 43
     checkpoints:
-    - step: 32
-      expectation: Full screen connection bar is visible.
     - step: 34
-      expectation: The desktop dimensions changed and match the fullscreen viewport; decoded pixels after reactivation and the client WebView PNG including the connection bar are retained.
-    - step: 35
-      expectation: The actual quality value is recorded (0..4).
+      expectation: Full screen connection bar is visible.
+    - step: 36
+      expectation: The desktop dimensions changed and match the fullscreen viewport; decoded pixels after reactivation
+        and the client WebView PNG including the connection bar are retained.
     - step: 37
+      expectation: The actual quality value is recorded (0..4).
+    - step: 39
       expectation: Restore removes the connection bar.
-    - step: 42
+    - step: 44
       expectation: Disconnect ends the reference session.
     results:
-    - 32
     - 34
-    - 35
+    - 36
     - 37
-    - 42
+    - 39
+    - 44
   native:
   - check: Real xrdp service and desktop on Linux; product client framebuffer and remote input.
     method: automated
