@@ -22,10 +22,12 @@ interface Props {
   sessionId: string;
   schema: string | null;
   table: string;
+  kind?: "table" | "view" | "materialized_view";
   engine: string;
   catalog?: string | null;
   onClose: () => void;
   onStatus?: (message: string) => void;
+  onOpenData?: () => void;
 }
 
 interface Metadata {
@@ -39,7 +41,7 @@ interface Metadata {
 const emptyMetadata: Metadata = { columns: [], foreignKeys: [], indexes: [], stats: null, ddl: "" };
 
 /** DBeaver-style table object inspector built on the existing metadata IPC. */
-export function DbTableDetailPanel({ sessionId, schema, table, engine, catalog, onClose, onStatus }: Props) {
+export function DbTableDetailPanel({ sessionId, schema, table, kind = "table", engine, catalog, onClose, onStatus, onOpenData }: Props) {
   const t = useT();
   const closeRef = useRef<HTMLButtonElement>(null);
   const sqlEngine = asSqlEngine(engine);
@@ -59,7 +61,7 @@ export function DbTableDetailPanel({ sessionId, schema, table, engine, catalog, 
         dbListForeignKeys(sessionId, schema, table, catalog).catch(() => []),
         dbListIndexes(sessionId, schema, table).catch(() => []),
         dbTableStats(sessionId, schema, table).catch(() => null),
-        dbObjectDdl(sessionId, schema, "table", table).catch(() => ""),
+        dbObjectDdl(sessionId, schema, kind, table).catch(() => ""),
       ]);
       setMetadata({ columns, foreignKeys, indexes, stats, ddl });
     } catch (cause) {
@@ -85,7 +87,7 @@ export function DbTableDetailPanel({ sessionId, schema, table, engine, catalog, 
   useEffect(() => {
     closeRef.current?.focus();
     void loadMetadata();
-  }, [sessionId, schema, table, catalog]);
+  }, [sessionId, schema, table, kind, catalog]);
 
   useEffect(() => {
     if (tab === "data" && data === null) void loadData();
@@ -132,6 +134,7 @@ export function DbTableDetailPanel({ sessionId, schema, table, engine, catalog, 
       <div className="flex items-center gap-2 shrink-0">
         <input className="taomni-input h-7 flex-1 text-[12px]" placeholder={t("dbObjects.detailFilterRows")} value={filter} onChange={(event) => setFilter(event.target.value)} data-testid="db-detail-data-filter" />
         <button type="button" className="taomni-btn h-7 px-2 text-[11px]" onClick={() => void loadData()}><RefreshCw className="w-3 h-3" /> {t("dbObjects.refresh")}</button>
+        {onOpenData && <button type="button" className="taomni-btn h-7 px-2 text-[11px]" onClick={onOpenData}>{t("dbObjects.detailOpenEditor")}</button>}
         <span className="text-[11px] text-[var(--taomni-text-muted)]">{visibleRows.length}/{data?.rows.length ?? 0}</span>
       </div>
       <div className="flex-1 min-h-0 overflow-auto taomni-scroll-y border rounded" data-testid="db-detail-data-grid">

@@ -192,6 +192,7 @@ const dict = {
     detailUnique: "Unique",
     detailReferences: "References",
     detailFilterRows: "Filter rows",
+    detailOpenEditor: "Open full editor",
     detailNoRelations: "No foreign-key relations",
   },
   hbaseObjects: {

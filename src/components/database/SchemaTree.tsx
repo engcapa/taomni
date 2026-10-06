@@ -175,7 +175,7 @@ export function SchemaTree({
   const confirmDialog = useConfirmDialog();
   const inputDialog = useTextInputDialog();
   const [detail, setDetail] = useState<ObjectDetail | null>(null);
-  const [tableDetail, setTableDetail] = useState<{ schema: string; table: string } | null>(null);
+  const [tableDetail, setTableDetail] = useState<{ schema: string; table: string; kind: "table" | "view" | "materialized_view" } | null>(null);
 
   const [schemas, setSchemas] = useState<string[]>([]);
   const [databaseRootExpanded, setDatabaseRootExpanded] = useState(true);
@@ -551,8 +551,8 @@ export function SchemaTree({
     }
   };
 
-  const showTableDetail = (db: string, name: string) => {
-    setTableDetail({ schema: db, table: name });
+  const showTableDetail = (db: string, kind: "table" | "view" | "materialized_view", name: string) => {
+    setTableDetail({ schema: db, table: name, kind });
   };
 
   const indexResult = (rows: DbIndex[]): DbQueryResult => ({
@@ -712,9 +712,9 @@ export function SchemaTree({
       ),
   });
 
-  const tableMenu = (db: string, kind: ObjectKind, name: string): MenuItem[] => {
+  const tableMenu = (db: string, kind: "table" | "view" | "materialized_view", name: string): MenuItem[] => {
     const items: MenuItem[] = [
-      { label: t("dbObjects.openDetail"), onClick: () => showTableDetail(db, name) },
+      { label: t("dbObjects.openDetail"), onClick: () => showTableDetail(db, kind, name) },
       { label: t("dbObjects.browse"), onClick: () => onQuickSelect?.(db, name) },
     ];
     if (supportsInlineEdit(sqlEngine)) {
@@ -1231,10 +1231,15 @@ export function SchemaTree({
           sessionId={sessionId}
           schema={tableDetail.schema}
           table={tableDetail.table}
+          kind={tableDetail.kind}
           engine={engine}
           catalog={catalog}
           onClose={() => setTableDetail(null)}
           onStatus={onStatus}
+          onOpenData={() => {
+            onQuickSelect?.(tableDetail.schema, tableDetail.table);
+            setTableDetail(null);
+          }}
         />
       )}
     </div>

@@ -191,6 +191,7 @@ export const zhCN: DeepPartial<typeof en> = {
     detailUnique: "唯一",
     detailReferences: "引用",
     detailFilterRows: "过滤行",
+    detailOpenEditor: "打开完整编辑器",
     detailNoRelations: "没有外键关系",
   },
   hbaseObjects: {
