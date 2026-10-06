@@ -1,4 +1,5 @@
 id: TC-SHOT-N14
+description: Recording reads the selected display region through CoreGraphics display snapshots, using display-relative physical coordinates. Actual scene pixels and timing must match retained originals in both formats, and no persistent display stream may be constructed.
 title: macOS recording uses CoreGraphics snapshots for GIF and MP4
 covers:
 - F27.1

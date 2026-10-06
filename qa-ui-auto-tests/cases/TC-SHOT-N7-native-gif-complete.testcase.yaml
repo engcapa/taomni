@@ -48,7 +48,8 @@ verification:
       multiple frames and image load alone never pass. Inspect
       paired source/decoded/difference contact sheet alongside the retained GIF. The isolated macOS QA capture trace
       retains snapshot/provider/copy/conversion timings to distinguish stalls before encoding; diagnostics do not alter
-      captured pixels, timestamps or the fixed acceptance budgets.
+      captured pixels, timestamps or the fixed acceptance budgets. The current macOS candidate uses a display-region
+      snapshot to avoid window-list provider transitions; a black or transparent frame still fails the same original comparison.
   native:
   - check: Recorder lifecycle
     method: automated

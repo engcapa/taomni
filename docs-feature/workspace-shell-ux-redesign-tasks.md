@@ -37,6 +37,8 @@ QA trace 增加 macOS 快照/provider/copy/conversion 有界阶段耗时与图�
 
 ## 上一批次实施进度（历史）
 
+当前启动顺序候选 `d62c96d5` 的 [三端 native run 37409886287](https://github.com/engcapa/taomni/actions/runs/37409886287) 为 **17 pass / 1 fail / 0 skip**；Linux/Windows 各 6/0/0，macOS 5/1/0。原步骤、身份、receipt、构建和 hashes 匹配；六个 N7/N8 的新增真实 Cancel 后置条件及 N13 全屏隐藏控件均通过。macOS N7 在 poll 252 ms 的原始帧再次全零 RGBA，provider 读取约 1024.9 ms；原图/时间失败，控件前移不能宣称已消除此问题。后续采集候选用 CoreGraphics display-region snapshot 替换 window-list composite 的 deferred provider，沿用真实场景/时间/nonce、零 stream、取消/清理和全屏检查。API 坐标按 display-relative physical pixels，须 native 复验证明；尚未完成，任务保持 verification。
+
 TASK-01～12 已全部 done。最终产品/runner/用例输入为 `98ddf0182c74e53dbeb8b3c196e0ff02169020c2`；[完整六端 run 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束，250 ID / 761 次实际执行为 **761 pass / 0 fail / 0 skip**，33,090 步全部完整通过。三个 browser 端各 190/0/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。六份原始报告与源码、runner、用例、配置、receipt、native build 及 ZIP hashes 匹配，严格 gate 通过；72 张当前 Shell 截图已实际审阅。本地前端 526 文件 / 5244 项已按原始全量报告和完整编辑器重跑核对通过；前序 Rust full unit 为 1590 pass / 0 fail / 16 既有 ignored，本轮截图诊断相关 Rust unit 52/52 与日志观察 unit 5/5 通过，TypeScript 与相关静态检查通过。历史失败和未验证边界完整保留。
 
 早期完整 [run 37231369098](https://github.com/engcapa/taomni/actions/runs/37231369098) 的六份原始报告为 759 pass / 2 fail / 0 skip；browser Linux/Windows 各 190/0/0、macOS 188/2/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。失败为 macOS B07 延迟身份绑定抢导航与 B17 在 ready 前读取状态。两条在修正输入的 [三端 browser 复验 37236895398](https://github.com/engcapa/taomni/actions/runs/37236895398) 各 2/0/0，17+27 步完整执行，共 132 步通过；最终六端运行也全部通过。N08 的 stored/rendered 精确 232 检查在三端精准 run 37233544174 和最终六端运行通过，旧 248px 未复现，根因未确定；未据此声称完成了产品持久化修复。

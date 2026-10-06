@@ -4,13 +4,11 @@ use std::time::Instant;
 
 use anyhow::Context;
 use image::RgbaImage;
-use objc2_core_foundation::CGRect;
-use objc2_core_graphics::{
-    CGDataProvider, CGDisplayBounds, CGImage, CGWindowImageOption, CGWindowListCreateImage,
-    CGWindowListOption,
-};
+use objc2_core_foundation::{CGPoint, CGRect, CGSize};
+use objc2_core_graphics::{CGDataProvider, CGDisplayBounds, CGDisplayCreateImageForRect, CGImage};
 
 pub(super) struct RegionSnapshot {
+    display_id: u32,
     rect: CGRect,
     #[cfg(debug_assertions)]
     qa_stages: Option<serde_json::Value>,
@@ -22,21 +20,29 @@ impl RegionSnapshot {
         physical_size: (u32, u32),
         region: (u32, u32, u32, u32),
     ) -> anyhow::Result<Self> {
-        let mut rect = CGDisplayBounds(display_id);
+        let bounds = CGDisplayBounds(display_id);
         anyhow::ensure!(
-            rect.size.width > 0.0
-                && rect.size.height > 0.0
+            bounds.size.width > 0.0
+                && bounds.size.height > 0.0
                 && physical_size.0 > 0
                 && physical_size.1 > 0,
             "recording display has no capture bounds"
         );
-        let sx = rect.size.width / f64::from(physical_size.0);
-        let sy = rect.size.height / f64::from(physical_size.1);
-        rect.origin.x += f64::from(region.0) * sx;
-        rect.origin.y += f64::from(region.1) * sy;
-        rect.size.width = f64::from(region.2) * sx;
-        rect.size.height = f64::from(region.3) * sy;
+        // Display images take physical, display-relative coordinates. Avoid
+        // a window-list composite whose deferred provider has returned empty
+        // pixels and blocked during recorder control/window transitions.
+        let rect = CGRect {
+            origin: CGPoint {
+                x: f64::from(region.0),
+                y: f64::from(region.1),
+            },
+            size: CGSize {
+                width: f64::from(region.2),
+                height: f64::from(region.3),
+            },
+        };
         Ok(Self {
+            display_id,
             rect,
             #[cfg(debug_assertions)]
             qa_stages: None,
@@ -57,13 +63,8 @@ impl RegionSnapshot {
         {
             self.qa_stages = None;
         }
-        let image = CGWindowListCreateImage(
-            self.rect,
-            CGWindowListOption::OptionAll,
-            0,
-            CGWindowImageOption::Default,
-        )
-        .context("create recording region snapshot")?;
+        let image = CGDisplayCreateImageForRect(self.display_id, self.rect)
+            .context("create recording region snapshot")?;
         #[cfg(debug_assertions)]
         let snapshot_returned = Instant::now();
         let provider = CGImage::data_provider(Some(&image)).context("snapshot data provider")?;
@@ -92,6 +93,7 @@ impl RegionSnapshot {
                 "dataBytes": bytes.len(),
                 "bitsPerComponent": CGImage::bits_per_component(Some(&image)),
                 "bitsPerPixel": CGImage::bits_per_pixel(Some(&image)),
+                "source": "coregraphics-display-region",
             }));
         }
         if captured_at.elapsed().as_millis() > 250 {
