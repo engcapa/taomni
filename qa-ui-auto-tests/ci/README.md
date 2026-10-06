@@ -173,6 +173,12 @@ probes before the cases. Secrets are masked and referenced by environment name
 in config artifacts. No external server, repository secret or private network
 is required. Account/package mutations are limited to CI.
 
+The xrdp reference desktop uses a unique disposable account and an empty,
+fixture-owned home skeleton. Hosted `/etc/skel` can contain entire toolchains;
+copying those into the reference user's home can exceed setup's 90-second budget.
+The fixture supplies `.xsession` explicitly, supervises privileged commands and
+their children with a bounded timeout, and removes partially created accounts.
+
 `vnc_required` selects the `vnc` capability: on every platform the job starts
 the skill's scriptable RFB server (`vnc-realvnc-task/scripts/vnc_fixture_server.py`,
 VNCAuth with a disposable `QA_VNC_PASSWORD`, ExtendedClipboard text+HTML) on

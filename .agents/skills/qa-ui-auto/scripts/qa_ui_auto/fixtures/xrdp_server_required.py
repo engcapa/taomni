@@ -40,16 +40,19 @@ def _create_user(ctx: Any, user: str) -> None:
     if any(line.split(":", 1)[0] == user for line in Path("/etc/passwd").read_text().splitlines()):
         raise RuntimeError("xrdp fixture account already exists")
     _STATE["user"] = user
-    command = ["useradd", "-m", "-s", "/bin/bash", user]
-    if (case_dir := getattr(ctx, "case_dir", None)) is not None and shutil.which("strace"):
-        diagnostics = Path(case_dir) / "xrdp-diagnostics"
-        diagnostics.mkdir(parents=True, exist_ok=True)
-        # Exclude read/write/send/recv payloads and environment strings. This
-        # distinguishes locks, NSS and post-create hooks without credential data.
-        command = ["strace", "-f", "-tt", "-s", "80", "-e",
-                   "trace=%process,%file,connect,poll,ppoll,futex", "-o",
-                   str((diagnostics / "create-user.trace").resolve()), *command]
-    _sudo(*command)
+    # Hosted images put Rust/.NET toolchains in /etc/skel. Copying that tree can
+    # exceed the setup budget. This session supplies its own .xsession below.
+    with tempfile.TemporaryDirectory(prefix="taomni-xrdp-skel-") as skeleton:
+        command = ["useradd", "-m", "--skel", skeleton, "-s", "/bin/bash", user]
+        if (case_dir := getattr(ctx, "case_dir", None)) is not None and shutil.which("strace"):
+            diagnostics = Path(case_dir) / "xrdp-diagnostics"
+            diagnostics.mkdir(parents=True, exist_ok=True)
+            # Exclude read/write/send/recv payloads and environment strings. This
+            # distinguishes locks, NSS and post-create hooks without credential data.
+            command = ["strace", "-f", "-tt", "-s", "80", "-e",
+                       "trace=%process,%file,connect,poll,ppoll,futex", "-o",
+                       str((diagnostics / "create-user.trace").resolve()), *command]
+        _sudo(*command)
 
 
 def configure_xrdp(text: str, port: int) -> str:

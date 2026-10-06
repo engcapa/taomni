@@ -480,8 +480,14 @@ class XrdpFixtureTest(unittest.TestCase):
 
     def test_partial_setup_restores_services_config_and_removes_user(self):
         calls = []
+        skeletons = []
         def sudo(*args, **kwargs):
             calls.append((args, kwargs))
+            if args[0] == "useradd":
+                skeleton = Path(args[args.index("--skel") + 1])
+                self.assertTrue(skeleton.is_dir())
+                self.assertEqual(list(skeleton.iterdir()), [])
+                skeletons.append(skeleton)
             if args[0] == "chpasswd":
                 raise RuntimeError("injected password failure")
             return subprocess.CompletedProcess(args, 0, "", "")
@@ -495,6 +501,8 @@ class XrdpFixtureTest(unittest.TestCase):
         self.assertTrue(any(args[:2] == ("userdel", "-r") for args, _ in calls))
         self.assertTrue(any(args == ("tee", "/etc/xrdp/xrdp.ini") for args, _ in calls))
         self.assertTrue(any(args == ("systemctl", "start", "xrdp") for args, _ in calls))
+        self.assertEqual(len(skeletons), 1)
+        self.assertFalse(skeletons[0].exists())
         self.assertFalse(xrdp._STATE)
 
     def test_timed_out_account_creation_still_removes_partial_account(self):
