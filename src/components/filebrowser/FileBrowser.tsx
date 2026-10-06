@@ -44,6 +44,11 @@ function remotePathForTerminalCwd(cwd: string, homeDir: string | null | undefine
   return cwd.replace(/^\/([A-Za-z])(?=\/|$)/, (_match, drive: string) => `/${drive.toUpperCase()}:`);
 }
 
+function terminalPathForRemotePath(path: string, homeDir: string | null | undefined): string {
+  if (!homeDir || !/^\/?[A-Za-z]:\//.test(homeDir)) return path;
+  return path.replace(/^\/([A-Za-z]):(?:\/|$)/, "$1:/");
+}
+
 function loadOrientation(scope: string, fallback: Orientation): Orientation {
   try {
     const v = localStorage.getItem(ORIENTATION_KEY_PREFIX + scope);
@@ -961,7 +966,9 @@ export function FileBrowser(props: FileBrowserProps) {
               }}
               onNewFolder={() => void createFolder("remote")}
               onNewFile={() => void createFile("remote")}
-              onOpenTerminalHere={props.onOpenTerminalHere}
+              onOpenTerminalHere={props.onOpenTerminalHere
+                ? (path) => props.onOpenTerminalHere?.(terminalPathForRemotePath(path, session?.homeDir))
+                : undefined}
             />
           </Panel>
           <PanelResizeHandle

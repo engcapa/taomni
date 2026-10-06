@@ -100,8 +100,8 @@ steps:
     contains: ${fixture.sftp_chmod_status}
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
-    text: printf '\nQA_MODE=%s\n' "$(stat -c %a '${cfg.sftp.remote_test_dir}/tc010/qa-ui-auto-menu.txt' 2>/dev/null
-      || stat -f %Lp '${cfg.sftp.remote_test_dir}/tc010/qa-ui-auto-menu.txt')"
+    # Guard the readonly probe against the known Windows ConPTY first-byte loss.
+    text: " printf '\\nQA_MODE=%s\\n' \"$(stat -c %a '${cfg.sftp.remote_test_dir}/tc010/qa-ui-auto-menu.txt' 2>/dev/null || stat -f %Lp '${cfg.sftp.remote_test_dir}/tc010/qa-ui-auto-menu.txt')\""
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
