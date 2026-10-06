@@ -120,7 +120,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_rdp_host_target test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_rdp_host_target test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr test_tauri_webdriver.NativeSessionFillTest test_host_clipboard test_verification_workflow
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -155,6 +155,10 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
+    env:
+      # The QA app inherits tauri-driver's startup environment. Fixture setup
+      # happens later, so enable reference-client diagnostics before the driver.
+      TAOMNI_QA_RDP_TRACE: ${{ contains(matrix.capabilities, 'xrdp') && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -193,9 +197,22 @@ jobs:
         with:
           workspaces: src-tauri -> target/qa-ui-auto
           shared-key: qa-platforms-${{ matrix.cache_key }}
-          key: hosted-services-v2
+          # Keep the shared dependency/tool cache independent of the QA app.
+          # rust-cache ignores `key` when `shared-key` is also supplied.
+          cache-targets: false
           cache-on-failure: true
-          cache-workspace-crates: true
+      - name: Native QA workspace cache
+        if: matrix.mode == 'native'
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target/qa-ui-auto
+          # A new revision saves its workspace crates instead of hitting an
+          # immutable dependency cache. Separate debug/release workloads so
+          # a quick debug run cannot prevent saving the RDP release build.
+          key: qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ needs.plan.outputs.head }}
+          restore-keys: |
+            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
+            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
       - name: Windows build tools and WebView2 driver
         if: runner.os == 'Windows' && matrix.mode == 'native'
         shell: pwsh
@@ -314,7 +331,7 @@ jobs:
             pnpm build
             if [[ "$RUNNER_OS" == "macOS" ]]; then bash scripts/bundle-krb5-macos.sh stage; fi
             cd src-tauri
-            cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server --lib
+            cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server -p ironrdp-session --lib
             cargo test --locked --release -p ironrdp-server --lib profile_photo_encoder_costs -- --ignored --nocapture
             # The substring filter includes both rdp::* and servers::rdp::*.
             # One invocation covers all contracts without repeated root links.

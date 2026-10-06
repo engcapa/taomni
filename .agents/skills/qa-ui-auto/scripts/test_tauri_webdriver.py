@@ -193,6 +193,48 @@ class NativeSessionTransportTest(TestCase):
         self.assertEqual(options["webviewOptions"]["userDataFolder"],
                          str(Path("/qa/run/native-appdata/com.taomni.app.qa/webview")))
 
+    def test_wayland_start_activates_the_actual_webdriver_window(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.request = Mock(side_effect=[{"sessionId": "session-1"}, "window-qa", None])
+        session.wait_for_app_ready = Mock()
+        session.install_console_hook = Mock()
+        session.execute = Mock(side_effect=[False, False, True])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
+                patch("tauri_webdriver.time.sleep"):
+            session.start()
+        self.assertEqual(session.request.call_args_list[-2:], [
+            call("GET", "/session/session-1/window"),
+            call("POST", "/session/session-1/window", {"handle": "window-qa"}),
+        ])
+        session.execute.assert_called_with("return document.hasFocus();")
+        session.install_console_hook.assert_called_once_with()
+
+    def test_wayland_unfocused_document_fails_before_starting_app_steps(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock(side_effect=["window-qa", None])
+        session.execute = Mock(return_value=False)
+        with self.assertRaisesRegex(WebDriverError, "window did not receive focus"):
+            session.activate_wayland_window(timeout=0)
+        self.assertEqual(session.execute.call_count, 2)
+        session.execute.assert_called_with("return document.hasFocus();")
+
+    def test_wayland_start_requests_owned_desktop_activation_when_document_is_unfocused(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock(side_effect=["window-qa", None])
+        session.execute = Mock(side_effect=[False, True])
+        with patch.dict(os.environ, {"QA_WAYLAND_INPUT_SOCKET": "/qa/private/input.sock"}), \
+                patch("tauri_webdriver.socket.socket") as factory:
+            connection = factory.return_value.__enter__.return_value
+            connection.recv.return_value = b'{"ok":true}\n'
+            session.activate_wayland_window()
+        connection.connect.assert_called_once_with("/qa/private/input.sock")
+        request = json.loads(connection.sendall.call_args.args[0])
+        self.assertEqual(request, {"command": "activate", "application": str(Path("/tmp/taomni").resolve())})
+        session.request.assert_called_with("POST", "/session/session-1/window", {"handle": "window-qa"})
+
     def test_right_click_uses_right_button_and_releases_on_failure(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
@@ -527,6 +569,57 @@ class NativeSessionFillTest(TestCase):
             with self.assertRaisesRegex(WebDriverError, "could not receive focus"):
                 session.fill("input[name=path]", "/tmp/target")
         session.press_combo.assert_not_called()
+        session.type_text.assert_not_called()
+
+    def test_empty_password_fill_deletes_and_observes_value_without_empty_value_request(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, False, True])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}), patch("tauri_webdriver.time.sleep"):
+            session.fill('input[type=password]', '')
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
+        self.assertTrue(all(request.args[1].endswith('/execute/sync') for request in session.request.call_args_list))
+        self.assertFalse(any(request.args[1].endswith('/value') for request in session.request.call_args_list))
+        session.type_text.assert_not_called()
+
+    def test_empty_fill_rejects_a_control_that_retains_its_old_value(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(return_value=False)
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 6]):
+            with self.assertRaisesRegex(WebDriverError, 'did not clear'):
+                session.fill('input[type=password]', '')
+        session.type_text.assert_not_called()
+
+    def test_empty_contenteditable_fill_deletes_the_selection(self) -> None:
+        session = self.session(True)
+        session.fill('.cm-content', '')
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
+        session.type_text.assert_not_called()
+
+    def test_wayland_fill_retries_select_all_before_deleting_old_prefix(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, False, True, False])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 0.6, 1]):
+            session.fill('input[name=title]', 'Taomni')
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Mod+a"), call("Backspace")])
+        session.type_text.assert_called_once_with("Taomni")
+        self.assertIn("selectionEnd === el.value.length", session.execute.call_args_list[1].args[0])
+
+    def test_wayland_fill_rejects_unselected_password_before_modifying_it(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(return_value=False)
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 1, 2, 3, 4, 5]):
+            with self.assertRaisesRegex(WebDriverError, "did not select its existing value") as error:
+                session.fill('input[type=password]', 'private-secret')
+        self.assertNotIn('private-secret', str(error.exception))
+        self.assertNotIn(call("Backspace"), session.press_combo.call_args_list)
+        self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
         session.type_text.assert_not_called()
 
     def test_macos_fill_replaces_value_without_synthetic_backspace(self) -> None:

@@ -1,6 +1,6 @@
 id: TC-IDE-PARITY-007-03
 title: Java Extract Method on real JDT LS with the E1 program oracle
-description: Packaged QA app, real JDT LS, real host bytes and javac/java execution of the E1 extraction. The E3 side-effect oracle runs in TC-IDE-PARITY-007-06.
+description: Packaged QA app, cold real JDT LS refactor resolution, real host bytes and javac/java execution of the E1 extraction. The E3 side-effect oracle runs in TC-IDE-PARITY-007-06.
 covers:
 - F25.5
 tags:

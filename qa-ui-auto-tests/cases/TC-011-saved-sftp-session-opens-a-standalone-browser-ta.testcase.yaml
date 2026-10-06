@@ -55,8 +55,9 @@ steps:
 - assert_visible: '[data-testid="sftp-remote-pane"]'
 - assert_visible: '[data-testid="sftp-local-pane"]'
 - click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: input[data-testid="sftp-remote-path"]
 - fill:
-    selector: '[data-testid="sftp-remote-path"]'
+    selector: input[data-testid="sftp-remote-path"]
     value: ${cfg.sftp.remote_test_dir}
 - press: Enter
 - wait: 1
@@ -114,9 +115,9 @@ verification:
     - 21
     - 22
     - 26
-    - 27
     - 28
-    - 33
+    - 29
+    - 34
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
@@ -136,43 +137,45 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
     - step: 25
       expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
-    - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] >> text=\"REMOTE\""}'
+    - step: 27
+      expectation: 路径编辑入口已显示可填写的 INPUT，后续填写只定位该输入框。
     - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"] >> text=\"LOCAL\""}'
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] >> text=\"REMOTE\""}'
     - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"] >> text=\"LOCAL\""}'
+    - step: 33
       expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
-    - step: 34
-      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 35
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 36
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
         "equals": "${fixture.sftp_sync_test_dir}"}}'
     results:
-    - 35
+    - 36
   - id: R2
     requirement: 独立 SFTP 就绪后，垂直 Shell Rail 的按钮与 18px 图标保持相同尺寸、至少 32px 点击高度，落在视口内且中心可命中；Rail 位于标题栏拖动区下方，切换 Navigator
       到 Tools 后同样可用。
     actions:
     - 21
     - 22
-    - 38
+    - 39
     checkpoints:
-    - step: 36
+    - step: 37
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button:not([data-testid=\"shell-rail-more\"]):not(.shell-rail-secondary)",
         "min_count": 5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport":
         true, "hit_center": true}}'
-    - step: 37
+    - step: 38
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''nav'').getBoundingClientRect().top
         >= document.querySelector(''.shell-titlebar-start'').parentElement.getBoundingClientRect().bottom", "expect_truthy":
         true}}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"shell-rail\"] > button:not([data-testid=\"shell-rail-more\"]):not(.shell-rail-secondary)",
         "min_count": 5, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 18, "within_viewport":
         true, "hit_center": true}}'
     results:
-    - 36
     - 37
-    - 39
+    - 38
+    - 40
   visual:
   - check: 独立标签和双栏目录显示清晰。
     method: manual
@@ -182,4 +185,5 @@ verification:
     method: automated
     reason: 按实际执行模式解释；其他平台不继承 Linux 证据。
 description: ' Permanent rail geometry now uses the Shell Rail; standalone SFTP readiness, path and transfer assertions
-  are retained. Rail geometry observes the enclosing ControlBar; a flexible drag spacer is not the titlebar boundary.'
+  are retained. Rail geometry observes the enclosing ControlBar; a flexible drag spacer is not the titlebar boundary.
+  Retain main''s explicit INPUT readiness before path fill and remap every checkpoint to the combined Shell workflow.'

@@ -401,11 +401,22 @@ pub fn run() {
             });
 
             if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
+                let mut logger = tauri_plugin_log::Builder::default().level(log::LevelFilter::Info);
+                if app.config().identifier == "com.taomni.app.qa"
+                    && std::env::var("TAOMNI_QA_RDP_TRACE").as_deref() == Ok("1")
+                {
+                    #[cfg(debug_assertions)]
+                    if let Err(error) = rdp::qa_graphics_capture::enable(&app.path().app_log_dir()?) {
+                        eprintln!("QA RDP packet capture unavailable: {error}");
+                    }
+                    logger = logger
+                        .level_for("taomni_lib::rdp::session", log::LevelFilter::Debug)
+                        .level_for("ironrdp_session::fast_path", log::LevelFilter::Trace)
+                        .level_for("ironrdp_session::rfx", log::LevelFilter::Trace)
+                        .level_for("ironrdp_session::image", log::LevelFilter::Debug)
+                        .level_for("ironrdp_session::x224", log::LevelFilter::Debug);
+                }
+                app.handle().plugin(logger.build())?;
             }
 
             if let Some(main_window_config) = app.config().app.windows.first().cloned() {

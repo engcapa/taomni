@@ -192,7 +192,7 @@ def install(capabilities):
     if system == "Linux":
         if "xrdp" in capabilities:
             command(["sudo", "-n", "apt-get", "update"])
-            command(["sudo", "-n", "apt-get", "install", "-y", "xrdp", "xorgxrdp", "openbox"])
+            command(["sudo", "-n", "apt-get", "install", "-y", "xrdp", "xorgxrdp", "openbox", "strace"])
         if set(capabilities) & {"ssh", "mysql"}:
             command(["docker", "info", "--format", "{{.ServerVersion}}"])
     elif system == "Darwin":

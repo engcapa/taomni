@@ -119,6 +119,9 @@ Ubuntu 22.04 QA installs a checksum-pinned PipeWire 1.0.9 development/runtime
 overlay because pipewire-rs needs headers newer than stock Jammy. That overlay
 is part of the test environment, not evidence for stock Jammy PipeWire. The
 release workflow's existing independent recipe is not changed.
+Audio cases use Jammy's `pipewire-audio-client-libraries` package for the ALSA
+plugin and enable its shipped default ALSA route to the fixture's PipeWire null
+sink; later Ubuntu profiles use the separate `pipewire-alsa` package.
 
 The VNC desktop binds loopback, uses a disposable VNCAuth password outside
 uploaded reports, and authenticates an actual RFB handshake before launch.
@@ -136,6 +139,20 @@ listed as profile-specific capability gaps during planning. They are not
 silently run with weaker assertions or counted as Wayland passes. Explicitly
 selecting a case unavailable in all requested combinations fails. Portal
 interface readiness alone does not prove user authorization or screen capture.
+Headless Mutter initially exposes a `wl_seat` without input devices. A
+job-owned Mutter RemoteDesktop session keeps a virtual keyboard and pointer
+attached; readiness requires both capabilities in `desktop/wayland-info.txt`.
+This enables normal WebView focus and editing on the virtual desktop and does
+not establish portal consent or physical input coverage. Text paste helpers
+use `wl-copy`/`wl-paste` on Wayland and retain `xclip` for X11.
+Before case steps, the harness activates an unfocused app through the owned
+desktop's window manager and switches to its WebDriver window. The private
+GNOME compositor exposes Shell Eval for OS window inspection/activation. The
+helper matches the executable and private runtime against `/proc`, leaves
+Overview and activates only that QA window. `desktop/window-activation.jsonl`
+retains the observed OS focus before and after. The harness still requires
+`document.hasFocus()`; changing `activeElement` alone is insufficient for
+native CSS focus assertions.
 CI installs the Ubuntu GNOME session, theme and portal components explicitly
 with `--no-install-recommends`; provisioning runs noninteractively with a
 20-minute dependency timeout. Desktop application metapackages are unnecessary
@@ -158,6 +175,12 @@ The supervisor runs actual SSH login/PTY/exec, SFTP byte roundtrip and SQL DML
 probes before the cases. Secrets are masked and referenced by environment name
 in config artifacts. No external server, repository secret or private network
 is required. Account/package mutations are limited to CI.
+
+The xrdp reference desktop uses a unique disposable account and an empty,
+fixture-owned home skeleton. Hosted `/etc/skel` can contain entire toolchains;
+copying those into the reference user's home can exceed setup's 90-second budget.
+The fixture supplies `.xsession` explicitly, supervises privileged commands and
+their children with a bounded timeout, and removes partially created accounts.
 
 `vnc_required` selects the `vnc` capability: on every platform the job starts
 the skill's scriptable RFB server (`vnc-realvnc-task/scripts/vnc_fixture_server.py`,

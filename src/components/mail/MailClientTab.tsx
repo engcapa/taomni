@@ -5010,7 +5010,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       data-account-id={info.sessionId}
       data-ready={foldersReady && headersReady && !loadingFolders && !loadingMessages && !error ? "true" : "false"}
     >
-      <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
+      <div className="min-h-9 shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
         <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5" data-testid="mail-compose-open" onClick={() => openCompose()}>
           <MailIcon className="w-3.5 h-3.5" />
           Compose
@@ -5134,7 +5134,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
           Test
         </button>
-        <div className="relative w-[320px] max-w-[40vw]">
+        <div className="relative w-[320px] max-w-[40vw] shrink-0">
           <Search className="pointer-events-none w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
             ref={searchInputRef}

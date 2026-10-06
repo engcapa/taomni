@@ -881,6 +881,12 @@ def _do_rdp_canvas_assert(ctx: NativeStepContext, args: Any) -> str:
     selector = str(args.get("selector") or '[data-testid="rdp-canvas"]')
     points = args["points"]
     artifact = _within_report(ctx, str(args.get("artifact") or "client-pixels") + ".json")
+    previous_size = None
+    if args.get("resized_from"):
+        previous = json.loads(_within_report(ctx, str(args["resized_from"])).read_text(encoding="utf-8"))
+        previous_size = (previous.get("width"), previous.get("height"))
+        if not all(isinstance(size, int) and size > 0 for size in previous_size):
+            raise StepError("rdp_canvas_assert: resized_from must record positive canvas dimensions")
 
     def observe() -> tuple[bool, Any]:
         result = ctx.session.execute(
@@ -890,7 +896,11 @@ def _do_rdp_canvas_assert(ctx: NativeStepContext, args: Any) -> str:
             "const points=" + json.dumps(points) + ";"
             "const pixels=points.map(p=>Array.from(g.getImageData(p.x,p.y,1,1).data));"
             "const q=document.querySelector('[data-testid=rdp-bar-quality]');"
-            "return {width:c.width,height:c.height,pixels,quality_level:q?Number(q.getAttribute('data-level')):null};"
+            "const r=c.parentElement?.getBoundingClientRect();"
+            "const rw=r?Math.round(r.width):0,rh=r?Math.round(r.height):0;"
+            "const w=Math.max(200,Math.min(8192,rw));"
+            "const viewport_size=rw>0&&rh>0?{width:w-w%2,height:Math.max(200,Math.min(8192,rh))}:null;"
+            "return {width:c.width,height:c.height,pixels,viewport_size,quality_level:q?Number(q.getAttribute('data-level')):null};"
         )
         if not isinstance(result, dict):
             return False, result
@@ -898,6 +908,12 @@ def _do_rdp_canvas_assert(ctx: NativeStepContext, args: Any) -> str:
         ok = all(len(pixel) == 4 and pixel[3] == 255
                    and all(abs(pixel[channel] - point["rgb"][channel]) <= int(point.get("tolerance", 24)) for channel in range(3))
                    for point, pixel in zip(points, result.get("pixels", []))) and len(result.get("pixels", [])) == len(points)
+        size = (result.get("width"), result.get("height"))
+        if previous_size is not None:
+            ok = ok and all(isinstance(value, int) and value > 0 for value in size) and size != previous_size
+        if args.get("match_viewport"):
+            viewport = result.get("viewport_size")
+            ok = ok and isinstance(viewport, dict) and size == (viewport.get("width"), viewport.get("height"))
         return ok, result
 
     _poll(observe, float(args.get("timeout_sec") or 30), f"decoded client pixels in {artifact.name}")

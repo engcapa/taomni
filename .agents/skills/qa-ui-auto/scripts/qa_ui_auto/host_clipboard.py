@@ -99,6 +99,25 @@ def _xclip_get(mime: str) -> bytes:
     return _run(["xclip", "-selection", "clipboard", "-t", mime, "-o"], timeout=10)
 
 
+def _wayland_text() -> bool:
+    return bool(os.environ.get("WAYLAND_DISPLAY")) and os.environ.get("GDK_BACKEND") != "x11"
+
+
+def _wlcopy_text(text: str) -> None:
+    if not shutil.which("wl-copy"):
+        raise RuntimeError("wl-copy is not installed")
+    # Like xclip, wl-copy forks an owner. Do not leave that child holding
+    # capture pipes open until the next clipboard writer replaces it.
+    with tempfile.TemporaryFile() as err:
+        result = subprocess.run(["wl-copy", "--type", "text/plain;charset=utf-8"],
+                                input=text.encode("utf-8"), timeout=10,
+                                stdout=subprocess.DEVNULL, stderr=err)
+        if result.returncode:
+            err.seek(0)
+            raise RuntimeError(f"wl-copy failed ({result.returncode}): "
+                               f"{err.read().decode('utf-8', 'replace')[-1500:]}")
+
+
 def targets() -> list[str]:
     if SYSTEM == "Linux":
         return _xclip_get("TARGETS").decode("utf-8", "replace").split()
@@ -114,6 +133,8 @@ def set_text(text: str) -> None:
         _ps("[System.Windows.Forms.Clipboard]::SetText($arg)", text)
     elif SYSTEM == "Darwin":
         _run(["pbcopy"], input_bytes=text.encode("utf-8"), env={"LANG": "en_US.UTF-8"})
+    elif _wayland_text():
+        _wlcopy_text(text)
     else:
         _xclip_set("UTF8_STRING", text.encode("utf-8"))
 
@@ -124,6 +145,10 @@ def get_text() -> str:
                    "[Console]::Out.Write([System.Windows.Forms.Clipboard]::GetText())")
     if SYSTEM == "Darwin":
         return _run(["pbpaste"], env={"LANG": "en_US.UTF-8"}).decode("utf-8", "replace")
+    if _wayland_text():
+        if not shutil.which("wl-paste"):
+            raise RuntimeError("wl-paste is not installed")
+        return _run(["wl-paste", "--no-newline", "--type", "text"], timeout=10).decode("utf-8", "replace")
     return _xclip_get("UTF8_STRING").decode("utf-8", "replace")
 
 
