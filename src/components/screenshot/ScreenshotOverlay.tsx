@@ -344,7 +344,10 @@ export function ScreenshotOverlay() {
   const [fillableSelected, setFillableSelected] = useState(false);
   const [eraserMode, setEraserMode] = useState<EraserMode>("partial");
   const [drawing, setDrawing] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  // Keep the tool family together by default; the panel wraps/scrolls instead
+  // of moving actions into different popover locations. The button remains as
+  // an explicit compact-mode hook for small screens.
+  const [moreOpen, setMoreOpen] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
   const [imageUndo, setImageUndo] = useState<ImageSnapshot[]>([]);
@@ -925,7 +928,8 @@ export function ScreenshotOverlay() {
         else if (watermarkOpen) setWatermarkOpen(false);
         else if (ocrOpen) setOcrOpen(false);
         else if (pickerMode) exitPickerMode();
-        else if (moreOpen) setMoreOpen(false);
+        else if (scrollResult) close();
+        else if (moreOpen && phase === "annotate" && tool === "select" && canvasRef.current?.shapeCount() === 0) setMoreOpen(false);
         else if (phase === "annotate" && tool !== "select" && canvasRef.current?.shapeCount() === 0) setTool("select");
         else if (scrollResult) close();
         else if (phase === "annotate") resetSelection();
