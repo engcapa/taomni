@@ -33,6 +33,8 @@ export default defineConfig({
       "**/.claude/worktrees/**",
       // Retained fixtures / baseline checkouts are evidence, not current tests.
       "**/qa-ui-auto-report/**",
+      // These contracts use node:test and run with `pnpm test:tools`.
+      "scripts/*.test.mjs",
     ],
   },
 });

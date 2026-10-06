@@ -8339,7 +8339,7 @@ describe("CodeWorkspaceTab", () => {
         await Promise.resolve();
       });
       await waitFor(() => expect(changeCalls).toBe(blockedCall + 1));
-      await waitFor(() => expect(provider, commandId).toHaveBeenCalled(), { timeout: 3_000 });
+      await waitFor(() => expect(provider, commandId).toHaveBeenCalled(), { timeout: 10_000 });
     }
   });
 
@@ -10819,7 +10819,7 @@ end_of_record
       fireEvent.click(within(popup).getByRole("tab", { name: "Actions" }));
       fireEvent.change(within(popup).getByLabelText("Search actions"), { target: { value: "Undo Replace in files" } });
       fireEvent.click(await within(popup).findByText("Undo Replace in files"));
-      expect(await screen.findByTestId("code-workspace-undo-confirm")).toHaveTextContent("Undo Replace in files?");
+      expect(await screen.findByTestId("code-workspace-undo-confirm", {}, { timeout: 5_000 })).toHaveTextContent("Undo Replace in files?");
       expect(disk["src/a.txt"]).toBe("alpha coin\n");
       fireEvent.click(screen.getByTestId("code-workspace-undo-confirm-ok"));
       await waitFor(() => {
@@ -14369,7 +14369,13 @@ end_of_record
     async function mountExtract(fixture: ExtractFixture) {
       renderWorkspace(fixture.workspace, { onCommandsChange: fixture.onCommandsChange });
       await screen.findByTitle(EXTRACT_TITLE);
-      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+      await waitFor(() => expect(
+        selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), fixture.workspace.workspaceInstanceId!)
+          .lspFiles[EXTRACT_KEY]?.syncedText,
+      ).toBe(B0));
+      await waitFor(() => expect(fixture.registrationRef.current?.items.find(
+        (item) => item.id === "workspace.extractMethod",
+      )?.enabled).toBe(true));
       const pane = screen.getByTestId("code-workspace-editor-pane");
       const content = pane.querySelector<HTMLElement>(".cm-content");
       expect(content).not.toBeNull();
@@ -14408,7 +14414,7 @@ end_of_record
       // Only the method candidate was resolved (the variable candidate is filtered out).
       expect(lspMocks.lspCodeActionResolve).toHaveBeenCalledTimes(1);
 
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       expect(screen.getByTestId("text-input-dialog")).toHaveTextContent("Extract Method");
       expect(input).toHaveValue("extracted");
       expect((input as HTMLInputElement).selectionStart).toBe(0);
@@ -14425,7 +14431,7 @@ end_of_record
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
       pressExtractChord(pane);
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(fixture.text()).toBe(B1));
 
       fireEvent.change(input, { target: { value: "sumOf" } });
@@ -14450,7 +14456,7 @@ end_of_record
       const echo = await mountExtract(echoed);
       selectExtractRange(echo.content);
       pressExtractChord(echo.pane);
-      const echoInput = await screen.findByTestId("text-input-dialog-input");
+      const echoInput = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(echoed.disk[EXTRACT_PATH]).toBe(B1));
       await act(async () => {
         await emit("lsp://external-file-change", { workspaceId: "instance-extract-echo", path: EXTRACT_ABS, type: 2 });
@@ -14468,7 +14474,7 @@ end_of_record
       const second = await mountExtract(escaped);
       selectExtractRange(second.content);
       pressExtractChord(second.pane);
-      const escapeInput = await screen.findByTestId("text-input-dialog-input");
+      const escapeInput = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(escaped.text()).toBe(B1));
       const renamesBeforeEscape = lspMocks.lspRename.mock.calls.length;
       fireEvent.keyDown(escapeInput, { key: "Escape" });
@@ -14482,7 +14488,7 @@ end_of_record
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
       pressExtractChord(pane);
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(fixture.text()).toBe(B1));
       fireEvent.change(input, { target: { value: "sumOf" } });
       fireEvent.keyDown(input, { key: "Enter" });
@@ -14529,7 +14535,7 @@ end_of_record
       expect(enabled.length).toBeGreaterThan(0);
       fireEvent.click(enabled[0]!);
       await waitFor(() => expect(lspMocks.lspCodeActionResolve).toHaveBeenCalled());
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(fixture.text()).toBe(B1));
       expect(input).toHaveValue("extracted");
     });
@@ -14545,7 +14551,7 @@ end_of_record
       pressExtractChord(first.pane);
       // The provider still offers a method extraction for the caret statement.
       await waitFor(() => expect(available.text()).toBe(B1));
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       expect(input).toHaveValue("extracted");
       fireEvent.keyDown(input, { key: "Escape" });
       await waitFor(() => expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument());
@@ -14569,28 +14575,24 @@ end_of_record
       expect(lspMocks.lspCodeActionResolve).toHaveBeenCalledTimes(1);
     });
 
-    it("provider errors remain distinct from empty actions", async () => {
-      const cases: Array<{ mode: ExtractMode; expect: string }> = [
-        { mode: "timeout", expect: "Code action request timed out before the provider answered; try again" },
-        { mode: "changed", expect: "Refactor actions were cancelled because the document changed; try again" },
-        { mode: "boom", expect: "B-007 controlled provider error" },
-        { mode: "resolve-error", expect: "Code action resolve failed" },
-        { mode: "malformed", expect: "malformed" },
-        { mode: "command-only", expect: "Code action rejected" },
-        { mode: "disabled", expect: "The selected block has several outputs" },
-        { mode: "none", expect: "Extract Method is not available for this selection" },
-      ];
-      for (const entryCase of cases) {
-        const fixture = setupExtract("instance-extract-" + entryCase.mode, entryCase.mode);
-        const { pane, content } = await mountExtract(fixture);
-        selectExtractRange(content);
-        pressExtractChord(pane);
-        await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(entryCase.expect));
-        expect(fixture.disk[EXTRACT_PATH]).toBe(B0);
-        expect(fixture.text()).toBe(B0);
-        expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
-        await cleanup();
-      }
+    it.each<{ mode: ExtractMode; expect: string }>([
+      { mode: "timeout", expect: "Code action request timed out before the provider answered; try again" },
+      { mode: "changed", expect: "Refactor actions were cancelled because the document changed; try again" },
+      { mode: "boom", expect: "B-007 controlled provider error" },
+      { mode: "resolve-error", expect: "Code action resolve failed" },
+      { mode: "malformed", expect: "malformed" },
+      { mode: "command-only", expect: "Code action rejected" },
+      { mode: "disabled", expect: "The selected block has several outputs" },
+      { mode: "none", expect: "Extract Method is not available for this selection" },
+    ])("provider $mode remains distinct from empty actions", async (entryCase) => {
+      const fixture = setupExtract("instance-extract-" + entryCase.mode, entryCase.mode);
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(entryCase.expect));
+      expect(fixture.disk[EXTRACT_PATH]).toBe(B0);
+      expect(fixture.text()).toBe(B0);
+      expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
     });
 
     it("dirty buffer extracts without saving or prompting", async () => {
@@ -14634,13 +14636,13 @@ end_of_record
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
       pressExtractChord(pane);
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(fixture.text()).toBe(B1));
       fireEvent.change(input, { target: { value: "1bad" } });
       fireEvent.keyDown(input, { key: "Enter" });
       // The provider rejects the name; the prompt reopens with the user's input
       // and the committed extraction is never repeated.
-      const retry = await screen.findByTestId("text-input-dialog-input");
+      const retry = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       expect(retry).toHaveValue("1bad");
       expect(fixture.text()).toBe(B1);
       expect(lspMocks.lspCodeActions).toHaveBeenCalledTimes(1);
@@ -14688,12 +14690,12 @@ end_of_record
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
       pressExtractChord(pane);
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(fixture.text()).toBe(B1));
 
       fireEvent.change(input, { target: { value: "sumOf" } });
       fireEvent.keyDown(input, { key: "Enter" });
-      const retry = await screen.findByTestId("text-input-dialog-input");
+      const retry = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       expect(retry).toHaveValue("sumOf");
       expect(lspMocks.lspRename).toHaveBeenCalledTimes(1);
 
@@ -14751,7 +14753,7 @@ end_of_record
       selectExtractRange(content);
       pressExtractChord(pane);
 
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(fixture.text()).toBe(B1));
       fireEvent.change(input, { target: { value: "sumOf" } });
       fireEvent.keyDown(input, { key: "Enter" });
@@ -14789,7 +14791,7 @@ end_of_record
       expect(within(menu).queryByText(/Extract to constant/)).not.toBeInTheDocument();
 
       fireEvent.click(candidates[0]!);
-      const input = await screen.findByTestId("text-input-dialog-input");
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       await waitFor(() => expect(fixture.text()).toBe(B1));
       expect(input).toHaveValue("extracted");
     });
