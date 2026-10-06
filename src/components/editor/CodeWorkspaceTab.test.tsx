@@ -8328,15 +8328,16 @@ describe("CodeWorkspaceTab", () => {
       });
       await waitFor(() => expect(changeCalls).toBe(blockedCall), { timeout: 2_000 });
 
+      let actionResult: unknown;
       await act(async () => {
-        registrationRef.current?.executeAction(commandId);
+        actionResult = registrationRef.current?.executeAction(commandId);
         await Promise.resolve();
       });
       expect(provider).not.toHaveBeenCalled();
 
       await act(async () => {
         releaseBlocked?.();
-        await Promise.resolve();
+        await actionResult;
       });
       await waitFor(() => expect(changeCalls).toBe(blockedCall + 1));
       await waitFor(() => expect(provider, commandId).toHaveBeenCalled(), { timeout: 10_000 });
