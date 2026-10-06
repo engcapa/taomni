@@ -13449,6 +13449,11 @@ end_of_record
       await waitFor(() => expect(disk["src/A.java"]).toBe("hello REPLACED_UPPER"));
       expect(disk["src/a.java"]).toBe("hello replaced_lower");
 
+      // Disk writes finish before postcondition verification and undo registration.
+      await waitFor(() => expect(lspMocks.lspResolveWorkspaceEdit).toHaveBeenCalledWith(
+        expect.any(String), workspace.workspaceInstanceId, true, null, null,
+      ));
+
       // Undo restores both distinct files accurately
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });

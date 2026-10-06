@@ -115,6 +115,13 @@ function PixelFixture({ animated }: { animated: boolean }) {
     canvas.height = Math.round(height * scale);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    // Publish the frame id and moving shapes from one completed buffer.
+    // Retained originals describe complete scenes for native pixel comparison.
+    const frameCanvas = document.createElement("canvas");
+    frameCanvas.width = canvas.width;
+    frameCanvas.height = canvas.height;
+    const frameCtx = frameCanvas.getContext("2d");
+    if (!frameCtx) return;
     const nonce = crypto.getRandomValues(new Uint16Array(1))[0] || 1;
     const source: SourceEvidence = {
       kind: animated ? "anim" : "scroll", cssWidth: width, cssHeight: height,
@@ -123,9 +130,11 @@ function PixelFixture({ animated }: { animated: boolean }) {
     window.__qaScreenshotSource = source;
     let id = 0;
     const draw = () => {
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      if (animated) paintAnimation(ctx, width, height, id, nonce);
-      else paintPage(ctx, width);
+      frameCtx.setTransform(scale, 0, 0, scale, 0, 0);
+      if (animated) paintAnimation(frameCtx, width, height, id, nonce);
+      else paintPage(frameCtx, width);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(frameCanvas, 0, 0);
       const dataUrl = canvas.toDataURL("image/png");
       if (animated) {
         source.frames.push({ id, atMs: performance.now(), dataUrl });

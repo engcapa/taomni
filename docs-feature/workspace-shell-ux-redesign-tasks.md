@@ -6,6 +6,8 @@
 用户已授权实现、本地单元测试、Windows 11 browser/隔离 native 回归、推送及 `qa-ui-auto-platforms` browser/native 循环验证。
 状态：`todo` → `in_progress` → `verification` → `done`。用户于 2026-10-05 明确确认：本轮以实现完成和同一最终输入的六端自动化全部通过为 done 条件；真实 OS 文件对话框、Windows/macOS 真 IME、DPI/跨屏/读屏及匹配性能基线单列后续验收。未自动化项保留完整规格与未验证状态，不计为自动化 pass。
 
+用户于 2026-10-06 排除 LAN Chat 测试。当前最终范围为 **290 ID / 875 次**：browser 三端各 218，native Linux 77 / Windows 71 / macOS 73。TC-001 的 More 改验通用容器展开/收回；B06/B38 移除 LAN 分支并保留其它动作、结果和预算；N20 不选择。旧 291 ID / 878 次报告完整保留，不作为新范围的完成证据。
+
 | 任务 | 状态 | 依赖 | 交付 / 验证证据 |
 |---|---|---|---|
 | TASK-01 契约与纯模型 | verification | 无 | 类型、身份、尺寸策略、Shell store；unit 与最终六端验收 |
@@ -19,11 +21,11 @@
 | TASK-09 原生窗口 | verification | 04,05,06,07 | Git、detach 事务、回停靠；三端实际 native 验收 |
 | TASK-10 持久化与回退 | verification | 01,04,07 | v2 migration、SQLite 确认保存、恢复 identity；本机 N08 精确重启恢复通过，待新输入六端验证 |
 | TASK-11 用例与自动化支持 | verification | 随相关实现 | 本轮新增 B46～B52、N23，适配既有入口用例与 catalog/policy；新输入六端待验收 |
-| TASK-12 集成与验收 | verification | 02–11 | 本机 5301 项前端 unit、1603 项 Rust unit、聚焦 browser/native 已通过；新输入 GitHub 六端待完整验收 |
+| TASK-12 集成与验收 | verification | 02–11 | 本机前端 534 文件 / 5301 项全部通过，Rust 1603/0/16 既有 ignored；聚焦 browser 403 步通过；新输入 GitHub 六端待完整验收 |
 
 ## main 合并与审阅补齐（当前批次）
 
-本批已合入 `origin/main` 的 `a90a0bd3`、截图增量 `307c6322` 和 QA 桌面增量 `bc130eee`；冲突和功能整合已完成。补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口；按用户要求移除本地终端 Rail Git、Tao 悬浮球、旧顶部 Tab 预览与左上角展开入口，窗口抓手放在右上角系统区。四向 Dock/隐藏、完整沉浸、统一 Project 入口、按能力展示标题栏及 Java 工作区切换复用已实现。历史输入 `c769812b` 的 [六端回归 37318695278](https://github.com/engcapa/taomni/actions/runs/37318695278) 为 **877 pass / 1 fail / 0 skip**，macOS N08 重启宽度 232→200 的原失败保留。SQLite 耐久保存修复的单测与本机 N08 已通过；统一输入 `8bc412669261d6f25d38b4a27f6e82c6e89d553e` 的 [291 ID / 878 次完整六端回归 37342130547](https://github.com/engcapa/taomni/actions/runs/37342130547) 已启动，当前批次继续 verification，旧结果仅作历史基线。
+本批已合入 `origin/main` 的 `a90a0bd3`、截图增量 `307c6322` 和 QA 桌面增量 `bc130eee`；冲突和功能整合已完成。补齐恢复错误、Panel 路由、关闭部分成功摘要、总览检索/定位、壳层回退与扩展契约及用例缺口；按用户要求移除本地终端 Rail Git、Tao 悬浮球、旧顶部 Tab 预览与左上角展开入口，窗口抓手放在右上角系统区。四向 Dock/隐藏、完整沉浸、统一 Project 入口、按能力展示标题栏及 Java 工作区切换复用已实现。输入 `8bc41266` 的 [291 ID / 878 次完整六端回归 37342130547](https://github.com/engcapa/taomni/actions/runs/37342130547) 已结束，为 **873 pass / 5 fail / 0 skip**；SQLite N08 三 native 端真实重启与独立磁盘观察通过。后续输入 `9a10118a` 的 [三端 native 精准回归 37353593967](https://github.com/engcapa/taomni/actions/runs/37353593967) 为 **16 pass / 2 fail / 0 skip**，IDE-027 三端全部 70 步通过；Linux N5 编码前画面差异和 macOS N12 源位移不足仍待新输入复验。当前批次继续 verification，历史通过不代替最终同输入六端验收。
 
 ## 上一批次实施进度（历史）
 
@@ -395,3 +397,11 @@ N21/N22 分别以真实多仓库和单仓库操作验收 Git；新增七条既�
 - 三端同一 IDE-027 原第 22 步树宽 247，源于旧用例用 localStorage 缓存覆盖 native SQLite 来源；适配为公开分隔条 Home 后五次 Shift+ArrowRight，精确断言 360，并在最终 reload 后再次断言 360。保留树宽 300～500、全部 stripe ownership / Navigator 操作结果及 300 秒预算，1-based verification 同批更新；待实际复验。
 - Linux N6 的 29 帧录屏只有 decoded frame 19 的空间像素失败（8 个 tile），其 id 64 / nonce 45686 / 顺序 / 时间轴通过；失败原图可见移动方块与对应完整原图的位置差异。macOS N12 未达到至少四帧及长于 native preview 的真实源位移要求。根因尚未确证，新增有界 pre-encoder 原始像素保留和 scroll status/sourceTop 采样诊断，保留原 oracle、150 次轮询、20 秒脚本期限及用例预算；诊断不筛除采集帧或改变编码输入。原失败与差分图完整保留，下一轮先做远程精准复验，再执行统一六端验收。
 - 诊断与用例适配的本机 `571` 截图 Rust 单测为 **61 pass / 0 fail**；`572` catalog gate、`573` 三份 YAML/schema/reviewed verification 和 `574` 三端 6 ID / 18 次 native 精确选择通过。再次 fetch main，远端仍为已合入的 `bc130eee`。Linux 当前 14 张 native 代表图已实际审阅，终端、SFTP、Notes、Git、AI 与空分类未见新布局残留；这些图不替代修复输入的最终画面。
+- 固定输入 `9a10118a` 的 [精准 run 37353593967](https://github.com/engcapa/taomni/actions/runs/37353593967) 共 **16 pass / 2 fail / 0 skip**：Windows 6/0/0、Linux 5/1/0、macOS 5/1/0；三份输入、receipt、config、native build 与全部 ZIP hashes 匹配。IDE-027 三端的全部 70 步和 reload 后 360 通过。Linux N5 的 captured raw 8 与 decoded GIF 8 的 PNG bytes/hash 完全一致，但与 id 44 的独立完整原图不符，确认差异在编码前已经存在，不能据此指定某个 X11 内部根因。其余 11 条录屏均无 retained raw/编码差异；原失败不由这些通过抹掉。
+- macOS N12 的原始 progress 记录为 previewHeight 1200、regionHeight 428、poll 149 时 sourceTop 880 / frames 22，整个过程持续 auto、needsOverlap false。440 px 源窗口在原期限内未达到真实长预览条件；改用 640 px 的真实源窗口，仅适配此 controls 场景，仍以实际 OS wheel/stitch、至少四帧、原生 viewport + 160 的源长度及原图像素验收。动画 fixture 改为离屏画完整场景后一次发布至可见 canvas，继续保留实际绘制 PNG、nonce、全部帧、固定 pixel/timeline oracle 和诊断；复验尚待执行。
+- 候选 fixture 输入的本机完整 Rust `583` 为 **1602 pass / 1 fail / 16 ignored**，独立临时仓库的 Git config 写入返回 Permission denied，原失败日志保留。检查未发现共享目录或相关权限修改；不改个人 Git 配置，不忽略测试。原测试定向 `586` 为 **1 pass / 0 fail**，不改代码的完整重跑 `587` 为 **1603 pass / 0 fail / 16 既有 ignored**；错误尚未复现，具体原因仍未确认。TypeScript `584`、catalog `585` 与四份 YAML/schema/reviewed contract 检查通过；完整前端 `582` 仍在运行，native 复验尚待启动。
+- 随后完整前端 `582` 为 **534 files / 5299 pass / 2 fail / 0 pending**，实际使用本机默认 Node 24 / pnpm 11；保存失败重试测试耗时 17.8 秒后失败，报告只保留 STACK_TRACE_ERROR，原因未确定。截图收藏的 DOM 空列表检查后立即检查 passive effect 清理，改为在同一默认等待期限内单独观察 URL 撤销，保留删除确认、取消和精确 URL 断言。QA 目录按官方 SHA-256/npm integrity 校验准备 Node 22.23.3 / pnpm 10.34.6，与 `.github/actions/qa-runtime/action.yml` 的版本系列一致。修改前两项定向 `595` 均通过（252 项为名称过滤未选中）；修改后的完整前端 `596` 已启动。误传参数分隔符的 `593` 已停止，未作为定向或完整通过证据。没有修改保存重试产品代码、测试超时或原生像素/时间预算。
+- 按用户最新范围，`599` 为 TC-001/B06/B38 保存旧→新步骤映射；B06 从 153→148 步，B38 从 217→204 步，其余行为逐项保持，LAN 标签移除后的总览分别精确为 20/6。`600` 检查最终 290 ID 的实际步骤中没有 LAN 操作，N20 排除；`601` 的静态六端计划为 **875 次**，gaps/unreviewed 均为空。计划和契约审查不计为运行通过；最终仍要求统一输入的六端实证。21 个独立业务观察、114 张代表性 UI 画面和 12 张录屏差分的原验收要求继续适用，其范围不包含 LAN。
+- Node 22 / pnpm 10 的完整前端 `596` 为 **534 files / 5299 pass / 2 fail / 0 pending**。替换测试在磁盘写入后、事务校验与 Undo 登记前发送快捷键，改为观察成功的 LSP apply-edit 确认；Git 测试在 viewer identity 已变更、异步语言/editor 尚未挂载时检查文本，改为单独等待精确 WORKTREE 内容。原内容、撤销、迟到请求、期限断言保留；`611` 两项定向通过（254 项名称过滤未选中），完整 `612` 正在执行，不能据定向结果宣称全量通过。
+- 排除 LAN 后的本机 Windows browser `609` 为 **3 pass / 0 fail / 0 skip、403 步**；`local-browser-evidence-610.json` 核对当时的 current/stable source、runner、case、config、receipt 和 12 个原产物 hashes，四张原始 PNG 已实际查看。Home More、20/6 个总览项、终端与 MFA 画面无主要遮挡；DB renderer fixture 的真实连接边界仍明确。随后 unit 文件修改改变保守 source identity，最终六端候选会重新执行这些用例，不拼接旧结果为 done。
+- 当前候选完整前端 `612` 为 **534 files / 5301 pass / 0 fail / 0 pending**；`shell-scene-unit-evidence-588.json` 核对完整文件/测试名称集合与失败轮 `596` 一致，最终源码/runner 与执行中快照一致。Rust `587` 为 **1603/0/16 既有 ignored**，Node 22/pnpm 10 TypeScript `613`、catalog `606`、相关 Rust 单文件 rustfmt 与 diff check 通过。原失败完整保留，未改超时或像素预算；远程精准复验和最终同输入六端仍是后续必要验收。

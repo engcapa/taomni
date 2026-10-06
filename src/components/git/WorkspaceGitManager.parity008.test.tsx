@@ -245,7 +245,8 @@ describe("WorkspaceGitManager ED-PARITY-008 repository context", () => {
     fireEvent.click(rowFor("repo-b"));
     await waitFor(() => expect(screen.getByTestId("git-diff-viewer")).toHaveAttribute("data-repo-root", "/fx/repo-b"));
 
-    expect(screen.getByTestId("git-diff-viewer")).toHaveTextContent("repo-b WORKTREE");
+    // The viewer identity is set before its asynchronous language/editor mount.
+    await waitFor(() => expect(screen.getByTestId("git-diff-viewer")).toHaveTextContent("repo-b WORKTREE"));
     // A stale repo-a reload is EOL-only; applying it would re-show the banner under repo-b.
     await act(async () => { lateReload.resolve(pair("same.txt", "late-a\n", "late-a\r\n")); });
     expect(screen.getByTestId("git-diff-viewer")).toHaveAttribute("data-repo-root", "/fx/repo-b");

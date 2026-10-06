@@ -2,7 +2,8 @@ id: TC-SHELL-B38
 title: Twenty lane switches retain editor history, Notes and utility drafts, selection and late proxy results
 description: V-B38 renderer integration. Real PTY/disk/service effects are paired with N02-N07; the other retained
   consumers are mapped in the design evidence matrix. Classification now uses dock/Actions; Project uses the unified
-  Workspaces entry. Existing workspace content, shortcut and state assertions remain.
+  Workspaces entry. Existing workspace content, shortcut and state assertions remain. LAN Chat checks are excluded
+  from this acceptance at the user's request on 2026-10-06.
 covers:
 - F1.5
 - F25.5
@@ -104,21 +105,6 @@ steps:
     command: test_proxy_connection
     status: completed
     count: 1
-- click: '[data-testid="app-main-menu"]'
-- hover: '[data-testid="context-menu-item-tools"]'
-- click: '[data-testid="context-menu-item-lan-chat"]'
-- wait_for: '[data-testid="lanchat-roster-panel"]'
-- click: '[data-testid="lanchat-roster-panel"] button:has-text("赵敏 · 设计部")'
-- fill:
-    selector: '[data-testid="lanchat-composer-textarea"]'
-    value: 'SHELL-LAN-中文
-
-      Unsent complete second line'
-- assert_value:
-    selector: '[data-testid="lanchat-composer-textarea"]'
-    equals: 'SHELL-LAN-中文
-
-      Unsent complete second line'
 - shell_navigate: tools
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="mfa-tab"]'
@@ -156,7 +142,7 @@ steps:
 - click: '[data-testid="shell-overview-trigger"]'
 - assert_count:
     selector: '[data-testid="shell-tab-card"]'
-    equal: 7
+    equal: 6
 - press:
     selector: '[data-testid="shell-tab-search"]'
     key: Escape
@@ -211,7 +197,7 @@ steps:
 - click: '[data-testid="shell-overview-trigger"]'
 - assert_count:
     selector: '[data-testid="shell-tab-card"]'
-    equal: 7
+    equal: 6
 - press:
     selector: '[data-testid="shell-tab-search"]'
     key: Escape
@@ -266,7 +252,7 @@ steps:
 - click: '[data-testid="shell-overview-trigger"]'
 - assert_count:
     selector: '[data-testid="shell-tab-card"]'
-    equal: 7
+    equal: 6
 - press:
     selector: '[data-testid="shell-tab-search"]'
     key: Escape
@@ -321,7 +307,7 @@ steps:
 - click: '[data-testid="shell-overview-trigger"]'
 - assert_count:
     selector: '[data-testid="shell-tab-card"]'
-    equal: 7
+    equal: 6
 - press:
     selector: '[data-testid="shell-tab-search"]'
     key: Escape
@@ -448,22 +434,6 @@ steps:
     command: test_proxy_connection
     status: requested
     count: 1
-- click: '[data-testid="shell-quick-switch"]'
-- fill:
-    selector: '[data-testid="shell-quick-input"]'
-    value: lan-chat
-- assert_count:
-    selector: '[data-testid="shell-quick-option"]'
-    equal: 1
-- press:
-    selector: '[data-testid="shell-quick-input"]'
-    key: Enter
-- wait_for: '[data-testid="lanchat-composer-textarea"]'
-- assert_value:
-    selector: '[data-testid="lanchat-composer-textarea"]'
-    equals: 'SHELL-LAN-中文
-
-      Unsent complete second line'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
 - click: '[data-testid="shell-quick-switch"]'
 - fill:
@@ -547,219 +517,218 @@ verification:
     - 28
     - 29
     - 31
-    - 65
+    - 58
     checkpoints:
     - step: 26
       expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
     - step: 30
       expectation: '{"assert_count": {"selector": "[data-testid=\"note-editor\"]", "equal": 1}}'
-    - step: 66
+    - step: 59
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     results:
     - 26
     - 30
-    - 66
+    - 59
   - id: R3
-    requirement: Twenty lane transitions with repeated Overview and Tao open/close keep the exact four primary tabs.
+    requirement: Twenty lane transitions with repeated Overview and Tao open/close keep the exact six primary tabs.
     actions:
+    - 62
+    - 64
+    - 66
+    - 67
     - 69
-    - 71
-    - 73
-    - 74
-    - 76
-    - 79
-    - 83
-    - 87
-    - 91
-    - 95
-    - 97
-    - 99
-    - 100
-    - 102
-    - 105
-    - 109
-    - 113
-    - 117
-    - 121
-    - 123
-    - 125
-    - 126
-    - 128
-    - 131
-    - 135
-    - 139
-    - 143
-    - 147
-    - 149
-    - 151
-    - 152
-    - 154
-    - 157
-    - 161
-    - 165
-    - 169
-    checkpoints:
-    - step: 70
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "connect"}}'
-    - step: 72
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 7}}'
-    - step: 75
-      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
-    - step: 80
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "build"}}'
-    - step: 84
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "utility"}}'
-    - step: 88
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "home"}}'
-    - step: 92
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "connect"}}'
-    - step: 96
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "build"}}'
-    - step: 98
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 7}}'
-    - step: 101
-      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
-    - step: 106
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "utility"}}'
-    - step: 110
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "home"}}'
-    - step: 114
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "connect"}}'
-    - step: 118
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "build"}}'
-    - step: 122
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "utility"}}'
-    - step: 124
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 7}}'
-    - step: 127
-      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
-    - step: 132
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "home"}}'
-    - step: 136
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "connect"}}'
-    - step: 140
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "build"}}'
-    - step: 144
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "utility"}}'
-    - step: 148
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "home"}}'
-    - step: 150
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 7}}'
-    - step: 153
-      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
-    - step: 158
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "connect"}}'
-    - step: 162
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "build"}}'
-    - step: 166
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "utility"}}'
-    - step: 170
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
-        "home"}}'
-    results:
-    - 70
     - 72
-    - 75
+    - 76
     - 80
     - 84
     - 88
+    - 90
     - 92
-    - 96
+    - 93
+    - 95
     - 98
-    - 101
+    - 102
     - 106
     - 110
     - 114
+    - 116
     - 118
-    - 122
+    - 119
+    - 121
     - 124
-    - 127
+    - 128
     - 132
     - 136
     - 140
+    - 142
     - 144
-    - 148
+    - 145
+    - 147
     - 150
-    - 153
+    - 154
     - 158
     - 162
-    - 166
-    - 170
+    checkpoints:
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
+    - step: 65
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 6}}'
+    - step: 68
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 73
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
+    - step: 77
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
+    - step: 81
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "home"}}'
+    - step: 85
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
+    - step: 89
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
+    - step: 91
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 6}}'
+    - step: 94
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 99
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
+    - step: 103
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "home"}}'
+    - step: 107
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
+    - step: 111
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
+    - step: 115
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
+    - step: 117
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 6}}'
+    - step: 120
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 125
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "home"}}'
+    - step: 129
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
+    - step: 133
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
+    - step: 137
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
+    - step: 141
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "home"}}'
+    - step: 143
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-tab-card\"]", "equal": 6}}'
+    - step: 146
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 151
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "connect"}}'
+    - step: 155
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "build"}}'
+    - step: 159
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "utility"}}'
+    - step: 163
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"shell-root\"]", "name": "data-lane", "equals":
+        "home"}}'
+    results:
+    - 63
+    - 65
+    - 68
+    - 73
+    - 77
+    - 81
+    - 85
+    - 89
+    - 91
+    - 94
+    - 99
+    - 103
+    - 107
+    - 111
+    - 115
+    - 117
+    - 120
+    - 125
+    - 129
+    - 133
+    - 137
+    - 141
+    - 143
+    - 146
+    - 151
+    - 155
+    - 159
+    - 163
   - id: R4
     requirement: Returning to each surface preserves the full state and editor undo/redo history without a second
       SFTP attach.
     actions:
-    - 173
+    - 166
+    - 168
+    - 169
+    - 171
     - 175
-    - 176
-    - 178
-    - 182
-    - 186
+    - 179
     checkpoints:
-    - step: 174
+    - step: 167
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
         ["repo-a WORKTREE", "shared line", "z"]}}'
-    - step: 177
+    - step: 170
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
         ["repo-a WORKTREE", "shared line", ""]}}'
-    - step: 179
+    - step: 172
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals":
         ["repo-a WORKTREE", "shared line", "z"]}}'
-    - step: 183
+    - step: 176
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]:visible", "regex": "(?m)^SHELL_RETAIN_A[
         \\t]*$"}}'
-    - step: 184
+    - step: 177
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"sftp-remote-list\"] tr[title=\"/home/qa/alpha.txt\"]",
         "name": "aria-selected", "equals": "true"}}'
-    - step: 185
+    - step: 178
       expectation: '{"assert_shell_backend": {"command": "sftp_attach", "status": "requested", "count": 1}}'
-    - step: 187
+    - step: 180
       expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
-    - step: 188
+    - step: 181
       expectation: '{"assert_count": {"selector": "[data-testid=\"note-editor\"]", "equal": 1}}'
-    - step: 189
+    - step: 182
       expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-body\"]", "equals": "SHELL-NOTE-中文\nComplete
         second line"}}'
-    - step: 190
+    - step: 183
       expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-step\"]", "equals": "SHELL unfinished
         step"}}'
-    - step: 191
+    - step: 184
       expectation: '{"assert_value": {"selector": "[data-testid=\"note-editor-new-tag\"]", "equals": "SHELL unfinished
         tag"}}'
     results:
-    - 174
+    - 167
+    - 170
+    - 172
+    - 176
     - 177
-    - 179
+    - 178
+    - 180
+    - 181
+    - 182
     - 183
     - 184
-    - 185
-    - 187
-    - 188
-    - 189
-    - 190
-    - 191
   - id: R5
-    requirement: Proxy completion arrives while hidden; LAN Chat retains an unsent multiline draft, and MFA has
-      one filtered account before twenty lane switches.
+    requirement: Proxy completion arrives while hidden, and MFA has one filtered account before twenty lane switches.
     actions:
     - 32
     - 33
@@ -771,18 +740,13 @@ verification:
     - 43
     - 45
     - 46
-    - 47
-    - 49
+    - 48
     - 50
+    - 51
     - 52
     - 53
-    - 55
-    - 57
-    - 58
-    - 59
-    - 60
-    - 61
-    - 63
+    - 54
+    - 56
     checkpoints:
     - step: 34
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"SHELL-TYPE-proxy\"]"}'
@@ -795,18 +759,13 @@ verification:
     - step: 44
       expectation: '{"assert_shell_backend": {"command": "test_proxy_connection", "status": "completed", "count":
         1}}'
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"lanchat-roster-panel\"]"}'
-    - step: 51
-      expectation: '{"assert_value": {"selector": "[data-testid=\"lanchat-composer-textarea\"]", "equals": "SHELL-LAN-中文\nUnsent
-        complete second line"}}'
-    - step: 54
+    - step: 47
       expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
-    - step: 56
+    - step: 49
       expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
-    - step: 62
+    - step: 55
       expectation: '{"wait_for": "[data-testid=\"mfa-account-row\"][data-issuer=\"Shell Retained\"]"}'
-    - step: 64
+    - step: 57
       expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"]", "equal": 1}}'
     results:
     - 34
@@ -814,78 +773,63 @@ verification:
     - 40
     - 42
     - 44
-    - 48
-    - 51
-    - 54
-    - 56
-    - 62
-    - 64
+    - 47
+    - 49
+    - 55
+    - 57
   - id: R6
-    requirement: After repeated lane/overlay switches the exact LAN Chat draft, MFA filter and proxy target/result
-      remain; no proxy request reruns and no hidden MFA import opens.
+    requirement: After repeated lane/overlay switches the exact MFA filter and proxy target/result remain; no proxy
+      request reruns and no hidden MFA import opens.
     actions:
+    - 185
+    - 186
+    - 187
+    - 189
+    - 196
+    - 197
+    - 199
+    checkpoints:
+    - step: 188
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 190
+      expectation: '{"wait_for": "[data-testid=\"proxy-test-panel\"]"}'
+    - step: 191
+      expectation: '{"assert_value": {"selector": "[data-testid=\"proxy-test-url\"]", "equals": "retained.invalid:9443"}}'
+    - step: 192
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"proxy-test-result\"]", "equals": "QA proxy
+        accepted retained.invalid:9443"}}'
+    - step: 193
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"proxy-test-result\"]", "name": "data-success",
+        "equals": "true"}}'
+    - step: 194
+      expectation: '{"assert_shell_backend": {"command": "test_proxy_connection", "status": "requested", "count":
+        1}}'
+    - step: 195
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
+    - step: 198
+      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
+    - step: 200
+      expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
+    - step: 201
+      expectation: '{"assert_value": {"selector": "[data-testid=\"mfa-search\"]", "equals": "retained@example.invalid"}}'
+    - step: 202
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"][data-issuer=\"Shell Retained\"]",
+        "equal": 1}}'
+    - step: 203
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"]", "equal": 1}}'
+    results:
+    - 188
+    - 190
+    - 191
     - 192
     - 193
     - 194
-    - 196
-    - 202
-    - 203
-    - 205
-    - 209
-    - 210
-    - 212
-    checkpoints:
-    - step: 195
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
-    - step: 197
-      expectation: '{"wait_for": "[data-testid=\"proxy-test-panel\"]"}'
-    - step: 198
-      expectation: '{"assert_value": {"selector": "[data-testid=\"proxy-test-url\"]", "equals": "retained.invalid:9443"}}'
-    - step: 199
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"proxy-test-result\"]", "equals": "QA proxy
-        accepted retained.invalid:9443"}}'
-    - step: 200
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"proxy-test-result\"]", "name": "data-success",
-        "equals": "true"}}'
-    - step: 201
-      expectation: '{"assert_shell_backend": {"command": "test_proxy_connection", "status": "requested", "count":
-        1}}'
-    - step: 204
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
-    - step: 206
-      expectation: '{"wait_for": "[data-testid=\"lanchat-composer-textarea\"]"}'
-    - step: 207
-      expectation: '{"assert_value": {"selector": "[data-testid=\"lanchat-composer-textarea\"]", "equals": "SHELL-LAN-中文\nUnsent
-        complete second line"}}'
-    - step: 208
-      expectation: '{"assert_not_visible": "[data-testid=\"mfa-add-dialog\"]"}'
-    - step: 211
-      expectation: '{"assert_count": {"selector": "[data-testid=\"shell-quick-option\"]", "equal": 1}}'
-    - step: 213
-      expectation: '{"wait_for": "[data-testid=\"mfa-panel\"]"}'
-    - step: 214
-      expectation: '{"assert_value": {"selector": "[data-testid=\"mfa-search\"]", "equals": "retained@example.invalid"}}'
-    - step: 215
-      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"][data-issuer=\"Shell Retained\"]",
-        "equal": 1}}'
-    - step: 216
-      expectation: '{"assert_count": {"selector": "[data-testid=\"mfa-account-row\"]", "equal": 1}}'
-    results:
     - 195
-    - 197
     - 198
-    - 199
     - 200
     - 201
-    - 204
-    - 206
-    - 207
-    - 208
-    - 211
-    - 213
-    - 214
-    - 215
-    - 216
+    - 202
+    - 203
   native:
   - check: Real IPC, disk and window lifecycle
     method: external

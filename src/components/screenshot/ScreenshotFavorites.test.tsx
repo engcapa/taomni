@@ -30,7 +30,8 @@ describe("ScreenshotFavorites", () => {
     fireEvent.click(screen.getByTestId("screenshot-favorite-remove"));
     await screen.findByTestId("screenshot-favorites-empty");
     expect(api.remove).toHaveBeenCalledWith("saved-1");
-    expect(api.revoke).toHaveBeenCalledWith("blob:favorite");
+    // Observe passive effect cleanup separately from the list's DOM update.
+    await waitFor(() => expect(api.revoke).toHaveBeenCalledWith("blob:favorite"));
     view.unmount();
   });
   it("shows load errors and recovers through refresh", async () => {

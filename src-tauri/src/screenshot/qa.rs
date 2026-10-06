@@ -241,6 +241,14 @@ async fn open_fixture(
     app: &AppHandle,
     route: &str,
 ) -> anyhow::Result<(WebviewWindow, DisplayInfo, (u32, u32, u32, u32))> {
+    open_fixture_sized(app, route, (520.0, 440.0)).await
+}
+
+async fn open_fixture_sized(
+    app: &AppHandle,
+    route: &str,
+    size: (f64, f64),
+) -> anyhow::Result<(WebviewWindow, DisplayInfo, (u32, u32, u32, u32))> {
     if let Some(old) = app.get_webview_window(QA_WINDOW_LABEL) {
         let _ = old.destroy();
         tokio::time::sleep(Duration::from_millis(300)).await;
@@ -250,7 +258,7 @@ async fn open_fixture(
     let url = WebviewUrl::App(format!("index.html#screenshot-qa-{route}").into());
     let window = super::window_builder(app, QA_WINDOW_LABEL, url)
         .title("Screenshot QA fixture")
-        .inner_size(520.0, 440.0)
+        .inner_size(size.0, size.1)
         .position(display.x as f64 / s + 120.0, display.y as f64 / s + 120.0)
         .decorations(false)
         .resizable(false)
@@ -1583,7 +1591,10 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     super::close_session(&app);
     wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(5)).await;
 
-    let (fixture, display, region) = open_fixture(&app, "scroll")
+    // The hosted desktop can be 1200 px tall. A 640 px source keeps the
+    // production wheel/stitch path inside the unchanged progress deadline
+    // while still requiring a result taller than that actual desktop.
+    let (fixture, display, region) = open_fixture_sized(&app, "scroll", (520.0, 640.0))
         .await
         .map_err(|e| e.to_string())?;
     let source = read_source(&fixture).await.map_err(|e| e.to_string())?;
