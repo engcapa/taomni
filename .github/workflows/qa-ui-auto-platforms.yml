@@ -155,6 +155,10 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
+    env:
+      # The QA app inherits tauri-driver's startup environment. Fixture setup
+      # happens later, so enable reference-client diagnostics before the driver.
+      TAOMNI_QA_RDP_TRACE: ${{ contains(matrix.capabilities, 'xrdp') && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
         with:
