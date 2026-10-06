@@ -1208,6 +1208,14 @@ async fn drive_ironrdp_connection(
     let height = connection_result.desktop_size.height;
     let activation_factory = connection_result.activation_factory.clone();
     send_connected_event(&out_tx, width, height, protocol, &server_name);
+    #[cfg(debug_assertions)]
+    let qa_capture_connection = super::qa_graphics_capture::begin(
+        width,
+        height,
+        connection_result.user_channel_id,
+        connection_result.io_channel_id,
+        connection_result.share_id,
+    );
 
     let mut image = IronDecodedImage::new(PixelFormat::RgbA32, width, height);
     let mut active_stage = ActiveStageBuilder {
@@ -1271,6 +1279,8 @@ async fn drive_ironrdp_connection(
             }
             read = framed.read_pdu() => {
                 let (action, payload) = read.map_err(|e| format!("rdp read frame: {}", e))?;
+                #[cfg(debug_assertions)]
+                super::qa_graphics_capture::packet(qa_capture_connection, &format!("{action:?}"), &payload);
                 if let Some(sequence) = reactivation.as_mut() {
                     if matches!(action, Action::X224) {
                         if process_reactivation_frame(
@@ -1285,6 +1295,8 @@ async fn drive_ironrdp_connection(
                         )
                         .await?
                         {
+                            #[cfg(debug_assertions)]
+                            super::qa_graphics_capture::resized(qa_capture_connection, image.width(), image.height());
                             reactivation = None;
                             if let Some(clipboard) = &clipboard {
                                 drain_clipboard_actions(&mut active_stage, clipboard, &mut framed, &out_tx).await?;

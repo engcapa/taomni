@@ -23,6 +23,8 @@ pub mod frame;
 pub mod gateway;
 pub mod input;
 pub mod pdu;
+#[cfg(debug_assertions)]
+pub(crate) mod qa_graphics_capture;
 pub mod rdpdr;
 pub mod rdpsnd;
 pub mod rfx;

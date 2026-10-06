@@ -100,7 +100,11 @@ impl Processor {
 
         let update_pdu =
             decode_cursor::<FastPathUpdatePdu<'_>>(input).map_err(SessionError::decode)?;
-        trace!(fast_path_update_fragmentation = ?update_pdu.fragmentation);
+        trace!(
+            fast_path_update_fragmentation = ?update_pdu.fragmentation,
+            update_code = ?update_pdu.update_code,
+            compression_flags = ?update_pdu.compression_flags,
+        );
 
         // Decompress the payload if the server sent it compressed.
         let decompressed_data;
@@ -498,7 +502,7 @@ impl Processor {
                             )
                         })?;
 
-                    trace!(?codec_id, "Surface bits");
+                    trace!(?codec_id, ?bits, "Surface bits");
 
                     let destination = bits.destination;
                     // TODO(@pacmancoder): Correct rectangle conversion logic should
