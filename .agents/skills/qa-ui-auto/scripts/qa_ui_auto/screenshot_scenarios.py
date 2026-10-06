@@ -20,6 +20,7 @@ SCENARIOS = {
     "recorder": "screenshot_qa_recorder",
     "pin": "screenshot_qa_pin",
     "pin-tools": "screenshot_qa_pin_tools",
+    "pin-arrangement": "screenshot_qa_pin_arrangement",
     "scroll-manual": "screenshot_qa_scroll_manual",
     "colors": "screenshot_qa_colors",
     "annotation-tools": "screenshot_qa_annotation_tools",

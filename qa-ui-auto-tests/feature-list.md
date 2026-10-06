@@ -10368,6 +10368,7 @@ files:
   - src-tauri/src/screenshot/record.rs
   - src-tauri/src/screenshot/ocr.rs
   - src-tauri/src/screenshot/qa.rs
+  - src-tauri/src/screenshot/qa/pin_arrangement.rs
   - src-tauri/src/screenshot/qa_oracle.rs
   - src/components/screenshot/ScreenshotQaFixture.tsx
 controls:

@@ -49,8 +49,10 @@ impl RegionSnapshot {
             CGWindowImageOption::Default,
         )
         .context("create recording region snapshot")?;
+        let snapshot_elapsed = captured_at.elapsed();
         let provider = CGImage::data_provider(Some(&image)).context("snapshot data provider")?;
         let data = CGDataProvider::data(Some(&provider)).context("read snapshot pixels")?;
+        let provider_elapsed = captured_at.elapsed();
         let width = CGImage::width(Some(&image));
         let height = CGImage::height(Some(&image));
         let stride = CGImage::bytes_per_row(Some(&image));
@@ -83,8 +85,11 @@ impl RegionSnapshot {
         .context("decode recording snapshot")?;
         if captured_at.elapsed().as_millis() > 250 {
             log::warn!(
-                "screenshot: macOS region snapshot took {}ms; retaining its request timestamp",
-                captured_at.elapsed().as_millis()
+                "screenshot: macOS region snapshot took {}ms (snapshot {}ms, provider {}ms, conversion {}ms); retaining its request timestamp",
+                captured_at.elapsed().as_millis(),
+                snapshot_elapsed.as_millis(),
+                (provider_elapsed - snapshot_elapsed).as_millis(),
+                (captured_at.elapsed() - provider_elapsed).as_millis()
             );
         }
         Ok((image, captured_at))

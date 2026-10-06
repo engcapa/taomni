@@ -27,8 +27,8 @@ class LinuxProfile:
 DEFAULT_LINUX_PROFILE = "ubuntu-24.04-xvfb"
 LINUX_PROFILES = {
     DEFAULT_LINUX_PROFILE: LinuxProfile("ubuntu-24.04", "24.04", "x11", "Openbox", "Xvfb", "xcompmgr", "xvfb"),
-    "ubuntu-22.04-x11": LinuxProfile("ubuntu-22.04", "22.04", "x11", "LXQt/Openbox", "Xvfb", "none", "xvfb"),
-    "ubuntu-22.04-vnc": LinuxProfile("ubuntu-22.04", "22.04", "x11", "LXQt/Openbox", "Xtigervnc", "none", "dbus"),
+    "ubuntu-22.04-x11": LinuxProfile("ubuntu-22.04", "22.04", "x11", "LXQt/Openbox", "Xvfb", "xcompmgr", "xvfb"),
+    "ubuntu-22.04-vnc": LinuxProfile("ubuntu-22.04", "22.04", "x11", "LXQt/Openbox", "Xtigervnc", "xcompmgr", "dbus"),
     "ubuntu-26.04-wayland": LinuxProfile("ubuntu-26.04", "26.04", "wayland", "GNOME", "Mutter", "Mutter", "dbus"),
 }
 
@@ -52,6 +52,6 @@ def profile_support(case, name: str) -> str | None:
             return f"{verb} currently uses X11 OS automation; a Wayland helper is required"
         if verb == "native_keys" and (not isinstance(args, dict) or args.get("transport", "x11") == "x11"):
             return "native_keys selects the X11/XTEST transport"
-        if verb == "native_screenshot_scenario":
+        if verb == "native_screenshot_scenario" and args.get("scenario") != "pin-arrangement":
             return "Wayland capture scenarios require portal consent automation; not provided by this profile yet"
     return None

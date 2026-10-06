@@ -476,13 +476,14 @@ class DesktopTests(unittest.TestCase):
                 self.assertTrue(desktop.facts['ready'])
             self.assertTrue(any(command[0] == '/usr/bin/python3' for command in calls))
 
-    def test_old_x11_profile_preserves_uncomposited_desktop(self):
+    def test_ubuntu_22_x11_profile_owns_a_compositor_for_transparent_windows(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '22.04'}), \
              patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
              patch('ci_desktop.subprocess.check_output', side_effect=['XTEST', 'window id # 1']), \
              patch('ci_desktop.subprocess.run'), patch.object(Desktop, 'start') as start:
+            start.return_value.poll.return_value = None
             with Desktop(Path(d), ['display'], 'ubuntu-22.04-x11') as desktop:
-                self.assertEqual(desktop.facts['compositor'], 'none')
+                self.assertEqual(desktop.facts['compositor'], 'xcompmgr')
                 self.assertEqual(desktop.facts['desktop'], 'LXQt/Openbox')
-            self.assertEqual([call.args[0] for call in start.call_args_list], [['lxqt-session']])
+            self.assertEqual([call.args[0] for call in start.call_args_list], [['lxqt-session'], ['xcompmgr', '-n']])

@@ -176,7 +176,11 @@ jobs:
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
       - name: Linux native and service dependencies
         if: runner.os == 'Linux' && matrix.mode == 'native'
-        timeout-minutes: 20
+        # Wayland provisioning installs the GNOME/portal stack on a fresh
+        # runner. Azure mirrors can take more than twenty minutes for this
+        # dependency set; keep setup bounded while allowing a cold install to
+        # finish before the native case timeout starts.
+        timeout-minutes: 35
         env:
           QA_LINUX_PROFILE: ${{ matrix.linux_profile }}
           QA_CAPABILITIES: ${{ join(matrix.capabilities, ',') }}

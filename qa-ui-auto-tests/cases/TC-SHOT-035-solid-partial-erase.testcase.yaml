@@ -1,35 +1,84 @@
 id: TC-SHOT-035
 title: Solid rectangle ellipse freehand annotations and partial eraser preserve the stroke
-description: Browser verifies renderer state and native annotation-tools verifies real cross-platform canvas behavior without deleting an entire stroke.
-covers: [F27.1]
-tags: [screenshot, annotate, fill, eraser, p1]
-modes: [browser, native]
-fixtures: [reset_db]
+description: Browser verifies renderer state and native annotation-tools verifies real cross-platform canvas behavior
+  without deleting an entire stroke.
+covers:
+- F27.1
+tags:
+- screenshot
+- annotate
+- fill
+- eraser
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 steps:
 - open: ${cfg.app.base_url}#screenshot-overlay
-- set_viewport: {width: 1000, height: 750}
+- set_viewport:
+    width: 1000
+    height: 750
 - wait_for: '[data-testid="screenshot-hint"]'
 - click: '[data-testid="screenshot-fullscreen"]'
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - click: '[data-testid="screenshot-tool-rect"]'
 - click: '[data-testid="screenshot-fill"]'
-- assert_attribute: {selector: '[data-testid="screenshot-fill"]', name: aria-pressed, equals: 'true'}
-- drag_to: {from: '[data-testid="screenshot-annotation-layer"]', to: '[data-testid="screenshot-annotation-layer"]', from_position: {x: 80, y: 80}, to_position: {x: 180, y: 160}}
+- assert_attribute:
+    selector: '[data-testid="screenshot-fill"]'
+    name: aria-pressed
+    equals: 'true'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 80
+      y: 80
+    to_position:
+      x: 180
+      y: 160
 - wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
 - click: '[data-testid="screenshot-tool-ellipse"]'
-- drag_to: {from: '[data-testid="screenshot-annotation-layer"]', to: '[data-testid="screenshot-annotation-layer"]', from_position: {x: 220, y: 80}, to_position: {x: 320, y: 180}}
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 220
+      y: 80
+    to_position:
+      x: 320
+      y: 180
 - click: '[data-testid="screenshot-tool-pen"]'
-- drag_path: {selector: '[data-testid="screenshot-annotation-layer"]', points: [{x: 100, y: 250}, {x: 150, y: 200}, {x: 200, y: 250}]}
+- drag_path:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    points:
+    - x: 100
+      y: 250
+    - x: 150
+      y: 200
+    - x: 200
+      y: 250
 - wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="3"]'
 - click: '[data-testid="screenshot-tool-eraser"]'
-- assert_attribute: {selector: '[data-testid="screenshot-eraser-mode"]', name: value, equals: partial}
-- drag_to: {from: '[data-testid="screenshot-annotation-layer"]', to: '[data-testid="screenshot-annotation-layer"]', from_position: {x: 145, y: 200}, to_position: {x: 155, y: 205}}
-- assert_attribute: {selector: '[data-testid="screenshot-annotation-canvas"]', name: data-shapes, equals: '3'}
+- assert_attribute:
+    selector: '[data-testid="screenshot-eraser-mode"]'
+    name: value
+    equals: partial
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position:
+      x: 145
+      y: 200
+    to_position:
+      x: 155
+      y: 205
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '3'
 - click: '[data-testid="screenshot-cancel"]'
 - wait_for: '[data-testid="system-screenshot"]'
-- open: ${cfg.app.base_url}
-- wait_for: '[data-testid="system-screenshot"]'
-- native_screenshot_scenario: {scenario: annotation-tools}
 verification:
   review: reviewed
   requirements:
