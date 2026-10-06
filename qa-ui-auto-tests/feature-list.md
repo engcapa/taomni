@@ -1926,6 +1926,10 @@ controls:
   - id: new-folder
     selector: '[data-testid="session-new-folder"]'
     kind: interactive
+  - id: context-new-folder
+    selector: '[data-testid="context-menu-item-new-folder"]'
+    kind: interactive
+    optional: true
   - id: cancel-testid
     selector: '[data-testid="session-cancel"]'
     kind: interactive
@@ -4912,6 +4916,42 @@ controls:
     selector: '[data-testid="schema-tree-object"]'
     kind: interactive
     optional: true       # repeated per object row; derive with data-schema/data-object-name
+  - id: db-detail-panel
+    selector: '[data-testid="db-table-detail-panel"]'
+    kind: display
+    optional: true
+  - id: db-detail-summary
+    selector: '[data-testid="db-detail-summary"]'
+    kind: display
+    optional: true
+  - id: db-detail-ddl
+    selector: '[data-testid="db-detail-ddl"]'
+    kind: display
+    optional: true
+  - id: db-detail-tab-data
+    selector: '[data-testid="db-detail-tab-data"]'
+    kind: interactive
+    optional: true
+  - id: db-detail-tab-diagram
+    selector: '[data-testid="db-detail-tab-diagram"]'
+    kind: interactive
+    optional: true
+  - id: db-detail-data-filter
+    selector: '[data-testid="db-detail-data-filter"]'
+    kind: interactive
+    optional: true
+  - id: db-detail-data-grid
+    selector: '[data-testid="db-detail-data-grid"]'
+    kind: display
+    optional: true
+  - id: db-detail-diagram
+    selector: '[data-testid="db-detail-diagram"]'
+    kind: display
+    optional: true
+  - id: context-menu-open-table-details
+    selector: '[data-testid="context-menu-item-open-table-details"]'
+    kind: interactive
+    optional: true
   - id: query-library-tab
     selector: '[data-testid="db-query-library-tab"]'
     kind: interactive
@@ -10850,51 +10890,78 @@ controls:
   - id: screenshot-favorites-error
     selector: '[data-testid="screenshot-favorites-error"]'
     kind: display
-  - id: screenshot-fill
-    selector: '[data-testid="screenshot-fill"]'
+  - id: capture-menu
+    selector: '[data-testid="capture-menu"]'
+    kind: display
+    optional: true
+  - id: capture-toolbar
+    selector: '[data-testid="capture-toolbar"]'
+    kind: display
+    optional: true
+  - id: open-tabs-screenshot
+    selector: '[data-testid="open-tabs-screenshot"]'
     kind: interactive
-  - id: screenshot-eraser-mode
-    selector: '[data-testid="screenshot-eraser-mode"]'
-    kind: interactive
-  - id: screenshot-more
-    selector: '[data-testid="screenshot-more"]'
-    kind: interactive
+    optional: true
   - id: screenshot-edit
     selector: '[data-testid="screenshot-edit"]'
     kind: interactive
-  - id: screenshot-edit-panel
-    selector: '[data-testid="screenshot-edit-panel"]'
-    kind: display
-  - id: screenshot-edit-rotate
-    selector: '[data-testid="screenshot-edit-rotate"]'
-    kind: interactive
-  - id: screenshot-edit-undo
-    selector: '[data-testid="screenshot-edit-undo"]'
-    kind: interactive
-  - id: screenshot-edit-redo
-    selector: '[data-testid="screenshot-edit-redo"]'
-    kind: interactive
+    optional: true
   - id: screenshot-edit-external
     selector: '[data-testid="screenshot-edit-external"]'
     kind: interactive
-  - id: screenshot-pin-note-input
-    selector: '[data-testid="screenshot-pin-note-input"]'
+    optional: true
+  - id: screenshot-edit-panel
+    selector: '[data-testid="screenshot-edit-panel"]'
+    kind: display
+    optional: true
+  - id: screenshot-edit-redo
+    selector: '[data-testid="screenshot-edit-redo"]'
     kind: interactive
-  - id: screenshot-pin-note-save
-    selector: '[data-testid="screenshot-pin-note-save"]'
+    optional: true
+  - id: screenshot-edit-rotate
+    selector: '[data-testid="screenshot-edit-rotate"]'
     kind: interactive
+    optional: true
+  - id: screenshot-edit-undo
+    selector: '[data-testid="screenshot-edit-undo"]'
+    kind: interactive
+    optional: true
+  - id: screenshot-eraser-mode
+    selector: '[data-testid="screenshot-eraser-mode"]'
+    kind: interactive
+    optional: true
+  - id: screenshot-fill
+    selector: '[data-testid="screenshot-fill"]'
+    kind: interactive
+    optional: true
+  - id: screenshot-more
+    selector: '[data-testid="screenshot-more"]'
+    kind: interactive
+    optional: true
   - id: screenshot-pin-note
     selector: '[data-testid="screenshot-pin-note"]'
     kind: display
-  - id: screenshot-pins-tile
-    selector: '[data-testid="screenshot-pins-tile"]'
+    optional: true
+  - id: screenshot-pin-note-input
+    selector: '[data-testid="screenshot-pin-note-input"]'
     kind: interactive
+    optional: true
+  - id: screenshot-pin-note-save
+    selector: '[data-testid="screenshot-pin-note-save"]'
+    kind: interactive
+    optional: true
   - id: screenshot-pins-collapse
     selector: '[data-testid="screenshot-pins-collapse"]'
     kind: interactive
+    optional: true
   - id: screenshot-pins-expand
     selector: '[data-testid="screenshot-pins-expand"]'
     kind: interactive
+    optional: true
+  - id: screenshot-pins-tile
+    selector: '[data-testid="screenshot-pins-tile"]'
+    kind: interactive
+    optional: true
 -->
 
 - 系统截图工具：主窗口及独立终端/数据库/RDP/VNC 窗口共用相机入口，默认隐藏应用窗口；菜单“截取当前窗口”保留调用窗口并预选其物理边界。当前配置快捷键打开截图 overlay；默认 Windows/Linux `Ctrl+Alt+A`，macOS `Ctrl+Super+A`（Control+Command+A）。菜单支持 3/5/10 秒延迟，倒计时中点击相机取消。原有 session 图像截图/录制入口及实现已移除，终端文本日志录制继续保留。

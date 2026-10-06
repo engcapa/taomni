@@ -24,6 +24,18 @@ native_platforms:
 - macOS
 verification:
   review: reviewed
+  requirements:
+  - id: native-pin-arrangement
+    requirement: Native pin arrangement and Wayland board behavior are retained by the screenshot scenario.
+    actions: [1]
+    checkpoints:
+    - step: 4
+      expectation: 'assert_visible: [data-testid="system-screenshot"]'
+    results: [4]
+  visual:
+  - check: Native pin board layout and retained originals.
+    method: external
+    reason: The scenario inspects compositor geometry and independent files.
   native:
   - check: Windows/X11/macOS pins arrange inside monitor work area; Wayland presents a single top-level board and
       retains independent original pin files.

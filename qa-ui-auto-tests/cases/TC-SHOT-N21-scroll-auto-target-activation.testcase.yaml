@@ -24,6 +24,18 @@ native_platforms:
 - macOS
 verification:
   review: reviewed
+  requirements:
+  - id: native-scroll-target
+    requirement: Automatic scroll capture activates the target and sends native input through the platform path.
+    actions: [1]
+    checkpoints:
+    - step: 4
+      expectation: 'assert_visible: [data-testid="system-screenshot"]'
+    results: [4]
+  visual:
+  - check: Scroll capture preview is visible after native target activation.
+    method: external
+    reason: The scenario requires platform compositor and input evidence.
   native:
   - check: Automatic wheel input reaches the scrolling fixture after target activation on Windows; X11 uses native
       wheel injection; Wayland uses the approved RemoteDesktop portal input session.

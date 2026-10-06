@@ -17,6 +17,10 @@ cases:
 - TC-SHOT-N20
 - TC-SHOT-N21
 - TC-SHOT-034
+- TC-SHOT-035
+- TC-SHOT-036
+- TC-SHOT-N20
+- TC-SHOT-N21
 - TC-SHOT-031
 - TC-SHOT-032
 - TC-SHOT-033
@@ -361,6 +365,7 @@ cases:
 - TC-DB-TX-002-reconnect-close-native
 - TC-DB-EDIT-001-grid-sql-preview-native
 - TC-DB-GRID-001-sort-filter-count-native
+- TC-DB-DETAIL-001-table-detail-native
 - TC-auto-F-DB-2-redis-session-scaffold
 - TC-auto-F-DB-3-hbase-query-library
 - TC-auto-F-Detach-1-terminal-detach
