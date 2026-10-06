@@ -213,23 +213,39 @@ class Desktop:
         if not Path("/usr/share/fcitx5/inputmethod/wbpy.conf").is_file():
             raise RuntimeError("fcitx5 wbpy engine is not installed")
         env = {**os.environ, "XDG_CONFIG_HOME": str(config.resolve())}
-        self.start(["fcitx5", "--replace"], env=env)
+        fcitx = self.start(["fcitx5", "--replace"], env=env)
+
+        def owns_bus():
+            # fcitx5-remote activates the DBus service when no owner exists.
+            # Calling it during startup can create an unconfigured second
+            # daemon, then strand GTK's input context when --replace wins.
+            owner = subprocess.check_output([
+                "gdbus", "call", "--session", "--dest", "org.freedesktop.DBus",
+                "--object-path", "/org/freedesktop/DBus", "--method",
+                "org.freedesktop.DBus.GetConnectionUnixProcessID", "org.fcitx.Fcitx5",
+            ], env=env, text=True, timeout=5, stderr=subprocess.DEVNULL)
+            return owner.strip() == f"(uint32 {fcitx.pid},)"
+
+        self._wait(fcitx, owns_bus, "QA fcitx5 DBus owner")
         gtk = self.start(["/usr/bin/python3", "-c",
             "import gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk; "
             "w=Gtk.Window(title='QA GTK IME probe'); e=Gtk.Entry(); w.add(e); "
             "w.show_all(); w.present(); e.grab_focus(); Gtk.main()"], env=env)
-        for _ in range(60):
-            subprocess.run(["fcitx5-remote", "-s", "wbpy"], capture_output=True)
-            probe = subprocess.run(["fcitx5-remote", "-n"], capture_output=True, text=True)
-            if probe.returncode == 0 and probe.stdout.strip():
-                break
-            time.sleep(0.5)
-        else:
-            raise RuntimeError("fcitx5 session bus/engine did not become ready")
+
+        def engine_ready():
+            if fcitx.poll() is not None:
+                raise RuntimeError("QA fcitx5 exited during engine startup")
+            subprocess.run(["fcitx5-remote", "-s", "wbpy"], env=env,
+                           capture_output=True, timeout=5)
+            probe = subprocess.run(["fcitx5-remote", "-n"], env=env,
+                                   capture_output=True, text=True, timeout=5)
+            return probe.stdout.strip() if probe.returncode == 0 and probe.stdout.strip() == "wbpy" else False
+
+        engine = self._wait(gtk, engine_ready, "fcitx5 wbpy engine")
         gtk.terminate()
         gtk.wait(timeout=10)
         self.processes.remove(gtk)
-        facts["ime"] = {"configured_engine": "wbpy", "observed_engine": probe.stdout.strip(),
+        facts["ime"] = {"configured_engine": "wbpy", "observed_engine": engine, "pid": fcitx.pid,
                         "note": "active composition/commit is verified by the selected native case"}
 
     def _audio(self, facts):

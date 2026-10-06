@@ -89,6 +89,79 @@ class DesktopTests(unittest.TestCase):
                     pass
             self.assertFalse((Path(d) / 'desktop-readiness.json').exists())
 
+    def test_ime_waits_for_its_daemon_before_creating_a_gtk_context(self):
+        with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {'DBUS_SESSION_BUS_ADDRESS': 'qa-bus'}), \
+             patch('ci_desktop.Path.is_file', return_value=True), patch('ci_desktop.time.sleep'), \
+             patch.object(Desktop, 'start') as start, patch('ci_desktop.subprocess.check_output') as owner, \
+             patch('ci_desktop.subprocess.run') as remote:
+            desktop = Desktop(Path(d), ['ime'])
+            fcitx, gtk = Mock(pid=42), Mock()
+            fcitx.poll.return_value = gtk.poll.return_value = None
+            owners = iter(['(uint32 99,)', '(uint32 42,)'])
+            observed_owner = None
+            environments = []
+            probes = iter(['keyboard-us', 'wbpy'])
+
+            def launch(command, **kwargs):
+                environments.append(kwargs['env'])
+                if command[0] == 'fcitx5':
+                    process = fcitx
+                else:
+                    self.assertEqual(observed_owner, '(uint32 42,)')
+                    process = gtk
+                desktop.processes.append(process)
+                return process
+
+            def get_owner(command, **kwargs):
+                nonlocal observed_owner
+                self.assertEqual(command[-2:], ['org.freedesktop.DBus.GetConnectionUnixProcessID', 'org.fcitx.Fcitx5'])
+                self.assertEqual(kwargs['env'], environments[0])
+                observed_owner = next(owners)
+                return observed_owner
+
+            def get_engine(command, **kwargs):
+                self.assertEqual(observed_owner, '(uint32 42,)')
+                self.assertIn(gtk, desktop.processes)
+                self.assertEqual(kwargs['env'], environments[0])
+                return subprocess.CompletedProcess(command, 0, next(probes) if command[-1] == '-n' else '')
+
+            start.side_effect = launch
+            owner.side_effect = get_owner
+            remote.side_effect = get_engine
+            facts = {}
+            desktop._ime(facts)
+            self.assertEqual(facts['ime']['observed_engine'], 'wbpy')
+            self.assertEqual(facts['ime']['pid'], 42)
+            self.assertEqual(environments[0], environments[1])
+            self.assertEqual(owner.call_count, 2)
+            self.assertEqual(remote.call_count, 4)
+            self.assertEqual(desktop.processes, [fcitx])
+            gtk.terminate.assert_called_once()
+
+    def test_ime_rejects_a_dbus_service_owned_by_another_daemon(self):
+        with tempfile.TemporaryDirectory() as d, patch.dict(os.environ), \
+             patch('ci_desktop.Path.is_file', return_value=True), patch('ci_desktop.time.sleep'), \
+             patch.object(Desktop, 'start') as start, \
+             patch('ci_desktop.subprocess.check_output', return_value='(uint32 99,)'), \
+             patch('ci_desktop.subprocess.run') as remote:
+            start.return_value.pid = 42
+            start.return_value.poll.return_value = None
+            with self.assertRaisesRegex(RuntimeError, 'QA fcitx5 DBus owner did not become ready'):
+                Desktop(Path(d), ['ime'])._ime({})
+            self.assertEqual(start.call_count, 1)
+            remote.assert_not_called()
+
+    def test_ime_rejects_a_ready_daemon_with_the_wrong_engine(self):
+        with tempfile.TemporaryDirectory() as d, patch.dict(os.environ), \
+             patch('ci_desktop.Path.is_file', return_value=True), patch('ci_desktop.time.sleep'), \
+             patch.object(Desktop, 'start') as start, \
+             patch('ci_desktop.subprocess.check_output', return_value='(uint32 42,)'), \
+             patch('ci_desktop.subprocess.run', return_value=subprocess.CompletedProcess([], 0, 'keyboard-us')):
+            start.return_value.pid = 42
+            start.return_value.poll.return_value = None
+            with self.assertRaisesRegex(RuntimeError, 'fcitx5 wbpy engine did not become ready'):
+                Desktop(Path(d), ['ime'])._ime({})
+
     def test_x11_audio_is_ready_in_the_environment_inherited_by_native_children(self):
         real_run = subprocess.run
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
