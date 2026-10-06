@@ -13,6 +13,10 @@ unavailable:
     macos/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
 cases:
 - TC-SHOT-034
+- TC-SHOT-035
+- TC-SHOT-036
+- TC-SHOT-N20
+- TC-SHOT-N21
 - TC-SHOT-031
 - TC-SHOT-032
 - TC-SHOT-033
