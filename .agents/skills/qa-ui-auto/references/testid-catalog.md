@@ -1728,6 +1728,21 @@
 - `[data-testid="screenshot-favorite-item"]` — display — F27.1.screenshot-favorite-item
 - `[data-testid="screenshot-favorite-thumbnail"]` — display — F27.1.screenshot-favorite-thumbnail
 - `[data-testid="screenshot-favorites-error"]` — display — F27.1.screenshot-favorites-error
+- `[data-testid="screenshot-fill"]` — interactive — F27.1.screenshot-fill
+- `[data-testid="screenshot-eraser-mode"]` — interactive — F27.1.screenshot-eraser-mode
+- `[data-testid="screenshot-more"]` — interactive — F27.1.screenshot-more
+- `[data-testid="screenshot-edit"]` — interactive — F27.1.screenshot-edit
+- `[data-testid="screenshot-edit-panel"]` — display — F27.1.screenshot-edit-panel
+- `[data-testid="screenshot-edit-rotate"]` — interactive — F27.1.screenshot-edit-rotate
+- `[data-testid="screenshot-edit-undo"]` — interactive — F27.1.screenshot-edit-undo
+- `[data-testid="screenshot-edit-redo"]` — interactive — F27.1.screenshot-edit-redo
+- `[data-testid="screenshot-edit-external"]` — interactive — F27.1.screenshot-edit-external
+- `[data-testid="screenshot-pin-note-input"]` — interactive — F27.1.screenshot-pin-note-input
+- `[data-testid="screenshot-pin-note-save"]` — interactive — F27.1.screenshot-pin-note-save
+- `[data-testid="screenshot-pin-note"]` — display — F27.1.screenshot-pin-note
+- `[data-testid="screenshot-pins-tile"]` — interactive — F27.1.screenshot-pins-tile
+- `[data-testid="screenshot-pins-collapse"]` — interactive — F27.1.screenshot-pins-collapse
+- `[data-testid="screenshot-pins-expand"]` — interactive — F27.1.screenshot-pins-expand
 
 ## screenshot/settings (F27.2)
 

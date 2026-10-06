@@ -929,9 +929,7 @@ export function ScreenshotOverlay() {
         else if (ocrOpen) setOcrOpen(false);
         else if (pickerMode) exitPickerMode();
         else if (scrollResult) close();
-        else if (moreOpen && phase === "annotate" && tool === "select" && canvasRef.current?.shapeCount() === 0) setMoreOpen(false);
         else if (phase === "annotate" && tool !== "select" && canvasRef.current?.shapeCount() === 0) setTool("select");
-        else if (scrollResult) close();
         else if (phase === "annotate") resetSelection();
         else close();
         return;

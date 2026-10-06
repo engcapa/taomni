@@ -39,6 +39,9 @@ steps:
     to_position: {x: 380, y: 280}
 - wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="4"]'
 - click: '[data-testid="screenshot-tool-eraser"]'
+- select_option:
+    selector: '[data-testid="screenshot-eraser-mode"]'
+    value: object
 # Stay inside the separate rectangle so other shapes cannot be erased by accident.
 - drag_to:
     from: '[data-testid="screenshot-annotation-layer"]'
@@ -82,19 +85,19 @@ verification:
     results: [8, 11, 14, 17]
   - id: R2
     requirement: Erasing a hit removes the rectangle as an undoable mutation, enables redo only after undo, and ignores an eraser miss without polluting history.
-    actions: [18, 19, 23, 26, 29, 31, 33]
+    actions: [18, 19, 20, 24, 27, 30, 32, 34]
     checkpoints:
-    - {step: 20, expectation: The hit removes exactly one shape.}
-    - {step: 21, expectation: The erase can be undone.}
-    - {step: 22, expectation: Erasing itself does not enable redo.}
-    - {step: 24, expectation: Undo restores the erased rectangle.}
-    - {step: 25, expectation: Redo becomes available only after undo.}
-    - {step: 27, expectation: Redo removes the rectangle again.}
-    - {step: 28, expectation: Redo is exhausted.}
-    - {step: 30, expectation: An eraser miss leaves three shapes.}
-    - {step: 32, expectation: 'Undo immediately restores four shapes, proving the miss added no history entry.'}
-    - {step: 34, expectation: Cancel returns to main.}
-    results: [20, 21, 22, 24, 25, 27, 28, 30, 32, 34]
+    - {step: 21, expectation: The hit removes exactly one shape.}
+    - {step: 22, expectation: The erase can be undone.}
+    - {step: 23, expectation: Erasing itself does not enable redo.}
+    - {step: 25, expectation: Undo restores the erased rectangle.}
+    - {step: 26, expectation: Redo becomes available only after undo.}
+    - {step: 28, expectation: Redo removes the rectangle again.}
+    - {step: 29, expectation: Redo is exhausted.}
+    - {step: 31, expectation: An eraser miss leaves three shapes.}
+    - {step: 33, expectation: 'Undo immediately restores four shapes, proving the miss added no history entry.'}
+    - {step: 35, expectation: Cancel returns to main.}
+    results: [21, 22, 23, 25, 26, 28, 29, 31, 33, 35]
   visual:
   - check: Advanced-tool commits and eraser history outcomes.
     method: automated

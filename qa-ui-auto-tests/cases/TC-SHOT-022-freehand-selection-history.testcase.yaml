@@ -126,6 +126,7 @@ steps:
     selector: '[data-testid="screenshot-annotation-canvas"]'
     name: data-shapes
     equals: '0'
+# The expanded More tools row must not consume an extra Escape.
 - press: Escape
 - assert_not_visible: '[data-testid="screenshot-toolbar"]'
 - assert_attribute:

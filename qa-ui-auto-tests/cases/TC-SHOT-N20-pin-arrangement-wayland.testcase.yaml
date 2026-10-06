@@ -1,18 +1,48 @@
 id: TC-SHOT-N20
 title: Native pin notes arrangement and Wayland combined board
-covers: [F27.1]
-tags: [screenshot, pins, wayland, native, p1]
-modes: [native]
-fixtures: [reset_db]
+covers:
+- F27.1
+tags:
+- screenshot
+- pins
+- wayland
+- native
+- p1
+modes:
+- native
+fixtures:
+- reset_db
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
-- native_screenshot_scenario: {scenario: pin-tools}
+- native_screenshot_scenario:
+    scenario: pin-arrangement
 - assert_visible: '[data-testid="system-screenshot"]'
-native_platforms: [Linux, Windows, macOS]
+native_platforms:
+- Linux
+- Windows
+- macOS
 verification:
   review: reviewed
   native:
-  - check: Windows/X11/macOS pins arrange inside monitor work area; Wayland presents a single top-level board and retains independent original pin files.
-    method: external
+  - check: Windows/X11/macOS pins arrange inside monitor work area; Wayland presents a single top-level board and
+      retains independent original pin files.
+    method: automated
     reason: Native scenario must inspect actual compositor geometry and Wayland surface behavior.
+  requirements:
+  - id: native-workflow
+    requirement: Native pin notes arrangement and Wayland combined board
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: The native scenario verifies notes, layout, board closure, restored pins and independent original files through native window state.
+    - step: 4
+      expectation: The main window remains available after cleanup.
+    results:
+    - 3
+    - 4
+  visual:
+  - check: Native result
+    method: external
+    reason: Review retained native evidence alongside the automated assertions.

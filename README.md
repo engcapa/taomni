@@ -164,6 +164,7 @@ Run frontend and unit tests:
 
 ```bash
 pnpm test
+pnpm test:tools # Node.js build/signing script contracts
 ```
 
 Run Rust tests:

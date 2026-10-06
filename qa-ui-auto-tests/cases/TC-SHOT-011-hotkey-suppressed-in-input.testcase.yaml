@@ -56,6 +56,7 @@ steps:
     name: aria-pressed
     equals: 'false'
 - assert_visible: '[data-testid="screenshot-selection-move"]'
+# The expanded More tools row must not consume an extra Escape.
 - press: Escape
 - wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - assert_not_visible: '[data-testid="screenshot-selection"]'

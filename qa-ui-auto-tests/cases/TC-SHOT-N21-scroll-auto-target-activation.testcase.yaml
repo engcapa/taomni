@@ -1,17 +1,50 @@
 id: TC-SHOT-N21
 title: Automatic scroll capture activates target and uses portal input on Wayland
-covers: [F27.1]
-tags: [screenshot, scroll, auto, wayland, windows, native, p1]
-modes: [native]
+covers:
+- F27.1
+tags:
+- screenshot
+- scroll
+- auto
+- wayland
+- windows
+- native
+- p1
+modes:
+- native
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
-- native_screenshot_scenario: {scenario: scroll}
+- native_screenshot_scenario:
+    scenario: scroll
 - assert_visible: '[data-testid="system-screenshot"]'
-native_platforms: [Linux, Windows, macOS]
+native_platforms:
+- Linux
+- Windows
+- macOS
 verification:
   review: reviewed
   native:
-  - check: Automatic wheel input reaches the scrolling fixture after target activation on Windows; X11 uses native wheel injection; Wayland uses the approved RemoteDesktop portal input session.
+  - check: Automatic wheel input reaches the scrolling fixture after target activation on Windows; X11 uses native
+      wheel injection; Wayland uses the approved RemoteDesktop portal input session.
     method: external
     reason: Native desktop input and compositor permissions cannot be proven in browser mode.
+  requirements:
+  - id: native-workflow
+    requirement: Automatic scroll capture activates target and uses portal input on Wayland
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: The native scenario verifies the real window/input and retained output assertions.
+    - step: 4
+      expectation: The main window remains available after cleanup.
+    results:
+    - 3
+    - 4
+  visual:
+  - check: Native result
+    method: external
+    reason: Review retained native evidence alongside the automated assertions.
+fixtures:
+- reset_db
