@@ -1,0 +1,18 @@
+id: TC-SHOT-N20
+title: Native pin notes arrangement and Wayland combined board
+covers: [F27.1]
+tags: [screenshot, pins, wayland, native, p1]
+modes: [native]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: pin-tools}
+- assert_visible: '[data-testid="system-screenshot"]'
+native_platforms: [Linux, Windows, macOS]
+verification:
+  review: reviewed
+  native:
+  - check: Windows/X11/macOS pins arrange inside monitor work area; Wayland presents a single top-level board and retains independent original pin files.
+    method: external
+    reason: Native scenario must inspect actual compositor geometry and Wayland surface behavior.
