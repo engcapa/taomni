@@ -71,6 +71,21 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it("resets selection with Escape after leaving an empty tool while more tools are expanded", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
+    expect(screen.getByTestId("screenshot-more")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("screenshot-tool-text"));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByTestId("screenshot-tool-text")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "annotate");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+    expect(screen.queryByTestId("screenshot-selection")).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce();
+  });
+
   it("dispatches manual scrolling from the selected region", async () => {
     await open();
     drag("screenshot-select-layer", [100, 100], [500, 450]);
