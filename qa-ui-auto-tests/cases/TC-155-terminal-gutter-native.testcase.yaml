@@ -1,5 +1,7 @@
 id: TC-155
 title: Native local and SSH terminals copy complete first-column selections from the gutter
+description: Preserve complete forward, reverse and block selection clipboard results through font zoom and fullscreen.
+  Search highlight coordinates must follow terminal buffer reflow so the post-zoom drag still targets the actual output row.
 covers:
 - F2.1
 - F2.2
@@ -35,7 +37,7 @@ steps:
     timeout_sec: 5
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: echo QA-LEFT-""GUTTER
+    text: ' echo QA-LEFT-""GUTTER'
     submit: true
     verify:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
@@ -254,7 +256,7 @@ steps:
     timeout_sec: 5
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: echo QA-LEFT-""GUTTER
+    text: ' echo QA-LEFT-""GUTTER'
     submit: true
     verify:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'

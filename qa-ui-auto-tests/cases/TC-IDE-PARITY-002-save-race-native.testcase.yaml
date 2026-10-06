@@ -1,5 +1,6 @@
 id: TC-IDE-PARITY-002
 title: ED-PARITY-002 save-while-typing W0/W1/W2 byte + dirty retention baseline (native desktop)
+description: Recovery acknowledgement remains the final status after restored workspace files finish loading in the background.
 description: "ED-PARITY-002 / REQ-11 / CW-EDIT-003 packaged native desktop slice. It\nproves with real native writes,\
   \ real acknowledgements and real watched-file\nnotifications that a save freezes B1 on disk while newer typing\
   \ keeps its\nown live buffer:\n\n- W0: an edit typed after the prepare/history await and before the byte\n  writer\

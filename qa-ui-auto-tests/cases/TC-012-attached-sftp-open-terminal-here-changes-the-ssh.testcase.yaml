@@ -51,6 +51,10 @@ steps:
 - wait: 1
 - click: '[data-testid="sftp-remote-path-edit"]'
 - wait_for: input[data-testid="sftp-remote-path"]
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${fixture.sftp_sync_test_dir}
 - fill:
     selector: '[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}
@@ -71,7 +75,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SFTP 导航后点击在此打开终端，实际 shell 输出的工作目录精确等于 SFTP 目标。
+    requirement: SFTP 导航后点击在此打开终端，导航后规范路径精确匹配目标；POSIX 或 Windows shell 实际工作目录精确等于该目录，Windows 的 /C:/ SFTP 路径转换为 C:/ shell 路径。
     actions:
     - 1
     - 2
@@ -85,10 +89,10 @@ verification:
     - 17
     - 18
     - 20
-    - 22
     - 23
     - 24
-    - 26
+    - 25
+    - 27
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
@@ -107,11 +111,13 @@ verification:
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 21
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 28
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}"}}'
+    - step: 29
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD=${cfg.sftp.remote_test_dir}\\r?$",
         "timeout_sec": 60}}'
     results:
-    - 28
+    - 29
   visual:
   - check: SFTP 路径与关联终端输出可同时辨认。
     method: manual

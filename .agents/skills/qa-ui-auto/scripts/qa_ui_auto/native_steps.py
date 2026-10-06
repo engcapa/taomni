@@ -47,6 +47,7 @@ from typing import Any, Callable
 
 from .steps import StepError
 from .native_assertions import assert_count, assert_menu_items
+from .linux_ime import current_fcitx_engine
 from . import save_race
 
 
@@ -856,6 +857,17 @@ def _activate_x11_application(application: Path) -> tuple[str, str]:
             time.sleep(0.1)
         else:
             raise StepError(f"native X11: {window_id} did not become active")
+    # EWMH activation and the X server's keyboard focus are separate. LXQt can
+    # leave _NET_ACTIVE_WINDOW pointing at the app while GTK has no focused
+    # input context; physical keys then never reach the WebView/IME.
+    _command_output(["xdotool", "windowfocus", "--sync", window_id])
+    focus = _command_output(["xdotool", "getwindowfocus"])
+    try:
+        focus_id = int(focus, 16 if focus.startswith("0x") else 10)
+    except ValueError as exc:
+        raise StepError(f"native X11: invalid keyboard focus {focus!r}") from exc
+    if focus_id != int(window_id, 16):
+        raise StepError(f"native X11: keyboard focus is {focus}, expected {window_id}")
     return window_id, identity
 
 
@@ -2269,14 +2281,30 @@ def _do_native_ime_keys(ctx: NativeStepContext, args: Any) -> str:
         )
     time.sleep(0.25)
     window_id, window_identity = _activate_x11_application(ctx.session.application)
+    focus_script = (
+        f"const el = document.querySelector({json.dumps(selector)});"
+        "return document.hasFocus() && !!el && "
+        "(document.activeElement === el || el.contains(document.activeElement));"
+    )
+    expires = time.monotonic() + 3
+    while not ctx.session.execute(focus_script):
+        if time.monotonic() >= expires:
+            raise StepError(f"native_ime_keys: target has no native document focus: {selector}")
+        time.sleep(0.05)
     prior_state = _command_output(["fcitx5-remote"])
-    prior_engine = _command_output(["fcitx5-remote", "-n"])
+    try:
+        prior_engine = current_fcitx_engine(timeout=remaining_timeout(5))
+    except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+        raise StepError(f"native_ime_keys: could not observe the current fcitx5 engine: {exc}") from exc
 
     try:
         if prior_engine != expected_engine:
             _command_output(["fcitx5-remote", "-s", expected_engine])
             time.sleep(0.25)
-        engine = _command_output(["fcitx5-remote", "-n"])
+        try:
+            engine = current_fcitx_engine(timeout=remaining_timeout(5))
+        except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+            raise StepError(f"native_ime_keys: could not observe the current fcitx5 engine: {exc}") from exc
         if engine != expected_engine:
             raise StepError(
                 f"native_ime_keys: could not select engine {expected_engine!r}; current {engine!r}"

@@ -14,6 +14,7 @@ import tempfile
 import time
 
 from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES
+from qa_ui_auto.linux_ime import current_fcitx_engine
 
 
 def wayland_has_input(protocols: str) -> bool:
@@ -213,24 +214,75 @@ class Desktop:
         if not Path("/usr/share/fcitx5/inputmethod/wbpy.conf").is_file():
             raise RuntimeError("fcitx5 wbpy engine is not installed")
         env = {**os.environ, "XDG_CONFIG_HOME": str(config.resolve())}
-        self.start(["fcitx5", "--replace"], env=env)
+        fcitx = self.start(["fcitx5", "--replace"], env=env)
+
+        def owns_bus():
+            # fcitx5-remote activates the DBus service when no owner exists.
+            # Calling it during startup can create an unconfigured second
+            # daemon, then strand GTK's input context when --replace wins.
+            owner = subprocess.check_output([
+                "gdbus", "call", "--session", "--dest", "org.freedesktop.DBus",
+                "--object-path", "/org/freedesktop/DBus", "--method",
+                "org.freedesktop.DBus.GetConnectionUnixProcessID", "org.fcitx.Fcitx5",
+            ], env=env, text=True, timeout=5, stderr=subprocess.DEVNULL)
+            return owner.strip() == f"(uint32 {fcitx.pid},)"
+
+        self._wait(fcitx, owns_bus, "QA fcitx5 DBus owner")
         gtk = self.start(["/usr/bin/python3", "-c",
             "import gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk; "
             "w=Gtk.Window(title='QA GTK IME probe'); e=Gtk.Entry(); w.add(e); "
             "w.show_all(); w.present(); e.grab_focus(); Gtk.main()"], env=env)
-        for _ in range(60):
-            subprocess.run(["fcitx5-remote", "-s", "wbpy"], capture_output=True)
-            probe = subprocess.run(["fcitx5-remote", "-n"], capture_output=True, text=True)
-            if probe.returncode == 0 and probe.stdout.strip():
-                break
-            time.sleep(0.5)
-        else:
-            raise RuntimeError("fcitx5 session bus/engine did not become ready")
+
+        def engine_ready():
+            if fcitx.poll() is not None:
+                raise RuntimeError("QA fcitx5 exited during engine startup")
+            subprocess.run(["fcitx5-remote", "-s", "wbpy"], env=env,
+                           capture_output=True, timeout=5)
+            engine = current_fcitx_engine(env=env)
+            return engine if engine == "wbpy" else False
+
+        engine = self._wait(gtk, engine_ready, "fcitx5 wbpy engine")
         gtk.terminate()
         gtk.wait(timeout=10)
         self.processes.remove(gtk)
-        facts["ime"] = {"configured_engine": "wbpy", "observed_engine": probe.stdout.strip(),
+        facts["ime"] = {"configured_engine": "wbpy", "observed_engine": engine, "pid": fcitx.pid,
                         "note": "active composition/commit is verified by the selected native case"}
+
+    def _audio(self, facts):
+        # Prepare the graph before tauri-driver inherits the session environment.
+        # User-manager units keep their own runtime directory; starting them
+        # after a case fixture creates a different directory cannot serve that
+        # fixture or the already-running driver.
+        runtime = Path(self.temporary.name) / "runtime"
+        runtime.mkdir(mode=0o700)
+        os.environ.update(XDG_RUNTIME_DIR=str(runtime),
+                          PULSE_SERVER=f"unix:{runtime}/pulse/native")
+        core = self.start(["pipewire"])
+        self._wait(core, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire audio core")
+        manager = self.start(["wireplumber"])
+
+        def manager_ready():
+            # pw-dump is installed by the Jammy runtime overlay as well.
+            # Its stock pw-cli uses a private symbol removed by PipeWire 1.0.
+            clients = subprocess.run(["pw-dump"], capture_output=True,
+                                     text=True, timeout=5)
+            if clients.returncode:
+                return False
+            try:
+                objects = json.loads(clients.stdout)
+            except json.JSONDecodeError:
+                return False
+            return any(client.get("type") == "PipeWire:Interface:Client"
+                       and ((client.get("info") or {}).get("props") or {}).get("application.name")
+                       in {"WirePlumber", "WirePlumber [export]"}
+                       for client in objects)
+
+        self._wait(manager, manager_ready, "WirePlumber audio policy")
+        pulse = self.start(["pipewire-pulse"])
+        self._wait(pulse, lambda: subprocess.run(["pactl", "info"], capture_output=True,
+                                                timeout=5).returncode == 0, "PipeWire Pulse server")
+        facts["audio"] = {"backend": "PipeWire", "runtime_dir": str(runtime),
+                          "pulse_server": os.environ["PULSE_SERVER"], "scope": "job-owned"}
 
     def __enter__(self):
         self.root.mkdir(parents=True, exist_ok=True)
@@ -239,6 +291,8 @@ class Desktop:
         try:
             if system == "Linux":
                 self._linux(facts)
+                if "audio" in self.capabilities and facts.get("session_type") == "x11":
+                    self._audio(facts)
             elif system == "Windows":
                 kernel = ctypes.windll.kernel32
                 session = ctypes.c_ulong()
@@ -316,7 +370,7 @@ class Desktop:
         finally:
             # The wrapper owns its original bus/display; only restore keys this
             # Desktop changed, without discarding unrelated service variables.
-            for key in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE",
+            for key in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "PULSE_SERVER", "XDG_SESSION_TYPE",
                         "XDG_CURRENT_DESKTOP", "GDK_BACKEND", "LIBGL_ALWAYS_SOFTWARE",
                         "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_IM_MODULE", "QT_IM_MODULE", "XMODIFIERS"):
                 if key in self.environment_before:

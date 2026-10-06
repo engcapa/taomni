@@ -3615,7 +3615,7 @@ export function CodeWorkspaceTab({
           };
           libraryBuffersRef.current[key] = info;
           setOpenFiles((current) => ({ ...current, [key]: makeLibraryFile(info, contents.text) }));
-          setStatusMessage(`Opened ${info.title}`);
+          if (!options.restoring) setStatusMessage(`Opened ${info.title}`);
           return { canonicalFileKey: key, groupId, error: null };
         } catch (err) {
           const message = errorMessage(err);
@@ -3681,7 +3681,7 @@ export function CodeWorkspaceTab({
           previewKey: group.previewKey === key ? fileKey(nextRef) : group.previewKey,
           pinnedKeys: group.pinnedKeys.map((item) => (item === key ? fileKey(nextRef) : item)),
         }));
-        setStatusMessage(`Opened ${meta.subtitle}`);
+        if (!options.restoring) setStatusMessage(`Opened ${meta.subtitle}`);
         return { canonicalFileKey: fileKey(nextRef), groupId, error: null };
       } catch (err) {
         if (!isCurrent()) {

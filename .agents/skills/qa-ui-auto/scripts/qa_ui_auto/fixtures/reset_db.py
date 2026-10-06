@@ -11,14 +11,16 @@ verified data/config/cache roots. Never resolve or clear the production profile.
 from __future__ import annotations
 
 import errno
+import json
 import os
 import shutil
 import time
+import urllib.error
 from pathlib import Path
 from typing import Any
 
 from native_build import QA_APP_ID
-from tauri_webdriver import native_isolation_env
+from tauri_webdriver import WebDriverError, native_isolation_env
 
 LOCAL_STORAGE_KEYS = [
     "taomni.welcome.directoryUsage.v1",
@@ -101,7 +103,7 @@ def _reset_browser(ctx: Any) -> None:
         pass
 
 
-def _reset_native(ctx: Any) -> None:
+def _native_profile_targets(ctx: Any) -> list[Path]:
     report_root = getattr(ctx, "report_root", None)
     if report_root is None:
         raise RuntimeError("reset_db requires a native run directory; refusing profile cleanup")
@@ -112,8 +114,51 @@ def _reset_native(ctx: Any) -> None:
     # Validate every target before deleting any; rmtree does not follow child symlinks.
     if any(target.resolve() != target for target in targets):
         raise RuntimeError("reset_db refuses symlinked QA profile paths")
+    return targets
+
+
+def _reset_native(ctx: Any) -> None:
+    targets = _native_profile_targets(ctx)
     for target in targets:
         _remove_native_profile(target)
+
+
+def reset_native_renderer(ctx: Any, session: Any, timeout_sec: float = 20.0) -> None:
+    """Reset macOS WKWebView state once before this case's steps.
+
+    WKWebView's persistent website data store can outlive the run-owned app
+    directories. Clear the same explicit keys/prefixes as browser reset_db in
+    the verified QA session, then reload to reinitialize renderer singletons.
+    Later reloads in the case must retain state for persistence assertions.
+    """
+    _native_profile_targets(ctx)
+    session.execute(
+        "const keys = " + json.dumps(LOCAL_STORAGE_KEYS) + ";"
+        "const prefixes = " + json.dumps(LOCAL_STORAGE_PREFIXES) + ";"
+        "for (const key of keys) localStorage.removeItem(key);"
+        "for (let i = localStorage.length - 1; i >= 0; i--) {"
+        " const key = localStorage.key(i);"
+        " if (key && prefixes.some(prefix => key.startsWith(prefix))) localStorage.removeItem(key);"
+        "}"
+        "window.__QA_UI_AUTO_RESET_PENDING__ = true;"
+        "window.setTimeout(() => window.location.reload(), 0); return true;"
+    )
+    end = time.monotonic() + timeout_sec
+    last_error = "new document is not mounted"
+    while time.monotonic() < end:
+        try:
+            ready = session.execute(
+                "return window.__QA_UI_AUTO_RESET_PENDING__ !== true && "
+                "document.readyState === 'complete' && !!document.querySelector('#root > *');"
+            )
+        except (WebDriverError, urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+            last_error = str(exc)
+        else:
+            if ready is True:
+                session.install_console_hook()
+                return
+        time.sleep(max(0.0, min(0.1, end - time.monotonic())))
+    raise WebDriverError(f"reset_db renderer reload did not complete within {timeout_sec:.1f}s: {last_error}")
 
 
 def _remove_native_profile(target: Path, timeout_sec: float = 10.0) -> None:

@@ -59,13 +59,13 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: ${cfg.sftp.remote_test_dir}
+    equals: ${fixture.sftp_sync_test_dir}
 - screenshot: 008-attached-sftp-browser.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH 会话附属 SFTP 显示双栏及传输队列；导航和刷新后路径精确等于目标目录。
+    requirement: SSH 会话附属 SFTP 显示双栏及传输队列；导航和刷新后路径精确等于目标目录的 SFTP 规范路径（Windows OpenSSH 使用 /C:/ 形式）。
     actions:
     - 1
     - 2
@@ -102,7 +102,7 @@ verification:
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 25
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${cfg.sftp.remote_test_dir}"}}'
+        "equals": "${fixture.sftp_sync_test_dir}"}}'
     results:
     - 25
   visual:

@@ -527,6 +527,38 @@ describe("FileBrowser → FilePanel toolbar wiring", () => {
     expect(onOpenTerminalHere).toHaveBeenCalledWith("/work");
   });
 
+  it.each([
+    ["/C:/Users/qa", "/C:/work/it's a folder", "C:/work/it's a folder"],
+    ["/C:/Users/qa", "/D:/projects/example", "D:/projects/example"],
+    ["/C:/Users/qa", "/C:", "C:/"],
+    ["/C:/Users/qa", "C:/projects/example", "C:/projects/example"],
+    ["/home/qa", "/C:/projects/example", "/C:/projects/example"],
+  ])("opens SFTP directory %s / %s in the associated shell as %s", async (homeDir, path, expected) => {
+    const user = userEvent.setup();
+    seedSession({ path });
+    useSftpStore.setState((state) => ({
+      sessions: {
+        ...state.sessions,
+        [SESSION_ID]: { ...state.sessions[SESSION_ID], homeDir },
+      },
+    }));
+    const onOpenTerminalHere = vi.fn();
+    render(
+      <FileBrowser
+        sessionId={SESSION_ID}
+        host="example.com"
+        port={22}
+        username="user"
+        authMethod="password"
+        authData={null}
+        onOpenTerminalHere={onOpenTerminalHere}
+      />,
+    );
+    const remotePanel = screen.getByText("REMOTE").closest("div.h-full") as HTMLElement;
+    await user.click(within(remotePanel).getByTestId("sftp-remote-open-terminal-here"));
+    expect(onOpenTerminalHere).toHaveBeenCalledWith(expected);
+  });
+
   it("does not auto-sync the remote pane from a terminal cwd hint on open", () => {
     seedSession();
     render(

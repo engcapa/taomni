@@ -2541,7 +2541,10 @@ fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
             color_depth,
             codecs,
         }),
-        client_build: 0,
+        // Use FreeRDP's interoperability build. xrdp 0.9 treats builds <= 419
+        // as legacy clients and omits resize reactivation even after accepting
+        // Display Control, leaving the decoder at the original desktop size.
+        client_build: 18_363,
         client_name: "taomni".to_owned(),
         client_dir: "C:\\Windows\\System32\\mstscax.dll".to_owned(),
         platform: platform_type(),

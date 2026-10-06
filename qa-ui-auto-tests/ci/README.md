@@ -6,6 +6,11 @@ or release dependency. Default runners are Ubuntu 24.04 x64, Windows 2025 x64
 and macOS 15 ARM64. Each can run browser and native cases. Linux native supports
 the optional desktop profiles below; release builds and packaging are unchanged.
 
+macOS audio provisioning retains the Background Music HAL loopback device but
+stops the package's desktop controller. Its microphone consent dialog otherwise
+occludes screenshot targets and intercepts OS input. Provisioning checks that
+the HAL output remains available; the audio playback case verifies actual sound.
+
 ## Trigger and select
 
 After the workflow is on the default branch, use **Actions → QA UI Auto Platforms
@@ -122,6 +127,11 @@ release workflow's existing independent recipe is not changed.
 Audio cases use Jammy's `pipewire-audio-client-libraries` package for the ALSA
 plugin and enable its shipped default ALSA route to the fixture's PipeWire null
 sink; later Ubuntu profiles use the separate `pipewire-alsa` package.
+For X11 audio cases, desktop preflight starts a job-owned PipeWire/WirePlumber/
+Pulse server in a private runtime directory before the native driver starts.
+The driver, application and host-tone probe inherit that same environment;
+daemon logs and readiness are retained under the desktop report. The case
+fixture owns the null sink, and desktop teardown stops the session daemons.
 
 The VNC desktop binds loopback, uses a disposable VNCAuth password outside
 uploaded reports, and authenticates an actual RFB handshake before launch.
@@ -215,6 +225,10 @@ and debugging still require the actual native cases; preparation alone is not
 product coverage.
 
 Default Linux native uses Xvfb, Openbox, DBus and, when required, fcitx5/wbpy.
+IME preparation waits for the job-owned daemon to acquire its DBus name before
+opening a GTK input context. Preparation and native key injection observe the
+current engine through the DBus controller API, which also works with Jammy's
+fcitx5 5.0.14 (its `fcitx5-remote` has no `-n` option).
 X11 profiles probe Python/Tk and XTEST in their session; additional Linux
 profiles are described above. Windows requires a nonzero interactive
 session and an input desktop. macOS requires an Aqua session and uses

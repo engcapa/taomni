@@ -1567,6 +1567,48 @@ describe("TerminalPanel focus behavior", () => {
     }
   });
 
+  it("refreshes search highlights after reflow without replacing a manual selection or advancing the match", async () => {
+    render(<TerminalPanel visible />);
+    await waitFor(() => expect(terminalMocks.focus).toHaveBeenCalled());
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    let lines = ["prompt marker", "", "marker"];
+    term.buffer.active.length = lines.length;
+    term.buffer.active.getLine.mockImplementation((row: number) => ({
+      length: lines[row]?.length ?? 0,
+      getCell: (column: number) => ({ getChars: () => lines[row]?.[column] ?? "", getWidth: () => 1 }),
+    }));
+    const terminalScreen = screen.getByTestId("terminal-pane").querySelector(".xterm-screen")!;
+    vi.spyOn(terminalScreen, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, right: 800, bottom: 240, width: 800, height: 240,
+      x: 0, y: 0, toJSON: () => ({}),
+    });
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(screen.getByTestId("context-menu-item-find"));
+    const input = await screen.findByPlaceholderText("Find");
+    fireEvent.change(input, { target: { value: "marker" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByText("Match 2/2")).toBeInTheDocument();
+    const activeHit = () => screen.getByTestId("terminal-pane").querySelector(".terminal-search-hit-active");
+    expect(activeHit()).toHaveStyle({ top: "20px" });
+    fireEvent.mouseDown(terminalScreen, { button: 0 });
+    term.select.mockClear();
+    term.clearSelection.mockClear();
+
+    // A prompt gaining a wrapped row moves the output match in the buffer.
+    lines = ["prompt", "marker", "", "marker"];
+    term.buffer.active.length = lines.length;
+    act(() => terminalMocks.state.onResizeHandler?.({ cols: 60, rows: 24 }));
+
+    expect(activeHit()).toHaveStyle({ top: "30px" });
+    expect(screen.getByText("Match 2/2")).toBeInTheDocument();
+    expect(term.select).not.toHaveBeenCalled();
+    expect(term.clearSelection).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Prev" }));
+    expect(screen.getByText("Match 1/2")).toBeInTheDocument();
+    expect(term.select).toHaveBeenCalledWith(0, 1, 6);
+  });
+
   it("keeps a block selection alive when pressing the floating selection toolbar", async () => {
     const onSessionReady = vi.fn();
     render(<TerminalPanel visible onSessionReady={onSessionReady} />);
