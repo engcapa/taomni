@@ -547,7 +547,14 @@ class XrdpFixtureTest(unittest.TestCase):
             for pid in json.loads(pid_file.read_text()):
                 status = Path(f"/proc/{pid}/status")
                 if status.exists():
-                    self.assertRegex(status.read_text(), r"State:\s+Z", "an owned descendant is still alive")
+                    try:
+                        state = status.read_text()
+                    except (FileNotFoundError, ProcessLookupError):
+                        # Reaping between exists() and read_text() is the
+                        # strongest possible cleanup result; procfs is a
+                        # moving target while the owned process exits.
+                        continue
+                    self.assertRegex(state, r"State:\s+Z", "an owned descendant is still alive")
 
     def test_ci_xrdp_install_never_checks_docker(self):
         from ci_services import install
