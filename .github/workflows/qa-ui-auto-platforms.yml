@@ -258,6 +258,30 @@ jobs:
       - name: Virtual audio output
         if: runner.os != 'Linux' && contains(matrix.capabilities, 'audio')
         uses: LABSN/sound-ci-helpers@d08c889a7bba7d9b1b059f8f76dac4672ea3a9cf # v1.0.4
+      - name: Keep macOS virtual audio without its desktop controller
+        if: runner.os == 'macOS' && contains(matrix.capabilities, 'audio')
+        run: |
+          # The package installer opens the controller, whose microphone
+          # consent dialog otherwise covers screenshot fixtures and steals
+          # OS input. The HAL loopback driver works independently of this UI.
+          bgm_executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' '/Applications/Background Music.app/Contents/Info.plist')
+          /usr/bin/pkill -TERM -x "$bgm_executable" || [[ $? -eq 1 ]]
+          for attempt in {1..25}; do
+            /usr/bin/pgrep -x "$bgm_executable" >/dev/null || break
+            sleep 0.2
+          done
+          if /usr/bin/pgrep -x "$bgm_executable" >/dev/null; then
+            echo 'Background Music desktop controller did not exit' >&2
+            exit 1
+          fi
+          python - <<'PY'
+          from qa_ui_auto.fixtures.rdp_audio_required import _CoreAudio
+          audio = _CoreAudio()
+          outputs = [audio.name(device) for device in audio.devices() if audio.has_output(device)]
+          if not any('Background Music' in name for name in outputs):
+              raise SystemExit('Background Music HAL output unavailable after controller exit')
+          print('HAL outputs after controller exit:', outputs)
+          PY
       - name: macOS build dependencies
         if: runner.os == 'macOS' && matrix.mode == 'native'
         run: |
