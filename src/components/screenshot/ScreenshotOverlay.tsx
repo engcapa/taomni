@@ -16,6 +16,8 @@ import {
   Maximize,
   MessageCircle,
   MousePointer2,
+  MoreHorizontal,
+  SlidersHorizontal,
   Minus,
   Pencil,
   Pin,
@@ -35,6 +37,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { listSystemFonts } from "../../lib/ipc";
 import { ScrollCaptureResult } from "./ScrollCaptureResult";
+import { ImageEditPanel } from "./ImageEditPanel";
+import { drawEdited, editedSize, paintWatermark, type ImageEdit, type WatermarkSettings } from "../../lib/screenshotImage";
 import { useT } from "../../lib/i18n";
 import { formatUnknownError } from "../../lib/appDialogs";
 import {
@@ -46,11 +50,14 @@ import {
   loadScreenshotUrl,
   normalizeRect,
   ocrImage,
+  openImageEditor,
   pinToScreen,
   revokeScreenshotUrl,
   saveDataUrl,
   saveImageToFile,
   scrollCapture,
+  scrollPlan,
+  type PhysicalRect,
   startRecording,
   toPhysicalRect,
   updateOverlayImage,
@@ -64,6 +71,8 @@ import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/s
 import {
   AnnotationCanvas,
   FONT_STACK,
+  FILLABLE_TOOLS,
+  type EraserMode,
   type AnnotationCanvasHandle,
   type AnnotationTool,
   type CssRect,
@@ -71,6 +80,10 @@ import {
 } from "./AnnotationCanvas";
 
 type Phase = "loading" | "select" | "annotate" | "busy" | "preview";
+interface ImageSnapshot {
+  img: HTMLImageElement; url: string; selection: CssRect | null; contour: ScreenshotPoint[] | null;
+  result: { frames: number; w: number; h: number } | null; shapes: Shape[];
+}
 
 /** Selections smaller than this (CSS px) are treated as a click. */
 const MIN_SEL = 6;
@@ -143,13 +156,9 @@ function cropDataUrl(dataUrl: string, r: { x: number; y: number; width: number; 
   });
 }
 
-export interface WatermarkSettings {
-  text: string;
-  opacity: number;
-  color: string;
-}
+export type { WatermarkSettings } from "../../lib/screenshotImage";
 
-/** Overlay a text watermark at the bottom-right corner. */
+/** Apply the same seeded, scattered watermark layout to every export. */
 function applyWatermark(dataUrl: string, wm: WatermarkSettings): Promise<string> {
   return loadImage(dataUrl).then((image) => {
     const c = document.createElement("canvas");
@@ -158,17 +167,7 @@ function applyWatermark(dataUrl: string, wm: WatermarkSettings): Promise<string>
     const ctx = c.getContext("2d");
     if (!ctx) throw new Error("canvas 2d context unavailable");
     ctx.drawImage(image, 0, 0);
-    const fontSize = Math.max(14, Math.round(Math.min(c.width, c.height * 2) / 30));
-    ctx.font = `600 ${fontSize}px Inter, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`;
-    ctx.globalAlpha = wm.opacity;
-    ctx.fillStyle = wm.color;
-    ctx.textAlign = "right";
-    ctx.textBaseline = "bottom";
-    const pad = Math.round(fontSize * 0.8);
-    // Subtle shadow for readability on any background.
-    ctx.shadowColor = "rgba(0,0,0,0.5)";
-    ctx.shadowBlur = Math.round(fontSize / 4);
-    ctx.fillText(wm.text, c.width - pad, c.height - pad);
+    paintWatermark(ctx, c.width, c.height, wm);
     return c.toDataURL("image/png");
   });
 }
@@ -341,6 +340,18 @@ export function ScreenshotOverlay() {
   const [colorDraft, setColorDraft] = useState(COLORS[0].value);
   useEffect(() => setColorDraft(color), [color]);
   const [lineWidth, setLineWidth] = useState(4);
+  const [fill, setFill] = useState(false);
+  const [fillableSelected, setFillableSelected] = useState(false);
+  const [eraserMode, setEraserMode] = useState<EraserMode>("partial");
+  const [drawing, setDrawing] = useState(false);
+  // Keep the tool family together by default; the panel wraps/scrolls instead
+  // of moving actions into different popover locations. The button remains as
+  // an explicit compact-mode hook for small screens.
+  const [moreOpen, setMoreOpen] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const [imageUndo, setImageUndo] = useState<ImageSnapshot[]>([]);
+  const [imageRedo, setImageRedo] = useState<ImageSnapshot[]>([]);
   const [fontFamily, setFontFamily] = useState(FONT_STACK);
   const [fontSize, setFontSize] = useState(18);
   const [systemFonts, setSystemFonts] = useState<string[]>([]);
@@ -351,9 +362,15 @@ export function ScreenshotOverlay() {
   const [annotationSelected, setAnnotationSelected] = useState(false);
   const [scrollConfirm, setScrollConfirm] = useState(false);
   const [scrollMode, setScrollMode] = useState<ScrollMode>("auto");
+  const [plannedRegion, setPlannedRegion] = useState<PhysicalRect | null>(null);
+  const [planningScroll, setPlanningScroll] = useState(false);
   const onAnnotationSelection = useCallback((shape: Shape | null) => {
     setAnnotationSelected(!!shape);
     setTextSelected(shape?.kind === "text");
+    const fillable = !!shape && FILLABLE_TOOLS.includes(shape.kind);
+    setFillableSelected(fillable);
+    if (fillable && shape && "filled" in shape) setFill(!!shape.filled);
+    else if (fillable) setFill(false);
     if (shape?.kind === "text") { setFontFamily(shape.fontFamily ?? FONT_STACK); setFontSize(shape.fontSize); }
     if (shape) { setColor(shape.color); setLineWidth(shape.lineWidth); }
   }, []);
@@ -369,13 +386,20 @@ export function ScreenshotOverlay() {
   const [watermarkOpen, setWatermarkOpen] = useState(false);
   const [watermark, setWatermark] = useState<WatermarkSettings | null>(null);
   const [watermarkText, setWatermarkText] = useState("");
-  const [watermarkOpacity, setWatermarkOpacity] = useState(0.5);
+  const [watermarkOpacity, setWatermarkOpacity] = useState(0.16);
   const [watermarkColor, setWatermarkColor] = useState("#ffffff");
   const [ocrOpen, setOcrOpen] = useState(false);
   const [ocrText, setOcrText] = useState("");
   const [ocrLoading, setOcrLoading] = useState(false);
   const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(null);
   const canvasRef = useRef<AnnotationCanvasHandle | null>(null);
+  const pendingShapes = useRef<Shape[] | null>(null);
+  useLayoutEffect(() => {
+    if (pendingShapes.current && canvasRef.current) {
+      canvasRef.current.restore(pendingShapes.current);
+      pendingShapes.current = null;
+    }
+  });
   const recordMenuRef = useRef<HTMLDivElement | null>(null);
   const recordButtonRef = useRef<HTMLDivElement | null>(null);
   const [recordPos, setRecordPos] = useState({ left: 8, top: 8 });
@@ -421,7 +445,11 @@ export function ScreenshotOverlay() {
     },
     [],
   );
-  useEffect(() => () => revokeScreenshotUrl(imgUrl), [imgUrl]);
+  // Image undo keeps previous backgrounds alive. Revoke all owned URLs only
+  // on unmount, not when selecting the next edit snapshot.
+  const ownedUrls = useRef(new Set<string>());
+  useEffect(() => { if (imgUrl) ownedUrls.current.add(imgUrl); }, [imgUrl]);
+  useEffect(() => () => { ownedUrls.current.forEach(revokeScreenshotUrl); }, []);
 
   const close = useCallback(() => {
     void closeScreenshotOverlay().catch(() => undefined);
@@ -448,7 +476,10 @@ export function ScreenshotOverlay() {
       setInit(data);
       setImg(loaded.img);
       setImgUrl(loaded.url);
-      if (data.windowRegion) {
+      if (data.document) {
+        const size = { w: loaded.img.naturalWidth, h: loaded.img.naturalHeight };
+        setScrollResult({ frames: 0, ...size }); setSel({ x: 0, y: 0, ...size }); setTool("move"); setPhase("preview");
+      } else if (data.windowRegion) {
         const s = data.windowRegion;
         setSel({ x: s.x * window.innerWidth / data.width, y: s.y * window.innerHeight / data.height,
           w: s.width * window.innerWidth / data.width, h: s.height * window.innerHeight / data.height });
@@ -653,12 +684,12 @@ export function ScreenshotOverlay() {
   // ---------------------------------------------------------------------
 
   /** Composite base + annotations at natural size, cropped to the selection. */
-  const exportCropped = async (): Promise<string> => {
+  const exportCropped = async (includeWatermark = true): Promise<string> => {
     const canvas = canvasRef.current;
     if (!canvas || !img) throw new Error("screenshot not ready");
     const full = canvas.exportDataUrl(img, sx, sy);
     let out = sel ? await cropDataUrl(full, toPhysical(sel)) : full;
-    if (watermark && watermark.text.trim()) out = await applyWatermark(out, watermark);
+    if (includeWatermark && watermark && watermark.text.trim()) out = await applyWatermark(out, watermark);
     if (contour && sel) {
       const image = await loadImage(out);
       const c = document.createElement("canvas");
@@ -683,6 +714,61 @@ export function ScreenshotOverlay() {
       busyRef.current = false;
     }
   };
+
+  const imageSnapshot = (): ImageSnapshot | null => img && imgUrl ? {
+    img, url: imgUrl, selection: sel, contour, result: scrollResult, shapes: canvasRef.current?.snapshot() ?? [],
+  } : null;
+
+  const restoreImage = (snapshot: ImageSnapshot) => {
+    setImg(snapshot.img); setImgUrl(snapshot.url); setSel(snapshot.selection); setContour(snapshot.contour);
+    setScrollResult(snapshot.result); setPhase(snapshot.result ? "preview" : "annotate");
+    setTool("move"); pendingShapes.current = snapshot.shapes;
+  };
+  const undoImage = () => {
+    const current = imageSnapshot(), previous = imageUndo.at(-1);
+    if (!current || !previous || editBusy) return;
+    setImageRedo((list) => [...list, current]); setImageUndo((list) => list.slice(0, -1)); restoreImage(previous);
+  };
+  const redoImage = () => {
+    const current = imageSnapshot(), next = imageRedo.at(-1);
+    if (!current || !next || editBusy) return;
+    setImageUndo((list) => [...list, current]); setImageRedo((list) => list.slice(0, -1)); restoreImage(next);
+  };
+  const editImage = (edit: ImageEdit) => runBusy(async () => {
+    const before = imageSnapshot();
+    if (!before) return;
+    setEditBusy(true);
+    try {
+      const image = await loadImage(await exportCropped(false));
+      const size = editedSize(image.naturalWidth, image.naturalHeight, edit);
+      const canvas = document.createElement("canvas"); canvas.width = size.width; canvas.height = size.height;
+      const ctx = canvas.getContext("2d"); if (!ctx) throw new Error("canvas unavailable");
+      drawEdited(ctx, image, image.naturalWidth, image.naturalHeight, edit);
+      const url = canvas.toDataURL("image/png");
+      const loaded = await loadImage(url);
+      setImageUndo((list) => [...list.slice(-7), before]); setImageRedo([]);
+      // Edits bake annotations into a new background. Image undo retains the
+      // original vector shapes; restore them after switching canvas hosts.
+      setImg(loaded); setImgUrl(url); setScrollResult({ frames: scrollResult?.frames ?? 0, w: size.width, h: size.height });
+      setSel({ x: 0, y: 0, w: size.width, h: size.height }); setContour(null);
+      canvasRef.current?.clear(); setTool("move"); setPhase("preview");
+    } catch (e) { showToast(formatUnknownError(e)); }
+    finally { setEditBusy(false); }
+  });
+  const externalEdit = (choose: boolean) => runBusy(async () => {
+    try {
+      let editor: string | undefined;
+      if (choose) {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({ title: t("screenshot.chooseEditor"), multiple: false, directory: false });
+        if (typeof selected !== "string") return;
+        editor = selected;
+      }
+      const file = await saveDataUrl(await exportCropped());
+      await openImageEditor(file.path, editor);
+      await closeScreenshotOverlay();
+    } catch (e) { showToast(formatUnknownError(e)); }
+  });
 
   const handleCopy = () =>
     runBusy(async () => {
@@ -773,16 +859,24 @@ export function ScreenshotOverlay() {
       }
     });
 
+  const confirmScroll = async () => {
+    if (!sel || !init) return;
+    setScrollConfirm(true); setRecordOpen(false); setPlanningScroll(true); setPlannedRegion(null); setScrollError(null);
+    try { setPlannedRegion(await scrollPlan(init.displayId || undefined, toPhysical(sel))); }
+    catch (e) { setScrollError(formatUnknownError(e)); setScrollConfirm(false); }
+    finally { setPlanningScroll(false); }
+  };
+
   const handleScrollCapture = () =>
     runBusy(async () => {
-      if (!init || !img || !sel || contour) return;
+      if (!init || !img || !sel || contour || !plannedRegion) return;
       setPhase("busy");
       setScrollError(null);
       setRecordOpen(false);
       setScrollConfirm(false);
       try {
         // The backend hides this window while it scrolls, then shows it.
-        const res = await scrollCapture(init.displayId || undefined, toPhysical(sel), scrollMode);
+        const res = await scrollCapture(init.displayId || undefined, plannedRegion, scrollMode);
         const loaded = await loadArtifact(res.path);
         await updateOverlayImage(res).catch(() => undefined);
         canvasRef.current?.clear();
@@ -828,18 +922,21 @@ export function ScreenshotOverlay() {
       if (e.key === "Escape") {
         e.preventDefault();
         if (scrollError) close();
+        else if (editOpen) setEditOpen(false);
         else if (scrollConfirm) setScrollConfirm(false);
         else if (recordOpen) setRecordOpen(false);
         else if (watermarkOpen) setWatermarkOpen(false);
         else if (ocrOpen) setOcrOpen(false);
         else if (pickerMode) exitPickerMode();
+        else if (scrollResult) close();
+        else if (moreOpen && phase === "annotate" && tool === "select" && canvasRef.current?.shapeCount() === 0) setMoreOpen(false);
         else if (phase === "annotate" && tool !== "select" && canvasRef.current?.shapeCount() === 0) setTool("select");
         else if (scrollResult) close();
         else if (phase === "annotate") resetSelection();
         else close();
         return;
       }
-      if (typing || (phase !== "annotate" && phase !== "preview")) return;
+      if (typing || editOpen || editBusy || (phase !== "annotate" && phase !== "preview")) return;
       if ((e.key === "Delete" || e.key === "Backspace") && tool === "move") {
         if (canvasRef.current?.deleteSelected()) e.preventDefault();
         return;
@@ -884,11 +981,11 @@ export function ScreenshotOverlay() {
     if (scrollResult) top = viewport.h - h - 12;
     else if (sel.y + sel.h + gap + h <= viewport.h - 4) top = sel.y + sel.h + gap;
     else if (sel.y - gap - h >= 4) top = sel.y - gap - h;
-    else top = Math.max(4, sel.y + sel.h - h - gap);
+    else top = Math.max(8, viewport.h - h - 12);
     top = Math.min(Math.max(4, top), Math.max(4, viewport.h - h - 4));
     const left = Math.min(Math.max(4, sel.x + sel.w - w), Math.max(4, viewport.w - w - 4));
     setToolbarPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }));
-  }, [sel, phase, dragging, viewport.w, viewport.h, ocrOpen, tool, textSelected, scrollResult]);
+  }, [sel, phase, dragging, viewport.w, viewport.h, ocrOpen, tool, textSelected, scrollResult, moreOpen, fillableSelected]);
 
   useLayoutEffect(() => {
     if (!recordOpen) return;
@@ -979,6 +1076,9 @@ export function ScreenshotOverlay() {
       lineWidth={lineWidth}
       fontFamily={fontFamily}
       fontSize={fontSize}
+      fill={fill}
+      eraserMode={eraserMode}
+      onDrawingChange={setDrawing}
       textHint={t("screenshot.textHint")}
       baseImage={img}
       selection={sel}
@@ -999,11 +1099,16 @@ export function ScreenshotOverlay() {
     <div
       ref={toolbarRef}
       data-testid="screenshot-toolbar"
+      data-drawing={drawing}
       className={scrollResult ? "relative z-50 shrink-0 px-4 py-2" : "fixed z-50"}
-      style={scrollResult ? panelStyle : {
+      style={scrollResult ? { ...panelStyle, maxHeight: "40vh", overflowY: "auto" } : {
         left: toolbarPos?.left ?? -9999,
         top: toolbarPos?.top ?? -9999,
-        maxWidth: viewport.w - 8,
+        width: Math.min(760, viewport.w - 16),
+        maxHeight: viewport.h - 16,
+        overflowY: "auto",
+        opacity: drawing ? 0.15 : 1,
+        pointerEvents: drawing ? "none" : "auto",
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -1045,7 +1150,14 @@ export function ScreenshotOverlay() {
             <Icon size={16} />
           </ToolButton>
         ))}
-        <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
+        {(FILLABLE_TOOLS.includes(tool) || fillableSelected) && <button type="button" data-testid="screenshot-fill" aria-pressed={fill}
+          title={t("screenshot.solidFill")} className="rounded px-2 h-8 text-[12px]" onClick={() => { setFill(!fill); if (fillableSelected) canvasRef.current?.updateSelectedStyle({ filled: !fill }); }}>
+          {t(fill ? "screenshot.solidFill" : "screenshot.outlineFill")}
+        </button>}
+        {tool === "eraser" && <select data-testid="screenshot-eraser-mode" aria-label={t("screenshot.toolEraser")} className="taomni-input h-8 text-[12px]" value={eraserMode} onChange={(e) => setEraserMode(e.target.value as EraserMode)}>
+          <option value="partial">{t("screenshot.erasePartial")}</option><option value="object">{t("screenshot.eraseObject")}</option>
+        </select>}
+        <div className="basis-full h-px my-1" style={{ background: "var(--taomni-divider)" }} />
         {COLORS.map((c) => (
           <button
             key={c.value}
@@ -1096,9 +1208,14 @@ export function ScreenshotOverlay() {
           <Trash2 size={16} />
         </ToolButton>
         <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-        {!scrollResult && <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour || !!scrollResult} onClick={() => { setRecordOpen(false); setScrollConfirm(true); }}>
+        {!scrollResult && <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour || !!scrollResult} onClick={() => void confirmScroll()}>
           <ScrollText size={16} />
         </ToolButton>}
+        {!scrollResult && <ToolButton testid="screenshot-recrop" title={t("screenshot.recrop")} active={tool === "select"} onClick={() => setTool("select")}><Crop size={16} /></ToolButton>}
+        <ToolButton testid="screenshot-pin" title={t("screenshot.pinDescription")} onClick={() => void handlePin()}><Pin size={16} /></ToolButton>
+        <ToolButton testid="screenshot-edit" title={t("screenshot.editImage")} onClick={() => setEditOpen(true)}><SlidersHorizontal size={16} /></ToolButton>
+        <ToolButton testid="screenshot-more" title={t("screenshot.moreTools")} active={moreOpen} onClick={() => setMoreOpen(!moreOpen)}><MoreHorizontal size={16} /></ToolButton>
+        <div data-testid="screenshot-more-tools" className="flex flex-wrap items-center gap-0.5 basis-full" style={{ display: moreOpen ? "flex" : "none" }}>
         <ToolButton
           testid="screenshot-color-picker"
           title={t("screenshot.colorPicker")}
@@ -1106,12 +1223,6 @@ export function ScreenshotOverlay() {
           onClick={() => (pickerMode ? exitPickerMode() : enterPickerMode())}
         >
           <Pipette size={16} />
-        </ToolButton>
-        {!scrollResult && <ToolButton testid="screenshot-recrop" title={t("screenshot.recrop")} active={tool === "select"} onClick={() => setTool("select")}>
-          <Crop size={16} />
-        </ToolButton>}
-        <ToolButton testid="screenshot-pin" title={t("screenshot.pinDescription")} onClick={() => void handlePin()}>
-          <Pin size={16} />
         </ToolButton>
         <ToolButton testid="screenshot-ocr" title={t("screenshot.ocr")} onClick={() => void handleOcr()}>
           <ScanText size={16} />
@@ -1142,6 +1253,7 @@ export function ScreenshotOverlay() {
                 type="text"
                 data-testid="screenshot-watermark-text"
                 value={watermarkText}
+                maxLength={120}
                 onChange={(e) => setWatermarkText(e.target.value)}
                 placeholder={t("screenshot.watermarkPlaceholder")}
                 aria-label={t("screenshot.watermarkPlaceholder")}
@@ -1183,7 +1295,7 @@ export function ScreenshotOverlay() {
                   data-testid="screenshot-watermark-apply"
                   onClick={() => {
                     if (watermarkText.trim()) {
-                      setWatermark({ text: watermarkText.trim(), opacity: watermarkOpacity, color: watermarkColor });
+                      setWatermark({ text: watermarkText.trim(), opacity: watermarkOpacity, color: watermarkColor, seed: watermark?.seed ?? crypto.getRandomValues(new Uint32Array(1))[0] });
                     }
                     setWatermarkOpen(false);
                   }}
@@ -1252,6 +1364,7 @@ export function ScreenshotOverlay() {
             </div>
           )}
         </div>}
+        </div>
         <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
         {!scrollResult && <><ToolButton testid="screenshot-cancel" title={`${t("screenshot.cancel")} (Esc)`} onClick={close}>
           <X size={16} />
@@ -1412,10 +1525,11 @@ export function ScreenshotOverlay() {
             </label>)}
           </fieldset>
           <p data-testid="screenshot-scroll-mode-description" className="mb-3">{t(scrollMode === "auto" ? "screenshot.scrollRunningHint" : "screenshot.scrollManualHint")}</p>
+          {plannedRegion && physSel && plannedRegion.height !== physSel.height && <p data-testid="screenshot-scroll-adjusted" className="mb-3 text-amber-600">{t("screenshot.scrollAdjusted", { width: plannedRegion.width, height: plannedRegion.height })}</p>}
           <p data-testid="screenshot-scroll-instructions" className="mb-4">{t("screenshot.scrollInstructions", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
           <div className="flex justify-end gap-2">
             <button data-testid="screenshot-scroll-confirm-cancel" type="button" className="px-3 py-2 rounded-lg" onClick={() => setScrollConfirm(false)}>{t("screenshot.cancel")}</button>
-            <button data-testid="screenshot-scroll-start" type="button" className="px-3 py-2 rounded-lg" style={{ background: "var(--taomni-accent)", color: "#fff" }} onClick={() => void handleScrollCapture()}>{t("screenshot.scrollStart")}</button>
+            <button data-testid="screenshot-scroll-start" disabled={planningScroll || !plannedRegion} type="button" className="px-3 py-2 rounded-lg" style={{ background: "var(--taomni-accent)", color: "#fff" }} onClick={() => void handleScrollCapture()}>{t("screenshot.scrollStart")}</button>
           </div>
         </div>
       </div>}
@@ -1454,6 +1568,11 @@ export function ScreenshotOverlay() {
           </button>
         </div>
       )}
+
+      {editOpen && img && <ImageEditPanel key={`${img.naturalWidth}x${img.naturalHeight}:${imageUndo.length}:${imageRedo.length}`}
+        width={physSel?.width ?? img.naturalWidth} height={physSel?.height ?? img.naturalHeight} busy={editBusy}
+        canUndo={imageUndo.length > 0} canRedo={imageRedo.length > 0} onApply={(edit) => void editImage(edit)}
+        onUndo={undoImage} onRedo={redoImage} onExternal={(choose) => void externalEdit(choose)} onClose={() => setEditOpen(false)} />}
 
       {/* Color picker layer (above the canvas, below the toolbar). */}
       {pickerMode && (

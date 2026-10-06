@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   closePin: vi.fn(), closeWindow: vi.fn(), startDragging: vi.fn(),
   copy: vi.fn(), save: vi.fn(), choosePath: vi.fn(), addFavorite: vi.fn(), removeFavorite: vi.fn(),
   setSize: vi.fn(), setResizable: vi.fn(), innerSize: vi.fn(), scaleFactor: vi.fn(),
-  setPinCompact: vi.fn(),
+  setPinCompact: vi.fn(), setPinNote: vi.fn(), listPins: vi.fn(), arrangePins: vi.fn(), pinsBatch: vi.fn(), focusPin: vi.fn(), openPinEditor: vi.fn(), openImageEditor: vi.fn(),
   translate: (key: string) => key,
 }));
 vi.mock("../../lib/i18n", () => ({ useT: () => mocks.translate }));
@@ -16,9 +16,13 @@ vi.mock("../../lib/screenshot", () => ({
   revokeScreenshotUrl: mocks.revokeScreenshotUrl, closePin: mocks.closePin,
   copyImageToClipboard: mocks.copy, saveImageToFile: mocks.save,
   addScreenshotFavorite: mocks.addFavorite, removeScreenshotFavorite: mocks.removeFavorite,
-  setPinCompact: mocks.setPinCompact,
+  setPinCompact: mocks.setPinCompact, setPinNote: mocks.setPinNote, listPins: mocks.listPins,
+  arrangePins: mocks.arrangePins, pinsBatch: mocks.pinsBatch, focusPin: mocks.focusPin,
+  openPinEditor: mocks.openPinEditor, openImageEditor: mocks.openImageEditor,
+  PIN_ACTION_EVENT: "screenshot://pin-action", PINS_CHANGED_EVENT: "screenshot://pins-changed",
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: mocks.choosePath }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => undefined) }));
 vi.mock("@tauri-apps/api/window", () => ({
   LogicalSize: class { constructor(public width: number, public height: number) {} },
   getCurrentWindow: () => ({ label: "screenshot-pin-unit", close: mocks.closeWindow, startDragging: mocks.startDragging,
@@ -40,6 +44,10 @@ beforeEach(() => {
   mocks.setSize.mockResolvedValue(undefined);
   mocks.setResizable.mockResolvedValue(undefined);
   mocks.setPinCompact.mockResolvedValue(undefined);
+  mocks.setPinNote.mockImplementation(async (note: string) => note.trim());
+  mocks.listPins.mockResolvedValue([{ label: "screenshot-pin-unit", note: "", width: 160, height: 120, order: 1 }]);
+  mocks.arrangePins.mockResolvedValue(1);
+  mocks.pinsBatch.mockResolvedValue(1);
   mocks.innerSize.mockResolvedValue({ width: 640, height: 480 });
   mocks.scaleFactor.mockResolvedValue(2);
 });

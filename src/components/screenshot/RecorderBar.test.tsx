@@ -223,7 +223,7 @@ describe("RecorderBar Stop and Cancel", () => {
     expect(screen.getByTestId("screenshot-recorder-stop")).toBeDisabled();
     expect(screen.queryByText("screenshot.recordFinishing")).not.toBeInTheDocument();
     expect(screen.getByTestId("screenshot-recorder-cancel")).toBeEnabled();
-    expect(mocks.unlisten).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mocks.unlisten).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByTestId("screenshot-recorder-stop"));
     emitEnded();
     fireEvent.click(screen.getByTestId("screenshot-recorder-cancel"));

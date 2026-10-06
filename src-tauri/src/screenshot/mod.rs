@@ -12,8 +12,14 @@
 //! [`screenshot_read_file`] and deleted when the capture session ends.
 
 pub mod capture;
+pub mod edit;
 pub mod favorites;
 pub mod ocr;
+#[cfg(target_os = "macos")]
+mod ocr_macos;
+#[cfg(target_os = "windows")]
+mod ocr_windows;
+pub mod pins;
 pub mod qa;
 mod qa_oracle;
 pub mod record;
@@ -56,6 +62,7 @@ pub struct OverlayInit {
     pub height: u32,
     pub scale_factor: f64,
     pub window_region: Option<PhysicalRegion>,
+    pub document: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -74,6 +81,9 @@ pub struct PinInit {
     pub width: u32,
     pub height: u32,
     pub favorite_id: Option<String>,
+    /// User caption shown on the pin (empty = none).
+    #[serde(default)]
+    pub note: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -86,6 +96,10 @@ pub struct ScreenshotProbe {
     /// MP4 uses the bundled H.264 encoder, so it is always available.
     pub mp4_available: bool,
     pub ocr_available: bool,
+    /// `windows`, `vision` or `tesseract`; absent when none is usable.
+    pub ocr_engine: Option<String>,
+    /// How to enable OCR on this platform when no engine is usable.
+    pub ocr_hint: Option<String>,
     pub summary: String,
 }
 
@@ -125,6 +139,7 @@ static OPENING: AtomicBool = AtomicBool::new(false);
 static STARTING_RECORDING: AtomicBool = AtomicBool::new(false);
 static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
 static PIN_COUNTER: AtomicU64 = AtomicU64::new(1);
+static NATIVE_WAYLAND: AtomicBool = AtomicBool::new(false);
 #[cfg(all(debug_assertions, target_os = "macos"))]
 static QA_WINDOW_HIDE_CALLS: AtomicU64 = AtomicU64::new(0);
 
@@ -149,6 +164,11 @@ fn internal_error(e: anyhow::Error) -> String {
 
 /// Startup: purge leftovers of earlier runs and register the hotkey.
 pub fn init(app: &AppHandle) {
+    #[cfg(target_os = "linux")]
+    {
+        use gtk::prelude::*;
+        NATIVE_WAYLAND.store(gtk::gdk::Display::default().is_some_and(|d| d.type_().name() == "GdkWaylandDisplay"), Ordering::SeqCst);
+    }
     capture::purge_stale_artifacts();
     shortcut::init(app);
 }
@@ -274,9 +294,9 @@ pub async fn screenshot_scroll_capture(
         scroll::ensure_control_permission().map_err(internal_error)?;
     }
     let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
-    let region = capture::clamp_region(display.width, display.height, (x, y, width, height));
+    let requested = capture::clamp_region(display.width, display.height, (x, y, width, height));
+    let (region, position) = scroll_layout(&app, &display, requested)?;
     let rect = surfaces::region_rect(&display, region);
-    let position = capture_control_position(&app, &display, rect)?;
     let control = Arc::new(scroll::ScrollControl::new(mode));
     {
         let mut state = tool_state();
@@ -325,6 +345,17 @@ pub async fn screenshot_scroll_capture(
 }
 
 #[tauri::command]
+pub async fn screenshot_scroll_surface() -> bool { pins::native_wayland() }
+
+#[tauri::command]
+pub async fn screenshot_scroll_plan(app: AppHandle, display_id: Option<String>, x: u32, y: u32, width: u32, height: u32) -> Result<PhysicalRegion, String> {
+    let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
+    let requested = capture::clamp_region(display.width, display.height, (x, y, width, height));
+    let (region, _) = scroll_layout(&app, &display, requested)?;
+    Ok(PhysicalRegion { x: region.0, y: region.1, width: region.2, height: region.3 })
+}
+
+#[tauri::command]
 pub async fn screenshot_scroll_status() -> Result<Option<serde_json::Value>, String> {
     Ok(tool_state().scroll.as_ref().map(|control| control.status()))
 }
@@ -346,6 +377,50 @@ pub async fn screenshot_stop_scroll_capture(cancel: bool) -> Result<(), String> 
         control.request_stop(cancel);
     }
     Ok(())
+}
+
+/// Region and control placement for a scroll capture. When the selection
+/// leaves no room for the controls outside it (full screen or nearly so), a
+/// strip at the bottom of the selection holds them and the captured region
+/// shrinks to the content above it: the controls stay visible and usable
+/// without ever appearing in the stitched image.
+fn scroll_layout(
+    app: &AppHandle,
+    display: &DisplayInfo,
+    requested: (u32, u32, u32, u32),
+) -> Result<((u32, u32, u32, u32), Option<surfaces::Rect>), String> {
+    let rect = surfaces::region_rect(display, requested);
+    if pins::native_wayland() {
+        // Fullscreen transparent controller: only the bottom strip accepts
+        // input; all other pixels are transparent and click-through.
+        let full = surfaces::region_rect(display, (0, 0, display.width, display.height));
+        let (available, bar) = surfaces::inside_control_strip(display, full, scroll::MIN_REGION_HEIGHT as i32)
+            .ok_or("display is too short for scroll capture controls")?;
+        let bottom = (rect.y + rect.h).min(available.y + available.h);
+        if bottom - rect.y < scroll::MIN_REGION_HEIGHT as i32 { return Err("Move the selection above the bottom control strip".into()); }
+        return Ok(((requested.0, requested.1, requested.2, (bottom - rect.y) as u32), Some(bar)));
+    }
+    let mut displays = capture::list_displays(app).map_err(internal_error)?;
+    displays.sort_by_key(|d| d.id != display.id);
+    if let Some(position) = surfaces::control_position(&displays, rect) {
+        return Ok((requested, Some(position)));
+    }
+    if shortcut::current_status().registered { return Ok((requested, None)); }
+    // Keep at least a few overlap bands of content for stitching.
+    let min_height = scroll::MIN_REGION_HEIGHT as i32;
+    match surfaces::inside_control_strip(display, rect, min_height) {
+        Some((captured, controls)) => Ok((
+            (
+                (captured.x - display.x) as u32,
+                (captured.y - display.y) as u32,
+                captured.w as u32,
+                captured.h as u32,
+            ),
+            Some(controls),
+        )),
+        None if shortcut::current_status().registered => Ok((requested, None)),
+        None => Err("The selection is too short to keep the scroll controls outside it. Select a taller region, or enable the system screenshot hotkey to finish a hidden-controls capture.".into()),
+    }
 }
 
 fn capture_control_position(
@@ -374,6 +449,7 @@ fn open_scroll_bar(
         WebviewUrl::App("index.html#screenshot-scroll".into()),
     )
     .title("Scroll capture")
+    .transparent(pins::native_wayland())
     .inner_size(surfaces::CONTROL_WIDTH, surfaces::CONTROL_HEIGHT)
     .visible(false)
     .decorations(false)
@@ -390,6 +466,13 @@ fn open_scroll_bar(
             control.request_stop(true);
         }
     });
+    #[cfg(target_os = "linux")]
+    if pins::native_wayland() {
+        window.set_fullscreen(true).map_err(|e| e.to_string())?;
+        window.show().map_err(|e| e.to_string())?;
+        surfaces::configure_wayland_scroll(&window)?;
+        return Ok(());
+    }
     if let Some(rect) = position {
         window
             .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
@@ -505,19 +588,20 @@ pub async fn screenshot_save_data_url(data_url: String) -> Result<ScreenshotFile
 pub async fn screenshot_probe() -> Result<ScreenshotProbe, String> {
     blocking("probe", || {
         let base = crate::servers::rdp::capture::probe()?;
-        let ocr_available = ocr::tesseract_available();
+        let engine = ocr::engine_name();
         Ok(ScreenshotProbe {
             permission: base.permission,
             control_permission: base.control_permission,
             mp4_available: true,
-            ocr_available,
+            ocr_available: engine.is_some(),
+            ocr_engine: engine.map(str::to_string),
+            ocr_hint: engine.is_none().then(|| ocr::install_hint().to_string()),
             summary: format!(
                 "{}. OCR {}.",
                 base.summary,
-                if ocr_available {
-                    "is available (tesseract found)"
-                } else {
-                    "needs tesseract installed"
+                match engine {
+                    Some(name) => format!("uses the {name} engine"),
+                    None => "needs an OCR engine".into(),
                 }
             ),
         })
@@ -557,6 +641,39 @@ fn hide_app_windows(app: &AppHandle) -> bool {
         }
     }
     hid_any
+}
+
+/// Wait for UI-thread unmapping, then allow compositor fade-out to complete.
+/// A queued hide returning Ok is not proof of native visibility on GTK.
+async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
+    let labels = tool_state().hidden.clone();
+    let until = std::time::Instant::now() + Duration::from_secs(3);
+    loop {
+        let mut visible = false;
+        for label in &labels {
+            if let Some(window) = app.get_webview_window(label) {
+                visible |= window.is_visible().map_err(|e| e.to_string())?;
+            }
+        }
+        if !visible { break; }
+        if std::time::Instant::now() >= until { return Err("Screenshot cancelled: an application window did not hide".into()); }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        app.run_on_main_thread(move || {
+            use gtk::prelude::*;
+            if let Some(display) = gtk::gdk::Display::default() { display.sync(); }
+            let _ = tx.send(());
+        }).map_err(|e| e.to_string())?;
+        tokio::time::timeout(Duration::from_secs(3), rx).await.map_err(|_| "GTK hide barrier timed out")?.map_err(|e| e.to_string())?;
+        // GNOME/KWin fade animations can exceed the old fixed 250ms delay.
+        tokio::time::sleep(Duration::from_millis(650)).await;
+    }
+    #[cfg(not(target_os = "linux"))]
+    tokio::time::sleep(HIDE_SETTLE).await;
+    Ok(())
 }
 
 fn restore_app_windows(app: &AppHandle) {
@@ -691,7 +808,7 @@ async fn open_overlay_inner(
     };
     tool_state().include_current_window = current_window.is_some();
     if current_window.is_none() && hide_app_windows(app) {
-        tokio::time::sleep(HIDE_SETTLE).await;
+        await_hidden_windows(app).await?;
     } else if current_window.is_some() {
         // Let the invoking options menu disappear before freezing the window.
         tokio::time::sleep(HIDE_SETTLE).await;
@@ -716,6 +833,7 @@ async fn open_overlay_inner(
         height,
         scale_factor: display.scale_factor,
         window_region,
+        document: false,
     });
 
     let url = WebviewUrl::App("index.html#screenshot-overlay".into());
@@ -861,16 +979,26 @@ fn open_pin(
     height: u32,
     favorite_id: Option<String>,
 ) -> Result<String, String> {
-    let overlay_scale = tool_state().overlay.as_ref().map(|o| o.scale_factor);
+    open_pin_with_note(app, pinned, width, height, favorite_id, String::new())
+}
+
+fn open_pin_with_note(app: &AppHandle, pinned: PathBuf, width: u32, height: u32, favorite_id: Option<String>, note: String) -> Result<String, String> {
+    let overlay_display = tool_state().overlay.as_ref().map(|o| o.display_id.clone());
     // Release the session lock before waiting for GTK monitor enumeration.
-    let scale = overlay_scale
-        .or_else(|| {
-            capture::resolve_display(app, None)
-                .ok()
-                .map(|display| display.scale_factor)
-        })
+    // Pins open on the captured display (or the one under the pointer).
+    let display = match overlay_display {
+        Some(id) => capture::resolve_display(app, Some(&id)).ok(),
+        None => capture::display_at_cursor(app).ok(),
+    };
+    let scale = display
+        .as_ref()
+        .map(|d| d.scale_factor)
         .unwrap_or(1.0)
         .max(0.5);
+    let origin = display
+        .as_ref()
+        .map(|d| (d.x as f64 / scale, d.y as f64 / scale))
+        .unwrap_or((0.0, 0.0));
     // Logical size at 1:1 physical pixels, capped so huge shots stay usable.
     const MAX_DIM: f64 = 720.0;
     let (lw, lh) = (width as f64 / scale, height as f64 / scale);
@@ -886,13 +1014,23 @@ fn open_pin(
             width,
             height,
             favorite_id,
+            note,
         },
     );
 
+    // New pins cascade from the previous one instead of stacking exactly on
+    // top of it; the user can tile them later from any pin's menu.
+    let open_pins = app
+        .webview_windows()
+        .keys()
+        .filter(|label| label.starts_with(PIN_LABEL_PREFIX))
+        .count() as f64;
+    let offset = 32.0 * (open_pins % 10.0);
     let url = WebviewUrl::App("index.html#screenshot-pin".into());
     let window = window_builder(app, &label, url)
         .title("Pinned Screenshot")
         .inner_size((lw * fit).round().max(240.0), (lh * fit).round().max(160.0))
+        .position(origin.0 + 96.0 + offset, origin.1 + 96.0 + offset)
         .transparent(true)
         .decorations(false)
         // A native shadow darkens the desktop through translucent pin pixels on macOS.
@@ -910,13 +1048,20 @@ fn open_pin(
         }
     };
     let pin_label = label.clone();
+    let pin_app = app.clone();
     window.on_window_event(move |event| {
+        use tauri::Emitter;
         if let tauri::WindowEvent::Destroyed = event {
             if let Some(pin) = tool_state().pins.remove(&pin_label) {
                 std::fs::remove_file(pin.path).ok();
             }
+            let _ = pin_app.emit(pins::PINS_CHANGED_EVENT, ());
         }
     });
+    {
+        use tauri::Emitter;
+        let _ = app.emit(pins::PINS_CHANGED_EVENT, ());
+    }
     Ok(label)
 }
 
@@ -1343,6 +1488,7 @@ mod tests {
                 height: 1,
                 scale_factor: 1.0,
                 window_region: None,
+                document: false,
             });
             state.hidden = vec!["main".into()];
         }

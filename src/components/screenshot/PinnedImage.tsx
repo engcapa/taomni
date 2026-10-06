@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Copy, Download, Maximize2, Minimize2, MoreHorizontal, Star, X } from "lucide-react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { useT } from "../../lib/i18n";
 import { formatUnknownError } from "../../lib/appDialogs";
 import {
   addScreenshotFavorite, removeScreenshotFavorite, copyImageToClipboard, saveImageToFile,
   closePin, fetchPinInit, loadScreenshotUrl, revokeScreenshotUrl, type PinInit,
-  setPinCompact,
+  setPinCompact, setPinNote, listPins, arrangePins, pinsBatch, focusPin, openImageEditor, openPinEditor,
+  PIN_ACTION_EVENT, PINS_CHANGED_EVENT, type PinSummary, type PinBatchAction, type PinArrangement,
 } from "../../lib/screenshot";
 
 /** An independent reference image; view changes never alter the original PNG. */
@@ -22,6 +24,10 @@ export function PinnedImage() {
   const [opacity, setOpacity] = useState(1);
   const [favoriteId, setFavoriteId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const [noteDraft, setNoteDraft] = useState("");
+  const [pins, setPins] = useState<PinSummary[]>([]);
+  const [confirmCloseAll, setConfirmCloseAll] = useState(false);
   const busyRef = useRef(false);
   const sizeBusy = useRef(false);
   const expandedSize = useRef<LogicalSize | null>(null);
@@ -36,6 +42,7 @@ export function PinnedImage() {
       loaded = objectUrl;
       if (cancelled) { revokeScreenshotUrl(objectUrl); return; }
       setInit(pin);
+      setNote(pin.note ?? ""); setNoteDraft(pin.note ?? "");
       setFavoriteId(pin.favoriteId ?? null);
       setUrl(objectUrl);
       const scale = window.devicePixelRatio || 1;
@@ -106,8 +113,8 @@ export function PinnedImage() {
     } catch (e) { setError(formatUnknownError(e)); }
     finally { sizeBusy.current = false; }
   };
-  const collapse = async () => {
-    if (sizeBusy.current) return;
+  const collapse = async (target = !collapsed) => {
+    if (sizeBusy.current || target === collapsed) return;
     sizeBusy.current = true;
     setError(null);
     try {
@@ -124,11 +131,54 @@ export function PinnedImage() {
         await win.setSize(new LogicalSize(64, 64));
         await win.setResizable(false);
       }
-      setCollapsed(!collapsed);
+      setCollapsed(target);
       setMenuOpen(false);
     } catch (e) { setError(formatUnknownError(e)); }
     finally { sizeBusy.current = false; }
   };
+
+  const eventHandler = useRef<(action: string) => void>(() => undefined);
+  eventHandler.current = (action) => {
+    if (action === "collapse") void collapse(true);
+    if (action === "expand") void collapse(false);
+    if (action === "resetOpacity") setOpacity(1);
+    if (action === "arranged" && init && !collapsed) {
+      setZoom(Math.min(window.innerWidth * (window.devicePixelRatio || 1) / init.width, window.innerHeight * (window.devicePixelRatio || 1) / init.height));
+    }
+  };
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen<{ action: string }>(PIN_ACTION_EVENT, ({ payload }) => eventHandler.current(payload.action)).then((fn) => { if (disposed) fn(); else unlisten = fn; }).catch((e) => { if (!disposed) setError(formatUnknownError(e)); });
+    return () => { disposed = true; unlisten?.(); };
+  }, []);
+  useEffect(() => {
+    if (!menuOpen) return;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    const refresh = () => { void listPins().then((items) => { if (active) setPins(items); }).catch((e) => { if (active) setError(formatUnknownError(e)); }); };
+    refresh();
+    void listen(PINS_CHANGED_EVENT, refresh).then((fn) => { if (!active) fn(); else unlisten = fn; }).catch((e) => { if (active) setError(formatUnknownError(e)); });
+    return () => { active = false; unlisten?.(); };
+  }, [menuOpen]);
+  const saveNote = () => run(async () => {
+    const value = await setPinNote(noteDraft);
+    setNote(value); setNoteDraft(value);
+    setNotice(t("screenshot.saved"));
+  });
+  const batch = (action: PinBatchAction) => run(async () => { await pinsBatch(action); setConfirmCloseAll(false); });
+  const arrange = (mode: PinArrangement) => run(async () => { await arrangePins(mode); setMenuOpen(false); });
+  const editExternal = (choose: boolean) => run(async () => {
+    if (!init) return;
+    let editor: string | undefined;
+    if (choose) {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const value = await open({ title: t("screenshot.chooseEditor"), multiple: false });
+      if (typeof value !== "string") return;
+      editor = value;
+    }
+    await openImageEditor(init.path, editor);
+  });
 
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -193,9 +243,33 @@ export function PinnedImage() {
           <input data-testid="screenshot-pin-opacity" aria-label={t("screenshot.pinOpacity")} type="range" min={10} max={100} step={10} value={Math.round(opacity * 100)} onChange={(e) => setOpacity(Number(e.target.value) / 100)} className="min-w-0 flex-1" />
           <span className="tabular-nums">{Math.round(opacity * 100)}%</span>
         </label>
+        <label className="block mb-2">{t("screenshot.pinNote")}
+          <textarea data-testid="screenshot-pin-note-input" aria-label={t("screenshot.pinNote")} maxLength={500} rows={2} value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)} className="block w-full rounded p-2 bg-white/15 mt-1" />
+        </label>
+        <button data-testid="screenshot-pin-note-save" disabled={busy} className="rounded px-2 py-1 bg-white/15 mb-3" onClick={() => void saveNote()}>{t("screenshot.save")}</button>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button data-testid="screenshot-pin-edit" disabled={busy} onClick={() => void run(openPinEditor)}>{t("screenshot.editImage")}</button>
+          <button data-testid="screenshot-pin-external" disabled={busy} onClick={() => void editExternal(false)}>{t("screenshot.externalEditor")}</button>
+          <button data-testid="screenshot-pin-choose-editor" disabled={busy} onClick={() => void editExternal(true)}>{t("screenshot.chooseEditor")}</button>
+        </div>
+        <p className="mb-2">{t("screenshot.pinArrange")}</p>
+        <div className="flex flex-wrap gap-2 mb-3">{(["tile", "cascade", "stackRight", "stackBottom"] as const).map((mode) =>
+          <button key={mode} data-testid={`screenshot-pins-${mode}`} disabled={busy} className="rounded px-2 py-1 bg-white/15" onClick={() => void arrange(mode)}>{t(`screenshot.pin${mode[0].toUpperCase()}${mode.slice(1)}`)}</button>)}</div>
+        <div className="flex flex-wrap gap-2 mb-3">{(["collapse", "expand", "resetOpacity"] as const).map((action) =>
+          <button key={action} data-testid={`screenshot-pins-${action}`} disabled={busy} onClick={() => void batch(action)}>{t(`screenshot.batch${action[0].toUpperCase()}${action.slice(1)}`)}</button>)}
+          <button data-testid="screenshot-pins-close-all" onClick={() => setConfirmCloseAll(true)}>{t("screenshot.closeAllPins")}</button>
+          {confirmCloseAll && <div role="alert" className="w-full rounded p-2 bg-white/15">{t("screenshot.closeAllPinsConfirm")}
+            <button data-testid="screenshot-pins-close-confirm" disabled={busy} className="ml-2 underline" onClick={() => void batch("closeAll")}>{t("screenshot.done")}</button>
+            <button className="ml-2" onClick={() => setConfirmCloseAll(false)}>{t("screenshot.cancel")}</button></div>}
+        </div>
+        <ul data-testid="screenshot-pin-list" className="max-h-28 overflow-auto mb-3">{pins.map((pin) => <li key={pin.label}>
+          <button className="text-left truncate w-full hover:underline" data-testid="screenshot-pin-focus" onClick={() => void run(() => focusPin(pin.label))}>{pin.note || `${t("screenshot.pin")} ${pin.order}`} · {pin.width} × {pin.height}</button>
+        </li>)}</ul>
         <p data-testid="screenshot-pin-help" className="leading-relaxed text-white/75">{t("screenshot.pinHelp")}</p>
       </div>}
     </>}
+    {!collapsed && note && !menuOpen && <p data-pin-controls data-testid="screenshot-pin-note" className="absolute bottom-1 left-1 right-1 max-h-[30%] overflow-auto whitespace-pre-wrap break-words rounded bg-black/80 text-white text-[12px] p-2 cursor-text select-text">{note}</p>}
     {(error || notice) && <p data-pin-controls data-testid="screenshot-pin-notice" role={error ? "alert" : "status"} className="absolute bottom-1 left-1 right-1 rounded bg-black/85 text-white text-[11px] p-2 cursor-default break-words">{error ?? notice}</p>}
   </div>;
 }

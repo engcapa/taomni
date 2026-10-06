@@ -800,6 +800,45 @@ pub async fn screenshot_qa_ocr_redact(app: AppHandle) -> Result<String, String> 
     ))
 }
 
+/// Exercise solid annotation modes and the pixel-level eraser through the
+/// public overlay controls. The native browser is the real renderer; the
+/// scenario intentionally does not substitute a canvas mock.
+#[tauri::command]
+pub async fn screenshot_qa_annotation_tools(app: AppHandle) -> Result<String, String> {
+    ensure_qa(&app)?;
+    let _cleanup = ScenarioCleanup(app.clone());
+    super::open_overlay(&app, None).await?;
+    let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let result = run_js(&overlay, r#"
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      const q=id=>document.querySelector('[data-testid="'+id+'"]');
+      for(let i=0;i<100&&!q('screenshot-hint');i++) await sleep(80);
+      q('screenshot-fullscreen').click(); await sleep(120);
+      const fire=(el,type,x,y,extra={})=>el.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,buttons:type==='mouseup'?0:1,clientX:x,clientY:y,...extra}));
+      const layer=q('screenshot-annotation-layer');
+      q('screenshot-tool-rect').click(); q('screenshot-fill').click();
+      fire(layer,'mousedown',80,80); fire(window,'mousemove',180,160); fire(window,'mouseup',180,160); await sleep(80);
+      const filledRect=q('screenshot-fill').getAttribute('aria-pressed')==='true';
+      q('screenshot-tool-ellipse').click(); fire(layer,'mousedown',220,80); fire(window,'mousemove',320,180); fire(window,'mouseup',320,180); await sleep(80);
+      q('screenshot-tool-pen').click(); fire(layer,'mousedown',100,250); fire(window,'mousemove',150,200); fire(window,'mousemove',200,250); fire(window,'mouseup',200,250); await sleep(80);
+      const beforeErase=Number(q('screenshot-annotation-canvas').dataset.shapes);
+      q('screenshot-tool-eraser').click();
+      fire(layer,'mousedown',145,200); fire(window,'mousemove',155,205); fire(window,'mouseup',155,205); await sleep(100);
+      const afterErase=Number(q('screenshot-annotation-canvas').dataset.shapes);
+      return {filledRect,beforeErase,afterErase,eraseMode:q('screenshot-eraser-mode').value,fill:q('screenshot-fill').getAttribute('aria-pressed')};
+    "#, Duration::from_secs(25)).await.map_err(|e| e.to_string())?;
+    overlay.eval("document.querySelector('[data-testid=\\\"screenshot-cancel\\\"]')?.click()").map_err(|e| e.to_string())?;
+    let closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
+    Ok(report(
+        result["filledRect"] == json!(true)
+            && result["beforeErase"] == json!(3)
+            && result["afterErase"] == json!(3)
+            && result["eraseMode"] == json!("partial")
+            && closed,
+        json!({"renderer":result,"closed":closed,"platform":platform()}),
+    ))
+}
+
 /// Real scroll capture over a known page: wheel input, complete original
 /// pixel comparison and row decoding reject duplicated, skipped or squashed
 /// content.

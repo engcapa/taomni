@@ -21,6 +21,7 @@ import {
 import { useScreenshotAppShortcut } from "./lib/screenshotShortcut";
 import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
 import { PinnedImage } from "./components/screenshot/PinnedImage";
+import { PinBoard } from "./components/screenshot/PinBoard";
 import { RecorderBar } from "./components/screenshot/RecorderBar";
 import { ScrollCaptureBar } from "./components/screenshot/ScrollCaptureBar";
 import { ScreenshotQaFixture } from "./components/screenshot/ScreenshotQaFixture";
@@ -206,6 +207,7 @@ function App() {
       </AppDialogProvider>
     );
   }
+  if (overlayHash.startsWith("#screenshot-pin-board")) return <PinBoard />;
   if (
     isScreenshotPinWindow() ||
     overlayHash.startsWith("#screenshot-pin")

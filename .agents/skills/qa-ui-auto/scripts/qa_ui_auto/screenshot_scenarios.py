@@ -22,6 +22,7 @@ SCENARIOS = {
     "pin-tools": "screenshot_qa_pin_tools",
     "scroll-manual": "screenshot_qa_scroll_manual",
     "colors": "screenshot_qa_colors",
+    "annotation-tools": "screenshot_qa_annotation_tools",
     "freehand": "screenshot_qa_freehand",
     "hotkey": "screenshot_qa_hotkey",
     "controls": "screenshot_qa_controls",

@@ -1,0 +1,43 @@
+id: TC-SHOT-036
+title: Scattered watermark, in-place image editing, pin notes and arrangement controls
+description: Browser coverage for tiled watermark, editor dialog, note persistence and batch pin actions; native pin arrangement is verified by TC-SHOT-N20.
+covers: [F27.1]
+tags: [screenshot, watermark, editor, pins, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-hint"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- click: '[data-testid="screenshot-more"]'
+- click: '[data-testid="screenshot-watermark"]'
+- fill: {selector: '[data-testid="screenshot-watermark-text"]', value: Confidential}
+- click: '[data-testid="screenshot-watermark-apply"]'
+- assert_attribute: {selector: '[data-testid="screenshot-watermark"]', name: aria-pressed, equals: 'true'}
+- click: '[data-testid="screenshot-edit"]'
+- wait_for: '[data-testid="screenshot-edit-panel"]'
+- click: '[data-testid="screenshot-edit-rotate"]'
+- click: '[data-testid="screenshot-edit-undo"]'
+- click: '[data-testid="screenshot-edit-redo"]'
+- click: '[data-testid="screenshot-edit-external"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-hint"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- click: '[data-testid="screenshot-pin"]'
+- wait_for: '[data-testid="screenshot-pin-image"]'
+- click: '[data-testid="screenshot-pin-menu-toggle"]'
+- fill: {selector: '[data-testid="screenshot-pin-note-input"]', value: Compare with design}
+- click: '[data-testid="screenshot-pin-note-save"]'
+- assert_text: {selector: '[data-testid="screenshot-pin-note"]', contains: Compare with design}
+- click: '[data-testid="screenshot-pins-tile"]'
+- click: '[data-testid="screenshot-pins-collapse"]'
+- click: '[data-testid="screenshot-pins-expand"]'
+- click: '[data-testid="screenshot-pin-close"]'
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  browser:
+  - check: Tiled watermark controls, image edit undo/redo, external-editor handoff, pin note and batch menu remain usable.
+    method: automated

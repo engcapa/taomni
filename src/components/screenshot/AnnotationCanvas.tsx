@@ -39,10 +39,22 @@ interface Point {
   y: number;
 }
 
+/** A partial-eraser pass attached to the shape it removed pixels from. */
+export interface EraseStroke {
+  pts: Point[];
+  /** Stroke diameter in canvas CSS px. */
+  width: number;
+}
+
 interface ShapeBase {
   id: number;
   color: string;
   lineWidth: number;
+  /**
+   * Partial erasures. Stored on the shape (not the layer) so moving or
+   * resizing the shape keeps exactly the same pixels removed.
+   */
+  erase?: EraseStroke[];
 }
 
 export interface RectLikeShape extends ShapeBase {
@@ -51,6 +63,8 @@ export interface RectLikeShape extends ShapeBase {
   y: number;
   w: number;
   h: number;
+  /** Solid rect / ellipse instead of an outline. */
+  filled?: boolean;
 }
 
 export interface LineLikeShape extends ShapeBase {
@@ -64,7 +78,14 @@ export interface LineLikeShape extends ShapeBase {
 export interface PenShape extends ShapeBase {
   kind: "pen" | "highlighter";
   pts: Point[];
+  /** Freehand pen closed into a solid region. */
+  filled?: boolean;
 }
+
+export type EraserMode = "partial" | "object";
+
+/** Tools whose shapes can be drawn solid. */
+export const FILLABLE_TOOLS: readonly AnnotationTool[] = ["rect", "ellipse", "pen"];
 
 export interface TextShape extends ShapeBase {
   kind: "text";
@@ -108,7 +129,19 @@ export interface AnnotationCanvasHandle {
   addShapes: (shapes: Shape[]) => void;
   shapeCount: () => number;
   deleteSelected: () => boolean;
-  updateSelectedStyle: (style: { color?: string; lineWidth?: number; fontFamily?: string; fontSize?: number }) => void;
+  updateSelectedStyle: (style: ShapeStyle) => void;
+  /** Current shapes (image edits bake them and restore them on undo). */
+  snapshot: () => Shape[];
+  /** Replace all shapes with `shapes` and reset annotation history. */
+  restore: (shapes: Shape[]) => void;
+}
+
+export interface ShapeStyle {
+  color?: string;
+  lineWidth?: number;
+  fontFamily?: string;
+  fontSize?: number;
+  filled?: boolean;
 }
 
 interface AnnotationCanvasProps {
@@ -121,6 +154,10 @@ interface AnnotationCanvasProps {
   fontFamily?: string;
   fontSize?: number;
   textHint?: string;
+  /** New rect / ellipse / pen shapes are solid. */
+  fill?: boolean;
+  /** `partial` removes pixels under the eraser; `object` deletes whole shapes. */
+  eraserMode?: EraserMode;
   /** Loaded background image; sampled by mosaic and blur. */
   baseImage: HTMLImageElement | null;
   /** CSS-pixel rect annotations are clipped to; null = whole image. */
@@ -131,6 +168,8 @@ interface AnnotationCanvasProps {
   /** Fired when the user presses a draw tool outside the selection. */
   onRequestReselect?: (at: Point) => void;
   onSelectionChange?: (shape: Shape | null) => void;
+  /** True while a pointer stroke is in progress (toolbar fades out). */
+  onDrawingChange?: (drawing: boolean) => void;
 }
 
 const TEXT_FONT_SIZE = 18;
@@ -265,6 +304,9 @@ function paintPolyline(ctx: CanvasRenderingContext2D, pts: Point[]): void {
   }
 }
 
+/** Scratch layer for shapes with erase masks (painting is sequential). */
+let eraseLayer: HTMLCanvasElement | null = null;
+
 /**
  * Paint one shape in canvas CSS-px space (the caller's transform maps it to
  * device pixels). `sampleScaleX`/`sampleScaleY` map CSS px to base-image
@@ -277,6 +319,49 @@ export function paintShape(
   sampleScaleX: number,
   sampleScaleY: number = sampleScaleX,
 ): void {
+  const target = ctx.canvas as HTMLCanvasElement | undefined;
+  if (shape.erase?.length && target?.width && target.height) {
+    // Render on a same-size layer, punch the erased strokes out of it, then
+    // composite: erasing never reveals or removes the screenshot underneath.
+    const layer = (eraseLayer ??= document.createElement("canvas"));
+    if (layer.width !== target.width || layer.height !== target.height) {
+      layer.width = target.width;
+      layer.height = target.height;
+    }
+    const lctx = layer.getContext("2d");
+    if (lctx) {
+      lctx.setTransform(1, 0, 0, 1, 0, 0);
+      lctx.clearRect(0, 0, layer.width, layer.height);
+      lctx.setTransform(ctx.getTransform());
+      paintShapeBody(lctx, shape, base, sampleScaleX, sampleScaleY);
+      lctx.save();
+      lctx.globalCompositeOperation = "destination-out";
+      lctx.strokeStyle = "#000";
+      lctx.fillStyle = "#000";
+      lctx.lineCap = "round";
+      lctx.lineJoin = "round";
+      for (const stroke of shape.erase) {
+        lctx.lineWidth = stroke.width;
+        paintPolyline(lctx, stroke.pts);
+      }
+      lctx.restore();
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(layer, 0, 0);
+      ctx.restore();
+      return;
+    }
+  }
+  paintShapeBody(ctx, shape, base, sampleScaleX, sampleScaleY);
+}
+
+function paintShapeBody(
+  ctx: CanvasRenderingContext2D,
+  shape: Shape,
+  base: HTMLImageElement | null,
+  sampleScaleX: number,
+  sampleScaleY: number,
+): void {
   ctx.save();
   ctx.strokeStyle = shape.color;
   ctx.fillStyle = shape.color;
@@ -286,14 +371,16 @@ export function paintShape(
   switch (shape.kind) {
     case "rect": {
       const r = normRect(shape);
-      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      if (shape.filled) ctx.fillRect(r.x, r.y, r.w, r.h);
+      else ctx.strokeRect(r.x, r.y, r.w, r.h);
       break;
     }
     case "ellipse": {
       const r = normRect(shape);
       ctx.beginPath();
       ctx.ellipse(r.x + r.w / 2, r.y + r.h / 2, Math.max(0.5, r.w / 2), Math.max(0.5, r.h / 2), 0, 0, Math.PI * 2);
-      ctx.stroke();
+      if (shape.filled) ctx.fill();
+      else ctx.stroke();
       break;
     }
     case "line":
@@ -306,7 +393,15 @@ export function paintShape(
       paintArrow(ctx, shape);
       break;
     case "pen":
-      paintPolyline(ctx, shape.pts);
+      if (shape.filled && shape.pts.length >= 3) {
+        // Closed freehand region; the outline keeps thin shapes visible.
+        ctx.beginPath();
+        ctx.moveTo(shape.pts[0].x, shape.pts[0].y);
+        for (let i = 1; i < shape.pts.length; i++) ctx.lineTo(shape.pts[i].x, shape.pts[i].y);
+        ctx.closePath();
+        ctx.fill("evenodd");
+        ctx.stroke();
+      } else paintPolyline(ctx, shape.pts);
       break;
     case "highlighter":
       ctx.globalAlpha = 0.35;
@@ -380,8 +475,100 @@ function rectFromDrag(a: Point, b: Point): CssRect {
   };
 }
 
+function distToSegment(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return dist(p, a);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** Shortest distance from `p` to a polyline (a lone point is a dot). */
+export function distToPath(p: Point, pts: readonly Point[]): number {
+  if (pts.length === 0) return Infinity;
+  if (pts.length === 1) return dist(p, pts[0]);
+  let best = Infinity;
+  for (let i = 1; i < pts.length; i++) best = Math.min(best, distToSegment(p, pts[i - 1], pts[i]));
+  return best;
+}
+
+/** Points along a polyline no further than `step` apart (endpoints kept). */
+export function resamplePath(pts: readonly Point[], step: number): Point[] {
+  if (pts.length < 2) return [...pts];
+  const out: Point[] = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    const n = Math.max(1, Math.ceil(dist(a, b) / step));
+    for (let k = 1; k <= n; k++) out.push({ x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n });
+  }
+  return out;
+}
+
+/** Half the painted width of a stroke-like shape. */
+function strokeHalfWidth(shape: Shape): number {
+  return shape.kind === "highlighter" ? Math.max(8, shape.lineWidth * 3) / 2 : Math.max(1, shape.lineWidth) / 2;
+}
+
+/** Centre line of shapes whose pixels are fully described by a stroke. */
+function strokePath(shape: Shape): Point[] | null {
+  if ((shape.kind === "pen" && !shape.filled) || shape.kind === "highlighter") return shape.pts;
+  if (shape.kind === "line") return [{ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }];
+  return null;
+}
+
+/** Whether every painted pixel of a stroke lies under its erase masks. */
+function fullyErased(shape: Shape): boolean {
+  const path = strokePath(shape);
+  if (!path || !shape.erase?.length) return false;
+  const half = strokeHalfWidth(shape);
+  return resamplePath(path, Math.max(0.5, half / 2))
+    .every((p) => shape.erase!.some((s) => distToPath(p, s.pts) + half <= s.width / 2));
+}
+
+/** Whether the eraser at `p` touches visible pixels of `shape`. */
+function eraseHitTest(shape: Shape, p: Point, radius: number): boolean {
+  if (shape.erase?.some((s) => distToPath(p, s.pts) + radius <= s.width / 2)) return false;
+  if ((shape.kind === "rect" || shape.kind === "ellipse") && !shape.filled) {
+    // Outlines have no interior pixels to erase.
+    const r = normRect(shape);
+    const reach = radius + shape.lineWidth / 2;
+    if (shape.kind === "rect") {
+      const corners = [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }];
+      return distToPath(p, [...corners, corners[0]]) <= reach;
+    }
+    const a = Math.max(0.5, r.w / 2), b = Math.max(0.5, r.h / 2);
+    const cx = r.x + a, cy = r.y + b;
+    const t = Math.atan2((p.y - cy) / b, (p.x - cx) / a);
+    return dist(p, { x: cx + a * Math.cos(t), y: cy + b * Math.sin(t) }) <= reach;
+  }
+  return shapeHitTest(shape, p, radius);
+}
+
+/**
+ * Partial eraser: removes exactly the pixels under the eraser path from every
+ * shape it touches, like a raster eraser, while each shape stays editable
+ * (the mask moves and scales with it). A stroke whose every painted pixel has
+ * been erased is dropped. Returns the input array when nothing changed.
+ */
+export function eraseShapes(shapes: readonly Shape[], eraser: readonly Point[], radius: number): readonly Shape[] {
+  const path = resamplePath(eraser, Math.max(1, radius / 2));
+  let changed = false;
+  const out: Shape[] = [];
+  for (const shape of shapes) {
+    if (!path.some((p) => eraseHitTest(shape, p, radius))) {
+      out.push(shape);
+      continue;
+    }
+    changed = true;
+    const next = { ...shape, erase: [...(shape.erase ?? []), { pts: path, width: radius * 2 }] };
+    if (!fullyErased(next)) out.push(next);
+  }
+  return changed ? out : shapes;
+}
+
 /** Whether `p` is within `radius` of a shape's geometry (eraser). */
 export function shapeHitTest(shape: Shape, p: Point, radius: number): boolean {
+  if (shape.kind === "pen" && shape.filled && shape.pts.length >= 3 && pointInContour(p, shape.pts)) return true;
   switch (shape.kind) {
     case "rect":
     case "ellipse":
@@ -441,6 +628,13 @@ export function transformShape(shape: Shape, from: CssRect, to: CssRect): Shape 
   const sx = from.w ? to.w / from.w : 1, sy = from.h ? to.h / from.h : 1;
   const x = (v: number) => to.x + (v - from.x) * sx;
   const y = (v: number) => to.y + (v - from.y) * sy;
+  const moved = transformGeometry(shape, x, y, sx, sy);
+  if (!shape.erase) return moved;
+  const k = Math.sqrt(Math.abs(sx * sy)) || 1;
+  return { ...moved, erase: shape.erase.map((s) => ({ width: s.width * k, pts: s.pts.map((p) => ({ x: x(p.x), y: y(p.y) })) })) };
+}
+
+function transformGeometry(shape: Shape, x: (v: number) => number, y: (v: number) => number, sx: number, sy: number): Shape {
   switch (shape.kind) {
     case "rect": case "ellipse": case "mosaic": case "blur":
       return { ...shape, x: x(shape.x), y: y(shape.y), w: shape.w * sx, h: shape.h * sy };
@@ -477,8 +671,9 @@ const EMPTY_HISTORY: History = { shapes: [], undo: [], redo: [] };
 
 export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCanvasProps>(
   function AnnotationCanvas(props, ref) {
-    const { imageWidth, imageHeight, tool, color, lineWidth, fontFamily = FONT_STACK, fontSize = TEXT_FONT_SIZE, textHint, baseImage, selection, selectionContour, onHistoryChange, onRequestReselect } =
-      props;
+    const { imageWidth, imageHeight, tool, color, lineWidth, fontFamily = FONT_STACK, fontSize = TEXT_FONT_SIZE, textHint, baseImage, selection, selectionContour, onHistoryChange, onRequestReselect,
+      fill = false, eraserMode = "partial" } = props;
+    const filled = fill && FILLABLE_TOOLS.includes(tool) ? true : undefined;
 
     const wrapRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -498,6 +693,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     const drawingRef = useRef<{ start: Point; pts: Point[] } | null>(null);
     /** Set when a mousedown already placed a number marker for this click. */
     const numberPlacedRef = useRef(false);
+    const drawingActiveRef = useRef(false);
 
     const apply = useCallback((next: History) => {
       historyRef.current = next;
@@ -520,9 +716,16 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       setSelectedId(null);
       return true;
     }, [mutate, selectedId]);
-    const updateSelectedStyle = useCallback((style: { color?: string; lineWidth?: number; fontFamily?: string; fontSize?: number }) => {
+    const updateSelectedStyle = useCallback((style: ShapeStyle) => {
       if (selectedId === null) return;
-      mutate(historyRef.current.shapes.map((s) => s.id === selectedId ? { ...s, ...style } : s));
+      mutate(historyRef.current.shapes.map((s) => {
+        if (s.id !== selectedId) return s;
+        const { filled, ...rest } = style;
+        const next = { ...s, ...rest } as Shape;
+        // Fill applies only to shapes that have a solid form.
+        if (filled !== undefined && (next.kind === "rect" || next.kind === "ellipse" || next.kind === "pen")) next.filled = filled || undefined;
+        return next;
+      }));
     }, [mutate, selectedId]);
 
     // Toolbar availability is part of the same visible history update;
@@ -574,11 +777,25 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       return c.toDataURL("image/png");
     }, []);
 
+    const restore = useCallback((shapes: Shape[]) => {
+      clear();
+      idRef.current = shapes.reduce((n, s) => Math.max(n, s.id), 0) + 1;
+      apply({ shapes, undo: [], redo: [] });
+    }, [apply, clear]);
+
     useImperativeHandle(
       ref,
-      () => ({ undo, redo, clear, exportDataUrl, addShapes, deleteSelected, updateSelectedStyle, shapeCount: () => historyRef.current.shapes.length }),
-      [undo, redo, clear, exportDataUrl, addShapes, deleteSelected, updateSelectedStyle],
+      () => ({ undo, redo, clear, exportDataUrl, addShapes, deleteSelected, updateSelectedStyle, restore,
+        snapshot: () => historyRef.current.shapes, shapeCount: () => historyRef.current.shapes.length }),
+      [undo, redo, clear, exportDataUrl, addShapes, deleteSelected, updateSelectedStyle, restore],
     );
+
+    const drawingChange = props.onDrawingChange;
+    const setDrawing = (value: boolean) => {
+      if (drawingActiveRef.current === value) return;
+      drawingActiveRef.current = value;
+      drawingChange?.(value);
+    };
 
     // Live redraw (HiDPI-aware; CSS-px coordinate space).
     useEffect(() => {
@@ -617,7 +834,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       if (eraserTrail && eraserTrail.length > 0) {
         ctx.save();
         ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-        ctx.lineWidth = Math.max(10, lineWidth * 2) * 2;
+        ctx.lineWidth = eraserRadius(lineWidth) * 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.globalAlpha = 0.35;
@@ -645,11 +862,16 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           }
         : p;
 
-    const makeDraft = (a: Point, b: Point): Shape | null => {
+    const makeDraft = (a: Point, b: Point, constrain = false): Shape | null => {
+      if (constrain && (tool === "rect" || tool === "ellipse")) {
+        const side = Math.min(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+        b = { x: a.x + Math.sign(b.x - a.x) * side, y: a.y + Math.sign(b.y - a.y) * side };
+      }
       const base = { id: -1, color, lineWidth };
       switch (tool) {
         case "rect":
         case "ellipse":
+          return { ...base, kind: tool, ...rectFromDrag(a, b), filled };
         case "mosaic":
         case "blur":
           return { ...base, kind: tool, ...rectFromDrag(a, b) };
@@ -657,6 +879,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         case "arrow":
           return { ...base, kind: tool, x1: a.x, y1: a.y, x2: b.x, y2: b.y };
         case "pen":
+          return { ...base, kind: tool, pts: [a, b], filled };
         case "highlighter":
           return { ...base, kind: tool, pts: [a, b] };
         case "balloon":
@@ -695,6 +918,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         return;
       }
       drawingRef.current = { start: p, pts: [p] };
+      setDrawing(true);
       if (tool === "eraser") {
         setEraserTrail([p]);
         return;
@@ -730,14 +954,14 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         setEraserTrail(d.pts);
       } else if (tool === "pen" || tool === "highlighter") {
         d.pts = [...d.pts, p];
-        setDraft({ id: -1, color, lineWidth, kind: tool, pts: d.pts });
+        setDraft({ id: -1, color, lineWidth, kind: tool, pts: d.pts, filled: tool === "pen" ? filled : undefined });
       } else {
-        const next = makeDraft(d.start, p);
+        const next = makeDraft(d.start, p, e.shiftKey);
         if (next) setDraft(next);
       }
     };
 
-    const finishDrawing = (e: { clientX: number; clientY: number }) => {
+    const finishDrawing = (e: { clientX: number; clientY: number; shiftKey?: boolean }) => {
       if (movingRef.current) {
         if (editedShape && JSON.stringify(editedShape) !== JSON.stringify(movingRef.current.shape)) {
           mutate(historyRef.current.shapes.map((s) => s.id === editedShape.id ? editedShape : s));
@@ -748,14 +972,20 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       }
       const d = drawingRef.current;
       drawingRef.current = null;
+      setDrawing(false);
       setDraft(null);
       setEraserTrail(null);
       if (!d || tool === "select" || tool === "text" || tool === "number") return;
       const p = clampToSelection(localPos(e));
       if (tool === "eraser") {
         const pts = [...d.pts, p];
-        const radius = Math.max(10, lineWidth * 2);
+        const radius = eraserRadius(lineWidth);
         const prev = historyRef.current.shapes;
+        if (eraserMode === "partial") {
+          const next = eraseShapes(prev, pts, radius);
+          if (next !== prev) mutate([...next]);
+          return;
+        }
         const kept = prev.filter((s) => !pts.some((pt) => shapeHitTest(s, pt, radius)));
         if (kept.length !== prev.length) mutate(kept);
         return;
@@ -763,9 +993,9 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       let shape: Shape | null;
       if (tool === "pen" || tool === "highlighter") {
         const pts = [...d.pts, p];
-        shape = { id: -1, color, lineWidth, kind: tool, pts };
+        shape = { id: -1, color, lineWidth, kind: tool, pts, filled: tool === "pen" ? filled : undefined };
       } else {
-        shape = makeDraft(d.start, p);
+        shape = makeDraft(d.start, p, e.shiftKey);
       }
       if (!shape) return;
       let valid = false;
@@ -775,6 +1005,11 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         valid = dist({ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }) >= 5;
       } else if (shape.kind === "pen" || shape.kind === "highlighter") {
         valid = shape.pts.length >= 2;
+        if (shape.kind === "pen" && shape.filled) {
+          // A solid freehand region needs an area; a short flick stays a line.
+          const b = shapeBounds(shape);
+          if (shape.pts.length < 3 || b.w < 3 || b.h < 3) shape = { ...shape, filled: undefined };
+        }
       } else if (shape.kind === "balloon") {
         valid = Math.abs(shape.w) >= 16 && Math.abs(shape.h) >= 12;
       }
@@ -788,7 +1023,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         if (drawingRef.current || movingRef.current) finishDrawing(e);
       };
       window.addEventListener("mouseup", onUp);
-      const onMove = (e: MouseEvent) => { if (movingRef.current && !wrapRef.current?.contains(e.target as Node)) handleMouseMove(e as unknown as ReactMouseEvent); };
+      const onMove = (e: MouseEvent) => { if ((movingRef.current || drawingRef.current) && !wrapRef.current?.contains(e.target as Node)) handleMouseMove(e as unknown as ReactMouseEvent); };
       window.addEventListener("mousemove", onMove);
       return () => { window.removeEventListener("mouseup", onUp); window.removeEventListener("mousemove", onMove); };
     });
@@ -947,6 +1182,11 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     );
   },
 );
+
+/** Eraser reach (CSS px) for the selected line width: 2/4/8 -> 6/8/16. */
+export function eraserRadius(lineWidth: number): number {
+  return Math.max(6, lineWidth * 2);
+}
 
 function midpoint(a: Point, b: Point): Point {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };

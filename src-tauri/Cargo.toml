@@ -322,6 +322,12 @@ windows = { version = "0.62", features = [
   "Win32_System_Threading",
   "Win32_UI_Shell",
   "Win32_System_DataExchange",
+  # Screenshot OCR: the built-in Windows.Media.Ocr engine (no install).
+  "Globalization",
+  "Graphics_Imaging",
+  "Media_Ocr",
+  "Security_Cryptography",
+  "Storage_Streams",
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -334,13 +340,15 @@ xcap = "0.9.6"
 objc2 = "0.6.4"
 block2 = "0.6.2"
 dispatch2 = "0.3.1"
-objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSError"] }
+objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSError", "NSData", "NSDictionary", "NSString"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSPasteboard"] }
 objc2-core-media = { version = "0.3.2", features = ["CMSampleBuffer", "objc2-core-video"] }
 # AudioBufferList/ASBD for the RDPSND ScreenCaptureKit system-audio loopback.
 objc2-core-audio-types = { version = "0.3.2", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
 objc2-core-video = { version = "0.3.2", features = ["CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
 objc2-core-foundation = "0.3.2"
+# Screenshot OCR: the built-in Vision text recognizer (no install).
+objc2-vision = { version = "0.3.2", default-features = false, features = ["std", "VNRequest", "VNRecognizeTextRequest", "VNRequestHandler", "VNObservation", "VNTypes", "objc2-core-foundation"] }
 objc2-screen-capture-kit = { version = "0.3.2", default-features = false, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-graphics", "objc2-core-media"] }
 objc2-video-toolbox = { version = "0.3.2", default-features = false, features = ["std", "block2", "objc2-core-media", "objc2-core-video", "VTBase", "VTCompressionProperties", "VTCompressionSession", "VTErrors", "VTSession"] }
 # The IronRDP umbrella crate does not expose its server EGFX feature. A direct
@@ -390,6 +398,8 @@ xcap = "0.9.6"
 # `webkit2gtk::WebView` type matches; `v2_38` exposes set_enable_webrtc (and
 # transitively v2_4's set_enable_media_stream / set_enable_mediasource).
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
+# Screenshot hide barriers and Wayland input-region controls share Tao's GTK.
+gtk = "0.18.2"
 
 [dev-dependencies]
 tempfile = "3"
