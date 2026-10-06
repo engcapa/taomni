@@ -49,16 +49,19 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         q('screenshot-pin-menu-toggle').click();
         for(let i=0;i<100&&!q('screenshot-pin-note-input');i++) await wait();
         const input=q('screenshot-pin-note-input');
-        const setter=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),'value')?.set;
+        input.focus();
+        const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')?.set;
         if(!setter) throw new Error('pin note value setter unavailable');
         setter.call(input,'QA original A');
         input.dispatchEvent(new Event('input',{bubbles:true}));
         input.dispatchEvent(new Event('change',{bubbles:true})); await wait();
+        for(let i=0;i<100&&input.value!=='QA original A';i++) await wait();
         q('screenshot-pin-note-save').click();
+        for(let i=0;i<100&&q('screenshot-pin-note-save')?.disabled;i++) await wait();
         q('screenshot-pin-menu-toggle').click();
         for(let i=0;i<100&&q('screenshot-pin-note')?.textContent!=='QA original A';i++) await wait();
         return q('screenshot-pin-note')?.textContent;
-    "#, Duration::from_secs(10)).await?;
+    "#, Duration::from_secs(20)).await?;
     anyhow::ensure!(
         note == "QA original A",
         "pin note was not saved through the UI: {note}"
