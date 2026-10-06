@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use ironrdp_bulk::BulkCompressor;
@@ -109,6 +110,16 @@ impl ActiveStageBuilder {
 }
 
 impl ActiveStage {
+    /// Normalize IO-channel bulk compression before a reactivation sequence
+    /// consumes the frame, preserving the connection's graphics history.
+    pub fn normalize_reactivation_frame<'a>(
+        &mut self,
+        frame: &'a [u8],
+    ) -> SessionResult<Cow<'a, [u8]>> {
+        self.x224_processor
+            .normalize_io_channel_frame(frame, self.fast_path_processor.bulk_decompressor_mut())
+    }
+
     pub fn update_mouse_pos(&mut self, x: u16, y: u16) {
         self.fast_path_processor.update_mouse_pos(x, y);
     }

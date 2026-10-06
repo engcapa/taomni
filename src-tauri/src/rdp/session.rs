@@ -1838,9 +1838,15 @@ where
     // until it receives our Font List, so if we stop after a single `step`
     // (as the old code did) both sides wait on each other forever and the
     // canvas freezes after a maximize/restore until the user reconnects.
+    // Activation ShareData PDUs use the same bulk history as graphics. In
+    // particular, xrdp's Font Map carries FLUSHED/AT_FRONT; parsing it directly
+    // would miss the reset and corrupt the first repaint after this resize.
+    let frame = active_stage
+        .normalize_reactivation_frame(frame)
+        .map_err(|e| format!("rdp reactivation compression: {}", e.report()))?;
     let mut output = WriteBuf::new();
     sequence
-        .step(frame, &mut output)
+        .step(frame.as_ref(), &mut output)
         .map_err(|e| format!("rdp reactivation: {}", e))?;
     flush_reactivation_output(framed, &output).await?;
 

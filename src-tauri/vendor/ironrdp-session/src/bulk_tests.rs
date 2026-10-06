@@ -181,6 +181,18 @@ fn compressed_bitmap_without_negotiation_fails_explicitly() {
             .to_string()
             .contains("without a negotiated decompressor")
     );
+    assert!(
+        client
+            .normalize_reactivation_frame(&slow_frame(&slow_share_data(
+                &compressed,
+                flags,
+                payload.len(),
+                2,
+            )))
+            .unwrap_err()
+            .to_string()
+            .contains("without a negotiated decompressor")
+    );
 }
 
 #[test]
@@ -199,6 +211,13 @@ fn malformed_compressed_lengths_are_rejected() {
             )
             .unwrap_err();
         assert!(error.to_string().contains("invalid compressed Share"));
+        assert!(
+            stage(Some(PduCompressionType::K64))
+                .normalize_reactivation_frame(&slow_frame(&user_data))
+                .unwrap_err()
+                .to_string()
+                .contains("invalid compressed Share")
+        );
     }
 }
 
@@ -288,4 +307,114 @@ fn malformed_short_deactivate_all_is_rejected() {
                 .is_err()
         );
     }
+}
+
+#[test]
+fn captured_xrdp_font_map_reset_preserves_resized_remotefx_pixels() {
+    // Captured server packets from the real hosted xrdp resize failure. The
+    // Font Map resets MPPC history even though the activation sequence, rather
+    // than ActiveStage::process, consumes it. See testdata/README.md.
+    let mut records = &include_bytes!("../testdata/xrdp-resize.bin")[..];
+    let mut client = stage(Some(PduCompressionType::K64));
+    let mut image = DecodedImage::new(PixelFormat::RgbA32, 994, 750);
+    let mut saw_font_map = false;
+    let mut saw_resize = false;
+    while !records.is_empty() {
+        let kind = records[0];
+        let length = u32::from_le_bytes(records[1..5].try_into().unwrap()) as usize;
+        let payload = &records[5..5 + length];
+        records = &records[5 + length..];
+        match kind {
+            0 | 1 => {
+                let action = if kind == 0 {
+                    Action::FastPath
+                } else {
+                    Action::X224
+                };
+                client.process(&mut image, action, payload).unwrap();
+            }
+            2 => {
+                let frame = client.normalize_reactivation_frame(payload).unwrap();
+                let ctx = ironrdp_pdu::mcs::decode_send_data_indication(&frame).unwrap();
+                if ctx.user_data[14] == 40 {
+                    saw_font_map = true;
+                    // The original compressed payload happens to consist of
+                    // literal bytes, so ordinary Font Map parsing succeeds
+                    // while leaving the graphics decompressor out of sync.
+                    let _ = ironrdp_pdu::rdp::headers::decode_io_channel(ctx).unwrap();
+                }
+            }
+            3 => {
+                assert_eq!(&image.data()[(240 * 994 + 280) * 4..][..4], &[255; 4]);
+                let width = u16::from_le_bytes(payload[..2].try_into().unwrap());
+                let height = u16::from_le_bytes(payload[2..].try_into().unwrap());
+                image = DecodedImage::new(PixelFormat::RgbA32, width, height);
+                saw_resize = true;
+            }
+            _ => panic!("unknown capture record type"),
+        }
+    }
+    assert!(saw_font_map && saw_resize);
+    assert_eq!((image.width(), image.height()), (1492, 1030));
+    assert_eq!(
+        &image.data()[(240 * 1492 + 280) * 4..][..4],
+        &[255; 4],
+        "opaque white center after resize"
+    );
+    for (x, y, rgba) in [
+        (60, 100, [255u8, 0, 255, 255]),
+        (160, 100, [0u8, 255, 255, 255]),
+    ] {
+        let offset = (y * 1492 + x) * 4;
+        let actual = &image.data()[offset..offset + 4];
+        // RemoteFX color conversion is lossy; alpha must remain fully opaque.
+        assert_eq!(actual[3], 255, "pixel ({x},{y}) alpha after resize");
+        for channel in 0..3 {
+            assert!(
+                actual[channel].abs_diff(rgba[channel]) <= 3,
+                "pixel ({x},{y}) after resize: {actual:?}, expected {rgba:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn reactivation_normalization_preserves_non_io_packets_and_graphics_history() {
+    let mut client = stage(Some(PduCompressionType::K64));
+    let mut sender = BulkCompressor::new(CompressionType::Rdp5).unwrap();
+    let mut image = DecodedImage::new(PixelFormat::RgbA32, 32, 32);
+    let payload = bitmap([255, 0, 255]);
+    let (compressed, flags) = compress(&mut sender, &payload);
+    client
+        .process(
+            &mut image,
+            Action::FastPath,
+            &fast_frame(&compressed, flags, PduCompressionType::K64),
+        )
+        .unwrap();
+
+    let other_channel = encode_vec(&X224(McsMessage::SendDataIndication(SendDataIndication {
+        initiator_id: 1007,
+        channel_id: 1004,
+        user_data: Cow::Owned(slow_share_data(&[0; 8], 0xe1, 8, 40)),
+    })))
+    .unwrap();
+    let uncompressed = slow_frame(&slow_share_data(&[0; 8], 0, 8, 40));
+    for frame in [&other_channel, &uncompressed] {
+        assert!(matches!(
+            client.normalize_reactivation_frame(frame).unwrap(),
+            Cow::Borrowed(bytes) if bytes == frame.as_slice()
+        ));
+    }
+
+    let (compressed, flags) = compress(&mut sender, &payload);
+    assert_eq!(flags & (flags::PACKET_FLUSHED | flags::PACKET_AT_FRONT), 0);
+    client
+        .process(
+            &mut image,
+            Action::FastPath,
+            &fast_frame(&compressed, flags, PduCompressionType::K64),
+        )
+        .unwrap();
+    assert_eq!(&image.data()[..4], &[255, 0, 255, 255]);
 }

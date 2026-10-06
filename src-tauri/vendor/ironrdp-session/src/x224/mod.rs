@@ -1,8 +1,11 @@
+use std::borrow::Cow;
+
 use ironrdp_bulk::BulkCompressor;
-use ironrdp_core::{WriteBuf, decode};
+use ironrdp_core::{WriteBuf, decode, encode_vec};
 use ironrdp_dvc::{DrdynvcClient, DvcProcessor, DynamicVirtualChannel};
 use ironrdp_pdu::mcs::{
-    DisconnectProviderUltimatum, DisconnectReason, McsMessage, SendDataIndicationCtx,
+    DisconnectProviderUltimatum, DisconnectReason, McsMessage, SendDataIndication,
+    SendDataIndicationCtx,
 };
 use ironrdp_pdu::rdp::autodetect::{
     AutoDetectReqPdu, AutoDetectRequest, AutoDetectResponse, AutoDetectRspPdu,
@@ -141,6 +144,31 @@ impl Processor {
         self.process_with_bulk(frame, None)
     }
 
+    pub(crate) fn normalize_io_channel_frame<'a>(
+        &self,
+        frame: &'a [u8],
+        decompressor: Option<&mut BulkCompressor>,
+    ) -> SessionResult<Cow<'a, [u8]>> {
+        let ctx =
+            ironrdp_pdu::mcs::decode_send_data_indication(frame).map_err(SessionError::decode)?;
+        if ctx.channel_id != self.io_channel_id {
+            return Ok(Cow::Borrowed(frame));
+        }
+        match bulk::decompress_share_data(ctx.user_data, decompressor)? {
+            Cow::Borrowed(_) => Ok(Cow::Borrowed(frame)),
+            Cow::Owned(user_data) => {
+                let normalized =
+                    encode_vec(&X224(McsMessage::SendDataIndication(SendDataIndication {
+                        initiator_id: ctx.initiator_id,
+                        channel_id: ctx.channel_id,
+                        user_data: Cow::Owned(user_data),
+                    })))
+                    .map_err(SessionError::encode)?;
+                Ok(Cow::Owned(normalized))
+            }
+        }
+    }
+
     pub(crate) fn process_with_bulk(
         &mut self,
         frame: &[u8],
@@ -230,8 +258,8 @@ impl Processor {
                             ),
                         );
 
-                        let encoded_pdu = ironrdp_core::encode_vec(&X224(ultimatum))
-                            .map_err(SessionError::encode);
+                        let encoded_pdu =
+                            encode_vec(&X224(ultimatum)).map_err(SessionError::encode);
 
                         Ok(vec![
                             ProcessorOutput::ResponseFrame(encoded_pdu?),
