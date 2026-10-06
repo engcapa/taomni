@@ -15,6 +15,7 @@ modes:
 - native
 fixtures:
 - reset_db
+- ssh_required
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}

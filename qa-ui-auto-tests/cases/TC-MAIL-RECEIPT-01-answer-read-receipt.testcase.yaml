@@ -12,6 +12,10 @@ description: 'TASK-17 (docs-feature/mail-thunderbird-parity-design.md, read rece
 
   MDN format are covered by Vitest and the Rust test (mail::receipts).
 
+  The toolbar search control must retain a usable width and stay within the
+
+  viewport before typing, including the default native 1280x800 window.
+
   Browser mode drives the stub server model (renderer orchestration only);
 
   native mode parses the real header from the fake IMAP server and sends
@@ -52,6 +56,11 @@ steps:
 - click: '[data-testid="mail-sync-button"]'
 - mail_server_assert_list_matches:
     timeout_sec: 60
+- assert_element_geometry:
+    selector: '[data-testid="mail-search-input"]'
+    min_width: 160
+    min_height: 22
+    viewport_margin: 0
 - fill:
     selector: '[data-testid="mail-search-input"]'
     value: Receipt 0001
@@ -78,29 +87,32 @@ verification:
     - 6
     - 9
     - 10
-    - 12
     - 13
+    - 14
     checkpoints:
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 11
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 14
+    - step: 12
+      expectation: Search input is at least 160px wide, 22px high, and wholly within the viewport before filling.
+    - step: 15
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-receipt-banner\"]", "timeout_sec": 20}}'
     results:
-    - 14
+    - 12
+    - 15
   - id: R2
     requirement: 点击 Send receipt 后发出 RFC 8098 回执（multipart/report; report-type=disposition-notification），提示不再出现（邮件标记 $MDNSent）。
     actions:
-    - 15
+    - 16
     checkpoints:
-    - step: 16
-      expectation: '{"mail_server_assert_smtp_contains": {"text": "report-type=disposition-notification", "timeout_sec": 20}}'
     - step: 17
+      expectation: '{"mail_server_assert_smtp_contains": {"text": "report-type=disposition-notification", "timeout_sec": 20}}'
+    - step: 18
       expectation: '{"assert_not_visible": "[data-testid=\"mail-receipt-banner\"]"}'
     results:
-    - 16
     - 17
+    - 18
   visual:
   - check: 截图中阅读区不再显示回执提示，状态栏显示回执已发送。
     method: manual

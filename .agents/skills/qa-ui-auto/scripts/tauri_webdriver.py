@@ -486,7 +486,44 @@ class NativeSession:
         # race that navigation; transient evaluation failures are retryable,
         # but the case deadline remains authoritative.
         self.wait_for_app_ready()
+        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND") == "wayland":
+            self.activate_wayland_window()
         self.install_console_hook()
+
+    def activate_wayland_window(self, timeout: float = 5.0) -> None:
+        # Headless Wayland can create a visible WebView whose page is not
+        # focused. DOM focus() still changes activeElement, but :focus and
+        # :focus-within correctly remain false. Activate the toplevel through
+        # the owned desktop's window manager, then focus its WebDriver context.
+        if self.execute("return document.hasFocus();") is not True:
+            input_socket = os.environ.get("QA_WAYLAND_INPUT_SOCKET")
+            if input_socket:
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                    connection.settimeout(10)
+                    connection.connect(input_socket)
+                    connection.sendall(json.dumps({"command": "activate", "application":
+                                                   str(self.application.resolve())}).encode() + b"\n")
+                    response = b""
+                    while not response.endswith(b"\n") and len(response) < 4096:
+                        chunk = connection.recv(4096)
+                        if not chunk:
+                            break
+                        response += chunk
+                result = json.loads(response)
+                if result.get("ok") is not True:
+                    raise WebDriverError("Wayland desktop did not activate the QA app window: "
+                                         + str(result.get("error", "missing acknowledgement")))
+        handle = self.request("GET", self.endpoint("/window"))
+        if not isinstance(handle, str) or not handle:
+            raise WebDriverError("Wayland driver did not return a window handle")
+        self.request("POST", self.endpoint("/window"), {"handle": handle})
+        end = time.monotonic() + timeout
+        while True:
+            if self.execute("return document.hasFocus();") is True:
+                return
+            if time.monotonic() >= end:
+                raise WebDriverError("Wayland WebView window did not receive focus")
+            time.sleep(0.05)
 
     def wait_for_app_ready(self, timeout: float = 20.0) -> None:
         """Wait until the QA WebView has a mounted application root."""
@@ -844,6 +881,9 @@ class NativeSession:
             else:
                 raise WebDriverError(f"contenteditable did not receive focus: {selector}")
             self.press_combo("Control+a")
+            if not text:
+                self.press_combo("Backspace")
+                return f"filled contenteditable {selector}"
             lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
             for index, line in enumerate(lines):
                 if index:
@@ -861,8 +901,23 @@ class NativeSession:
         # (path breadcrumbs, rename fields) disappear before /value arrives.
         # Select and replace through keyboard input while retaining focus.
         self.request("POST", self.element_path(element, "/click"), {})
-        self.press_combo("Mod+a")
+        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND") == "wayland":
+            self._select_wayland_fill_input(selector)
+        else:
+            self.press_combo("Mod+a")
         self.press_combo("Backspace")
+        if not text:
+            # Empty password /value requests are rejected by WebKitWebDriver.
+            # The real select-all/backspace path already clears the control;
+            # observe completion without sending another text request.
+            probe = (f"const el = document.querySelector({json.dumps(selector)});"
+                     "return !!el && el.value === ''; ")
+            end = time.monotonic() + 5
+            while self.execute(probe) is not True:
+                if time.monotonic() >= end:
+                    raise WebDriverError(f"input did not clear its existing value: {selector}")
+                time.sleep(0.05)
+            return f"filled {selector}"
         password_input = platform.system() == "Linux" and self.execute(
             f"const el = document.querySelector({json.dumps(selector)});"
             "return el instanceof HTMLInputElement && el.type === 'password';"
@@ -884,6 +939,28 @@ class NativeSession:
             self.type_text(text)
         return f"filled {selector}"
 
+    def _select_wayland_fill_input(self, selector: str) -> None:
+        # A successful /actions response can precede GTK's focus/selection
+        # update on Wayland. Backspace then deletes only the character before
+        # the caret, leaving an old prefix in ports, paths and passwords.
+        # Observe the real selection before proceeding; never rewrite values.
+        probe = (
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "if (!el || document.activeElement !== el) return false;"
+            "if (el.selectionStart === null) return true;"
+            "return el.selectionStart === 0 && el.selectionEnd === el.value.length;"
+        )
+        for _ in range(3):
+            self.press_combo("Mod+a")
+            deadline = time.monotonic() + 0.5
+            while True:
+                if self.execute(probe) is True:
+                    return
+                if time.monotonic() >= deadline:
+                    break
+                time.sleep(0.05)
+        raise WebDriverError(f"Wayland input did not select its existing value: {selector}")
+
     def _paste_linux_password(self, element: str, selector: str, text: str, check: str) -> None:
         from qa_ui_auto import host_clipboard
 
@@ -892,7 +969,10 @@ class NativeSession:
             previous = host_clipboard.get_text()
         try:
             self.request("POST", self.element_path(element, "/click"), {})
-            self.press_combo("Mod+a")
+            if os.environ.get("GDK_BACKEND") == "wayland":
+                self._select_wayland_fill_input(selector)
+            else:
+                self.press_combo("Mod+a")
             self.press_combo("Backspace")
             host_clipboard.set_text(text)
             self.press_combo("Control+v")
@@ -1032,6 +1112,8 @@ class NativeSession:
 
     def type_text(self, text: str) -> str:
         """Type text into the focused element, one paced key pair per char."""
+        if not text:
+            return "typed 0 chars"
         if platform.system() == "Darwin":
             # The macOS in-process bridge dispatches a whole /actions
             # sequence inside one synchronous JS task. MutationObserver
@@ -1128,6 +1210,25 @@ class NativeSession:
         script = r"""
         if (!window.__QA_UI_AUTO_CONSOLE__) {
           window.__QA_UI_AUTO_CONSOLE__ = [];
+          // Keep focus transitions without recording typed text or values.
+          window.__QA_UI_AUTO_FOCUS__ = [];
+          const describeFocus = el => ({
+            tag: el?.tagName ?? null,
+            testid: el?.getAttribute?.('data-testid') ?? null,
+            role: el?.getAttribute?.('role') ?? null
+          });
+          for (const type of ['focusin', 'focusout', 'pointerdown', 'pointerup', 'click']) {
+            document.addEventListener(type, event => {
+              window.__QA_UI_AUTO_FOCUS__.push({
+                type, time: performance.now(), trusted: event.isTrusted,
+                target: describeFocus(event.target),
+                related: describeFocus(event.relatedTarget),
+                active: describeFocus(document.activeElement),
+                document_has_focus: document.hasFocus()
+              });
+              if (window.__QA_UI_AUTO_FOCUS__.length > 64) window.__QA_UI_AUTO_FOCUS__.shift();
+            }, true);
+          }
           for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
             const original = console[level] ? console[level].bind(console) : console.log.bind(console);
             console[level] = (...args) => {

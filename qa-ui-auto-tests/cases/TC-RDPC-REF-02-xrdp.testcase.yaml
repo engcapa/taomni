@@ -1,8 +1,8 @@
 id: TC-RDPC-REF-02-xrdp
 title: Taomni RDP client renders and controls a real xrdp reference desktop
 description: 'AC-E07/E08: connect the product client to a disposable reference account, confirm its certificate,
-  assert decoded magenta/cyan pixels and click to flip the target. Exercise full screen, quality evidence, restore
-  and disconnect. Disable NLA in the saved session because xrdp uses TLS/Client Info logon rather than CredSSP. DEC-07 authorizes sudo xrdp provisioning only on the hosted Linux runner.'
+  assert decoded magenta/cyan pixels with negotiated bulk compression and click to flip the target. Exercise full screen, quality evidence, restore
+  and disconnect, including xrdp desktop resize/reactivation, activation-time bulk history resets, and retaining RemoteFX repaint through frontend dimension updates at non-tile-aligned desktop sizes. Retain QA-only protocol/render diagnostics and bounded server packet evidence for failed resize analysis. Disable NLA in the saved session because xrdp uses TLS/Client Info logon rather than CredSSP. DEC-07 authorizes sudo xrdp provisioning only on the hosted Linux runner.'
 covers:
 - F9.7
 tags:
@@ -121,6 +121,8 @@ steps:
 - wait_for: '[data-testid="rdp-bar-quality"]'
 - rdp_canvas_assert:
     artifact: reference-fullscreen
+    match_viewport: true
+    resized_from: reference-after.json
     points:
     - x: 280
       y: 240
@@ -153,7 +155,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The product client connects to the reference desktop and decodes its known target pixels.
+    requirement: The product client connects with bulk compression enabled and decodes the reference desktop's known target pixels.
     actions:
     - 19
     - 22
@@ -193,7 +195,7 @@ verification:
     - step: 32
       expectation: Full screen connection bar is visible.
     - step: 34
-      expectation: Decoded fullscreen pixels and the client WebView PNG including the connection bar are retained.
+      expectation: The desktop dimensions changed and match the fullscreen viewport; decoded pixels after reactivation and the client WebView PNG including the connection bar are retained.
     - step: 35
       expectation: The actual quality value is recorded (0..4).
     - step: 37

@@ -213,7 +213,8 @@ class VerificationTest(unittest.TestCase):
             case = TestCase(id="TC-fail", title="Failure", modes=["native"], steps=[{"click": "missing"}])
             session = Mock()
             session.console_entries.return_value = []
-            session.execute.return_value = "<html>failure</html>"
+            focus = {"document_has_focus": False, "visibility": "visible", "active": {"tag": "DIV"}}
+            session.execute.side_effect = [focus, "<html>failure</html>"]
             captured = []
             session.screenshot.side_effect = lambda path: captured.append(not session.close.called)
             harness = Mock()
@@ -224,6 +225,8 @@ class VerificationTest(unittest.TestCase):
                  patch.object(native_steps, "run_native_step", side_effect=RuntimeError("failure")):
                 results = runner._native_run([case], {}, {}, root, False)
             self.assertEqual(captured, [True])
+            self.assertEqual(json.loads((root / "TC-fail/focus-failure.json").read_text()), focus)
+            self.assertNotIn(".focus(", session.execute.call_args_list[0].args[0])
             harness.create_session.assert_called_once()
             session.close.assert_called_once()
             self.assertEqual(results[0]["failure"]["step_index"], 1)

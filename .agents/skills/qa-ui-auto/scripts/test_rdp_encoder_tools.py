@@ -1,8 +1,9 @@
-"""Encoder QA tool boundaries, readiness and failure cleanup (all OS calls mocked)."""
+"""Encoder QA boundaries and cleanup; accounts/services are always mocked."""
 import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import sys
@@ -287,6 +288,34 @@ class EncoderToolsTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "WebView capture failed"):
             steps._do_rdp_canvas_assert(self.ctx, {"points": [{"x": 60, "y": 100, "rgb": [255, 0, 255]}]})
 
+    def test_canvas_resize_waits_for_new_viewport_dimensions_and_repaint(self):
+        (self.case / "before.json").write_text('{"width":994,"height":750}', encoding="utf-8")
+        viewport = {"width": 1492, "height": 1030}
+        self.ctx.session.execute.side_effect = [
+            {"width": 994, "height": 750, "viewport_size": {"width": 994, "height": 750}, "pixels": [[255, 255, 255, 255]]},
+            {"width": 994, "height": 750, "viewport_size": viewport, "pixels": [[255, 255, 255, 255]]},
+            {"width": 1492, "height": 1030, "viewport_size": viewport, "pixels": [[0, 0, 0, 0]]},
+            {"width": 1492, "height": 1030, "viewport_size": viewport, "pixels": [[255, 255, 255, 255]]},
+        ]
+        with patch.object(steps.time, "sleep"):
+            steps._do_rdp_canvas_assert(self.ctx, {
+                "points": [{"x": 280, "y": 240, "rgb": [255, 255, 255]}],
+                "match_viewport": True, "resized_from": "before.json",
+            })
+        self.assertEqual(self.ctx.session.execute.call_count, 4)
+        self.assertEqual(json.loads((self.case / "client-pixels.json").read_text())["width"], 1492)
+        self.ctx.session.screenshot.assert_called_once_with(self.case / "client-pixels.png")
+
+    def test_canvas_matching_pixels_without_viewport_geometry_do_not_pass_resize(self):
+        self.ctx.session.execute.return_value = {"width": 1492, "height": 1030, "pixels": [[255, 255, 255, 255]]}
+        with patch.object(steps.time, "time", side_effect=[0, 11]):
+            with self.assertRaisesRegex(StepError, "decoded client pixels"):
+                steps._do_rdp_canvas_assert(self.ctx, {
+                    "points": [{"x": 280, "y": 240, "rgb": [255, 255, 255]}],
+                    "match_viewport": True, "timeout_sec": 10,
+                })
+        self.ctx.session.screenshot.assert_not_called()
+
     def test_photo_target_noise_is_deterministic_and_changes_each_frame(self):
         self.assertEqual(photo_noise(20, 12, 0), photo_noise(20, 12, 0))
         self.assertNotEqual(photo_noise(20, 12, 0), photo_noise(20, 12, 1))
@@ -451,8 +480,14 @@ class XrdpFixtureTest(unittest.TestCase):
 
     def test_partial_setup_restores_services_config_and_removes_user(self):
         calls = []
+        skeletons = []
         def sudo(*args, **kwargs):
             calls.append((args, kwargs))
+            if args[0] == "useradd":
+                skeleton = Path(args[args.index("--skel") + 1])
+                self.assertTrue(skeleton.is_dir())
+                self.assertEqual(list(skeleton.iterdir()), [])
+                skeletons.append(skeleton)
             if args[0] == "chpasswd":
                 raise RuntimeError("injected password failure")
             return subprocess.CompletedProcess(args, 0, "", "")
@@ -466,7 +501,53 @@ class XrdpFixtureTest(unittest.TestCase):
         self.assertTrue(any(args[:2] == ("userdel", "-r") for args, _ in calls))
         self.assertTrue(any(args == ("tee", "/etc/xrdp/xrdp.ini") for args, _ in calls))
         self.assertTrue(any(args == ("systemctl", "start", "xrdp") for args, _ in calls))
+        self.assertEqual(len(skeletons), 1)
+        self.assertFalse(skeletons[0].exists())
         self.assertFalse(xrdp._STATE)
+
+    def test_timed_out_account_creation_still_removes_partial_account(self):
+        calls = []
+        def sudo(*args, **kwargs):
+            calls.append(args)
+            if args[0] == "useradd":
+                raise RuntimeError("account creation timed out after writing passwd")
+            return subprocess.CompletedProcess(args, 0, "", "")
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), \
+             patch.object(xrdp.platform, "system", return_value="Linux"), \
+             patch.object(xrdp.shutil, "which", return_value="/mock/tool"), \
+             patch.object(Path, "read_bytes", return_value=b"[Globals]\nport=3389\n"), \
+             patch.object(Path, "read_text", return_value="root:x:0:0:root:/root:/bin/bash\n"), \
+             patch.object(xrdp, "_sudo", side_effect=sudo), \
+             patch.object(xrdp.secrets, "token_hex", return_value="dummy"):
+            with self.assertRaisesRegex(RuntimeError, "account creation timed out"):
+                xrdp.setup(SimpleNamespace())
+        self.assertIn(("userdel", "-r", "qaxrdpdummy"), calls)
+        self.assertFalse(xrdp._STATE)
+
+    @unittest.skipUnless(os.name == "posix" and shutil.which("timeout"), "GNU timeout requires POSIX")
+    def test_command_timeout_kills_descendants_that_ignore_term(self):
+        # Exercise a real owned process tree, without sudo/account mutations.
+        real_run = subprocess.run
+        def run_without_sudo(command, **kwargs):
+            self.assertEqual(command[2], "timeout")
+            kwargs["timeout"] = 5
+            return real_run([command[2], "--signal=TERM", "--kill-after=0.1", "0.3", *command[6:]], **kwargs)
+        with tempfile.TemporaryDirectory() as directory:
+            pid_file = Path(directory) / "owned-pids.json"
+            script = ("import json, os, signal, sys, time\n"
+                      "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                      "child = os.fork()\n"
+                      "if not child:\n"
+                      "    with open(sys.argv[1], 'w') as f: json.dump([os.getppid(), os.getpid()], f)\n"
+                      "while True: time.sleep(0.05)\n")
+            with patch.object(xrdp.subprocess, "run", side_effect=run_without_sudo):
+                with self.assertRaisesRegex(RuntimeError, "failed"):
+                    xrdp._sudo(sys.executable, "-c", script, str(pid_file))
+            self.assertTrue(pid_file.exists(), "the child must start before the timeout")
+            for pid in json.loads(pid_file.read_text()):
+                status = Path(f"/proc/{pid}/status")
+                if status.exists():
+                    self.assertRegex(status.read_text(), r"State:\s+Z", "an owned descendant is still alive")
 
     def test_ci_xrdp_install_never_checks_docker(self):
         from ci_services import install

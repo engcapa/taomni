@@ -1208,6 +1208,14 @@ async fn drive_ironrdp_connection(
     let height = connection_result.desktop_size.height;
     let activation_factory = connection_result.activation_factory.clone();
     send_connected_event(&out_tx, width, height, protocol, &server_name);
+    #[cfg(debug_assertions)]
+    let qa_capture_connection = super::qa_graphics_capture::begin(
+        width,
+        height,
+        connection_result.user_channel_id,
+        connection_result.io_channel_id,
+        connection_result.share_id,
+    );
 
     let mut image = IronDecodedImage::new(PixelFormat::RgbA32, width, height);
     let mut active_stage = ActiveStageBuilder {
@@ -1271,6 +1279,8 @@ async fn drive_ironrdp_connection(
             }
             read = framed.read_pdu() => {
                 let (action, payload) = read.map_err(|e| format!("rdp read frame: {}", e))?;
+                #[cfg(debug_assertions)]
+                super::qa_graphics_capture::packet(qa_capture_connection, &format!("{action:?}"), &payload);
                 if let Some(sequence) = reactivation.as_mut() {
                     if matches!(action, Action::X224) {
                         if process_reactivation_frame(
@@ -1285,6 +1295,8 @@ async fn drive_ironrdp_connection(
                         )
                         .await?
                         {
+                            #[cfg(debug_assertions)]
+                            super::qa_graphics_capture::resized(qa_capture_connection, image.width(), image.height());
                             reactivation = None;
                             if let Some(clipboard) = &clipboard {
                                 drain_clipboard_actions(&mut active_stage, clipboard, &mut framed, &out_tx).await?;
@@ -1297,7 +1309,7 @@ async fn drive_ironrdp_connection(
                 }
                 let outputs = active_stage
                     .process(&mut image, action, &payload)
-                    .map_err(|e| format!("rdp active stage: {}", e))?;
+                    .map_err(|e| format!("rdp active stage ({action:?}, {} bytes): {}", payload.len(), e.report()))?;
                 match handle_active_outputs(&mut framed, &image, outputs, &out_tx).await? {
                     ActiveOutputFlow::Continue => {}
                     ActiveOutputFlow::Terminate => break,
@@ -1727,6 +1739,12 @@ where
                 }
             }
             ActiveStageOutput::GraphicsUpdate(rect) => {
+                tracing::debug!(
+                    ?rect,
+                    width = image.width(),
+                    height = image.height(),
+                    "Forwarding decoded RDP graphics"
+                );
                 if let Some(tile) = tile_from_image(image, rect) {
                     tile.validate()?;
                     let payload = frame_payload_with_header(tile.header, &tile.rgba);
@@ -1820,9 +1838,15 @@ where
     // until it receives our Font List, so if we stop after a single `step`
     // (as the old code did) both sides wait on each other forever and the
     // canvas freezes after a maximize/restore until the user reconnects.
+    // Activation ShareData PDUs use the same bulk history as graphics. In
+    // particular, xrdp's Font Map carries FLUSHED/AT_FRONT; parsing it directly
+    // would miss the reset and corrupt the first repaint after this resize.
+    let frame = active_stage
+        .normalize_reactivation_frame(frame)
+        .map_err(|e| format!("rdp reactivation compression: {}", e.report()))?;
     let mut output = WriteBuf::new();
     sequence
-        .step(frame, &mut output)
+        .step(frame.as_ref(), &mut output)
         .map_err(|e| format!("rdp reactivation: {}", e))?;
     flush_reactivation_output(framed, &output).await?;
 
@@ -1833,6 +1857,11 @@ where
             ..
         } = sequence.connection_activation_state()
         {
+            tracing::debug!(
+                width = desktop_size.width,
+                height = desktop_size.height,
+                "RDP desktop reactivation finalized"
+            );
             active_stage.set_enable_server_pointer(enable_server_pointer);
             *image =
                 IronDecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);

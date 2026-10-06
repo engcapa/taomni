@@ -13,7 +13,7 @@ default-run = "taomni"
 # Make the patched protocol crates' unit tests runnable with this application's
 # patch table, while ordinary Cargo commands continue to target Taomni only.
 [workspace]
-members = ["vendor/ironrdp-acceptor", "vendor/ironrdp-bulk", "vendor/ironrdp-server"]
+members = ["vendor/ironrdp-acceptor", "vendor/ironrdp-bulk", "vendor/ironrdp-server", "vendor/ironrdp-session"]
 default-members = ["."]
 resolver = "2"
 
@@ -262,6 +262,7 @@ libspa = { path = "vendor/libspa" }
 ironrdp-connector = { path = "vendor/ironrdp-connector" }
 ironrdp-acceptor = { path = "vendor/ironrdp-acceptor" }
 ironrdp-bulk = { path = "vendor/ironrdp-bulk" }
+ironrdp-session = { path = "vendor/ironrdp-session" }
 # Keep latency-sensitive RDP display updates out of Nagle's small-packet delay.
 ironrdp-server = { path = "vendor/ironrdp-server" }
 picky = { path = "vendor/picky" }
