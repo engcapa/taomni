@@ -2760,6 +2760,18 @@ export function TerminalPanel({
       syncAutomationState();
     });
     const resizeDisposable = term.onResize(({ cols, rows }) => {
+      const { query, index } = fallbackSearchRef.current;
+      if (searchInputRef.current && query && index >= 0) {
+        // xterm reflows the buffer when column count changes. Keep the same
+        // match ordinal, but refresh its coordinates without selecting over
+        // a user's current drag/block selection or navigating to a new hit.
+        const matches = collectBufferMatches(term, query);
+        const nextIndex = Math.min(index, matches.length - 1);
+        fallbackSearchRef.current = { query, index: nextIndex };
+        setSearchMatches(matches);
+        setActiveSearchIndex(nextIndex);
+        setSearchStatus(nextIndex >= 0 ? `Match ${nextIndex + 1}/${matches.length}` : "No matches");
+      }
       setViewportVersion((v) => v + 1);
       appendEvent("resize", `${cols}x${rows}`);
       syncTerminalSize();

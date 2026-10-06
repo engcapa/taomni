@@ -534,6 +534,7 @@ class NativeIsolationTest(unittest.TestCase):
                     patch.object(runner, "_matching_pids", return_value=set()),
                     patch.object(runner, "_reap_orphaned_jdtls", return_value={}),
                     patch.object(runner, "_reap_lingering_qa_apps", return_value={}),
+                    patch.object(reset_db, "reset_native_renderer"),
                 ):
                     results = runner._native_run(
                         [case],

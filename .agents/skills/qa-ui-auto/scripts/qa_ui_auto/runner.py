@@ -485,6 +485,12 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     r["timings"]["session_setup_sec"] = time.monotonic() - session_started
                     nctx: NativeStepContext | None = None
                     try:
+                        if platform.system() == "Darwin" and "reset_db" in c.fixtures:
+                            from .fixtures.reset_db import reset_native_renderer
+
+                            renderer_reset_started = time.monotonic()
+                            reset_native_renderer(ctx_ns, session)
+                            r["timings"]["renderer_reset_sec"] = time.monotonic() - renderer_reset_started
                         nctx = NativeStepContext(session, case_dir, cfg)
                         last_step, last_verb, last_args = 0, "<setup>", None
                         for i, step in enumerate(c.steps, start=1):
