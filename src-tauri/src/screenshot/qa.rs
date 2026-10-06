@@ -1962,6 +1962,62 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let preview_ok = info["naturalWidth"].as_u64() == Some(clip.width as u64)
         && info["naturalHeight"].as_u64() == Some(clip.height as u64)
         && (format != "mp4" || info["playbackMoved"] == json!(true));
+    // Start a fresh native session after Done, then use the real Cancel
+    // control. Mount readiness must not leave a previous window/session or
+    // output alive, including when the first preview has already been used.
+    let second = super::screenshot_start_recording(
+        app.clone(),
+        Some(display.id.clone()),
+        Some(region.0),
+        Some(region.1),
+        Some(region.2),
+        Some(region.3),
+        format.clone(),
+        Some(10),
+    )
+    .await?;
+    let cancel_output = super::record::output_path(&second.recording_id)
+        .ok_or("cancel recording output not tracked")?;
+    let second_main_hidden = !main_visible(&app);
+    let second_bar = wait_window(&app, super::RECORDER_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+    run_js(
+        &second_bar,
+        r#"for (let i = 0; i < 50; i++) {
+            const stop = document.querySelector('[data-testid="screenshot-recorder-stop"]');
+            if (stop && !stop.disabled) {
+                const cancel = document.querySelector('[data-testid="screenshot-recorder-cancel"]');
+                if (!cancel || cancel.disabled) throw new Error('Cancel unavailable while recording');
+                cancel.click(); return true;
+            }
+            await new Promise(r => setTimeout(r, 100));
+        }
+        throw new Error('fresh recorder did not initialize');"#,
+        Duration::from_secs(10),
+    )
+    .await
+    .map_err(|e| format!("{e:#}"))?;
+    let cancel_closed = wait_closed(&app, super::RECORDER_LABEL, Duration::from_secs(10)).await;
+    let cancel_deadline = Instant::now() + Duration::from_secs(10);
+    while (!main_visible(&app)
+        || cancel_output.exists()
+        || super::tool_state().recording.is_some()
+        || app
+            .windows()
+            .keys()
+            .any(|label| label.starts_with(super::surfaces::BORDER_PREFIX)))
+        && Instant::now() < cancel_deadline
+    {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let cancel_restored = main_visible(&app);
+    let cancel_output_removed = !cancel_output.exists();
+    let cancel_session_empty = super::tool_state().recording.is_none();
+    let cancel_borders_closed = !app
+        .windows()
+        .keys()
+        .any(|label| label.starts_with(super::surfaces::BORDER_PREFIX));
     let ok = main_hidden
         && geometry["controlsOutside"] == json!(true)
         && geometry["bordersOutside"] == json!(true)
@@ -1973,6 +2029,13 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
         && copied
         && preview_retained
         && output_removed
+        && second_main_hidden
+        && second.recording_id != started.recording_id
+        && cancel_closed
+        && cancel_restored
+        && cancel_output_removed
+        && cancel_session_empty
+        && cancel_borders_closed
         && clip.frames >= 8
         && clip.distinct_frames >= 4
         && content["passed"] == json!(true)
@@ -1981,7 +2044,9 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     Ok(report(
         ok,
         json!({ "page":info,"clip":clip,"barClosed":closed,"mainHidden":main_hidden,"mainRestored":restored,
-        "gifCopied":copied,"previewRetained":preview_retained,"tempRemoved":output_removed,"format":format,"originalComparison":content,"artifact":artifact,"captureGeometry":geometry }),
+        "gifCopied":copied,"previewRetained":preview_retained,"tempRemoved":output_removed,"format":format,"originalComparison":content,"artifact":artifact,"captureGeometry":geometry,
+        "cancel":{"freshSession":second.recording_id != started.recording_id,"mainHidden":second_main_hidden,"barClosed":cancel_closed,"mainRestored":cancel_restored,
+        "tempRemoved":cancel_output_removed,"sessionEmpty":cancel_session_empty,"bordersClosed":cancel_borders_closed} }),
     ))
 }
 

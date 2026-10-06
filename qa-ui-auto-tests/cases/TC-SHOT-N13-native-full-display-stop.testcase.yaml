@@ -20,7 +20,8 @@ verification:
   review: reviewed
   requirements:
   - id: full-recorder
-    requirement: Whole-display recording keeps controls outside captured pixels or hides them; the production screenshot hotkey
+    requirement: Whole-display recorder controls finish mounting before sampling while staying hidden when there is no
+      external control position. Whole-display recording keeps controls outside captured pixels or hides them; the production screenshot hotkey
       route stops it before showing the preview; a real GIF decodes and cleanup restores main.
     actions:
     - 1

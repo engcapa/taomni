@@ -26,7 +26,8 @@ verification:
   review: reviewed
   requirements:
   - id: gif-recorder
-    requirement: Recorder UI stops a real clip, loads GIF preview, copies first frame, preserves preview on reentry and Done
+    requirement: Recorder controls finish mounting and are shown outside the crop before capture starts; their existing
+      current-recording handshake waits for the resulting id. Recorder UI stops a real clip, loads GIF preview, copies first frame, preserves preview on reentry and Done
       restores main/removes temp clip. Recording borders are visible outside the selected pixels and the control bar does
       not intersect the recording; decoded original scene comparisons reject captured tool chrome.
     actions:
@@ -36,7 +37,8 @@ verification:
       expectation: Timer advances; every decoded GIF frame matches original state pixels/id/nonce and ordered source visibility
         intervals (<=250ms drift) before preview/clipboard checks can pass. Preview dimensions agree, first frame clipboard
         exists, reentry retains preview and Done restores main/removes temp. GIF, actual original PNG states, timeline and
-        difference contact sheet are retained.
+        difference contact sheet are retained. After Done, start a fresh real recording and click Cancel while Stop is enabled;
+        main is restored, controls/borders close, the recording id is cleared and its temporary output is removed.
     results:
     - 3
   visual:

@@ -1358,7 +1358,7 @@ N08 精准 run 37233544174 的三端 native 36 步已全部通过，身份、nat
 
 按用户最新要求，本轮不测试 LAN Chat。最终选择为 290 ID / 875 次六端执行；TC-001/B06/B38 保留非 LAN 动作与业务结果，N20 不选择。最终验收须来自同一稳定产品/runner/YAML 输入的一次完整六端运行，并核对 21 个独立业务观察、126 张实际 UI 原图和 12 张录屏差分。真实 OS picker/IME/DPI/跨屏/读屏与匹配性能基线继续单列后续验收。
 
-输入 b23f2da3 的精准 run 37393821741 为 26/1/0，macOS N7 失败；同输入区分 run 37395892565 再次 N7 失败，阻塞完整验收。全零 RGBA 原生帧与 GIF 对应 PNG bytes/hash 相同，不能归因于编码器。N7 保持每帧原图/id/nonce、250 ms drift、700 ms unexplained gap 和完整生命周期断言；QA 增加有界采集阶段耗时，用来定位编码前停顿，不作通过依据。历史失败保留；尚未完成的任务继续 verification。
+输入 b23f2da3 的精准 run 37393821741 为 26/1/0，macOS N7 失败；同输入区分 run 37395892565 再次 N7 失败，阻塞完整验收。全零 RGBA 原生帧与 GIF 对应 PNG bytes/hash 相同，不能归因于编码器。N7 保持每帧原图/id/nonce、250 ms drift、700 ms unexplained gap 和完整生命周期断言；QA 增加有界采集阶段耗时，用来定位编码前停顿，不作通过依据。输入 21133cbb 的 run 37403583535 为 macOS 5/0/0；N7/N8 provider 读取仍分别约 506/584 ms。候选调整为控件挂载并显示后再采集，N7/N8 及取消/全屏/失败路径均须以原步骤复验。历史失败保留；尚未完成的任务继续 verification。
 
 ## main 合并后增量验收（当前为 verification）
 

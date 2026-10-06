@@ -31,7 +31,9 @@
 
 输入 `b23f2da3` 的 [六端精准 run 37393821741](https://github.com/engcapa/taomni/actions/runs/37393821741) 为 **26 pass / 1 fail / 0 skip**：browser 三端各 3/0/0、403 步；native Linux/Windows 各 6/0/0、90 步，macOS 5/1/0、89 步。身份、receipt、构建及原始 ZIP hashes 匹配；Linux 原图发布和 macOS N12 高视口验证通过。macOS N7 的 802 ms 采集停顿超出原时间断言；同输入 [区分 run 37395892565](https://github.com/engcapa/taomni/actions/runs/37395892565) 再次 5/1/0，N7 有 1068 ms 采集停顿、全零 RGBA 原始帧及两帧比对失败。GIF 与失败 raw PNG 完全一致，差异在编码前；内部原因尚未确定，不再以原样重跑作为恢复依据。
 
-候选只在 QA trace 增加 macOS 快照/provider/copy/conversion 有界阶段耗时与图像尺寸信息，不改变原像素、采集时间戳或固定断言。待定位并恢复后，执行最终 **290 ID / 875 次**统一输入六端回归，实际审阅 **126 张 UI 原图及 12 张录屏差分**；新增 12 张是 LAN 排除后 TC-001/B06/B38 的共享入口画面。LAN Chat 按用户要求排除，历史记录保留。TASK-01～12 仍为 verification。
+QA trace 增加 macOS 快照/provider/copy/conversion 有界阶段耗时与图像尺寸信息，不改变原像素、采集时间戳或固定断言。输入 `21133cbb` 的 [定位 run 37403583535](https://github.com/engcapa/taomni/actions/runs/37403583535) 为 macOS **5/0/0**；四条录屏原像素/时间/生命周期通过，但 N7/N8 仍有 522/603 ms poll，分别约 506/584 ms 位于 provider 读取，N5/N6 最长仅 38/22 ms。内部长停顿根因尚未完全确定，不能称诊断代码已修复产品。
+
+候选调整控件启动顺序：复用 RecorderBar 挂载后查询当前录屏 id 的 IPC 握手；控件完成挂载并在采集区外显示后，才通过既有 compositor settle 开始原生采集。全屏控件继续保持隐藏；启动关闭、加载失败、取消和录屏失败沿原清理/恢复路径处理。unit 检查未挂载时不继续、ready 后继续、关闭拒绝；N7/N8 原步骤和固定像素/时间检查保留，Done 后新增第二个真实录屏的 Cancel 操作，独立观察新 id、主窗口恢复、session 清空、控件/边框关闭和临时输出删除。Rust full `629` 1604/0/16、frontend `631` 48/48 通过；QA Cancel 增量后的 Rust `633` 仍需收齐。再次 fetch main `632` 仍为已合入的 bc130eee，没有新待合并提交。待原断言复验恢复后，执行最终 **290 ID / 875 次**统一输入六端回归，实际审阅 **126 张 UI 原图及 12 张录屏差分**；新增 12 张是 LAN 排除后 TC-001/B06/B38 的共享入口画面。LAN Chat 按用户要求排除，历史记录保留。TASK-01～12 仍为 verification。
 
 ## 上一批次实施进度（历史）
 

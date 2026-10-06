@@ -1,5 +1,6 @@
 id: TC-SHOT-N8
 title: Native MP4 recorder preview decodes and actually plays
+description: Recorder controls mount before native sampling and appear outside the crop. Keep the original MP4 pixel/timeline, timer, playback and cleanup assertions when exercising this startup order; after Done, start a fresh native recording and Cancel it, checking main restoration and no remaining session, controls, borders or temporary output.
 covers:
 - F27.1
 tags:
@@ -26,7 +27,7 @@ verification:
   review: reviewed
   requirements:
   - id: mp4-recorder
-    requirement: Recorder stop loads a real MP4 in the platform WebView and playback advances, then Done restores main/removes
+    requirement: Recorder controls finish mounting before sampling. Recorder stop loads a real MP4 in the platform WebView and playback advances, then Done restores main/removes
       temp clip. Recording borders are visible outside the selected pixels and the control bar does not intersect the recording;
       decoded original scene comparisons reject captured tool chrome.
     actions:
@@ -36,7 +37,9 @@ verification:
       expectation: Every decoded video frame matches its actual original scene PNG/id/random nonce and ordered timeline; only
         gaps unexplained by real original visibility holds may count as a stall, in addition to timer advance and real WebView
         metadata/pixels/playback advancement. Dimensions agree, reentry retains preview and Done restores main/removes temp.
-        MP4, source frame PNGs, per-frame metrics/timeline and difference contact sheet are retained.
+        MP4, source frame PNGs, per-frame metrics/timeline and difference contact sheet are retained. Then a fresh real recording
+        is cancelled using its enabled control; main is restored, controls and borders close, recording id is cleared and its
+        temporary output is removed.
     results:
     - 3
   visual:

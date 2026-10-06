@@ -113,6 +113,8 @@ struct ToolState {
     recording: Option<String>,
     /// Remains true while the stopped clip is being previewed.
     recorder_open: bool,
+    /// The new recorder has mounted before native sampling begins.
+    recorder_ready: Option<tokio::sync::oneshot::Sender<()>>,
     include_current_window: bool,
     recording_region: Option<PhysicalRegion>,
     scroll: Option<Arc<scroll::ScrollControl>>,
@@ -798,6 +800,7 @@ pub(crate) fn close_session(app: &AppHandle) {
         let mut state = tool_state();
         state.overlay = None;
         state.recorder_open = false;
+        state.recorder_ready = None;
         state.recording_region = None;
         state.include_current_window = false;
         if let Some(control) = state.scroll.take() {
@@ -1052,14 +1055,36 @@ pub async fn screenshot_start_recording(
         display.height,
         region.unwrap_or((0, 0, display.width, display.height)),
     );
-    capture_control_position(&app, &display, surfaces::region_rect(&display, bounded))?;
+    let control_position =
+        capture_control_position(&app, &display, surfaces::region_rect(&display, bounded))?;
     if !tool_state().include_current_window {
         hide_app_windows(&app);
     }
     if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
         let _ = window.hide();
     }
-    if let Err(error) = open_recorder_bar(&app, &display, bounded) {
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    tool_state().recorder_ready = Some(ready_tx);
+    let prepared = async {
+        open_recorder_bar(&app, &display, bounded)?;
+        wait_for_recorder_mount(ready_rx).await?;
+        if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
+            return Err("screen recording start was cancelled".into());
+        }
+        // Finish loading/showing a fresh WebView before native sampling so
+        // its startup work does not overlap provider readback. Controls stay
+        // they remain outside the crop, or hidden for whole-display capture.
+        if control_position.is_some() {
+            app.get_webview_window(RECORDER_LABEL)
+                .ok_or("recording controls closed during startup")?
+                .show()
+                .map_err(|e| format!("show recording controls: {e}"))?;
+        }
+        Ok::<_, String>(())
+    }
+    .await;
+    if let Err(error) = prepared {
+        tool_state().recorder_ready = None;
         surfaces::close_borders(&app);
         if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
             let _ = window.close();
@@ -1121,13 +1146,14 @@ pub async fn screenshot_start_recording(
     if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
         let _ = window.close();
     }
-    if capture_control_position(&app, &display, surfaces::region_rect(&display, bounded))?.is_some()
-    {
-        if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
-            let _ = window.show();
-        }
-    }
     Ok(RecordingStarted { recording_id })
+}
+
+async fn wait_for_recorder_mount(ready: tokio::sync::oneshot::Receiver<()>) -> Result<(), String> {
+    tokio::time::timeout(Duration::from_secs(10), ready)
+        .await
+        .map_err(|_| "recording controls did not finish loading".to_string())?
+        .map_err(|_| "recording controls closed during startup".to_string())
 }
 
 #[tauri::command]
@@ -1190,7 +1216,14 @@ pub async fn screenshot_cancel_recording(
 
 /// The recorder bar window reads this to learn which recording it controls.
 #[tauri::command]
-pub async fn screenshot_current_recording() -> Result<Option<String>, String> {
+pub async fn screenshot_current_recording(window: WebviewWindow) -> Result<Option<String>, String> {
+    // RecorderBar invokes this from its mounted effect. Reuse that existing
+    // handshake instead of a second readiness event or a fixed load delay.
+    if window.label() == RECORDER_LABEL {
+        if let Some(ready) = tool_state().recorder_ready.take() {
+            let _ = ready.send(());
+        }
+    }
     while STARTING_RECORDING.load(Ordering::SeqCst) && tool_state().recording.is_none() {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
@@ -1270,6 +1303,26 @@ fn open_recorder_bar(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn recorder_preparation_waits_for_mount_and_rejects_closed_startup() {
+        let (ready, receiver) = tokio::sync::oneshot::channel();
+        let pending = tokio::spawn(wait_for_recorder_mount(receiver));
+        tokio::task::yield_now().await;
+        assert!(
+            !pending.is_finished(),
+            "capture must not start before mount"
+        );
+        ready.send(()).unwrap();
+        assert!(pending.await.unwrap().is_ok());
+
+        let (ready, receiver) = tokio::sync::oneshot::channel();
+        drop(ready);
+        assert_eq!(
+            wait_for_recorder_mount(receiver).await.unwrap_err(),
+            "recording controls closed during startup"
+        );
+    }
 
     #[test]
     fn recording_requires_a_complete_nonempty_region() {
