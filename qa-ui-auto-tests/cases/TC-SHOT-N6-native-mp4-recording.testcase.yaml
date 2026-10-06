@@ -1,5 +1,6 @@
 id: TC-SHOT-N6
 title: Native H264 MP4 decoded frames match original scene pixels and timeline
+description: Compare every decoded MP4 frame to the completed source scene published to the native canvas in a single draw every 50ms. Retain the per-frame pixel, state order, random nonce and playback timing checks.
 covers: [F27.1]
 tags: [screenshot, recording, native, p1]
 modes: [native]

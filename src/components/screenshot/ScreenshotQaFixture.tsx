@@ -115,6 +115,16 @@ function PixelFixture({ animated }: { animated: boolean }) {
     canvas.height = Math.round(height * scale);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    // OS capture runs independently of JavaScript. Finish the animated scene
+    // offscreen before publishing it so the visible canvas is never the
+    // scratch surface for the next frame's background, codes and moving blocks.
+    const frameCanvas = animated ? document.createElement("canvas") : canvas;
+    if (animated) {
+      frameCanvas.width = canvas.width;
+      frameCanvas.height = canvas.height;
+    }
+    const paintContext = frameCanvas.getContext("2d");
+    if (!paintContext) return;
     const nonce = crypto.getRandomValues(new Uint16Array(1))[0] || 1;
     const source: SourceEvidence = {
       kind: animated ? "anim" : "scroll", cssWidth: width, cssHeight: height,
@@ -123,11 +133,13 @@ function PixelFixture({ animated }: { animated: boolean }) {
     window.__qaScreenshotSource = source;
     let id = 0;
     const draw = () => {
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-      if (animated) paintAnimation(ctx, width, height, id, nonce);
-      else paintPage(ctx, width);
-      const dataUrl = canvas.toDataURL("image/png");
+      paintContext.setTransform(scale, 0, 0, scale, 0, 0);
+      if (animated) paintAnimation(paintContext, width, height, id, nonce);
+      else paintPage(paintContext, width);
+      const dataUrl = frameCanvas.toDataURL("image/png");
       if (animated) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(frameCanvas, 0, 0);
         source.frames.push({ id, atMs: performance.now(), dataUrl });
         // Bounded originals from actual draw calls, never reconstructed later.
         if (source.frames.length > 240) source.frames.shift();
