@@ -21,6 +21,8 @@ pub struct ScreenshotFavorite {
     pub width: u32,
     pub height: u32,
     pub created_at: u64,
+    #[serde(default)]
+    pub note: String,
 }
 
 fn root(app: &AppHandle) -> anyhow::Result<PathBuf> {
@@ -66,6 +68,7 @@ fn add(root: &Path, src: &Path) -> anyhow::Result<ScreenshotFavorite> {
         width: image.width(),
         height: image.height(),
         created_at: SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
+        note: String::new(),
     };
     std::fs::create_dir_all(root)?;
     let staging = root.join(format!(".pending-{}", favorite.id));
@@ -103,7 +106,12 @@ pub async fn screenshot_add_favorite(
 ) -> Result<ScreenshotFavorite, String> {
     blocking("favorite", move || {
         let _guard = STORAGE.lock().unwrap_or_else(|e| e.into_inner());
-        add(&root(&app)?, &capture::ensure_artifact_path(&path)?)
+        let root = root(&app)?;
+        let mut item = add(&root, &capture::ensure_artifact_path(&path)?)?;
+        let note = super::tool_state().pins.values().find(|pin| pin.path == path).map(|pin| pin.note.clone()).unwrap_or_default();
+        item.note = note;
+        std::fs::write(entry_dir(&root, &item.id)?.join("info.json"), serde_json::to_vec(&item)?)?;
+        Ok(item)
     })
     .await
 }
@@ -148,13 +156,7 @@ pub async fn screenshot_pin_favorite(app: AppHandle, id: String) -> Result<Strin
         Ok((path, favorite))
     })
     .await?;
-    super::open_pin(
-        &app,
-        path,
-        favorite.width,
-        favorite.height,
-        Some(favorite.id),
-    )
+    super::open_pin_with_note(&app, path, favorite.width, favorite.height, Some(favorite.id), favorite.note)
 }
 
 #[cfg(test)]

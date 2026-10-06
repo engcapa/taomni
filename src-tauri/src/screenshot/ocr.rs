@@ -1,9 +1,14 @@
 //! OCR text extraction and automatic sensitive-information redaction.
 //!
-//! Uses the `tesseract` CLI when available (no linked native dependency, so
-//! the build stays portable across Windows / Linux / macOS). TSV output gives
-//! word-level bounding boxes, which the auto-redact pass uses to locate
-//! e-mail addresses, phone numbers and ID-like tokens.
+//! Engines, in order of preference (no user installation needed on Windows
+//! or macOS):
+//! - Windows: the built-in `Windows.Media.Ocr` engine (Windows 10+).
+//! - macOS: the built-in Vision `VNRecognizeTextRequest` (10.15+).
+//! - Linux, and a fallback everywhere: the `tesseract` CLI. Linux packages
+//!   recommend `tesseract-ocr` + Chinese data so distro installs get it.
+//!
+//! Word-level bounding boxes feed the auto-redact pass, which locates e-mail
+//! addresses, phone numbers and ID-like tokens.
 
 use serde::Serialize;
 use std::process::Command;
@@ -71,14 +76,87 @@ pub fn tesseract_available() -> bool {
         .unwrap_or(false)
 }
 
+/// Which engine OCR uses on this machine, if any.
+pub fn engine_name() -> Option<&'static str> {
+    #[cfg(target_os = "windows")]
+    if super::ocr_windows::available() {
+        return Some("windows");
+    }
+    #[cfg(target_os = "macos")]
+    if super::ocr_macos::available() {
+        return Some("vision");
+    }
+    tesseract_available().then_some("tesseract")
+}
+
+/// Platform-specific instructions shown when no OCR engine is usable.
+pub fn install_hint() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "Windows OCR has no installed recognition language. Open Settings > Time & language > Language & region, add a language (e.g. Chinese (Simplified) or English) including its OCR feature, then retry. Installing Tesseract also works."
+    } else if cfg!(target_os = "macos") {
+        "macOS text recognition is unavailable on this system. Install Tesseract (`brew install tesseract tesseract-lang`) and retry."
+    } else {
+        "OCR needs Tesseract. Install it with your package manager, e.g. `sudo apt install tesseract-ocr tesseract-ocr-chi-sim` (Debian/Ubuntu) or `sudo dnf install tesseract tesseract-langpack-chi_sim` (Fedora), then retry."
+    }
+}
+
+/// Split one recognized line into word boxes. Engines that report only line
+/// geometry (Vision) still need per-token boxes for redaction, so each
+/// whitespace-separated token gets a slice of the line proportional to its
+/// rendered width (CJK characters count double, as they are full-width).
+pub fn split_line_words(
+    text: &str,
+    (x, y, w, h): (f64, f64, f64, f64),
+    conf: f32,
+    line_key: &str,
+) -> Vec<OcrWord> {
+    let weight = |c: char| if (c as u32) >= 0x2E80 { 2.0 } else { 1.0 };
+    let total = text.chars().map(weight).sum::<f64>().max(1.0);
+    let unit = w / total;
+    let mut out = Vec::new();
+    let mut offset = 0.0;
+    let mut token: Option<(usize, f64)> = None;
+    let mut push = |token: &str, start: f64, end: f64| {
+        out.push(OcrWord {
+            text: token.to_string(),
+            line_key: line_key.to_string(),
+            x: (x + start).round().max(0.0) as u32,
+            y: y.round().max(0.0) as u32,
+            w: (end - start).round().max(1.0) as u32,
+            h: h.round().max(1.0) as u32,
+            conf,
+        });
+    };
+    for (i, c) in text.char_indices() {
+        if c.is_whitespace() {
+            if let Some((start, start_offset)) = token.take() {
+                push(&text[start..i], start_offset, offset);
+            }
+        } else if token.is_none() {
+            token = Some((i, offset));
+        }
+        offset += weight(c) * unit;
+    }
+    if let Some((start, start_offset)) = token {
+        push(&text[start..], start_offset, offset);
+    }
+    out
+}
+
+/// Reuse the native sensitive-token classifier for the bundled offline engine.
+#[tauri::command]
+pub fn screenshot_redact_tsv(tsv: String) -> Result<RedactResult, String> {
+    if tsv.len() > 8 * 1024 * 1024 { return Err("OCR result exceeds size limit".into()); }
+    let words: Vec<_> = parse_tsv_words(&tsv).into_iter().filter(|w| w.conf >= 30.0).collect();
+    let boxes = find_sensitive(&words);
+    Ok(RedactResult { count: boxes.len(), boxes })
+}
+
 /// Run tesseract on `path`, requesting TSV output for word boxes.
 /// Returns `(tsv_text, langs_used)`.
 fn run_tesseract_tsv(path: &str) -> Result<(String, String), String> {
     if !tesseract_available() {
-        return Err(
-            "tesseract is not installed. Install it to use OCR (e.g. `brew install tesseract`, `apt install tesseract-ocr tesseract-ocr-chi-sim`, or the UB-Mannheim build on Windows)."
-                .to_string(),
-        );
+        return Err(install_hint().to_string());
     }
     // Prefer Chinese+English; fall back to English only when the Chinese data
     // files are missing.
@@ -157,15 +235,48 @@ fn words_to_text(words: &[OcrWord]) -> String {
     text
 }
 
-/// Run OCR on an image file. Blocking; call from `spawn_blocking`.
+/// Run OCR on an image file with the best available engine. Blocking; call
+/// from `spawn_blocking`. A built-in engine that fails falls back to
+/// tesseract when it is installed.
 pub fn ocr_image(path: &str) -> Result<OcrResult, String> {
-    let (tsv, langs) = run_tesseract_tsv(path)?;
-    let words: Vec<OcrWord> = parse_tsv_words(&tsv)
-        .into_iter()
-        .filter(|w| w.conf >= 30.0)
-        .collect();
+    #[allow(unused_mut)]
+    let mut native_error: Option<String> = None;
+    #[cfg(target_os = "windows")]
+    if super::ocr_windows::available() {
+        let attempt = image::open(path)
+            .map_err(|e| format!("read image for OCR: {e}"))
+            .and_then(|image| super::ocr_windows::recognize(&image.to_rgba8()));
+        match attempt {
+            Ok(result) => return Ok(finish(result.words, format!("windows:{}", result.langs))),
+            Err(error) => native_error = Some(error),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    if super::ocr_macos::available() {
+        let attempt = std::fs::read(path)
+            .map_err(|e| format!("read image for OCR: {e}"))
+            .and_then(|bytes| {
+                let (w, h) = image::image_dimensions(path).map_err(|e| e.to_string())?;
+                super::ocr_macos::recognize(&bytes, w, h)
+            });
+        match attempt {
+            Ok(result) => return Ok(finish(result.words, format!("vision:{}", result.langs))),
+            Err(error) => native_error = Some(error),
+        }
+    }
+    match run_tesseract_tsv(path) {
+        Ok((tsv, langs)) => Ok(finish(parse_tsv_words(&tsv), langs)),
+        Err(error) => Err(match native_error {
+            Some(native) => format!("{native}\n{error}"),
+            None => error,
+        }),
+    }
+}
+
+fn finish(words: Vec<OcrWord>, langs: String) -> OcrResult {
+    let words: Vec<OcrWord> = words.into_iter().filter(|w| w.conf >= 30.0).collect();
     let text = words_to_text(&words);
-    Ok(OcrResult { text, words, langs })
+    OcrResult { text, words, langs }
 }
 
 fn is_email(token: &str) -> bool {
@@ -418,6 +529,49 @@ mod tests {
         // Only the second line's number is a phone on its own.
         assert_eq!(boxes.len(), 1);
         assert_eq!(boxes[0].w, 130 + 2 * 5);
+    }
+
+    #[test]
+    fn line_boxes_split_into_proportional_word_boxes() {
+        let words = split_line_words(
+            "mail user@example.com now",
+            (100.0, 50.0, 250.0, 20.0),
+            90.0,
+            "0:0:1",
+        );
+        let texts: Vec<&str> = words.iter().map(|w| w.text.as_str()).collect();
+        assert_eq!(texts, ["mail", "user@example.com", "now"]);
+        // 25 chars over 250px -> 10px per char.
+        assert_eq!((words[0].x, words[0].w), (100, 40));
+        assert_eq!((words[1].x, words[1].w), (150, 160));
+        assert_eq!((words[2].x, words[2].w), (320, 30));
+        assert!(
+            words
+                .iter()
+                .all(|w| w.y == 50 && w.h == 20 && w.line_key == "0:0:1")
+        );
+        let boxes = find_sensitive(&words);
+        assert_eq!(boxes.len(), 1);
+        assert_eq!(boxes[0].kind, "email");
+    }
+
+    #[test]
+    fn cjk_tokens_count_as_full_width() {
+        // 2 CJK (weight 4) + space + 11 digits = 16 units over 160px.
+        let words = split_line_words("电话 13812345678", (0.0, 0.0, 160.0, 20.0), 90.0, "k");
+        assert_eq!(words.len(), 2);
+        assert_eq!((words[0].x, words[0].w), (0, 40));
+        assert_eq!((words[1].x, words[1].w), (50, 110));
+        assert_eq!(find_sensitive(&words)[0].kind, "phone");
+    }
+
+    #[test]
+    fn low_confidence_words_are_dropped_for_every_engine() {
+        let mut low = word("noise", 0, "1:1:1");
+        low.conf = 10.0;
+        let result = finish(vec![low, word("kept", 60, "1:1:1")], "test".into());
+        assert_eq!(result.text, "kept");
+        assert_eq!(result.words.len(), 1);
     }
 
     #[test]

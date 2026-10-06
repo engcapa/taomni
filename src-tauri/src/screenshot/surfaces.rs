@@ -109,6 +109,51 @@ pub fn control_position(displays: &[DisplayInfo], region: Rect) -> Option<Rect> 
     None
 }
 
+/// Fallback when [`control_position`] finds no room (a full-display or very
+/// large selection): reserve a control strip inside the bottom of `region` and
+/// shrink the captured region above it, so the controls stay visible and are
+/// never part of the capture. Returns `(captured region, controls)` in
+/// virtual-desktop physical pixels, or `None` when too little would remain.
+pub fn inside_control_strip(
+    display: &DisplayInfo,
+    region: Rect,
+    min_height: i32,
+) -> Option<(Rect, Rect)> {
+    let scale = display.scale_factor.max(0.5);
+    let w = ((CONTROL_WIDTH * scale).ceil() as i32).min(display.width as i32);
+    let h = (CONTROL_HEIGHT * scale).ceil() as i32;
+    let gap = (8.0 * scale).ceil() as i32;
+    // Clip to the display first: the strip must be on the same screen.
+    let screen = Rect {
+        x: display.x,
+        y: display.y,
+        w: display.width as i32,
+        h: display.height as i32,
+    };
+    let left = region.x.max(screen.x);
+    let top = region.y.max(screen.y);
+    let right = (region.x + region.w).min(screen.x + screen.w);
+    let bottom = (region.y + region.h).min(screen.y + screen.h);
+    let remaining = bottom - top - h - gap;
+    if right - left <= 0 || remaining < min_height {
+        return None;
+    }
+    let captured = Rect {
+        x: left,
+        y: top,
+        w: right - left,
+        h: remaining,
+    };
+    let x = (left + (right - left - w) / 2).clamp(screen.x, screen.x + screen.w - w);
+    let controls = Rect {
+        x,
+        y: bottom - h,
+        w,
+        h,
+    };
+    Some((captured, controls))
+}
+
 pub fn borders(region: Rect, thickness: i32) -> [Rect; 4] {
     [
         Rect {
@@ -173,6 +218,9 @@ fn request_gtk_border_size(window: &tauri::Window, width: f64, height: f64) -> R
 
 pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Result<(), String> {
     close_borders(app);
+    // Wayland cannot position arbitrary top-level border windows. The
+    // full-display controller supplies a click-through outline instead.
+    if super::pins::native_wayland() { return Ok(()); }
     let result = (|| {
         for (i, rect) in borders(region, (2.0 * display.scale_factor.max(1.0)).ceil() as i32)
             .into_iter()
@@ -235,6 +283,29 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
     result
 }
 
+/// Restrict native input to the bottom control strip on a fullscreen
+/// Wayland surface. Apply on every GTK allocation (the compositor chooses
+/// the fullscreen size asynchronously) and to the embedded WebView window.
+#[cfg(target_os = "linux")]
+pub fn configure_wayland_scroll(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let target = window.clone();
+    window.run_on_main_thread(move || {
+        use gtk::prelude::*;
+        if let Ok(gtk) = target.gtk_window() {
+            let apply = |widget: &gtk::Window| {
+                let allocation = widget.allocation();
+                let region = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(
+                    0, (allocation.height() - CONTROL_HEIGHT as i32).max(0), allocation.width(), CONTROL_HEIGHT as i32,
+                ));
+                widget.input_shape_combine_region(Some(&region));
+                widget.display().flush();
+            };
+            apply(&gtk);
+            gtk.connect_size_allocate(move |widget, _| apply(widget));
+        }
+    }).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,6 +331,33 @@ mod tests {
             assert!(borders(region, 4).iter().all(|b| !region.intersects(*b)));
         }
     }
+    #[test]
+    fn full_display_selection_reserves_an_inside_strip_outside_the_capture() {
+        for (x, y, scale) in [(0, 0, 1.0), (-1920, -200, 1.0), (100, 200, 2.0)] {
+            let d = display(x, y, scale);
+            let region = region_rect(&d, (0, 0, d.width, d.height));
+            assert_eq!(control_position(&[d.clone()], region), None);
+            let (captured, controls) = inside_control_strip(&d, region, 48).unwrap();
+            assert!(!captured.intersects(controls), "{captured:?} {controls:?}");
+            // Borders drawn around the shrunk region stay off the controls too.
+            let thickness = (2.0 * scale).ceil() as i32;
+            assert!(borders(captured, thickness).iter().all(|b| !b.intersects(controls)));
+            let screen = Rect { x: d.x, y: d.y, w: d.width as i32, h: d.height as i32 };
+            assert!(screen.contains(controls) && screen.contains(captured));
+            assert_eq!(captured.w, d.width as i32);
+            assert!(captured.h >= d.height as i32 - ((CONTROL_HEIGHT + 8.0) * scale).ceil() as i32);
+        }
+    }
+
+    #[test]
+    fn inside_strip_rejects_regions_too_short_to_keep_content() {
+        let d = display(0, 0, 1.0);
+        let region = region_rect(&d, (0, 0, d.width, 240));
+        assert!(inside_control_strip(&d, region, 48).is_none());
+        let region = region_rect(&d, (0, 0, d.width, 300));
+        assert_eq!(inside_control_strip(&d, region, 48).unwrap().0.h, 92);
+    }
+
     #[test]
     fn full_display_controls_use_another_monitor_or_remain_hidden() {
         let d = display(0, 0, 1.0);

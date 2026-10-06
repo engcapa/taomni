@@ -1662,8 +1662,12 @@ const stubScreenshotFiles = new Map<string, string>();
 let stubScreenshotIncludeWindow = false;
 let stubScreenshotScrollAttempts = 0;
 const stubScreenshotFavoritesFails = createScreenshotFavoritesFault();
-let stubScreenshotActivePin: { path: string; width: number; height: number; favoriteId: string | null } | null = null;
-type StubScreenshotFavorite = { id: string; width: number; height: number; createdAt: number; dataUrl: string };
+let stubScreenshotActivePin: { path: string; width: number; height: number; favoriteId: string | null; note?: string } | null = null;
+let stubScreenshotDocument = false;
+let stubPinSequence = 0;
+const stubPins = new Map<string, { path: string; width: number; height: number; note: string; order: number }>();
+let stubActivePinLabel = "screenshot-pin-1";
+type StubScreenshotFavorite = { id: string; width: number; height: number; createdAt: number; dataUrl: string; note?: string };
 const STUB_SCREENSHOT_FAVORITES = "taomni.stub.screenshotFavorites.v1";
 function screenshotFavorites(): StubScreenshotFavorite[] {
   return JSON.parse(localStorage.getItem(STUB_SCREENSHOT_FAVORITES) ?? "[]") as StubScreenshotFavorite[];
@@ -5082,6 +5086,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       ] as unknown) as T;
     }
     case "screenshot_overlay_init": {
+      if (stubScreenshotDocument && stubScreenshotActivePin) return { ...stubScreenshotActivePin, displayId: "0,0", scaleFactor: 1, document: true } as T;
       return ({
         windowRegion: stubScreenshotIncludeWindow ? { x: 40, y: 30, width: 320, height: 240 } : null,
         path: STUB_SCREENSHOT_DATA_URL,
@@ -5092,6 +5097,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as unknown) as T;
     }
     case "screenshot_open_overlay": {
+      stubScreenshotDocument = false;
       stubScreenshotIncludeWindow = Boolean(args?.includeCurrentWindow);
       stubScreenshotCall(cmd, args);
       location.hash = "screenshot-overlay";
@@ -5114,6 +5120,12 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         width: Number(a.width ?? 400),
         height: Number(a.height ?? 300),
       } as unknown) as T;
+    }
+    case "screenshot_scroll_surface": return false as T;
+    case "screenshot_scroll_plan": {
+      stubScreenshotCall(cmd, args);
+      const r = args as { x: number; y: number; width: number; height: number };
+      return { x: r.x, y: r.y, width: r.width, height: r.height } as T;
     }
     case "screenshot_scroll_status": {
       return ({ frames: 3, mode: new URLSearchParams(location.search).get("qaScrollMode") === "manual" ? "manual" : "auto", needsOverlap: false } as unknown) as T;
@@ -5185,20 +5197,51 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "screenshot_close_pin": {
       stubScreenshotCall(cmd, args);
-      location.hash = "";
+      stubPins.delete(String(args?.label ?? stubActivePinLabel));
+      if (location.hash !== "#screenshot-pin-board") location.hash = "";
       return (undefined as unknown) as T;
     }
     case "screenshot_pin_to_screen": {
       stubScreenshotCall(cmd, args);
       const path = String((args as { path: string }).path);
       const dataUrl = stubScreenshotFiles.get(path) ?? (path.startsWith("data:") ? path : STUB_SCREENSHOT_DATA_URL);
-      stubScreenshotActivePin = { path: dataUrl, ...await screenshotImageSize(dataUrl), favoriteId: null };
+      stubScreenshotActivePin = { path: dataUrl, ...await screenshotImageSize(dataUrl), favoriteId: null, note: "" };
+      stubActivePinLabel = `screenshot-pin-${++stubPinSequence}`;
+      stubPins.set(stubActivePinLabel, { ...stubScreenshotActivePin, note: "", order: stubPinSequence });
       location.hash = "screenshot-pin";
-      return ("screenshot-pin-1" as unknown) as T;
+      return stubActivePinLabel as T;
     }
     case "screenshot_pin_init": {
       const files = [...stubScreenshotFiles.values()];
       return (stubScreenshotActivePin ?? { path: files[files.length - 1] ?? STUB_SCREENSHOT_DATA_URL, width: 400, height: 300, favoriteId: null }) as T;
+    }
+    case "screenshot_set_pin_note": {
+      stubScreenshotCall(cmd, args);
+      const note = String(args?.note ?? "").trim().slice(0, 500);
+      if (stubScreenshotActivePin) stubScreenshotActivePin.note = note;
+      const pin = stubPins.get(stubActivePinLabel); if (pin) pin.note = note;
+      return note as T;
+    }
+    case "screenshot_list_pins":
+    case "screenshot_board_pins": return [...stubPins].map(([label, pin]) => ({ label, ...pin })) as T;
+    case "screenshot_arrange_pins": {
+      stubScreenshotCall(cmd, args);
+      if (new URLSearchParams(location.search).get("qaPinBoard") === "1") location.hash = "screenshot-pin-board";
+      return stubPins.size as T;
+    }
+    case "screenshot_pins_batch": {
+      stubScreenshotCall(cmd, args);
+      const count = stubPins.size;
+      if (args?.action === "closeAll") { stubPins.clear(); location.hash = ""; }
+      else { const { emit } = await import("./tauri-event"); await emit("screenshot://pin-action", { action: args?.action }); }
+      return count as T;
+    }
+    case "screenshot_focus_pin": stubScreenshotCall(cmd, args); return undefined as T;
+    case "screenshot_edit_pin": {
+      stubScreenshotCall(cmd, args); stubScreenshotDocument = true; location.hash = "screenshot-overlay"; return undefined as T;
+    }
+    case "screenshot_open_editor": {
+      stubScreenshotCall(cmd, args); return "stub-external-working-copy.png" as T;
     }
     case "screenshot_list_favorites": {
       stubScreenshotCall(cmd, args);
@@ -5210,7 +5253,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       stubScreenshotCall(cmd, args);
       const path = String((args as { path: string }).path);
       const dataUrl = stubScreenshotFiles.get(path) ?? path;
-      const item: StubScreenshotFavorite = { id: crypto.randomUUID(), ...await screenshotImageSize(dataUrl), createdAt: Date.now(), dataUrl };
+      const item: StubScreenshotFavorite = { id: crypto.randomUUID(), ...await screenshotImageSize(dataUrl), createdAt: Date.now(), dataUrl, note: stubScreenshotActivePin?.note ?? "" };
       localStorage.setItem(STUB_SCREENSHOT_FAVORITES, JSON.stringify([item, ...screenshotFavorites()]));
       const { dataUrl: _dataUrl, ...info } = item;
       return info as T;
@@ -5230,7 +5273,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       stubScreenshotCall(cmd, args);
       const item = screenshotFavorites().find((item) => item.id === (args as { id: string }).id);
       if (!item) throw new Error("Screenshot favorite unavailable");
-      stubScreenshotActivePin = { path: item.dataUrl, width: item.width, height: item.height, favoriteId: item.id };
+      stubScreenshotActivePin = { path: item.dataUrl, width: item.width, height: item.height, favoriteId: item.id, note: item.note ?? "" };
+      stubActivePinLabel = `screenshot-pin-${++stubPinSequence}`;
+      stubPins.set(stubActivePinLabel, { ...stubScreenshotActivePin, note: item.note ?? "", order: stubPinSequence });
       location.hash = "screenshot-pin";
       return "screenshot-pin-1" as T;
     }

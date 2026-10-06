@@ -40,6 +40,8 @@ const MATCH_THRESHOLD: f64 = 6.0;
 const STATIC_THRESHOLD: f64 = 1.5;
 /// Minimum overlap (rows) for a match to be trusted.
 const MIN_OVERLAP: usize = 16;
+/// Shortest region a scroll capture accepts (three overlap bands).
+pub const MIN_REGION_HEIGHT: u32 = (MIN_OVERLAP as u32) * 3;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -64,6 +66,7 @@ pub struct ScrollControl {
     pub frames: AtomicU32,
     automatic: AtomicBool,
     needs_overlap: AtomicBool,
+    input_error: std::sync::Mutex<Option<String>>,
 }
 
 impl Default for ScrollControl {
@@ -80,6 +83,7 @@ impl ScrollControl {
             frames: AtomicU32::new(0),
             automatic: AtomicBool::new(mode == ScrollMode::Auto),
             needs_overlap: AtomicBool::new(false),
+            input_error: std::sync::Mutex::new(None),
         }
     }
 
@@ -96,11 +100,16 @@ impl ScrollControl {
             .store(mode == ScrollMode::Auto, Ordering::SeqCst);
     }
 
+    fn set_input_error(&self, message: String) {
+        *self.input_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(message);
+    }
+
     pub fn status(&self) -> serde_json::Value {
         serde_json::json!({
             "frames": self.frames.load(Ordering::SeqCst),
             "mode": self.mode(),
             "needsOverlap": self.needs_overlap.load(Ordering::SeqCst),
+            "inputError": self.input_error.lock().unwrap_or_else(|e| e.into_inner()).clone(),
         })
     }
 
@@ -155,7 +164,7 @@ pub fn scroll_capture_controlled(
     control: &ScrollControl,
 ) -> anyhow::Result<ScrollCaptureResult> {
     let (x, y, width, height) = region;
-    if width < 8 || height < (MIN_OVERLAP as u32) * 3 {
+    if width < 8 || height < MIN_REGION_HEIGHT {
         anyhow::bail!("scroll capture region is too small ({width}x{height})");
     }
     // Manual capture never initializes input synthesis or asks for control
@@ -166,15 +175,16 @@ pub fn scroll_capture_controlled(
         anyhow::bail!("scroll capture cancelled");
     }
 
-    let mut source = FrameSource::one_shot(app, display.clone());
+    let source = std::cell::RefCell::new(FrameSource::for_scroll(app, display.clone(), control.mode() == ScrollMode::Auto));
     let mut grab = || -> anyhow::Result<RgbaImage> {
-        let full = source.grab().context("capture scroll frame")?;
+        let full = source.borrow_mut().grab().context("capture scroll frame")?;
         Ok(crop(&full, x, y, width, height))
     };
 
     let stitched = capture_frames(
         &mut grab,
         &mut |notches| {
+            if source.borrow_mut().portal_scroll(x + width / 2, y + height / 2, notches)? { return Ok(()); }
             if wheel.is_none() {
                 wheel = Some(Wheel::new()?);
             }
@@ -226,7 +236,12 @@ fn capture_frames(
             previous_mode = mode;
         }
         if mode == ScrollMode::Auto {
-            scroll(notches)?;
+            if let Err(error) = scroll(notches) {
+                control.set_input_error(format!("{error:#}"));
+                control.set_mode(ScrollMode::Manual);
+                progress(stitcher.frames);
+                continue;
+            }
         }
         wait(if mode == ScrollMode::Auto {
             SETTLE_DELAY
@@ -387,8 +402,19 @@ impl Wheel {
             // SetCursorPos takes virtual-desktop physical pixels (the app is
             // per-monitor DPI aware), so any display works.
             let _ = &mut self.enigo;
-            unsafe { windows::Win32::UI::WindowsAndMessaging::SetCursorPos(gx, gy) }
-                .map_err(|e| anyhow::anyhow!("move pointer: {e}"))?;
+            use windows::Win32::UI::WindowsAndMessaging::{SetCursorPos, WindowFromPoint, GetAncestor, GA_ROOT, GetForegroundWindow, SetForegroundWindow};
+            use windows::Win32::Foundation::POINT;
+            unsafe {
+                SetCursorPos(gx, gy).map_err(|e| anyhow::anyhow!("move pointer: {e}"))?;
+                // SendInput wheel events otherwise go to the old focused app
+                // when Windows 'scroll inactive windows' is disabled. Activate
+                // the window under the crop without clicking its content.
+                let target = GetAncestor(WindowFromPoint(POINT { x: gx, y: gy }), GA_ROOT);
+                if !target.is_invalid() && target != GetForegroundWindow() {
+                    anyhow::ensure!(SetForegroundWindow(target).as_bool(), "Windows could not activate the scroll target. Click the target once and retry, or use manual scrolling; elevated targets require matching permissions.");
+                    std::thread::sleep(Duration::from_millis(80));
+                }
+            }
             Ok(())
         }
         #[cfg(not(target_os = "windows"))]

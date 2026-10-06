@@ -7,7 +7,7 @@ const api = vi.hoisted(() => ({
   fetchOverlayInit: vi.fn(), captureFull: vi.fn(), loadScreenshotUrl: vi.fn(), revokeScreenshotUrl: vi.fn(),
   closeScreenshotOverlay: vi.fn(), saveDataUrl: vi.fn(), copyImageToClipboard: vi.fn(),
   saveImageToFile: vi.fn(), pinToScreen: vi.fn(), ocrImage: vi.fn(), autoRedact: vi.fn(),
-  scrollCapture: vi.fn(), updateOverlayImage: vi.fn(), startRecording: vi.fn(),
+  scrollCapture: vi.fn(), scrollPlan: vi.fn(), openImageEditor: vi.fn(), updateOverlayImage: vi.fn(), startRecording: vi.fn(),
 }));
 vi.mock("../../lib/screenshot", async (original) => ({
   ...await original<typeof import("../../lib/screenshot")>(), ...api,
@@ -26,6 +26,8 @@ beforeEach(() => {
   api.copyImageToClipboard.mockResolvedValue(undefined);
   api.closeScreenshotOverlay.mockResolvedValue(undefined);
   api.updateOverlayImage.mockResolvedValue(undefined);
+  api.scrollPlan.mockImplementation(async (_display, region) => region);
+  api.openImageEditor.mockResolvedValue("working-copy.png");
   api.ocrImage.mockResolvedValue({ text: "user@example.com" });
   api.autoRedact.mockResolvedValue({ count: 2, boxes: [{ x: 10, y: 20, w: 40, h: 20 }, { x: 80, y: 20, w: 40, h: 20 }] });
   vi.stubGlobal("Image", function () {
@@ -75,6 +77,7 @@ describe("ScreenshotOverlay", () => {
     fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
     fireEvent.click(screen.getByTestId("screenshot-scroll-mode-manual"));
     api.scrollCapture.mockRejectedValueOnce(new Error("scroll capture cancelled"));
+    await waitFor(() => expect(screen.getByTestId("screenshot-scroll-start")).toBeEnabled());
     fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
     await waitFor(() => expect(api.scrollCapture).toHaveBeenCalledWith("0,0", { x: 200, y: 150, width: 800, height: 525 }, "manual"));
   });
@@ -186,6 +189,7 @@ describe("ScreenshotOverlay", () => {
     api.loadScreenshotUrl.mockResolvedValueOnce("data:image/png;base64,400x2400");
     api.updateOverlayImage.mockResolvedValueOnce(undefined);
     fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    await waitFor(() => expect(screen.getByTestId("screenshot-scroll-start")).toBeEnabled());
     fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
     await screen.findByTestId("screenshot-scroll-result");
     expect(screen.queryByTestId("screenshot-hint")).not.toBeInTheDocument();
@@ -218,6 +222,7 @@ describe("ScreenshotOverlay", () => {
     api.scrollCapture.mockResolvedValueOnce({ path: "tall.png", width: 400, height: 2400, frames: 6 });
     api.loadScreenshotUrl.mockResolvedValueOnce("data:image/png;base64,400x2400");
     fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    await waitFor(() => expect(screen.getByTestId("screenshot-scroll-start")).toBeEnabled());
     fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
     await screen.findByTestId("screenshot-scroll-result");
     fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
@@ -238,6 +243,7 @@ describe("ScreenshotOverlay", () => {
     expect(screen.queryByTestId("screenshot-scroll-confirm")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
     api.scrollCapture.mockRejectedValueOnce(new Error("scroll capture cancelled"));
+    await waitFor(() => expect(screen.getByTestId("screenshot-scroll-start")).toBeEnabled());
     fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
     await waitFor(() => expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "annotate"));
     expect(screen.getByTestId("screenshot-selection")).toHaveStyle({ left: "100px", top: "100px" });
@@ -248,6 +254,7 @@ describe("ScreenshotOverlay", () => {
     drag("screenshot-select-layer", [100, 100], [500, 450]);
     api.scrollCapture.mockRejectedValueOnce(new Error("Scrolling capture requires macOS Accessibility permission"));
     fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
+    await waitFor(() => expect(screen.getByTestId("screenshot-scroll-start")).toBeEnabled());
     fireEvent.click(screen.getByTestId("screenshot-scroll-start"));
     const error = await screen.findByRole("alert");
     expect(error).toHaveTextContent("screenshot.scrollFailed");
@@ -348,6 +355,7 @@ describe("ScreenshotOverlay", () => {
     fireEvent.mouseDown(layer, { button: 0, clientX: 100, clientY: 100 });
     fireEvent.mouseMove(window, { clientX: 300, clientY: 100 });
     fireEvent.mouseUp(window, { clientX: 100, clientY: 300 });
+    if (screen.getByTestId("screenshot-more").getAttribute("aria-pressed") !== "true") fireEvent.click(screen.getByTestId("screenshot-more"));
     fireEvent.click(screen.getByTestId("screenshot-watermark"));
     fireEvent.change(screen.getByTestId("screenshot-watermark-text"), { target: { value: "masked watermark" } });
     fireEvent.click(screen.getByTestId("screenshot-watermark-apply"));
@@ -394,6 +402,7 @@ describe("ScreenshotOverlay", () => {
   it("applies watermark text to the selected export without expanding its dimensions", async () => {
     await open();
     drag("screenshot-select-layer", [100, 100], [300, 300]);
+    if (screen.getByTestId("screenshot-more").getAttribute("aria-pressed") !== "true") fireEvent.click(screen.getByTestId("screenshot-more"));
     fireEvent.click(screen.getByTestId("screenshot-watermark"));
     fireEvent.change(screen.getByTestId("screenshot-watermark-text"), { target: { value: "QA watermark" } });
     fireEvent.click(screen.getByTestId("screenshot-watermark-apply"));

@@ -45,6 +45,8 @@ export interface ScreenshotProbe {
   controlPermission: string;
   mp4Available: boolean;
   ocrAvailable: boolean;
+  ocrEngine?: string | null;
+  ocrHint?: string | null;
   summary: string;
 }
 
@@ -57,6 +59,7 @@ export interface OverlayInit {
   scaleFactor: number;
   /** Visible part of the invoking window, in display-relative physical pixels. */
   windowRegion?: PhysicalRect | null;
+  document?: boolean;
 }
 
 export interface RecordingStarted {
@@ -78,6 +81,7 @@ export interface PinInit {
   width: number;
   height: number;
   favoriteId?: string | null;
+  note?: string;
 }
 
 export interface ScreenshotFavorite { id: string; width: number; height: number; createdAt: number; }
@@ -112,7 +116,10 @@ export const RECORDING_ENDED_EVENT = "screenshot://recording-ended";
 export const SCROLL_PROGRESS_EVENT = "screenshot://scroll-progress";
 export const SCREENSHOT_OPEN_FAILED_EVENT = "screenshot://open-failed";
 
-export interface ScrollStatus { frames: number; mode: ScrollMode; needsOverlap: boolean; }
+export interface ScrollStatus { frames: number; mode: ScrollMode; needsOverlap: boolean; inputError?: string | null; }
+
+export const scrollPlan = (displayId: string | undefined, region: PhysicalRect) =>
+  invoke<PhysicalRect>("screenshot_scroll_plan", { displayId: displayId ?? null, ...region });
 
 export async function scrollStatus(): Promise<ScrollStatus | null> {
   return invoke<ScrollStatus | null>("screenshot_scroll_status");
@@ -211,6 +218,19 @@ export async function setPinCompact(compact: boolean): Promise<void> {
   return invoke<void>("screenshot_set_pin_compact", { compact });
 }
 
+export type PinArrangement = "tile" | "cascade" | "stackRight" | "stackBottom";
+export type PinBatchAction = "collapse" | "expand" | "resetOpacity" | "closeAll";
+export interface PinSummary { label: string; width: number; height: number; note: string; order: number; }
+export const PIN_ACTION_EVENT = "screenshot://pin-action";
+export const PINS_CHANGED_EVENT = "screenshot://pins-changed";
+export const listPins = () => invoke<PinSummary[]>("screenshot_list_pins");
+export const setPinNote = (note: string) => invoke<string>("screenshot_set_pin_note", { note });
+export const arrangePins = (mode: PinArrangement) => invoke<number>("screenshot_arrange_pins", { mode, anchor: getCurrentWindow().label });
+export const pinsBatch = (action: PinBatchAction) => invoke<number>("screenshot_pins_batch", { action });
+export const focusPin = (label: string) => invoke<void>("screenshot_focus_pin", { label });
+export const openImageEditor = (path: string, editor?: string) => invoke<string>("screenshot_open_editor", { path, editor: editor ?? null });
+export const openPinEditor = () => invoke<void>("screenshot_edit_pin");
+
 export async function closePin(label: string): Promise<void> {
   return invoke<void>("screenshot_close_pin", { label });
 }
@@ -220,8 +240,20 @@ export interface OcrResponse {
   langs: string;
 }
 
+async function offlineOcr(path: string) {
+  const url = await loadScreenshotUrl(path);
+  try {
+    const { recognizeOffline } = await import("./screenshotOcr");
+    return await recognizeOffline(url);
+  } finally { revokeScreenshotUrl(url); }
+}
+
 export async function ocrImage(path: string): Promise<OcrResponse> {
-  return invoke<OcrResponse>("screenshot_ocr", { path });
+  try { return await invoke<OcrResponse>("screenshot_ocr", { path }); }
+  catch (nativeError) {
+    try { return await offlineOcr(path); }
+    catch (error) { throw new Error(`OCR: ${String(nativeError)}; offline engine: ${String(error)}`); }
+  }
 }
 
 export interface RedactResponse {
@@ -230,7 +262,11 @@ export interface RedactResponse {
 }
 
 export async function autoRedact(path: string): Promise<RedactResponse> {
-  return invoke<RedactResponse>("screenshot_auto_redact", { path });
+  try { return await invoke<RedactResponse>("screenshot_auto_redact", { path }); }
+  catch {
+    const { tsv } = await offlineOcr(path);
+    return invoke<RedactResponse>("screenshot_redact_tsv", { tsv });
+  }
 }
 
 export async function startRecording(

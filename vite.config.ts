@@ -8,6 +8,7 @@ import { sshProxyPlugin } from "./vite-plugins/sshProxy";
 import { sftpProxyPlugin } from "./vite-plugins/sftpProxy";
 import { rdpProxyPlugin } from "./vite-plugins/rdpProxy";
 import { vncProxyPlugin } from "./vite-plugins/vncProxy";
+import { screenshotOcrPlugin } from "./vite-plugins/screenshotOcr";
 
 const isTauriBuild = !!process.env.TAURI_ENV_PLATFORM;
 
@@ -18,7 +19,7 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8")
 };
 
 export default defineConfig(({ mode }) => ({
-  plugins: [tailwindcss(), react(), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin(), rdpProxyPlugin(), vncProxyPlugin()])],
+  plugins: [tailwindcss(), react(), screenshotOcrPlugin(), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin(), rdpProxyPlugin(), vncProxyPlugin()])],
   clearScreen: false,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
@@ -36,6 +37,7 @@ export default defineConfig(({ mode }) => ({
     noDiscovery: true,
     include: [
       "zmodem.js",
+      "tesseract.js",
       "react",
       "react-dom",
       "react-dom/client",

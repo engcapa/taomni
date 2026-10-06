@@ -36,8 +36,8 @@ export function ScrollCaptureResult({ url, width, height, frames, toolbar, child
     style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-[var(--taomni-divider)]">
       <div>
-        <h2 className="text-[14px] font-medium">{t("screenshot.scrollResult")}</h2>
-        <p data-testid="screenshot-scroll-result-meta" className="text-[12px] text-[var(--taomni-text-muted)]">{width} × {height} · {t("screenshot.scrollDone", { count: frames })}</p>
+        <h2 className="text-[14px] font-medium">{t(frames > 0 ? "screenshot.scrollResult" : "screenshot.editImage")}</h2>
+        <p data-testid="screenshot-scroll-result-meta" className="text-[12px] text-[var(--taomni-text-muted)]">{width} × {height}{frames > 0 ? ` · ${t("screenshot.scrollDone", { count: frames })}` : ""}</p>
       </div>
       <div className="flex items-center gap-1">
         <button type="button" data-testid="screenshot-scroll-fit" className={button} aria-pressed={!actual} onClick={() => zoom(false)}>{t("screenshot.fitImage")}</button>

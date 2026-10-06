@@ -5,6 +5,7 @@ allowBuilds:
   cpu-features: true
   esbuild: true
   ssh2: true
+  tesseract.js: false
 
 onlyBuiltDependencies:
   - esbuild

@@ -419,7 +419,16 @@ pub fn capture_display(app: &AppHandle, display: &DisplayInfo) -> anyhow::Result
     #[cfg(target_os = "linux")]
     {
         let mut source = FrameSource::open(app, display.clone());
-        source.grab()
+        let mut latest = source.grab()?;
+        // Portal startup retains its first frame. Drain the stream through a
+        // short settling interval so that frame cannot freeze a closing
+        // chooser or the tail of the application's compositor animation.
+        let until = Instant::now() + Duration::from_millis(250);
+        while Instant::now() < until {
+            if let Some(image) = source.poll()? { latest = image.clone(); }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        Ok(latest)
     }
 }
 
@@ -542,6 +551,10 @@ pub(super) fn qa_source_counts() -> (u64, u64) {
 impl FrameSource {
     /// Persistent backend when available (Linux always needs it for stills).
     pub fn open(app: &AppHandle, display: DisplayInfo) -> Self {
+        Self::open_with_input(app, display, false)
+    }
+
+    fn open_with_input(app: &AppHandle, display: DisplayInfo, request_input: bool) -> Self {
         #[cfg(all(debug_assertions, target_os = "macos"))]
         QA_STREAM_OPENS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let log =
@@ -550,7 +563,7 @@ impl FrameSource {
         let backend = match crate::servers::rdp::capture::create_capturer_for_display(
             &log,
             native_id.as_deref(),
-            false,
+            request_input,
         ) {
             Ok(capturer) => Backend::Persistent(capturer),
             Err(e) => {
@@ -579,6 +592,31 @@ impl FrameSource {
             #[cfg(target_os = "linux")]
             desktop_origin,
         }
+    }
+
+    /// Wayland capture and input must share the same approved portal session.
+    pub fn for_scroll(app: &AppHandle, display: DisplayInfo, automatic: bool) -> Self {
+        #[cfg(target_os = "linux")]
+        if crate::servers::rdp::capture::wayland::is_wayland_session() {
+            return Self::open_with_input(app, display, automatic);
+        }
+        let _ = automatic;
+        Self::one_shot(app, display)
+    }
+
+    /// Returns false for platforms that use their native input injector.
+    pub fn portal_scroll(&mut self, px: u32, py: u32, notches: i32) -> anyhow::Result<bool> {
+        #[cfg(target_os = "linux")]
+        if crate::servers::rdp::capture::wayland::is_wayland_session() {
+            use crate::servers::rdp::capture::PortalInput;
+            let Backend::Persistent(capturer) = &mut self.backend else { anyhow::bail!("Wayland portal capture unavailable"); };
+            anyhow::ensure!(capturer.supports_portal_input(), "Wayland pointer permission was not granted. Restart automatic capture and allow remote control, or use manual scrolling.");
+            capturer.inject_portal_input(PortalInput::MotionAbsolute { x: px as f64, y: py as f64 })?;
+            capturer.inject_portal_input(PortalInput::Scroll { horizontal: false, steps: notches })?;
+            return Ok(true);
+        }
+        let _ = (px, py, notches);
+        Ok(false)
     }
 
     /// Recording retains only the requested region. Persistent backends crop
