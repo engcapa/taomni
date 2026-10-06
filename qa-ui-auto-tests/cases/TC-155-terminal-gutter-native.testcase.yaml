@@ -37,7 +37,7 @@ steps:
     timeout_sec: 5
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: echo QA-LEFT-""GUTTER
+    text: ' echo QA-LEFT-""GUTTER'
     submit: true
     verify:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
@@ -256,7 +256,7 @@ steps:
     timeout_sec: 5
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: echo QA-LEFT-""GUTTER
+    text: ' echo QA-LEFT-""GUTTER'
     submit: true
     verify:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
