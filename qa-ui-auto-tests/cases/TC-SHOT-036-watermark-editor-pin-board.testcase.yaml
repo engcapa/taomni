@@ -38,6 +38,21 @@ steps:
 - wait_for: '[data-testid="system-screenshot"]'
 verification:
   review: reviewed
-  browser:
+  requirements:
+  - id: watermark-pin-workflow
+    requirement: Watermark, editor, pin note and arrangement controls remain usable in one workflow.
+    actions: [9]
+    checkpoints:
+    - step: 9
+      expectation: 'assert_attribute: {"selector": "[data-testid=\"screenshot-watermark\"]", "name": "aria-pressed", "equals": "true"}'
+    - step: 25
+      expectation: 'assert_text: {"selector": "[data-testid=\"screenshot-pin-note\"]", "contains": "Compare with design"}'
+    results: [9, 25]
+  visual:
   - check: Tiled watermark controls, image edit undo/redo, external-editor handoff, pin note and batch menu remain usable.
     method: automated
+    reason: Browser uses IPC stubs for the screenshot surface.
+  native:
+  - check: Native pin arrangement is covered by TC-SHOT-N20.
+    method: external
+    reason: This case is browser-only; native compositor evidence is retained by the dedicated native case.

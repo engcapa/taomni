@@ -906,6 +906,15 @@
 - `[data-testid="db-schema-drawer-handle"]` — interactive [optional] — F-DB-1.schema-drawer-handle
 - `[data-testid="schema-tree-filter"]` — interactive [optional] — F-DB-1.schema-tree-filter
 - `[data-testid="schema-tree-object"]` — interactive [optional] — F-DB-1.schema-tree-object
+- `[data-testid="db-table-detail-panel"]` — display [optional] — F-DB-1.db-detail-panel
+- `[data-testid="db-detail-summary"]` — display [optional] — F-DB-1.db-detail-summary
+- `[data-testid="db-detail-ddl"]` — display [optional] — F-DB-1.db-detail-ddl
+- `[data-testid="db-detail-tab-data"]` — interactive [optional] — F-DB-1.db-detail-tab-data
+- `[data-testid="db-detail-tab-diagram"]` — interactive [optional] — F-DB-1.db-detail-tab-diagram
+- `[data-testid="db-detail-data-filter"]` — interactive [optional] — F-DB-1.db-detail-data-filter
+- `[data-testid="db-detail-data-grid"]` — display [optional] — F-DB-1.db-detail-data-grid
+- `[data-testid="db-detail-diagram"]` — display [optional] — F-DB-1.db-detail-diagram
+- `[data-testid="context-menu-item-open-table-details"]` — interactive [optional] — F-DB-1.context-menu-open-table-details
 - `[data-testid="db-query-library-tab"]` — interactive [optional] — F-DB-1.query-library-tab
 - `[data-testid="db-save-query"]` — interactive [optional] — F-DB-1.save-query
 - `[data-testid="db-tab-limit"]` — interactive [optional] — F-DB-1.tab-limit
@@ -1728,6 +1737,24 @@
 - `[data-testid="screenshot-favorite-item"]` — display — F27.1.screenshot-favorite-item
 - `[data-testid="screenshot-favorite-thumbnail"]` — display — F27.1.screenshot-favorite-thumbnail
 - `[data-testid="screenshot-favorites-error"]` — display — F27.1.screenshot-favorites-error
+- `[data-testid="capture-menu"]` — display [optional] — F27.1.capture-menu
+- `[data-testid="capture-toolbar"]` — display [optional] — F27.1.capture-toolbar
+- `[data-testid="open-tabs-screenshot"]` — interactive [optional] — F27.1.open-tabs-screenshot
+- `[data-testid="screenshot-edit"]` — interactive [optional] — F27.1.screenshot-edit
+- `[data-testid="screenshot-edit-external"]` — interactive [optional] — F27.1.screenshot-edit-external
+- `[data-testid="screenshot-edit-panel"]` — display [optional] — F27.1.screenshot-edit-panel
+- `[data-testid="screenshot-edit-redo"]` — interactive [optional] — F27.1.screenshot-edit-redo
+- `[data-testid="screenshot-edit-rotate"]` — interactive [optional] — F27.1.screenshot-edit-rotate
+- `[data-testid="screenshot-edit-undo"]` — interactive [optional] — F27.1.screenshot-edit-undo
+- `[data-testid="screenshot-eraser-mode"]` — interactive [optional] — F27.1.screenshot-eraser-mode
+- `[data-testid="screenshot-fill"]` — interactive [optional] — F27.1.screenshot-fill
+- `[data-testid="screenshot-more"]` — interactive [optional] — F27.1.screenshot-more
+- `[data-testid="screenshot-pin-note"]` — display [optional] — F27.1.screenshot-pin-note
+- `[data-testid="screenshot-pin-note-input"]` — interactive [optional] — F27.1.screenshot-pin-note-input
+- `[data-testid="screenshot-pin-note-save"]` — interactive [optional] — F27.1.screenshot-pin-note-save
+- `[data-testid="screenshot-pins-collapse"]` — interactive [optional] — F27.1.screenshot-pins-collapse
+- `[data-testid="screenshot-pins-expand"]` — interactive [optional] — F27.1.screenshot-pins-expand
+- `[data-testid="screenshot-pins-tile"]` — interactive [optional] — F27.1.screenshot-pins-tile
 
 ## screenshot/settings (F27.2)
 
@@ -1934,6 +1961,7 @@
 - `[data-testid="session-delete-editor"]` — interactive — F6.3.delete
 - `button[aria-label="Cancel"]` — interactive — F6.3.cancel
 - `[data-testid="session-new-folder"]` — interactive — F6.3.new-folder
+- `[data-testid="context-menu-item-new-folder"]` — interactive [optional] — F6.3.context-new-folder
 - `[data-testid="session-cancel"]` — interactive — F6.3.cancel-testid
 - `[data-testid="session-help"]` — interactive — F6.3.editor-help
 - `[data-testid="session-close"]` — interactive — F6.3.editor-close

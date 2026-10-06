@@ -32,10 +32,23 @@ steps:
 - native_screenshot_scenario: {scenario: annotation-tools}
 verification:
   review: reviewed
+  requirements:
+  - id: annotation-workflow
+    requirement: Solid shapes remain visible while partial erase preserves the freehand stroke.
+    actions: [8, 17]
+    checkpoints:
+    - step: 8
+      expectation: 'assert_attribute: {"selector": "[data-testid=\"screenshot-fill\"]", "name": "aria-pressed", "equals": "true"}'
+    - step: 17
+      expectation: 'assert_attribute: {"selector": "[data-testid=\"screenshot-eraser-mode\"]", "name": "value", "equals": "partial"}'
+    - step: 19
+      expectation: 'assert_attribute: {"selector": "[data-testid=\"screenshot-annotation-canvas\"]", "name": "data-shapes", "equals": "3"}'
+    results: [8, 17, 19]
+  visual:
+  - check: Solid annotation colors and partial eraser state are visible.
+    method: automated
+    reason: Browser DOM assertions and retained screenshot provide renderer evidence.
   native:
   - check: Real overlay renderer keeps solid shapes and retains a partially erased freehand stroke.
     method: automated
     reason: Isolated QA command drives the production annotation UI and verifies state after real window input.
-  browser:
-  - check: Solid fill state and partial eraser DOM shape count.
-    method: automated
