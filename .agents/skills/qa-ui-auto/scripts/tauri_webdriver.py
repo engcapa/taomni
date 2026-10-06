@@ -1210,6 +1210,25 @@ class NativeSession:
         script = r"""
         if (!window.__QA_UI_AUTO_CONSOLE__) {
           window.__QA_UI_AUTO_CONSOLE__ = [];
+          // Keep focus transitions without recording typed text or values.
+          window.__QA_UI_AUTO_FOCUS__ = [];
+          const describeFocus = el => ({
+            tag: el?.tagName ?? null,
+            testid: el?.getAttribute?.('data-testid') ?? null,
+            role: el?.getAttribute?.('role') ?? null
+          });
+          for (const type of ['focusin', 'focusout', 'pointerdown', 'pointerup', 'click']) {
+            document.addEventListener(type, event => {
+              window.__QA_UI_AUTO_FOCUS__.push({
+                type, time: performance.now(), trusted: event.isTrusted,
+                target: describeFocus(event.target),
+                related: describeFocus(event.relatedTarget),
+                active: describeFocus(document.activeElement),
+                document_has_focus: document.hasFocus()
+              });
+              if (window.__QA_UI_AUTO_FOCUS__.length > 64) window.__QA_UI_AUTO_FOCUS__.shift();
+            }, true);
+          }
           for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
             const original = console[level] ? console[level].bind(console) : console.log.bind(console);
             console[level] = (...args) => {

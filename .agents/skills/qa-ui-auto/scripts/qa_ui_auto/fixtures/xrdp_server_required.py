@@ -24,11 +24,32 @@ _STATE: dict[str, Any] = {}
 
 
 def _sudo(*args: str, input: str | None = None, check: bool = True) -> subprocess.CompletedProcess:
-    result = subprocess.run(["sudo", "-n", *args], input=input, capture_output=True,
-                            text=True, timeout=90)
+    # The supervisor runs as root too: killing sudo alone can leave useradd or
+    # its hooks alive, holding account locks after Python's timeout expires.
+    result = subprocess.run(["sudo", "-n", "timeout", "--signal=TERM", "--kill-after=5",
+                             "90", *args], input=input, capture_output=True,
+                            text=True, timeout=100)
     if check and result.returncode:
         raise RuntimeError(f"xrdp fixture: {args[0]} failed ({result.returncode}): {result.stderr[-500:]}")
     return result
+
+
+def _create_user(ctx: Any, user: str) -> None:
+    # Claim this unique, absent account before the command: a post-create hook
+    # can hang after passwd has already been written. Teardown must remove it.
+    if any(line.split(":", 1)[0] == user for line in Path("/etc/passwd").read_text().splitlines()):
+        raise RuntimeError("xrdp fixture account already exists")
+    _STATE["user"] = user
+    command = ["useradd", "-m", "-s", "/bin/bash", user]
+    if (case_dir := getattr(ctx, "case_dir", None)) is not None and shutil.which("strace"):
+        diagnostics = Path(case_dir) / "xrdp-diagnostics"
+        diagnostics.mkdir(parents=True, exist_ok=True)
+        # Exclude read/write/send/recv payloads and environment strings. This
+        # distinguishes locks, NSS and post-create hooks without credential data.
+        command = ["strace", "-f", "-tt", "-s", "80", "-e",
+                   "trace=%process,%file,connect,poll,ppoll,futex", "-o",
+                   str((diagnostics / "create-user.trace").resolve()), *command]
+    _sudo(*command)
 
 
 def configure_xrdp(text: str, port: int) -> str:
@@ -72,8 +93,7 @@ def setup(ctx: Any) -> None:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
         _sudo("systemctl", "stop", "xrdp", "xrdp-sesman")
-        _sudo("useradd", "-m", "-s", "/bin/bash", user)
-        _STATE["user"] = user
+        _create_user(ctx, user)
         _sudo("chpasswd", input=f"{user}:{password}\n")
         groups = subprocess.run(["id", "-nG", "xrdp"], capture_output=True, text=True, check=True).stdout.split()
         if "ssl-cert" not in groups:

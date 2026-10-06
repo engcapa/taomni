@@ -758,7 +758,8 @@ def _capture_native_failure(session: Any, case_dir: Path) -> dict:
                 active: describe(document.activeElement),
                 focused: Array.from(document.querySelectorAll(':focus')).map(describe),
                 tree_focus_within: !!document.querySelector('[data-testid="code-workspace-tree-pane"]:focus-within'),
-                editor_focus: !!document.querySelector('[data-testid="code-workspace-editor"] .cm-content:focus')
+                editor_focus: !!document.querySelector('[data-testid="code-workspace-editor"] .cm-content:focus'),
+                events: window.__QA_UI_AUTO_FOCUS__ || []
             };
         """)
         if isinstance(focus, dict):

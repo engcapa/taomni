@@ -53,8 +53,9 @@ steps:
 - assert_visible: '[data-testid="sftp-remote-pane"]'
 - assert_visible: '[data-testid="sftp-local-pane"]'
 - click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: 'input[data-testid="sftp-remote-path"]'
 - fill:
-    selector: '[data-testid="sftp-remote-path"]'
+    selector: 'input[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}
 - press: Enter
 - wait: 1
@@ -103,9 +104,9 @@ verification:
     - 19
     - 20
     - 24
-    - 25
     - 26
-    - 31
+    - 27
+    - 32
     checkpoints:
     - step: 2
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
@@ -125,35 +126,37 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
     - step: 23
       expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
-    - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] >> text=\"REMOTE\""}'
+    - step: 25
+      expectation: 路径编辑入口已显示可填写的 INPUT，后续填写只定位该输入框。
     - step: 29
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"] >> text=\"LOCAL\""}'
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] >> text=\"REMOTE\""}'
     - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"] >> text=\"LOCAL\""}'
+    - step: 31
       expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
-    - step: 32
-      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 33
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 34
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
         "${fixture.sftp_sync_test_dir}"}}'
     results:
-    - 33
+    - 34
   - id: R2
     requirement: 打开和认证独立 SFTP 后，展开侧栏的 Sessions/Tools 保持相同尺寸且完整落在侧栏可视范围内，不因分栏或滚动到选中会话而裁切。
     actions:
     - 19
     - 20
     checkpoints:
-    - step: 34
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"] button[data-tool-window-id]", "min_count": 2, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
     - step: 35
-      expectation: 'Sessions 按钮完整落在侧栏左右边界之间，没有水平裁切。'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"] button[data-tool-window-id]", "min_count": 2, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
     - step: 36
+      expectation: 'Sessions 按钮完整落在侧栏左右边界之间，没有水平裁切。'
+    - step: 37
       expectation: 'Tools 按钮完整落在侧栏左右边界之间，没有水平裁切。'
     results:
-    - 34
     - 35
     - 36
+    - 37
   visual:
   - check: 独立标签和双栏目录显示清晰。
     method: manual
