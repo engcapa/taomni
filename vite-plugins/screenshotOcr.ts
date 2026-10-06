@@ -11,8 +11,12 @@ export function screenshotOcrPlugin(): Plugin {
     ["worker.min.js", join(root("tesseract.js"), "dist/worker.min.js")],
     ["eng.traineddata.gz", join(root("@tesseract.js-data/eng"), "4.0.0_best_int/eng.traineddata.gz")],
     ["chi_sim.traineddata.gz", join(root("@tesseract.js-data/chi_sim"), "4.0.0_best_int/chi_sim.traineddata.gz")],
-    ...["tesseract-core-lstm.wasm.js", "tesseract-core-simd-lstm.wasm.js"].map((file) =>
-      [file, join(root("tesseract.js-core"), file)] as [string, string]),
+    ...[
+      "tesseract-core.wasm.js", "tesseract-core-simd.wasm.js",
+      "tesseract-core-lstm.wasm.js", "tesseract-core-simd-lstm.wasm.js",
+      "tesseract-core.wasm", "tesseract-core-simd.wasm",
+      "tesseract-core-lstm.wasm", "tesseract-core-simd-lstm.wasm",
+    ].map((file) => [file, join(root("tesseract.js-core"), file)] as [string, string]),
     ["Tesseract-LICENSE.txt", join(root("tesseract.js"), "LICENSE.md")],
     ["Tesseract-core-LICENSE.txt", join(root("tesseract.js-core"), "LICENSE")],
   ]);
