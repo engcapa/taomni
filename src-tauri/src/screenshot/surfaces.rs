@@ -292,16 +292,23 @@ pub fn configure_wayland_scroll(window: &tauri::WebviewWindow) -> Result<(), Str
     window.run_on_main_thread(move || {
         use gtk::prelude::*;
         if let Ok(gtk) = target.gtk_window() {
-            let apply = |widget: &gtk::Window| {
-                let allocation = widget.allocation();
-                let region = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(
-                    0, (allocation.height() - CONTROL_HEIGHT as i32).max(0), allocation.width(), CONTROL_HEIGHT as i32,
-                ));
-                widget.input_shape_combine_region(Some(&region));
-                widget.display().flush();
-            };
-            apply(&gtk);
-            gtk.connect_size_allocate(move |widget, _| apply(widget));
+            let allocation = gtk.allocation();
+            let region = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(
+                0, (allocation.height() - CONTROL_HEIGHT as i32).max(0), allocation.width(), CONTROL_HEIGHT as i32,
+            ));
+            if let Some(gdk_window) = gtk.window() {
+                gdk_window.input_shape_combine_region(&region, 0, 0);
+                gdk_window.display().flush();
+            }
+            gtk.connect_size_allocate(move |widget, allocation| {
+                if let Some(gdk_window) = widget.window() {
+                    let region = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(
+                        0, (allocation.height() - CONTROL_HEIGHT as i32).max(0), allocation.width(), CONTROL_HEIGHT as i32,
+                    ));
+                    gdk_window.input_shape_combine_region(&region, 0, 0);
+                    gdk_window.display().flush();
+                }
+            });
         }
     }).map_err(|e| e.to_string())
 }
