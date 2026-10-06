@@ -118,7 +118,9 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
             "board has no native surface size"
         );
         trace.mark("board", content.clone());
-        run_js(&board, "document.querySelector('[data-testid=\"screenshot-board-close\"]').click(); return true;", Duration::from_secs(5)).await?;
+        // Closing destroys the WebView, including run_js's result slot. Observe
+        // the native window lifecycle instead of polling that destroyed page.
+        board.eval("document.querySelector('[data-testid=\"screenshot-board-close\"]').click()")?;
         anyhow::ensure!(
             wait_closed(app, "screenshot-pin-board", Duration::from_secs(5)).await,
             "board did not close"
@@ -186,7 +188,7 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
     trace.mark("arranged", geometry.clone());
     // Closing one pin must remove only its own file and leave the other usable.
     for (index, window) in windows.iter().enumerate() {
-        run_js(window, "document.querySelector('[data-testid=\"screenshot-pin-close\"]').click(); return true;", Duration::from_secs(5)).await?;
+        window.eval("document.querySelector('[data-testid=\"screenshot-pin-close\"]').click()")?;
         anyhow::ensure!(
             wait_closed(app, window.label(), Duration::from_secs(5)).await,
             "pin did not close"

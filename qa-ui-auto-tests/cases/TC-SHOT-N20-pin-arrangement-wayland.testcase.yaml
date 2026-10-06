@@ -36,7 +36,7 @@ verification:
     - 1
     checkpoints:
     - step: 3
-      expectation: The native scenario verifies the real window/input and retained output assertions.
+      expectation: The native scenario verifies notes, layout, board closure, restored pins and independent original files through native window state.
     - step: 4
       expectation: The main window remains available after cleanup.
     results:
