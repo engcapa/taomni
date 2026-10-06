@@ -390,6 +390,8 @@ class NativeIsolationTest(unittest.TestCase):
             'WM_CLASS(STRING) = "taomni", "Taomni"\n_NET_WM_PID(CARDINAL) = 102',
             'WM_CLASS(STRING) = "taomni-qa", "Taomni QA"\n_NET_WM_PID(CARDINAL) = 101',
             "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x1",
+            "",  # Keyboard focus was transferred to this same owned window.
+            "1",  # xdotool reports the X server's focused window in decimal.
         ]
         with patch.object(native_steps, "_command_output", side_effect=outputs), patch.object(Path, "resolve", resolve):
             window, identity = native_steps._activate_x11_application(qa_binary)
