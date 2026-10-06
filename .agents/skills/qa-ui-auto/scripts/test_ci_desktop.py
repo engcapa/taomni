@@ -2,6 +2,8 @@ import os
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import unittest
 from unittest.mock import Mock, patch
 from ci_desktop import Desktop, wayland_has_input
@@ -9,6 +11,8 @@ from ci_wayland_input import activate_window, owned_window_pid
 
 
 WAYLAND_PROTOCOLS = "wl_compositor xdg_wm_base wl_output\ninterface: 'wl_seat', version: 10, name: 16\n\tname: seat0\n\tcapabilities: pointer keyboard\n"
+AUDIO_CLIENTS = json.dumps([{'type': 'PipeWire:Interface:Client',
+                            'info': {'props': {'application.name': 'WirePlumber'}}}])
 
 
 class DesktopTests(unittest.TestCase):
@@ -84,6 +88,52 @@ class DesktopTests(unittest.TestCase):
                 with Desktop(Path(d), ['display']):
                     pass
             self.assertFalse((Path(d) / 'desktop-readiness.json').exists())
+
+    def test_x11_audio_is_ready_in_the_environment_inherited_by_native_children(self):
+        real_run = subprocess.run
+        with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
+             patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus',
+                                     'XDG_RUNTIME_DIR': '/original/runtime', 'PULSE_SERVER': 'original-pulse'}), \
+             patch('ci_desktop.subprocess.check_output', side_effect=['XTEST', 'window id # 1']), \
+             patch('ci_desktop.subprocess.run', return_value=subprocess.CompletedProcess([], 0, AUDIO_CLIENTS)), \
+             patch('ci_desktop.Path.is_socket', return_value=True), patch('ci_desktop.time.sleep'), \
+             patch.object(Desktop, 'start') as start:
+            start.return_value.poll.return_value = None
+            with Desktop(Path(d), ['audio']) as desktop:
+                runtime = Path(desktop.facts['audio']['runtime_dir'])
+                self.assertNotEqual(str(runtime), '/original/runtime')
+                self.assertEqual(runtime.stat().st_mode & 0o777, 0o700)
+                child = real_run([sys.executable, '-c',
+                    'import json,os; print(json.dumps({k:os.environ[k] for k in ("XDG_RUNTIME_DIR","PULSE_SERVER")}))'],
+                    check=True, capture_output=True, text=True)
+                self.assertEqual(json.loads(child.stdout), {
+                    'XDG_RUNTIME_DIR': str(runtime), 'PULSE_SERVER': f'unix:{runtime}/pulse/native'})
+                self.assertTrue(desktop.facts['ready'])
+            self.assertFalse(runtime.exists())
+            self.assertEqual(os.environ['XDG_RUNTIME_DIR'], '/original/runtime')
+            self.assertEqual(os.environ['PULSE_SERVER'], 'original-pulse')
+            self.assertEqual([c.args[0] for c in start.call_args_list],
+                             [['openbox', '--sm-disable'], ['pipewire'], ['wireplumber'], ['pipewire-pulse']])
+
+    def test_failed_audio_server_prevents_readiness_and_restores_the_original_runtime(self):
+        processes = [Mock() for _ in range(4)]
+        for process in processes:
+            process.poll.return_value = None
+        processes[-1].poll.return_value = 7
+        with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system', return_value='Linux'), \
+             patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus',
+                                     'XDG_RUNTIME_DIR': '/original/runtime', 'PULSE_SERVER': 'original-pulse'}), \
+             patch('ci_desktop.subprocess.check_output', side_effect=['XTEST', 'window id # 1']), \
+             patch('ci_desktop.subprocess.run', return_value=subprocess.CompletedProcess([], 0, AUDIO_CLIENTS)), \
+             patch('ci_desktop.Path.is_socket', return_value=True), patch('ci_desktop.time.sleep'), \
+             patch.object(Desktop, 'start', side_effect=processes):
+            with self.assertRaisesRegex(RuntimeError, 'PipeWire Pulse server exited'):
+                with Desktop(Path(d), ['audio']):
+                    pass
+            self.assertFalse((Path(d) / 'desktop-readiness.json').exists())
+            self.assertFalse(json.loads((Path(d) / 'desktop-failure.json').read_text())['ready'])
+            self.assertEqual(os.environ['XDG_RUNTIME_DIR'], '/original/runtime')
+            self.assertEqual(os.environ['PULSE_SERVER'], 'original-pulse')
 
     def test_missing_bus_fails_before_starting_window_manager(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system',return_value='Linux'), \

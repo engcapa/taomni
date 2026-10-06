@@ -232,6 +232,42 @@ class Desktop:
         facts["ime"] = {"configured_engine": "wbpy", "observed_engine": probe.stdout.strip(),
                         "note": "active composition/commit is verified by the selected native case"}
 
+    def _audio(self, facts):
+        # Prepare the graph before tauri-driver inherits the session environment.
+        # User-manager units keep their own runtime directory; starting them
+        # after a case fixture creates a different directory cannot serve that
+        # fixture or the already-running driver.
+        runtime = Path(self.temporary.name) / "runtime"
+        runtime.mkdir(mode=0o700)
+        os.environ.update(XDG_RUNTIME_DIR=str(runtime),
+                          PULSE_SERVER=f"unix:{runtime}/pulse/native")
+        core = self.start(["pipewire"])
+        self._wait(core, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire audio core")
+        manager = self.start(["wireplumber"])
+
+        def manager_ready():
+            # pw-dump is installed by the Jammy runtime overlay as well.
+            # Its stock pw-cli uses a private symbol removed by PipeWire 1.0.
+            clients = subprocess.run(["pw-dump"], capture_output=True,
+                                     text=True, timeout=5)
+            if clients.returncode:
+                return False
+            try:
+                objects = json.loads(clients.stdout)
+            except json.JSONDecodeError:
+                return False
+            return any(client.get("type") == "PipeWire:Interface:Client"
+                       and ((client.get("info") or {}).get("props") or {}).get("application.name")
+                       in {"WirePlumber", "WirePlumber [export]"}
+                       for client in objects)
+
+        self._wait(manager, manager_ready, "WirePlumber audio policy")
+        pulse = self.start(["pipewire-pulse"])
+        self._wait(pulse, lambda: subprocess.run(["pactl", "info"], capture_output=True,
+                                                timeout=5).returncode == 0, "PipeWire Pulse server")
+        facts["audio"] = {"backend": "PipeWire", "runtime_dir": str(runtime),
+                          "pulse_server": os.environ["PULSE_SERVER"], "scope": "job-owned"}
+
     def __enter__(self):
         self.root.mkdir(parents=True, exist_ok=True)
         system = platform.system()
@@ -239,6 +275,8 @@ class Desktop:
         try:
             if system == "Linux":
                 self._linux(facts)
+                if "audio" in self.capabilities and facts.get("session_type") == "x11":
+                    self._audio(facts)
             elif system == "Windows":
                 kernel = ctypes.windll.kernel32
                 session = ctypes.c_ulong()
@@ -316,7 +354,7 @@ class Desktop:
         finally:
             # The wrapper owns its original bus/display; only restore keys this
             # Desktop changed, without discarding unrelated service variables.
-            for key in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE",
+            for key in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "PULSE_SERVER", "XDG_SESSION_TYPE",
                         "XDG_CURRENT_DESKTOP", "GDK_BACKEND", "LIBGL_ALWAYS_SOFTWARE",
                         "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_IM_MODULE", "QT_IM_MODULE", "XMODIFIERS"):
                 if key in self.environment_before:

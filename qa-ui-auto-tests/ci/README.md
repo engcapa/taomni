@@ -122,6 +122,11 @@ release workflow's existing independent recipe is not changed.
 Audio cases use Jammy's `pipewire-audio-client-libraries` package for the ALSA
 plugin and enable its shipped default ALSA route to the fixture's PipeWire null
 sink; later Ubuntu profiles use the separate `pipewire-alsa` package.
+For X11 audio cases, desktop preflight starts a job-owned PipeWire/WirePlumber/
+Pulse server in a private runtime directory before the native driver starts.
+The driver, application and host-tone probe inherit that same environment;
+daemon logs and readiness are retained under the desktop report. The case
+fixture owns the null sink, and desktop teardown stops the session daemons.
 
 The VNC desktop binds loopback, uses a disposable VNCAuth password outside
 uploaded reports, and authenticates an actual RFB handshake before launch.
