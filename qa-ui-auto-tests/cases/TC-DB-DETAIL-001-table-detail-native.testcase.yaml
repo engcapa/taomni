@@ -1,0 +1,102 @@
+id: TC-DB-DETAIL-001-table-detail-native
+title: Native table details expose properties, data and ER diagram tabs
+description: |
+  DB-DETAIL-001. On a live MySQL session, the schema tree table context menu opens
+  a DBeaver-style object inspector. The inspector loads existing metadata, shows
+  the three Properties/Data/ER diagram tabs, and filters the first 100 data rows.
+covers:
+- F-DB-1
+tags:
+- database
+- db-parity
+- table-details
+- native-boundary
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- mysql_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-db-detail-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-detail
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-db-detail-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-db-detail-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-detail"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-detail"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait_for:
+    selector: '[data-testid="schema-tree"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="schema-tree-filter"]'
+    value: TABLES
+- wait_for:
+    selector: '[data-testid="schema-tree-object"][data-object-name="TABLES"]'
+    timeout_sec: 30
+- right_click: '[data-testid="schema-tree-object"][data-object-name="TABLES"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu-item-open-table-details"]'
+- wait_for:
+    selector: '[data-testid="db-table-detail-panel"]'
+    timeout_sec: 30
+- assert_visible: '[data-testid="db-detail-summary"]'
+- assert_visible: '[data-testid="db-detail-ddl"]'
+- click: '[data-testid="db-detail-tab-data"]'
+- wait_for:
+    selector: '[data-testid="db-detail-data-grid"]'
+    timeout_sec: 30
+- assert_visible: '[data-testid="db-detail-data-filter"]'
+- fill:
+    selector: '[data-testid="db-detail-data-filter"]'
+    value: information_schema
+- click: '[data-testid="db-detail-tab-diagram"]'
+- assert_visible: '[data-testid="db-detail-diagram"]'
+- screenshot: db-detail-001-table-detail-native.png
