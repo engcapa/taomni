@@ -1,6 +1,6 @@
 id: TC-SHOT-N6
 title: Native H264 MP4 decoded frames match original scene pixels and timeline
-description: Publish a completed fixture scene in one visible canvas operation and retain bounded pre-encoder native pixel samples after recording for diagnosis; every decoded frame still must match its independently drawn original with the fixed pixel and timeline thresholds.
+description: Publish each independently drawn original as a completed immutable canvas surface, without repainting a visible source canvas; retain bounded pre-encoder native pixel samples for diagnosis. Every decoded frame still must match its actual published original with the fixed pixel and timeline thresholds.
 covers: [F27.1]
 tags: [screenshot, recording, native, p1]
 modes: [native]

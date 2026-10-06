@@ -8147,6 +8147,40 @@ describe("CodeWorkspaceTab", () => {
     expect(useAppStore.getState().statusMessage).toContain("Provider returned no cleanup action");
   });
 
+  it("reads the live editor caret for debugger actions before a typing burst is published", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-live-debug-caret",
+      workspaceInstanceId: "instance-live-debug-caret",
+      name: "Live debug caret",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/App.java" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/App.java", "int a = 1;"));
+    let commands: WorkspaceCommandRegistration | null = null;
+    const rendered = renderWorkspace(workspace, { onCommandsChange: (_id, value) => { commands = value; } });
+    await screen.findByTitle("app / src/App.java");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(content)!;
+    const text = "int a = 1;\nint b = 2;\nint c = 3;";
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: text },
+        selection: { anchor: text.indexOf("int c") },
+        userEvent: "input.type",
+      });
+      commands!.execute("workspace.toggleBreakpoint");
+    });
+    await waitFor(() => expect(content.closest(".cm-editor")!
+      .querySelector('[data-bp-gutter-line="3"] .taomni-bp')).not.toBeNull());
+    expect(content.closest(".cm-editor")!.querySelector('[data-bp-gutter-line="1"] .taomni-bp')).toBeNull();
+    act(() => { commands!.execute("workspace.viewBreakpoints"); });
+    expect(screen.getByTestId("debug-breakpoint-popup-title")).toHaveTextContent("App.java:3");
+    expect(screen.queryByTestId("debug-breakpoints-dialog")).toBeNull();
+  });
+
   it("routes every common semantic navigation command through the provider host", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

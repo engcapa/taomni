@@ -255,11 +255,40 @@ async fn open_fixture_sized(
     }
     let display = capture::resolve_display(app, None)?;
     let s = display.scale_factor.max(0.5);
+    // Tall source windows must fit the usable desktop. On a 1024x768 Windows
+    // runner, the old fixed y=120 put the scroll source under the taskbar.
+    // Monitor work areas access GDK; read them on the UI thread on every OS.
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let ui_app = app.clone();
+    let display_position = (display.x, display.y);
+    app.run_on_main_thread(move || {
+        let area = ui_app.available_monitors().map(|monitors| {
+            monitors.into_iter().find_map(|monitor| {
+                let pos = monitor.position();
+                if (pos.x, pos.y) != display_position {
+                    return None;
+                }
+                let area = monitor.work_area();
+                Some((
+                    (area.position.x, area.position.y),
+                    (area.size.width, area.size.height),
+                ))
+            })
+        });
+        let _ = tx.send(area);
+    })
+    .context("read QA fixture work area on UI thread")?;
+    let (area_position, area_size) = tokio::time::timeout(Duration::from_secs(5), rx)
+        .await
+        .context("QA fixture work area timed out")?
+        .context("QA fixture work area channel closed")??
+        .context("QA fixture display work area unavailable")?;
+    let position = fixture_position_in_work_area(area_position, area_size, size, s)?;
     let url = WebviewUrl::App(format!("index.html#screenshot-qa-{route}").into());
     let window = super::window_builder(app, QA_WINDOW_LABEL, url)
         .title("Screenshot QA fixture")
         .inner_size(size.0, size.1)
-        .position(display.x as f64 / s + 120.0, display.y as f64 / s + 120.0)
+        .position(position.0 / s, position.1 / s)
         .decorations(false)
         .resizable(false)
         .always_on_top(true)
@@ -300,6 +329,25 @@ async fn open_fixture_sized(
         size.height.saturating_sub(margin * 2),
     );
     Ok((window, display, region))
+}
+
+fn fixture_position_in_work_area(
+    origin: (i32, i32),
+    area: (u32, u32),
+    size: (f64, f64),
+    scale: f64,
+) -> anyhow::Result<(f64, f64)> {
+    let place = |origin: i32, available: u32, requested: f64| {
+        let remaining = available as f64 - requested * scale;
+        if remaining < 16.0 * scale {
+            anyhow::bail!("QA fixture does not fit the display work area");
+        }
+        Ok(origin as f64 + (120.0 * scale).min(remaining - 8.0 * scale))
+    };
+    Ok((
+        place(origin.0, area.0, size.0)?,
+        place(origin.1, area.1, size.1)?,
+    ))
 }
 
 fn close_fixture(app: &AppHandle) {
@@ -2562,6 +2610,23 @@ mod tests {
         let process = &name[platform().len() + 1..platform().len() + 37];
         assert!(uuid::Uuid::parse_str(process).is_ok());
         assert!(name.ends_with("-recording.gif"));
+    }
+
+    #[test]
+    fn tall_fixture_stays_above_a_windows_taskbar() {
+        let position =
+            fixture_position_in_work_area((0, 0), (1024, 728), (520.0, 640.0), 1.0).unwrap();
+        assert_eq!(position, (120.0, 80.0));
+        assert!(position.1 + 640.0 < 728.0);
+    }
+
+    #[test]
+    fn fixture_work_area_respects_scale_and_negative_display_origins() {
+        let position =
+            fixture_position_in_work_area((-2048, 40), (2048, 1440), (520.0, 640.0), 2.0).unwrap();
+        assert_eq!(position, (-1808.0, 184.0));
+        assert!(position.1 + 1280.0 < 1480.0);
+        assert!(fixture_position_in_work_area((0, 0), (800, 600), (520.0, 640.0), 1.0).is_err());
     }
 
     #[test]

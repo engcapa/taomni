@@ -173,6 +173,54 @@ describe("useBackupStore", () => {
     expect(useBackupStore.getState().policy).toEqual(policy);
   });
 
+  it("saves rapid policy edits in order without losing other changed fields", async () => {
+    useBackupStore.setState({ policy: fakePolicy });
+    let saved = { ...fakePolicy };
+    let releaseFirst!: () => void;
+    const firstWrite = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let writes = 0;
+    invokeMock.mockImplementation(async (cmd: string, args?: { policy: BackupPolicy }) => {
+      if (cmd === "backup_get_policy") return { ...saved };
+      if (cmd === "backup_set_policy") {
+        writes += 1;
+        if (writes === 1) await firstWrite;
+        saved = { ...args!.policy };
+        return;
+      }
+      throw new Error(`unhandled cmd: ${cmd}`);
+    });
+
+    const first = useBackupStore.getState().updatePolicy({ frequency: "daily" });
+    const second = useBackupStore.getState().updatePolicy({ maxRetainedCopies: 2 });
+    await vi.waitFor(() => expect(writes).toBeGreaterThan(0));
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(saved).toMatchObject({ frequency: "daily", maxRetainedCopies: 2 });
+    expect(useBackupStore.getState().policy).toEqual(saved);
+  });
+
+  it("keeps a saved policy when an older history read finishes after the edit", async () => {
+    useBackupStore.setState({ policy: fakePolicy });
+    let saved = { ...fakePolicy };
+    let finishRead!: (policy: BackupPolicy) => void;
+    const staleRead = new Promise<BackupPolicy>((resolve) => { finishRead = resolve; });
+    let reads = 0;
+    invokeMock.mockImplementation(async (cmd: string, args?: { policy: BackupPolicy }) => {
+      if (cmd === "backup_list_history") return fakeHistory;
+      if (cmd === "backup_get_policy") return ++reads === 1 ? staleRead : { ...saved };
+      if (cmd === "backup_set_policy") { saved = { ...args!.policy }; return; }
+      throw new Error(`unhandled cmd: ${cmd}`);
+    });
+    const refresh = useBackupStore.getState().refreshHistory();
+    await useBackupStore.getState().updatePolicy({ frequency: "daily" });
+    finishRead(fakePolicy);
+    await refresh;
+
+    expect(useBackupStore.getState().policy?.frequency).toBe("daily");
+    expect(useBackupStore.getState().history).toEqual(fakeHistory);
+  });
+
   it("deletes a backup file via deleteBackup", async () => {
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === "backup_delete_item") return Promise.resolve();

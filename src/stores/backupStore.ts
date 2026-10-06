@@ -47,6 +47,9 @@ interface BackupStore {
 }
 
 let latestHistoryRequest = 0;
+let policyUpdateQueue = Promise.resolve();
+let pendingPolicyUpdates = 0;
+let policyRevision = 0;
 
 export const useBackupStore = create<BackupStore>((set, get) => ({
   policy: null,
@@ -77,12 +80,18 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
 
   refreshHistory: async () => {
     const request = ++latestHistoryRequest;
+    const revision = policyRevision;
     try {
       const [history, policy] = await Promise.all([
         listBackupHistory(),
         getBackupPolicy(),
       ]);
-      if (request === latestHistoryRequest) set({ history, policy });
+      if (request === latestHistoryRequest) {
+        set({
+          history,
+          ...(pendingPolicyUpdates === 0 && revision === policyRevision ? { policy } : {}),
+        });
+      }
     } catch (e) {
       if (request === latestHistoryRequest) {
         set({ error: e instanceof Error ? e.message : String(e) });
@@ -91,18 +100,29 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
   },
 
   updatePolicy: async (patch) => {
-    const current = get().policy;
-    if (!current) return;
-    const next: BackupPolicy = { ...current, ...patch };
-    try {
-      await setBackupPolicy(next);
-      // The backend preserves the latest timestamp from automatic backups.
-      const policy = await getBackupPolicy();
-      set({ policy });
-    } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) });
-      throw e;
-    }
+    if (!get().policy) return;
+    pendingPolicyUpdates += 1;
+    policyRevision += 1;
+    // Settings can issue another edit before IPC finishes. Preserve input order
+    // and merge each patch with the policy that the preceding write committed.
+    const update = policyUpdateQueue.then(async () => {
+      try {
+        const current = await getBackupPolicy();
+        await setBackupPolicy({ ...current, ...patch });
+        // The backend owns timestamps written by automatic backups.
+        const policy = await getBackupPolicy();
+        set({ policy, error: null });
+      } catch (e) {
+        set({ error: e instanceof Error ? e.message : String(e) });
+        throw e;
+      } finally {
+        pendingPolicyUpdates -= 1;
+        policyRevision += 1;
+      }
+    });
+    // A rejected write reports its error but must not block the next edit.
+    policyUpdateQueue = update.catch(() => {});
+    await update;
   },
 
   triggerBackup: async (params) => {

@@ -1,6 +1,6 @@
 id: TC-SHOT-N12
 title: Native current window, scroll stop and cancel, visible range and exclusion
-description: Use a 640 px tall real scroll source for hosted desktops up to 1200 px tall and retain bounded production scroll status and actual source displacement samples on success or failure; the output must exceed the actual preview viewport under the original polling budget.
+description: Position the 640 px tall real scroll source inside the matching monitor work area so an OS taskbar cannot cover its original content. Retain bounded production scroll status and actual source displacement samples on success or failure; the output must exceed the actual preview viewport under the original polling budget, with the full original pixel comparison unchanged.
 covers:
 - F27.1
 tags:

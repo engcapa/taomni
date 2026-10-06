@@ -35,9 +35,15 @@ QA trace 增加 macOS 快照/provider/copy/conversion 有界阶段耗时与图�
 
 候选调整控件启动顺序：复用 RecorderBar 挂载后查询当前录屏 id 的 IPC 握手；控件完成挂载并在采集区外显示后，才通过既有 compositor settle 开始原生采集。全屏控件继续保持隐藏；启动关闭、加载失败、取消和录屏失败沿原清理/恢复路径处理。unit 检查未挂载时不继续、ready 后继续、关闭拒绝；N7/N8 原步骤和固定像素/时间检查保留，Done 后新增第二个真实录屏的 Cancel 操作，独立观察新 id、主窗口恢复、session 清空、控件/边框关闭和临时输出删除。Rust full `629` 1604/0/16、frontend `631` 48/48 通过；QA Cancel 增量后的 Rust `633` 仍需收齐。再次 fetch main `632` 仍为已合入的 bc130eee，没有新待合并提交。待原断言复验恢复后，执行最终 **290 ID / 875 次**统一输入六端回归，实际审阅 **126 张 UI 原图及 12 张录屏差分**；新增 12 张是 LAN 排除后 TC-001/B06/B38 的共享入口画面。LAN Chat 按用户要求排除，历史记录保留。TASK-01～12 仍为 verification。
 
-## 上一批次实施进度（历史）
-
 当前启动顺序候选 `d62c96d5` 的 [三端 native run 37409886287](https://github.com/engcapa/taomni/actions/runs/37409886287) 为 **17 pass / 1 fail / 0 skip**；Linux/Windows 各 6/0/0，macOS 5/1/0。原步骤、身份、receipt、构建和 hashes 匹配；六个 N7/N8 的新增真实 Cancel 后置条件及 N13 全屏隐藏控件均通过。macOS N7 在 poll 252 ms 的原始帧再次全零 RGBA，provider 读取约 1024.9 ms；原图/时间失败，控件前移不能宣称已消除此问题。后续采集候选用 CoreGraphics display-region snapshot 替换 window-list composite 的 deferred provider，沿用真实场景/时间/nonce、零 stream、取消/清理和全屏检查。API 坐标按 display-relative physical pixels，须 native 复验证明；尚未完成，任务保持 verification。
+
+输入 `ef9da82a` 的 [macOS native 精准 run 37415838009](https://github.com/engcapa/taomni/actions/runs/37415838009) 为 **6 pass / 0 fail / 0 skip**、25 步完整；所有原像素/nonce/时间/取消/清理及零 stream 检查通过，未再出现全零 RGBA。N7/N8 仍保留最长 470/506 ms poll，不声明匹配性能基线改善。Windows Rust full `635` 为 **1604/0/16 既有 ignored**，前端 full `612` 为 **534 files / 5301 pass**；`650` 核对唯一后续源码差异是 macOS cfg 的采集模块，复用未变的前端/Windows unit 输入，并用实际 macOS 执行证明编译/API。
+
+该稳定输入的 [完整六端 run 37419892522](https://github.com/engcapa/taomni/actions/runs/37419892522) 已结束，为 **871 pass / 4 fail / 0 skip**，不能验收。browser Linux/Windows 各 218/0/0、macOS 217/1/0；native Linux 75/2/0、Windows 70/1/0、macOS 73/0/0。六份身份、selection、receipt、config、native build 与 ZIP 原 bytes hashes 匹配；原步骤检查明确保留四处中止和失败。
+
+四项后续修复候选：Linux `TC-BACKUP-001` 第 14 步 daily 策略未落盘，store 串行提交连续 patch 并拒绝迟到 history 读覆盖；macOS browser `IDE-025-01` 第 67 步在断点行打开了对话框，debug actions 改向注册的 live editor port 读取光标；Windows `SHOT-N12` 原图末尾混入真实任务栏，源窗口改在匹配显示器 work area 内定位（主线程读取 GDK）；Linux `SHOT-N6` 一帧蓝色形状在 native raw 中已错位、编码前后比较无新增差异，fixture 发布完整不可变 canvas，保留原 id/nonce/全图 tiles/时间检查，不过滤失败帧。备份新增两项 unit 在改前均失败；live caret 挂载回归在正确 harness 下改前失败、改后通过。聚焦 `656` 为 103/103、`657` 为 1/1；完整 units、精准 native 与最终统一输入六端仍待验收。TASK-01～12 保持 verification。
+
+## 上一批次实施进度（历史）
 
 TASK-01～12 已全部 done。最终产品/runner/用例输入为 `98ddf0182c74e53dbeb8b3c196e0ff02169020c2`；[完整六端 run 37247775178](https://github.com/engcapa/taomni/actions/runs/37247775178) 已成功结束，250 ID / 761 次实际执行为 **761 pass / 0 fail / 0 skip**，33,090 步全部完整通过。三个 browser 端各 190/0/0，native Linux 68/0/0、Windows 62/0/0、macOS 61/0/0。六份原始报告与源码、runner、用例、配置、receipt、native build 及 ZIP hashes 匹配，严格 gate 通过；72 张当前 Shell 截图已实际审阅。本地前端 526 文件 / 5244 项已按原始全量报告和完整编辑器重跑核对通过；前序 Rust full unit 为 1590 pass / 0 fail / 16 既有 ignored，本轮截图诊断相关 Rust unit 52/52 与日志观察 unit 5/5 通过，TypeScript 与相关静态检查通过。历史失败和未验证边界完整保留。
 

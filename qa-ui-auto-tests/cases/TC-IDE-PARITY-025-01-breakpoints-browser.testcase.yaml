@@ -7,7 +7,8 @@ description: 'ED-PARITY-025 A1/A2/A3 browser case: IDEA''s gutter mouse model (c
   menu, Ctrl+Shift+F8 (balloon on a breakpoint line, View Breakpoints dialog elsewhere)
   with Space/Delete keyboard editing, and Ctrl+Alt+Shift+F8 temporary breakpoints.
   Breakpoints persist without a debug adapter, so browser mode covers the editor and
-  dialog surfaces; hit semantics are covered natively by TC-IDE-PARITY-025-02.
+  dialog surfaces. Debugger actions read the live editor caret even before batched
+  workspace cursor state commits; hit semantics are covered natively by TC-IDE-PARITY-025-02.
 
 
   Mode: browser.

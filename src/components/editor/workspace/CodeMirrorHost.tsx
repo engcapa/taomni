@@ -1394,6 +1394,8 @@ export interface EditorCommandState {
 export interface EditorCommandPort {
   execute: (commandId: EditorCommandId, options?: EditorCommandOptions) => boolean;
   state: () => EditorCommandState;
+  /** Live head position, independent of batched workspace UI publications. */
+  caret?: () => LspPosition;
   focus?: (options?: { preventScroll?: boolean }) => boolean;
 }
 
@@ -1579,6 +1581,7 @@ function editorCommandPort(view: EditorView, isComposing?: () => boolean): Edito
       occurrenceSessionActive: view.state.field(occurrenceSessionField, false) ?? false,
       completionActive: completionStatus(view.state) !== null,
     }),
+    caret: () => lspPositionFromOffset(view.state.doc, view.state.selection.main.head),
   };
 }
 

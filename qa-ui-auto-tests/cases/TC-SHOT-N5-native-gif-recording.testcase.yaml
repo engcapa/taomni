@@ -1,6 +1,6 @@
 id: TC-SHOT-N5
 title: Native GIF frames match actual original screen states and timing
-description: Draw the fixture scene offscreen and publish the completed frame once. Every decoded frame must match the retained original canvas state for its complementary frame id and random per-run nonce under the fixed pixel and timing thresholds. Changing frame hashes or multiple frames alone cannot pass.
+description: Draw each fixture scene on an independent canvas and publish its completed immutable surface without repainting a visible source canvas. Every decoded frame must match the retained actual published original for its complementary frame id and random per-run nonce under the fixed pixel and timing thresholds. Changing frame hashes or multiple frames alone cannot pass.
 covers: [F27.1]
 tags: [screenshot, recording, native, p1]
 modes: [native]

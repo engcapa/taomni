@@ -2453,6 +2453,13 @@ export function CodeWorkspaceTab({
     committedCursorPositionsRef.current = cursorPositions;
     cursorPositionsRef.current = cursorPositions;
   }
+  const activeDebugCaretLine = useCallback(() => {
+    // Actions can follow typing/navigation before the workspace's transition
+    // commits. Ask the registered live editor instead of its UI cursor cache.
+    const cursor = activeEditorCommandOwner()?.port.caret?.()
+      ?? cursorPositionsRef.current[activeEditorGroupIdRef.current];
+    return (cursor?.line ?? 0) + 1;
+  }, [activeEditorCommandOwner]);
   const [viewportRanges, setViewportRangesNow] = useState<Record<EditorGroupId, LspRange | null>>({
     primary: null,
     secondary: null,
@@ -15910,9 +15917,7 @@ export function CodeWorkspaceTab({
       keywords: ["breakpoint", "toggle breakpoint", "debug"],
       when: () => !!activeFile && !activeFile.library,
       run: () => {
-        const cursor = cursorPositionsRef.current[activeEditorGroupId];
-        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        toggleActiveBreakpointRef.current(line);
+        toggleActiveBreakpointRef.current(activeDebugCaretLine());
       },
     },
     {
@@ -15923,9 +15928,7 @@ export function CodeWorkspaceTab({
       keybindings: ["Mod-Shift-F8"],
       keywords: ["breakpoint", "manage breakpoints", "condition", "log", "debug"],
       run: () => {
-        const cursor = cursorPositionsRef.current[activeEditorGroupId];
-        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        viewBreakpointsAtCaretRef.current(line);
+        viewBreakpointsAtCaretRef.current(activeDebugCaretLine());
       },
     },
     {
@@ -15936,9 +15939,7 @@ export function CodeWorkspaceTab({
       keywords: ["breakpoint", "temporary", "remove once hit", "debug"],
       when: () => !!activeFile && !activeFile.library,
       run: () => {
-        const cursor = cursorPositionsRef.current[activeEditorGroupId];
-        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        toggleTemporaryBreakpointRef.current(line);
+        toggleTemporaryBreakpointRef.current(activeDebugCaretLine());
       },
     },
     {
@@ -15948,9 +15949,7 @@ export function CodeWorkspaceTab({
       keywords: ["breakpoint", "enable", "disable", "debug"],
       when: () => !!activeFile && !activeFile.library,
       run: () => {
-        const cursor = cursorPositionsRef.current[activeEditorGroupId];
-        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        toggleActiveBreakpointEnabledRef.current(line);
+        toggleActiveBreakpointEnabledRef.current(activeDebugCaretLine());
       },
     },
     {
@@ -16488,6 +16487,7 @@ export function CodeWorkspaceTab({
     },
   ], [
     activeCapabilities,
+    activeDebugCaretLine,
     activeEditorCommandState,
     activeEditorGroupId,
     activeFile,
@@ -22205,9 +22205,7 @@ export function CodeWorkspaceTab({
           onViewBreakpoints={() => setBreakpointsDialog({ initial: null })}
           onEvaluateExpression={(expression) => openEvaluateDialogRef.current(expression ?? "")}
           onRunToCursor={debug.state?.status === "stopped" && activeFileAbsPath ? () => {
-            const cursor = cursorPositionsRef.current[activeEditorGroupId];
-            const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-            debugRunToCursorLine(line);
+            debugRunToCursorLine(activeDebugCaretLine());
           } : null}
           runtimeAvailable={debugRuntimeAvailable}
           configurations={activeRunConfigurations

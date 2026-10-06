@@ -1,6 +1,8 @@
 id: TC-BACKUP-001
 title: Daily backup runs while the native app stays open and refreshes Settings
-description: 'A disabled daily policy is seeded in an isolated profile. Enabling automatic
+description: 'A disabled daily policy is seeded in an isolated profile. Rapid frequency
+  edits preserve input order, and late history reads cannot replace a saved policy.
+  Native disk assertions remain decisive. Enabling automatic
   backup in Settings creates a real core archive on the next background check. A second
   check without an elapsed day must not create a duplicate. Moving lastBackupAt two
   days into the past simulates an elapsed day without restarting the app: the real

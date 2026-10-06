@@ -99,49 +99,47 @@ function paintAnimation(ctx: CanvasRenderingContext2D, width: number, height: nu
 
 function PixelFixture({ animated }: { animated: boolean }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const root = rootRef.current;
-    const canvas = canvasRef.current;
-    if (!root || !canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const surface = surfaceRef.current;
+    if (!root || !surface) return;
     // WebKit's overlay scrollbar can cover pixels without reducing clientWidth.
     // Keep its entire gutter outside both the drawn canvas and capture region.
     const width = root.clientWidth - (animated ? 0 : 8);
     const height = animated ? root.clientHeight : ROWS * 48;
     const scale = window.devicePixelRatio || 1;
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    // Publish the frame id and moving shapes from one completed buffer.
-    // Retained originals describe complete scenes for native pixel comparison.
-    const frameCanvas = document.createElement("canvas");
-    frameCanvas.width = canvas.width;
-    frameCanvas.height = canvas.height;
-    const frameCtx = frameCanvas.getContext("2d");
-    if (!frameCtx) return;
     const nonce = crypto.getRandomValues(new Uint16Array(1))[0] || 1;
     const source: SourceEvidence = {
       kind: animated ? "anim" : "scroll", cssWidth: width, cssHeight: height,
-      width: canvas.width, height: canvas.height, scale, nonce, frames: [],
+      width: Math.round(width * scale), height: Math.round(height * scale), scale, nonce, frames: [],
     };
     window.__qaScreenshotSource = source;
     let id = 0;
     const draw = () => {
-      frameCtx.setTransform(scale, 0, 0, scale, 0, 0);
-      if (animated) paintAnimation(frameCtx, width, height, id, nonce);
-      else paintPage(frameCtx, width);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.drawImage(frameCanvas, 0, 0);
+      // A published canvas stays immutable. Replacing a completed surface
+      // prevents incremental canvas damage from publishing the id and moving
+      // shapes in separate compositor updates. Native capture stays unmodified.
+      const canvas = document.createElement("canvas");
+      canvas.width = source.width;
+      canvas.height = source.height;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      canvas.style.display = "block";
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      if (animated) paintAnimation(ctx, width, height, id, nonce);
+      else paintPage(ctx, width);
       const dataUrl = canvas.toDataURL("image/png");
+      canvas.dataset.sourceId = String(id);
+      surface.replaceChildren(canvas);
       if (animated) {
         source.frames.push({ id, atMs: performance.now(), dataUrl });
         // Bounded originals from actual draw calls, never reconstructed later.
         if (source.frames.length > 240) source.frames.shift();
       } else source.dataUrl = dataUrl;
-      canvas.dataset.sourceId = String(id++);
+      id += 1;
       root.dataset.sourceReady = "true";
     };
     draw();
@@ -155,7 +153,7 @@ function PixelFixture({ animated }: { animated: boolean }) {
     // Keep the native scene consistent with the retained canvas original while
     // real OS wheel input moves the pointer through the fixture.
     <div ref={rootRef} data-testid="screenshot-qa-fixture-ready" style={{ position: "fixed", inset: 0, paddingRight: animated ? 0 : 8, overflowY: animated ? "hidden" : "scroll", background: "#ffffff", scrollBehavior: "auto", cursor: "none" }}>
-      <canvas ref={canvasRef} style={{ display: "block" }} />
+      <div ref={surfaceRef} />
     </div>
   );
 }
