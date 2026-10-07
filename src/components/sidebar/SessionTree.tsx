@@ -1793,7 +1793,12 @@ function SessionItem({
       style={selected ? { background: "var(--taomni-selected)" } : undefined}
       onPointerDown={onPointerDown}
       onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onDoubleClick={(event) => {
+        // Rapid range/toggle selections can form a native double-click.
+        // Keep modifier clicks in selection mode instead of connecting.
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        onDoubleClick();
+      }}
       onContextMenu={onContextMenu}
     >
       <span className="w-3" />
