@@ -3591,7 +3591,7 @@ controls:
 id: F-AI-2.3
 status: done
 area: ai/voice
-components: [PttButton, DictationButton, AsrPanel, TitleBarTrayControls]
+components: [PttButton, DictationButton, VoiceSettingsDialog, AsrPanel, TitleBarTrayControls]
 files:
   - src/components/window/PttButton.tsx
   - src/components/voice/
@@ -3611,6 +3611,24 @@ controls:
     kind: interactive
   - id: voice-settings-close
     selector: '[data-testid="voice-settings-close"]'
+    kind: interactive
+  - id: voice-settings-dialog
+    selector: '[data-testid="voice-settings-dialog"]'
+    kind: display
+  - id: asr-installation-progress
+    selector: '[data-testid="asr-installation-progress"]'
+    kind: display
+  - id: asr-cancel-download
+    selector: '[data-testid="asr-cancel-download"]'
+    kind: interactive
+  - id: asr-download-url-base
+    selector: '[data-testid="asr-download-url-whisper-base"]'
+    kind: interactive
+  - id: asr-copy-url-base
+    selector: '[data-testid="asr-copy-url-whisper-base"]'
+    kind: interactive
+  - id: asr-open-url-base
+    selector: '[data-testid="asr-open-url-whisper-base"]'
     kind: interactive
   - id: asr-download-proxy-mode
     selector: '[data-testid="asr-download-proxy-mode"]'
@@ -3639,6 +3657,7 @@ controls:
 -->
 
 - 单击开始，再次单击停止识别；Esc、取消、切换上下文或窗口失焦会取消。最长 120 秒。
+- 模型设置提供完整下载地址、复制与浏览器打开；后端进度支持关闭重开恢复，取消保留断点，再次下载按 Range 续传。宽窄窗口自适应，标题栏入口卸载不关闭设置。
 - 默认 Whisper Base，多语言 Small/Medium 可选；首次显式下载或离线导入，校验 SHA-256。多语言权重支持中文；模型版本目录按哈希隔离，支持显式检查完整性与更新。
 - 标题栏和 Chat、LAN 聊天、终端 AI 改写说明共用听写组件，只填入可编辑文本，不自动发送或执行。
 - AI 全局禁用时隐藏入口。浏览器语音 fixture 仅验证交互；原生采集与跨平台权限需真机检查。

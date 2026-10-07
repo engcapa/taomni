@@ -32,6 +32,12 @@ pub const MODELS: &[Model] = &[
         sha256: "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208",
     },
 ];
+pub fn download_url(m: &Model) -> String {
+    format!(
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/{UPSTREAM_REVISION}/{}?download=true",
+        m.filename
+    )
+}
 pub fn model(id: &str) -> Result<&'static Model, String> {
     MODELS
         .iter()

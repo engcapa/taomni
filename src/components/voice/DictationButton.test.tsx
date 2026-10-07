@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { VoiceSettingsDialog, useVoiceSettingsStore } from "./VoiceSettingsDialog";
 import { DictationButton } from "./DictationButton";
 import { useAiStore } from "../../stores/aiStore";
 const ipc = vi.hoisted(() => vi.fn());
@@ -10,7 +11,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 function Input({ context = "one", disabled = false }: { context?: string; disabled?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState("hello world");
-  return <><textarea ref={ref} value={text} onChange={(e) => setText(e.target.value)} /><DictationButton targetRef={ref} onText={setText} contextKey={context} disabled={disabled} /></>;
+  return <><textarea ref={ref} value={text} onChange={(e) => setText(e.target.value)} /><DictationButton targetRef={ref} onText={setText} contextKey={context} disabled={disabled} /><VoiceSettingsDialog /></>;
 }
 async function record() {
   fireEvent.click(screen.getByTestId("dictation-button"));
@@ -20,6 +21,7 @@ function deferred<T>() { let resolve!: (value: T) => void; const promise = new P
 describe("local dictation lifecycle", () => {
   beforeEach(() => {
     useAiStore.setState({ config: null });
+    useVoiceSettingsStore.setState({ open: false });
     ipc.mockReset().mockImplementation(async (command: string) => {
       if (command === "voice_capture_supported") return true;
       if (command === "voice_models") return [{ id: "whisper-base", installed: true }];
@@ -75,6 +77,17 @@ describe("local dictation lifecycle", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("MIC_PERMISSION_OR_DEVICE");
     expect(screen.getByTestId("dictation-button")).toHaveAttribute("data-state", "idle");
     denied = false; await record();
+  });
+  it("keeps setup open when the initiating button unmounts on a responsive layout change", async () => {
+    ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_models" ? [{ id: "whisper-base", installed: false, bytes: 147951465, license: "MIT" }] : null);
+    const Host = ({ show }: { show: boolean }) => <>{show && <DictationButton />}<VoiceSettingsDialog /></>;
+    const view = render(<Host show />);
+    fireEvent.click(screen.getByTestId("dictation-button"));
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    view.rerender(<Host show={false} />);
+    expect(screen.getByRole("dialog")).toBeVisible();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
   it("opens model setup without an automatic download or microphone access", async () => {
     ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_models" ? [{ id: "whisper-base", installed: false, bytes: 147951465, license: "MIT" }] : null);

@@ -7,7 +7,96 @@ use crate::{
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::Emitter;
+use tokio_util::sync::CancellationToken;
 static INSTALL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+#[derive(Clone, Serialize, Debug)]
+pub struct InstallationProgress {
+    revision: u64,
+    job_id: String,
+    model_id: String,
+    bytes: u64,
+    total: u64,
+    phase: &'static str,
+    error: Option<String>,
+}
+#[derive(Default)]
+struct InstallationTracker(std::sync::Mutex<Option<InstallationProgress>>);
+impl InstallationTracker {
+    fn snapshot(&self) -> Option<InstallationProgress> {
+        self.0.lock().unwrap().clone()
+    }
+    fn update(
+        &self,
+        model: &catalog::Model,
+        job_id: &str,
+        phase: &'static str,
+        bytes: u64,
+        error: Option<String>,
+    ) -> InstallationProgress {
+        let mut current = self.0.lock().unwrap();
+        let next = InstallationProgress {
+            revision: current.as_ref().map_or(1, |p| p.revision + 1),
+            job_id: job_id.into(),
+            model_id: model.id.into(),
+            bytes: bytes.min(model.bytes),
+            total: model.bytes,
+            phase,
+            error,
+        };
+        *current = Some(next.clone());
+        next
+    }
+}
+static INSTALLATION: InstallationTracker = InstallationTracker(std::sync::Mutex::new(None));
+/// Retained in the backend, independently of the initiating window/component.
+#[tauri::command]
+pub fn voice_model_installation() -> Option<InstallationProgress> {
+    INSTALLATION.snapshot()
+}
+static CANCELLATION: std::sync::Mutex<Option<(String, CancellationToken)>> =
+    std::sync::Mutex::new(None);
+#[tauri::command]
+pub fn voice_cancel_model_installation(job_id: String) {
+    if let Some((current, token)) = CANCELLATION.lock().unwrap().as_ref() {
+        if current == &job_id {
+            token.cancel();
+        }
+    }
+}
+struct InstallationReporter<'a> {
+    app: &'a tauri::AppHandle,
+    model: &'static catalog::Model,
+    job_id: String,
+    bytes: u64,
+    finished: bool,
+}
+impl InstallationReporter<'_> {
+    fn report(&mut self, phase: &'static str, bytes: u64, error: Option<String>) {
+        self.bytes = bytes;
+        self.finished = matches!(phase, "complete" | "failed" | "cancelled");
+        let progress = INSTALLATION.update(self.model, &self.job_id, phase, bytes, error);
+        let _ = self.app.emit("voice-model-progress", progress);
+    }
+}
+impl Drop for InstallationReporter<'_> {
+    fn drop(&mut self) {
+        let mut cancellation = CANCELLATION.lock().unwrap();
+        if cancellation
+            .as_ref()
+            .is_some_and(|(id, _)| id == &self.job_id)
+        {
+            cancellation.take();
+        }
+        if !self.finished {
+            self.report(
+                "failed",
+                self.bytes,
+                Some("Model installation interrupted".into()),
+            );
+        }
+    }
+}
 
 /// A download takes one snapshot; changing settings affects the next download.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -93,6 +182,8 @@ pub struct ModelStatus {
     #[serde(flatten)]
     model: catalog::Model,
     installed: bool,
+    download_url: String,
+    resumable_bytes: u64,
     license: &'static str,
     catalog_version: &'static str,
     available_version: &'static str,
@@ -140,6 +231,12 @@ fn inventory(m: &catalog::Model, root: &std::path::Path, verify: bool) -> ModelS
     let legacy = root.join(m.id).join(m.filename).is_file();
     ModelStatus {
         model: m.clone(),
+        download_url: catalog::download_url(m),
+        resumable_bytes: std::fs::metadata(target.with_extension("bin.part"))
+            .map(|v| v.len())
+            .ok()
+            .filter(|n| *n <= m.bytes)
+            .unwrap_or(0),
         license: "MIT",
         catalog_version: catalog::CATALOG_VERSION,
         available_version: &m.sha256[..12],
@@ -187,10 +284,34 @@ pub async fn voice_install_model(
         .map_err(|_| "A model installation is already running")?;
     let m = catalog::model(&model_id)?;
     let target = catalog::path(m);
-    std::fs::create_dir_all(target.parent().ok_or("Invalid model directory")?)
-        .map_err(|e| e.to_string())?;
-    let part = target.with_extension("bin.part");
+    let offline = source_path.is_some();
+    let part = target.with_extension(if offline {
+        "bin.import.part"
+    } else {
+        "bin.part"
+    });
+    let cancel = CancellationToken::new();
+    let job_id = uuid::Uuid::new_v4().to_string();
+    *CANCELLATION.lock().unwrap() = Some((job_id.clone(), cancel.clone()));
+    let mut reporter = InstallationReporter {
+        app: &app,
+        model: m,
+        job_id,
+        bytes: 0,
+        finished: false,
+    };
+    reporter.report(
+        if source_path.is_some() {
+            "importing"
+        } else {
+            "connecting"
+        },
+        0,
+        None,
+    );
     let result: Result<(), String> = async {
+        std::fs::create_dir_all(target.parent().ok_or("Invalid model directory")?)
+            .map_err(|e| e.to_string())?;
         if let Some(source) = source_path {
             if tokio::fs::metadata(&source)
                 .await
@@ -200,71 +321,214 @@ pub async fn voice_install_model(
             {
                 return Err("Incorrect model file size".into());
             }
-            let dest = part.clone();
-            tokio::task::spawn_blocking(move || std::fs::copy(source, dest))
-                .await
-                .map_err(|e| e.to_string())?
-                .map_err(|e| e.to_string())?;
-        } else {
-            // Explicit downloads use the official source; offline import works without network.
-            let origin = format!(
-                "https://huggingface.co/ggerganov/whisper.cpp/resolve/{}",
-                catalog::UPSTREAM_REVISION
-            );
-            let settings = state.ai_ctx.read().await.config.asr.download_proxy.clone();
-            let proxy = resolve_download_proxy(&state, &settings)?;
-            let client = download_client(proxy.as_ref())?;
-            let response = client
-                .get(format!("{origin}/{}", m.filename))
-                .send()
-                .await
-                .map_err(|e| e.to_string())?
-                .error_for_status()
-                .map_err(|e| e.to_string())?;
-            let mut file = tokio::fs::File::create(&part)
+            // Separate import scratch file preserves a paused network download.
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let mut input = tokio::fs::File::open(source)
                 .await
                 .map_err(|e| e.to_string())?;
-            let mut stream = response.bytes_stream();
-            let mut bytes = 0u64;
-            let mut last = std::time::Instant::now();
-            use tokio::io::AsyncWriteExt;
-            while let Some(chunk) = stream.next().await {
-                let chunk = chunk.map_err(|e| e.to_string())?;
-                bytes += chunk.len() as u64;
+            let mut output = tokio::fs::File::create(&part)
+                .await
+                .map_err(|e| e.to_string())?;
+            let mut buffer = vec![0; 1024 * 1024];
+            let mut bytes = 0;
+            loop {
+                let count = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return Err("CANCELLED".into()),
+                    read = input.read(&mut buffer) => read.map_err(|e| e.to_string())?,
+                };
+                if count == 0 {
+                    break;
+                }
+                bytes += count as u64;
                 if bytes > m.bytes {
                     return Err("Model exceeds expected size".into());
                 }
-                file.write_all(&chunk).await.map_err(|e| e.to_string())?;
-                if last.elapsed().as_millis() >= 200 || bytes == m.bytes {
-                    let _ = app.emit(
-                        "voice-model-progress",
-                        serde_json::json!({"model_id": m.id, "bytes": bytes, "total": m.bytes}),
-                    );
-                    last = std::time::Instant::now();
-                }
+                output
+                    .write_all(&buffer[..count])
+                    .await
+                    .map_err(|e| e.to_string())?;
+                reporter.report("importing", bytes, None);
             }
-            file.sync_all().await.map_err(|e| e.to_string())?;
+            output.sync_all().await.map_err(|e| e.to_string())?;
+        } else {
+            let settings = state.ai_ctx.read().await.config.asr.download_proxy.clone();
+            let proxy = resolve_download_proxy(&state, &settings)?;
+            let client = download_client(proxy.as_ref())?;
+            download_to_part(
+                &client,
+                &catalog::download_url(m),
+                m.bytes,
+                &part,
+                &cancel,
+                |phase, bytes| reporter.report(phase, bytes, None),
+            )
+            .await?;
         }
+        if cancel.is_cancelled() {
+            return Err("CANCELLED".into());
+        }
+        reporter.report("verifying", m.bytes, None);
         let install_target = target.clone();
         let install_part = part.clone();
-        tokio::task::spawn_blocking(move || publish_verified(m, &install_part, &install_target))
-            .await
-            .map_err(|e| e.to_string())??;
+        let verification_cancel = cancel.clone();
+        tokio::task::spawn_blocking(move || {
+            publish_verified_cancellable(
+                m,
+                &install_part,
+                &install_target,
+                Some(&verification_cancel),
+            )
+        })
+        .await
+        .map_err(|e| e.to_string())??;
         Ok(())
     }
     .await;
-    if result.is_err() {
-        let _ = std::fs::remove_file(&part);
+    if let Err(error) = &result {
+        // Interrupted network transfers remain resumable; rejected weights do not.
+        if offline || error.starts_with("MODEL_CORRUPT") {
+            let _ = std::fs::remove_file(&part);
+        }
+        let bytes = std::fs::metadata(&part).map(|v| v.len()).unwrap_or(0);
+        reporter.report(
+            if error == "CANCELLED" {
+                "cancelled"
+            } else {
+                "failed"
+            },
+            bytes,
+            (error != "CANCELLED").then(|| error.clone()),
+        );
+    } else {
+        if offline {
+            let _ = std::fs::remove_file(target.with_extension("bin.part"));
+        }
+        reporter.report("complete", m.bytes, None);
     }
     result
 }
 
+/// Resume only against the immutable, hash-pinned artifact. Final SHA verification
+/// is mandatory even if the server ignores Range and a full restart is needed.
+async fn download_to_part(
+    client: &reqwest::Client,
+    url: &str,
+    total: u64,
+    part: &std::path::Path,
+    cancel: &CancellationToken,
+    mut progress: impl FnMut(&'static str, u64),
+) -> Result<(), String> {
+    use tokio::io::AsyncWriteExt;
+    if cancel.is_cancelled() {
+        return Err("CANCELLED".into());
+    }
+    let mut offset = tokio::fs::metadata(part)
+        .await
+        .map(|v| v.len())
+        .unwrap_or(0);
+    if offset > total {
+        offset = 0;
+    }
+    progress("connecting", offset);
+    if offset == total {
+        return Ok(());
+    }
+    let mut request = client
+        .get(url)
+        .header(reqwest::header::ACCEPT_ENCODING, "identity");
+    if offset > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={offset}-"));
+    }
+    let response = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return Err("CANCELLED".into()),
+        response = request.send() => response.map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?,
+    };
+    if response
+        .headers()
+        .get(reqwest::header::CONTENT_ENCODING)
+        .is_some_and(|v| v != "identity")
+    {
+        return Err("Unsupported encoded model response".into());
+    }
+    if response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+        let expected = format!("bytes {offset}-{}/{total}", total - 1);
+        if response
+            .headers()
+            .get(reqwest::header::CONTENT_RANGE)
+            .and_then(|v| v.to_str().ok())
+            != Some(expected.as_str())
+        {
+            return Err("Invalid model Content-Range; partial download retained".into());
+        }
+    } else if response.status() == reqwest::StatusCode::OK {
+        offset = 0; // Range unsupported: truncate, never append a full response.
+    } else {
+        return Err("Unexpected model download response".into());
+    }
+    let mut file = tokio::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(offset > 0)
+        .truncate(offset == 0)
+        .open(part)
+        .await
+        .map_err(|e| e.to_string())?;
+    progress("downloading", offset);
+    let mut stream = response.bytes_stream();
+    let mut last = std::time::Instant::now();
+    let result = async {
+        loop {
+            let chunk = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return Err("CANCELLED".into()),
+                chunk = stream.next() => chunk,
+            };
+            let Some(chunk) = chunk else {
+                break;
+            };
+            let chunk = chunk.map_err(|e| e.to_string())?;
+            if offset + chunk.len() as u64 > total {
+                return Err("Model exceeds expected size".into());
+            }
+            file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+            offset += chunk.len() as u64;
+            if last.elapsed().as_millis() >= 200 || offset == total {
+                progress("downloading", offset);
+                last = std::time::Instant::now();
+            }
+        }
+        if offset != total {
+            return Err("Incomplete model download; retry to resume".into());
+        }
+        Ok(())
+    }
+    .await;
+    // Flush pending Tokio writes before reporting a pause/error or reopening.
+    file.flush().await.map_err(|e| e.to_string())?;
+    file.sync_all().await.map_err(|e| e.to_string())?;
+    result
+}
+
+#[cfg(test)]
 fn publish_verified(
     m: &catalog::Model,
     part: &std::path::Path,
     target: &std::path::Path,
 ) -> Result<(), String> {
+    publish_verified_cancellable(m, part, target, None)
+}
+fn publish_verified_cancellable(
+    m: &catalog::Model,
+    part: &std::path::Path,
+    target: &std::path::Path,
+    cancel: Option<&CancellationToken>,
+) -> Result<(), String> {
     catalog::verify(m, part)?;
+    if cancel.is_some_and(CancellationToken::is_cancelled) {
+        return Err("CANCELLED".into());
+    }
     if target.exists() {
         if catalog::verify(m, target).is_ok() {
             // Never delete a valid current file on reinstall, including Windows.
@@ -280,6 +544,202 @@ fn publish_verified(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stale_download_cancel_does_not_stop_a_new_job() {
+        let token = CancellationToken::new();
+        *CANCELLATION.lock().unwrap() = Some(("new-job".into(), token.clone()));
+        voice_cancel_model_installation("old-job".into());
+        assert!(!token.is_cancelled());
+        voice_cancel_model_installation("new-job".into());
+        assert!(token.is_cancelled());
+        CANCELLATION.lock().unwrap().take();
+    }
+
+    #[tokio::test]
+    async fn download_range_resume_restart_and_invalid_range() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        for (status, range, body, valid) in [
+            (
+                "206 Partial Content",
+                "Content-Range: bytes 3-5/6\r\n",
+                "def",
+                true,
+            ),
+            ("200 OK", "", "abcdef", true),
+            (
+                "206 Partial Content",
+                "Content-Range: bytes 2-5/6\r\n",
+                "cdef",
+                false,
+            ),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let part = root.path().join("model.part");
+            std::fs::write(&part, b"abc").unwrap();
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = [0; 4096];
+                let count = socket.read(&mut request).await.unwrap();
+                assert!(
+                    String::from_utf8_lossy(&request[..count])
+                        .to_lowercase()
+                        .contains("range: bytes=3-")
+                );
+                socket.write_all(format!("HTTP/1.1 {status}\r\n{range}Content-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await.unwrap();
+            });
+            let result = download_to_part(
+                &download_client(None).unwrap(),
+                &format!("http://{addr}/model"),
+                6,
+                &part,
+                &CancellationToken::new(),
+                |_, _| {},
+            )
+            .await;
+            server.await.unwrap();
+            assert_eq!(result.is_ok(), valid, "{result:?}");
+            assert_eq!(
+                std::fs::read(part).unwrap(),
+                if valid {
+                    b"abcdef".as_slice()
+                } else {
+                    b"abc".as_slice()
+                }
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn cancelling_download_preserves_partial_and_allows_resume() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let root = tempfile::tempdir().unwrap();
+        let part = root.path().join("model.part");
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = CancellationToken::new();
+        let release_server = cancel.clone();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0; 2048];
+            socket.read(&mut request).await.unwrap();
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nabc")
+                .await
+                .unwrap();
+            release_server.cancelled().await;
+        });
+        let signal = cancel.clone();
+        let observed = part.clone();
+        let cancellation = tokio::spawn(async move {
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                while tokio::fs::metadata(&observed)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0)
+                    < 3
+                {
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .unwrap();
+            signal.cancel();
+        });
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(6),
+            download_to_part(
+                &download_client(None).unwrap(),
+                &format!("http://{addr}/model"),
+                6,
+                &part,
+                &cancel,
+                |_, _| {},
+            ),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.unwrap_err(), "CANCELLED");
+        cancellation.await.unwrap();
+        server.await.unwrap();
+        assert_eq!(std::fs::read(&part).unwrap(), b"abc");
+        // The next request resumes the file produced by actual cancellation.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0; 2048];
+            let count = socket.read(&mut request).await.unwrap();
+            assert!(
+                String::from_utf8_lossy(&request[..count])
+                    .to_lowercase()
+                    .contains("range: bytes=3-")
+            );
+            socket.write_all(b"HTTP/1.1 206 Partial Content\r\nContent-Range: bytes 3-5/6\r\nContent-Length: 3\r\nConnection: close\r\n\r\ndef").await.unwrap();
+        });
+        download_to_part(
+            &download_client(None).unwrap(),
+            &format!("http://{addr}/model"),
+            6,
+            &part,
+            &CancellationToken::new(),
+            |_, _| {},
+        )
+        .await
+        .unwrap();
+        server.await.unwrap();
+        assert_eq!(std::fs::read(&part).unwrap(), b"abcdef");
+        let model = catalog::Model {
+            id: "test",
+            filename: "model.bin",
+            bytes: 6,
+            sha256: "bef57ec7f53a6d40beb640a780a639c83bc29ac8a9816f1fc6c5c6dcd93c4721",
+        };
+        let target = root.path().join("model.bin");
+        assert!(publish_verified_cancellable(&model, &part, &target, Some(&cancel)).is_err());
+        assert!(!target.exists());
+        publish_verified(&model, &part, &target).unwrap();
+        assert_eq!(std::fs::read(target).unwrap(), b"abcdef");
+    }
+
+    #[test]
+    fn installation_snapshot_survives_observers_and_retains_terminal_results() {
+        let tracker = InstallationTracker::default();
+        let model = catalog::model("whisper-base").unwrap();
+        assert!(tracker.snapshot().is_none());
+        let connecting = tracker.update(model, "test-job", "connecting", 0, None);
+        tracker.update(model, "test-job", "downloading", 1024, None);
+        let reopened = tracker.snapshot().unwrap();
+        assert_eq!(reopened.bytes, 1024);
+        assert_eq!(reopened.phase, "downloading");
+        assert!(reopened.revision > connecting.revision);
+        let verifying = tracker.update(model, "test-job", "verifying", model.bytes, None);
+        assert_eq!(verifying.phase, "verifying"); // 100% transfer is not completion.
+        tracker.update(
+            model,
+            "test-job",
+            "failed",
+            1024,
+            Some("connection lost".into()),
+        );
+        assert_eq!(
+            tracker.snapshot().unwrap().error.as_deref(),
+            Some("connection lost")
+        );
+        let retry = tracker.update(model, "test-job", "connecting", 0, None);
+        assert!(retry.revision > verifying.revision);
+        assert!(retry.error.is_none());
+        tracker.update(model, "test-job", "complete", model.bytes, None);
+        let completed = tracker.snapshot().unwrap();
+        assert_eq!(completed.phase, "complete");
+        assert_eq!(completed.bytes, completed.total);
+        let status = inventory(model, tempfile::tempdir().unwrap().path(), false);
+        assert_eq!(status.download_url, catalog::download_url(model));
+        assert!(status.download_url.contains(catalog::UPSTREAM_REVISION));
+        assert!(status.download_url.ends_with("ggml-base.bin?download=true"));
+    }
+
     #[test]
     fn download_proxy_modes_do_not_fall_back_to_another_route() {
         let app = AppProxyConfig {

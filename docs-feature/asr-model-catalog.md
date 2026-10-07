@@ -11,7 +11,7 @@
 
 `src-tauri/src/asr/catalog.rs` 定义目录版本、上游仓库不可变修订、模型 ID、文件名、精确字节数及 SHA-256。SHA-256 是权重版本的真实标识，界面显示前 12 位；目录版本变更而 SHA 不变不会重复下载。
 
-文件路径：`<cache>/taomni/models/<model-id>/<sha256>/<filename>`。安装先写同目录 `.part`，限制大小并校验，再发布最终文件。下载错误或校验失败清理 `.part`；新的目录不覆盖任何历史版本。重新安装当前版本时保留仍然有效的文件，只替换损坏文件。
+文件路径：`<cache>/taomni/models/<model-id>/<sha256>/<filename>`。安装先写同目录 `.part`，限制大小并校验，再发布最终文件。取消或网络错误保留 `.part` 用于 Range 续传，SHA-256 校验失败清理损坏文件；新的目录不覆盖任何历史版本。重新安装当前版本时保留仍然有效的文件，只替换损坏文件。
 
 `voice_models` 返回廉价库存及版本差异；`voice_check_models` 在阻塞线程进行完整校验，返回 missing/unverified/verified/corrupt 状态与 update_available。识别引擎每次冷加载也校验，不能仅凭库存显示或目录名信任文件。安装与完整性检查串行，避免对正在写入的文件作出错误判定。
 
