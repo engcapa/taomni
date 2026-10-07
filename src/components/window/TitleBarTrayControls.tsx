@@ -240,7 +240,7 @@ function CompactTitleBarTray({
           />
           {!aiFullyDisabled && (
             <div className="flex items-center justify-between gap-3 px-3 py-1">
-              <span className="truncate">{t("ptt.holdToSpeak")}</span>
+              <span className="truncate">{t("voice.start")}</span>
               <PttButton />
             </div>
           )}

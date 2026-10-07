@@ -82,6 +82,8 @@ Dark-mode slide gallery captured from local dev builds, including the `5000` bro
 - Node.js 18+
 - pnpm
 - Rust 1.94+
+- CMake, a C/C++ toolchain and libclang for the bundled Whisper runtime (Linux also needs `libasound2-dev`).
+- Local voice dictation defaults to multilingual Whisper Base with an explicit first-use download or offline import (x86 CPUs require AVX2/FMA/F16C/SSE4.2); see [voice setup and verification](docs-feature/voice-input-delivery.md).
 - `protoc` for Protocol Buffers, required by the native HBase client build
 - A complete Perl 5 distribution, required to build the vendored OpenSSL used
   by VNC anonymous TLS. Git for Windows' bundled Perl is not complete enough.

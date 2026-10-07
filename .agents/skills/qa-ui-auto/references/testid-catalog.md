@@ -94,6 +94,15 @@
 ## ai/voice (F-AI-2.3)
 
 - `[data-testid="ptt-button"]` — interactive [optional] — F-AI-2.3.ptt-button
+- `[data-testid="chat-voice-button"]` — interactive — F-AI-2.3.chat-voice-button
+- `[data-testid="chat-voice-button-cancel"]` — interactive — F-AI-2.3.chat-voice-cancel
+- `[data-testid="voice-settings-close"]` — interactive — F-AI-2.3.voice-settings-close
+- `[data-testid="asr-check-models"]` — interactive — F-AI-2.3.asr-check-models
+- `[data-testid="asr-language"]` — interactive — F-AI-2.3.asr-language
+- `[data-testid="asr-download-whisper-base"]` — interactive — F-AI-2.3.asr-download-base
+- `[data-testid="asr-download-whisper-small"]` — interactive — F-AI-2.3.asr-download-small
+- `[data-testid="asr-select-whisper-base"]` — interactive — F-AI-2.3.asr-select-base
+- `[data-testid="asr-select-whisper-small"]` — interactive — F-AI-2.3.asr-select-small
 
 ## application/update (F-Update-1)
 

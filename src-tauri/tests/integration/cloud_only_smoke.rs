@@ -14,7 +14,7 @@ fn default_config_lists_canonical_providers() {
     assert!(cfg.llm.providers.contains_key("groq"));
     assert!(cfg.llm.providers.contains_key("local"));
     assert!(cfg.llm.providers.contains_key("anthropic"));
-    assert!(cfg.asr.providers.contains_key("sherpa-zipformer-zh-en"));
+    assert!(cfg.asr.providers.contains_key("whisper-base"));
 }
 
 #[test]

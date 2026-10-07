@@ -1,123 +1,240 @@
-// Tauri commands for the voice/PTT pipeline.
-
-use super::VoiceTranscriptResult;
-#[cfg(feature = "voice-capture")]
-use crate::llm::{ChatMessage, ChatRequest, TaskKind};
-use crate::state::AppState;
-#[cfg(feature = "voice-capture")]
-use std::time::Instant;
+//! Session IDs isolate cancellation and late results across inputs and windows.
+use crate::{asr::manager::AsrManager, state::AppState};
+use std::sync::{
+    Arc, Mutex, OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 use tauri::State;
-
-#[tauri::command]
-pub async fn voice_capture_supported() -> bool {
-    cfg!(feature = "voice-capture")
+#[derive(serde::Serialize)]
+pub struct VoiceTranscriptResult {
+    transcript: String,
+    audio_duration_ms: u64,
+    processing_ms: u64,
 }
-
-/// Start microphone capture (PTT pressed).
-#[tauri::command]
-pub async fn voice_start_capture() -> Result<u32, String> {
+struct Session {
+    id: String,
+    cancel: Arc<AtomicBool>,
+    finishing: AtomicBool,
+    engine: Arc<AsrManager>,
     #[cfg(feature = "voice-capture")]
-    {
-        return super::capture::start();
-    }
-    #[cfg(not(feature = "voice-capture"))]
-    {
-        Err("voice-capture feature not built (rebuild with --features voice-capture)".into())
+    capture: Mutex<Option<super::capture::Capture>>,
+}
+fn current() -> &'static Mutex<Option<Arc<Session>>> {
+    static CURRENT: OnceLock<Mutex<Option<Arc<Session>>>> = OnceLock::new();
+    CURRENT.get_or_init(|| Mutex::new(None))
+}
+// IPC cancellation can arrive before the async start command is polled.
+// Keep a bounded recent ledger, always accessed while holding current().
+fn cancelled_ids() -> &'static Mutex<std::collections::VecDeque<String>> {
+    static IDS: OnceLock<Mutex<std::collections::VecDeque<String>>> = OnceLock::new();
+    IDS.get_or_init(|| Mutex::new(std::collections::VecDeque::new()))
+}
+fn take_cancelled(id: &str) -> bool {
+    let mut ids = cancelled_ids().lock().unwrap();
+    if let Some(index) = ids.iter().position(|value| value == id) {
+        ids.remove(index);
+        true
+    } else {
+        false
     }
 }
-
-/// Stop microphone capture and return the captured PCM size (debugging).
-#[tauri::command]
-pub async fn voice_stop_capture() -> Result<usize, String> {
-    #[cfg(feature = "voice-capture")]
-    {
-        let pcm = super::capture::stop()?;
-        return Ok(pcm.len());
-    }
-    #[cfg(not(feature = "voice-capture"))]
-    {
-        Err("voice-capture feature not built".into())
+fn remove(id: &str) {
+    let mut guard = current().lock().unwrap();
+    if guard.as_ref().is_some_and(|s| s.id == id) {
+        guard.take();
     }
 }
-
-/// Stop capture, transcribe via the active ASR engine, and optionally route
-/// the transcript through the LLM as a voice intent.
+pub fn cancel_all() {
+    if let Some(s) = current().lock().unwrap().take() {
+        s.cancel.store(true, Ordering::Relaxed);
+        #[cfg(feature = "voice-capture")]
+        if let Some(c) = s.capture.lock().unwrap().take() {
+            let _ = c.stop.send(());
+        }
+    }
+}
 #[tauri::command]
-pub async fn voice_stop_and_transcribe(
-    route_intent: bool,
+pub fn voice_capture_supported() -> bool {
+    cfg!(feature = "voice-capture") && AsrManager::supported()
+}
+#[tauri::command]
+pub async fn voice_start_capture(
+    session_id: String,
     state: State<'_, AppState>,
-) -> Result<VoiceTranscriptResult, String> {
-    #[cfg(not(feature = "voice-capture"))]
+) -> Result<(), String> {
+    if !voice_capture_supported() {
+        return Err("Voice support not built".into());
+    }
+    let engine = {
+        let ai = state.ai_ctx.read().await;
+        if ai.config.fully_disabled {
+            return Err("AI is fully disabled".into());
+        }
+        ai.asr.clone()
+    };
+    let session = Arc::new(Session {
+        id: session_id.clone(),
+        finishing: AtomicBool::new(false),
+        cancel: Arc::new(AtomicBool::new(false)),
+        engine,
+        #[cfg(feature = "voice-capture")]
+        capture: Mutex::new(None),
+    });
     {
-        let _ = (route_intent, state);
-        return Err("voice-capture feature not built".into());
+        let mut guard = current().lock().unwrap();
+        if take_cancelled(&session_id) {
+            return Err("Cancelled".into());
+        }
+        if guard.is_some() {
+            return Err("Voice input is busy".into());
+        }
+        *guard = Some(session.clone());
     }
-
-    #[cfg(feature = "voice-capture")]
-    let started = Instant::now();
-    #[cfg(feature = "voice-capture")]
-    let pcm = super::capture::stop()?;
-
-    #[cfg(feature = "voice-capture")]
-    if pcm.is_empty() {
-        return Err("No audio captured".into());
+    let result = async {
+        session.engine.prepare().await?;
+        if session.cancel.load(Ordering::Relaxed) {
+            return Err("Cancelled".into());
+        }
+        // Recheck the master switch after model loading (it can take seconds).
+        {
+            let ai = state.ai_ctx.read().await;
+            if ai.config.fully_disabled || !Arc::ptr_eq(&ai.asr, &session.engine) {
+                return Err("Voice configuration changed".into());
+            }
+        }
+        #[cfg(feature = "voice-capture")]
+        {
+            let capture = super::capture::start().await?;
+            let mut guard = session.capture.lock().unwrap();
+            if session.cancel.load(Ordering::Relaxed) {
+                let _ = capture.stop.send(());
+                return Err("Cancelled".into());
+            }
+            *guard = Some(capture);
+        }
+        Ok(())
     }
-
-    // Transcribe via the configured ASR engine.
-    #[cfg(feature = "voice-capture")]
-    let ai_ctx = state.ai_ctx.read().await;
-    #[cfg(feature = "voice-capture")]
-    if ai_ctx.config.fully_disabled {
-        return Err("AI is fully disabled.".into());
-    }
-    #[cfg(feature = "voice-capture")]
-    let transcript = ai_ctx
-        .asr
-        .transcribe(&pcm)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    #[cfg(feature = "voice-capture")]
-    if !route_intent {
-        return Ok(VoiceTranscriptResult {
-            transcript,
-            duration_ms: started.elapsed().as_millis() as u64,
-            intent_json: None,
+    .await;
+    if result.is_err() {
+        remove(&session_id);
+    } else {
+        // Also expire sessions when their renderer disappears without cleanup.
+        let expiry = Arc::downgrade(&session);
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(125)).await;
+            if let Some(expiry) = expiry.upgrade() {
+                if !expiry.finishing.load(Ordering::SeqCst) {
+                    voice_stop_capture(expiry.id.clone());
+                }
+            }
         });
     }
-
-    // Voice intent: ask the LLM to classify the transcript as one of a few
-    // tools, returning JSON. Keep this minimal — the rich intent dispatcher
-    // belongs in the next iteration.
-    #[cfg(feature = "voice-capture")]
-    let req = ChatRequest {
-        messages: vec![
-            ChatMessage::system(
-                "你是 Taomni 终端管理器的语音意图分类器。把用户的语音转写映射到一个工具调用。\n\
-                 工具列表：list_sessions、switch_tab、search_history、explain_error、\n\
-                 generate_shell_command、none（普通对话）。\n\
-                 只返回一段 JSON：{\"tool\":\"<name>\",\"args\":{...}}。",
-            ),
-            ChatMessage::user(transcript.clone()),
-        ],
-        max_tokens: Some(200),
-        temperature: Some(0.1),
-        stream: false,
-    };
-
-    #[cfg(feature = "voice-capture")]
-    let intent_json = match ai_ctx.llm.complete(req, TaskKind::VoiceIntent).await {
-        Ok(resp) => Some(resp.content),
-        Err(e) => {
-            tracing::warn!(?e, "voice intent classification failed");
-            None
+    result
+}
+#[tauri::command]
+pub fn voice_stop_capture(session_id: String) {
+    let mut guard = current().lock().unwrap();
+    if guard.as_ref().is_some_and(|s| s.id == session_id) {
+        let session = guard.take().unwrap();
+        session.cancel.store(true, Ordering::Relaxed);
+        #[cfg(feature = "voice-capture")]
+        if let Some(capture) = session.capture.lock().unwrap().take() {
+            let _ = capture.stop.send(());
         }
-    };
+    } else {
+        let mut ids = cancelled_ids().lock().unwrap();
+        if !ids.contains(&session_id) {
+            if ids.len() >= 128 {
+                ids.pop_front();
+            }
+            ids.push_back(session_id);
+        }
+    }
+}
+#[tauri::command]
+pub async fn voice_stop_and_transcribe(
+    session_id: String,
+    state: State<'_, AppState>,
+) -> Result<VoiceTranscriptResult, String> {
+    let session = current()
+        .lock()
+        .unwrap()
+        .clone()
+        .filter(|s| s.id == session_id)
+        .ok_or("Recording expired")?;
+    if session.finishing.swap(true, Ordering::SeqCst) {
+        return Err("Transcription already running".into());
+    }
+    let result = async {
+        #[cfg(feature = "voice-capture")]
+        {
+            let capture = session
+                .capture
+                .lock()
+                .unwrap()
+                .take()
+                .ok_or("Recording is not ready or already stopped")?;
+            let _ = capture.stop.send(());
+            let pcm = capture.result.await.map_err(|e| e.to_string())??;
+            if session.cancel.load(Ordering::Relaxed)
+                || state.ai_ctx.read().await.config.fully_disabled
+            {
+                return Err("Cancelled".into());
+            }
+            let duration = pcm.len() as u64 * 1000 / 16000;
+            let started = std::time::Instant::now();
+            let transcript = session
+                .engine
+                .transcribe(pcm, session.cancel.clone())
+                .await?;
+            if session.cancel.load(Ordering::Relaxed)
+                || state.ai_ctx.read().await.config.fully_disabled
+            {
+                return Err("Cancelled".into());
+            }
+            Ok(VoiceTranscriptResult {
+                transcript,
+                audio_duration_ms: duration,
+                processing_ms: started.elapsed().as_millis() as u64,
+            })
+        }
+        #[cfg(not(feature = "voice-capture"))]
+        {
+            let _ = (session, state);
+            Err("Voice support not built".into())
+        }
+    }
+    .await;
+    remove(&session_id);
+    result
+}
 
-    #[cfg(feature = "voice-capture")]
-    Ok(VoiceTranscriptResult {
-        transcript,
-        duration_ms: started.elapsed().as_millis() as u64,
-        intent_json,
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stale_cancel_cannot_stop_another_input_session() {
+        let session = Arc::new(Session {
+            id: "current-input".into(),
+            cancel: Arc::new(AtomicBool::new(false)),
+            finishing: AtomicBool::new(false),
+            engine: Arc::new(AsrManager::configured("whisper-base", "auto")),
+            #[cfg(feature = "voice-capture")]
+            capture: Mutex::new(None),
+        });
+        *current().lock().unwrap() = Some(session.clone());
+        voice_stop_capture("old-input".into());
+        assert!(!session.cancel.load(Ordering::Relaxed));
+        assert!(current().lock().unwrap().is_some());
+        voice_stop_capture("current-input".into());
+        assert!(session.cancel.load(Ordering::Relaxed));
+        assert!(current().lock().unwrap().is_none());
+        // A cancel sent before start registration must prevent that late start.
+        voice_stop_capture("not-yet-registered".into());
+        let _guard = current().lock().unwrap();
+        assert!(take_cancelled("not-yet-registered"));
+        assert!(!take_cancelled("not-yet-registered"));
+        assert!(take_cancelled("old-input"));
+    }
 }

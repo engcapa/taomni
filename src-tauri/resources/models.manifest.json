@@ -1,38 +1,6 @@
 {
   "version": "2026-05-23",
   "models": {
-    "asr_sherpa_zipformer_zh_en_small": {
-      "kind": "asr",
-      "engine": "sherpa-onnx",
-      "display_name": "Streaming Zipformer (zh-en, small)",
-      "version": "20231129",
-      "size_mb": 80,
-      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "license": "Apache-2.0",
-      "license_note": "Apache-2.0; safe for commercial use.",
-      "filename": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-small.tar.bz2",
-      "urls": [
-        "https://modelscope.cn/api/v1/models/newmob/asr-models/repo?Revision=master&FilePath=sherpa-zipformer-zh-en-small-2023-11-29.tar.bz2",
-        "https://gh-proxy.com/https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
-        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2"
-      ]
-    },
-    "asr_sense_voice_small": {
-      "kind": "asr",
-      "engine": "sherpa-onnx",
-      "display_name": "SenseVoice Small (zh-pro)",
-      "version": "20240711",
-      "size_mb": 234,
-      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "license": "CC-BY-NC-4.0",
-      "license_note": "Non-commercial use only. Use Paraformer-zh-small or Whisper-small for commercial.",
-      "filename": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
-      "urls": [
-        "https://modelscope.cn/api/v1/models/newmob/asr-models/repo?Revision=master&FilePath=sense-voice-small-2024-07-17.tar.bz2",
-        "https://gh-proxy.com/https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
-        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2"
-      ]
-    },
     "llm_qwen3_0_6b_q4_k_m": {
       "kind": "llm",
       "engine": "llama-cpp",

@@ -16,6 +16,7 @@ export interface AsrProviderConfig {
 }
 
 export interface AsrConfig {
+  language?: string;
   active: string;
   providers: Record<string, AsrProviderConfig>;
   warm_on_startup: boolean;
@@ -356,13 +357,13 @@ interface AiStore {
 
 const DEFAULT_CONFIG: AiConfig = {
   asr: {
-    active: "sherpa-zipformer-zh-en",
-    providers: {
-      "sherpa-zipformer-zh-en": { engine: "sherpa-onnx", model: "streaming-zipformer-bilingual-zh-en-small" },
-      "whisper-base": { engine: "whisper-rs", model: "ggml-base-q5_1" },
-    },
-    warm_on_startup: true,
-    vad: "silero",
+    active: "whisper-base",
+    providers: Object.fromEntries(["base", "small", "medium"].map((size) => [
+      `whisper-${size}`, { engine: "whisper-rs", model: `ggml-${size}.bin` },
+    ])),
+    warm_on_startup: false,
+    vad: "none",
+    language: "auto",
   },
   llm: {
     active: "deepseek",
@@ -625,6 +626,11 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
   );
   return {
     ...config,
+    asr: {
+      ...DEFAULT_CONFIG.asr,
+      active: ["whisper-base", "whisper-small", "whisper-medium"].includes(config.asr?.active) ? config.asr.active : "whisper-base",
+      language: ["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].includes(config.asr?.language ?? "") ? config.asr.language : "auto",
+    },
     llm: {
       ...config.llm,
       providers: Object.fromEntries(
