@@ -74,6 +74,7 @@ impl AiConfig {
         self.codex_bridge.normalize();
         self.acp_bridge.normalize();
         self.llm.normalize();
+        self.asr.normalize();
     }
 
     pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {
@@ -90,41 +91,56 @@ impl AiConfig {
 
 // ── ASR ──────────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AsrConfig {
     pub active: String,
     pub providers: HashMap<String, AsrProviderConfig>,
     pub warm_on_startup: bool,
     pub vad: String,
+    #[serde(default = "asr_auto_language")]
+    pub language: String,
 }
-
+fn asr_auto_language() -> String {
+    "auto".into()
+}
+impl AsrConfig {
+    pub fn normalize(&mut self) {
+        // Previous releases advertised unimplemented engines/quantized files.
+        // Migrate them to the runnable multilingual Base without downloading.
+        if !["whisper-base", "whisper-small", "whisper-medium"].contains(&self.active.as_str()) {
+            self.active = "whisper-base".into();
+        }
+        self.providers = Self::default().providers;
+        if !["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].contains(&self.language.as_str()) {
+            self.language = "auto".into();
+        }
+        self.warm_on_startup = false;
+        self.vad = "none".into();
+    }
+}
 impl Default for AsrConfig {
     fn default() -> Self {
-        let mut providers = HashMap::new();
-        providers.insert(
-            "sherpa-zipformer-zh-en".into(),
-            AsrProviderConfig {
-                engine: "sherpa-onnx".into(),
-                model: "streaming-zipformer-bilingual-zh-en-small".into(),
-            },
-        );
-        providers.insert(
-            "whisper-base".into(),
-            AsrProviderConfig {
-                engine: "whisper-rs".into(),
-                model: "ggml-base-q5_1".into(),
-            },
-        );
         Self {
-            active: "sherpa-zipformer-zh-en".into(),
-            providers,
-            warm_on_startup: true,
-            vad: "silero".into(),
+            active: "whisper-base".into(),
+            providers: ["base", "small", "medium"]
+                .into_iter()
+                .map(|size| {
+                    (
+                        format!("whisper-{size}"),
+                        AsrProviderConfig {
+                            engine: "whisper-rs".into(),
+                            model: format!("ggml-{size}.bin"),
+                        },
+                    )
+                })
+                .collect(),
+            warm_on_startup: false,
+            vad: "none".into(),
+            language: "auto".into(),
         }
     }
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AsrProviderConfig {
     pub engine: String,
     pub model: String,
@@ -528,5 +544,25 @@ mod tests {
             serde_json::to_value(&loaded.codex_bridge).unwrap(),
             serde_json::to_value(&current.codex_bridge).unwrap()
         );
+    }
+}
+
+#[cfg(test)]
+mod asr_migration_tests {
+    use super::*;
+    #[test]
+    fn legacy_asr_migrates_without_enabling_download_or_warmup() {
+        let mut config = AsrConfig::default();
+        config.active = "sherpa-zipformer-zh-en".into();
+        config.language = "invalid".into();
+        config.warm_on_startup = true;
+        config.normalize();
+        assert_eq!(config.active, "whisper-base");
+        assert_eq!(config.language, "auto");
+        assert!(!config.warm_on_startup);
+        assert_eq!(config.providers.len(), 3);
+        config.active = "whisper-small".into();
+        config.normalize();
+        assert_eq!(config.active, "whisper-small");
     }
 }

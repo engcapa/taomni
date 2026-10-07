@@ -1,61 +1,283 @@
-use super::{Asr, AsrResult, StubAsr};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use super::catalog;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
-/// Manages the lifecycle of the active ASR engine:
-/// - startup warm (load model into memory)
-/// - idle unload (release RAM after inactivity)
-/// - model download coordination (stub — real download in models::downloader)
+/// One lazy recognizer per configuration. Loading/decoding never blocks Tokio.
+/// A request keeps its own manager snapshot when the selected model changes.
 pub struct AsrManager {
-    engine: Arc<RwLock<Arc<dyn Asr>>>,
-    warm_on_startup: bool,
+    pub model_id: String,
+    language: String,
+    #[cfg(feature = "asr-whisper")]
+    context: Arc<std::sync::Mutex<Option<whisper_rs::WhisperContext>>>,
 }
-
 impl AsrManager {
-    pub fn new(warm_on_startup: bool) -> Self {
-        Self {
-            engine: Arc::new(RwLock::new(Arc::new(StubAsr))),
-            warm_on_startup,
+    pub fn supported() -> bool {
+        if !cfg!(feature = "asr-whisper") {
+            return false;
+        }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            std::is_x86_feature_detected!("avx2")
+                && std::is_x86_feature_detected!("fma")
+                && std::is_x86_feature_detected!("f16c")
+                && std::is_x86_feature_detected!("sse4.2")
+        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+        {
+            true
         }
     }
 
-    /// Synchronously install an engine before the manager is shared.
-    /// Used at startup when the runtime hasn't begun yet.
-    pub fn set_engine_sync(&self, engine: Arc<dyn Asr>) {
-        // RwLock::blocking_write is safe to call from sync context.
-        let mut guard = self.engine.blocking_write();
-        *guard = engine;
+    pub fn configured(model_id: &str, language: &str) -> Self {
+        Self {
+            model_id: model_id.into(),
+            language: language.into(),
+            #[cfg(feature = "asr-whisper")]
+            context: Arc::new(std::sync::Mutex::new(None)),
+        }
+    }
+    pub async fn prepare(&self) -> Result<(), String> {
+        if !Self::supported() {
+            return Err(
+                "Whisper requires a supported build and CPU (AVX2/FMA/F16C/SSE4.2 on x86).".into(),
+            );
+        }
+        let m = catalog::model(&self.model_id)?;
+        #[cfg(feature = "asr-whisper")]
+        {
+            // Suppress native debug token logs as well as normal inference output.
+            whisper_rs::install_logging_hooks();
+            let context = self.context.clone();
+            tokio::task::spawn_blocking(move || {
+                let mut guard = context.lock().map_err(|_| "Recognizer lock failed")?;
+                if guard.is_none() {
+                    let path = catalog::path(m);
+                    catalog::verify(m, &path)?;
+                    let mut params = whisper_rs::WhisperContextParameters::default();
+                    params.use_gpu(false); // CPU inference; the x86 instruction baseline is checked before loading.
+                    *guard = Some(
+                        whisper_rs::WhisperContext::new_with_params(
+                            path.to_str().ok_or("Invalid model path")?,
+                            params,
+                        )
+                        .map_err(|e| format!("MODEL_LOAD: {e}"))?,
+                    );
+                }
+                Ok(())
+            })
+            .await
+            .map_err(|e| e.to_string())?
+        }
+        #[cfg(not(feature = "asr-whisper"))]
+        {
+            let _ = m;
+            Err("Whisper support not built".into())
+        }
+    }
+    pub async fn transcribe(
+        &self,
+        pcm: Vec<f32>,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<String, String> {
+        if pcm.len() < 1600 || pcm.iter().all(|s| s.abs() < 0.001) {
+            return Err("NO_SPEECH: No speech detected.".into());
+        }
+        self.prepare().await?;
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Cancelled".into());
+        }
+        #[cfg(feature = "asr-whisper")]
+        {
+            let context = self.context.clone();
+            let language = self.language.clone();
+            tokio::task::spawn_blocking(move || {
+                let guard = context.lock().map_err(|_| "Recognizer lock failed")?;
+                if cancel.load(Ordering::Relaxed) {
+                    return Err("Cancelled".into());
+                }
+                let mut state = guard
+                    .as_ref()
+                    .ok_or("Model not loaded")?
+                    .create_state()
+                    .map_err(|e| e.to_string())?;
+                let mut params =
+                    whisper_rs::FullParams::new(whisper_rs::SamplingStrategy::Greedy {
+                        best_of: 1,
+                    });
+                params.set_n_threads(
+                    std::thread::available_parallelism()
+                        .map(|n| n.get().min(4) as i32)
+                        .unwrap_or(2),
+                );
+                params.set_language(if language == "auto" {
+                    None
+                } else {
+                    Some(&language)
+                });
+                params.set_translate(false);
+                params.set_no_context(true);
+                params.set_no_timestamps(true);
+                params.set_print_progress(false);
+                params.set_print_realtime(false);
+                params.set_print_timestamps(false);
+                params.set_suppress_nst(true);
+                // whisper-rs 0.16's generic safe abort helper boxes a trait object
+                // but casts its pointer back to the concrete closure type. Avoid
+                // that mismatched layout and its leaked allocation entirely.
+                unsafe extern "C" fn abort_on_cancel(data: *mut std::ffi::c_void) -> bool {
+                    // SAFETY: data comes from Arc::as_ptr below. The Arc remains
+                    // alive until synchronous state.full has joined its workers.
+                    unsafe { &*data.cast::<AtomicBool>() }.load(Ordering::Relaxed)
+                }
+                // SAFETY: only an AtomicBool is shared with the native workers;
+                // its address is stable and cancel outlives the full call.
+                unsafe {
+                    params.set_abort_callback(Some(abort_on_cancel));
+                    params.set_abort_callback_user_data(Arc::as_ptr(&cancel).cast_mut().cast());
+                }
+                let decoded = state.full(params, &pcm);
+                if cancel.load(Ordering::Relaxed) {
+                    return Err("Cancelled".into());
+                }
+                decoded.map_err(|e| format!("TRANSCRIPTION: {e}"))?;
+                let mut text = String::new();
+                for segment in state.as_iter() {
+                    text.push_str(&segment.to_str().map_err(|e| e.to_string())?);
+                }
+                let text = text.trim().to_string();
+                if text.is_empty() {
+                    Err("NO_SPEECH: No speech detected.".into())
+                } else {
+                    Ok(text)
+                }
+            })
+            .await
+            .map_err(|e| e.to_string())?
+        }
+        #[cfg(not(feature = "asr-whisper"))]
+        {
+            Err("Whisper support not built".into())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn silence_never_loads_a_model() {
+        let engine = AsrManager::configured("whisper-base", "auto");
+        let error = engine
+            .transcribe(vec![0.0; 16000], Arc::new(AtomicBool::new(false)))
+            .await
+            .unwrap_err();
+        assert!(error.starts_with("NO_SPEECH"));
     }
 
-    /// Replace the active engine (called when user changes ASR provider in settings).
-    pub async fn set_engine(&self, engine: Arc<dyn Asr>) {
-        let mut guard = self.engine.write().await;
-        *guard = engine;
+    /// Run with NEWMOB_CACHE_DIR pointing at an isolated cache containing the
+    /// pinned base model, and TAOMNI_VOICE_PCM pointing at 16 kHz mono f32 LE.
+    #[cfg(feature = "asr-whisper")]
+    #[tokio::test]
+    #[ignore = "requires the pinned base weights and official JFK audio fixture"]
+    async fn base_decodes_real_audio_and_cancels() {
+        let path = std::env::var("TAOMNI_VOICE_PCM").expect("TAOMNI_VOICE_PCM");
+        let bytes = std::fs::read(path).unwrap();
+        let pcm: Vec<f32> = bytes
+            .chunks_exact(4)
+            .map(|v| f32::from_le_bytes(v.try_into().unwrap()))
+            .collect();
+        let engine = AsrManager::configured("whisper-base", "en");
+        let start = std::time::Instant::now();
+        let text = engine
+            .transcribe(pcm.clone(), Arc::new(AtomicBool::new(false)))
+            .await
+            .unwrap();
+        eprintln!("Whisper Base: {text}; elapsed {:?}", start.elapsed());
+        let lower = text.to_lowercase();
+        assert!(
+            lower.contains("ask not") && lower.contains("country"),
+            "{text}"
+        );
+        assert_eq!(
+            engine
+                .transcribe(pcm.clone(), Arc::new(AtomicBool::new(true)))
+                .await
+                .unwrap_err(),
+            "Cancelled"
+        );
+        let cancel = Arc::new(AtomicBool::new(false));
+        let signal = cancel.clone();
+        let cancellation = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            signal.store(true, Ordering::Relaxed);
+        });
+        assert_eq!(
+            engine.transcribe(pcm.clone(), cancel).await.unwrap_err(),
+            "Cancelled"
+        );
+        cancellation.await.unwrap();
+        // A cancelled decode must not poison the reused recognizer or abort
+        // the next recording; also catches invalid native callback user-data.
+        let retry = engine
+            .transcribe(pcm, Arc::new(AtomicBool::new(false)))
+            .await
+            .unwrap();
+        assert!(retry.to_lowercase().contains("country"), "{retry}");
     }
-
-    /// Get a reference to the current engine for transcription.
-    pub async fn engine(&self) -> Arc<dyn Asr> {
-        self.engine.read().await.clone()
-    }
-
-    /// Transcribe PCM audio using the current engine.
-    pub async fn transcribe(&self, pcm: &[f32]) -> AsrResult<String> {
-        let engine = self.engine().await;
-        engine.transcribe(pcm).await
-    }
-
-    /// Returns true if the current engine is warm.
-    pub async fn is_warm(&self) -> bool {
-        self.engine().await.is_warm()
-    }
-
-    /// Unload the current engine (called on idle timeout).
-    pub async fn unload(&self) {
-        let engine = self.engine().await;
-        engine.unload().await;
-    }
-
-    pub fn warm_on_startup(&self) -> bool {
-        self.warm_on_startup
+    #[cfg(feature = "asr-whisper")]
+    #[tokio::test]
+    #[ignore = "requires the pinned multilingual base model and Chinese audio fixture"]
+    async fn base_decodes_chinese_audio() {
+        let bytes =
+            std::fs::read(std::env::var("TAOMNI_VOICE_ZH_PCM").expect("TAOMNI_VOICE_ZH_PCM"))
+                .unwrap();
+        let pcm = bytes
+            .chunks_exact(4)
+            .map(|v| f32::from_le_bytes(v.try_into().unwrap()))
+            .collect();
+        let engine = AsrManager::configured("whisper-base", "zh");
+        let start = std::time::Instant::now();
+        let text = engine
+            .transcribe(pcm, Arc::new(AtomicBool::new(false)))
+            .await
+            .unwrap();
+        eprintln!(
+            "Whisper Base Chinese: {text}; elapsed {:?}",
+            start.elapsed()
+        );
+        // Independent FLEURS ground truth. Normalize punctuation and the
+        // traditional variants in this sentence before measuring character errors.
+        let actual: Vec<char> = text
+            .chars()
+            .filter(|c| ('\u{4e00}'..='\u{9fff}').contains(c))
+            .map(|c| match c {
+                '這' => '这',
+                '並' => '并',
+                '別' => '别',
+                '個' => '个',
+                '結' => '结',
+                '開' => '开',
+                c => c,
+            })
+            .collect();
+        let reference: Vec<char> = "这并不是告别这是一个篇章的结束也是新篇章的开始"
+            .chars()
+            .collect();
+        let mut previous: Vec<usize> = (0..=reference.len()).collect();
+        for (i, a) in actual.iter().enumerate() {
+            let mut next = vec![i + 1; reference.len() + 1];
+            for (j, b) in reference.iter().enumerate() {
+                next[j + 1] = (previous[j] + usize::from(a != b))
+                    .min(previous[j + 1] + 1)
+                    .min(next[j] + 1);
+            }
+            previous = next;
+        }
+        let cer = previous[reference.len()] as f64 / reference.len() as f64;
+        eprintln!("Chinese fixture character error rate: {cer:.3}");
+        assert!(cer <= 0.25, "Chinese fixture CER {cer:.3}: {text}");
     }
 }

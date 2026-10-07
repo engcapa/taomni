@@ -1,75 +1,82 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
-
-const ASR_ENGINE_LABELS: Record<string, string> = {
-  "sherpa-onnx": "sherpa-onnx (Recommended)",
-  "whisper-rs":  "Whisper (Backup)",
-  "vosk":        "Vosk (Low-end devices)",
-};
-
-const ASR_MODEL_LABELS: Record<string, string> = {
-  "streaming-zipformer-bilingual-zh-en-small": "Zipformer zh-en small (~80 MB) ⭐",
-  "sense-voice-small":                         "SenseVoice Small (~234 MB) — strong Chinese",
-  "ggml-base-q5_1":                            "Whisper Base Q5 (~150 MB)",
-  "vosk-model-small-cn-0.22":                  "Vosk Small CN (~42 MB)",
-};
-
+interface Model {
+  id: string; filename: string; bytes: number; installed: boolean; license: string;
+  available_version?: string; installed_version?: string | null;
+  update_available?: boolean; integrity?: "missing" | "unverified" | "verified" | "corrupt";
+}
 export function AsrPanel() {
-  const { config, loading, loadConfig } = useAiStore();
+  const { config, loadConfig, saveConfig } = useAiStore();
   const t = useT();
-
+  const [models, setModels] = useState<Model[]>([]);
+  const [busy, setBusy] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [checked, setChecked] = useState(false);
+  const [error, setError] = useState("");
+  const [supported, setSupported] = useState(true);
+  const refresh = () => invoke<Model[]>("voice_models").then(setModels);
   useEffect(() => {
-    if (!config) loadConfig();
+    if (!config) void loadConfig();
+    void refresh().catch((e) => setError(String(e)));
+    void invoke<boolean>("voice_capture_supported").then(setSupported).catch(() => setSupported(false));
+    let disposed = false;
+    const unlisten = listen<{ model_id: string; bytes: number; total: number }>("voice-model-progress", ({ payload }) => {
+      if (!disposed) setProgress(Math.round(payload.bytes / payload.total * 100));
+    });
+    return () => { disposed = true; void unlisten.then((fn) => fn()).catch(() => undefined); };
   }, []);
-
-  if (loading || !config) {
-    return <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("aiSettings.loading")}</div>;
-  }
-
-  const asr = config.asr;
-
-  return (
-    <div className="space-y-3">
-      <div>
-        <div className="text-[13px] font-semibold">{t("aiSettings.asrTitle")}</div>
-        <div className="text-[11px] text-[var(--taomni-text-muted)]">
-          {t("aiSettings.asrSubtitle")}
-        </div>
+  const install = async (model: Model, offline: boolean) => {
+    setBusy(model.id); setProgress(0); setError("");
+    try {
+      const sourcePath = offline ? await open({ multiple: false, filters: [{ name: "Whisper", extensions: ["bin"] }] }) : null;
+      if (offline && !sourcePath) return;
+      await invoke("voice_install_model", { modelId: model.id, sourcePath });
+      await refresh();
+    } catch (e) { setError(String(e)); }
+    finally { setBusy(""); }
+  };
+  const checkModels = async () => {
+    setBusy("check"); setError(""); setChecked(false);
+    try { setModels(await invoke<Model[]>("voice_check_models")); setChecked(true); }
+    catch (e) { setError(String(e)); }
+    finally { setBusy(""); }
+  };
+  const select = async (patch: { active?: string; language?: string }) => {
+    if (!config) return;
+    setError(""); setBusy("config");
+    try { await saveConfig({ ...config, asr: { ...config.asr, ...patch, warm_on_startup: false, vad: "none" } }); }
+    catch (e) { setError(String(e)); }
+    finally { setBusy(""); }
+  };
+  return <div className="space-y-3 text-xs" data-testid="asr-settings">
+    <div className="text-[13px] font-semibold">{t("aiSettings.asrTitle")} · Whisper</div>
+    <p>{t("voice.privacy")}</p>
+    <p className="text-[var(--taomni-text-muted)]">{t("voice.modelHelp")}</p>
+    {!supported && <p role="alert">{t("voice.unsupported")}</p>}
+    <label className="block">{t("voice.language")}
+      <select className="taomni-input ml-2" data-testid="asr-language" value={config?.asr.language ?? "auto"} disabled={!!busy} onChange={(e) => void select({ language: e.target.value })}>
+        {["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].map((language) => <option key={language} value={language}>{language === "auto" ? t("voice.autoLanguage") : ({ zh: "中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español" } as Record<string, string>)[language]}</option>)}
+      </select>
+    </label>
+    <p className="text-[var(--taomni-text-muted)]">{t("voice.updateHelp")}</p>
+    <button type="button" className="taomni-btn px-2 py-1" data-testid="asr-check-models" disabled={!!busy} onClick={() => void checkModels()}>{t("voice.checkModels")}</button>
+    {checked && <p role="status">{t("voice.checkComplete")}</p>}
+    {models.map((m) => <div key={m.id} className="rounded border border-[var(--taomni-divider)] p-3 space-y-2" data-testid={`asr-model-${m.id}`}>
+      <div className="flex justify-between"><strong>{m.id.replace("whisper-", "Whisper ")}</strong><span>{Math.round(m.bytes / 1e6)} MB · {m.license}</span></div>
+      <p>{m.update_available ? t("voice.updateAvailable") : m.integrity === "corrupt" ? t("voice.corrupt") : m.integrity === "verified" ? t("voice.verified") : m.installed ? t("voice.installed") : t("voice.notInstalled")}{config?.asr.active === m.id ? ` · ${t("voice.selected")}` : ""}</p>
+      {m.available_version && <p className="text-[var(--taomni-text-muted)]">{t("voice.version")} {m.available_version}{m.installed_version && m.installed_version !== m.available_version ? ` ← ${m.installed_version}` : ""}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="taomni-btn px-2 py-1" disabled={!!busy || !supported} data-testid={`asr-download-${m.id}`} onClick={() => void install(m, false)}>{m.update_available ? t("voice.updateModel") : m.installed || m.integrity === "corrupt" ? t("voice.reinstall") : t("voice.download")}</button>
+        <button type="button" className="taomni-btn px-2 py-1" disabled={!!busy || !supported} onClick={() => void install(m, true)}>{t("voice.import")}</button>
+        <button type="button" className="taomni-btn px-2 py-1" disabled={!!busy || !m.installed || config?.asr.active === m.id} data-testid={`asr-select-${m.id}`} onClick={() => void select({ active: m.id })}>{t("voice.useModel")}</button>
       </div>
-
-      <div className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] p-3 space-y-2">
-        <div>
-          <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.asrActiveEngine")}</label>
-          <div className="text-[12px] font-medium">
-            {ASR_ENGINE_LABELS[config.asr.providers[asr.active]?.engine ?? ""] ?? asr.active}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.asrActiveModel")}</label>
-          <div className="text-[12px]">
-            {ASR_MODEL_LABELS[config.asr.providers[asr.active]?.model ?? ""] ?? config.asr.providers[asr.active]?.model ?? t("aiSettings.asrNotConfigured")}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 pt-1">
-          <div
-            className={`w-2 h-2 rounded-full ${asr.warm_on_startup ? "bg-green-400" : "bg-gray-500"}`}
-          />
-          <span className="text-[11px] text-[var(--taomni-text-muted)]">
-            {asr.warm_on_startup ? t("aiSettings.asrWarmStart") : t("aiSettings.asrLoadOnDemand")}
-          </span>
-        </div>
-      </div>
-
-      <div className="rounded border border-[var(--taomni-divider)] border-dashed p-3">
-        <div className="text-[12px] text-[var(--taomni-text-muted)] text-center">
-          {t("aiSettings.asrModelLibrary")}
-          <br />
-          <span className="text-[11px]">{t("aiSettings.asrComingSoon")}</span>
-        </div>
-      </div>
-    </div>
-  );
+      {busy === m.id && <div role="status">{t("voice.installing")} {progress}%</div>}
+    </div>)}
+    <p className="text-[var(--taomni-text-muted)]">{t("voice.downloadConsent")}</p>
+    {error && <p role="alert" className="text-red-400 break-words">{error}</p>}
+  </div>;
 }

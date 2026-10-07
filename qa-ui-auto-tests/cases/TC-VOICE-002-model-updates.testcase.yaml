@@ -1,0 +1,42 @@
+id: TC-VOICE-002
+title: Chinese language selection and explicit model data update
+description: Simulates an old catalog revision in browser; native tests validate the real Chinese audio and filesystem version behavior.
+covers: [F-AI-2.3]
+tags: [ai, voice, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 75
+steps:
+- open: '${cfg.app.base_url}/?voiceFixture=1&voiceOldBase=1'
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="asr-settings"]'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: 'Model data update available'}
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: 'fixture-v1'}
+- select_option: {selector: '[data-testid="asr-language"]', label: 中文}
+- assert_localstorage: {key: taomni.ai.config.v1, contains: '"language":"zh"'}
+- click: '[data-testid="asr-check-models"]'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: 'Model data update available'}
+- click: '[data-testid="asr-download-whisper-base"]'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: 'Downloaded'}
+- click: '[data-testid="asr-check-models"]'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: 'Downloaded and verified'}
+- screenshot: chinese-model-update.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Selecting Chinese persists, checking never installs implicitly, explicit updating replaces the displayed revision and integrity status.
+    actions: [3, 7, 9, 11, 13]
+    checkpoints:
+    - {step: 5, expectation: Old weights require an update.}
+    - {step: 6, expectation: The previous revision is visible.}
+    - {step: 8, expectation: Chinese is persisted.}
+    - {step: 10, expectation: Checking alone does not install the new version.}
+    - {step: 12, expectation: Explicit updating makes the selected weights ready.}
+    - {step: 14, expectation: The downloaded version passes the explicit integrity check.}
+    results: [8, 10, 12, 14]
+  visual:
+  - {check: Model settings layout, method: manual, reason: Inspect retained screenshot for clipping.}
+  native:
+  - {check: Chinese decode and versioned artifact safety, method: external, reason: See the real-audio and artifact unit tests in docs-feature/voice-input-delivery.md.}

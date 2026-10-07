@@ -36,35 +36,7 @@ impl AppAiCtx {
         vault: Arc<Vault>,
         proxy_db: Option<&rusqlite::Connection>,
     ) -> Self {
-        let asr = AsrManager::new(cfg.asr.warm_on_startup);
-
-        // Best-effort: if the active ASR provider is the sherpa engine and a
-        // model dir exists under <cache>/taomni/models/<id>/, plug it in.
-        // We don't fail startup if the model is missing — AsrManager remains
-        // on StubAsr, the UI will show "未下载" and trigger the download.
-        if let Some(active) = cfg.asr.providers.get(&cfg.asr.active) {
-            if active.engine == "sherpa-onnx" {
-                let manifest = crate::models::manifest::load_manifest().ok();
-                if let Some(m) = manifest {
-                    let model_id = match cfg.asr.active.as_str() {
-                        "sherpa-zipformer-zh-en" => "asr_sherpa_zipformer_zh_en_small",
-                        "sense-voice-small" => "asr_sense_voice_small",
-                        _ => "",
-                    };
-                    if let Some(meta) = m.models.get(model_id) {
-                        let path = crate::models::store::model_path(model_id, meta);
-                        if path.exists() {
-                            let engine =
-                                std::sync::Arc::new(crate::asr::sherpa_onnx::SherpaOnnxAsr::new(
-                                    path.parent().map(|p| p.to_path_buf()).unwrap_or(path),
-                                ));
-                            let _ = engine.warm_up();
-                            asr.set_engine_sync(engine);
-                        }
-                    }
-                }
-            }
-        }
+        let asr = AsrManager::configured(&cfg.asr.active, &cfg.asr.language);
 
         let llm = build_router_from_ai_with_proxy_db(&cfg, Some(vault.as_ref()), proxy_db);
         Self {
@@ -79,16 +51,25 @@ impl AppAiCtx {
     /// while reusing the existing AsrManager (engines are expensive to warm).
     pub fn reload(&mut self, cfg: AiConfig) {
         self.llm = build_router_from_ai(&cfg, Some(self.vault.as_ref()));
+        if self.config.asr != cfg.asr || cfg.fully_disabled {
+            self.asr = Arc::new(AsrManager::configured(&cfg.asr.active, &cfg.asr.language));
+        }
         self.config = cfg;
     }
 
     pub fn reload_with_proxy_db(&mut self, cfg: AiConfig, proxy_db: Option<&rusqlite::Connection>) {
         self.llm = build_router_from_ai_with_proxy_db(&cfg, Some(self.vault.as_ref()), proxy_db);
+        if self.config.asr != cfg.asr || cfg.fully_disabled {
+            self.asr = Arc::new(AsrManager::configured(&cfg.asr.active, &cfg.asr.language));
+        }
         self.config = cfg;
     }
 
     pub fn reload_with_router(&mut self, cfg: AiConfig, llm: LlmRouter) {
         self.llm = llm;
+        if self.config.asr != cfg.asr || cfg.fully_disabled {
+            self.asr = Arc::new(AsrManager::configured(&cfg.asr.active, &cfg.asr.language));
+        }
         self.config = cfg;
     }
 

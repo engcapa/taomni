@@ -10762,6 +10762,7 @@ dependencies = [
  "uuid",
  "webkit2gtk",
  "which 8.0.6",
+ "whisper-rs",
  "winapi",
  "windows 0.62.2",
  "winreg 0.55.0",
@@ -12538,6 +12539,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "whisper-rs"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2088172d00f936c348d6a72f488dc2660ab3f507263a195df308a3c2383229f6"
+dependencies = [
+ "whisper-rs-sys",
+]
+
+[[package]]
+name = "whisper-rs-sys"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6986c0fe081241d391f09b9a071fbcbb59720c3563628c3c829057cf69f2a56f"
+dependencies = [
+ "bindgen 0.72.1",
+ "cfg-if 1.0.4",
+ "cmake",
+ "fs_extra",
+ "semver",
 ]
 
 [[package]]

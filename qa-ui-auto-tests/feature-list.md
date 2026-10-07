@@ -3585,28 +3585,57 @@ controls:
 - `Enable AI command rewrite (Ctrl+K)` 开关 + 自定义快捷键输入框
 - 选择 `+ai` 时按需下载 FIM 模型（约 400 MB）；本地 PowerShell 终端忽略此功能避免与 PSReadLine 冲突
 
-### 14.3 PTT 语音录制按钮 ✅
+### 14.3 本地 Whisper 语音输入 ✅
 
 <!-- feature
 id: F-AI-2.3
 status: done
 area: ai/voice
-components: [PttButton, AsrPanel, TitleBarTrayControls]
+components: [PttButton, DictationButton, AsrPanel, TitleBarTrayControls]
 files:
   - src/components/window/PttButton.tsx
+  - src/components/voice/
   - src/components/settings/AsrPanel.tsx
   - src-tauri/src/voice/
+  - src-tauri/src/asr/
 controls:
   - id: ptt-button
     selector: '[data-testid="ptt-button"]'
     kind: interactive
-    optional: true       # hidden when AI master switch is on (fully_disabled)
+    optional: true
+  - id: chat-voice-button
+    selector: '[data-testid="chat-voice-button"]'
+    kind: interactive
+  - id: chat-voice-cancel
+    selector: '[data-testid="chat-voice-button-cancel"]'
+    kind: interactive
+  - id: voice-settings-close
+    selector: '[data-testid="voice-settings-close"]'
+    kind: interactive
+  - id: asr-check-models
+    selector: '[data-testid="asr-check-models"]'
+    kind: interactive
+  - id: asr-language
+    selector: '[data-testid="asr-language"]'
+    kind: interactive
+  - id: asr-download-base
+    selector: '[data-testid="asr-download-whisper-base"]'
+    kind: interactive
+  - id: asr-download-small
+    selector: '[data-testid="asr-download-whisper-small"]'
+    kind: interactive
+  - id: asr-select-base
+    selector: '[data-testid="asr-select-whisper-base"]'
+    kind: interactive
+  - id: asr-select-small
+    selector: '[data-testid="asr-select-whisper-small"]'
+    kind: interactive
 -->
 
-- 标题栏托盘内的麦克风按钮：按下开始录音、释放停止 + 转写
-- 探测 `voice_capture_supported` 失败时按钮置灰并显示 `MicOff` 图标（`data-state="unsupported"`）
-- 转写结果通过 `chatStore.attachToComposer(text)` 暂存到当前可聊天 tab 的 Chat 输入框，便于检视后再发送
-- AI 全局禁用 (`fully_disabled`) 时整个按钮被卸载
+- 单击开始，再次单击停止识别；Esc、取消、切换上下文或窗口失焦会取消。最长 120 秒。
+- 默认 Whisper Base，多语言 Small/Medium 可选；首次显式下载或离线导入，校验 SHA-256。多语言权重支持中文；模型版本目录按哈希隔离，支持显式检查完整性与更新。
+- 标题栏和 Chat、LAN 聊天、终端 AI 改写说明共用听写组件，只填入可编辑文本，不自动发送或执行。
+- AI 全局禁用时隐藏入口。浏览器语音 fixture 仅验证交互；原生采集与跨平台权限需真机检查。
 
 ### 14.4 AI Chat Drawer ✅
 

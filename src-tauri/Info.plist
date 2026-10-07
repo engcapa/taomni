@@ -11,7 +11,7 @@
 	  the system permission prompt.
 	-->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Taomni 需要使用麦克风以进行局域网语音 / 视频通话。</string>
+	<string>Taomni 需要使用麦克风以进行本地语音输入和局域网语音 / 视频通话。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Taomni 需要使用摄像头以进行局域网视频通话和扫描 MFA 二维码。</string>
 </dict>

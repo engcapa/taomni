@@ -4,6 +4,7 @@ import { AtSign, Camera, Paperclip, Send, Smile } from "lucide-react";
 import { useLanChatStore } from "../../stores/lanChatStore";
 import { pickFile } from "../../lib/lanFilePicker";
 import type { LanPeer } from "../../types";
+import { DictationButton } from "../voice/DictationButton";
 import { Avatar } from "./Avatar";
 
 interface MentionState {
@@ -193,6 +194,7 @@ export function MessageInput({ disabled }: { disabled?: boolean }) {
           }}
         />
         <div className="mt-2 flex min-w-0 items-center gap-0.5">
+          <DictationButton targetRef={taRef} onText={setText} contextKey={activeConvId} disabled={disabled || busy} testId="lanchat-voice-button" />
           <ToolButton title="表情（即将支持）" disabled>
             <Smile className="h-4 w-4" />
           </ToolButton>

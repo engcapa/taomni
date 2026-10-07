@@ -1,0 +1,129 @@
+id: TC-VOICE-001
+title: Explicit model setup, upgrade, titlebar and chat dictation without sending
+description: Browser voiceFixture simulates IPC only; no microphone, file download
+  or Whisper decode evidence.
+covers:
+- F-AI-2.3
+tags:
+- ai
+- voice
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}/?voiceFixture=1
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="asr-settings"]'
+- assert_text:
+    selector: '[data-testid="asr-model-whisper-base"]'
+    contains: Not downloaded
+- click: '[data-testid="asr-download-whisper-base"]'
+- assert_text:
+    selector: '[data-testid="asr-model-whisper-base"]'
+    contains: Downloaded
+- click: '[data-testid="asr-download-whisper-small"]'
+- click: '[data-testid="asr-select-whisper-small"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"active":"whisper-small"'
+- select_option:
+    selector: '[data-testid="asr-language"]'
+    value: zh
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"language":"zh"'
+- click: '[data-testid="asr-select-whisper-base"]'
+- click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="ptt-button"][data-state="recording"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="chat-composer-textarea"]'
+- eval_readonly:
+    expression: document.querySelector("#chat-composer-textarea").value
+    contains: 本地语音测试 Local voice fixture.
+- fill:
+    selector: '[data-testid="chat-composer-textarea"]'
+    value: 'Draft: '
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="chat-voice-button"][data-state="recording"]'
+- click: '[data-testid="chat-voice-button"]'
+- eval_readonly:
+    expression: document.querySelector("#chat-composer-textarea").value
+    contains: 'Draft: 本地语音测试 Local voice fixture.'
+    timeout_sec: 5
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="chat-voice-button"][data-state="recording"]'
+- click: '[data-testid="chat-voice-button-cancel"]'
+- assert_attribute:
+    selector: '[data-testid="chat-voice-button"]'
+    name: data-state
+    equals: idle
+- eval_readonly:
+    expression: document.querySelector("#chat-composer-textarea").value
+    contains: 'Draft: 本地语音测试 Local voice fixture.'
+- screenshot: voice-draft.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Explicit installation and model/language selection persist before
+      recording.
+    actions:
+    - 3
+    - 6
+    - 8
+    - 9
+    - 11
+    checkpoints:
+    - step: 5
+      expectation: Base is missing before consent.
+    - step: 7
+      expectation: Explicit install makes Base ready.
+    - step: 10
+      expectation: Small selection persists.
+    - step: 12
+      expectation: Language selection persists.
+    results:
+    - 7
+    - 10
+    - 12
+  - id: R2
+    requirement: Titlebar and Chat dictation fill editable drafts; cancelling retains
+      the draft.
+    actions:
+    - 13
+    - 14
+    - 15
+    - 17
+    - 20
+    - 21
+    - 23
+    - 25
+    - 27
+    checkpoints:
+    - step: 19
+      expectation: Titlebar transcript appears in composer.
+    - step: 24
+      expectation: Chat retains typed prefix and inserts transcript without sending.
+    - step: 28
+      expectation: Cancellation restores idle.
+    - step: 29
+      expectation: Cancelling leaves draft unchanged.
+    results:
+    - 19
+    - 24
+    - 28
+    - 29
+  visual:
+  - check: Setup modal and draft layout
+    method: manual
+    reason: Inspect the retained screenshot.
+  native:
+  - check: Actual capture, permission, model installation and decoding
+    method: external
+    reason: Browser IPC fixture cannot prove these. See docs-feature/voice-input-delivery.md
+      for native tests and physical-device checklist.

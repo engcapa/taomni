@@ -344,6 +344,8 @@ cases:
 - TC-WELCOME-RS-N-03-osc-cwd-record
 - TC-WELCOME-RS-N-04-restore-local-shell
 - TC-auto-F-AI-2-1
+- TC-VOICE-001
+- TC-VOICE-002
 - TC-auto-F-AI-2-3
 - TC-auto-F-AI-2-4-grok-media-provider
 - TC-auto-F-AI-2-7-acp-grok-settings

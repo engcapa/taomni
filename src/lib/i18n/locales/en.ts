@@ -6,6 +6,7 @@ type Dict = {
 };
 
 const dict = {
+
   app: {
     name: "Taomni",
     title: "Taomni",
@@ -2933,6 +2934,36 @@ const dict = {
     webSearchDeny: "Deny",
   },
   voice: {
+    updateHelp: "All models support Chinese and other languages. Model versions are published with app updates. Checking verifies local files; updates are explicit and keep previous weights.",
+    checkModels: "Check versions and integrity",
+    checkComplete: "Check complete. Review each model below.",
+    updateAvailable: "Model data update available",
+    corrupt: "File verification failed. Please reinstall.",
+    verified: "Downloaded and verified",
+    version: "Available version",
+    updateModel: "Update model",
+
+    "noSpeech": "No speech detected. Please try again.",
+    "unsupported": "Local voice input is unavailable in this build or on this CPU (x86 requires AVX2, FMA, F16C and SSE4.2).",
+    "settings": "Voice settings",
+    "preparing": "Loading voice model…",
+    "start": "Start voice input (up to 2 minutes)",
+    "stop": "Stop and transcribe",
+    "cancel": "Cancel voice input",
+    "close": "Close",
+    "privacy": "Speech recognition runs on this device. Audio is not uploaded. Review the text before sending.",
+    "modelHelp": "Base supports Chinese. For Chinese dictation, choose 中文; upgrade to Small/Medium if accuracy is insufficient. Small and Medium may improve accuracy but use more memory and take longer. Click once to record and again to transcribe; Esc cancels.",
+    "language": "Speech language",
+    "autoLanguage": "Auto detect",
+    "installed": "Downloaded (verified when loaded)",
+    "notInstalled": "Not downloaded",
+    "selected": "Selected",
+    "reinstall": "Reinstall",
+    "download": "Download",
+    "useModel": "Use this model",
+    "installing": "Installing…",
+    "downloadConsent": "Download retrieves weights from Hugging Face, verifies SHA-256 and saves them locally. Nothing is downloaded until you click Download. For offline use, import the matching official ggml .bin file.",
+    "import": "Import .bin",
     cardTitle: "AI-generated command (not yet executed)",
     cardCancelTitle: "Cancel (Esc)",
     cardBlockedPrefix: "⛔ Command blocked by safety rule: {reason}",

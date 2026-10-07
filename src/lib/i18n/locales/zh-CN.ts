@@ -5,6 +5,7 @@ import type { en } from "./en";
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export const zhCN: DeepPartial<typeof en> = {
+
   app: {
     name: "Taomni",
     title: "Taomni",
@@ -2910,6 +2911,36 @@ export const zhCN: DeepPartial<typeof en> = {
     webSearchDeny: "拒绝",
   },
   voice: {
+    updateHelp: "以上模型均支持中文等多种语言，无需按语言重复下载。模型目录随应用更新；检查会校验本地文件。新版模型需手动更新，旧版文件会保留。",
+    checkModels: "检查版本与完整性",
+    checkComplete: "检查完成，请查看各模型状态。",
+    updateAvailable: "有新版模型数据",
+    corrupt: "文件校验失败，请重新安装。",
+    verified: "已下载并通过校验",
+    version: "可用版本",
+    updateModel: "更新模型",
+
+    "noSpeech": "未检测到语音，请重试。",
+    "unsupported": "此构建或 CPU 不支持本地语音输入（x86 需要 AVX2、FMA、F16C 和 SSE4.2）。",
+    "settings": "语音设置",
+    "preparing": "正在加载语音模型…",
+    "start": "开始语音输入（最长 2 分钟）",
+    "stop": "停止并识别",
+    "cancel": "取消语音输入",
+    "close": "关闭",
+    "privacy": "语音识别在本机运行，不上传音频。识别结果仅填入草稿，请确认后发送。",
+    "modelHelp": "Base 支持中文。中文听写建议选择“中文”；准确率不足时可升级 Small/Medium。Small 和 Medium 可能提高准确率，但需要更多内存和识别时间。单击开始录音，再次单击停止识别；Esc 取消。",
+    "language": "语音语言",
+    "autoLanguage": "自动检测",
+    "installed": "已下载（加载时校验）",
+    "notInstalled": "未下载",
+    "selected": "当前选择",
+    "reinstall": "重新安装",
+    "download": "下载",
+    "useModel": "使用此模型",
+    "installing": "正在安装…",
+    "downloadConsent": "点击下载后，从 Hugging Face 获取权重并校验 SHA-256，保存到本机。不会自动下载。无法联网时可导入对应的官方 ggml .bin 文件。",
+    "import": "导入 .bin",
     cardTitle: "AI 生成的命令（未执行）",
     cardCancelTitle: "取消 (Esc)",
     cardBlockedPrefix: "⛔ 命令被安全规则拦截：{reason}",
