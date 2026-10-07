@@ -93,6 +93,8 @@ impl AiConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AsrConfig {
+    #[serde(default)]
+    pub download_proxy: crate::asr::models::DownloadProxyConfig,
     pub active: String,
     pub providers: HashMap<String, AsrProviderConfig>,
     pub warm_on_startup: bool,
@@ -121,6 +123,7 @@ impl AsrConfig {
 impl Default for AsrConfig {
     fn default() -> Self {
         Self {
+            download_proxy: Default::default(),
             active: "whisper-base".into(),
             providers: ["base", "small", "medium"]
                 .into_iter()

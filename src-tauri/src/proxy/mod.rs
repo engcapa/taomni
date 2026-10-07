@@ -33,7 +33,7 @@ fn default_port() -> u16 {
 /// Persisted application-proxy configuration (`~/.config/taomni/proxy.json`).
 /// Field names are snake_case to match the `ai.json` convention; the frontend
 /// `AppProxyConfig` interface mirrors these keys verbatim.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AppProxyConfig {
     /// Master switch. When false the app makes direct connections.
     #[serde(default)]

@@ -2911,6 +2911,13 @@ export const zhCN: DeepPartial<typeof en> = {
     webSearchDeny: "拒绝",
   },
   voice: {
+    downloadProxy: "模型下载代理",
+    proxyApp: "使用应用级代理",
+    proxyCustom: "单独配置代理",
+    proxyHelp: "应用级模式跟随 Settings 的应用代理（未启用时直连）。单独配置仅影响模型下载；No proxy 忽略系统代理设置。",
+    proxySave: "保存下载代理",
+    proxyUnsaved: "请保存代理设置后再下载。",
+
     updateHelp: "以上模型均支持中文等多种语言，无需按语言重复下载。模型目录随应用更新；检查会校验本地文件。新版模型需手动更新，旧版文件会保留。",
     checkModels: "检查版本与完整性",
     checkComplete: "检查完成，请查看各模型状态。",

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useAiStore } from "../../stores/aiStore";
+import { AppProxyPanel } from "./AppProxyPanel";
+import { useAiStore, type AsrConfig } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
 interface Model {
   id: string; filename: string; bytes: number; installed: boolean; license: string;
@@ -18,6 +19,10 @@ export function AsrPanel() {
   const [checked, setChecked] = useState(false);
   const [error, setError] = useState("");
   const [supported, setSupported] = useState(true);
+  const savedProxy = config?.asr.download_proxy;
+  const [downloadProxy, setDownloadProxy] = useState(savedProxy);
+  useEffect(() => { setDownloadProxy(savedProxy); }, [savedProxy]);
+  const proxyDirty = JSON.stringify(downloadProxy) !== JSON.stringify(savedProxy);
   const refresh = () => invoke<Model[]>("voice_models").then(setModels);
   useEffect(() => {
     if (!config) void loadConfig();
@@ -45,7 +50,7 @@ export function AsrPanel() {
     catch (e) { setError(String(e)); }
     finally { setBusy(""); }
   };
-  const select = async (patch: { active?: string; language?: string }) => {
+  const select = async (patch: Partial<AsrConfig>) => {
     if (!config) return;
     setError(""); setBusy("config");
     try { await saveConfig({ ...config, asr: { ...config.asr, ...patch, warm_on_startup: false, vad: "none" } }); }
@@ -62,6 +67,19 @@ export function AsrPanel() {
         {["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].map((language) => <option key={language} value={language}>{language === "auto" ? t("voice.autoLanguage") : ({ zh: "中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español" } as Record<string, string>)[language]}</option>)}
       </select>
     </label>
+    {downloadProxy && <fieldset disabled={!!busy} className="rounded border border-[var(--taomni-divider)] p-3 space-y-2" data-testid="asr-download-proxy">
+      <label className="block">{t("voice.downloadProxy")}
+        <select className="taomni-input ml-2" data-testid="asr-download-proxy-mode" value={downloadProxy.mode} onChange={(e) => setDownloadProxy({ ...downloadProxy, mode: e.target.value as typeof downloadProxy.mode })}>
+          <option value="app">{t("voice.proxyApp")}</option>
+          <option value="custom">{t("voice.proxyCustom")}</option>
+          <option value="none">{t("aiSettings.codexProxyNone")}</option>
+        </select>
+      </label>
+      {downloadProxy.mode === "custom" && <AppProxyPanel value={downloadProxy.custom} onSave={async (custom) => setDownloadProxy((current) => current ? { ...current, custom } : current)} testHost="huggingface.co" />}
+      <p className="text-[var(--taomni-text-muted)]">{t("voice.proxyHelp")}</p>
+      <button type="button" className="taomni-btn px-2 py-1" data-testid="asr-download-proxy-save" disabled={!proxyDirty} onClick={() => void select({ download_proxy: downloadProxy })}>{t("voice.proxySave")}</button>
+      {proxyDirty && <p role="status">{t("voice.proxyUnsaved")}</p>}
+    </fieldset>}
     <p className="text-[var(--taomni-text-muted)]">{t("voice.updateHelp")}</p>
     <button type="button" className="taomni-btn px-2 py-1" data-testid="asr-check-models" disabled={!!busy} onClick={() => void checkModels()}>{t("voice.checkModels")}</button>
     {checked && <p role="status">{t("voice.checkComplete")}</p>}
@@ -70,7 +88,7 @@ export function AsrPanel() {
       <p>{m.update_available ? t("voice.updateAvailable") : m.integrity === "corrupt" ? t("voice.corrupt") : m.integrity === "verified" ? t("voice.verified") : m.installed ? t("voice.installed") : t("voice.notInstalled")}{config?.asr.active === m.id ? ` · ${t("voice.selected")}` : ""}</p>
       {m.available_version && <p className="text-[var(--taomni-text-muted)]">{t("voice.version")} {m.available_version}{m.installed_version && m.installed_version !== m.available_version ? ` ← ${m.installed_version}` : ""}</p>}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="taomni-btn px-2 py-1" disabled={!!busy || !supported} data-testid={`asr-download-${m.id}`} onClick={() => void install(m, false)}>{m.update_available ? t("voice.updateModel") : m.installed || m.integrity === "corrupt" ? t("voice.reinstall") : t("voice.download")}</button>
+        <button type="button" className="taomni-btn px-2 py-1" disabled={!!busy || !supported || proxyDirty || !config} data-testid={`asr-download-${m.id}`} onClick={() => void install(m, false)}>{m.update_available ? t("voice.updateModel") : m.installed || m.integrity === "corrupt" ? t("voice.reinstall") : t("voice.download")}</button>
         <button type="button" className="taomni-btn px-2 py-1" disabled={!!busy || !supported} onClick={() => void install(m, true)}>{t("voice.import")}</button>
         <button type="button" className="taomni-btn px-2 py-1" disabled={!!busy || !m.installed || config?.asr.active === m.id} data-testid={`asr-select-${m.id}`} onClick={() => void select({ active: m.id })}>{t("voice.useModel")}</button>
       </div>

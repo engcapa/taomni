@@ -58,3 +58,50 @@ it("checks installed revisions and updates only after an explicit click", async 
   fireEvent.click(screen.getByTestId("asr-check-models"));
   expect(await screen.findByText(/Downloaded and verified/)).toBeVisible();
 });
+
+it("persists an independent proxy, tests HF, and keeps application settings untouched", async () => {
+  ipc.mockImplementation(async (command) => {
+    if (command === "voice_capture_supported") return true;
+    if (command === "voice_models") return [{ id: "whisper-base", bytes: 147951465, installed: false, license: "MIT" }];
+    if (command === "list_sessions") return [];
+    if (command === "test_proxy_connection") return "Connected";
+    return null;
+  });
+  const view = render(<AsrPanel />);
+  const mode = await screen.findByTestId("asr-download-proxy-mode");
+  expect(mode).toHaveValue("app");
+  fireEvent.change(mode, { target: { value: "custom" } });
+  fireEvent.change(screen.getByPlaceholderText("Proxy host"), { target: { value: "127.0.0.1" } });
+  fireEvent.change(screen.getByPlaceholderText("Port"), { target: { value: "7890" } });
+  fireEvent.click(screen.getByLabelText("SOCKS 5"));
+  expect(screen.getByTestId("asr-download-whisper-base")).toBeDisabled();
+  fireEvent.click(screen.getByText("Test", { exact: true }));
+  expect(await screen.findByText("Connected")).toBeVisible();
+  expect(ipc).toHaveBeenCalledWith("test_proxy_connection", expect.objectContaining({ proxyHost: "127.0.0.1", proxyPort: 7890, testHost: "huggingface.co" }));
+  fireEvent.click(screen.getByTestId("asr-download-proxy-save"));
+  await waitFor(() => expect(screen.getByTestId("asr-download-whisper-base")).toBeEnabled());
+  expect(useAiStore.getState().config?.asr.download_proxy).toMatchObject({ mode: "custom", custom: { host: "127.0.0.1", port: 7890, kind: "socks5" } });
+  expect(ipc.mock.calls.some(([c]) => c === "save_app_proxy_config" || c === "get_app_proxy_config")).toBe(false);
+  view.unmount(); render(<AsrPanel />);
+  expect(screen.getByTestId("asr-download-proxy-mode")).toHaveValue("custom");
+  expect(screen.getByPlaceholderText("Proxy host")).toHaveValue("127.0.0.1");
+  fireEvent.change(screen.getByTestId("asr-download-proxy-mode"), { target: { value: "none" } });
+  fireEvent.click(screen.getByTestId("asr-download-proxy-save"));
+  await waitFor(() => expect(useAiStore.getState().config?.asr.download_proxy?.mode).toBe("none"));
+});
+
+it("keeps unsaved proxy edits and blocks download when saving fails", async () => {
+  ipc.mockImplementation(async (command) => {
+    if (command === "voice_capture_supported") return true;
+    if (command === "voice_models") return [{ id: "whisper-base", bytes: 147951465, installed: false, license: "MIT" }];
+    if (command === "save_ai_config") throw new Error("Save failed");
+    return null;
+  });
+  render(<AsrPanel />);
+  fireEvent.change(await screen.findByTestId("asr-download-proxy-mode"), { target: { value: "none" } });
+  fireEvent.click(screen.getByTestId("asr-download-proxy-save"));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Save failed");
+  expect(screen.getByTestId("asr-download-whisper-base")).toBeDisabled();
+  expect(screen.getByTestId("asr-download-proxy-mode")).toHaveValue("none");
+  expect(useAiStore.getState().config?.asr.download_proxy?.mode).toBe("app");
+});

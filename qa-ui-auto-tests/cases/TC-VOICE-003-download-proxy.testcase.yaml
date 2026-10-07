@@ -1,0 +1,48 @@
+id: TC-VOICE-003
+title: Model download proxy modes and independent Settings editor
+covers: [F-AI-2.3]
+tags: [ai, voice, proxy, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+- open: '${cfg.app.base_url}/?voiceFixture=1'
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="asr-download-proxy-mode"]'
+- select_option: {selector: '[data-testid="asr-download-proxy-mode"]', value: custom}
+- fill: {selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]', value: '127.0.0.1'}
+- fill: {selector: '[data-testid="asr-download-proxy"] input[placeholder="Port"]', value: '7890'}
+- assert_text: {selector: '[data-testid="asr-download-proxy"]', contains: 'Save proxy changes before downloading.'}
+- click: '[data-testid="asr-download-proxy-save"]'
+- assert_localstorage: {key: taomni.ai.config.v1, contains: '"host":"127.0.0.1"'}
+- screenshot: custom-download-proxy.png
+- click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="ptt-button"]'
+- assert_attribute: {selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]', name: value, equals: '127.0.0.1'}
+- select_option: {selector: '[data-testid="asr-download-proxy-mode"]', value: none}
+- click: '[data-testid="asr-download-proxy-save"]'
+- assert_localstorage: {key: taomni.ai.config.v1, contains: '"mode":"none","custom"'}
+- select_option: {selector: '[data-testid="asr-download-proxy-mode"]', value: app}
+- click: '[data-testid="asr-download-proxy-save"]'
+- assert_localstorage: {key: taomni.ai.config.v1, contains: '"mode":"app","custom"'}
+- click: '[data-testid="asr-download-whisper-base"]'
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: Downloaded}
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Custom proxy uses the shared Settings editor and persists across opening the voice setup; no-proxy and app modes save independently.
+    actions: [5, 6, 7, 9, 12, 13, 15, 16, 18, 19, 21]
+    checkpoints:
+    - {step: 8, expectation: Unsaved edits require saving before downloading.}
+    - {step: 10, expectation: Custom endpoint is persisted.}
+    - {step: 14, expectation: Reopened setup restores the saved custom host.}
+    - {step: 17, expectation: No-proxy mode is persisted.}
+    - {step: 20, expectation: Application proxy mode is persisted.}
+    - {step: 22, expectation: Download remains available after saved proxy settings.}
+    results: [8, 10, 14, 17, 20, 22]
+  visual:
+  - {check: Shared proxy editor in voice modal, method: manual, reason: Inspect screenshot for clipping and scroll access.}
+  native:
+  - {check: HTTP routing and direct environment bypass, method: external, reason: Rust local-server tests validate the real downloader client; browser download is a fixture.}

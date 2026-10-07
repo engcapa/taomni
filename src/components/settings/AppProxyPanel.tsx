@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Network, Loader2 } from "lucide-react";
 import { useT } from "../../lib/i18n";
 import {
@@ -43,9 +43,17 @@ interface ProxySessionOption {
  * references a saved Proxy session or carries manual fields. The manual
  * password is stored in the vault — only a `vault:<id>` ref is persisted.
  */
-export function AppProxyPanel() {
+interface Props {
+  /** Reuse the Settings editor without reading/writing the application proxy. */
+  value?: AppProxyConfig;
+  onSave?: (config: AppProxyConfig) => Promise<void>;
+  testHost?: string;
+}
+export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Props = {}) {
+  const fieldGroup = useId();
+  const embedded = !!onSave;
   const t = useT();
-  const [cfg, setCfg] = useState<AppProxyConfig | null>(null);
+  const [cfg, setCfg] = useState<AppProxyConfig | null>(value ?? null);
   const [proxySessions, setProxySessions] = useState<ProxySessionOption[]>([]);
   const [password, setPassword] = useState("");
   const [testing, setTesting] = useState(false);
@@ -53,7 +61,7 @@ export function AppProxyPanel() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    getAppProxyConfig()
+    if (!embedded) getAppProxyConfig()
       .then((c) => setCfg(c))
       .catch(() => setCfg(DEFAULT_CFG));
     listSessions()
@@ -67,6 +75,8 @@ export function AppProxyPanel() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => { if (value) setCfg(value); }, [value]);
+
   if (!cfg) {
     return <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("aiSettings.loading")}</div>;
   }
@@ -77,7 +87,7 @@ export function AppProxyPanel() {
     const next = { ...cfg, ...patch };
     setCfg(next);
     try {
-      await saveAppProxyConfig(next);
+      await (onSave ? onSave(next) : saveAppProxyConfig(next));
     } catch (e) {
       setMsg({ ok: false, text: String(e) });
     }
@@ -158,7 +168,7 @@ export function AppProxyPanel() {
         setMsg({ ok: false, text: t("settings.appProxyHostRequired") });
         return;
       }
-      const text = await testProxyConnection(p.kind, p.host, p.port, p.user, p.pass, "www.google.com", 443);
+      const text = await testProxyConnection(p.kind, p.host, p.port, p.user, p.pass, testHost, 443);
       setMsg({ ok: true, text });
     } catch (e) {
       setMsg({ ok: false, text: String(e) });
@@ -227,16 +237,16 @@ export function AppProxyPanel() {
   };
   return (
     <div className="space-y-3">
-      <div>
+      {!embedded && <div>
         <div className="text-[13px] font-semibold flex items-center gap-2">
           <Network className="w-4 h-4 text-[var(--taomni-accent)]" />
           {t("settings.appProxyTitle")}
         </div>
         <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("settings.appProxySubtitle")}</div>
-      </div>
+      </div>}
 
       {/* Enable toggle */}
-      <div
+      {!embedded && <div
         className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
           cfg.enabled
             ? "border-[var(--taomni-accent)]/40 bg-[var(--taomni-accent)]/5"
@@ -251,9 +261,9 @@ export function AppProxyPanel() {
         <div className={`w-9 h-5 rounded-full transition-colors relative ${cfg.enabled ? "bg-[var(--taomni-accent)]" : "bg-[var(--taomni-divider)]"}`}>
           <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${cfg.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
         </div>
-      </div>
+      </div>}
 
-      {cfg.enabled && (
+      {(embedded || cfg.enabled) && (
         <>
           {/* Source mode */}
           <div className="flex gap-4">
@@ -261,7 +271,7 @@ export function AppProxyPanel() {
               <label key={m} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  name="app-proxy-mode"
+                  name={`${fieldGroup}-mode`}
                   checked={cfg.mode === m}
                   onChange={() => persist({ mode: m })}
                   className="accent-[var(--taomni-accent)]"
@@ -302,7 +312,7 @@ export function AppProxyPanel() {
                   <label key={value} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
-                      name="app-proxy-kind"
+                      name={`${fieldGroup}-kind`}
                       checked={cfg.kind === value}
                       onChange={() => persist({ kind: value })}
                       className="accent-[var(--taomni-accent)]"
@@ -387,7 +397,7 @@ export function AppProxyPanel() {
               <span className={`text-[11px] break-all max-w-full ${msg.ok ? "text-green-400" : "text-red-400"}`}>{msg.text}</span>
             )}
           </div>
-          <div className="text-[10px] text-[var(--taomni-text-muted)]">{t("settings.appProxyUpdaterNote")}</div>
+          {!embedded && <div className="text-[10px] text-[var(--taomni-text-muted)]">{t("settings.appProxyUpdaterNote")}</div>}
         </>
       )}
     </div>
