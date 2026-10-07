@@ -185,8 +185,26 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
         selector = args.get("selector")
     else:
         raise StepError(f"press: expected string or {{key, macos_key?, selector?}}, got {args!r}")
+    # WebDriver can focus an element while LXQt still leaves the native
+    # WebKit toplevel without X11 keyboard focus.  The next chord then lands
+    # in the window manager (or is dropped), which is especially visible when
+    # Esc should return focus to CodeMirror.  Re-activate the owned app after
+    # the DOM focus operation so WebDriver and the real desktop agree.
+    if platform.system() == "Linux" and os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+        try:
+            _activate_x11_application(ctx.session.application)
+        except StepError:
+            # Keep the existing WebDriver-only behavior on desktops without
+            # the X11 helper tools; native focus assertions still report the
+            # resulting state.
+            pass
     if selector:
         ctx.session.focus(selector)
+        if platform.system() == "Linux" and os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+            try:
+                _activate_x11_application(ctx.session.application)
+            except StepError:
+                pass
     return ctx.session.press_combo(key)
 
 

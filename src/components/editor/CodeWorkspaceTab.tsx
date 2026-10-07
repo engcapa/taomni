@@ -18163,7 +18163,28 @@ export function CodeWorkspaceTab({
       }
       updateLspStatusForFile(live, renamed.status);
       if (!isCurrent()) return staleResult();
-      const operationCount = workspaceEditOperations(renamed.edit).length;
+      let operationCount = workspaceEditOperations(renamed.edit).length;
+      // JDT LS can answer the first rename request with an empty edit while
+      // its cross-file index is finishing a watcher update.  The document
+      // revision is still unchanged, so a short same-token retry is safe and
+      // avoids exposing a transient "Rename produced no edits" result to the
+      // user.  A real edit or a second empty response follows the normal
+      // result path below.
+      if (operationCount === 0 && isCurrent() && semanticIndex.current().revision === buildToken.revision) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (isCurrent() && semanticIndex.current().revision === buildToken.revision) {
+          try {
+            renamed = await lspRename(descriptor, position, nextName);
+            updateLspStatusForFile(live, renamed.status);
+            operationCount = workspaceEditOperations(renamed.edit).length;
+          } catch (err) {
+            const message = errorMessage(err);
+            semanticIndex.failBuild(buildToken, message);
+            setStatusMessage(message);
+            return { status: "failed", message, retryable: true };
+          }
+        }
+      }
       if (operationCount === 0) {
         semanticIndex.finishQuery(buildToken, { kind: "rename", resultCount: 0 });
         const message = "Rename produced no edits";
