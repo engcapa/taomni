@@ -224,6 +224,15 @@ class Desktop:
         config = self.root / "ime-config"
         directory = config / "fcitx5"
         directory.mkdir(parents=True, exist_ok=True)
+        # The disposable desktop provides IME through native_ime_keys, which
+        # explicitly selects/activates the engine and restores it afterwards.
+        # App shortcuts and modifier drags must not toggle it accidentally.
+        (directory / "config").write_text(
+            "[Hotkey]\nEnumerateWithTriggerKeys=False\n"
+            "[Hotkey/TriggerKeys]\n[Hotkey/AltTriggerKeys]\n"
+            "[Hotkey/ActivateKeys]\n[Hotkey/DeactivateKeys]\n"
+            "[Hotkey/EnumerateForwardKeys]\n[Hotkey/EnumerateBackwardKeys]\n",
+            encoding="utf-8")
         (directory / "profile").write_text(
             "[Groups/0]\nName=Default\nDefault Layout=us\nDefaultIM=wbpy\n"
             "[Groups/0/Items/0]\nName=keyboard-us\nLayout=\n"
@@ -259,6 +268,10 @@ class Desktop:
             return engine if engine == "wbpy" else False
 
         engine = self._wait(gtk, engine_ready, "fcitx5 wbpy engine")
+        # The readiness probe activated wbpy. Leave the ordinary typing path
+        # on the US keyboard before destroying its input context.
+        subprocess.run(["fcitx5-remote", "-s", "keyboard-us"], env=env, check=True, timeout=5)
+        subprocess.run(["fcitx5-remote", "-c"], env=env, check=True, timeout=5)
         gtk.terminate()
         gtk.wait(timeout=10)
         self.processes.remove(gtk)

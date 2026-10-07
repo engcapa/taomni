@@ -1973,6 +1973,8 @@ export function CodeWorkspaceTab({
   const rearrangeRequestTokenRef = useRef(0);
   const cleanupRequestTokenRef = useRef(0);
   const workspaceEditQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingWorkspaceEditsRef = useRef(0);
+  const pendingWorkspaceHistoryClaimRef = useRef(false);
   const providerCommandSemanticGuardRef = useRef<{
     generation: number;
     revision: number;
@@ -10920,7 +10922,10 @@ export function CodeWorkspaceTab({
     edit: LspWorkspaceEdit,
     options: WorkspaceEditApplyOptions = {},
   ) => {
-    const pending = workspaceEditQueueRef.current.then(() => applyLspWorkspaceEditNow(edit, options));
+    pendingWorkspaceEditsRef.current += 1;
+    const pending = workspaceEditQueueRef.current
+      .then(() => applyLspWorkspaceEditNow(edit, options))
+      .finally(() => { pendingWorkspaceEditsRef.current -= 1; });
     workspaceEditQueueRef.current = pending.then(() => undefined, () => undefined);
     return pending;
   }, [applyLspWorkspaceEditNow]);
@@ -11406,6 +11411,21 @@ export function CodeWorkspaceTab({
   // journal blocks the stroke entirely so a document undo can never interleave
   // with a running multi-file restore.
   const claimWorkspaceHistory = useCallback((action: "undo" | "redo"): boolean | undefined => {
+    if (pendingWorkspaceHistoryClaimRef.current) return false;
+    if (pendingWorkspaceEditsRef.current > 0) {
+      // Writes become visible before post-state verification registers their
+      // history. Keep this stroke with the multi-file transaction; falling
+      // through here would undo only the open document and strand disk edits.
+      const sequence = workspaceEditHistorySequenceRef.current;
+      pendingWorkspaceHistoryClaimRef.current = true;
+      const pendingClaim = workspaceEditQueueRef.current.then(async () => {
+        if (action === "undo" && workspaceEditHistorySequenceRef.current > sequence) {
+          await undoWorkspaceEdit();
+        }
+      }).finally(() => { pendingWorkspaceHistoryClaimRef.current = false; });
+      workspaceEditQueueRef.current = pendingClaim.then(() => undefined, () => undefined);
+      return true;
+    }
     const state = workspaceEditHistory.state();
     if (state.busy) return false;
     if (action === "undo" ? !state.canUndo : !state.canRedo) return undefined;

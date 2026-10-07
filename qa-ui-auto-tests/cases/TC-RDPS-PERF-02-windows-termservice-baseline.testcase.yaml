@@ -12,7 +12,10 @@ description: |
   The first connection of each account creates its session (first logon)
   and stays connected until the in-session target reports ready (the probe
   attaches the work directory's launch logs if it never does); the measured
-  connections then reconnect to the running session. The results are
+  connections then reconnect to the running session. After each successful
+  measurement the runner explicitly disconnects only the fixture-owned WTS
+  session and waits for its connection slot to be released, retaining the
+  warmed target and recording the session identity. The results are
   reference numbers for the budgets, not a pass verdict on TermService:
   expectations only guard that measurement happened.
 

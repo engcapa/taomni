@@ -1,6 +1,6 @@
 id: TC-IDE-PARITY-017-03
 title: Native JDT LS in-place rename previews both files and undoes in one step
-description: 'ED-PARITY-017 A1/A2 native case on the in-repo maven-single sample and the CI-provisioned JDT LS: Shift+F6 on a static method opens the in-place naming session; the cross-file rename previews true before/after lines for Greeter.java and Caller.java; Do Refactor updates the buffer and the unopened file on disk; one undo restores both.
+description: 'ED-PARITY-017 A1/A2 native case on the in-repo maven-single sample and the CI-provisioned JDT LS: Shift+F6 on a static method opens the in-place naming session; the cross-file rename previews true before/after lines for Greeter.java and Caller.java; Do Refactor updates the buffer and the unopened file on disk; one undo restores both. Issue Undo as soon as the editor and unopened disk file expose the new text, without waiting for a completion banner: post-state verification must retain ownership of that undo until the multi-file history is ready.
 
 
   Mode: native.

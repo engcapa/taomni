@@ -222,3 +222,81 @@ The release workflows are unchanged. After the final targeted group passes,
 start all nine entries and inspect their progress/artifacts every **30 minutes**.
 The current full plan contains 2,060 eligible case executions; unsupported
 capability gaps remain explicit and are not counted as passes.
+
+## Full nine-entry run 37638010528 at ac842a24
+
+The six-hour job limit was active. Actual aggregate: **2,053/2,060 passed**, seven
+failures across six case IDs, zero execution skips and no provenance errors.
+
+| Entry | Passed / selected | Failed cases |
+| --- | --- | --- |
+| Linux browser | 345/346 | D2-01 replace preview |
+| Linux default native | 186/186 | None |
+| Ubuntu 22.04 X11 | 184/186 | TC-155, PARITY-017-03 |
+| Ubuntu 22.04 VNC | 185/186 | TC-155 |
+| Ubuntu 26.04 Wayland | 136/136 | None |
+| Windows browser | 346/346 | None |
+| Windows native | 169/170 | RDPS-PERF-02 |
+| macOS browser | 344/344 | None |
+| macOS native | 158/160 | RDPJ-01, RDPJ-02 |
+
+Screenshot N17/N20 passed in the full run. Unsupported portal/physical-input
+combinations remain gaps in the selection manifest, not successful executions.
+
+### Batched follow-up repairs (2026-10-08)
+
+- TC-155: both Jammy failure DOMs show Chinese-transformed session names/user
+  text. fcitx5 5.0.14 defaults `EnumerateForwardKeys` to `Control+Shift_L` and
+  backward to `Control+Shift_R`, colliding with terminal block selection.
+  Disable activation/enumeration hotkeys in the owned QA desktop config and
+  deactivate the readiness probe's wbpy engine. Explicit native IME scenarios
+  still activate/observe/restore fcitx; retain their focused regressions.
+- Browser D2-01: Playwright contenteditable fill left the original CodeMirror
+  lines ahead of the requested text. Select all through CodeMirror's actual
+  keyboard command and insert through browser input. Add an immediate exact
+  content assertion before replacement; preserve both cancel assertions.
+- PARITY-017-03: Undo can arrive after writes are visible but before post-state
+  reads register the cross-file history. A mounted deferred-read test reproduces
+  the missing disk undo before the fix. Reserve the stroke for the pending
+  workspace transaction and execute it after verified history registration;
+  serialize following applies behind that claim. Failed/unverified transactions
+  must not cause an older unrelated journal entry to be undone.
+- macOS RDPJ-01/02: retained HTML exposes typed `Connection reset by peer` during
+  negotiation. The native worker can stop while its relay remains open; the
+  frontend previously only scheduled retry from WebSocket close, leaving the
+  typed transient error stranded. Close the errored relay explicitly, retaining
+  the existing three-attempt bound and no-retry rule for auth/certificate errors.
+  Mounted tests fail before the fix and pass after it, including auth exclusion.
+  The initial server-side reset is not conclusively diagnosed by these artifacts.
+- Windows PERF-02: decoded throughput screenshot is the Windows sign-in dialog
+  "There are too many users signed in", while the warmed animation process is
+  still running. After each successful owned baseline probe, disconnect its
+  exact WTS session and await `WTSDisconnected` before reconnecting. Preserve
+  the warmed target, original measurement thresholds and runneradmin session;
+  configure/restore both policy and system single-session-per-user settings.
+  Ownership, active/disconnected states, cleanup and probe routing are tested.
+
+Local checks: TypeScript passed; 14 mounted editor/RDP checks passed; 50 RDP
+frontend checks passed; four browser save/replace/rename regressions passed with
+stable identity in `followup-repair-browser-final/run-20261008-065044-820795025`.
+Catalog audit passed. Native confirmation uses only affected cases and direct
+regressions on X11/VNC/Wayland, Windows and macOS; browser reruns only on Linux.
+
+Windows full-run build log reports a missing binary and 1,352.4 seconds of build;
+170 cases took 3,548.0 seconds, including 955.3 seconds of session initialization.
+Default Linux's 186 cases took 3,315.4 seconds with 308.6 seconds initialization.
+macOS reused a verified build and ran 160 cases in 2,908.0 seconds. These differing
+workloads do not establish a matched performance improvement.
+
+The old background monitor's 240-second macOS artifact download timed out on a
+771.8 MB archive before it could update the final state. Retrieve the aggregate
+first, checkpoint job state before downloading, isolate per-artifact failures,
+and use a separate bounded large-artifact download. All raw evidence has now
+been recovered; a download timeout is not a case failure or passing evidence.
+
+Final local tool checks: 87 Python CI/desktop/RDP/selection checks passed, then
+all 40 RDP tool checks passed again after closing the parent's probe-log handle.
+TypeScript and static audit passed. Add the xrdp reference client to the targeted
+Linux selection so Wayland also exercises the changed RDP relay lifecycle;
+Wayland cannot run the host-screen loopback server cases. Keep the six-hour job
+budget and inspect hosted progress every 30 minutes.

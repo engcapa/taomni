@@ -571,8 +571,8 @@ def _do_rdp_probe(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("rdp_probe: expected a mapping")
     command, artifact = _probe_command(ctx, args)
     artifact.unlink(missing_ok=True)
-    log = (artifact.with_suffix(".log")).open("w", encoding="utf-8")
-    process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=log)
+    with artifact.with_suffix(".log").open("w", encoding="utf-8") as log:
+        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=log)
     background = args.get("background")
     timeout = float(args.get("timeout_sec") or 180)
     if background:
@@ -583,7 +583,19 @@ def _do_rdp_probe(ctx: NativeStepContext, args: Any) -> str:
         jobs[str(background)] = (process, artifact, timeout)
         _register_cleanup(ctx, lambda: _stop_process(process))
         return f"rdp_probe {args['scenario']} running in background as {background}"
-    return _finish_probe(ctx, process, artifact, args, "rdp_probe", timeout)
+    result = _finish_probe(ctx, process, artifact, args, "rdp_probe", timeout)
+    # TermService reference probes reconnect to a warmed per-user desktop.
+    # Wait for the owned connection slot to be released before the next probe;
+    # socket close alone is asynchronous on Server 2025.
+    from .fixtures import rdp_baseline_required as baseline
+    options = args.get("args") or {}
+    user = options.get("user")
+    if (platform.system() == "Windows" and user in baseline._CREATED
+            and str(options.get("port")) == os.environ.get("QA_RDP_BASELINE_PORT")):
+        sessions = baseline.disconnect_owned_session(user)
+        artifact.with_name(artifact.stem + "-disconnect.json").write_text(
+            json.dumps({"user": user, "sessions": sessions, "state": "disconnected"}), encoding="utf-8")
+    return result
 
 
 @_verb("rdp_probe_wait")

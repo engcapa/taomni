@@ -69,8 +69,9 @@ class TestRdpSocket {
   readyState = TestRdpSocket.OPEN;
   binaryType = "";
   onmessage: ((event: { data: string | ArrayBuffer }) => void) | null = null;
+  onclose: (() => void) | null = null;
   send = vi.fn();
-  close = vi.fn();
+  close = vi.fn(() => { this.readyState = 3; this.onclose?.(); });
 
   constructor() {
     TestRdpSocket.instances.push(this);
@@ -126,6 +127,8 @@ describe("RdpPanel framebuffer lifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     TestRdpSocket.instances = [];
+    vi.mocked(rdpConnect).mockClear();
+    vi.mocked(rdpDisconnect).mockClear();
     vi.stubGlobal("WebSocket", TestRdpSocket);
     vi.stubGlobal("ImageData", class {
       constructor(public data: Uint8ClampedArray, public width: number, public height: number) {}
@@ -161,6 +164,35 @@ describe("RdpPanel framebuffer lifecycle", () => {
     const { readPixel, socket } = await connectPanel(994, 750);
     act(() => { socket.connected(994, 750); });
     expect(readPixel()).toEqual([255, 255, 255, 255]);
+  });
+
+  it("releases an errored relay and retries transient failures at most three times", async () => {
+    render(<RdpPanel tabId="rdp-tab" host="loopback.test" port={3389} options={DEFAULT_RDP_OPTIONS} visible />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const socket = TestRdpSocket.instances[attempt];
+      act(() => { socket.onmessage?.({ data: JSON.stringify({
+        type: "error", retryable: true,
+        message: "rdp negotiation failed (transient transport): Connection reset by peer",
+      }) }); });
+      expect(socket.close).toHaveBeenCalledOnce();
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+      expect(rdpConnect).toHaveBeenCalledTimes(Math.min(attempt + 2, 4));
+    }
+    expect(rdpDisconnect).toHaveBeenCalledTimes(4);
+  });
+
+  it("closes an authentication failure without retrying or replacing its diagnostic", async () => {
+    render(<RdpPanel tabId="rdp-tab" host="loopback.test" port={3389} options={DEFAULT_RDP_OPTIONS} visible />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    const socket = TestRdpSocket.instances[0];
+    act(() => { socket.onmessage?.({ data: JSON.stringify({
+      type: "error", retryable: false, message: "CredSSP authentication rejected",
+    }) }); });
+    expect(socket.close).toHaveBeenCalledOnce();
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(rdpConnect).toHaveBeenCalledTimes(1);
+    expect(useRdpStore.getState().connections['rdp-tab'].error).toBe("CredSSP authentication rejected");
   });
 
   it.each([
