@@ -120,6 +120,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.update({"rdp", "xrdp"})
             if "system_rdp_running" in fixtures:
                 result.add("rdp")
+            if any("host_mstsc" in step for step in case.steps):
+                result.add("mstsc")
             # Performance budgets are only meaningful on optimised code; the
             # whole entry then uses the release QA build.
             if "release_build_required" in fixtures:
@@ -244,6 +246,13 @@ def make_plan(args) -> dict:
                                 "cache_key": profile_name if profile_name and profile_name != DEFAULT_LINUX_PROFILE else platform_key,
                                 "capabilities": capabilities(eligible, mode),
                                 "case_digests": {c.id: input_digest(c.source_path) for c in eligible}})
+    # These Rust contracts do not depend on the desktop. Select one available
+    # Linux native entry, including when a targeted run excludes the default.
+    rdp_unit_owner = next((entry["id"] for entry in entries
+                           if entry["platform_key"] == "linux" and entry["mode"] == "native"
+                           and "rdp" in entry["capabilities"]), None)
+    for entry in entries:
+        entry["rdp_unit_contracts"] = entry["id"] == rdp_unit_owner
     if explicit - reachable:
         raise ValueError(f"explicit cases unavailable in requested combinations: {sorted(explicit-reachable)}")
     if not entries and args.scope != "impacted":
@@ -407,7 +416,7 @@ def main(argv=None):
             result = make_plan(args)
             write_json(args.output, result)
             matrix = {"include": [{k: e[k] for k in ("id", "runner", "arch", "mode", "platform_key", "capabilities",
-                                                     "linux_profile", "linux_wrapper", "cache_key")} for e in result["entries"]]}
+                                                     "linux_profile", "linux_wrapper", "cache_key", "rdp_unit_contracts")} for e in result["entries"]]}
             github_output("matrix", json.dumps(matrix, separators=(",", ":")))
             github_output("has_cases", str(bool(result["entries"])).lower())
             github_output("head", result["head"])

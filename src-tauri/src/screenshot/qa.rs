@@ -247,6 +247,18 @@ async fn open_fixture(
         tokio::time::sleep(Duration::from_millis(300)).await;
     }
     let display = capture::resolve_display(app, None)?;
+    // Keep the fixture above the X11 main surface, but use the same hidden
+    // window ledger as capture. Closing the real tool must restore the app;
+    // fixture cleanup must not manufacture a passing lifecycle assertion.
+    if cfg!(target_os = "linux")
+        && std::env::var_os("DISPLAY").is_some()
+        && std::env::var_os("WAYLAND_DISPLAY").is_none()
+    {
+        super::hide_app_windows(app);
+        super::await_hidden_windows(app)
+            .await
+            .map_err(anyhow::Error::msg)?;
+    }
     let s = display.scale_factor.max(0.5);
     let url = WebviewUrl::App(format!("index.html#screenshot-qa-{route}").into());
     let window = super::window_builder(app, QA_WINDOW_LABEL, url)
@@ -305,6 +317,12 @@ async fn open_fixture(
 fn close_fixture(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(QA_WINDOW_LABEL) {
         let _ = window.destroy();
+    }
+    if cfg!(target_os = "linux")
+        && std::env::var_os("DISPLAY").is_some()
+        && std::env::var_os("WAYLAND_DISPLAY").is_none()
+    {
+        super::restore_app_windows(app);
     }
 }
 

@@ -3,10 +3,11 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from qa_ui_auto.ci import dependency_order, diff_paths, make_plan, selection_entry, write_json
+from qa_ui_auto.ci import capabilities, dependency_order, diff_paths, make_plan, selection_entry, write_json
 from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES
 
 
@@ -17,6 +18,23 @@ def args(**overrides):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_only_mstsc_cases_require_windows_debugger_tools(self):
+        client = SimpleNamespace(fixtures=["rdp_server_required"], steps=[{"open": "/"}], tags=[])
+        self.assertNotIn("mstsc", capabilities([client], "native"))
+        client.steps.append({"host_mstsc": {"action": "start"}})
+        self.assertIn("mstsc", capabilities([client], "native"))
+        self.assertNotIn("mstsc", capabilities([client], "browser"))
+
+    def test_rdp_contracts_run_once_in_selected_linux_profiles(self):
+        plan = make_plan(args(scope="selected", case_ids="TC-RDPJ-02-joint-clipboard-no-echo",
+                              modes="native", linux_profiles=",".join(LINUX_PROFILES)))
+        owners = [e for e in plan["entries"] if e["rdp_unit_contracts"]]
+        self.assertEqual(len(owners), 1)
+        self.assertEqual(owners[0]["id"], "linux-native")
+        plan = make_plan(args(scope="selected", case_ids="TC-RDPJ-02-joint-clipboard-no-echo",
+                              platforms="linux", modes="native", linux_profiles="ubuntu-22.04-vnc"))
+        self.assertTrue(plan["entries"][0]["rdp_unit_contracts"])
+
     def test_smoke_expands_to_six_real_combinations(self):
         plan = make_plan(args())
         self.assertEqual(len(plan['entries']), 6)

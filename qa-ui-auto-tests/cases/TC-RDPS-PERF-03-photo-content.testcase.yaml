@@ -103,7 +103,7 @@ steps:
     expect:
       marker.frames:
         min: 100
-      vs_baseline.kbps_ratio:
+      vs_baseline.kbps_per_frame_ratio:
         max: 1.05
       vs_baseline.fps_ratio:
         min: 0.95

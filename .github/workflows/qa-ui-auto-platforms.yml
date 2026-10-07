@@ -120,7 +120,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -231,7 +231,7 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
           $driver >> $env:GITHUB_PATH
-          if ('${{ contains(matrix.capabilities, 'rdp') }}' -eq 'true') {
+          if ('${{ contains(matrix.capabilities, 'mstsc') }}' -eq 'true') {
             $dumpZip = Join-Path $env:RUNNER_TEMP 'qa-procdump.zip'
             $dumpTools = Join-Path $env:RUNNER_TEMP 'qa-procdump'
             Invoke-WebRequest 'https://download.sysinternals.com/files/Procdump.zip' -OutFile $dumpZip
@@ -317,12 +317,12 @@ jobs:
           QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
         run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
       - name: Windows mstsc startup diagnostic
-        if: runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        if: runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'mstsc')
         run: >-
           python -m qa_ui_auto.rdp_helpers.mstsc
           --preflight 'qa-ui-auto-report/${{ matrix.id }}/mstsc-startup'
       - name: Retain the mstsc startup diagnostic before compiling
-        if: always() && runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        if: always() && runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'mstsc')
         uses: actions/upload-artifact@v4
         with:
           name: qa-windows-mstsc-startup-${{ needs.plan.outputs.artifact_key }}
@@ -336,7 +336,7 @@ jobs:
         # startup diagnostics below. This removes a 30–50 minute duplicate
         # Rust test build from each non-Linux native job without changing any
         # release app build or product evidence.
-        if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp') && runner.os == 'Linux'
+        if: matrix.rdp_unit_contracts
         env:
           CARGO_TARGET_DIR: target/qa-ui-auto
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'

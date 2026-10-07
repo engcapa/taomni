@@ -1137,7 +1137,7 @@ async fn drive_ironrdp_connection(
             RDP_NEGOTIATION_TIMEOUT.as_secs()
         )
     })?
-    .map_err(|e| format!("rdp negotiation failed: {}", e))?;
+    .map_err(negotiation_error)?;
 
     send_status(&out_tx, "tls", "Upgrading the transport to TLS.");
     let stream = framed.into_inner_no_leftover();
@@ -2715,6 +2715,32 @@ fn send_error(out_tx: &SessionOutputSender, code: &str, message: &str) {
     );
 }
 
+// IronRDP's Display omits its source ("custom error"). Preserve the chain and
+// the transport error kind so a closed certificate-review connection can use
+// the existing bounded reconnect path without retrying protocol/auth errors.
+fn negotiation_error(error: connector::ConnectorError) -> String {
+    let mut source: Option<&(dyn std::error::Error + 'static)> = Some(&error);
+    let mut transient = false;
+    while let Some(cause) = source {
+        if let Some(io) = cause.downcast_ref::<std::io::Error>() {
+            transient |= matches!(
+                io.kind(),
+                std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::UnexpectedEof
+                    | std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::TimedOut
+            );
+        }
+        source = cause.source();
+    }
+    format!(
+        "rdp negotiation failed{}: {}",
+        if transient { " (transient transport)" } else { "" },
+        error.report()
+    )
+}
+
 fn is_retryable_rdp_error(message: &str) -> bool {
     let lower = message.to_ascii_lowercase();
     lower.contains("timed out")
@@ -2722,6 +2748,7 @@ fn is_retryable_rdp_error(message: &str) -> bool {
         || lower.starts_with("rdp write frame:")
         || lower.contains("connection reset")
         || lower.contains("broken pipe")
+        || lower.starts_with("rdp negotiation failed (transient transport):")
 }
 
 fn send_text(out_tx: &SessionOutputSender, text: String) {
@@ -2992,6 +3019,24 @@ mod tests {
         assert!(matches!(ops[1], Operation::UnicodeKeyReleased('中')));
         assert!(matches!(ops[2], Operation::UnicodeKeyPressed('😀')));
         assert!(matches!(ops[3], Operation::UnicodeKeyReleased('😀')));
+    }
+
+    #[test]
+    fn negotiation_transport_cause_survives_error_formatting() {
+        for kind in [
+            std::io::ErrorKind::ConnectionReset,
+            std::io::ErrorKind::UnexpectedEof,
+        ] {
+            let cause = std::io::Error::new(kind, "not enough bytes");
+            let error = connector::custom_err!("read frame by hint", cause);
+            let message = negotiation_error(error);
+            assert!(is_retryable_rdp_error(&message), "{message}");
+        }
+        let error = connector::custom_err!(
+            "read frame by hint",
+            std::io::Error::other("invalid PDU")
+        );
+        assert!(!is_retryable_rdp_error(&negotiation_error(error)));
     }
 
     #[test]

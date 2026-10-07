@@ -187,6 +187,9 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
         raise StepError(f"press: expected string or {{key, macos_key?, selector?}}, got {args!r}")
     if selector:
         ctx.session.focus(selector)
+    # X input focus alone is insufficient: WebKit's automation browsing
+    # context also needs activation after reloads and auxiliary windows.
+    ctx.session.activate_linux_window()
     return ctx.session.press_combo(key)
 
 
@@ -304,6 +307,7 @@ def _eval_readonly(ctx: NativeStepContext, args: Any) -> str:
 
 
 def _hover(ctx: NativeStepContext, args: Any) -> str:
+    ctx.session.activate_linux_window()
     selector, _ = _selector_args(args)
     element = ctx.session.find(selector, interactive=True)
     # Use the WebDriver element origin instead of converting the element's
@@ -2014,6 +2018,7 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
     window_id = None
     window_identity = None
     if transport == "webdriver":
+        ctx.session.activate_linux_window()
         ctx.session.press_combos(keys)
     elif transport == "x11":
         if platform.system() != "Linux" or not os.environ.get("DISPLAY"):

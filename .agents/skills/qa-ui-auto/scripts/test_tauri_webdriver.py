@@ -259,15 +259,17 @@ class NativeSessionTransportTest(TestCase):
         with self.assertRaisesRegex(Exception, "invalid element list"):
             session.count(".tab")
 
-    def test_scoped_press_focuses_without_activation(self):
+    def test_scoped_press_activates_webview_without_clicking_target(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
         session.find = Mock(return_value="row-1")
         session.request = Mock(return_value=True)
         session.press_combo = Mock(return_value="pressed")
+        session.activate_linux_window = Mock()
         ctx = Mock(session=session)
         native_steps._press(ctx, {"selector": "#folder", "key": "ArrowRight"})
         session.press_combo.assert_called_once_with("ArrowRight")
+        session.activate_linux_window.assert_called_once_with()
         session.request.assert_called_once()
         self.assertTrue(session.request.call_args.args[1].endswith("/execute/sync"))
         self.assertEqual(session.request.call_args.args[2]["args"], [{"element-6066-11e4-a52e-4f735466cecf": "row-1"}])

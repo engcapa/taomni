@@ -114,6 +114,10 @@ describe("frames and formatting", () => {
     expect(formatCode("94287082")).toBe("9428 7082");
     expect(remainingSeconds(30_000, 12_001)).toBe(18);
     expect(remainingSeconds(null, 0)).toBe(0);
+    expect(remainingSeconds(60_000, 29_950, 30_000)).toBe(30);
+    expect(remainingSeconds(120_000, 59_950, 60_000)).toBe(60);
+    expect(remainingSeconds(60_000, 45_001, 30_000)).toBe(15);
+    expect(remainingSeconds(60_000, 60_001, 30_000)).toBe(0);
     expect(mfaErrorCode(new Error("VAULT_LOCKED"))).toBe("VAULT_LOCKED");
     expect(mfaErrorCode("MFA_INVALID_INPUT: secret: bad")).toBe("MFA_INVALID_INPUT");
     expect(invalidInputField("MFA_INVALID_INPUT: secret: invalid Base32 character '!'")).toEqual({ field: "secret", detail: "invalid Base32 character '!'" });
