@@ -85,7 +85,7 @@ steps:
 - wait_for: '[data-testid="vnc-canvas"][width="900"][height="600"]'
 - assert_text:
     selector: '[data-testid="workspace-header"]'
-    contains: "Workspace \xB7 QA Main"
+    contains: Workspace · QA Main
 - assert_count:
     selector: '[data-testid="vnc-canvas"]'
     equal: 1
@@ -108,38 +108,37 @@ verification:
     - 14
     - 15
     - 16
+    - 17
     - 18
-    - 20
     - 21
+    - 22
+    - 23
     - 24
     - 25
-    - 26
-    - 27
     - 28
+    - 30
     - 31
-    - 33
-    - 34
+    - 32
     - 35
+    - 37
     - 38
-    - 40
-    - 41
     checkpoints:
-    - step: 23
+    - step: 20
       expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    - step: 30
+    - step: 27
       expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    - step: 32
+    - step: 29
       expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    - step: 43
+    - step: 40
       expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    - step: 44
+    - step: 41
       expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
     results:
-    - 23
-    - 30
-    - 32
-    - 43
-    - 44
+    - 20
+    - 27
+    - 29
+    - 40
+    - 41
   native:
   - check: Tauri VNC relay and detached OS window lifecycle.
     method: automated
