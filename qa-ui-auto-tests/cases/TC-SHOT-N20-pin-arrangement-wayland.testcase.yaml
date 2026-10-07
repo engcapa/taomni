@@ -17,6 +17,10 @@ steps:
 - wait_for: '[data-testid="system-screenshot"]'
 - native_screenshot_scenario:
     scenario: pin-arrangement
+- native_screenshot_scenario:
+    scenario: pin-arrangement
+- native_screenshot_scenario:
+    scenario: pin-arrangement
 - assert_visible: '[data-testid="system-screenshot"]'
 native_platforms:
 - Linux
@@ -25,36 +29,35 @@ native_platforms:
 verification:
   review: reviewed
   requirements:
-  - id: native-pin-arrangement
-    requirement: Native pin arrangement and Wayland board behavior are retained by the screenshot scenario.
-    actions: [1]
+  - id: native-workflow
+    requirement: Repeated native pin notes, arrangement, independent originals and window teardown/recreation
+    actions:
+    - 1
     checkpoints:
+    - step: 3
+      expectation: The native scenario verifies notes, layout, board closure, restored pins and independent original
+        files through native window state.
     - step: 4
-      expectation: 'assert_visible: [data-testid="system-screenshot"]'
-    results: [4]
+      expectation: The native scenario verifies notes, layout, board closure, restored pins and independent original
+        files through native window state.
+    - step: 5
+      expectation: The native scenario verifies notes, layout, board closure, restored pins and independent original
+        files through native window state.
+    - step: 6
+      expectation: The main window remains available after all three lifecycles.
+    results:
+    - 3
+    - 4
+    - 5
+    - 6
   visual:
-  - check: Native pin board layout and retained originals.
+  - check: Native result
     method: external
-    reason: The scenario inspects compositor geometry and independent files.
+    reason: Review retained native evidence alongside the automated assertions.
   native:
   - check: Windows/X11/macOS pins arrange inside monitor work area; Wayland presents a single top-level board and
       retains independent original pin files.
     method: automated
     reason: Native scenario must inspect actual compositor geometry and Wayland surface behavior.
-  requirements:
-  - id: native-workflow
-    requirement: Native pin notes arrangement and Wayland combined board
-    actions:
-    - 1
-    checkpoints:
-    - step: 3
-      expectation: The native scenario verifies notes, layout, board closure, restored pins and independent original files through native window state.
-    - step: 4
-      expectation: The main window remains available after cleanup.
-    results:
-    - 3
-    - 4
-  visual:
-  - check: Native result
-    method: external
-    reason: Review retained native evidence alongside the automated assertions.
+description: Repeat the complete two-pin lifecycle three times in one native app process, retaining note, tile/board,
+  independent-original and close assertions on every cycle.
