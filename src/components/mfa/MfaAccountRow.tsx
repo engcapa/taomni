@@ -79,7 +79,7 @@ export function MfaAccountRow({
   const rowRef = useRef<HTMLLIElement>(null);
   const [dropActive, setDropActive] = useState(false);
   const name = accountLabel(account);
-  const remaining = remainingSeconds(code?.validUntilMs ?? null, now);
+  const remaining = remainingSeconds(code?.validUntilMs ?? null, now, code?.validFromMs ?? null);
   const showNext = account.kind === "totp" && !!code?.nextCode && remaining <= MFA_NEXT_CODE_SECONDS;
   const avatar = getAvatarInfo(account.issuer || account.accountName);
 

@@ -185,26 +185,11 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
         selector = args.get("selector")
     else:
         raise StepError(f"press: expected string or {{key, macos_key?, selector?}}, got {args!r}")
-    # WebDriver can focus an element while LXQt still leaves the native
-    # WebKit toplevel without X11 keyboard focus.  The next chord then lands
-    # in the window manager (or is dropped), which is especially visible when
-    # Esc should return focus to CodeMirror.  Re-activate the owned app after
-    # the DOM focus operation so WebDriver and the real desktop agree.
-    if platform.system() == "Linux" and os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
-        try:
-            _activate_x11_application(ctx.session.application)
-        except StepError:
-            # Keep the existing WebDriver-only behavior on desktops without
-            # the X11 helper tools; native focus assertions still report the
-            # resulting state.
-            pass
     if selector:
         ctx.session.focus(selector)
-        if platform.system() == "Linux" and os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
-            try:
-                _activate_x11_application(ctx.session.application)
-            except StepError:
-                pass
+    # X input focus alone is insufficient: WebKit's automation browsing
+    # context also needs activation after reloads and auxiliary windows.
+    ctx.session.activate_linux_window()
     return ctx.session.press_combo(key)
 
 
@@ -322,6 +307,7 @@ def _eval_readonly(ctx: NativeStepContext, args: Any) -> str:
 
 
 def _hover(ctx: NativeStepContext, args: Any) -> str:
+    ctx.session.activate_linux_window()
     selector, _ = _selector_args(args)
     element = ctx.session.find(selector, interactive=True)
     # Use the WebDriver element origin instead of converting the element's
@@ -2032,6 +2018,7 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
     window_id = None
     window_identity = None
     if transport == "webdriver":
+        ctx.session.activate_linux_window()
         ctx.session.press_combos(keys)
     elif transport == "x11":
         if platform.system() != "Linux" or not os.environ.get("DISPLAY"):

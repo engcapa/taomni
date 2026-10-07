@@ -247,17 +247,17 @@ async fn open_fixture(
         tokio::time::sleep(Duration::from_millis(300)).await;
     }
     let display = capture::resolve_display(app, None)?;
-    // LXQt/Openbox on the Ubuntu 22.04 Xvfb profile can keep the full-screen
-    // main surface above a newly mapped always-on-top WebView.  Hide that
-    // surface while the fixture is being sampled so native capture and OCR
-    // always see the fixture pixels.  The cleanup path restores it.
-    let hide_main_for_x11 = cfg!(target_os = "linux")
+    // Keep the fixture above the X11 main surface, but use the same hidden
+    // window ledger as capture. Closing the real tool must restore the app;
+    // fixture cleanup must not manufacture a passing lifecycle assertion.
+    if cfg!(target_os = "linux")
         && std::env::var_os("DISPLAY").is_some()
-        && std::env::var_os("WAYLAND_DISPLAY").is_none();
-    if hide_main_for_x11 {
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.hide();
-        }
+        && std::env::var_os("WAYLAND_DISPLAY").is_none()
+    {
+        super::hide_app_windows(app);
+        super::await_hidden_windows(app)
+            .await
+            .map_err(anyhow::Error::msg)?;
     }
     let s = display.scale_factor.max(0.5);
     let url = WebviewUrl::App(format!("index.html#screenshot-qa-{route}").into());
@@ -318,17 +318,11 @@ fn close_fixture(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(QA_WINDOW_LABEL) {
         let _ = window.destroy();
     }
-    // Restore the app surface after a Linux X11 fixture capture.  OCR opens
-    // its overlay before cleanup and therefore restores visibility itself;
-    // this keeps every other fixture scenario isolated and leaves the app in
-    // the same state as it started.
     if cfg!(target_os = "linux")
         && std::env::var_os("DISPLAY").is_some()
         && std::env::var_os("WAYLAND_DISPLAY").is_none()
     {
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.show();
-        }
+        super::restore_app_windows(app);
     }
 }
 
@@ -754,17 +748,6 @@ pub async fn screenshot_qa_ocr_redact(app: AppHandle) -> Result<String, String> 
         region.3,
     )
     .await?;
-    // The fixture is hidden above the main WebView on X11.  Once its pixels
-    // have been copied into the source artifact, restore the main surface so
-    // the overlay's close assertion still proves the normal app lifecycle.
-    if cfg!(target_os = "linux")
-        && std::env::var_os("DISPLAY").is_some()
-        && std::env::var_os("WAYLAND_DISPLAY").is_none()
-    {
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.show();
-        }
-    }
     let ocr = super::screenshot_ocr(source.path.clone()).await?;
     let boxes = super::screenshot_auto_redact(source.path.clone()).await?;
     let ocr_ok = ocr.text.contains("user@example.com") && ocr.text.contains("13812345678");

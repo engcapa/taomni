@@ -2014,7 +2014,8 @@ describe("TerminalPanel focus behavior", () => {
       const setBufferRows = (rows: string[]) => {
         term.buffer.active = {
           type: "normal",
-          length: rows.length,
+          // Real xterm buffers include unused viewport rows below the prompt.
+          length: Math.max(24, rows.length),
           baseY: 0,
           cursorY: rows.length - 1,
           cursorX: rows[rows.length - 1].length,
@@ -2059,6 +2060,7 @@ describe("TerminalPanel focus behavior", () => {
       expect(writes[0]).toBe(`${startupCommand}\r`);
       expect(writes[1]).toContain("__taomni_cwd_sync_done");
       expect(writes[1]).not.toContain("PROMPT_COMMAND");
+      expect(screen.getByTestId("terminal-pane")).not.toHaveAttribute("data-terminal-ready");
     } finally {
       vi.useRealTimers();
       Object.defineProperty(window.navigator, "platform", {
