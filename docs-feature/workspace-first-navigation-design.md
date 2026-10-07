@@ -434,3 +434,105 @@ Browser cases prove renderer state and stub boundaries only; native V-13 is requ
 - 旧 `sidebarRailPolicy`、`activeTabId`、`TabBar` 可能被已有 QA 与用户快捷键依赖。采用 projection 与旧 key 读取回退，完成切换后再删除旧路径。
 - 原型与产品实现不得混用：原型中的示例 workspace/session 不是生产数据。
 - 当前可开始：TASK-01、TASK-05（保持现有树的测试基线）、TASK-11；TASK-02 需先确定持久化复用路径，但可先写纯内存契约测试。TASK-03/04/06/07/08/09 等待 TASK-01/02 契约稳定。
+
+## 11. 实施前冻结契约与完整用例交接
+
+本节是对实现 agent 的强制补充，避免把 Workspace-first 误实现为一次性替换 `Tab/activeTabId` 的 rewrite。详细的 browser/native case 设计和受影响既有用例矩阵见 [`workspace-first-navigation-testcase-handoff.md`](workspace-first-navigation-testcase-handoff.md)。
+
+### 11.1 稳定身份、生命周期与入口规则
+
+- **Durable Workspace ID** 与 `RecentWorkspace.id` 分离。`RecentWorkspace.id` 继续作为按 roots/kinds 计算的 recents 去重键；首次将 Recent Workspace 固化为 Workspace 时生成稳定 UUID，重命名、增删 roots、改变 active file 均不改变 Workspace ID。迁移记录 `legacyRecentId`，重复迁移必须幂等。
+- **Canonical Session** 只有 `SessionConfig.id` 一个身份，Workspace 只保存 membership，不复制 `SessionConfig`、凭据、`options_json` secrets、vault reference 或 Mail cache。
+- **Ephemeral runtime session**：没有 Saved Session 的 local shell、command terminal、adopted terminal 或 attached SFTP 只生成 runtime `sessionRef`，不得因为打开 Surface 自动写入 `sessions` 表。用户选择“Save session”才进入 canonical store。
+- **Surface instance** 具有独立 `surfaceId`。同一 canonical Session 可以有多个 terminal/database/mail Surface；关闭一个 Surface 不关闭其他实例或 canonical Session。`sourceTabId` 只用于迁移/回溯，不能作为持久化 canonical identity。
+- **Standalone Session opening**：从 Sessions 视图直接打开 Session 时，默认进入 Session context，不自动写入 active Workspace membership；界面提供明确 `Add to Workspace`。从 Workspace 内点击 Session reference 才进入该 Workspace 的 Session Surface。
+- **Workspace deletion** 只删除 memberships、Workspace navigation/layout 和 Workspace metadata，不删除 Session；删除 canonical Session 必须显示引用 Workspace 数量并由用户确认，确认后才可移除所有 memberships 和 Session。
+- Membership 唯一键是 `(workspaceId, sessionId)`；重复添加是幂等 no-op。`primary`/`attached`/`reference` 角色变更必须是显式 patch；删除 primary 不自动提升另一个 reference，需显示“选择新的 primary / 保持无 primary”。
+- **Unified Mail** 的 global surface 聚合全部 canonical Mail Sessions；Workspace surface 只聚合该 Workspace 的 Mail memberships。两个 surface 都按 Session ID 去重，不启动重复 sync worker，也不复制 credentials/cache。
+- **Global Tool context** 使用 transient `contextWorkspaceId`/`contextSessionId`，不写 membership；离开工具后仍保持原 active Workspace。
+- `welcome` 不创建伪 Workspace。无 Workspace 时 Work 视图显示创建/选择 Workspace 的空状态；Welcome compatibility Surface 可继续作为旧 Tab projection，但不可成为 durable Workspace。
+
+### 11.2 严格的 SurfaceDescriptor 形状
+
+不得使用同时带有可选 `workspaceId`、`sessionId` 的宽松接口。实现采用 discriminated union（字段名可按最终代码风格调整）：
+
+```ts
+export type SurfaceDescriptor =
+  | {
+      scope: "global";
+      kind: GlobalSurfaceKind;
+      surfaceId: string;
+      contextWorkspaceId?: string;
+      contextSessionId?: string;
+    }
+  | {
+      scope: "workspace";
+      kind: WorkspaceSurfaceKind;
+      surfaceId: string;
+      workspaceId: string;
+    }
+  | {
+      scope: "session";
+      kind: SessionSurfaceKind;
+      surfaceId: string;
+      sessionRef:
+        | { kind: "canonical"; sessionId: string }
+        | { kind: "ephemeral"; runtimeId: string };
+      workspaceId?: string;
+    }
+  | {
+      scope: "unavailable";
+      kind: string;
+      surfaceId: string;
+      workspaceId?: string;
+      sessionId?: string;
+      reason: "missing-workspace" | "missing-session" | "unknown-kind" | "migration-error";
+    };
+```
+
+`workspaceId` 对 `workspace` 必填；canonical `sessionId` 对 canonical Session Surface 必填；global context 字段只用于上下文，不改变 ownership。Resolver 必须对当前全部 `TabKind` 显式返回结果：
+
+| 当前 TabKind | Surface scope | 迁移规则 |
+|---|---|---|
+| `terminal` | `session` | `tab.sessionId` 存在则 canonical；local/command/adopted 无 saved Session 时 ephemeral；workspaceId 仅作上下文 |
+| `sftp` | `session` | `tab.sessionId` 是 canonical 时使用；`tab.sftp.sessionId` 是 runtime handle 时只能作为 ephemeral runtimeId；attached SFTP 继承 terminal workspace context |
+| `rdp`, `vnc` | `session` | canonical `tab.sessionId` 优先，否则 ephemeral；detach 保留 surfaceId/scope |
+| `database`, `redis`, `hbase-shell`, `object-storage` | `session` | canonical sessionId 优先；runtime DB connection 不成为 canonical Session；workspace query state 单独按 workspaceId 保存 |
+| `mail` | `session` | Mail account 是 canonical Session；账号 surface 可被 Workspace membership 引用 |
+| `mail-unified` | `global` | 可带 contextWorkspaceId；按 global 全量或 Workspace membership 聚合，禁止重复 sync |
+| `git` | `workspace` | `sourceWorkspaceId`/`sourceWorkspaceInstanceId` 可解析则复用 Workspace；仅 repoRoot 的旧 standalone Git 必须显式创建/reuse Workspace shell，不复制 Session |
+| `code-workspace` | `workspace` | `workspaceId` 是 durable Workspace 关联；`workspaceInstanceId` 是 editor runtime scope |
+| `file-browser` | `workspace` / `session` / `global` | 有 Workspace binding 用 workspace；Saved File Session 用 session；ad-hoc local path 用 global context，不猜测为 Workspace |
+| `nettools`, `sockscap`, `mfa`, `lan-chat`, `settings` | `global` | 不写 membership；使用 transient context |
+| `proxy-test` | `session` | 有 SessionConfig 用 canonical；临时 proxy test 用 ephemeral sessionRef |
+| `welcome` | `global` | compatibility Home surface；不创建 durable Workspace |
+| `placeholder` 或未来未知类型 | `unavailable` | 保留原始 type/source，显示迁移/不支持原因，不能静默绑定 |
+
+### 11.3 原生持久化与 hydration 顺序
+
+Workspace records 和 membership 使用现有 `AppState.db` 对应的 `taomni.db` SQLite 连接与 Tauri command pattern（`src-tauri/src/session/db.rs`、`session/mod.rs`、`src/lib/ipc.ts`），而不是以 renderer `localStorage` 作为权威来源。建议新增 versioned tables（最终表名由实现 agent 与现有迁移习惯核对）：
+
+- `workspaces`: `id`, `name`, `description`, `roots_json`, `settings_json`, `created_at`, `updated_at`, `last_opened_at`, `sort_order`, `revision`。
+- `workspace_memberships`: `workspace_id`, `session_id`, `role`, `sort_order`, `pinned`, `default_surface`, `metadata_json`, timestamps；primary key `(workspace_id, session_id)`。
+- `workspace_navigation`: `workspace_id`, `active_surface`, `layout_json`, `revision`, `updated_at`。
+- `workspace_schema_meta`: schema version / migration marker only; no credentials.
+
+每次 membership/workspace/navigation composite write 使用 SQLite transaction；已有 revision 不匹配时返回 conflict，前端重新读取再合并，不覆盖另一个窗口的更新。启动 hydration 顺序固定为：打开 DB → load canonical Sessions/Groups → load Workspaces/Memberships → resolve missing references → restore active Workspace/Surface → project legacy `activeTabId`/runtime Tabs。任何 Session 未加载前不得把 membership 判为 missing。
+
+Rust command 需要定义输入、输出、错误和 event：`list_workspaces`, `get_workspace`, `save_workspace`, `delete_workspace`, `list_workspace_memberships`, `upsert_workspace_membership`, `remove_workspace_membership`, `save_workspace_navigation`；提交成功后 emit `workspace-state-changed`（workspaceId、revision、changed collections），多窗口订阅后按 revision reload。Browser fallback 可用 BroadcastChannel，但只作为 stub；不得把它当 native durability 证据。
+
+Workspace records 不保存密码、private key、vault secret、Mail password/token、数据库 password 或完整 Session options；只保存 Session IDs 与非敏感 display metadata。
+
+### 11.4 Detached / multi-window contract
+
+Detached handoff payload 增加 `surfaceId`, `workspaceId?`, `sessionRef`, `surfaceKind`；凭据仍沿用现有 one-time handoff/claim，不复制进 Workspace 数据。`BroadcastChannel`/localStorage backstop 的 reattach message 要保留 scope 字段；主窗口按 `(kind, surfaceId)` 去重，重新 resolve membership 后才创建 compatibility Tab projection。Detached window 关闭/reattach 不删除 canonical Session 或 membership。
+
+### 11.5 入口与快捷键影响清单
+
+实施前必须建立 exhaustive inventory：
+
+- `MainLayout.handleCommand`、`ControlBar.openMainMenu`、native menu `buildAppMenuSpec/installAppMenu`。
+- `Ctrl/Cmd+1..9`, `Ctrl/Cmd+Shift+T/N/L/S`, `Ctrl/Cmd+Shift+H`, command palette/common commands、QuickConnect、Welcome cards、Sidebar Tools/SessionTree rows。
+- 所有直接调用 `addTab`, `setActiveTab`, `removeTab`, `updateGitTabInfo`, `openCodeWorkspaceInfo`, `openGitTab`, `openMailTab`, `openDetached*` 的调用点。
+- `App.tsx` detached routes：SFTP、terminal、RDP、VNC、database、LAN Chat、notes、servers、screenshot；每个 detached route 必须声明 scope 恢复策略。
+- Existing QA controls/cases must be mapped to new Rail/Navigator/Surface IDs; no case is removed merely because its selector changed.
