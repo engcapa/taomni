@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%236ca8ff'/%3E%3Cpath d='M7 9h18M16 9v15M11 24h10' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <title>Taomni · 工作台原型</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10131a;
+      --bg-raised: #171b24;
+      --bg-elevated: #1d2330;
+      --bg-hover: #242c3b;
+      --bg-selected: #263951;
+      --line: #2d3645;
+      --line-soft: rgba(145, 161, 184, .16);
+      --text: #f3f6fb;
+      --text-2: #b4bfd0;
+      --text-3: #7f8da4;
+      --accent: #6ca8ff;
+      --accent-strong: #4d8ff5;
+      --accent-soft: rgba(108, 168, 255, .15);
+      --green: #65d49a;
+      --yellow: #e7bc62;
+      --red: #ef7d86;
+      --purple: #bd9aff;
+      --shadow: 0 20px 60px rgba(0, 0, 0, .34);
+      --radius: 10px;
+      --sidebar: 266px;
+      --inspector: 326px;
+      --topbar: 54px;
+      --statusbar: 29px;
+      --density: 1;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --bg-raised: #ffffff;
+      --bg-elevated: #ffffff;
+      --bg-hover: #edf2fa;
+      --bg-selected: #e6efff;
+      --line: #dce3ef;
+      --line-soft: rgba(85, 103, 132, .14);
+      --text: #1b2434;
+      --text-2: #526176;
+      --text-3: #7d8aa0;
+      --accent: #326edc;
+      --accent-strong: #245dc4;
+      --accent-soft: rgba(50, 110, 220, .11);
+      --green: #188b58;
+      --yellow: #a06d12;
+      --red: #cb4553;
+      --purple: #7752c3;
+      --shadow: 0 20px 60px rgba(30, 58, 96, .14);
+    }
+
+    :root.compact {
+      --density: .82;
+      --sidebar: 248px;
+      --inspector: 300px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    body { background: var(--bg); color: var(--text); font-size: 13px; }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .app { display: grid; grid-template-rows: var(--topbar) minmax(0, 1fr) var(--statusbar); height: 100vh; min-width: 0; }
+    .topbar { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg-raised) 92%, transparent); padding: 0 15px; position: relative; z-index: 5; }
+    .brand { display: flex; align-items: center; gap: 8px; min-width: 177px; font-weight: 700; letter-spacing: -.02em; }
+    .brand-mark { width: 25px; height: 25px; border-radius: 8px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #6ca8ff, #7e6cf5); box-shadow: 0 5px 16px rgba(91, 119, 242, .36); }
+    .brand-mark svg { width: 15px; height: 15px; }
+    .brand small { color: var(--text-3); font-size: 11px; font-weight: 500; margin-left: 1px; }
+    .topbar-spacer { flex: 1; }
+    .workspace-crumb { display: flex; align-items: center; gap: 7px; color: var(--text-2); white-space: nowrap; }
+    .workspace-crumb strong { color: var(--text); font-weight: 600; }
+    .crumb-sep { color: var(--text-3); }
+    .top-search { width: min(300px, 25vw); min-width: 170px; height: 32px; border: 1px solid var(--line); background: var(--bg); border-radius: 7px; display: flex; align-items: center; gap: 8px; color: var(--text-3); padding: 0 9px; cursor: pointer; text-align: left; }
+    .top-search:hover { border-color: var(--accent); background: var(--bg-hover); color: var(--text-2); }
+    .top-search .search-copy { flex: 1; }
+    kbd { border: 1px solid var(--line); background: var(--bg-elevated); border-radius: 4px; padding: 1px 5px; font-size: 10px; color: var(--text-3); }
+    .icon-button, .plain-button { border: 0; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--text-2); border-radius: 7px; }
+    .icon-button { width: 31px; height: 31px; }
+    .plain-button { gap: 6px; padding: 6px 8px; }
+    .icon-button:hover, .plain-button:hover { color: var(--text); background: var(--bg-hover); }
+    .avatar { width: 27px; height: 27px; border-radius: 50%; background: linear-gradient(145deg, #f3ad7d, #c46cf1); display: grid; place-items: center; color: #2f1b2c; font-size: 11px; font-weight: 800; cursor: pointer; }
+
+    .shell { display: grid; grid-template-columns: var(--sidebar) minmax(420px, 1fr) var(--inspector); min-height: 0; position: relative; }
+    .context-panel { background: var(--bg-raised); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; }
+    .context-head { padding: calc(15px * var(--density)) 14px 10px; }
+    .workspace-switcher { width: 100%; display: flex; gap: 9px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 9px; background: var(--bg); cursor: pointer; text-align: left; }
+    .workspace-switcher:hover { border-color: var(--accent); background: var(--bg-hover); }
+    .workspace-icon { width: 27px; height: 27px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-weight: 800; background: linear-gradient(145deg, #24b597, #3680e4); }
+    .switcher-copy { flex: 1; min-width: 0; }
+    .switcher-copy strong, .switcher-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .switcher-copy strong { font-size: 12px; }
+    .switcher-copy small { color: var(--text-3); margin-top: 2px; font-size: 10px; }
+    .context-nav { display: grid; gap: 2px; padding: 5px 9px 8px; }
+    .nav-item { border: 0; background: transparent; border-radius: 7px; display: flex; align-items: center; gap: 9px; min-height: 32px; padding: 0 9px; color: var(--text-2); cursor: pointer; text-align: left; }
+    .nav-item:hover { background: var(--bg-hover); color: var(--text); }
+    .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .nav-item .nav-count { margin-left: auto; color: var(--text-3); font-size: 11px; }
+    .section-label { display: flex; align-items: center; padding: 11px 14px 5px; color: var(--text-3); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+    .section-label button { margin-left: auto; color: var(--text-3); }
+    .task-list { overflow: auto; padding: 0 8px 10px; flex: 1; }
+    .task-group-title { padding: 8px 7px 4px; color: var(--text-3); font-size: 11px; }
+    .task-row { width: 100%; display: flex; align-items: flex-start; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 8px 8px; text-align: left; cursor: pointer; color: var(--text-2); }
+    .task-row:hover { background: var(--bg-hover); color: var(--text); }
+    .task-row.active { background: var(--bg-selected); color: var(--text); }
+    .task-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-top: 5px; flex: 0 0 auto; box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 14%, transparent); }
+    .task-dot.muted { background: var(--text-3); box-shadow: none; }
+    .task-copy { min-width: 0; flex: 1; }
+    .task-copy strong, .task-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .task-copy strong { font-size: 12px; font-weight: 600; }
+    .task-copy small { color: var(--text-3); margin-top: 3px; font-size: 10px; }
+    .task-badge { color: var(--accent); font-size: 10px; margin-top: 2px; }
+    .context-footer { padding: 9px; border-top: 1px solid var(--line); display: grid; gap: 2px; }
+    .footer-link { min-height: 30px; padding: 0 8px; border-radius: 6px; border: 0; background: transparent; color: var(--text-2); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 9px; }
+    .footer-link:hover { background: var(--bg-hover); color: var(--text); }
+
+    .main-panel { background: var(--bg); min-width: 0; display: flex; flex-direction: column; position: relative; }
+    .main-head { min-height: 59px; padding: 11px 17px 8px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+    .main-title { min-width: 0; flex: 1; }
+    .eyebrow { color: var(--text-3); font-size: 10px; display: flex; gap: 6px; align-items: center; margin-bottom: 3px; }
+    .eyebrow .online { color: var(--green); }
+    .main-title h1 { margin: 0; font-size: 16px; letter-spacing: -.02em; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .head-actions { display: flex; align-items: center; gap: 4px; }
+    .button { border: 1px solid var(--line); background: var(--bg-raised); min-height: 31px; border-radius: 7px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-2); white-space: nowrap; }
+    .button:hover { background: var(--bg-hover); color: var(--text); border-color: var(--text-3); }
+    .button.primary { border-color: transparent; background: var(--accent-strong); color: #fff; }
+    .button.primary:hover { background: var(--accent); }
+    .button.subtle { border-color: transparent; background: transparent; }
+    .surface-tabs { display: flex; align-items: center; gap: 2px; padding: 7px 13px 0; min-height: 40px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+    .surface-tab { border: 0; border-bottom: 2px solid transparent; background: transparent; height: 33px; padding: 0 10px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; color: var(--text-3); white-space: nowrap; }
+    .surface-tab:hover { color: var(--text); }
+    .surface-tab.active { border-bottom-color: var(--accent); color: var(--text); font-weight: 600; }
+    .surface-tab .tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .surface-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .surface-content { flex: 1; min-height: 0; overflow: auto; padding: 17px 19px 13px; }
+    .terminal-view { height: 100%; min-height: 280px; display: flex; flex-direction: column; gap: 13px; }
+    .terminal-toolbar { display: flex; align-items: center; gap: 8px; color: var(--text-3); font-size: 11px; }
+    .terminal-toolbar .toolbar-spacer { flex: 1; }
+    .terminal-window { flex: 1; min-height: 245px; border: 1px solid var(--line); border-radius: 9px; background: color-mix(in srgb, var(--bg-raised) 88%, #000 12%); overflow: auto; padding: 16px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 12px; line-height: 1.68; }
+    .terminal-line { white-space: pre-wrap; color: var(--text-2); }
+    .terminal-line .prompt { color: var(--green); }
+    .terminal-line .command { color: var(--text); }
+    .terminal-line .path { color: var(--accent); }
+    .terminal-line.output { color: var(--text-3); }
+    .terminal-line.success { color: var(--green); }
+    .terminal-cursor { display: inline-block; width: 7px; height: 14px; background: var(--accent); vertical-align: -2px; animation: blink 1.1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .editor-view, .query-view, .mail-view { max-width: 920px; margin: 0 auto; width: 100%; }
+    .editor-card, .query-card, .mail-card { border: 1px solid var(--line); border-radius: 9px; background: var(--bg-raised); overflow: hidden; }
+    .editor-toolbar, .query-toolbar, .mail-toolbar { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 7px; align-items: center; color: var(--text-2); }
+    .editor-toolbar span:first-child, .query-toolbar span:first-child, .mail-toolbar strong { color: var(--text); font-weight: 600; }
+    .code-lines { padding: 15px 17px 18px; counter-reset: line; font: 12px/1.8 "SFMono-Regular", Consolas, monospace; overflow: auto; }
+    .code-line { display: grid; grid-template-columns: 33px 1fr; white-space: pre; }
+    .code-line::before { counter-increment: line; content: counter(line); color: var(--text-3); text-align: right; padding-right: 13px; user-select: none; }
+    .tok-key { color: var(--purple); }.tok-string { color: var(--green); }.tok-fn { color: var(--accent); }.tok-comment { color: var(--text-3); }
+    .query-input { width: 100%; min-height: 100px; resize: vertical; border: 0; outline: 0; background: transparent; color: var(--text); padding: 16px; font: 12px/1.65 "SFMono-Regular", Consolas, monospace; }
+    .result-table { width: 100%; border-collapse: collapse; font-size: 11px; }.result-table th, .result-table td { text-align: left; border-top: 1px solid var(--line-soft); padding: 10px 13px; }.result-table th { color: var(--text-3); font-weight: 500; }.result-table td { color: var(--text-2); }
+    .mail-list { display: grid; }.mail-item { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; padding: 13px; align-items: center; border-top: 1px solid var(--line-soft); }.mail-item:first-child { border-top: 0; }.mail-avatar { width: 25px; height: 25px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: #5c83cf; font-size: 10px; }.mail-copy strong, .mail-copy small { display: block; }.mail-copy strong { color: var(--text); font-size: 12px; }.mail-copy small { color: var(--text-3); margin-top: 3px; }.mail-time { color: var(--text-3); font-size: 10px; }
+
+    .composer { border-top: 1px solid var(--line); padding: 10px 17px 12px; background: color-mix(in srgb, var(--bg) 86%, var(--bg-raised)); }
+    .composer-box { border: 1px solid var(--line); background: var(--bg-raised); border-radius: 10px; box-shadow: 0 5px 22px rgba(0, 0, 0, .1); overflow: hidden; }
+    .composer-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .composer-input { width: 100%; resize: none; min-height: 47px; max-height: 115px; border: 0; outline: 0; background: transparent; color: var(--text); padding: 12px 13px 7px; line-height: 1.45; }
+    .composer-input::placeholder { color: var(--text-3); }
+    .composer-bottom { display: flex; align-items: center; gap: 4px; padding: 0 8px 7px; color: var(--text-3); }
+    .composer-bottom .chip { border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; color: var(--text-2); font-size: 10px; background: var(--bg); }
+    .composer-bottom .composer-spacer { flex: 1; }.composer-hint { font-size: 10px; margin-right: 7px; }.send-button { width: 27px; height: 27px; border: 0; border-radius: 6px; display: grid; place-items: center; cursor: pointer; color: #fff; background: var(--accent-strong); }.send-button:disabled { opacity: .35; cursor: default; }.send-button:not(:disabled):hover { background: var(--accent); }
+    .context-note { color: var(--text-3); font-size: 10px; margin: 8px 1px 0; }
+
+    .inspector { background: var(--bg-raised); border-left: 1px solid var(--line); min-width: 0; display: flex; flex-direction: column; transition: width .18s ease, opacity .18s ease; }
+    .inspector.closed { display: none; }
+    .inspector-head { padding: 12px 13px 0; display: flex; align-items: center; gap: 8px; }.inspector-head strong { font-size: 12px; }.inspector-head .head-spacer { flex: 1; }.inspector-tabs { display: flex; padding: 9px 8px 0; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--line); }.inspector-tab { border: 0; border-bottom: 2px solid transparent; height: 31px; background: transparent; padding: 0 8px; color: var(--text-3); cursor: pointer; white-space: nowrap; font-size: 11px; }.inspector-tab:hover { color: var(--text); }.inspector-tab.active { color: var(--text); border-color: var(--accent); font-weight: 600; }.inspector-body { flex: 1; overflow: auto; padding: 12px; }.inspector-section { margin-bottom: 19px; }.inspector-section h3 { margin: 0 0 8px; color: var(--text-3); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }.activity-item { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }.activity-icon { width: 21px; height: 21px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 10px; }.activity-copy strong, .activity-copy small { display: block; }.activity-copy strong { font-size: 11px; color: var(--text-2); font-weight: 550; }.activity-copy small { color: var(--text-3); font-size: 10px; margin-top: 2px; }.file-row, .change-row, .agent-row { display: flex; align-items: center; gap: 8px; padding: 7px 6px; border-radius: 6px; color: var(--text-2); }.file-row:hover, .change-row:hover, .agent-row:hover { background: var(--bg-hover); }.file-row span:nth-child(2), .change-row span:nth-child(2), .agent-copy { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }.file-kind { color: var(--accent); font: 10px monospace; width: 15px; text-align: center; }.file-meta, .change-meta { font-size: 10px; color: var(--text-3); }.diff-add { color: var(--green); }.diff-remove { color: var(--red); }.agent-status { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }.agent-status.idle { background: var(--text-3); }.agent-copy strong, .agent-copy small { display: block; }.agent-copy strong { font-size: 11px; color: var(--text-2); }.agent-copy small { color: var(--text-3); font-size: 10px; margin-top: 2px; }
+    .inspector-empty { min-height: 190px; display: grid; place-items: center; text-align: center; color: var(--text-3); padding: 24px; }.inspector-empty .empty-icon { font-size: 27px; color: var(--accent); margin-bottom: 7px; }.inspector-empty p { margin: 0; font-size: 11px; line-height: 1.6; }
+
+    .statusbar { border-top: 1px solid var(--line); background: var(--bg-raised); display: flex; align-items: center; gap: 14px; padding: 0 13px; color: var(--text-3); font-size: 10px; white-space: nowrap; overflow: hidden; }.status-item { display: inline-flex; align-items: center; gap: 5px; }.status-spacer { flex: 1; }.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }.status-link { border: 0; background: transparent; color: var(--text-3); cursor: pointer; padding: 2px 3px; border-radius: 4px; }.status-link:hover { background: var(--bg-hover); color: var(--text); }
+
+    .modal-layer { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(4, 7, 13, .62); backdrop-filter: blur(5px); padding: 20px; }.modal-layer.hidden { display: none; }.modal { width: min(530px, 100%); max-height: min(700px, calc(100vh - 40px)); overflow: auto; border: 1px solid var(--line); border-radius: 13px; background: var(--bg-elevated); box-shadow: var(--shadow); }.modal.small { width: min(430px, 100%); }.modal-header { display: flex; align-items: flex-start; gap: 12px; padding: 18px 19px 13px; }.modal-header > div { flex: 1; }.modal-header h2 { margin: 0; font-size: 16px; }.modal-header p { color: var(--text-3); margin: 5px 0 0; font-size: 11px; line-height: 1.5; }.modal-body { padding: 0 19px 18px; }.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 19px 17px; border-top: 1px solid var(--line); }.field { display: grid; gap: 6px; margin-top: 13px; }.field label { color: var(--text-2); font-size: 11px; }.field input, .field select { width: 100%; height: 35px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--text); padding: 0 10px; outline: none; }.field input:focus, .field select:focus { border-color: var(--accent); }.modal-close { width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--text-3); cursor: pointer; }.modal-close:hover { background: var(--bg-hover); color: var(--text); }
+    .palette { width: min(620px, 100%); margin-top: -13vh; }.palette-search { display: flex; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); padding: 13px 16px; }.palette-search input { border: 0; outline: 0; background: transparent; color: var(--text); flex: 1; font-size: 14px; }.palette-list { padding: 7px; max-height: 410px; overflow: auto; }.palette-group { color: var(--text-3); font-size: 10px; font-weight: 700; padding: 8px 8px 5px; text-transform: uppercase; letter-spacing: .06em; }.palette-item { width: 100%; display: flex; gap: 10px; align-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--text-2); padding: 9px 10px; cursor: pointer; text-align: left; }.palette-item:hover, .palette-item.selected { color: var(--text); background: var(--bg-selected); }.palette-item .palette-icon { width: 23px; color: var(--accent); text-align: center; }.palette-item .palette-copy { flex: 1; }.palette-item small { color: var(--text-3); }.palette-empty { color: var(--text-3); padding: 24px; text-align: center; }
+    .toast-stack { position: fixed; right: 17px; bottom: 44px; z-index: 30; display: grid; gap: 8px; pointer-events: none; }.toast { min-width: 230px; max-width: 330px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; background: var(--bg-elevated); color: var(--text-2); padding: 10px 12px; box-shadow: var(--shadow); animation: toast-in .2s ease-out; font-size: 11px; }.toast.success { border-left-color: var(--green); }.toast.warn { border-left-color: var(--yellow); } @keyframes toast-in { from { transform: translateY(7px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .scrim { display: none; }
+
+    @media (max-width: 1100px) { :root { --sidebar: 238px; --inspector: 292px; }.brand { min-width: 120px; }.brand small, .workspace-crumb { display: none; }.top-search { width: min(250px, 32vw); } }
+    @media (max-width: 860px) { :root { --inspector: 300px; }.shell { grid-template-columns: var(--sidebar) minmax(0, 1fr); }.inspector { position: absolute; z-index: 4; right: 0; top: 0; bottom: 0; width: var(--inspector); box-shadow: -16px 0 35px rgba(0, 0, 0, .22); }.inspector.closed { display: none; }.scrim { display: block; position: absolute; inset: 0; z-index: 3; background: rgba(0, 0, 0, .32); }.scrim.hidden { display: none; }.head-actions .button:not(.primary) { display: none; }.top-search { min-width: 130px; } }
+    @media (max-width: 650px) { :root { --sidebar: 0px; --topbar: 50px; }.topbar { gap: 7px; padding: 0 9px; }.brand { min-width: auto; }.brand small { display: none; }.context-panel { position: absolute; z-index: 10; left: 0; top: 0; bottom: 0; width: 270px; box-shadow: 15px 0 35px rgba(0, 0, 0, .24); transform: translateX(-101%); transition: transform .18s ease; }.context-panel.open { transform: translateX(0); }.menu-toggle { display: inline-flex !important; }.top-search { flex: 1; min-width: 0; width: auto; }.top-search .search-copy { display: none; }.main-head { padding: 9px 11px 7px; }.main-title h1 { font-size: 14px; }.head-actions { gap: 0; }.surface-content { padding: 12px 11px 10px; }.composer { padding: 8px 10px 10px; }.composer-hint { display: none; }.statusbar { gap: 8px; padding: 0 8px; }.statusbar .optional-status { display: none; }.inspector { width: min(300px, calc(100vw - 24px)); }.surface-tab { padding: 0 8px; } }
+    @media (max-width: 650px) { .shell { grid-template-columns: minmax(0, 1fr); } }
+    @media (min-width: 651px) { .menu-toggle { display: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <button class="icon-button menu-toggle" id="contextToggle" aria-label="打开工作区导航" title="打开工作区导航">☰</button>
+      <div class="brand" aria-label="Taomni 工作台">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 6.2h14M12 6.2v12.1M8.1 18.3h7.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+        <span>taomni</span><small>WORKSPACE</small>
+      </div>
+      <div class="workspace-crumb"><span>工作区</span><span class="crumb-sep">/</span><strong id="crumbName">支付服务</strong></div>
+      <div class="topbar-spacer"></div>
+      <button class="top-search" id="commandButton" aria-label="打开命令中心" title="打开命令中心（Ctrl/Cmd+K）"><span aria-hidden="true">⌕</span><span class="search-copy">搜索工作区、任务和命令</span><kbd>⌘ K</kbd></button>
+      <button class="icon-button" id="themeButton" aria-label="切换主题" title="切换主题">☼</button>
+      <button class="icon-button" id="densityButton" aria-label="切换紧凑密度" title="切换紧凑密度">≡</button>
+      <button class="icon-button" id="notificationButton" aria-label="查看通知" title="查看通知">♢</button>
+      <button class="avatar" id="accountButton" aria-label="打开账户菜单" title="账户：Zhang Hao">ZH</button>
+    </header>
+
+    <div class="shell">
+      <aside class="context-panel" id="contextPanel" aria-label="工作区导航">
+        <div class="context-head">
+          <button class="workspace-switcher" id="workspaceButton" aria-label="切换工作区">
+            <span class="workspace-icon">付</span><span class="switcher-copy"><strong>支付服务</strong><small>~/projects/payment-api</small></span><span aria-hidden="true">⌄</span>
+          </button>
+        </div>
+        <nav class="context-nav" aria-label="工作区视图">
+          <button class="nav-item active" data-view="home"><span>⌂</span><span>概览</span></button>
+          <button class="nav-item" data-view="workspaces"><span>▦</span><span>工作区</span><span class="nav-count">3</span></button>
+          <button class="nav-item" data-view="sessions"><span>◷</span><span>会话</span><span class="nav-count">8</span></button>
+          <button class="nav-item" data-view="tasks"><span>✓</span><span>任务</span><span class="nav-count">4</span></button>
+        </nav>
+        <div class="section-label"><span>最近任务</span><button class="plain-button" id="newTaskSmall" aria-label="创建任务" title="创建任务">＋</button></div>
+        <div class="task-list" id="taskList">
+          <div class="task-group-title">今天</div>
+          <button class="task-row active" data-task="payment-api"><span class="task-dot"></span><span class="task-copy"><strong>支付服务 · 修复退款超时</strong><small>终端 · 2 分钟前</small></span><span class="task-badge">●</span></button>
+          <button class="task-row" data-task="checkout"><span class="task-dot"></span><span class="task-copy"><strong>Checkout · 新增税费查询</strong><small>编辑器 · 36 分钟前</small></span></button>
+          <div class="task-group-title">昨天</div>
+          <button class="task-row" data-task="infra"><span class="task-dot muted"></span><span class="task-copy"><strong>基础设施 · 升级 Redis</strong><small>查询 · 昨天</small></span></button>
+          <button class="task-row" data-task="mail"><span class="task-dot muted"></span><span class="task-copy"><strong>供应商沟通</strong><small>邮件 · 昨天</small></span></button>
+        </div>
+        <div class="context-footer">
+          <button class="footer-link" id="connectFooter"><span>＋</span><span>连接新资源</span></button>
+          <button class="footer-link" id="settingsButton"><span>⚙</span><span>设置</span></button>
+        </div>
+      </aside>
+
+      <main class="main-panel" aria-label="主工作面">
+        <div class="main-head">
+          <div class="main-title"><div class="eyebrow"><span class="online">● 已连接</span><span>SSH · payment-prod</span></div><h1 id="taskTitle">支付服务 · 修复退款超时</h1></div>
+          <div class="head-actions">
+            <button class="button" id="connectButton"><span>↗</span><span>连接</span></button>
+            <button class="button" id="newSurfaceButton"><span>＋</span><span>打开工作面</span></button>
+            <button class="button primary" id="inspectorButton"><span>▤</span><span id="inspectorButtonText">检查器</span></button>
+            <button class="icon-button" id="moreButton" aria-label="更多任务操作" title="更多任务操作">•••</button>
+          </div>
+        </div>
+        <div class="surface-tabs" role="tablist" aria-label="当前任务工作面">
+          <button class="surface-tab active" data-surface="terminal" role="tab" aria-selected="true"><span class="tab-dot"></span>终端</button>
+          <button class="surface-tab" data-surface="editor" role="tab" aria-selected="false">编辑器</button>
+          <button class="surface-tab" data-surface="query" role="tab" aria-selected="false">查询</button>
+          <button class="surface-tab" data-surface="mail" role="tab" aria-selected="false">邮件</button>
+          <button class="icon-button" id="addSurfaceButton" aria-label="添加工作面" title="添加工作面">＋</button>
+        </div>
+        <div class="surface-body">
+          <div class="surface-content" id="surfaceContent"></div>
+          <form class="composer" id="composerForm">
+            <div class="composer-box"><textarea class="composer-input" id="composerInput" rows="1" placeholder="询问 Tao：解释当前错误、修改文件或运行命令…" aria-label="向 Tao 发送消息"></textarea><div class="composer-bottom"><span class="chip">payment-api</span><span class="chip">当前任务</span><button type="button" class="plain-button" id="attachButton" aria-label="添加文件" title="添加文件">⌕</button><div class="composer-spacer"></div><span class="composer-hint">Enter 发送 · Shift+Enter 换行</span><button class="send-button" id="sendButton" type="submit" aria-label="发送消息" title="发送消息" disabled>↑</button></div></div><div class="context-note">Tao 将使用当前工作区、已打开文件和连接状态回答。可在发送前调整权限范围。</div>
+          </form>
+        </div>
+      </main>
+
+      <aside class="inspector" id="inspector" aria-label="任务检查器">
+        <div class="inspector-head"><strong>当前任务</strong><span class="head-spacer"></span><button class="icon-button" id="inspectorClose" aria-label="关闭检查器" title="关闭检查器">×</button></div>
+        <div class="inspector-tabs" role="tablist" aria-label="检查器面板">
+          <button class="inspector-tab active" data-inspector="activity" role="tab" aria-selected="true">活动</button>
+          <button class="inspector-tab" data-inspector="files" role="tab" aria-selected="false">文件</button>
+          <button class="inspector-tab" data-inspector="changes" role="tab" aria-selected="false">变更 <small>2</small></button>
+          <button class="inspector-tab" data-inspector="agents" role="tab" aria-selected="false">Agents</button>
+        </div>
+        <div class="inspector-body" id="inspectorBody"></div>
+      </aside>
+      <div class="scrim hidden" id="scrim"></div>
+    </div>
+
+    <footer class="statusbar"><span class="status-item"><span class="status-dot"></span> payment-prod · SSH</span><span class="status-item optional-status">延迟 42 ms</span><span class="status-item optional-status">Tao 就绪</span><span class="status-spacer"></span><button class="status-link" id="privacyButton">隐私模式：关</button><span class="status-item">v0.9.0 prototype</span></footer>
+  </div>
+
+  <div class="modal-layer hidden" id="modalLayer" aria-hidden="true"><section class="modal" id="modalContent" role="dialog" aria-modal="true"></section></div>
+  <div class="modal-layer hidden" id="paletteLayer" aria-hidden="true"><section class="modal palette" role="dialog" aria-modal="true" aria-label="命令中心"><div class="palette-search"><span aria-hidden="true">⌕</span><input id="paletteInput" type="search" placeholder="搜索命令或任务…" autocomplete="off" aria-label="搜索命令或任务" /><kbd>Esc</kbd></div><div class="palette-list" id="paletteList"></div></section></div>
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      "use strict";
+      const root = document.documentElement;
+      const $ = (selector, scope = document) => scope.querySelector(selector);
+      const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
+      const state = {
+        surface: "terminal",
+        inspector: "activity",
+        inspectorOpen: window.innerWidth > 650,
+        activeTask: "payment-api",
+        view: "home",
+        tasks: 4,
+        theme: "dark",
+        compact: false,
+        messages: []
+      };
+
+      const surfaceMarkup = {
+        terminal: () => `<div class="terminal-view"><div class="terminal-toolbar"><span>payment-prod</span><span>·</span><span>zsh</span><span class="toolbar-spacer"></span><button class="plain-button" data-action="split-terminal">⊞ Split</button><button class="plain-button" data-action="clear-terminal">清屏</button></div><div class="terminal-window" id="terminalWindow"><div class="terminal-line"><span class="prompt">➜</span> <span class="path">~/projects/payment-api</span> <span class="command">git status --short</span></div><div class="terminal-line output"> M services/refund/timeout.ts</div><div class="terminal-line output">?? tests/refund/timeout.spec.ts</div><div class="terminal-line"><span class="prompt">➜</span> <span class="path">~/projects/payment-api</span> <span class="command">pnpm test refund -- --runInBand</span></div><div class="terminal-line output"> RUNS  tests/refund/timeout.spec.ts</div><div class="terminal-line output"> ✓ retries on upstream timeout (128 ms)</div><div class="terminal-line success"> Tests: 1 passed, 1 total</div><div class="terminal-line"><span class="prompt">➜</span> <span class="path">~/projects/payment-api</span> <span class="terminal-cursor"></span></div></div></div>`,
+        editor: () => `<div class="editor-view"><div class="editor-card"><div class="editor-toolbar"><span>services/refund/timeout.ts</span><span class="toolbar-spacer"></span><button class="plain-button" data-action="save-file">保存</button><button class="plain-button" data-action="open-file">在窗口中打开</button></div><div class="code-lines"><div class="code-line"><span><span class="tok-key">export async function</span> <span class="tok-fn">withTimeout</span>(request, options) {</span></div><div class="code-line"><span>  <span class="tok-key">const</span> timeout = options.timeout ?? <span class="tok-string">8000</span>;</span></div><div class="code-line"><span>  <span class="tok-key">const</span> controller = <span class="tok-key">new</span> AbortController();</span></div><div class="code-line"><span>  <span class="tok-key">const</span> timer = setTimeout(() =&gt; controller.abort(), timeout);</span></div><div class="code-line"><span>  <span class="tok-key">try</span> {</span></div><div class="code-line"><span>    <span class="tok-key">return await</span> request({ signal: controller.signal });</span></div><div class="code-line"><span>  } <span class="tok-key">finally</span> {</span></div><div class="code-line"><span>    clearTimeout(timer);</span></div><div class="code-line"><span>  }</span></div><div class="code-line"><span>}</span></div><div class="code-line"><span class="tok-comment">// TODO: preserve upstream error cause for retry policy</span></div></div></div></div>`,
+        query: () => `<div class="query-view"><div class="query-card"><div class="query-toolbar"><span>PostgreSQL · payment-prod</span><span class="toolbar-spacer"></span><button class="button primary" data-action="run-query">运行查询</button></div><textarea class="query-input" aria-label="SQL 查询">select status, count(*) as total
+from refunds
+where created_at &gt; now() - interval '24 hours'
+group by status
+order by total desc;</textarea><table class="result-table"><thead><tr><th>status</th><th>total</th><th>last_updated</th></tr></thead><tbody><tr><td>completed</td><td>12,480</td><td>刚刚</td></tr><tr><td>pending</td><td>182</td><td>刚刚</td></tr><tr><td>failed</td><td>29</td><td>刚刚</td></tr></tbody></table></div></div>`,
+        mail: () => `<div class="mail-view"><div class="mail-card"><div class="mail-toolbar"><strong>供应商沟通</strong><span class="toolbar-spacer"></span><button class="plain-button" data-action="compose-mail">写邮件</button></div><div class="mail-list"><div class="mail-item"><span class="mail-avatar">L</span><span class="mail-copy"><strong>Lin · Re: refund webhook latency</strong><small>我们已在东京区域观察到延迟回落，附上本次 trace…</small></span><span class="mail-time">10:42</span></div><div class="mail-item"><span class="mail-avatar" style="background:#9d6ac8">S</span><span class="mail-copy"><strong>Stripe support · Case #38421</strong><small>Could you share the request IDs for the affected refunds?</small></span><span class="mail-time">昨天</span></div><div class="mail-item"><span class="mail-avatar" style="background:#d47b5e">M</span><span class="mail-copy"><strong>财务团队 · 本周退款异常汇总</strong><small>已将异常订单清单同步到支付工作区。</small></span><span class="mail-time">周一</span></div></div></div></div>`
+      };
+
+      function renderSurface() {
+        $("#surfaceContent").innerHTML = surfaceMarkup[state.surface]();
+        $$(".surface-tab").forEach(tab => {
+          const active = tab.dataset.surface === state.surface;
+          tab.classList.toggle("active", active);
+          tab.setAttribute("aria-selected", String(active));
+        });
+      }
+
+      const inspectorMarkup = {
+        activity: () => `<div class="inspector-section"><h3>最近活动</h3><div class="activity-item"><span class="activity-icon">✓</span><span class="activity-copy"><strong>测试通过：refund timeout</strong><small>刚刚 · 本地终端</small></span></div><div class="activity-item"><span class="activity-icon">✎</span><span class="activity-copy"><strong>修改 timeout.ts</strong><small>2 分钟前 · 你</small></span></div><div class="activity-item"><span class="activity-icon">↗</span><span class="activity-copy"><strong>连接 payment-prod</strong><small>4 分钟前 · SSH</small></span></div></div><div class="inspector-section"><h3>任务上下文</h3><div class="file-row"><span class="file-kind">⌁</span><span>payment-api</span><span class="file-meta">main</span></div><div class="file-row"><span class="file-kind">◈</span><span>2 个待处理变更</span><span class="file-meta">未提交</span></div></div>`,
+        files: () => `<div class="inspector-section"><h3>已打开文件</h3><div class="file-row"><span class="file-kind">TS</span><span>services/refund/timeout.ts</span><span class="file-meta">M</span></div><div class="file-row"><span class="file-kind">TS</span><span>tests/refund/timeout.spec.ts</span><span class="file-meta">U</span></div><div class="file-row"><span class="file-kind">JSON</span><span>package.json</span><span class="file-meta">—</span></div></div><div class="inspector-section"><h3>工作区</h3><div class="file-row"><span class="file-kind">⌂</span><span>~/projects/payment-api</span><span class="file-meta">本地</span></div><div class="file-row"><span class="file-kind">↗</span><span>payment-prod</span><span class="file-meta">SSH</span></div></div>`,
+        changes: () => `<div class="inspector-section"><h3>未提交变更 <span class="file-meta">2 个文件</span></h3><div class="change-row"><span class="file-kind">M</span><span>services/refund/timeout.ts</span><span class="change-meta"><span class="diff-add">+18</span> <span class="diff-remove">−4</span></span></div><div class="change-row"><span class="file-kind">U</span><span>tests/refund/timeout.spec.ts</span><span class="change-meta"><span class="diff-add">+42</span></span></div></div><div class="inspector-section"><button class="button primary" style="width:100%;justify-content:center" data-action="review-changes">查看变更</button></div>`,
+        agents: () => `<div class="inspector-section"><h3>当前 Agents</h3><div class="agent-row"><span class="agent-status"></span><span class="agent-copy"><strong>Tao · 主线程</strong><small>等待你的下一步指令</small></span><span class="file-meta">就绪</span></div><div class="agent-row"><span class="agent-status idle"></span><span class="agent-copy"><strong>测试助手</strong><small>保留上次测试上下文</small></span><span class="file-meta">空闲</span></div></div><div class="inspector-empty"><div><div class="empty-icon">✦</div><p>从当前任务派生一个 Agent<br/>并行处理独立工作。</p><button class="button" data-action="spawn-agent" style="margin-top:12px">＋ 派生 Agent</button></div></div>`
+      };
+
+      function renderInspector() {
+        $("#inspectorBody").innerHTML = inspectorMarkup[state.inspector]();
+        $$(".inspector-tab").forEach(tab => {
+          const active = tab.dataset.inspector === state.inspector;
+          tab.classList.toggle("active", active); tab.setAttribute("aria-selected", String(active));
+        });
+        $("#inspector").classList.toggle("closed", !state.inspectorOpen);
+        $("#inspectorButtonText").textContent = state.inspectorOpen ? "隐藏检查器" : "检查器";
+        $("#scrim").classList.toggle("hidden", !state.inspectorOpen || window.innerWidth > 860);
+      }
+
+      function toast(message, kind = "") {
+        const item = document.createElement("div"); item.className = `toast ${kind}`; item.textContent = message; $("#toastStack").append(item);
+        setTimeout(() => item.remove(), 3000);
+      }
+
+      function openModal(content, small = false) {
+        const modal = $("#modalContent"); modal.className = `modal${small ? " small" : ""}`; modal.innerHTML = content; $("#modalLayer").classList.remove("hidden"); $("#modalLayer").setAttribute("aria-hidden", "false");
+        const first = modal.querySelector("input, select, textarea, button"); if (first) setTimeout(() => first.focus(), 20);
+      }
+      function closeModal() { $("#modalLayer").classList.add("hidden"); $("#modalLayer").setAttribute("aria-hidden", "true"); }
+
+      function openConnectModal() {
+        openModal(`<div class="modal-header"><div><h2>连接新资源</h2><p>把服务器、数据库或文件服务加入当前工作区。</p></div><button class="modal-close" data-close-modal aria-label="关闭">×</button></div><div class="modal-body"><div class="field"><label for="connectionType">资源类型</label><select id="connectionType"><option>SSH 服务器</option><option>SFTP 文件服务</option><option>PostgreSQL 数据库</option><option>本地目录</option></select></div><div class="field"><label for="connectionName">显示名称</label><input id="connectionName" value="payment-staging" /></div><div class="field"><label for="connectionAddress">地址</label><input id="connectionAddress" placeholder="user@host:22" value="deploy@staging.internal:22" /></div></div><div class="modal-footer"><button class="button" data-close-modal>取消</button><button class="button primary" id="saveConnection">保存并连接</button></div>`);
+      }
+
+      function openNewTaskModal() {
+        openModal(`<div class="modal-header"><div><h2>创建任务</h2><p>任务会保留终端、文件、变更和 Tao 对话上下文。</p></div><button class="modal-close" data-close-modal aria-label="关闭">×</button></div><div class="modal-body"><div class="field"><label for="taskName">任务名称</label><input id="taskName" placeholder="例如：修复登录回调超时" /></div><div class="field"><label for="taskWorkspace">工作区</label><select id="taskWorkspace"><option>支付服务 · ~/projects/payment-api</option><option>基础设施 · ~/projects/infra</option><option>个人工具 · ~/projects/tools</option></select></div><div class="field"><label for="taskSurface">首个工作面</label><select id="taskSurface"><option value="terminal">终端</option><option value="editor">编辑器</option><option value="query">查询</option></select></div></div><div class="modal-footer"><button class="button" data-close-modal>取消</button><button class="button primary" id="createTask">创建任务</button></div>`);
+      }
+
+      function createTask() {
+        const input = $("#taskName"); const name = input && input.value.trim(); if (!name) { input.focus(); toast("请输入任务名称", "warn"); return; }
+        const row = document.createElement("button"); row.className = "task-row active"; row.dataset.task = `new-${Date.now()}`; row.innerHTML = `<span class="task-dot"></span><span class="task-copy"><strong></strong><small>终端 · 刚刚创建</small></span><span class="task-badge">●</span>`; $(".task-list").prepend(row); $$(".task-row").forEach(r => r.classList.remove("active")); row.classList.add("active"); row.querySelector("strong").textContent = name; state.activeTask = row.dataset.task; state.tasks += 1; $("#taskTitle").textContent = name; closeModal(); toast(`已创建任务「${name}」`, "success"); row.addEventListener("click", () => selectTask(row));
+      }
+
+      function selectTask(row) { $$(".task-row").forEach(r => r.classList.remove("active")); row.classList.add("active"); state.activeTask = row.dataset.task; $("#taskTitle").textContent = row.querySelector("strong").textContent; $("#crumbName").textContent = row.dataset.task === "mail" ? "支付服务" : "支付服务"; toast(`已切换到「${row.querySelector("strong").textContent}」`); renderInspector(); }
+
+      const commands = [
+        { icon: "＋", title: "创建新任务", hint: "在当前工作区开始新的工作", action: "new-task", group: "工作区" },
+        { icon: "↗", title: "连接新资源", hint: "SSH、SFTP、数据库或本地目录", action: "connect", group: "工作区" },
+        { icon: "▤", title: "切换检查器", hint: "显示或隐藏当前任务上下文", action: "toggle-inspector", group: "视图" },
+        { icon: "⌘", title: "打开终端工作面", hint: "在当前任务中切换到终端", action: "terminal", group: "视图" },
+        { icon: "☼", title: "切换主题", hint: "在深色和浅色主题之间切换", action: "theme", group: "偏好" },
+        { icon: "≡", title: "切换紧凑密度", hint: "为小屏或长列表压缩间距", action: "density", group: "偏好" }
+      ];
+      function openPalette() { $("#paletteLayer").classList.remove("hidden"); $("#paletteLayer").setAttribute("aria-hidden", "false"); const input = $("#paletteInput"); input.value = ""; renderPalette(); setTimeout(() => input.focus(), 20); }
+      function closePalette() { $("#paletteLayer").classList.add("hidden"); $("#paletteLayer").setAttribute("aria-hidden", "true"); }
+      function renderPalette() { const query = $("#paletteInput").value.toLowerCase().trim(); const filtered = commands.filter(c => `${c.title} ${c.hint}`.toLowerCase().includes(query)); const list = $("#paletteList"); if (!filtered.length) { list.innerHTML = `<div class="palette-empty">没有找到匹配的命令</div>`; return; } let html = ""; let group = ""; filtered.forEach((c, i) => { if (group !== c.group) { group = c.group; html += `<div class="palette-group">${group}</div>`; } html += `<button class="palette-item${i === 0 ? " selected" : ""}" data-command="${c.action}"><span class="palette-icon">${c.icon}</span><span class="palette-copy"><strong>${c.title}</strong><br><small>${c.hint}</small></span></button>`; }); list.innerHTML = html; }
+      function executeCommand(action) { closePalette(); if (action === "new-task") openNewTaskModal(); if (action === "connect") openConnectModal(); if (action === "toggle-inspector") { state.inspectorOpen = !state.inspectorOpen; renderInspector(); } if (action === "terminal") { state.surface = "terminal"; renderSurface(); } if (action === "theme") toggleTheme(); if (action === "density") toggleDensity(); }
+
+      function toggleTheme() { state.theme = state.theme === "dark" ? "light" : "dark"; root.dataset.theme = state.theme; toast(`${state.theme === "dark" ? "深色" : "浅色"}主题已启用`, "success"); }
+      function toggleDensity() { state.compact = !state.compact; root.classList.toggle("compact", state.compact); toast(state.compact ? "已切换为紧凑密度" : "已恢复舒适密度"); }
+      function sendComposer() { const input = $("#composerInput"); const message = input.value.trim(); if (!message) return; state.messages.push(message); input.value = ""; $("#sendButton").disabled = true; const terminal = $("#terminalWindow"); if (terminal) { const line = document.createElement("div"); line.className = "terminal-line"; line.innerHTML = `<span class="prompt">Tao</span> ${message}`; terminal.append(line); terminal.scrollTop = terminal.scrollHeight; } toast("Tao 已收到请求，正在处理…", "success"); setTimeout(() => toast("已将请求加入当前任务活动", "success"), 900); }
+
+      $("#surfaceContent").addEventListener("click", event => { const action = event.target.closest("[data-action]")?.dataset.action; if (!action) return; if (action === "clear-terminal") { $("#terminalWindow").innerHTML = `<div class="terminal-line output">终端已清屏</div>`; toast("终端已清屏"); } if (action === "split-terminal") toast("原型：已准备拆分终端布局"); if (action === "save-file") toast("已保存 timeout.ts", "success"); if (action === "open-file") toast("原型：将在独立窗口打开文件"); if (action === "run-query") toast("查询完成 · 3 行结果", "success"); if (action === "compose-mail") toast("原型：打开邮件编辑器"); });
+      $("#inspectorBody").addEventListener("click", event => { const action = event.target.closest("[data-action]")?.dataset.action; if (action === "review-changes") { state.inspector = "changes"; renderInspector(); toast("已打开变更审阅"); } if (action === "spawn-agent") toast("已创建测试助手 Agent", "success"); });
+      $$(".surface-tab").forEach(tab => tab.addEventListener("click", () => { state.surface = tab.dataset.surface; renderSurface(); }));
+      $$(".inspector-tab").forEach(tab => tab.addEventListener("click", () => { state.inspector = tab.dataset.inspector; renderInspector(); }));
+      $$(".task-row").forEach(row => row.addEventListener("click", () => selectTask(row)));
+      $$(".nav-item").forEach(item => item.addEventListener("click", () => { $$(".nav-item").forEach(n => n.classList.remove("active")); item.classList.add("active"); state.view = item.dataset.view; if (state.view === "tasks") toast("任务视图：按状态管理全部任务"); if (state.view === "sessions") toast("会话视图：查看连接和恢复的工作面"); if (state.view === "workspaces") toast("工作区视图：切换项目上下文"); }));
+      $("#inspectorButton").addEventListener("click", () => { state.inspectorOpen = !state.inspectorOpen; renderInspector(); }); $("#inspectorClose").addEventListener("click", () => { state.inspectorOpen = false; renderInspector(); }); $("#scrim").addEventListener("click", () => { state.inspectorOpen = false; renderInspector(); });
+      $("#commandButton").addEventListener("click", openPalette); $("#themeButton").addEventListener("click", toggleTheme); $("#densityButton").addEventListener("click", toggleDensity); $("#connectButton").addEventListener("click", openConnectModal); $("#connectFooter").addEventListener("click", openConnectModal); $("#newTaskSmall").addEventListener("click", openNewTaskModal); $("#newSurfaceButton").addEventListener("click", () => { state.surface = "editor"; renderSurface(); toast("已打开编辑器工作面", "success"); }); $("#addSurfaceButton").addEventListener("click", () => { state.surface = state.surface === "terminal" ? "editor" : "terminal"; renderSurface(); toast(`已切换到${state.surface === "editor" ? "编辑器" : "终端"}`); }); $("#settingsButton").addEventListener("click", () => toast("设置将在独立面板中打开")); $("#notificationButton").addEventListener("click", () => toast("没有新的通知")); $("#accountButton").addEventListener("click", () => toast("账户菜单：Zhang Hao")); $("#workspaceButton").addEventListener("click", () => toast("工作区切换器：支付服务、基础设施、个人工具")); $("#moreButton").addEventListener("click", () => toast("更多操作：重命名、复制任务、归档")); $("#attachButton").addEventListener("click", () => toast("选择工作区文件作为上下文")); $("#privacyButton").addEventListener("click", event => { event.currentTarget.textContent = event.currentTarget.textContent.includes("关") ? "隐私模式：开" : "隐私模式：关"; toast(event.currentTarget.textContent); });
+      $("#composerInput").addEventListener("input", event => { $("#sendButton").disabled = !event.target.value.trim(); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 115)}px`; }); $("#composerInput").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendComposer(); } }); $("#composerForm").addEventListener("submit", event => { event.preventDefault(); sendComposer(); });
+      $("#modalLayer").addEventListener("click", event => { if (event.target === event.currentTarget || event.target.closest("[data-close-modal]")) closeModal(); }); $("#modalContent").addEventListener("click", event => { if (event.target.id === "createTask") createTask(); if (event.target.id === "saveConnection") { closeModal(); toast("已保存连接并打开 SSH 工作面", "success"); } });
+      $("#paletteInput").addEventListener("input", renderPalette); $("#paletteList").addEventListener("click", event => { const item = event.target.closest("[data-command]"); if (item) executeCommand(item.dataset.command); }); $("#paletteLayer").addEventListener("click", event => { if (event.target === event.currentTarget) closePalette(); });
+      $("#contextToggle").addEventListener("click", () => { $("#contextPanel").classList.toggle("open"); $("#scrim").classList.toggle("hidden", $("#contextPanel").classList.contains("open") ? false : !state.inspectorOpen || window.innerWidth > 860); });
+      document.addEventListener("keydown", event => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openPalette(); } if (event.key === "Escape") { if (!$("#paletteLayer").classList.contains("hidden")) closePalette(); else if (!$("#modalLayer").classList.contains("hidden")) closeModal(); else { $("#contextPanel").classList.remove("open"); if (window.innerWidth <= 860) { state.inspectorOpen = false; renderInspector(); } } } if (event.key === "ArrowDown" && !$("#paletteLayer").classList.contains("hidden")) { const selected = $(".palette-item.selected"); const next = selected?.nextElementSibling?.matches(".palette-item") ? selected.nextElementSibling : $(".palette-item"); if (selected) selected.classList.remove("selected"); next?.classList.add("selected"); next?.scrollIntoView({ block: "nearest" }); } if (event.key === "Enter" && !$("#paletteLayer").classList.contains("hidden") && document.activeElement === $("#paletteInput")) { const selected = $(".palette-item.selected") || $(".palette-item"); if (selected) executeCommand(selected.dataset.command); } });
+      window.addEventListener("resize", renderInspector);
+      renderSurface(); renderInspector();
+    })();
+  </script>
+</body>
+</html>
