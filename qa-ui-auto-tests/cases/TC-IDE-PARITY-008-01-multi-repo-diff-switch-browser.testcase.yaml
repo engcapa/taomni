@@ -82,7 +82,9 @@ steps:
       equals: ${fixture.parity008_root}/repo-b
   - screenshot: tc-ide-parity-008-01-repo-b.png
   - parity008_trace: {writes: 0, pending: 0, last_pair_repo: '${fixture.parity008_root}/repo-b'}
-  - click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+  - click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
   - assert_items:
       selector: '[data-testid="code-workspace-editor"] .cm-line'

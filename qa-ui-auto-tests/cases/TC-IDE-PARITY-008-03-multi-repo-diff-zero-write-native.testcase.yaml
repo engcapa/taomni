@@ -85,7 +85,9 @@ steps:
   - assert_count:
       selector: '[data-testid="workspace-git-manager"]'
       equal: 0
-  - click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+  - click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
   - assert_items:
       selector: '[data-testid="code-workspace-editor"] .cm-line'
       equals: ['repo-a WORKTREE', 'shared line', 'edit-kept']

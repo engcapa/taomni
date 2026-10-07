@@ -215,7 +215,9 @@ steps:
     selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
     equals: Settings
 - screenshot: main-rail-terminal-footer.png
-- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
 - assert_count:
     selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]'
     equal: 0

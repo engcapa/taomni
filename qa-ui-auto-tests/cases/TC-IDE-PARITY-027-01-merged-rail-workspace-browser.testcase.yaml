@@ -82,7 +82,9 @@ steps:
 - click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_visible: '[data-testid="session-tree"]'
 - click: '[data-testid="side-tab-sessions"]'
@@ -96,7 +98,9 @@ steps:
 - click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="session-tree"]'
-- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_localstorage:
     key: taomni.sidebarCollapsed
@@ -127,7 +131,9 @@ steps:
 - assert_localstorage:
     key: taomni.mergeToolWindowRail
     equals: 'false'
-- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
