@@ -24,6 +24,12 @@ steps:
 - assert_visible: '[data-testid="shell-workspace-selector"]'
 - assert_visible: '[data-testid="shell-agents-status"]'
 - assert_visible: '[data-testid="shell-zen-toggle"]'
+- click: '[data-testid="shell-workspace-selector"]'
+- wait_for: '[data-testid="shell-overview"]'
+- press:
+    selector: '[data-testid="shell-overview"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-overview"]'
 - click: '[data-testid="shell-command-bar"]'
 - wait_for: '[data-testid="shell-action-palette"]'
 - assert_visible: '[data-testid="shell-action-search"]'

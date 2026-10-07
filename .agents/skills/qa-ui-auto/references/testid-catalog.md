@@ -1461,6 +1461,10 @@
 
 ## main/workspace-shell (F-SHELL-1)
 
+- `[data-testid="shell-agents-status"]` — interactive [optional] — F-SHELL-1.shell-agents-status
+- `[data-testid="shell-command-bar"]` — interactive [optional] — F-SHELL-1.shell-command-bar
+- `[data-testid="shell-workspace-selector"]` — interactive [optional] — F-SHELL-1.shell-workspace-selector
+- `[data-testid="shell-zen-toggle"]` — interactive [optional] — F-SHELL-1.shell-zen-toggle
 - `[data-testid="shell-close-cancel"]` — interactive — F-SHELL-1.shell-close-cancel
 - `[data-testid="shell-close-confirm"]` — interactive — F-SHELL-1.shell-close-confirm
 - `[data-testid="shell-close-count"]` — display — F-SHELL-1.shell-close-count

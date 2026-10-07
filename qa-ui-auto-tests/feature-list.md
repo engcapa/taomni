@@ -11198,15 +11198,19 @@ controls:
 - id: shell-agents-status
   selector: '[data-testid="shell-agents-status"]'
   kind: interactive
+  optional: true
 - id: shell-command-bar
   selector: '[data-testid="shell-command-bar"]'
   kind: interactive
+  optional: true
 - id: shell-workspace-selector
   selector: '[data-testid="shell-workspace-selector"]'
   kind: interactive
+  optional: true
 - id: shell-zen-toggle
   selector: '[data-testid="shell-zen-toggle"]'
   kind: interactive
+  optional: true
 - id: shell-close-cancel
   selector: '[data-testid="shell-close-cancel"]'
   kind: interactive
