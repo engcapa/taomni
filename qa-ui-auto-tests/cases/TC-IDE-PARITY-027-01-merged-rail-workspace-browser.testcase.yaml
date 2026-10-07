@@ -77,6 +77,9 @@ steps:
     key: taomni.sidebarCollapsedByGroup.v1
     contains: '"code-workspace":false'
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
@@ -88,6 +91,9 @@ steps:
     timeout_sec: 5
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
@@ -97,6 +103,9 @@ steps:
     equals: 'false'
 - reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - wait_for: '[data-testid="session-tree"]'
@@ -183,11 +192,11 @@ verification:
     requirement: A：在工作区里展开主侧栏后工具条回到工作区，且该选择对 Code Workspace 标签记忆（切到 Welcome 再回来仍展开）；再次折叠后工具条重新合并，且同样被记住。
     actions:
     - 30
-    - 36
-    - 38
+    - 39
     - 41
-    - 45
-    - 47
+    - 44
+    - 51
+    - 53
     checkpoints:
     - step: 31
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
@@ -198,83 +207,83 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 34
       expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":false"}}'
-    - step: 37
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 39
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 40
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 5}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 43
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 45
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 5}}'
     - step: 46
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 52
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 48
+    - step: 54
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     results:
     - 31
     - 32
     - 33
     - 34
-    - 37
-    - 39
     - 40
     - 42
     - 43
+    - 45
     - 46
-    - 48
+    - 52
+    - 54
   - id: R4
     requirement: 设置里关闭“单一工具窗口条”后回到旧布局：工作区保留自己的左工具条，不再并入主侧栏。
     actions:
-    - 62
-    - 64
-    - 65
-    - 67
+    - 71
+    - 73
+    - 74
+    - 76
     checkpoints:
-    - step: 63
+    - step: 72
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 66
+    - step: 75
       expectation: '{"assert_localstorage": {"key": "taomni.mergeToolWindowRail", "equals": "false"}}'
-    - step: 68
+    - step: 77
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 69
+    - step: 78
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 70
+    - step: 79
       expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
         "equal": 0}}'
     results:
-    - 63
-    - 66
-    - 68
-    - 69
-    - 70
+    - 72
+    - 75
+    - 77
+    - 78
+    - 79
   - id: R5
     requirement: A：工作区折叠侧栏时重新加载（等同重启），Welcome 仍按自己的状态展开侧栏（旧键 taomni.sidebarCollapsed 保持 false），再开工作区仍折叠合并。
     actions:
-    - 50
     - 56
-    - 59
+    - 65
+    - 68
     checkpoints:
-    - step: 49
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsed", "equals": "false"}}'
-    - step: 53
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 54
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 55
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsed", "equals": "false"}}'
+    - step: 62
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 63
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 64
       expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "equal": 0}}'
-    - step: 60
+    - step: 69
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 61
+    - step: 70
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     results:
-    - 49
-    - 53
-    - 54
     - 55
-    - 60
-    - 61
+    - 62
+    - 63
+    - 64
+    - 69
+    - 70
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -25,6 +25,9 @@ timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - wait_for:
@@ -38,6 +41,9 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu"] >> text="Sessions"'
 - click: '[data-testid="context-menu-item-show-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait: 1
 - wait_for:
@@ -46,6 +52,9 @@ steps:
 - wait_for: '[data-testid="welcome-restore-retry"]'
 - click: '[data-testid="welcome-restore-retry"]'
 - wait: 4
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu"] >> text="Sessions"'
 - click: '[data-testid="context-menu-item-show-sessions"]'
@@ -65,33 +74,33 @@ verification:
     requirement: Local-shell restore fails honestly in browser mode and retries without stacking tabs：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 6
-    - 12
-    - 16
-    - 21
+    - 9
+    - 18
+    - 22
+    - 30
     checkpoints:
-    - step: 4
+    - step: 7
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 5
+    - step: 8
       expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]",
         "timeout_sec": 15}}'
-    - step: 7
+    - step: 10
       expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "timeout_sec":
         15}}'
-    - step: 14
+    - step: 20
       expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"failed\"]",
         "timeout_sec": 30}}'
-    - step: 15
+    - step: 21
       expectation: '{"wait_for": "[data-testid=\"welcome-restore-retry\"]"}'
-    - step: 23
+    - step: 32
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "equal":
         1}}'
-    - step: 24
+    - step: 33
       expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"failed\"],
         [data-testid=\"welcome-restore-status\"][data-state=\"partial\"]", "timeout_sec": 15}}'
     results:
-    - 23
-    - 24
+    - 32
+    - 33
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

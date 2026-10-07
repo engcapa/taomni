@@ -35,6 +35,9 @@ steps:
 - wait_for: '[data-testid="status-bar"]'
 - assert_visible: '[data-testid="ptt-button"]'
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
@@ -76,59 +79,59 @@ verification:
     requirement: AI Chat Drawer opens, lists threads, and shows attachment chips：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 6
-    - 8
-    - 15
-    - 16
+    - 9
+    - 11
     - 18
-    - 20
-    - 25
-    - 29
+    - 19
+    - 21
+    - 23
+    - 28
     - 32
+    - 35
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
     - step: 3
       expectation: '{"assert_visible": "[data-testid=\"ptt-button\"]"}'
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     - step: 10
-      expectation: '{"assert_visible": "button[title=\"New chat\"]"}'
-    - step: 11
-      expectation: '{"assert_visible": "button[title=\"History\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-position\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-pin\"]"}'
+      expectation: '{"assert_visible": "button[title=\"New chat\"]"}'
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-hide\"]"}'
+      expectation: '{"assert_visible": "button[title=\"History\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-position\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-pin\"]"}'
     - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-hide\"]"}'
+    - step: 20
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-opacity\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-opacity-slider\"]"}'
-    - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"ai-chat-composer\"]"}'
     - step: 22
-      expectation: '{"assert_visible": "[data-testid=\"ai-chat-attach-button\"]"}'
-    - step: 23
-      expectation: '{"assert_visible": "[data-testid=\"ai-chat-composer-resize\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-opacity-slider\"]"}'
     - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-composer\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-attach-button\"]"}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-composer-resize\"]"}'
+    - step: 27
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"] textarea", "name": "placeholder",
         "equals": "Type a message... (Ctrl+Enter to send · supports @terminal:last-50 / @file:./error.log)"}}'
-    - step: 26
+    - step: 29
       expectation: '{"wait_for": "[data-testid=\"attachment-chip\"]"}'
-    - step: 27
-      expectation: '{"assert_visible": "[data-testid=\"attachment-chip\"]"}'
     - step: 30
-      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
-    - step: 31
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"attachment-chip\"]"}'
     - step: 33
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+    - step: 36
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     results:
-    - 33
+    - 36
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

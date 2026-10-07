@@ -146,6 +146,9 @@ steps:
 - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - eval_readonly:
@@ -171,12 +174,18 @@ steps:
 - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 80
     expect_truthy: true
 - reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - wait_for: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]'
@@ -288,15 +297,15 @@ verification:
     - 57
     - 59
     - 60
-    - 62
     - 65
     - 68
-    - 70
     - 71
     - 73
     - 74
     - 76
-    - 78
+    - 77
+    - 82
+    - 84
     checkpoints:
     - step: 51
       expectation: The collapsed workspace has one main sidebar resize edge.
@@ -308,19 +317,19 @@ verification:
       expectation: The Project context menu is not replaced by the sidebar names menu.
     - step: 58
       expectation: Project names toggle also hides permanent button names.
-    - step: 64
-      expectation: Welcome restores the same 68 CSS pixel rail.
     - step: 67
+      expectation: Welcome restores the same 68 CSS pixel rail.
+    - step: 70
       expectation: An active local terminal still has one main sidebar resize edge.
-    - step: 69
-      expectation: A terminal-state pointer drag grows the rail to 80 CSS pixels.
     - step: 72
+      expectation: A terminal-state pointer drag grows the rail to 80 CSS pixels.
+    - step: 75
       expectation: The permanent button names menu works in the terminal state.
-    - step: 77
-      expectation: Welcome keeps the 80 CSS pixel width.
     - step: 83
+      expectation: Welcome keeps the 80 CSS pixel width.
+    - step: 92
       expectation: Reloaded Welcome renders the stored 80 CSS pixel width.
-    - step: 84
+    - step: 93
       expectation: Names remain enabled after reload.
     results:
     - 51
@@ -328,31 +337,31 @@ verification:
     - 54
     - 56
     - 58
-    - 64
     - 67
-    - 69
+    - 70
     - 72
-    - 77
+    - 75
     - 83
-    - 84
+    - 92
+    - 93
   - id: R4
     requirement: 展开主侧栏后 Code Workspace 独立工具栏仍可用原有边缘及方向键调整宽度，共享设置同步至主侧栏。
     actions:
-    - 86
-    - 90
-    - 92
-    - 94
+    - 95
+    - 99
+    - 101
+    - 103
     checkpoints:
-    - step: 93
+    - step: 102
       expectation: Expanding the sidebar returns the left tool rail to the workspace.
-    - step: 95
+    - step: 104
       expectation: The standalone edge persists a width of 76 after ArrowLeft.
-    - step: 96
+    - step: 105
       expectation: The main sidebar shares the resulting 76 CSS pixel width.
     results:
-    - 93
-    - 95
-    - 96
+    - 102
+    - 104
+    - 105
   visual:
   - check: 欢迎页的整高边缘以及调整后的名称布局。
     method: automated

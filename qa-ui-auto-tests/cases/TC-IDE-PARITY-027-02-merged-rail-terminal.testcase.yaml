@@ -105,6 +105,9 @@ steps:
     selector: '[data-testid="tab-action-slot"] [data-testid="attached-sftp-toggle"]'
     timeout_sec: 5
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="tab-item"][data-tab-type="terminal"]'
@@ -168,8 +171,8 @@ verification:
     requirement: A：展开主侧栏后开关回到控制栏的标签操作区；切到 Welcome 再回到终端仍保持展开，只记住终端组（Code Workspace 组仍为折叠）。
     actions:
     - 38
-    - 43
-    - 45
+    - 46
+    - 48
     checkpoints:
     - step: 39
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
@@ -179,25 +182,25 @@ verification:
     - step: 41
       expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]",
         "timeout_sec": 5}}'
-    - step: 44
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 46
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 47
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 48
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 49
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 51
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
+    - step: 52
       expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
     results:
     - 39
     - 40
     - 41
-    - 44
-    - 46
     - 47
-    - 48
     - 49
+    - 50
+    - 51
+    - 52
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

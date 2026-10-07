@@ -27,6 +27,9 @@ timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - wait_for:
@@ -39,6 +42,9 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu"] >> text="Sessions"'
 - click: '[data-testid="context-menu-item-show-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for:
     selector: '[data-testid="welcome-restore-status"][data-state="succeeded"], [data-testid="welcome-restore-status"][data-state="partial"]'
@@ -48,6 +54,9 @@ steps:
 - assert_count:
     selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
     equal: 1
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu"] >> text="Sessions"'
 - click: '[data-testid="context-menu-item-show-sessions"]'
@@ -65,35 +74,35 @@ verification:
     requirement: Welcome restores the seeded snapshot entry and locates the existing tab on repeat：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 6
-    - 11
-    - 13
+    - 9
+    - 17
     - 19
-    - 21
-    - 23
+    - 28
+    - 30
+    - 32
     checkpoints:
-    - step: 4
+    - step: 7
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 5
+    - step: 8
       expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]",
         "timeout_sec": 15}}'
-    - step: 7
+    - step: 10
       expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"]", "timeout_sec":
         15}}'
-    - step: 12
+    - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"succeeded\"],
         [data-testid=\"welcome-restore-status\"][data-state=\"partial\"]", "timeout_sec": 30}}'
-    - step: 15
+    - step: 21
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"]",
         "equal": 1}}'
-    - step: 20
+    - step: 29
       expectation: '{"wait_for": "[data-testid=\"welcome-restore-row\"]"}'
-    - step: 22
+    - step: 31
       expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
-    - step: 24
+    - step: 33
       expectation: '{"wait_for": "[data-testid=\"welcome-restore-row\"]"}'
     results:
-    - 24
+    - 33
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -165,6 +165,9 @@ steps:
 - dblclick: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
 - assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
@@ -188,6 +191,9 @@ steps:
     key: Enter
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
@@ -333,7 +339,7 @@ verification:
     - 67
     - 69
     - 72
-    - 75
+    - 78
     checkpoints:
     - step: 49
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
@@ -371,11 +377,11 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 73
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 76
+    - step: 79
       expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]"}'
-    - step: 77
+    - step: 80
       expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]"}'
-    - step: 78
+    - step: 81
       expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
     results:
     - 49
@@ -393,53 +399,53 @@ verification:
     - 70
     - 71
     - 73
-    - 76
-    - 77
-    - 78
+    - 79
+    - 80
+    - 81
   - id: R4
     requirement: Settings 与其他 action 一起显示/隐藏名称，仍可用键盘打开设置；终端和 Code Workspace 的左下角不再出现独立 Git panel action。
     actions:
-    - 80
-    - 81
     - 83
     - 84
     - 86
+    - 87
     - 89
-    - 90
     - 95
     - 96
-    - 98
-    - 99
+    - 101
     - 102
+    - 104
+    - 105
+    - 108
     checkpoints:
-    - step: 82
-      expectation: Welcome hides the Settings name with all other action names.
     - step: 85
+      expectation: Welcome hides the Settings name with all other action names.
+    - step: 88
       expectation: Welcome restores the visible Settings name.
-    - step: 87
+    - step: 90
       expectation: Enter on Settings opens the settings panel.
-    - step: 92
+    - step: 98
       expectation: A local terminal adds no Git action to the main sidebar.
-    - step: 93
+    - step: 99
       expectation: The terminal rail shows the Settings name.
-    - step: 97
-      expectation: The Settings context menu hides its name in the terminal rail.
-    - step: 100
-      expectation: The Settings context menu restores its name in the terminal rail.
     - step: 103
+      expectation: The Settings context menu hides its name in the terminal rail.
+    - step: 106
+      expectation: The Settings context menu restores its name in the terminal rail.
+    - step: 109
       expectation: Code Workspace adds no duplicate Git action to the main sidebar.
-    - step: 104
+    - step: 110
       expectation: Code Workspace keeps the named Settings action in the main sidebar.
     results:
-    - 82
     - 85
-    - 87
-    - 92
-    - 93
-    - 97
-    - 100
+    - 88
+    - 90
+    - 98
+    - 99
     - 103
-    - 104
+    - 106
+    - 109
+    - 110
   visual:
   - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual
