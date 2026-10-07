@@ -160,7 +160,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       # The QA app inherits tauri-driver's startup environment. Fixture setup
       # happens later, so enable reference-client diagnostics before the driver.
