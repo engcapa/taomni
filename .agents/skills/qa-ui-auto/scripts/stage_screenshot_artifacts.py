@@ -63,6 +63,19 @@ if __name__ == "__main__":
     args = parser.parse_args()
     stage(args.source, args.report)
     if args.macos_crash_reports and sys.platform == "darwin":
-        stage_macos_crashes([Path.home() / "Library/Logs/DiagnosticReports",
-                            Path("/Library/Logs/DiagnosticReports")], args.report,
-                           time.time() - 3600)
+        roots = [Path.home() / "Library/Logs/DiagnosticReports", Path("/Library/Logs/DiagnosticReports")]
+        since = time.time() - 3600
+        # ReportCrash writes asynchronously. Only wait after an observed
+        # abnormal app exit, and keep the original case failure untouched.
+        crashed = False
+        for path in args.report.glob("run-*/*/native-process.json"):
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            crashed |= not state.get("macos_lldb") and state.get("exit_code_after_capture") not in (None, 0)
+        for attempt in range(6 if crashed else 1):
+            manifest = stage_macos_crashes(roots, args.report, since)
+            if manifest["files"] or not crashed or attempt == 5:
+                break
+            time.sleep(2)

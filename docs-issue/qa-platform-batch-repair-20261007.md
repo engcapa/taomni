@@ -167,3 +167,28 @@ releases its listening port; sibling-process exclusion and debugger restart
 are also tested. Four debugger tests and 19 isolation tests pass. The original
 macOS N20 close failure still requires its native trace; no product close change
 has been made on speculation. The matching QA build is available for reuse.
+
+
+The owned-tree diagnostic `37629721559` (`fc48fde9`) reuses the verified QA
+binary and executes both scenarios. N20 passes under LLDB without a crash;
+N17 fails because a debugger launch changes macOS input permission attribution
+(the normal native run at 74b5e7ed passed N17). These results do not establish
+a production close fix or a normal-launch regression. Restore normal launch,
+record the owned process exit code before failure teardown, and allow bounded
+time for macOS ReportCrash after abnormal exits. N20 now repeats all original
+assertions across three complete pin lifecycles in one app process; no delay,
+retry of a failed assertion, or weaker assertion is introduced. Verification
+indices are updated and duplicate inactive YAML verification keys are removed.
+Include Wayland and the repaired Ubuntu 22.04 profiles in the targeted batch.
+Thirty-three scenario/artifact/debugger/isolation checks pass. Node 22's twelve
+mounted watcher regressions and TypeScript build check also pass.
+
+
+Cache inventory also showed 10.5 GiB in use with three macOS workspace snapshots,
+two sharing the same application build. Key QA workspace caches by the existing
+build-input fingerprint (source/recipe/platform/profile/toolchains/environment)
+instead of commit SHA, after build dependencies publish their environment. This
+preserves native identity verification and older restore prefixes while avoiding
+large duplicate cache uploads for case/runner-only repairs. Production release
+workflows remain unchanged. Cache quota pressure is a plausible contributor to
+missing Windows build caches; no eviction cause or speedup is claimed as proven.

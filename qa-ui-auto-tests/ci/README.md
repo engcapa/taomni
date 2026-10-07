@@ -35,6 +35,9 @@ that require release still use it, and other native selections retain their
 existing debug profile. Browser selection and production release workflows are
 unchanged. The planner records the choice and the native `release` capability,
 so execution and cache keys cannot disagree about the profile.
+Workspace cache keys use the same source, recipe, toolchain and environment
+fingerprint as the QA build verifier. Test/runner-only commits therefore reuse
+one cache entry instead of saving duplicate binaries under each commit SHA.
 
 GitHub only registers `workflow_dispatch` on the default branch. Publishing the
 new file on a feature branch alone is insufficient. Branch validation can use a
