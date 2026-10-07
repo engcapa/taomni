@@ -18027,6 +18027,20 @@ export function CodeWorkspaceTab({
     return null;
   }, [promptInlineName]);
 
+  // "The workspace changed" alone cannot separate a genuine concurrent edit
+  // from a watcher echo of the provider's own project metadata
+  // (.project/.classpath/.settings) arriving during a rename. Name it.
+  const describeSemanticInvalidation = useCallback((
+    snapshot: ReturnType<typeof semanticIndex.current>,
+    tokenRevision: number,
+  ): string => [
+    snapshot.staleReasons.length > 0 ? `reasons=${snapshot.staleReasons.join(",")}` : null,
+    snapshot.invalidatedPaths.length > 0
+      ? `paths=${snapshot.invalidatedPaths.slice(0, 3).join(",")}`
+      : null,
+    `revision=${snapshot.revision}/${tokenRevision}`,
+  ].filter(Boolean).join(" "), []);
+
   const renameSymbolAt = useCallback(async (
     file: OpenFileState,
     position: LspPosition,
@@ -18131,7 +18145,8 @@ export function CodeWorkspaceTab({
       // change and must not cancel a rename the user already confirmed.
       if (beforeRename.revision !== buildToken.revision) {
         semanticIndex.abandonBuild(buildToken);
-        const message = "Rename was cancelled because the workspace changed while the dialog was open";
+        const message = "Rename was cancelled because the workspace changed while the dialog was open "
+          + `(${describeSemanticInvalidation(beforeRename, buildToken.revision)})`;
         setStatusMessage(message);
         return { status: "stale", message };
       }
@@ -18165,7 +18180,8 @@ export function CodeWorkspaceTab({
         !completion.accepted
         || !workspaceSemanticIndexBuildIsCurrent(completion.snapshot, buildToken)
       ) {
-        const message = "Rename result became stale because the workspace changed; run Rename again";
+        const message = "Rename result became stale because the workspace changed; run Rename again "
+          + `(${describeSemanticInvalidation(completion.snapshot, buildToken.revision)})`;
         setStatusMessage(message);
         return { status: "stale", message };
       }

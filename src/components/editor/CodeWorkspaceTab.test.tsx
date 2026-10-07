@@ -14779,6 +14779,45 @@ end_of_record
       expect(fixture.disk[HELPER_PATH]).toContain("// extract-cross-file");
     });
 
+    it("a stale rename names the invalidation that cancelled it", async () => {
+      // "the workspace changed" alone cannot separate a real concurrent edit
+      // from a watcher echo, so the status must carry reason, path and revisions.
+      // The watcher listener is registered at mount, so the Tauri runtime must be
+      // on before the workspace renders for an external change to arrive.
+      runtimeState.tauri = true;
+      const fixture = setupExtract("instance-rename-stale-detail");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+
+      // Change an unrelated file on disk while the naming prompt is open: a real
+      // content change, so the confirmed rename must be refused with detail.
+      // The watcher event only reaches the tab in the Tauri runtime.
+      await act(async () => {
+        await emit("lsp://external-file-change", {
+          workspaceId: "instance-rename-stale-detail",
+          path: "/repo/app/src/main/java/demo/Unrelated.java",
+          type: 2,
+        });
+        await new Promise((resolve) => { window.setTimeout(resolve, 200); });
+      });
+      fireEvent.change(input, { target: { value: "sumOf" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        const message = useAppStore.getState().statusMessage ?? "";
+        expect(message).toContain("workspace changed");
+      });
+      const message = useAppStore.getState().statusMessage!;
+      expect(message).toMatch(/reasons=[a-z-]+/);
+      expect(message).toContain("Unrelated.java");
+      expect(message).toMatch(/revision=\d+\/\d+/);
+      expect(fixture.text()).not.toContain("sumOf");
+      runtimeState.tauri = false;
+    });
+
     it("a view switch while the rename preview is open never renames the abandoned file", async () => {
       // DEC-07: the owner guard runs again at the preflight and at the exact
       // mutation boundary, so an async preview cannot commit a rename for a
