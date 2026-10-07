@@ -26,6 +26,10 @@ on:
         description: 'Linux native profiles (CSV): ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland'
         type: string
         default: ubuntu-24.04-xvfb
+      native_release:
+        description: Use release QA builds for selected native cases (reuse full-run caches)
+        type: boolean
+        default: false
       case_ids:
         description: Exact case IDs (selected, or additions to impacted)
         type: string
@@ -47,6 +51,7 @@ on:
       platforms: {type: string, default: 'linux,windows,macos'}
       modes: {type: string, default: 'browser,native'}
       linux_profiles: {type: string, default: 'ubuntu-24.04-xvfb'}
+      native_release: {type: boolean, default: false}
       case_ids: {type: string, default: ''}
       features: {type: string, default: ''}
       tags: {type: string, default: ''}
@@ -136,6 +141,7 @@ jobs:
           QA_PLATFORMS: ${{ inputs.platforms }}
           QA_MODES: ${{ inputs.modes }}
           QA_LINUX_PROFILES: ${{ inputs.linux_profiles }}
+          QA_NATIVE_RELEASE: ${{ inputs.native_release }}
           QA_CASE_IDS: ${{ inputs.case_ids }}
           QA_FEATURES: ${{ inputs.features }}
           QA_TAGS: ${{ inputs.tags }}
