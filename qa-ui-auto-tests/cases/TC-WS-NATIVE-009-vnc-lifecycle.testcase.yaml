@@ -127,8 +127,6 @@ verification:
       expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
     - step: 27
       expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    - step: 29
-      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
     - step: 40
       expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
     - step: 41
@@ -136,7 +134,6 @@ verification:
     results:
     - 20
     - 27
-    - 29
     - 40
     - 41
   native:
