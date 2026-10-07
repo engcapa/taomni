@@ -547,8 +547,11 @@ class XrdpFixtureTest(unittest.TestCase):
             self.assertTrue(pid_file.exists(), "the child must start before the timeout")
             for pid in json.loads(pid_file.read_text()):
                 status = Path(f"/proc/{pid}/status")
-                if status.exists():
-                    self.assertRegex(status.read_text(), r"State:\s+Z", "an owned descendant is still alive")
+                try:
+                    if status.exists():
+                        self.assertRegex(status.read_text(), r"State:\s+Z", "an owned descendant is still alive")
+                except (FileNotFoundError, ProcessLookupError):
+                    pass
 
     def test_ci_xrdp_install_never_checks_docker(self):
         from ci_services import install
