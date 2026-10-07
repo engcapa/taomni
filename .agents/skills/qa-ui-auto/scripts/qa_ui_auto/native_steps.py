@@ -1564,6 +1564,11 @@ def _terminal_verify_args(verify: Any) -> dict[str, Any]:
 def _dispatch_terminal_input(ctx: NativeStepContext, selector: str, text: str, submit: bool) -> None:
     ctx.session.focus(selector)
     ctx.session.press_combo("Shift")
+    # A focus() call and the synthetic modifier cycle are asynchronous in
+    # WebKitGTK/WebView2. Let xterm commit the focused helper textarea before
+    # dispatching its InputEvent; otherwise the first byte is intermittently
+    # dropped on Windows ConPTY (for example `printf` becomes `rintf`).
+    time.sleep(0.08)
     result = ctx.session.execute(
         f"const element = document.querySelector({json.dumps(selector)});"
         "if (!element) return {found:false,focused:false};"
