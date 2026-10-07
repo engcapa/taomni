@@ -192,3 +192,33 @@ preserves native identity verification and older restore prefixes while avoiding
 large duplicate cache uploads for case/runner-only repairs. Production release
 workflows remain unchanged. Cache quota pressure is a plausible contributor to
 missing Windows build caches; no eviction cause or speedup is claimed as proven.
+
+## Normal-launch targeted confirmation at 9e330470
+
+Linux run `37633329556` selects eight cases each on Ubuntu 22.04 X11/VNC
+and four on Ubuntu 26.04 Wayland. macOS run `37633786580` selects only
+N17/N20 with the normal launcher. Both use `native_release=true`.
+
+- macOS: **2/2 pass**, signed receipt and matching native build/source verified.
+  The existing release QA binary was reused. N20 completes three full pin
+  lifecycles, with six successful close events and a usable main window;
+  N17's real OS input/dialog path also passes. The earlier process exit did not
+  recur; its original cause remains undetermined, so this is regression
+  evidence, not proof of a diagnosed product close fix.
+- Ubuntu 22.04 X11: **8/8 pass**, including all five previous failures and the
+  related watcher/pin regressions. Receipt, desktop and binary identities match.
+- Ubuntu 22.04 VNC: **8/8 pass**, with the same identity checks. Desktop evidence
+  confirms screen saver/power-manager autostart disabled and idle blanking off.
+  OCR reads the intended fixture text and the pixel assertions pass. Build takes
+  704.5 seconds after changed source/environment; cases take 118.0 seconds.
+- Wayland: **4/4 pass**, including the three repeated combined-board lifecycles.
+  Signed receipts, case identities and the GNOME Wayland desktop/build identity
+  all match. This completes the targeted repair gate: 22/22, with no skips.
+
+User requested a six-hour full-run budget. GitHub Actions has no workflow-wide
+`timeout-minutes`; set the matrix execution job to **360 minutes** (previously
+180). Keep the bounded dependency setup step and individual case budgets.
+The release workflows are unchanged. After the final targeted group passes,
+start all nine entries and inspect their progress/artifacts every **30 minutes**.
+The current full plan contains 2,060 eligible case executions; unsupported
+capability gaps remain explicit and are not counted as passes.
