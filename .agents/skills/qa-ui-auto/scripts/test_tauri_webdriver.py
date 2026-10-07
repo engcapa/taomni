@@ -11,7 +11,7 @@ from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
 from qa_ui_auto.deadline import Deadline
-from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, selector_strategy
+from tauri_webdriver import NativeHarness, NativeSession, TauriDriverProcess, WebDriverError, selector_strategy
 
 
 class NativeSessionTransportTest(TestCase):
@@ -1200,3 +1200,33 @@ class NativeClipboardOwnerTest(TestCase):
                 )
             with self.assertRaises(native_steps.StepError):
                 native_steps.VERBS["assert_system_clipboard"](ctx, {})
+
+
+class MacosDebuggerProcessTest(TestCase):
+    def test_opt_in_debugger_keeps_the_isolated_application_and_captures_all_threads(self):
+        with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"), \
+                patch("tauri_webdriver._tcp_ok", side_effect=[False, True]), \
+                patch("tauri_webdriver.subprocess.Popen") as launch:
+            app = Path(root) / "qa-app"
+            app.touch()
+            launch.return_value.poll.return_value = None
+            driver = TauriDriverProcess({"app": {"native_binary": str(app), "macos_lldb": True}}, Path(root))
+            driver.start()
+            command = launch.call_args.args[0]
+            self.assertEqual(command[0], "lldb")
+            self.assertEqual(command[-2:], ["--", str(app.resolve())])
+            self.assertIn("thread backtrace all", command)
+            self.assertTrue(launch.call_args.kwargs["start_new_session"])
+            self.assertEqual(launch.call_args.kwargs["env"]["TAOMNI_QA_WEBDRIVER_PORT"], "4444")
+
+    def test_debugger_cleanup_signals_only_its_owned_group(self):
+        with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"), \
+                patch("tauri_webdriver.os.killpg") as kill:
+            driver = TauriDriverProcess({"app": {"macos_lldb": True}}, Path(root))
+            process = Mock(pid=4321)
+            driver.proc = process
+            driver.stop()
+            self.assertEqual(kill.call_args.args[0], 4321)
+            process.terminate.assert_not_called()
+            process.wait.assert_called_once_with(timeout=5)
+            self.assertIsNone(driver.proc)

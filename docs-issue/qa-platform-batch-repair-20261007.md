@@ -93,3 +93,34 @@ The selection planner accepts seven execution entries: 25 cases on each of the
 three X11/VNC desktops, eight on Wayland, seven on Windows native, five on macOS
 native, and five on macOS browser. Wayland includes the xrdp client fixture
 (remote Xorg desktop), not a Wayland screen-sharing/portal claim.
+
+
+## First targeted results at 74b5e7ed
+
+Actual stable case receipts: default Linux 25/25, Wayland 8/8, Windows native
+7/7, macOS browser 5/5, macOS native 4/5; Ubuntu 22.04 X11 and VNC each 20/25.
+Runs: Linux 37615798377, Windows 37615802651, macOS native 37615806747,
+macOS browser 37615811202. Workflow success remains advisory.
+
+Both Ubuntu 22.04 profiles have identical remaining failures: C0-01,
+010-04, 019-01, N1 and N10. LXQt launched xscreensaver during the long build;
+its animated pixels appear in both capture failures and document.hasFocus
+stays false in the focus failures. Disable its autostart and power manager
+in the owned disposable desktop before launch, plus X11 idle blanking.
+No existing user desktop is unlocked or changed.
+
+C0-01 also exposed a real delayed watcher echo: after a clean ISO-8859-1 save,
+read-back of unchanged bytes uses windows-1252 and overwrites the chosen policy.
+Compare disk hashes and refresh only file metadata for identical bytes, retaining
+encoding, dirty buffer and save errors. The existing C0-01 receipt/retry path
+protects this behavior without changing its assertions. The mounted encoding
+save test reproduces the label replacement before the fix and passes after it;
+three adjacent encoding/watcher/conflict tests also pass.
+
+macOS N20 saves notes and tiles both originals correctly, then the process
+vanishes while closing the second pin. No native crash report was retained and
+all subsequent bridge requests were refused. Cause remains unverified: collect
+an opt-in LLDB all-thread trace on this isolated QA process in a selected macOS
+run before making a speculative product change. Debugger use is recorded in the
+config and excluded from performance conclusions; remove the temporary workflow
+opt-in before normal validation/full measurement. No new full sweep yet.

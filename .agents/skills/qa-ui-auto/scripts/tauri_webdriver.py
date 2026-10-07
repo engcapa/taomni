@@ -14,6 +14,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -271,6 +272,7 @@ class TauriDriverProcess:
         self.native_port = int(webdriver.get("native_port", 4445))
         self._restart_required = False
         self.startup_timeout = float(webdriver.get("startup_timeout", 20))
+        self.macos_lldb = platform.system() == "Darwin" and cfg.get("app", {}).get("macos_lldb") is True
 
     def start(self) -> None:
         if self.host not in ("127.0.0.1", "localhost"):
@@ -293,9 +295,15 @@ class TauriDriverProcess:
             env = dict(os.environ)
             env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
             env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
+            command = [str(self.application.resolve())]
+            if self.macos_lldb:
+                command = ["lldb", "--batch", "-o", "settings set target.disable-aslr false",
+                           "-o", "run", "-k", "thread backtrace all", "-k", "process kill",
+                           "--", *command]
             with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
                 self.proc = subprocess.Popen(
-                    [str(self.application.resolve())],
+                    command,
+                    start_new_session=self.macos_lldb,
                     cwd=ROOT,
                     env=env,
                     stdout=stdout,
@@ -385,11 +393,20 @@ class TauriDriverProcess:
             self.proc.wait(timeout=5)
             self.proc = None
             return
-        self.proc.terminate()
+        if self.macos_lldb:
+            # The debugger and inferior share a job-owned process group.
+            with suppress(ProcessLookupError):
+                os.killpg(self.proc.pid, signal.SIGTERM)
+        elif self.proc.poll() is None:
+            self.proc.terminate()
         try:
             self.proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            self.proc.kill()
+            if self.macos_lldb:
+                with suppress(ProcessLookupError):
+                    os.killpg(self.proc.pid, signal.SIGKILL)
+            else:
+                self.proc.kill()
             self.proc.wait(timeout=5)
         self.proc = None
 

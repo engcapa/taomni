@@ -377,6 +377,8 @@ jobs:
         if: runner.os != 'Linux' || matrix.mode != 'native'
         env:
           QA_ENTRY: ${{ matrix.id }}
+          # Temporary opt-in for the selected macOS pin-close crash investigation.
+          TAOMNI_QA_MACOS_LLDB: ${{ runner.os == 'macOS' && matrix.mode == 'native' && inputs.scope == 'selected' && '1' || '0' }}
         run: >-
           python .agents/skills/qa-ui-auto/scripts/ci_execute.py
           --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"

@@ -486,4 +486,8 @@ class DesktopTests(unittest.TestCase):
             with Desktop(Path(d), ['display'], 'ubuntu-22.04-x11') as desktop:
                 self.assertEqual(desktop.facts['compositor'], 'xcompmgr')
                 self.assertEqual(desktop.facts['desktop'], 'LXQt/Openbox')
+                config = Path(desktop.temporary.name) / 'config'
+                for name in ('xscreensaver.desktop', 'lxqt-powermanagement.desktop'):
+                    self.assertIn('Hidden=true', (config / 'autostart' / name).read_text())
+                self.assertFalse(desktop.facts['idle_blanking'])
             self.assertEqual([call.args[0] for call in start.call_args_list], [['lxqt-session'], ['xcompmgr', '-n']])
