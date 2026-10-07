@@ -7582,6 +7582,7 @@ describe("CodeWorkspaceTab", () => {
   });
 
   it("opens the encoding chooser from workspace status and saves through the encoded writer", async () => {
+    runtimeState.tauri = true;
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-encoding-save",
@@ -7635,6 +7636,25 @@ describe("CodeWorkspaceTab", () => {
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-encoding-save")
         .openFiles["root:app:src/main.txt"]?.encoding,
     ).toBe("ISO-8859-1");
+
+    // The watcher reads the same saved bytes using the decoder's canonical
+    // label. It must not overwrite the user's chosen encoding after save.
+    workspaceMocks.workspaceReadFileWithEncoding.mockResolvedValue(file("src/main.txt", "café", {
+      encoding: "windows-1252", bom: false, hash: "hash-latin1", mtime: 12345,
+    }));
+    await act(async () => {
+      await emit("lsp://external-file-change", {
+        workspaceId: "instance-encoding-save", path: "/repo/app/src/main.txt", type: 2,
+      });
+    });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-encoding-save")
+        .openFiles["root:app:src/main.txt"]?.mtime,
+    ).toBe(12345));
+    expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-encoding-save")
+        .openFiles["root:app:src/main.txt"],
+    ).toMatchObject({ encoding: "ISO-8859-1", dirty: false });
   });
 
   it("opens a queued encoding chooser after an in-flight save settles", async () => {

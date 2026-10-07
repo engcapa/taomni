@@ -7204,6 +7204,17 @@ export function CodeWorkspaceTab({
     }
     const latest = openFilesRef.current[file.key];
     if (!latest || latest.saving) return;
+    if (disk.hash === latest.hash) {
+      // The bytes are still our accepted disk snapshot. A delayed save echo
+      // or chmod notification must not replace the selected encoding with
+      // the decoder's canonical alias (ISO-8859-1 reads as windows-1252),
+      // nor clear a newer edit or a failed-save state.
+      setOpenFiles((current) => ({
+        ...current,
+        [file.key]: { ...(current[file.key] ?? latest), mtime: disk.mtime, size: disk.size },
+      }));
+      return;
+    }
     // A delayed watcher echo of our last save can arrive after the user
     // chooses a new encoding/EOL without editing the logical text. Keep that
     // unsaved policy while refreshing the disk guard.
