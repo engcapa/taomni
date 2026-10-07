@@ -29,10 +29,14 @@ export type AppPlatform = "windows" | "macos" | "linux" | "unknown";
 
 export function getAppPlatform(): AppPlatform {
   if (typeof window === "undefined") return "unknown";
-  const userAgent = `${navigator.platform} ${navigator.userAgent}`.toLowerCase();
-  if (userAgent.includes("mac") || userAgent.includes("iphone") || userAgent.includes("ipad") || userAgent.includes("ipod")) return "macos";
-  if (userAgent.includes("win")) return "windows";
-  if (userAgent.includes("linux")) return "linux";
+  // The platform describes the host. Fall back to UA only if it is absent or
+  // unrecognized, since compatibility UA tokens can name another platform.
+  for (const value of [navigator.platform, navigator.userAgent]) {
+    const platform = (value ?? "").toLowerCase();
+    if (/mac|iphone|ipad|ipod/.test(platform)) return "macos";
+    if (platform.includes("win")) return "windows";
+    if (platform.includes("linux")) return "linux";
+  }
   return "unknown";
 }
 

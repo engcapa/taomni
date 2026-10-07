@@ -1210,7 +1210,7 @@ mod tests {
         let tmp = std::env::temp_dir().join(format!("taomni-ldt-key-{}", std::process::id()));
         std::fs::create_dir_all(&tmp).unwrap();
         let key = normalize_path_key(&tmp).expect("temp dir key");
-        assert!(key.starts_with('/'), "posix key is absolute: {key}");
+        assert!(Path::new(&key).is_absolute(), "path key is absolute: {key}");
 
         // Relative and empty inputs are rejected.
         assert!(normalize_path_key(Path::new("relative/path")).is_none());
@@ -1323,7 +1323,7 @@ mod tests {
         let inserts = [
             (format!("cd {}", work.display()), 1_700_000_000i64),
             (
-                "cd /definitely/not/a/real/path-xyz".to_string(),
+                format!("cd {}", dir.path().join("missing-path-xyz").display()),
                 1_699_999_999,
             ),
             ("cd projects".to_string(), 1_699_999_998), // relative: skipped
@@ -1347,7 +1347,7 @@ mod tests {
                 r.get(0)
             })
             .unwrap();
-        // Three unique resolvable paths: <tmp>/work, /definitely/not/a/real,
+        // Three unique resolvable paths: <tmp>/work, <tmp>/missing-path-xyz,
         // <home>/taomni-legacy-work. The relative `cd projects` is skipped.
         assert_eq!(usage_count, 3, "one row per resolvable unique path");
 

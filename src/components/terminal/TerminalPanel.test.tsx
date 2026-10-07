@@ -308,6 +308,7 @@ const sshInfo = {
 };
 
 describe("TerminalPanel focus behavior", () => {
+  let platformOverride: ReturnType<typeof vi.spyOn> | undefined;
   beforeEach(() => {
     window.localStorage.clear();
     terminalMocks.oscHandlers.clear();
@@ -347,6 +348,8 @@ describe("TerminalPanel focus behavior", () => {
 
   afterEach(() => {
     cleanup();
+    platformOverride?.mockRestore();
+    platformOverride = undefined;
     vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
@@ -522,6 +525,9 @@ describe("TerminalPanel focus behavior", () => {
   });
 
   it("installs SSH cwd reporting when a delayed startup later reaches an idle prompt", async () => {
+    // This exercises the POSIX browser integration; Windows has a separate
+    // readiness path because its browser bridge cannot install shell hooks.
+    platformOverride = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
     let onOutput: ((data: Uint8Array) => void) | undefined;
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
       onOutput = args[9] as (data: Uint8Array) => void;
@@ -582,6 +588,7 @@ describe("TerminalPanel focus behavior", () => {
   });
 
   it("holds keystrokes while a hidden SSH setup line is still being installed", async () => {
+    platformOverride = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
     let onOutput: ((data: Uint8Array) => void) | undefined;
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
       onOutput = args[9] as (data: Uint8Array) => void;
