@@ -2596,6 +2596,7 @@ def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     )
     time.sleep(2.0)  # document teardown; execute/sync is unavailable during it
     ctx.session.find("[data-testid='welcome-panel']", timeout=60)
+    ctx.session.activate_linux_window()
     # The reload dropped the console hook along with the old document.
     ctx.session.install_console_hook()
     return "reloaded; welcome-panel visible"
