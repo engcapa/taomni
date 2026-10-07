@@ -80,9 +80,13 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
     // Drive the same menu entry users use; this invokes native arrangement.
     run_js(&windows[0], r#"
         const q=id=>document.querySelector('[data-testid="'+id+'"]');
-        if(!q('screenshot-pins-tile')) { q('screenshot-pin-menu-toggle').click(); await new Promise(r=>setTimeout(r,100)); }
+        const wait=()=>new Promise(r=>setTimeout(r,50));
+        q('screenshot-pin-menu-toggle').click();
+        for(let i=0;i<100&&!q('screenshot-pin-tab-all');i++) await wait();
+        q('screenshot-pin-tab-all').click();
+        for(let i=0;i<100&&!q('screenshot-pins-tile');i++) await wait();
         q('screenshot-pins-tile').click(); return true;
-    "#, Duration::from_secs(5)).await?;
+    "#, Duration::from_secs(12)).await?;
     trace.mark(
         "tile-requested",
         json!({"wayland": super::super::pins::native_wayland()}),

@@ -318,7 +318,12 @@ fn close_fixture(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(QA_WINDOW_LABEL) {
         let _ = window.destroy();
     }
-    super::restore_app_windows(app);
+    if cfg!(target_os = "linux")
+        && std::env::var_os("DISPLAY").is_some()
+        && std::env::var_os("WAYLAND_DISPLAY").is_none()
+    {
+        super::restore_app_windows(app);
+    }
 }
 
 #[derive(Deserialize)]

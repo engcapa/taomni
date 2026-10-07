@@ -77,3 +77,19 @@ reduce redundant work; no measured end-to-end speedup is claimed yet.
   `qa-ui-auto-report/batch-repair-browser-final/run-20261007-192428-631768018`.
 - Native platform confirmation remains pending; this workstation has no built
   isolated QA executable or Xvfb. Hosted targeted runs provide those boundaries.
+
+## Main integration and final targeted selection
+
+Fetched and merged `origin/main` at `41871480` in merge commit `ab3dcf23`.
+Git merged without conflicts. The merged pin menu moves arrangement into the
+All Pins tab; updated N20's native scenario to select that tab through the UI.
+Kept fixture-ledger cleanup scoped to the X11 fixture hide path.
+
+Post-merge TypeScript check passed. All 18 pin/favorite/table-detail mounted
+unit tests passed. Browser MFA-003, F6-5, SHOT-035, SHOT-036 and SHOT-037 all
+passed on stable inputs in
+`qa-ui-auto-report/batch-repair-merged-browser/run-20261007-193415-527685465`.
+The selection planner accepts seven execution entries: 25 cases on each of the
+three X11/VNC desktops, eight on Wayland, seven on Windows native, five on macOS
+native, and five on macOS browser. Wayland includes the xrdp client fixture
+(remote Xorg desktop), not a Wayland screen-sharing/portal claim.
