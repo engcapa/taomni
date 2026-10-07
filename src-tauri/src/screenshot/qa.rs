@@ -259,6 +259,13 @@ async fn open_fixture(
         .focused(true)
         .build()
         .context("open QA fixture window")?;
+    // X11/LXQt and Xtigervnc can map a newly created WebView below the main
+    // surface even when the builder requests focus/topmost. Re-assert both
+    // after mapping so the OS capture region contains this fixture rather
+    // than the stale window underneath it.
+    let _ = window.show();
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_focus();
     let ready = run_js(
         &window,
         "const ready = () => { const root = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return !!root && (!root.querySelector('canvas') || root.dataset.sourceReady === 'true'); }; for (let i = 0; i < 100 && !ready(); i++) await new Promise((r) => setTimeout(r, 100)); return ready();",
@@ -270,7 +277,7 @@ async fn open_fixture(
     }
     let _ = window.set_focus();
     // Let the window manager map and raise it.
-    tokio::time::sleep(Duration::from_millis(700)).await;
+    tokio::time::sleep(Duration::from_millis(1200)).await;
     if route == "anim" {
         // A previous scroll scenario leaves the OS cursor over the fixture.
         // CoreGraphics snapshots include it even when a different WebView has

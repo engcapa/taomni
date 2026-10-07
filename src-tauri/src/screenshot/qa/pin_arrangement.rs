@@ -30,6 +30,10 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
             return image()?.naturalWidth === 320 && image()?.naturalHeight === 240;
         "#, Duration::from_secs(10)).await?;
         anyhow::ensure!(ready == true, "pin {index} did not load its original image");
+        // WebKitGTK needs one compositor turn between top-level surfaces on
+        // X11/VNC. Creating both pins back-to-back can tear down the driver
+        // page while the second WebView is still being mapped.
+        tokio::time::sleep(Duration::from_millis(500)).await;
         let pinned = super::super::tool_state()
             .pins
             .get(&label)

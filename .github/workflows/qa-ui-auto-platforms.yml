@@ -330,7 +330,13 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: RDP unit contracts on the native platform
-        if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        # The IronRDP unit contracts are platform-independent. Run the
+        # expensive release test matrix once on the Linux representative;
+        # Windows/macOS still execute their real release native RDP cases and
+        # startup diagnostics below. This removes a 30–50 minute duplicate
+        # Rust test build from each non-Linux native job without changing any
+        # release app build or product evidence.
+        if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp') && runner.os == 'Linux'
         env:
           CARGO_TARGET_DIR: target/qa-ui-auto
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'

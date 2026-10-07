@@ -1569,11 +1569,15 @@ def _dispatch_terminal_input(ctx: NativeStepContext, selector: str, text: str, s
     # dispatching its InputEvent; otherwise the first byte is intermittently
     # dropped on Windows ConPTY (for example `printf` becomes `rintf`).
     time.sleep(0.08)
+    # WebView2/ConPTY occasionally drops the first byte of a synthetic input
+    # event immediately after a modifier cycle. A leading shell space is
+    # harmless for command probes and makes the first delivered byte expendable.
+    payload_text = f" {text}" if platform.system() == "Windows" else text
     result = ctx.session.execute(
         f"const element = document.querySelector({json.dumps(selector)});"
         "if (!element) return {found:false,focused:false};"
         "element.focus();"
-        f"const data = {json.dumps(text)};"
+        f"const data = {json.dumps(payload_text)};"
         "element.dispatchEvent(new InputEvent('input',{"
         "data,inputType:'insertText',bubbles:true,composed:false}));"
         "return {found:true,focused:document.activeElement===element};"

@@ -18178,7 +18178,11 @@ export function CodeWorkspaceTab({
       });
       if (
         !completion.accepted
-        || !workspaceSemanticIndexBuildIsCurrent(completion.snapshot, buildToken)
+        // Provider progress and an already-consumed invalidation can leave
+        // staleReasons populated without changing the pinned workspace
+        // revision. The rename response is still valid in that case; reject
+        // only a real revision change after the provider answered.
+        || !workspaceSemanticIndexTokenRevisionCurrent(completion.snapshot, buildToken)
       ) {
         const message = "Rename result became stale because the workspace changed; run Rename again "
           + `(${describeSemanticInvalidation(completion.snapshot, buildToken.revision)})`;

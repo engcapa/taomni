@@ -119,17 +119,19 @@ def step_assert_pattern(ctx: StepContext, args: Any) -> None:
         nonlocal observed
         loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
         text = ""
+        candidates: list[str] = []
         try:
             text = loc.text_content() or ""
+            candidates.append(text)
         except Exception:
             text = ""
         # xterm.js renders to canvas; the app mirrors its buffer here for QA reads.
         try:
-            text = text or loc.get_attribute("data-terminal-text") or ""
+            candidates.append(loc.get_attribute("data-terminal-text") or "")
         except Exception:
             pass
         observed = text
-        return bool(pattern.search(text))
+        return any(pattern.search(candidate) for candidate in candidates)
 
     try:
         _wait_for_match(ctx, _check, timeout, fail=f"{selector} text does not match {args['regex']!r}")
