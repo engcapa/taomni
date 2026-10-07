@@ -311,7 +311,7 @@ export default function RdpPanel({
         };
 
         ws.onmessage = (event) => {
-          if (destroyedRef.current) return;
+          if (destroyedRef.current || wsRef.current !== ws) return;
           if (event.data instanceof ArrayBuffer) {
             const dv = new DataView(event.data);
             if (event.data.byteLength === 0) return;
@@ -373,6 +373,11 @@ export default function RdpPanel({
                   if (!challenge) {
                     retryAllowedRef.current = msg.retryable === true;
                     store.setDisconnected(tabId, msg.message);
+                    // The native worker has ended, but its relay can stay
+                    // open awaiting controls. Release it explicitly so the
+                    // close handler cleans up and applies the bounded retry
+                    // policy instead of leaving a transient error stranded.
+                    ws.close();
                     break;
                   }
                   retryAllowedRef.current = false;

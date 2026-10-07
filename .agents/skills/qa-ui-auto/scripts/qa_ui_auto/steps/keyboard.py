@@ -33,6 +33,16 @@ def step_fill(ctx: StepContext, args: Any) -> None:
           el.dispatchEvent(new Event('change', {bubbles: true}));
         }""", value)
         return
+    if loc.evaluate("el => el.isContentEditable && el.classList.contains('cm-content')") is True:
+        # Playwright fill selects DOM text; CodeMirror owns its selection and
+        # may still have a pending DOM reconciliation. Use its select-all
+        # command and a real input event so replacement is one editor edit.
+        loc.press("ControlOrMeta+a")
+        if value:
+            ctx.page.keyboard.insert_text(value)
+        else:
+            ctx.page.keyboard.press("Backspace")
+        return
     loc.fill(value)
 
 

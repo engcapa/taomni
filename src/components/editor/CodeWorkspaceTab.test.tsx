@@ -13198,6 +13198,45 @@ end_of_record
       expect(getRefactorRecoveryJournalV2("rec-conflict-1")?.status).toBe("recovery-required");
     });
 
+    it("queues editor undo until the cross-file post-state and journal are committed", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("pending-history", "src/a.ts");
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/a.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+      let releasePostRead!: () => void;
+      const postRead = new Promise<void>((resolve) => { releasePostRead = resolve; });
+      let waiting = false;
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (path === "src/b.ts" && disk[path] === "hello BETA") {
+          waiting = true;
+          await postRead;
+        }
+        return file(path, disk[path]!);
+      });
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: [
+          { uri: "file:///repo/app/src/a.ts", path: "/repo/app/src/a.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }] },
+          { uri: "file:///repo/app/src/b.ts", path: "/repo/app/src/b.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 10 } }, newText: "BETA" }] },
+        ],
+      });
+      try {
+        await waitFor(() => expect(waiting).toBe(true));
+        const pane = screen.getByTestId("code-workspace-editor-pane");
+        fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
+        // The document ledger must not restore only the open buffer while
+        // the multi-file journal is still being verified.
+        expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspace.workspaceInstanceId!)
+          .openFiles["root:app:src/a.ts"]?.text).toBe("hello ALPHA");
+      } finally {
+        await act(async () => { releasePostRead(); });
+      }
+      await waitFor(() => expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]));
+      expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspace.workspaceInstanceId!)
+        .openFiles["root:app:src/a.ts"]?.text).toBe(PRE["src/a.ts"]);
+    });
+
     it("commits recovery journal and supports single undo on verified success", async () => {
       const { disk, workspace, onCommandsChange } = setupWorkspace("planless-success", "src/c.ts");
       vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);

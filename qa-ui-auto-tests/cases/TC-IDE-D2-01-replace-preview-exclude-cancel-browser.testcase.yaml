@@ -48,7 +48,13 @@ steps:
 
       '
 - press: Control+s
-- wait: 1
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - first needle line
+    - second needle line
+    - ''
+    timeout_sec: 10
 - press: Control+Shift+F
 - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
 - fill:

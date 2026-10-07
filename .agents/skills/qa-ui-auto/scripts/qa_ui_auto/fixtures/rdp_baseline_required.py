@@ -138,6 +138,10 @@ def setup(ctx: Any) -> None:
                 winreg.HKEY_LOCAL_MACHINE,
                 r"SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services",
                 "fSingleSessionPerUser", 1))
+            _SESSION_POLICY.enter_context(_registry_value(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SYSTEM\CurrentControlSet\Control\Terminal Server",
+                "fSingleSessionPerUser", 1))
             _setup(ctx)
         except BaseException:
             try:
@@ -236,6 +240,53 @@ def logoff_owned_session(user: str) -> list[int]:
         if monotonic() >= deadline:
             raise RuntimeError("owned TermService session did not finish logging off")
         sleep(0.25)
+    return sessions
+
+
+def _session_connection_state(session: int) -> int:
+    """Use WTS enum values, independent of quser's localized state text."""
+    import ctypes
+    from ctypes import wintypes
+    api = ctypes.windll.wtsapi32
+    buffer = ctypes.c_void_p()
+    size = wintypes.DWORD()
+    # WTSConnectState = 8; WTSDisconnected = 4.
+    if not api.WTSQuerySessionInformationW(None, session, 8,
+                                           ctypes.byref(buffer), ctypes.byref(size)):
+        raise ctypes.WinError()
+    try:
+        return ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value
+    finally:
+        api.WTSFreeMemory(buffer)
+
+
+def disconnect_owned_session(user: str) -> list[int]:
+    """Keep the warmed target alive, but release its RDP connection slot.
+
+    Closing a probe's socket does not synchronously finish TermService's
+    disconnect. A following login can otherwise encounter the two-user limit.
+    This barrier acts only on disposable accounts created by this fixture.
+    """
+    if (platform.system() != "Windows" or os.environ.get("GITHUB_ACTIONS") != "true"
+            or user not in USERS or user not in _CREATED):
+        raise RuntimeError("TermService disconnect requires an owned hosted reference account")
+    import ctypes
+    from time import monotonic, sleep
+    result = subprocess.run(["quser"], capture_output=True, text=True, timeout=30, check=True)
+    sessions = session_ids(result.stdout, user)
+    if not sessions:
+        raise RuntimeError("owned TermService reference session disappeared")
+    for session in sessions:
+        if _session_connection_state(session) != 4:
+            if not ctypes.windll.wtsapi32.WTSDisconnectSession(None, session, False):
+                # A socket disconnect may have completed concurrently.
+                if _session_connection_state(session) != 4:
+                    raise ctypes.WinError()
+        deadline = monotonic() + 30
+        while _session_connection_state(session) != 4:
+            if monotonic() >= deadline:
+                raise RuntimeError("owned TermService connection did not finish disconnecting")
+            sleep(0.25)
     return sessions
 
 
