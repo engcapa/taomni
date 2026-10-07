@@ -315,6 +315,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # macOS – single arm64 runner, cross-compiles both architectures
+  # tauri.conf.json sets minimumSystemVersion to 10.15 for Whisper's C++17
+  # std::filesystem. Tauri forwards it as MACOSX_DEPLOYMENT_TARGET to both builds.
   # ---------------------------------------------------------------------------
   build-macos:
     needs: plan
