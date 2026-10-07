@@ -1714,6 +1714,9 @@
 - `[data-testid="screenshot-pin-collapse"]` — interactive — F27.1.screenshot-pin-collapse
 - `[data-testid="screenshot-pin-expand"]` — interactive — F27.1.screenshot-pin-expand
 - `[data-testid="screenshot-pin-menu-toggle"]` — interactive — F27.1.screenshot-pin-menu-toggle
+- `[data-testid="screenshot-pin-tab-pin"]` — interactive — F27.1.screenshot-pin-tab-pin
+- `[data-testid="screenshot-pin-tab-all"]` — interactive — F27.1.screenshot-pin-tab-all
+- `[data-testid="screenshot-pin-list"]` — display — F27.1.screenshot-pin-list
 - `[data-testid="screenshot-pin-close"]` — interactive — F27.1.screenshot-pin-close
 - `[data-testid="screenshot-pin-zoom-out"]` — interactive — F27.1.screenshot-pin-zoom-out
 - `[data-testid="screenshot-pin-zoom-in"]` — interactive — F27.1.screenshot-pin-zoom-in
@@ -1736,6 +1739,7 @@
 - `[data-testid="screenshot-favorites-empty"]` — display — F27.1.screenshot-favorites-empty
 - `[data-testid="screenshot-favorite-item"]` — display — F27.1.screenshot-favorite-item
 - `[data-testid="screenshot-favorite-thumbnail"]` — display — F27.1.screenshot-favorite-thumbnail
+- `[data-testid="screenshot-favorite-note"]` — display — F27.1.screenshot-favorite-note
 - `[data-testid="screenshot-favorites-error"]` — display — F27.1.screenshot-favorites-error
 - `[data-testid="capture-menu"]` — display [optional] — F27.1.capture-menu
 - `[data-testid="capture-toolbar"]` — display [optional] — F27.1.capture-toolbar
@@ -1750,6 +1754,7 @@
 - `[data-testid="screenshot-fill"]` — interactive [optional] — F27.1.screenshot-fill
 - `[data-testid="screenshot-more"]` — interactive [optional] — F27.1.screenshot-more
 - `[data-testid="screenshot-pin-note"]` — display [optional] — F27.1.screenshot-pin-note
+- `[data-testid="screenshot-pin-thumb-note"]` — display [optional] — F27.1.screenshot-pin-thumb-note
 - `[data-testid="screenshot-pin-note-input"]` — interactive [optional] — F27.1.screenshot-pin-note-input
 - `[data-testid="screenshot-pin-note-save"]` — interactive [optional] — F27.1.screenshot-pin-note-save
 - `[data-testid="screenshot-pins-collapse"]` — interactive [optional] — F27.1.screenshot-pins-collapse

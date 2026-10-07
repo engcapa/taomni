@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
-use super::{PIN_LABEL_PREFIX, tool_state};
+use super::{PIN_LABEL_PREFIX, blocking, tool_state};
 
 /// Pin windows listen for this to apply a batch action to themselves.
 pub const PIN_ACTION_EVENT: &str = "screenshot://pin-action";
@@ -234,13 +234,24 @@ pub async fn screenshot_set_pin_note(
         return Err("not a pin window".into());
     }
     let note = normalize_note(&note);
-    {
+    let favorite_id = {
         let mut state = tool_state();
         let pin = state
             .pins
             .get_mut(&label)
             .ok_or("no pinned screenshot for this window")?;
         pin.note = note.clone();
+        pin.favorite_id.clone()
+    };
+    // Keep the persistent favorite's caption in step so reopening it shows the
+    // same description the pin shows now.
+    if let Some(favorite_id) = favorite_id {
+        let app_for_favorite = app.clone();
+        let favorite_note = note.clone();
+        let _ = blocking("sync favorite note", move || {
+            super::favorites::sync_favorite_note(&app_for_favorite, &favorite_id, &favorite_note)
+        })
+        .await;
     }
     let _ = app.emit(PINS_CHANGED_EVENT, ());
     Ok(note)

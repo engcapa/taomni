@@ -92,6 +92,51 @@ describe("PinnedImage", () => {
     expect(mocks.closePin).not.toHaveBeenCalled();
   });
 
+  it("splits the menu into this-pin and all-pins tabs with the compact toolbar unchanged", async () => {
+    render(<PinnedImage />);
+    const pin = await screen.findByTestId("screenshot-pin-window");
+    fireEvent.contextMenu(pin);
+    expect(screen.getByTestId("screenshot-pin-tab-pin")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { selected: true })).toHaveAttribute("data-testid", "screenshot-pin-tab-pin");
+    expect(screen.getByTestId("screenshot-pin-help")).toBeVisible();
+    expect(screen.queryByTestId("screenshot-pins-tile")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("screenshot-pin-tab-all"));
+    expect(screen.getByTestId("screenshot-pin-tab-all")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("screenshot-pins-tile")).toBeVisible();
+    expect(screen.getByTestId("screenshot-pin-list")).toBeVisible();
+    expect(screen.queryByTestId("screenshot-pin-help")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("screenshot-pin-tab-pin"));
+    expect(screen.getByTestId("screenshot-pin-help")).toBeVisible();
+    // The tab switch keeps the menu open; the toggle closes it.
+    fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
+    expect(screen.queryByTestId("screenshot-pin-menu")).not.toBeInTheDocument();
+    // Right-click always reopens on the this-pin tab.
+    fireEvent.contextMenu(pin);
+    expect(screen.getByTestId("screenshot-pin-tab-pin")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("shows the note truncated on the collapsed thumbnail with a full tooltip", async () => {
+    render(<PinnedImage />);
+    await screen.findByTestId("screenshot-pin-window");
+    fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
+    fireEvent.change(screen.getByTestId("screenshot-pin-note-input"), { target: { value: "登录页对照图" } });
+    fireEvent.click(screen.getByTestId("screenshot-pin-note-save"));
+    // The note bar shows only while the menu is closed.
+    fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
+    await screen.findByTestId("screenshot-pin-note");
+    expect(screen.getByTestId("screenshot-pin-note")).toHaveTextContent("登录页对照图");
+    fireEvent.click(screen.getByTestId("screenshot-pin-collapse"));
+    const thumb = await screen.findByTestId("screenshot-pin-thumb-note");
+    expect(thumb).toHaveTextContent("登录页对照图");
+    expect(thumb).toHaveAttribute("title", "登录页对照图");
+    expect(screen.getByTestId("screenshot-pin-window")).toHaveAttribute("title", "登录页对照图");
+    fireEvent.click(screen.getByTestId("screenshot-pin-expand"));
+    await screen.findByTestId("screenshot-pin-toolbar");
+    expect(screen.getByTestId("screenshot-pin-window")).toHaveAttribute("title", "screenshot.pinHint");
+    fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
+    expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("登录页对照图");
+  });
+
   it("copies and saves original pixels while keeping the pin open, and save cancellation does not write", async () => {
     render(<PinnedImage />);
     await screen.findByTestId("screenshot-pin-window");

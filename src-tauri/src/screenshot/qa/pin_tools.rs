@@ -248,9 +248,22 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
             json!({"nativeSaveDialog":"did not save original PNG","destination":destination,"readiness":save_dialog_ready,"input":save_dialog_input,"controls":controls,"drag":drag}),
         ));
     }
+    // The note written through the menu must follow the pin into the
+    // persistent favorite so the collection and reopen show the same caption.
+    let favorite_note = run_js(&pin, r#"
+      const q=id=>document.querySelector('[data-testid="'+id+'"]');
+      q('screenshot-pin-menu-toggle').click(); await new Promise(r=>setTimeout(r,100));
+      const input=q('screenshot-pin-note-input');
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'QA pin note');
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      q('screenshot-pin-note-save').click(); await new Promise(r=>setTimeout(r,300));
+      q('screenshot-pin-menu-toggle').click(); await new Promise(r=>setTimeout(r,100));
+      return q('screenshot-pin-note')?.textContent ?? '';
+    "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     run_js(&pin, "document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').click(); for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed')!=='true';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
     let items = super::super::favorites::screenshot_list_favorites(app.clone()).await?;
     let favorite = items.first().ok_or("favorite write missing")?.clone();
+    let favorite_note_saved = favorite.note == "QA pin note";
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-close\"]').click()")
         .map_err(|e| e.to_string())?;
     let closed = wait_closed(&app, &label, Duration::from_secs(10)).await;
@@ -281,7 +294,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     let reopened_info = run_js(&reopened, r#"
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
       for(let i=0;i<100 && !q('screenshot-pin-image')?.naturalWidth;i++) await new Promise(r=>setTimeout(r,100));
-      return {width:q('screenshot-pin-image')?.naturalWidth,height:q('screenshot-pin-image')?.naturalHeight,favorite:q('screenshot-pin-favorite')?.getAttribute('aria-pressed')};
+      return {width:q('screenshot-pin-image')?.naturalWidth,height:q('screenshot-pin-image')?.naturalHeight,favorite:q('screenshot-pin-favorite')?.getAttribute('aria-pressed'),note:q('screenshot-pin-note')?.textContent ?? ''};
     "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
     let payload = super::super::tool_state()
         .pins
@@ -314,7 +327,10 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         && restored_opacity == json!(0.5)
         && saved_identical
         && closed
+        && favorite_note == json!("QA pin note")
+        && favorite_note_saved
         && reopened_info["favorite"] == "true"
+        && reopened_info["note"] == json!("QA pin note")
         && reopened_pixels
         && removed
         && independent_pin
@@ -322,6 +338,6 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         && favorite_artifact.is_some();
     Ok(report(
         ok,
-        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"saveDialogReady":save_dialog_ready,"saveDialogInput":save_dialog_input,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
+        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"saveDialogReady":save_dialog_ready,"saveDialogInput":save_dialog_input,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"pinNote":favorite_note,"favoriteNoteSaved":favorite_note_saved,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
     ))
 }
