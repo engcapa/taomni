@@ -108,9 +108,17 @@ pub async fn screenshot_add_favorite(
         let _guard = STORAGE.lock().unwrap_or_else(|e| e.into_inner());
         let root = root(&app)?;
         let mut item = add(&root, &capture::ensure_artifact_path(&path)?)?;
-        let note = super::tool_state().pins.values().find(|pin| pin.path == path).map(|pin| pin.note.clone()).unwrap_or_default();
+        let note = super::tool_state()
+            .pins
+            .values()
+            .find(|pin| pin.path == path)
+            .map(|pin| pin.note.clone())
+            .unwrap_or_default();
         item.note = note;
-        std::fs::write(entry_dir(&root, &item.id)?.join("info.json"), serde_json::to_vec(&item)?)?;
+        std::fs::write(
+            entry_dir(&root, &item.id)?.join("info.json"),
+            serde_json::to_vec(&item)?,
+        )?;
         Ok(item)
     })
     .await
@@ -156,7 +164,14 @@ pub async fn screenshot_pin_favorite(app: AppHandle, id: String) -> Result<Strin
         Ok((path, favorite))
     })
     .await?;
-    super::open_pin_with_note(&app, path, favorite.width, favorite.height, Some(favorite.id), favorite.note)
+    super::open_pin_with_note(
+        &app,
+        path,
+        favorite.width,
+        favorite.height,
+        Some(favorite.id),
+        favorite.note,
+    )
 }
 
 #[cfg(test)]

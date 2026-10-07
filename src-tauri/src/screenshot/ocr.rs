@@ -146,10 +146,18 @@ pub fn split_line_words(
 /// Reuse the native sensitive-token classifier for the bundled offline engine.
 #[tauri::command]
 pub fn screenshot_redact_tsv(tsv: String) -> Result<RedactResult, String> {
-    if tsv.len() > 8 * 1024 * 1024 { return Err("OCR result exceeds size limit".into()); }
-    let words: Vec<_> = parse_tsv_words(&tsv).into_iter().filter(|w| w.conf >= 30.0).collect();
+    if tsv.len() > 8 * 1024 * 1024 {
+        return Err("OCR result exceeds size limit".into());
+    }
+    let words: Vec<_> = parse_tsv_words(&tsv)
+        .into_iter()
+        .filter(|w| w.conf >= 30.0)
+        .collect();
     let boxes = find_sensitive(&words);
-    Ok(RedactResult { count: boxes.len(), boxes })
+    Ok(RedactResult {
+        count: boxes.len(),
+        boxes,
+    })
 }
 
 /// Run tesseract on `path`, requesting TSV output for word boxes.

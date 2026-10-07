@@ -20,12 +20,12 @@ use serde_json::json;
 use winapi::um::winnt::HANDLE;
 
 use crate::proc_info::{
-    path_matches_selector, port_owners_for_pids, tcp_owner_pid, udp_owner_pid,
-    udp_port_owners_for_pids, ProcessTree, SharedTree,
+    ProcessTree, SharedTree, path_matches_selector, port_owners_for_pids, tcp_owner_pid,
+    udp_owner_pid, udp_port_owners_for_pids,
 };
 use crate::windivert::{
-    addr_event, addr_for_reflect_inbound, addr_is_outbound, addr_layer, flow_endpoints_ip,
-    flow_process_id, WinDivertApi, ADDR_LEN, LAYER_FLOW, LAYER_NETWORK, LAYER_SOCKET,
+    ADDR_LEN, LAYER_FLOW, LAYER_NETWORK, LAYER_SOCKET, WinDivertApi, addr_event,
+    addr_for_reflect_inbound, addr_is_outbound, addr_layer, flow_endpoints_ip, flow_process_id,
 };
 
 #[derive(Debug, Clone)]
@@ -175,9 +175,7 @@ fn build_network_filter(bypass_cidrs: &[String], block_quic: bool) -> String {
             IpAddr::V4(_) => "ip.DstAddr",
             IpAddr::V6(_) => "ipv6.DstAddr",
         };
-        filter.push_str(&format!(
-            " and not ({field} >= {lo} and {field} <= {hi})"
-        ));
+        filter.push_str(&format!(" and not ({field} >= {lo} and {field} <= {hi})"));
     }
     filter
 }
@@ -264,7 +262,13 @@ impl FlowTable {
     /// A cached entry whose destination does not match the packet belongs to a
     /// previous connection that happened to use the same local port; it is
     /// dropped rather than reused.
-    fn lookup(&mut self, key: FlowKey, dst: IpAddr, dport: u16, now: Instant) -> Option<FlowAction> {
+    fn lookup(
+        &mut self,
+        key: FlowKey,
+        dst: IpAddr,
+        dport: u16,
+        now: Instant,
+    ) -> Option<FlowAction> {
         match self.entries.get(&key) {
             Some(e) if e.dst == dst && e.dport == dport => {}
             Some(_) => {
@@ -281,7 +285,14 @@ impl FlowTable {
         })
     }
 
-    fn insert(&mut self, key: FlowKey, dst: IpAddr, dport: u16, verdict: FlowVerdict, now: Instant) {
+    fn insert(
+        &mut self,
+        key: FlowKey,
+        dst: IpAddr,
+        dport: u16,
+        verdict: FlowVerdict,
+        now: Instant,
+    ) {
         self.remove(&key);
         if let FlowVerdict::Redirect(m) = &verdict {
             self.peer_index.insert((m.orig_dst, m.orig_sport), key);
@@ -380,8 +391,11 @@ impl FlowTable {
     /// re-triggering on every subsequent insert.
     fn evict_overflow(&mut self) {
         let target = self.entries.len().saturating_sub(MAX_FLOW_ENTRIES * 7 / 8);
-        let mut by_deadline: Vec<(Instant, FlowKey)> =
-            self.entries.iter().map(|(k, e)| (e.expires_at, *k)).collect();
+        let mut by_deadline: Vec<(Instant, FlowKey)> = self
+            .entries
+            .iter()
+            .map(|(k, e)| (e.expires_at, *k))
+            .collect();
         by_deadline.sort_unstable_by_key(|(t, _)| *t);
         for (_, k) in by_deadline.into_iter().take(target) {
             self.remove(&k);
@@ -1223,7 +1237,16 @@ fn network_loop(
             index_synced = Instant::now();
         }
 
-        let verdict = classify_flow(&plan, &bypass_nets, &flows, &tree, key, dst, dport, &app_index);
+        let verdict = classify_flow(
+            &plan,
+            &bypass_nets,
+            &flows,
+            &tree,
+            key,
+            dst,
+            dport,
+            &app_index,
+        );
 
         if let Ok(mut t) = redirects.lock() {
             t.insert(key, dst, dport, verdict.clone(), now);
@@ -1575,11 +1598,7 @@ fn should_bypass(
 /// It was also unnecessary: `GetExtendedTcpTable(OWNER_PID_ALL)` lists sockets
 /// in `SYN_SENT`, so the row exists by the time the SYN reaches us, and
 /// `tcp_owner_pid` already forces one fresh read on a miss.
-fn resolve_flow(
-    flows: &Arc<Mutex<FlowMap>>,
-    tree: &SharedTree,
-    key: FlowKey,
-) -> Option<FlowInfo> {
+fn resolve_flow(flows: &Arc<Mutex<FlowMap>>, tree: &SharedTree, key: FlowKey) -> Option<FlowInfo> {
     let (src, sport) = key;
     if let Some(f) = flows.lock().ok().and_then(|m| m.get(&key).cloned()) {
         return Some(f);
@@ -1896,7 +1915,10 @@ mod tests {
         let key = client(52_000);
         t.insert(key, remote(1), 443, redirect_to(key, remote(1), 443), now);
 
-        assert_eq!(t.lookup(key, remote(1), 443, now), Some(FlowAction::Redirect));
+        assert_eq!(
+            t.lookup(key, remote(1), 443, now),
+            Some(FlowAction::Redirect)
+        );
         // Same local port, different peer → previous verdict must not apply.
         assert_eq!(t.lookup(key, remote(2), 443, now), None);
         assert_eq!(t.len(), 0, "stale entry should be dropped, not kept");
@@ -1975,7 +1997,10 @@ mod tests {
         // FIN/RST brings expiry forward without breaking the rest of the
         // close handshake.
         t.mark_closing(&key, now);
-        assert_eq!(t.lookup(key, remote(1), 443, now), Some(FlowAction::Redirect));
+        assert_eq!(
+            t.lookup(key, remote(1), 443, now),
+            Some(FlowAction::Redirect)
+        );
 
         // `lookup` refreshed the entry, so close again and sweep past the grace.
         t.mark_closing(&key, now);
@@ -2174,4 +2199,3 @@ mod tests {
         assert_eq!(m.len(), 0);
     }
 }
-

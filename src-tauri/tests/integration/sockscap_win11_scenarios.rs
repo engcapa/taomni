@@ -162,9 +162,10 @@ fn test_policy_app_isolation_and_bypass() {
 /// Scenario 2: Egress dialing through an upstream HTTP proxy (opt-in).
 #[tokio::test]
 async fn test_upstream_http_dialer() {
-    let (Some(proxy_host), Some(proxy_port)) =
-        (env_opt("QA_HTTP_PROXY_HOST"), env_port("QA_HTTP_PROXY_PORT"))
-    else {
+    let (Some(proxy_host), Some(proxy_port)) = (
+        env_opt("QA_HTTP_PROXY_HOST"),
+        env_port("QA_HTTP_PROXY_PORT"),
+    ) else {
         eprintln!(
             "SKIP test_upstream_http_dialer: set QA_HTTP_PROXY_HOST and QA_HTTP_PROXY_PORT to run"
         );
@@ -248,7 +249,9 @@ async fn test_upstream_ssh_tunnel_dialer() {
         .await
         .expect("SSH connection failed");
 
-    println!("[SSH Tunnel Test] Channel connected. Dialing {target_host}:{target_port} over tunnel...");
+    println!(
+        "[SSH Tunnel Test] Channel connected. Dialing {target_host}:{target_port} over tunnel..."
+    );
     let mut channel = pool
         .dial(&target_host, target_port, "127.0.0.1", 12345)
         .await

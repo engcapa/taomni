@@ -25,8 +25,8 @@ use super::qa_oracle;
 pub mod colors;
 #[cfg(target_os = "macos")]
 mod macos_save_dialog;
-pub mod pin_tools;
 pub mod pin_arrangement;
+pub mod pin_tools;
 pub mod scroll_manual;
 #[cfg(target_os = "windows")]
 mod windows_save_dialog;
@@ -666,17 +666,35 @@ pub async fn screenshot_qa_capture_fidelity(app: AppHandle) -> Result<String, St
     // production capture command briefly so the case checks the settled
     // desktop pixels without weakening the comparison oracle.
     let mut file = super::screenshot_capture_region(
-        app.clone(), Some(display.id.clone()), region.0, region.1, region.2, region.3,
-    ).await?;
-    let mut image = image::open(&file.path).map_err(|e| e.to_string())?.to_rgba8();
+        app.clone(),
+        Some(display.id.clone()),
+        region.0,
+        region.1,
+        region.2,
+        region.3,
+    )
+    .await?;
+    let mut image = image::open(&file.path)
+        .map_err(|e| e.to_string())?
+        .to_rgba8();
     let mut comparison = qa_oracle::compare(&image, &expected, false);
     for _ in 0..5 {
-        if comparison.passed { break; }
+        if comparison.passed {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(250)).await;
         file = super::screenshot_capture_region(
-            app.clone(), Some(display.id.clone()), region.0, region.1, region.2, region.3,
-        ).await?;
-        image = image::open(&file.path).map_err(|e| e.to_string())?.to_rgba8();
+            app.clone(),
+            Some(display.id.clone()),
+            region.0,
+            region.1,
+            region.2,
+            region.3,
+        )
+        .await?;
+        image = image::open(&file.path)
+            .map_err(|e| e.to_string())?
+            .to_rgba8();
         comparison = qa_oracle::compare(&image, &expected, false);
     }
     let runs = row_runs(&image, image.width() * 3 / 4);
@@ -814,7 +832,9 @@ pub async fn screenshot_qa_annotation_tools(app: AppHandle) -> Result<String, St
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
     super::open_overlay(&app, None).await?;
-    let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
     let result = run_js(&overlay, r#"
       const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
@@ -840,7 +860,9 @@ pub async fn screenshot_qa_annotation_tools(app: AppHandle) -> Result<String, St
       const afterErase=Number(q('screenshot-annotation-canvas').dataset.shapes);
       return {filledRect,beforeErase,afterErase,eraseMode:q('screenshot-eraser-mode').value,fill:filledRect};
     "#, Duration::from_secs(25)).await.map_err(|e| e.to_string())?;
-    overlay.eval("document.querySelector('[data-testid=\"screenshot-cancel\"]')?.click()").map_err(|e| e.to_string())?;
+    overlay
+        .eval("document.querySelector('[data-testid=\"screenshot-cancel\"]')?.click()")
+        .map_err(|e| e.to_string())?;
     let closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
     Ok(report(
         result["filledRect"] == json!(true)

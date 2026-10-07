@@ -220,7 +220,9 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
     close_borders(app);
     // Wayland cannot position arbitrary top-level border windows. The
     // full-display controller supplies a click-through outline instead.
-    if super::pins::native_wayland() { return Ok(()); }
+    if super::pins::native_wayland() {
+        return Ok(());
+    }
     let result = (|| {
         for (i, rect) in borders(region, (2.0 * display.scale_factor.max(1.0)).ceil() as i32)
             .into_iter()
@@ -289,28 +291,37 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
 #[cfg(target_os = "linux")]
 pub fn configure_wayland_scroll(window: &tauri::WebviewWindow) -> Result<(), String> {
     let target = window.clone();
-    window.run_on_main_thread(move || {
-        use gtk::prelude::*;
-        if let Ok(gtk) = target.gtk_window() {
-            let allocation = gtk.allocation();
-            let region = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(
-                0, (allocation.height() - CONTROL_HEIGHT as i32).max(0), allocation.width(), CONTROL_HEIGHT as i32,
-            ));
-            if let Some(gdk_window) = gtk.window() {
-                gdk_window.input_shape_combine_region(&region, 0, 0);
-                gdk_window.display().flush();
-            }
-            gtk.connect_size_allocate(move |widget, allocation| {
-                if let Some(gdk_window) = widget.window() {
-                    let region = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(
-                        0, (allocation.height() - CONTROL_HEIGHT as i32).max(0), allocation.width(), CONTROL_HEIGHT as i32,
-                    ));
+    window
+        .run_on_main_thread(move || {
+            use gtk::prelude::*;
+            if let Ok(gtk) = target.gtk_window() {
+                let allocation = gtk.allocation();
+                let region = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(
+                    0,
+                    (allocation.height() - CONTROL_HEIGHT as i32).max(0),
+                    allocation.width(),
+                    CONTROL_HEIGHT as i32,
+                ));
+                if let Some(gdk_window) = gtk.window() {
                     gdk_window.input_shape_combine_region(&region, 0, 0);
                     gdk_window.display().flush();
                 }
-            });
-        }
-    }).map_err(|e| e.to_string())
+                gtk.connect_size_allocate(move |widget, allocation| {
+                    if let Some(gdk_window) = widget.window() {
+                        let region =
+                            gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(
+                                0,
+                                (allocation.height() - CONTROL_HEIGHT as i32).max(0),
+                                allocation.width(),
+                                CONTROL_HEIGHT as i32,
+                            ));
+                        gdk_window.input_shape_combine_region(&region, 0, 0);
+                        gdk_window.display().flush();
+                    }
+                });
+            }
+        })
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -348,8 +359,17 @@ mod tests {
             assert!(!captured.intersects(controls), "{captured:?} {controls:?}");
             // Borders drawn around the shrunk region stay off the controls too.
             let thickness = (2.0 * scale).ceil() as i32;
-            assert!(borders(captured, thickness).iter().all(|b| !b.intersects(controls)));
-            let screen = Rect { x: d.x, y: d.y, w: d.width as i32, h: d.height as i32 };
+            assert!(
+                borders(captured, thickness)
+                    .iter()
+                    .all(|b| !b.intersects(controls))
+            );
+            let screen = Rect {
+                x: d.x,
+                y: d.y,
+                w: d.width as i32,
+                h: d.height as i32,
+            };
             assert!(screen.contains(controls) && screen.contains(captured));
             assert_eq!(captured.w, d.width as i32);
             assert!(captured.h >= d.height as i32 - ((CONTROL_HEIGHT + 8.0) * scale).ceil() as i32);

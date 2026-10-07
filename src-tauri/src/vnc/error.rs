@@ -34,9 +34,14 @@ impl VncError {
             message.push_str("...");
         }
         let lower = message.to_ascii_lowercase();
-        let (code, stage, retryable) = if lower.contains("unencrypted connection requires confirmation")
+        let (code, stage, retryable) = if lower
+            .contains("unencrypted connection requires confirmation")
         {
-            ("unencrypted-confirmation-required", VncStage::Security, false)
+            (
+                "unencrypted-confirmation-required",
+                VncStage::Security,
+                false,
+            )
         } else if lower.starts_with("credentials required:") {
             // Only the client's own stop (rfb::CREDENTIALS_REQUIRED), never a
             // server's failure reason.

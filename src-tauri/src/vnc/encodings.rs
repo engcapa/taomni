@@ -1,5 +1,5 @@
-use zlib_rs::{Inflate, InflateFlush};
 use std::io::Read;
+use zlib_rs::{Inflate, InflateFlush};
 
 use crate::vnc::limits::DecodeLimits;
 use crate::vnc::pixel::PixelConverter;
@@ -70,10 +70,7 @@ pub(crate) fn rgb_to_rgba(src: &[u8], dst: &mut [u8]) {
     let pixels = dst.len() / 4;
     debug_assert!(src.len() >= pixels * 3);
     let mut written = 0usize;
-    for (out, window) in dst
-        .chunks_exact_mut(4)
-        .zip(src.windows(4).step_by(3))
-    {
+    for (out, window) in dst.chunks_exact_mut(4).zip(src.windows(4).step_by(3)) {
         let value = u32::from_le_bytes([window[0], window[1], window[2], window[3]]) | 0xFF00_0000;
         out.copy_from_slice(&value.to_le_bytes());
         written += 1;
@@ -938,7 +935,16 @@ mod tests {
         let mut rgba = vec![0u8; 8];
         decode_raw_into(&mut cur, 2, 1, &PixelConverter::default(), &mut rgba).unwrap();
         assert_eq!(rgba, vec![10, 20, 30, 255, 40, 50, 60, 255]);
-        assert!(decode_raw_into(&mut Cursor::new(vec![0u8; 8]), 3, 1, &PixelConverter::default(), &mut rgba).is_err());
+        assert!(
+            decode_raw_into(
+                &mut Cursor::new(vec![0u8; 8]),
+                3,
+                1,
+                &PixelConverter::default(),
+                &mut rgba
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -957,8 +963,28 @@ mod tests {
 
     #[test]
     fn rich_cursor_rejects_invalid_geometry() {
-        assert!(read_rich_cursor(&mut Cursor::new(Vec::<u8>::new()), 3, 0, 3, 1, &PixelConverter::default()).is_err());
-        assert!(read_rich_cursor(&mut Cursor::new(Vec::<u8>::new()), 0, 0, 513, 1, &PixelConverter::default()).is_err());
+        assert!(
+            read_rich_cursor(
+                &mut Cursor::new(Vec::<u8>::new()),
+                3,
+                0,
+                3,
+                1,
+                &PixelConverter::default()
+            )
+            .is_err()
+        );
+        assert!(
+            read_rich_cursor(
+                &mut Cursor::new(Vec::<u8>::new()),
+                0,
+                0,
+                513,
+                1,
+                &PixelConverter::default()
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1023,7 +1049,15 @@ mod tests {
         let mut cur = Cursor::new(&payload);
         let mut st = HextileState::new();
         let mut rgba = vec![0u8; 8];
-        decode_hextile_into(&mut cur, 2, 1, &mut st, &PixelConverter::default(), &mut rgba).unwrap();
+        decode_hextile_into(
+            &mut cur,
+            2,
+            1,
+            &mut st,
+            &PixelConverter::default(),
+            &mut rgba,
+        )
+        .unwrap();
         // Alpha forced to 255.
         assert_eq!(rgba, vec![255, 0, 0, 255, 0, 255, 0, 255]);
         // No trailing bytes consumed from the cursor.
@@ -1041,7 +1075,15 @@ mod tests {
         let mut cur = Cursor::new(&payload);
         let mut st = HextileState::new();
         let mut rgba = vec![0u8; 32 * 4];
-        decode_hextile_into(&mut cur, 32, 1, &mut st, &PixelConverter::default(), &mut rgba).unwrap();
+        decode_hextile_into(
+            &mut cur,
+            32,
+            1,
+            &mut st,
+            &PixelConverter::default(),
+            &mut rgba,
+        )
+        .unwrap();
         for p in rgba.chunks_exact(4) {
             assert_eq!(p, &[255, 0, 0, 255]);
         }
@@ -1060,7 +1102,15 @@ mod tests {
         payload.extend_from_slice(&[0x11, 0x10]);
         let mut st = HextileState::new();
         let mut rgba = vec![0u8; 20 * 2 * 4];
-        decode_hextile_into(&mut Cursor::new(&payload), 20, 2, &mut st, &PixelConverter::default(), &mut rgba).unwrap();
+        decode_hextile_into(
+            &mut Cursor::new(&payload),
+            20,
+            2,
+            &mut st,
+            &PixelConverter::default(),
+            &mut rgba,
+        )
+        .unwrap();
         let px = |x: usize, y: usize| &rgba[(y * 20 + x) * 4..(y * 20 + x) * 4 + 4];
         assert_eq!(px(16, 0), &[0, 0, 255, 255]);
         assert_eq!(px(17, 1), &[0, 255, 0, 255]);
@@ -1248,7 +1298,9 @@ mod tests {
         let mut emit = |input: &[u8]| {
             let mut out = vec![0u8; input.len() + input.len() / 10 + 1024];
             let before = stream.total_out();
-            stream.compress(input, &mut out, FlushCompress::Sync).unwrap();
+            stream
+                .compress(input, &mut out, FlushCompress::Sync)
+                .unwrap();
             out.truncate((stream.total_out() - before) as usize);
             let mut payload = (out.len() as u32).to_be_bytes().to_vec();
             payload.extend(out);
@@ -1270,7 +1322,10 @@ mod tests {
             &mut rgba,
         )
         .unwrap();
-        assert!(rgba == expected, "pipelined decode differs from the source pixels");
+        assert!(
+            rgba == expected,
+            "pipelined decode differs from the source pixels"
+        );
         assert_eq!(dec.pos, 0);
         assert!(dec.buf.is_empty());
 

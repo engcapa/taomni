@@ -368,7 +368,13 @@ fn replay_decode_benchmark() {
         let frame = Arc::new(std::fs::read(&path).expect("read capture"));
         let mut samples: Vec<FrameStats> = (0..rounds)
             .map(|_| {
-                replay_once(width, height, frame.clone(), &encodings, profile_pixel_format(profile))
+                replay_once(
+                    width,
+                    height,
+                    frame.clone(),
+                    &encodings,
+                    profile_pixel_format(profile),
+                )
             })
             .collect();
         samples.sort_by(|a, b| a.wall_ms.total_cmp(&b.wall_ms));
@@ -406,7 +412,10 @@ fn replay_zrle_breakdown() {
         .expect("read capture dir")
         .filter_map(Result::ok)
         .map(|entry| entry.path())
-        .find(|path| path.file_name().is_some_and(|name| name.to_string_lossy().starts_with("zrle-")))
+        .find(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with("zrle-"))
+        })
     else {
         eprintln!("no zrle capture; skipping");
         return;
@@ -472,7 +481,11 @@ fn replay_zrle_breakdown() {
             let before_in = inflater.total_in();
             let before_out = inflater.total_out();
             inflater
-                .decompress(body, &mut sink[produced..], zlib_rs::InflateFlush::SyncFlush)
+                .decompress(
+                    body,
+                    &mut sink[produced..],
+                    zlib_rs::InflateFlush::SyncFlush,
+                )
                 .unwrap();
             assert_eq!((inflater.total_in() - before_in) as usize, len);
             produced += (inflater.total_out() - before_out) as usize;
@@ -490,6 +503,10 @@ fn replay_zrle_breakdown() {
         totals[totals.len() / 2],
         inflates[inflates.len() / 2],
         rs_inflates[rs_inflates.len() / 2],
-        if cfg!(debug_assertions) { "debug" } else { "release" },
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        },
     );
 }

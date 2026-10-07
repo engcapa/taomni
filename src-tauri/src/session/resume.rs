@@ -199,8 +199,15 @@ fn load_record(conn: &Connection) -> Result<Option<RunSnapshotRecord>, String> {
         )
         .optional()
         .map_err(|e| e.to_string())?;
-    let Some((schema_version, _revision, run_sequence, batch_id, committed_at_ms, entries_json, active_identity)) =
-        row
+    let Some((
+        schema_version,
+        _revision,
+        run_sequence,
+        batch_id,
+        committed_at_ms,
+        entries_json,
+        active_identity,
+    )) = row
     else {
         return Ok(None);
     };
@@ -209,8 +216,8 @@ fn load_record(conn: &Connection) -> Result<Option<RunSnapshotRecord>, String> {
             "snapshot schema version {schema_version} is not supported"
         ));
     }
-    let entries: Vec<SnapshotEntry> =
-        serde_json::from_str(&entries_json).map_err(|e| format!("corrupt snapshot entries: {e}"))?;
+    let entries: Vec<SnapshotEntry> = serde_json::from_str(&entries_json)
+        .map_err(|e| format!("corrupt snapshot entries: {e}"))?;
     Ok(Some(RunSnapshotRecord {
         schema_version,
         revision: current_revision(conn),
@@ -241,8 +248,9 @@ pub fn get_run_snapshot(conn: &Connection) -> Result<GetRunSnapshotResponse, Str
                     issue: None,
                 });
             }
-            let cleared =
-                metadata_get(conn, METADATA_CLEAR_MARKER).map_err(|e| e.to_string())?.is_some();
+            let cleared = metadata_get(conn, METADATA_CLEAR_MARKER)
+                .map_err(|e| e.to_string())?
+                .is_some();
             let legacy_candidate = if cleared {
                 None
             } else {
@@ -455,8 +463,7 @@ pub fn commit_run_snapshot(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     let now_ms = crate::terminal::local_directories::system_now_ms();
     let revision = metadata_increment(&tx, METADATA_REVISION).map_err(|e| e.to_string())?;
-    let run_sequence =
-        metadata_increment(&tx, METADATA_RUN_SEQUENCE).map_err(|e| e.to_string())?;
+    let run_sequence = metadata_increment(&tx, METADATA_RUN_SEQUENCE).map_err(|e| e.to_string())?;
     let batch_id = if batch_id.trim().is_empty() {
         uuid::Uuid::new_v4().simple().to_string()
     } else {
@@ -524,7 +531,10 @@ pub async fn clear_welcome_run_snapshot(
     clear_run_snapshot(&mut db, expected_revision)
 }
 
-pub fn clear_run_snapshot(conn: &mut Connection, expected_revision: Option<i64>) -> Result<(), String> {
+pub fn clear_run_snapshot(
+    conn: &mut Connection,
+    expected_revision: Option<i64>,
+) -> Result<(), String> {
     init_tables(conn).map_err(|e| e.to_string())?;
     let current_revision = current_revision(conn);
     if let Some(expected) = expected_revision {
@@ -627,7 +637,10 @@ mod tests {
                 display_name,
                 ..
             } => {
-                assert_eq!(saved_session_id, "y", "latest positive time; id tie broken ascending");
+                assert_eq!(
+                    saved_session_id, "y",
+                    "latest positive time; id tie broken ascending"
+                );
                 assert_eq!(saved_session_type, "SFTP");
                 assert_eq!(display_name, "tie-winner");
             }
@@ -642,8 +655,9 @@ mod tests {
         insert_session(&conn, "a", "old", "SSH", Some(5000));
 
         let mut entries = vec![saved_entry("a", "SSH")];
-        let response = commit_run_snapshot(&mut conn, "batch-1".into(), &mut entries, None, None, false)
-            .unwrap();
+        let response =
+            commit_run_snapshot(&mut conn, "batch-1".into(), &mut entries, None, None, false)
+                .unwrap();
         assert!(response.applied);
 
         let response = get_run_snapshot(&conn).unwrap();
@@ -662,7 +676,8 @@ mod tests {
         let mut entries = vec![saved_entry("a", "SSH")];
         commit_run_snapshot(&mut conn, "batch".into(), &mut entries, None, None, false).unwrap();
 
-        conn.execute("DELETE FROM sessions WHERE id = 'a'", []).unwrap();
+        conn.execute("DELETE FROM sessions WHERE id = 'a'", [])
+            .unwrap();
         // INSERT OR REPLACE must not cascade into the snapshot either.
         insert_session(&conn, "a", "replaced", "SSH", None);
         conn.execute(
@@ -674,7 +689,9 @@ mod tests {
         .unwrap();
 
         let response = get_run_snapshot(&conn).unwrap();
-        let record = response.record.expect("record preserved without foreign keys");
+        let record = response
+            .record
+            .expect("record preserved without foreign keys");
         assert_eq!(record.entries.len(), 1);
     }
 
@@ -697,12 +714,16 @@ mod tests {
 
         // Revision kept advancing across the clear (no ABA).
         let mut entries = vec![saved_entry("a", "SSH")];
-        let response = commit_run_snapshot(&mut conn, "batch2".into(), &mut entries, None, None, true)
-            .unwrap();
+        let response =
+            commit_run_snapshot(&mut conn, "batch2".into(), &mut entries, None, None, true)
+                .unwrap();
         assert!(response.applied);
         assert!(response.record.as_ref().unwrap().revision >= 3);
         let response = get_run_snapshot(&conn).unwrap();
-        assert!(response.record.is_some(), "restored commit revives the record");
+        assert!(
+            response.record.is_some(),
+            "restored commit revives the record"
+        );
     }
 
     /// CAS: expectedRevision mismatch does not overwrite the newer commit.
@@ -710,12 +731,20 @@ mod tests {
     fn cas_mismatch_does_not_overwrite_newer_record() {
         let mut conn = test_conn();
         let mut entries = vec![saved_entry("a", "SSH")];
-        let first = commit_run_snapshot(&mut conn, "b1".into(), &mut entries.clone(), None, None, false)
-            .unwrap();
+        let first = commit_run_snapshot(
+            &mut conn,
+            "b1".into(),
+            &mut entries.clone(),
+            None,
+            None,
+            false,
+        )
+        .unwrap();
         let first_revision = first.record.as_ref().unwrap().revision;
 
         let mut newer = vec![saved_entry("b", "SFTP")];
-        let second = commit_run_snapshot(&mut conn, "b2".into(), &mut newer, None, None, false).unwrap();
+        let second =
+            commit_run_snapshot(&mut conn, "b2".into(), &mut newer, None, None, false).unwrap();
         let second_revision = second.record.as_ref().unwrap().revision;
         assert!(second_revision > first_revision);
 
@@ -731,9 +760,13 @@ mod tests {
         )
         .unwrap();
         assert!(!response.applied);
-        let record = response.record.expect("current record returned on CAS miss");
+        let record = response
+            .record
+            .expect("current record returned on CAS miss");
         match &record.entries[0] {
-            SnapshotEntry::SavedSession { saved_session_id, .. } => {
+            SnapshotEntry::SavedSession {
+                saved_session_id, ..
+            } => {
                 assert_eq!(saved_session_id, "b", "the newer commit survives");
             }
             other => panic!("unexpected entry {other:?}"),
@@ -762,7 +795,10 @@ mod tests {
         let mut conn = conn;
         let mut entries = vec![saved_entry("a", "SSH")];
         let result = commit_run_snapshot(&mut conn, "b".into(), &mut entries, None, None, false);
-        assert!(result.is_err(), "must refuse to overwrite an unknown schema");
+        assert!(
+            result.is_err(),
+            "must refuse to overwrite an unknown schema"
+        );
         let version: i64 = conn
             .query_row(
                 "SELECT schema_version FROM welcome_run_snapshot WHERE singleton = 1",
@@ -815,8 +851,8 @@ mod tests {
 
         // Unknown raw type is preserved verbatim (no SSH fallback).
         let mut unknown = vec![saved_entry("u", "SomeFutureProtocol")];
-        let response = commit_run_snapshot(&mut conn, "b".into(), &mut unknown, None, None, false)
-            .unwrap();
+        let response =
+            commit_run_snapshot(&mut conn, "b".into(), &mut unknown, None, None, false).unwrap();
         match &response.record.unwrap().entries[0] {
             SnapshotEntry::SavedSession {
                 saved_session_type, ..
@@ -858,8 +894,15 @@ mod tests {
         test_schema(&mut conn);
         let mut entries = vec![saved_entry("a", "SSH")];
         assert!(
-            commit_run_snapshot(&mut conn, "b".into(), &mut entries, Some("saved:zz".to_string()), None, false)
-                .is_err()
+            commit_run_snapshot(
+                &mut conn,
+                "b".into(),
+                &mut entries,
+                Some("saved:zz".to_string()),
+                None,
+                false
+            )
+            .is_err()
         );
     }
 

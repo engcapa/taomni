@@ -42,11 +42,11 @@ use crate::terminal::network::NetworkSettings;
 pub mod autoconfig;
 pub mod caldav;
 pub mod calendar;
-pub mod contacts;
-pub mod filters;
 pub mod certs;
+pub mod contacts;
 #[cfg(test)]
 mod fake_imap;
+pub mod filters;
 pub mod folders;
 pub mod idle;
 pub mod lists;

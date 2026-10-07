@@ -175,7 +175,11 @@ pub fn scroll_capture_controlled(
         anyhow::bail!("scroll capture cancelled");
     }
 
-    let source = std::cell::RefCell::new(FrameSource::for_scroll(app, display.clone(), control.mode() == ScrollMode::Auto));
+    let source = std::cell::RefCell::new(FrameSource::for_scroll(
+        app,
+        display.clone(),
+        control.mode() == ScrollMode::Auto,
+    ));
     let mut grab = || -> anyhow::Result<RgbaImage> {
         let full = source.borrow_mut().grab().context("capture scroll frame")?;
         Ok(crop(&full, x, y, width, height))
@@ -184,7 +188,12 @@ pub fn scroll_capture_controlled(
     let stitched = capture_frames(
         &mut grab,
         &mut |notches| {
-            if source.borrow_mut().portal_scroll(x + width / 2, y + height / 2, notches)? { return Ok(()); }
+            if source
+                .borrow_mut()
+                .portal_scroll(x + width / 2, y + height / 2, notches)?
+            {
+                return Ok(());
+            }
             if wheel.is_none() {
                 wheel = Some(Wheel::new()?);
             }
@@ -402,8 +411,11 @@ impl Wheel {
             // SetCursorPos takes virtual-desktop physical pixels (the app is
             // per-monitor DPI aware), so any display works.
             let _ = &mut self.enigo;
-            use windows::Win32::UI::WindowsAndMessaging::{SetCursorPos, WindowFromPoint, GetAncestor, GA_ROOT, GetForegroundWindow, SetForegroundWindow};
             use windows::Win32::Foundation::POINT;
+            use windows::Win32::UI::WindowsAndMessaging::{
+                GA_ROOT, GetAncestor, GetForegroundWindow, SetCursorPos, SetForegroundWindow,
+                WindowFromPoint,
+            };
             unsafe {
                 SetCursorPos(gx, gy).map_err(|e| anyhow::anyhow!("move pointer: {e}"))?;
                 // SendInput wheel events otherwise go to the old focused app
@@ -411,7 +423,10 @@ impl Wheel {
                 // the window under the crop without clicking its content.
                 let target = GetAncestor(WindowFromPoint(POINT { x: gx, y: gy }), GA_ROOT);
                 if !target.is_invalid() && target != GetForegroundWindow() {
-                    anyhow::ensure!(SetForegroundWindow(target).as_bool(), "Windows could not activate the scroll target. Click the target once and retry, or use manual scrolling; elevated targets require matching permissions.");
+                    anyhow::ensure!(
+                        SetForegroundWindow(target).as_bool(),
+                        "Windows could not activate the scroll target. Click the target once and retry, or use manual scrolling; elevated targets require matching permissions."
+                    );
                     std::thread::sleep(Duration::from_millis(80));
                 }
             }

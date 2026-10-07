@@ -149,9 +149,18 @@ impl PixelFormat {
     /// Convert a pixel value (already assembled from its bytes) to RGBA.
     pub fn value_to_rgba(&self, value: u32) -> [u8; 4] {
         [
-            Self::scale((value >> self.red_shift) & u32::from(self.red_max), self.red_max),
-            Self::scale((value >> self.green_shift) & u32::from(self.green_max), self.green_max),
-            Self::scale((value >> self.blue_shift) & u32::from(self.blue_max), self.blue_max),
+            Self::scale(
+                (value >> self.red_shift) & u32::from(self.red_max),
+                self.red_max,
+            ),
+            Self::scale(
+                (value >> self.green_shift) & u32::from(self.green_max),
+                self.green_max,
+            ),
+            Self::scale(
+                (value >> self.blue_shift) & u32::from(self.blue_max),
+                self.blue_max,
+            ),
             255,
         ]
     }
@@ -300,7 +309,10 @@ mod tests {
         assert_eq!(rgb222.pixel(&[0b11_00_01]), [255, 0, 85, 255]);
         let rgb111 = PixelConverter::new(PixelFormat::RGB111);
         assert_eq!(rgb111.pixel(&[0b101]), [255, 0, 255, 255]);
-        assert_eq!(PixelFormat::RGB111.label(), "depth 3 (8 bpp) little-endian rgb111");
+        assert_eq!(
+            PixelFormat::RGB111.label(),
+            "depth 3 (8 bpp) little-endian rgb111"
+        );
         let rgb565 = PixelConverter::new(PixelFormat::RGB565);
         let value: u16 = (31 << 11) | (63 << 5);
         assert_eq!(rgb565.pixel(&value.to_le_bytes()), [255, 255, 0, 255]);

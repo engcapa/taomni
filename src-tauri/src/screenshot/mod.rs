@@ -167,7 +167,10 @@ pub fn init(app: &AppHandle) {
     #[cfg(target_os = "linux")]
     {
         use gtk::prelude::*;
-        NATIVE_WAYLAND.store(gtk::gdk::Display::default().is_some_and(|d| d.type_().name() == "GdkWaylandDisplay"), Ordering::SeqCst);
+        NATIVE_WAYLAND.store(
+            gtk::gdk::Display::default().is_some_and(|d| d.type_().name() == "GdkWaylandDisplay"),
+            Ordering::SeqCst,
+        );
     }
     capture::purge_stale_artifacts();
     shortcut::init(app);
@@ -345,14 +348,28 @@ pub async fn screenshot_scroll_capture(
 }
 
 #[tauri::command]
-pub async fn screenshot_scroll_surface() -> bool { pins::native_wayland() }
+pub async fn screenshot_scroll_surface() -> bool {
+    pins::native_wayland()
+}
 
 #[tauri::command]
-pub async fn screenshot_scroll_plan(app: AppHandle, display_id: Option<String>, x: u32, y: u32, width: u32, height: u32) -> Result<PhysicalRegion, String> {
+pub async fn screenshot_scroll_plan(
+    app: AppHandle,
+    display_id: Option<String>,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<PhysicalRegion, String> {
     let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
     let requested = capture::clamp_region(display.width, display.height, (x, y, width, height));
     let (region, _) = scroll_layout(&app, &display, requested)?;
-    Ok(PhysicalRegion { x: region.0, y: region.1, width: region.2, height: region.3 })
+    Ok(PhysicalRegion {
+        x: region.0,
+        y: region.1,
+        width: region.2,
+        height: region.3,
+    })
 }
 
 #[tauri::command]
@@ -394,18 +411,31 @@ fn scroll_layout(
         // Fullscreen transparent controller: only the bottom strip accepts
         // input; all other pixels are transparent and click-through.
         let full = surfaces::region_rect(display, (0, 0, display.width, display.height));
-        let (available, bar) = surfaces::inside_control_strip(display, full, scroll::MIN_REGION_HEIGHT as i32)
-            .ok_or("display is too short for scroll capture controls")?;
+        let (available, bar) =
+            surfaces::inside_control_strip(display, full, scroll::MIN_REGION_HEIGHT as i32)
+                .ok_or("display is too short for scroll capture controls")?;
         let bottom = (rect.y + rect.h).min(available.y + available.h);
-        if bottom - rect.y < scroll::MIN_REGION_HEIGHT as i32 { return Err("Move the selection above the bottom control strip".into()); }
-        return Ok(((requested.0, requested.1, requested.2, (bottom - rect.y) as u32), Some(bar)));
+        if bottom - rect.y < scroll::MIN_REGION_HEIGHT as i32 {
+            return Err("Move the selection above the bottom control strip".into());
+        }
+        return Ok((
+            (
+                requested.0,
+                requested.1,
+                requested.2,
+                (bottom - rect.y) as u32,
+            ),
+            Some(bar),
+        ));
     }
     let mut displays = capture::list_displays(app).map_err(internal_error)?;
     displays.sort_by_key(|d| d.id != display.id);
     if let Some(position) = surfaces::control_position(&displays, rect) {
         return Ok((requested, Some(position)));
     }
-    if shortcut::current_status().registered { return Ok((requested, None)); }
+    if shortcut::current_status().registered {
+        return Ok((requested, None));
+    }
     // Keep at least a few overlap bands of content for stitching.
     let min_height = scroll::MIN_REGION_HEIGHT as i32;
     match surfaces::inside_control_strip(display, rect, min_height) {
@@ -655,8 +685,12 @@ async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
                 visible |= window.is_visible().map_err(|e| e.to_string())?;
             }
         }
-        if !visible { break; }
-        if std::time::Instant::now() >= until { return Err("Screenshot cancelled: an application window did not hide".into()); }
+        if !visible {
+            break;
+        }
+        if std::time::Instant::now() >= until {
+            return Err("Screenshot cancelled: an application window did not hide".into());
+        }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
     #[cfg(target_os = "linux")]
@@ -664,10 +698,16 @@ async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         app.run_on_main_thread(move || {
             use gtk::prelude::*;
-            if let Some(display) = gtk::gdk::Display::default() { display.sync(); }
+            if let Some(display) = gtk::gdk::Display::default() {
+                display.sync();
+            }
             let _ = tx.send(());
-        }).map_err(|e| e.to_string())?;
-        tokio::time::timeout(Duration::from_secs(3), rx).await.map_err(|_| "GTK hide barrier timed out")?.map_err(|e| e.to_string())?;
+        })
+        .map_err(|e| e.to_string())?;
+        tokio::time::timeout(Duration::from_secs(3), rx)
+            .await
+            .map_err(|_| "GTK hide barrier timed out")?
+            .map_err(|e| e.to_string())?;
         // GNOME/KWin fade animations can exceed the old fixed 250ms delay.
         tokio::time::sleep(Duration::from_millis(650)).await;
     }
@@ -982,7 +1022,14 @@ fn open_pin(
     open_pin_with_note(app, pinned, width, height, favorite_id, String::new())
 }
 
-fn open_pin_with_note(app: &AppHandle, pinned: PathBuf, width: u32, height: u32, favorite_id: Option<String>, note: String) -> Result<String, String> {
+fn open_pin_with_note(
+    app: &AppHandle,
+    pinned: PathBuf,
+    width: u32,
+    height: u32,
+    favorite_id: Option<String>,
+    note: String,
+) -> Result<String, String> {
     let overlay_display = tool_state().overlay.as_ref().map(|o| o.display_id.clone());
     // Release the session lock before waiting for GTK monitor enumeration.
     // Pins open on the captured display (or the one under the pointer).
@@ -1442,7 +1489,9 @@ async fn open_recorder_bar(
     // snapshot. Creating a hidden WebView does not finish its navigation;
     // showing it after capture starts can stall WindowServer and lose motion.
     if position.is_some() {
-        window.show().map_err(|e| format!("show recording controls: {e}"))?;
+        window
+            .show()
+            .map_err(|e| format!("show recording controls: {e}"))?;
     }
     tokio::time::timeout(Duration::from_secs(15), loaded_rx)
         .await

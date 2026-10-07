@@ -88,8 +88,7 @@ impl WinDivertApi {
 
         unsafe {
             // WinDivert 2.0+ exports WinDivertShutdown; 1.x does not.
-            let shutdown_ptr =
-                GetProcAddress(module, b"WinDivertShutdown\0".as_ptr() as *const i8);
+            let shutdown_ptr = GetProcAddress(module, b"WinDivertShutdown\0".as_ptr() as *const i8);
             if shutdown_ptr.is_null() {
                 FreeLibrary(module);
                 return Err(format!(
@@ -146,7 +145,13 @@ impl WinDivertApi {
         }
     }
 
-    pub fn open(&self, filter: &str, layer: i32, priority: i16, flags: u64) -> Result<HANDLE, String> {
+    pub fn open(
+        &self,
+        filter: &str,
+        layer: i32,
+        priority: i16,
+        flags: u64,
+    ) -> Result<HANDLE, String> {
         let c = std::ffi::CString::new(filter).map_err(|e| e.to_string())?;
         let h = unsafe { (self.open)(c.as_ptr(), layer, priority, flags) };
         if h.is_null() || h == (-1isize as HANDLE) {
@@ -328,7 +333,12 @@ fn resolve_dll(dir: Option<&Path>) -> Result<PathBuf, String> {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             candidates.push(parent.join("WinDivert.dll"));
-            candidates.push(parent.join("sockscap").join("windows").join("WinDivert.dll"));
+            candidates.push(
+                parent
+                    .join("sockscap")
+                    .join("windows")
+                    .join("WinDivert.dll"),
+            );
         }
     }
     if let Ok(d) = std::env::var("SOCKSCAP_WINDIVERT_DIR") {

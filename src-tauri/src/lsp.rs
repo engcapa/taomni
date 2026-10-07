@@ -13474,7 +13474,10 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         let actions = code_actions_from_response(Ok(response)).expect("actions");
         assert_eq!(actions.len(), 1);
         assert_eq!(actions[0].title, "Extract to method");
-        assert_eq!(actions[0].kind.as_deref(), Some("refactor.extract.function"));
+        assert_eq!(
+            actions[0].kind.as_deref(),
+            Some("refactor.extract.function")
+        );
         assert!(actions[0].is_preferred);
         assert_eq!(
             actions[0]

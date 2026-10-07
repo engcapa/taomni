@@ -4201,7 +4201,10 @@ mod tests {
         let path_string = path.to_string_lossy().to_string();
 
         let file = workspace_read_loose_file(path_string.clone(), None).unwrap();
-        assert_eq!(PathBuf::from(&file.path).canonicalize().unwrap(), path.canonicalize().unwrap());
+        assert_eq!(
+            PathBuf::from(&file.path).canonicalize().unwrap(),
+            path.canonicalize().unwrap()
+        );
         assert_eq!(file.text, "one");
 
         let saved =

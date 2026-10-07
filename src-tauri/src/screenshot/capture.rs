@@ -425,7 +425,9 @@ pub fn capture_display(app: &AppHandle, display: &DisplayInfo) -> anyhow::Result
         // chooser or the tail of the application's compositor animation.
         let until = Instant::now() + Duration::from_millis(250);
         while Instant::now() < until {
-            if let Some(image) = source.poll()? { latest = image.clone(); }
+            if let Some(image) = source.poll()? {
+                latest = image.clone();
+            }
             std::thread::sleep(Duration::from_millis(20));
         }
         Ok(latest)
@@ -609,10 +611,21 @@ impl FrameSource {
         #[cfg(target_os = "linux")]
         if crate::servers::rdp::capture::wayland::is_wayland_session() {
             use crate::servers::rdp::capture::PortalInput;
-            let Backend::Persistent(capturer) = &mut self.backend else { anyhow::bail!("Wayland portal capture unavailable"); };
-            anyhow::ensure!(capturer.supports_portal_input(), "Wayland pointer permission was not granted. Restart automatic capture and allow remote control, or use manual scrolling.");
-            capturer.inject_portal_input(PortalInput::MotionAbsolute { x: px as f64, y: py as f64 })?;
-            capturer.inject_portal_input(PortalInput::Scroll { horizontal: false, steps: notches })?;
+            let Backend::Persistent(capturer) = &mut self.backend else {
+                anyhow::bail!("Wayland portal capture unavailable");
+            };
+            anyhow::ensure!(
+                capturer.supports_portal_input(),
+                "Wayland pointer permission was not granted. Restart automatic capture and allow remote control, or use manual scrolling."
+            );
+            capturer.inject_portal_input(PortalInput::MotionAbsolute {
+                x: px as f64,
+                y: py as f64,
+            })?;
+            capturer.inject_portal_input(PortalInput::Scroll {
+                horizontal: false,
+                steps: notches,
+            })?;
             return Ok(true);
         }
         let _ = (px, py, notches);

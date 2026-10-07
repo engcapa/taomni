@@ -487,7 +487,11 @@ mod tests {
             for c in 0..3 {
                 diffs.push((i32::from(pixel[c]) - left[c]) as u8);
             }
-            left = [i32::from(pixel[0]), i32::from(pixel[1]), i32::from(pixel[2])];
+            left = [
+                i32::from(pixel[0]),
+                i32::from(pixel[1]),
+                i32::from(pixel[2]),
+            ];
         }
         let mut payload = vec![0x40 | 0x30, FILTER_GRADIENT];
         // 12 bytes: compressed with a fresh stream 3.
@@ -530,7 +534,10 @@ mod tests {
         payload.extend(&jpeg);
         let out = decode(&payload, 16, 8, &mut TightDecoder::new()).unwrap();
         let pixel = &out[..4];
-        assert!(pixel[0] > 180 && pixel[1] < 70 && pixel[3] == 255, "{pixel:?}");
+        assert!(
+            pixel[0] > 180 && pixel[1] < 70 && pixel[3] == 255,
+            "{pixel:?}"
+        );
         // A size mismatch is a protocol error, not a partial paint.
         assert!(decode(&payload, 8, 8, &mut TightDecoder::new()).is_err());
     }

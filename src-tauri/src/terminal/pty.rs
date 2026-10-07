@@ -57,7 +57,10 @@ pub fn list_local_shells() -> Vec<LocalShellOption> {
     shells
 }
 
-pub(crate) fn directory_from_history_command(command: &str, home: Option<&Path>) -> Option<PathBuf> {
+pub(crate) fn directory_from_history_command(
+    command: &str,
+    home: Option<&Path>,
+) -> Option<PathBuf> {
     let trimmed = command.trim();
     if trimmed.is_empty() {
         return None;
