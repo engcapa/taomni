@@ -4570,6 +4570,40 @@ describe("CodeWorkspaceTab", () => {
     );
   });
 
+  it("preserves unsaved EOL and BOM choices when a save watcher echo arrives", async () => {
+    runtimeState.tauri = true;
+    const instance = "instance-watcher-policy";
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-watcher-policy",
+      workspaceInstanceId: instance, name: "Watcher policy",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [], initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "first\nsecond", {
+      hash: "watcher-original", encoding: "UTF-8", bom: false,
+    }));
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    const key = "root:app:src/main.ts";
+    const current = () => selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instance).openFiles[key];
+    await waitFor(() => expect(current()?.text).toBe("first\nsecond"));
+    await waitFor(() => expect(useCodeWorkspaceStatusStore.getState().actions?.cycleEol).toBeDefined());
+    act(() => {
+      useCodeWorkspaceStatusStore.getState().actions?.cycleEol?.();
+      useCodeWorkspaceStatusStore.getState().actions?.toggleBom?.();
+    });
+    await waitFor(() => expect(current()).toMatchObject({ eol: "CRLF", bom: true, dirty: true }));
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "first\nsecond", {
+      hash: "watcher-refreshed", encoding: "UTF-8", bom: false,
+    }));
+    await act(async () => {
+      await emit("lsp://external-file-change", { workspaceId: instance, path: "/repo/app/src/main.ts", type: 2 });
+    });
+    await waitFor(() => expect(current()?.hash).toBe("watcher-refreshed"));
+    expect(current()).toMatchObject({ eol: "CRLF", bom: true, dirty: true, text: "first\nsecond" });
+  });
+
   it("queues an external dirty-buffer conflict and applies a merge against the latest disk hash", async () => {
     runtimeState.tauri = true;
     const workspace: CodeWorkspaceTabInfo = {

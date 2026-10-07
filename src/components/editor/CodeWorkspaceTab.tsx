@@ -7208,7 +7208,16 @@ export function CodeWorkspaceTab({
       setStatusMessage(`Cannot read external change for ${file.subtitle}: ${errorMessage(error)}`);
       return;
     }
-    const latest = openFilesRef.current[file.key] ?? file;
+    const latest = openFilesRef.current[file.key];
+    if (!latest || latest.saving) return;
+    // A delayed watcher echo of our last save can arrive after the user
+    // chooses a new encoding/EOL without editing the logical text. Keep that
+    // unsaved policy while refreshing the disk guard.
+    const preservePolicy = latest.dirty && (
+      latest.eol !== disk.eol
+      || latest.encoding !== disk.encoding
+      || latest.bom !== disk.bom
+    );
     if (disk.text !== latest.text && disk.text !== latest.savedText) invalidateSemantics();
     if (disk.text === latest.text) {
       // Another process wrote exactly the buffer we already have. Accept the
@@ -7218,13 +7227,11 @@ export function CodeWorkspaceTab({
         [file.key]: {
           ...(current[file.key] ?? latest),
           savedText: disk.text,
-          eol: disk.eol,
-          encoding: disk.encoding,
-          bom: disk.bom,
+          ...(preservePolicy ? {} : { eol: disk.eol, encoding: disk.encoding, bom: disk.bom }),
           hash: disk.hash,
           mtime: disk.mtime,
           size: disk.size,
-          dirty: false,
+          dirty: preservePolicy,
           error: null,
         },
       }));
@@ -7237,9 +7244,7 @@ export function CodeWorkspaceTab({
         ...current,
         [file.key]: {
           ...(current[file.key] ?? latest),
-          eol: disk.eol,
-          encoding: disk.encoding,
-          bom: disk.bom,
+          ...(preservePolicy ? {} : { eol: disk.eol, encoding: disk.encoding, bom: disk.bom }),
           hash: disk.hash,
           mtime: disk.mtime,
           size: disk.size,
