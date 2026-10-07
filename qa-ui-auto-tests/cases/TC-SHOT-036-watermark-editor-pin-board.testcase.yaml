@@ -56,6 +56,7 @@ steps:
 - wait_for: '[data-testid="screenshot-pin-expand"]'
 - click: '[data-testid="screenshot-pin-expand"]'
 - click: '[data-testid="screenshot-pin-menu-toggle"]'
+- click: '[data-testid="screenshot-pin-tab-all"]'
 - click: '[data-testid="screenshot-pins-tile"]'
 - click: '[data-testid="screenshot-pin-close"]'
 - wait_for: '[data-testid="system-screenshot"]'
@@ -64,13 +65,13 @@ verification:
   requirements:
   - id: watermark-pin-workflow
     requirement: Watermark, editor, pin note and arrangement controls remain usable in one workflow.
-    actions: [9]
+    actions: [8]
     checkpoints:
-    - step: 9
+    - step: 8
       expectation: 'assert_attribute: {"selector": "[data-testid=\"screenshot-watermark\"]", "name": "aria-pressed", "equals": "true"}'
     - step: 25
       expectation: 'assert_text: {"selector": "[data-testid=\"screenshot-pin-note\"]", "contains": "Compare with design"}'
-    results: [9, 25]
+    results: [8, 25]
   visual:
   - check: Tiled watermark controls, image edit undo/redo, external-editor handoff, pin note and batch menu remain usable.
     method: automated

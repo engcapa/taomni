@@ -1,7 +1,7 @@
 id: TC-SHOT-N17
 title: The real pin remains above other windows and moves with OS drag. Zoom changes actual dimensions, opacity reveals desktop pixels,
   64px collapse restores geometry and opacity, public Copy/Save retain original pixels, and a persistent favorite reopens after temporary
-  artifacts are deleted.
+  artifacts are deleted with the pin note preserved.
 covers:
 - F27.1
 tags:
@@ -27,8 +27,8 @@ verification:
   requirements:
   - id: workflow
     requirement: The real pin remains above other windows and moves with OS drag. Zoom changes actual dimensions, opacity reveals desktop
-      pixels, 64px collapse restores geometry and opacity, public Copy/Save retain original pixels, and a persistent favorite reopens
-      after temporary artifacts are deleted.
+      pixels, 64px collapse restores geometry and opacity, public Copy/Save retain original pixels. A note written through the pin menu
+      is stored on the persistent favorite, and reopening the favorite after temporary artifacts are deleted shows the same note.
     actions:
     - 1
     - 3
