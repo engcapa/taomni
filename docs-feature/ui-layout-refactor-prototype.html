@@ -1,0 +1,226 @@
+<meta charset="UTF-8">
+<link rel="icon" href="data:,">
+<title>Taomni Workspace</title>
+<meta name="description" content="Interactive Taomni workspace prototype for reviewing workspace, session, global-tool, and pane navigation.">
+<style>
+/* Layout concept: session navigator → canvas tabs → contextual pane canvas; live surfaces stay mounted and tools dock by scope. */
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e8eef6;
+  --line: #cbd5e1;
+  --line-soft: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #1e40af;
+  --accent-soft: #dbeafe;
+  --green: #16a34a;
+  --amber: #b45309;
+  --red: #dc2626;
+  --radius: 8px;
+  --font-display: "Outfit", "Segoe UI", sans-serif;
+  --font-body: "Inter", "Segoe UI", sans-serif;
+  --font-mono: "Cascadia Code", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1e1f22; --surface: #26282e; --surface-2: #191a1c; --surface-3: #30343c;
+    --line: #454a55; --line-soft: #353a44; --text: #e6eaf0; --muted: #9ca3ad;
+    --accent: #6aa6f8; --accent-soft: #293b55; --green: #5fd58a; --amber: #fbbf24; --red: #ff7b72;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] { --bg:#1e1f22; --surface:#26282e; --surface-2:#191a1c; --surface-3:#30343c; --line:#454a55; --line-soft:#353a44; --text:#e6eaf0; --muted:#9ca3ad; --accent:#6aa6f8; --accent-soft:#293b55; --green:#5fd58a; --amber:#fbbf24; --red:#ff7b72; color-scheme:dark; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; padding-block: 0; padding-inline: 16px; overflow: hidden; background: var(--bg); color: var(--text); font: 12px/1.35 var(--font-body); }
+button, input, select { font: inherit; color: inherit; }
+button { border: 0; background: transparent; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.app { height: 100%; max-width: 1480px; margin: 0 auto; display: grid; grid-template-rows: 42px 1fr 24px; border-inline: 1px solid var(--line-soft); background: var(--surface); overflow: hidden; }
+.topbar { display:flex; align-items:center; gap:8px; padding: 0 10px; border-bottom:1px solid var(--line); background:linear-gradient(var(--surface),var(--surface-2)); }
+.brand { display:flex; align-items:center; gap:7px; min-width: 178px; font:600 15px var(--font-display); }
+.brand-mark { display:grid; place-items:center; width:24px; height:24px; border-radius:6px; color:#fff; background:linear-gradient(135deg,#1e5fa8,#62d36f); font-weight:700; }
+.top-tabs { display:none; }
+.top-tab { display:none; }
+.icon { font-size:14px; }
+.toolbar { display:flex; align-items:center; gap:3px; }
+.icon-btn { width:28px; height:28px; display:grid; place-items:center; border-radius:6px; color:var(--muted); }
+.icon-btn:hover { background:var(--surface-3); color:var(--text); }
+.primary { background:var(--accent); color:#fff; border-radius:6px; padding:6px 9px; font-weight:600; }
+.primary:hover { filter:brightness(1.08); }
+.workspace { min-height:0; display:grid; grid-template-columns: 42px 264px minmax(0,1fr); }
+.workspace[data-sidebar-collapsed="true"] { grid-template-columns:42px 0 minmax(0,1fr); }
+.workspace[data-sidebar-collapsed="true"] .sidebar { visibility:hidden; overflow:hidden; border-right:0; }
+.rail { min-width:0; display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 5px; border-right:1px solid var(--line); background:var(--surface-2); }
+.rail-btn { width:32px; min-height:42px; display:grid; place-items:center; border-radius:6px; color:var(--muted); writing-mode:vertical-rl; font-size:10px; letter-spacing:.02em; }
+.rail-btn:hover { background:var(--surface-3); color:var(--text); }
+.rail-btn.active { background:var(--accent-soft); color:var(--accent); box-shadow:inset 2px 0 var(--accent); }
+.rail-spacer { flex:1; }
+.view-label { padding:4px 8px; border:1px solid var(--line-soft); border-radius:999px; color:var(--muted); background:var(--surface-2); }
+.sidebar { min-width:0; display:flex; flex-direction:column; border-right:1px solid var(--line); background:var(--surface-2); transition:width .18s ease, opacity .18s ease; }
+.nav-row { display:flex; align-items:center; gap:8px; padding:8px; border-radius:6px; cursor:pointer; }
+.nav-row:hover { background:var(--surface-3); }
+.nav-row.active { background:var(--accent-soft); box-shadow:inset 2px 0 var(--accent); }
+.nav-row .nav-main { min-width:0; flex:1; }
+.nav-row .nav-name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nav-row .nav-meta { color:var(--muted); font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tool-group { display:grid; gap:2px; }
+.tool-row { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:6px; color:var(--text); text-align:left; }
+.tool-row:hover { background:var(--surface-3); }
+.tool-row .tool-icon { width:18px; text-align:center; color:var(--muted); }
+.tool-row small { margin-left:auto; color:var(--muted); }
+.sidebar-head { padding:10px; display:grid; gap:7px; border-bottom:1px solid var(--line-soft); }
+.sidebar-title { white-space:nowrap; }
+.row { display:flex; align-items:center; gap:7px; min-width:0; }
+.sidebar-title { font:600 13px var(--font-display); flex:1; white-space:nowrap; }
+.search { width:100%; height:28px; border:1px solid var(--line); border-radius:6px; padding:0 8px; background:var(--surface); }
+.filters { display:flex; gap:4px; overflow:auto hidden; }
+.filter { padding:4px 7px; border-radius:999px; color:var(--muted); white-space:nowrap; }
+.filter.active, .filter:hover { background:var(--accent-soft); color:var(--accent); }
+.sidebar-scroll { min-height:0; flex:1; overflow:auto; padding:8px; display:grid; align-content:start; gap:10px; }
+.section-label { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; }
+.session { display:grid; grid-template-columns: 8px 1fr auto; gap:8px; align-items:start; padding:8px; border-radius:7px; cursor:pointer; }
+.session:hover { background:var(--surface-3); }
+.session.active { background:var(--accent-soft); box-shadow: inset 2px 0 var(--accent); }
+.status-dot { width:7px; height:7px; margin-top:4px; border-radius:50%; background:var(--muted); }
+.status-dot.green { background:var(--green); } .status-dot.amber { background:var(--amber); } .status-dot.red { background:var(--red); }
+.session-name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.session-meta { color:var(--muted); font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.badge { padding:1px 5px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:10px; }
+.sidebar-footer { padding:8px; border-top:1px solid var(--line); display:grid; gap:4px; }
+.footer-action { display:flex; align-items:center; gap:7px; padding:7px; border-radius:6px; color:var(--muted); text-align:left; }
+.footer-action:hover { color:var(--text); background:var(--surface-3); }
+.main { min-width:0; min-height:0; display:grid; grid-template-rows: 40px minmax(0,1fr); background:var(--bg); }
+.canvas-header { display:flex; align-items:center; gap:8px; padding:0 12px; background:var(--surface); border-bottom:1px solid var(--line-soft); }
+.canvas-title { min-width:0; flex:1; display:grid; gap:1px; }
+.canvas-title strong { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.canvas-title small { color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.context-chip { display:inline-flex; align-items:center; gap:5px; max-width:230px; padding:4px 7px; border:1px solid var(--line-soft); border-radius:999px; background:var(--surface-2); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.content { min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 360px; }
+.primary-canvas { min-width:0; min-height:0; display:grid; grid-template-rows: 34px minmax(0,1fr) 156px; }
+.subtabs { display:flex; align-items:center; gap:2px; padding:0 10px; border-bottom:1px solid var(--line-soft); background:var(--surface-2); overflow:auto hidden; }
+.subtab { height:26px; padding:0 9px; border-radius:5px; color:var(--muted); white-space:nowrap; }
+.subtab:hover { background:var(--surface-3); color:var(--text); }
+.subtab.active { background:var(--surface); color:var(--accent); box-shadow: inset 0 -2px var(--accent); }
+.terminal { min-height:0; overflow:auto; padding:14px 16px; background:#0f172a; color:#d9e6f5; font:12px/1.55 var(--font-mono); }
+.term-line { white-space:pre-wrap; }
+.term-prompt { color:#62d36f; } .term-path { color:#6aa6f8; }
+.bottom-dock { min-height:0; display:grid; grid-template-rows:30px minmax(0,1fr); border-top:1px solid var(--line); background:var(--surface); }
+.dock-head { display:flex; align-items:center; gap:4px; padding:0 8px; }
+.dock-tab { padding:4px 8px; color:var(--muted); border-radius:5px; } .dock-tab.active { background:var(--accent-soft); color:var(--accent); }
+.dock-body { padding:8px 10px; overflow:auto; }
+.side-pane { min-width:0; min-height:0; display:grid; grid-template-rows: 42px 40px minmax(0,1fr); border-left:1px solid var(--line); background:var(--surface); }
+.side-head { display:flex; align-items:center; gap:7px; padding:0 10px; border-bottom:1px solid var(--line-soft); }
+.side-head strong { flex:1; }
+.side-tabs { display:flex; gap:2px; padding:0 8px; align-items:end; border-bottom:1px solid var(--line-soft); }
+.side-tab { padding:9px 9px 8px; color:var(--muted); border-bottom:2px solid transparent; } .side-tab.active { color:var(--accent); border-color:var(--accent); }
+.side-body { min-height:0; overflow:auto; padding:12px; display:grid; align-content:start; gap:10px; }
+.card { border:1px solid var(--line-soft); border-radius:7px; background:var(--surface-2); padding:10px; display:grid; gap:7px; }
+.card-title { display:flex; align-items:center; gap:7px; font-weight:600; }
+.card p { margin:0; color:var(--muted); font-size:11px; }
+.stat-row { display:flex; gap:6px; flex-wrap:wrap; } .stat { padding:5px 7px; border-radius:5px; background:var(--surface-3); color:var(--muted); font:11px var(--font-mono); }
+.diff { font:11px/1.45 var(--font-mono); } .diff-add { color:var(--green); } .diff-del { color:var(--red); }
+.statusbar { display:flex; align-items:center; gap:10px; padding:0 9px; border-top:1px solid var(--line); background:var(--surface-2); color:var(--muted); overflow:hidden; white-space:nowrap; }
+.statusbar span { overflow:hidden; text-overflow:ellipsis; }
+.toast { position:fixed; right:24px; bottom:36px; padding:8px 10px; background:var(--text); color:var(--bg); border-radius:6px; box-shadow:0 8px 24px #0004; }
+.overlay { position:fixed; inset:0; display:grid; place-items:center; background:#0f172a66; z-index:10; }
+.modal { width:min(680px, calc(100% - 32px)); max-height:80%; overflow:auto; border:1px solid var(--line); border-radius:10px; background:var(--surface); box-shadow:0 18px 48px #0005; }
+.modal-head { display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--line-soft); }
+.modal-head strong { flex:1; font:600 15px var(--font-display); }
+.command-input { width:100%; border:0; border-bottom:1px solid var(--line-soft); border-radius:0; padding:12px 14px; background:transparent; outline:0; }
+.command-row { display:flex; align-items:center; gap:9px; padding:9px 14px; } .command-row:hover,.command-row.active { background:var(--accent-soft); }
+.hidden { display:none !important; }
+@media (max-width: 980px) { .workspace { grid-template-columns: 42px 220px minmax(0,1fr); } .content { grid-template-columns: minmax(0,1fr) 300px; } .brand { min-width:120px; } }
+@media (max-width: 760px) { body { padding-inline:0; } .app { border:0; } .workspace { grid-template-columns:42px 1fr; } .rail { display:flex; } .sidebar { display:none; } .content { grid-template-columns:1fr; } .side-pane { display:none; } .topbar { gap:4px; } .brand { min-width:32px; } .brand-label { display:none; } .primary-canvas { grid-template-rows:34px minmax(0,1fr) 132px; } }
+</style>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">T</span><span class="brand-label">Taomni Workspace</span></div>
+    <button class="icon-btn" id="homeBtn" title="Welcome">Home</button>
+    <div class="toolbar" style="margin-left:auto">
+      <button class="icon-btn" id="commandBtn" title="Command center · Ctrl+K">Search</button>
+      <button class="icon-btn" id="newBtn" title="New session · Ctrl+Shift+N">New</button>
+      <button class="icon-btn" id="themeBtn" title="Toggle theme">Theme</button>
+      <button class="icon-btn" id="moreBtn" title="More window actions">More</button>
+    </div>
+  </header>
+  <div class="workspace" id="workspaceShell">
+    <nav class="rail" aria-label="Taomni views">
+      <button class="rail-btn active" data-view="workspaces" title="Workspaces">Work</button>
+      <button class="rail-btn" data-view="sessions" title="All sessions">Sessions</button>
+      <button class="rail-btn" data-view="tools" title="Tools">Tools</button>
+      <button class="rail-btn" data-view="notifications" title="Notifications">Alerts</button>
+      <span class="rail-spacer"></span>
+      <button class="rail-btn" data-view="settings" title="Settings">Settings</button>
+    </nav>
+    <aside class="sidebar" aria-label="Workspace navigator">
+      <div class="sidebar-head"><div class="row"><strong class="sidebar-title">Workspaces</strong><button class="icon-btn" id="collapseBtn" title="Collapse sidebar">Hide</button></div><input class="search" id="sessionSearch" placeholder="Search workspaces..." aria-label="Search workspaces"><div class="filters" id="statusFilters"><button class="filter active" data-filter="all">All 3</button><button class="filter" data-filter="running">Running 2</button><button class="filter" data-filter="attention">Needs input 1</button><button class="filter" data-filter="done">Done 0</button></div><div class="filters hidden" id="sessionKindFilters"><button class="filter active" data-kind-filter="all">All</button><button class="filter" data-kind-filter="terminal">Terminal</button><button class="filter" data-kind-filter="ssh">Remote</button><button class="filter" data-kind-filter="mail">Mail</button></div></div>
+      <div class="sidebar-scroll" id="sessionList"></div>
+      <div class="sidebar-scroll hidden" id="toolsList"><div class="section-label">Tools outside workspace</div><div class="tool-group"><button class="tool-row" data-global-tool="servers"><span class="tool-icon">Tools</span><span>Local servers</span><small>global</small></button><button class="tool-row" data-global-tool="network"><span class="tool-icon">⌁</span><span>Network tools</span><small>global</small></button><button class="tool-row" data-global-tool="capture"><span class="tool-icon">▧</span><span>Screenshot capture</span><small>global</small></button><button class="tool-row" data-global-tool="mfa"><span class="tool-icon">♢</span><span>MFA authenticator</span><small>global</small></button><button class="tool-row" data-global-tool="lan"><span class="tool-icon">◌</span><span>LAN Chat</span><small>global</small></button></div><div class="section-label" style="margin-top:10px">Workspace tools</div><div class="tool-group"><button class="tool-row" data-global-tool="git"><span class="tool-icon">⑂</span><span>Git changes</span><small>workspace</small></button><button class="tool-row" data-global-tool="sftp"><span class="tool-icon">▱</span><span>SFTP browser</span><small>session</small></button><button class="tool-row" data-global-tool="mail"><span class="tool-icon">✉</span><span>Mail</span><small>workspace</small></button></div></div>
+      <div class="sidebar-footer"><button class="footer-action" id="settingsBtn">Settings <span>Preferences</span></button><button class="footer-action" id="helpBtn">Help <span>Shortcuts</span></button></div>
+    </aside>
+    <main class="main">
+      <div class="canvas-header"><div class="canvas-title"><strong id="canvasTitle">Local terminal · taomni</strong><small id="canvasSubtitle">Current workspace · C:\\code\\person\\taomni</small></div><span class="context-chip" id="contextChip">● Connected · local</span><button class="icon-btn" id="sideToggle" title="Toggle tools pane">Tools</button><button class="icon-btn" id="detachBtn" title="Pop out active surface">Pop out</button><button class="icon-btn" id="closeBtn" title="Close session">Close</button></div>
+      <div class="content">
+        <section class="primary-canvas">
+          <nav class="subtabs" id="surfaceTabs" aria-label="Workspace views"><button class="subtab active" data-surface="overview">Overview</button><button class="subtab" data-surface="files">Files</button><button class="subtab" data-surface="preview">Preview</button><button class="subtab" data-surface="chat">Tao</button><button class="subtab" data-surface="changes">Changes</button><button class="subtab" data-surface="mail">Mail</button></nav>
+          <div class="terminal" id="overviewSurface"><div class="card" style="max-width:720px;margin:14px"><div class="card-title">Workspace overview <span class="badge">taomni</span></div><p>One workspace groups its related surfaces: terminal, files, code, Git changes, SFTP, mail and Tao. Switch views here; do not create a separate top-level tab for every tool.</p><div class="stat-row"><span class="stat">2 terminals</span><span class="stat">12 changed files</span><span class="stat">3 unread mail</span><span class="stat">SFTP attached</span></div><button class="primary" data-action="open-terminal">Open terminal view</button></div></div>
+          <div class="hidden" id="terminalSurface"><div class="terminal"><div class="term-line"><span class="term-prompt">➜</span> <span class="term-path">taomni</span> git:(main) <span class="term-prompt">$</span> pnpm dev</div><div class="term-line">VITE v8.3.0 ready in 1.7s</div><div class="term-line">➜ Local: http://127.0.0.1:5000/</div><div class="term-line">➜ Network: use --host to expose</div><br><div class="term-line"><span class="term-prompt">➜</span> <span class="term-path">taomni</span> git:(main) <span class="term-prompt">$</span> _</div></div></div>
+          <div class="hidden" id="filesSurface"><div class="card"><div class="card-title">▱ Project files <span class="badge">12 changed</span></div><p>Keep file browsing contextual to the active session. Open a file here or promote it to a larger editor surface.</p><div class="diff"><div>▾ src</div><div>　▾ components</div><div class="diff-add">　　New layout/WorkbenchShell.tsx</div><div>　　○ sidebar/Sidebar.tsx</div><div class="diff-del">　　− tabbar/ControlBar.tsx</div></div></div></div>
+          <div class="hidden" id="previewSurface"><div class="card"><div class="card-title">◫ Browser preview <span class="badge">127.0.0.1:5000</span></div><p>Preview is a first-class surface. Start or stop dev servers from the header and keep the browser state mounted while switching sessions.</p><button class="primary" data-action="open-preview">Open preview</button></div></div>
+          <div class="hidden" id="chatSurface"><div class="card"><div class="card-title">✦ Tao side chat <span class="badge">Bound to terminal</span></div><p>Use a focused, task-bound conversation without losing the terminal. Drag this surface to the right pane when it becomes a primary workflow.</p><button class="primary" data-action="open-chat">Open Chat</button></div></div>
+          <div class="hidden" id="changesSurface"><div class="card"><div class="card-title">Changes <span class="badge">+12 −3</span></div><p>Git review belongs inside the workspace. Review by file, comment on a line, or send selected changes to Tao for follow-up.</p><button class="primary" data-action="review-diff">Review changes</button></div></div>
+          <div class="hidden" id="mailSurface"><div class="card"><div class="card-title">✉ Mail <span class="badge">3 unread</span></div><p>Mail is a workspace surface, not a second app shell. Keep account navigation inside the surface and retain the active session above.</p><button class="primary" data-action="open-mail">Open inbox</button></div></div>
+          <div class="bottom-dock"><div class="dock-head"><button class="dock-tab active">Terminal</button><button class="dock-tab">Problems <span class="badge">2</span></button><button class="dock-tab">Tasks</button><button class="icon-btn" style="margin-left:auto" title="Hide bottom panel">⌄</button></div><div class="dock-body"><div class="row"><span class="status-dot green"></span><strong>Development server</strong><span class="badge">running</span><span style="margin-left:auto;color:var(--muted)">Port 5000 · 1m 42s</span></div><p style="color:var(--muted);margin:7px 0 0">The bottom panel is a task-oriented dock. Terminal tabs stay mounted; Problems and Tasks can replace it without changing the main session.</p></div></div>
+        </section>
+        <aside class="side-pane" id="sidePane"><div class="side-head"><strong id="sideTitle">Tools</strong><button class="icon-btn" id="sideSearchBtn" title="Search tools">Search</button><button class="icon-btn" id="sideCloseBtn" title="Close tools pane">Close</button></div><div class="side-tabs"><button class="side-tab active" data-tool="overview">Overview</button><button class="side-tab" data-tool="changes">Changes</button><button class="side-tab" data-tool="tasks">Tasks</button><button class="side-tab" data-tool="notes">Notes</button></div><div class="side-body" id="sideBody"><div class="card"><div class="card-title">⌘ Session health</div><div class="stat-row"><span class="stat">Local</span><span class="stat">main</span><span class="stat">12 files</span></div><p>Side panes are scoped by workspace and owner. Switching sessions keeps tools alive when the surface is stateful.</p></div><div class="card"><div class="card-title">Tools Quick actions</div><button class="footer-action" data-action="open-preview">Open browser preview</button><button class="footer-action" data-action="review-diff">Review changed files</button><button class="footer-action" data-action="open-chat">Ask Tao about this session</button></div></div></aside>
+      </div>
+    </main>
+  </div>
+  <footer class="statusbar"><span>3 workspaces</span><span>3 canonical sessions</span><span>2 workspace memberships</span><span>Network online</span><span>LLM: —</span><span>Web Search: disabled</span><span style="margin-left:auto">Theme: Follow system</span><span>Workspace · 2 terminals</span></footer>
+</div>
+<div class="toast hidden" id="toast" role="status"></div>
+<div class="overlay hidden" id="commandOverlay"><div class="modal" role="dialog" aria-label="Command center"><div class="modal-head"><strong>Command center</strong><button class="icon-btn" id="commandClose">Close</button></div><input class="command-input" id="commandInput" placeholder="> commands  # sessions  @ files" autofocus><div id="commandRows"><button class="command-row active" data-command="new">New New session <span style="margin-left:auto;color:var(--muted)">Ctrl+Shift+N</span></button><button class="command-row" data-command="preview">◫ Open browser preview</button><button class="command-row" data-command="diff">⑂ Review changed files</button><button class="command-row" data-command="chat">✦ Open Tao side chat</button><button class="command-row" data-command="settings">⚙ Open settings</button></div></div></div>
+<script>
+const workspaces = [
+  {id:'taomni',name:'taomni',meta:'Code · Git · Files · SFTP · Mail',status:'amber',state:'attention',sessionIds:['local','ssh']},
+  {id:'remote-ops',name:'Remote operations',meta:'SSH · SFTP · RDP',status:'green',state:'running',sessionIds:['ssh']},
+  {id:'mail-notes',name:'Mail & notes',meta:'Unified Mail · Tao',status:'',state:'done',sessionIds:['mail-account']}
+];
+const sessions = [
+  {id:'local',name:'Local terminal',meta:'taomni · main',status:'green',kind:'terminal',state:'running',workspaceIds:['taomni']},
+  {id:'ssh',name:'prod-api · SSH',meta:'root@10.0.0.21 · SFTP attached',status:'green',kind:'ssh',state:'running',workspaceIds:['taomni','remote-ops']},
+  {id:'mail-account',name:'Work mailbox',meta:'yuhang.zhao@ipinyou.com · 3 unread',status:'',kind:'mail',state:'done',workspaceIds:['taomni','mail-notes']}
+];
+let activeWorkspace='taomni', activeSession='local', activeFilter='all', activeKindFilter='all', collapsed=false, activeView='workspaces';
+const workspaceSessions = new Set(['local','ssh','mail-account']);
+const globalTools = new Set(['servers','network','capture','mfa','lan']);
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+function toast(message){const e=$('#toast');e.textContent=message;e.classList.remove('hidden');clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.add('hidden'),1800)}
+function renderSessions(){const q=$('#sessionSearch').value.toLowerCase();const list=$('#sessionList');list.innerHTML='';if(activeView==='workspaces'){for(const w of workspaces){if(q&&!`${w.name} ${w.meta}`.toLowerCase().includes(q))continue;if(activeFilter!=='all'&&w.state!==activeFilter)continue;const row=document.createElement('div');row.className='session'+(w.id===activeWorkspace?' active':'');row.dataset.id=w.id;row.innerHTML=`<span class="status-dot ${w.status}"></span><div><div class="session-name">${w.name}</div><div class="session-meta">${w.meta}</div></div><span class="badge">${w.sessionIds.length} sessions</span>`;row.onclick=()=>activateWorkspace(w.id);list.appendChild(row)}}else{const linked=sessions.filter(s=>s.workspaceIds.includes(activeWorkspace));const groups=[['User sessions · canonical',sessions],['Workspace memberships · references',linked],['Unassigned / global',sessions.filter(s=>s.workspaceIds.length===0)]];for(const [label,items] of groups){const visible=items.filter(s=>(!q||`${s.name} ${s.meta}`.toLowerCase().includes(q))&&(activeFilter==='all'||s.state===activeFilter)&&(activeKindFilter==='all'||s.kind===activeKindFilter));if(!visible.length)continue;const section=document.createElement('section');section.innerHTML=`<div class="section-label">▾ ${label}</div>`;for(const s of visible){const ref=label.startsWith('Workspace')?`<span class="badge">ref · ${activeWorkspace}</span>`:`<span class="badge">${s.kind}</span>`;const row=document.createElement('div');row.className='session'+(s.id===activeSession?' active':'');row.innerHTML=`<span class="status-dot ${s.status}"></span><div><div class="session-name">${s.name}</div><div class="session-meta">${s.meta}</div></div>${ref}`;row.onclick=()=>activateSession(s.id);section.appendChild(row)}list.appendChild(section)}}}
+function activateWorkspace(id){const w=workspaces.find(x=>x.id===id);if(!w)return;activeWorkspace=id;const first=sessions.find(s=>w.sessionIds.includes(s.id));if(first)activeSession=first.id;$('#canvasTitle').textContent='Workspace · '+w.name;$('#canvasSubtitle').textContent=w.meta+' · workspace';$('#contextChip').textContent=w.state==='running'?'Connected · local':'Needs attention · review';toast('Switched to workspace '+w.name);renderSessions();activateSurface('overview')}
+function activateSession(id){activeSession=id;const s=sessions.find(x=>x.id===id);if(!s)return;const w=workspaces.find(x=>s.workspaceIds.includes(x.id));if(w)activeWorkspace=w.id;$('#canvasTitle').textContent=s.name;$('#canvasSubtitle').textContent=s.meta+' · session';$('#contextChip').textContent=s.status==='green'?'Connected · local':'Needs attention · review';toast('Switched to '+s.name);renderSessions();if(s.kind==='mail')activateSurface('mail');else activateSurface('terminal')}
+function activateSurface(name){if(name==='git')name='changes';if(name==='terminal')name='terminal';$$('[data-surface]').forEach(b=>b.classList.toggle('active',b.dataset.surface===name));['overview','terminal','files','preview','chat','changes','mail'].forEach(x=>$('#'+x+'Surface').classList.toggle('hidden',x!==name));}
+function openCommand(){ $('#commandOverlay').classList.remove('hidden');$('#commandInput').focus() }
+function closeCommand(){ $('#commandOverlay').classList.add('hidden') }
+function setView(view){activeView=view;$$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));const sessionList=$('#sessionList'),toolsList=$('#toolsList');const workspaceView=view==='workspaces'||view==='sessions';sessionList.classList.toggle('hidden',!workspaceView);toolsList.classList.toggle('hidden',view!=='tools');if(view==='workspaces'){$('.sidebar-title').textContent='Workspaces';$('.search').placeholder='Search workspaces...';$('#statusFilters').classList.remove('hidden');$('#sessionKindFilters').classList.add('hidden');}if(view==='sessions'){$('.sidebar-title').textContent='All sessions';$('.search').placeholder='Search sessions...';$('#statusFilters').classList.add('hidden');$('#sessionKindFilters').classList.remove('hidden');}if(view==='tools'){$('.sidebar-title').textContent='Tools';$('#statusFilters').classList.add('hidden');$('#sessionKindFilters').classList.add('hidden');}if(view==='notifications')toast('Notifications view would open in the navigator');if(view==='settings')toast('Settings view would open in the navigator');renderSessions();}
+$$('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$$('[data-global-tool]').forEach(b=>b.onclick=()=>{const tool=b.dataset.globalTool;if(tool==='git')activateSurface('changes');else if(tool==='mail')activateSurface('mail');else if(tool==='sftp')activateSurface('files');else toast('Opened '+b.textContent.trim()+' · '+(workspaceSessions.has(activeSession)?'workspace/session scope':'global scope'))});
+$('#sessionSearch').oninput=renderSessions;setView('workspaces');activateWorkspace('taomni');
+$$('[data-filter]').forEach(b=>b.onclick=()=>{$$('[data-filter]').forEach(x=>x.classList.remove('active'));b.classList.add('active');activeFilter=b.dataset.filter;renderSessions()});
+$$('[data-kind-filter]').forEach(b=>b.onclick=()=>{$$('[data-kind-filter]').forEach(x=>x.classList.remove('active'));b.classList.add('active');activeKindFilter=b.dataset.kindFilter;renderSessions()});
+$$('[data-surface]').forEach(b=>b.onclick=()=>activateSurface(b.dataset.surface));
+$$('[data-tool]').forEach(b=>b.onclick=()=>{ $$('[data-tool]').forEach(x=>x.classList.toggle('active',x===b)); $('#sideTitle').textContent=b.textContent; $('#sideBody').innerHTML=`<div class="card"><div class="card-title">${b.textContent}</div><p>This scoped tool surface keeps its own scroll and remains mounted while you switch sessions.</p><div class="stat-row"><span class="stat">workspace</span><span class="stat">${activeSession}</span></div></div>`});
+$('#commandBtn').onclick=openCommand;$('#commandClose').onclick=closeCommand;$('#commandOverlay').onclick=e=>{if(e.target.id==='commandOverlay')closeCommand()};document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openCommand()}if(e.key==='Escape')closeCommand()});
+$('#commandInput').oninput=e=>{$$('.command-row').forEach(r=>r.classList.toggle('hidden',!r.textContent.toLowerCase().includes(e.target.value.toLowerCase().replace(/^[@#>]/,''))))};
+$$('[data-command]').forEach(b=>b.onclick=()=>{const c=b.dataset.command;closeCommand();if(c==='preview')activateSurface('preview');if(c==='diff')activateSurface('changes');if(c==='chat')activateSurface('chat');if(c==='settings')toast('Settings would open as a dedicated workspace view');if(c==='new')toast('New workspace dialog would open')});
+$('#newBtn').onclick=()=>toast('New workspace dialog would open');$('#homeBtn').onclick=()=>{activeWorkspace='taomni';activeSession='local';activateWorkspace('taomni')};$('#sideToggle').onclick=()=>{$('#sidePane').classList.toggle('hidden');toast($('#sidePane').classList.contains('hidden')?'Tools pane hidden':'Tools pane shown')};$('#sideCloseBtn').onclick=()=>$('#sidePane').classList.add('hidden');$('#collapseBtn').onclick=()=>{collapsed=!collapsed;$('#workspaceShell').dataset.sidebarCollapsed=collapsed?'true':'false';toast(collapsed?'Navigator collapsed':'Navigator shown')};$('#detachBtn').onclick=()=>toast('Active surface would pop out into a native window');$('#closeBtn').onclick=()=>toast('Close active workspace');
+$('#sideSearchBtn').onclick=()=>toast('Search tools and workspace surfaces');
+$('#moreBtn').onclick=()=>openCommand();$('#settingsBtn').onclick=()=>setView('settings');$('#helpBtn').onclick=openCommand;
+$('#themeBtn').onclick=()=>{const r=document.documentElement;const next=r.dataset.theme==='dark'?'light':'dark';r.dataset.theme=next;toast('Theme: '+next)};
+$$('[data-action]').forEach(b=>b.onclick=()=>{const a=b.dataset.action;if(a==='open-preview')activateSurface('preview');if(a==='review-diff')activateSurface('changes');if(a==='open-chat')activateSurface('chat');if(a==='open-mail')activateSurface('mail');if(a==='open-terminal')activateSurface('terminal');toast('Opened '+a)});
+function renderTop(){}
+</script>
