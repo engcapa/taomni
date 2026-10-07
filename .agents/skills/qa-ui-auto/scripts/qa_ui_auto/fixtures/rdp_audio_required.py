@@ -15,7 +15,7 @@ provides a virtual output and makes it the default:
   consent), which recording from the virtual cable requires.
 * macOS: a default output device is required (the server captures system
   audio with ScreenCaptureKit, which needs something to render to); the
-  workflow installs the Background Music virtual device for ``audio``.
+  workflow installs the BlackHole virtual device for ``audio``.
 
 Exports ``QA_AUDIO_BACKEND`` describing what was prepared.
 """
@@ -312,8 +312,8 @@ def _macos(ctx: Any) -> str:
     outputs = [item.get("_name", "?") for group in groups for item in group.get("_items") or []
                if item.get("coreaudio_default_audio_output_device") == "spaudio_yes"]
     if not outputs:
-        raise FixtureSkip("no default audio output device; CI installs Background Music for the "
-                          "audio capability (LABSN/sound-ci-helpers), local runs need an output")
+        raise FixtureSkip("no default audio output device; CI installs BlackHole for the "
+                          "audio capability (LABSN/sound-ci-helpers on Windows), local runs need an output")
     return "macos " + ", ".join(outputs) + "; " + loopback
 
 
