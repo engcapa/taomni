@@ -97,6 +97,12 @@
 - `[data-testid="chat-voice-button"]` — interactive — F-AI-2.3.chat-voice-button
 - `[data-testid="chat-voice-button-cancel"]` — interactive — F-AI-2.3.chat-voice-cancel
 - `[data-testid="voice-settings-close"]` — interactive — F-AI-2.3.voice-settings-close
+- `[data-testid="voice-settings-dialog"]` — display — F-AI-2.3.voice-settings-dialog
+- `[data-testid="asr-installation-progress"]` — display — F-AI-2.3.asr-installation-progress
+- `[data-testid="asr-cancel-download"]` — interactive — F-AI-2.3.asr-cancel-download
+- `[data-testid="asr-download-url-whisper-base"]` — interactive — F-AI-2.3.asr-download-url-base
+- `[data-testid="asr-copy-url-whisper-base"]` — interactive — F-AI-2.3.asr-copy-url-base
+- `[data-testid="asr-open-url-whisper-base"]` — interactive — F-AI-2.3.asr-open-url-base
 - `[data-testid="asr-download-proxy-mode"]` — interactive — F-AI-2.3.asr-download-proxy-mode
 - `[data-testid="asr-download-proxy-save"]` — interactive — F-AI-2.3.asr-download-proxy-save
 - `[data-testid="asr-check-models"]` — interactive — F-AI-2.3.asr-check-models

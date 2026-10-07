@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Mic, Square, Loader2, X } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
-import { AsrPanel } from "../settings/AsrPanel";
+import { useVoiceSettingsStore } from "./VoiceSettingsDialog";
 
 type Phase = "idle" | "preparing" | "recording" | "transcribing";
 type Target = HTMLInputElement | HTMLTextAreaElement;
@@ -26,7 +26,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
   const finishing = useRef(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
-  const [setup, setSetup] = useState(false);
+  const setSetup = useVoiceSettingsStore((s) => s.setOpen);
   const session = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mounted = useRef(true);
@@ -131,12 +131,6 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
     {error && createPortal(<div role="alert" className="fixed top-14 right-4 z-[10001] w-80 rounded border bg-[var(--taomni-panel-bg)] p-3 text-xs text-red-400">
       {error}<button type="button" className="ml-2 underline" onClick={() => { setError(""); setSetup(true); }}>{t("voice.settings")}</button>
       <button type="button" aria-label={t("voice.close")} onClick={() => setError("")}><X className="h-4 w-4" /></button>
-    </div>, document.body)}
-    {setup && createPortal(<div data-taomni-context-menu="" role="dialog" aria-modal="true" aria-label={t("voice.settings")} className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={(e) => e.stopPropagation()}>
-      <div className="max-h-[85vh] w-[480px] max-w-[95vw] overflow-auto rounded-lg bg-[var(--taomni-panel-bg)] p-4 shadow-xl">
-        <button type="button" className="float-right taomni-btn" data-testid="voice-settings-close" aria-label={t("voice.close")} onClick={() => setSetup(false)}><X className="h-4 w-4" /></button>
-        <AsrPanel />
-      </div>
     </div>, document.body)}
   </div>;
 }

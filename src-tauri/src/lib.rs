@@ -1053,6 +1053,8 @@ pub fn run() {
             llm::llama_server::sidecar_status,
             perf::perf_baseline_recent,
             asr::models::voice_models,
+            asr::models::voice_model_installation,
+            asr::models::voice_cancel_model_installation,
             asr::models::voice_check_models,
             asr::models::voice_install_model,
             voice::commands::voice_capture_supported,
