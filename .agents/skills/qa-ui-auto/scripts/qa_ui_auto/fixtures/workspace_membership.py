@@ -32,6 +32,11 @@ def setup(ctx: Any) -> None:
             ("qa-mail", "QA mailbox", "Mail"),
         ])
     ]
+    # Reuse the same job-owned SSH endpoint as ssh_required/sftp_required.
+    # Passwords remain in the auth fixture environment, never in memberships.
+    ssh = ctx.cfg.get("ssh") or {}
+    if ssh.get("host") and ssh.get("port") and ssh.get("user"):
+        sessions[1].update(host=ssh["host"], port=int(ssh["port"]), username=ssh["user"], auth_method="Password")
     workspaces = []
     for index, (identity, name, members) in enumerate([
         ("qa-workspace-main", "QA Main", ["qa-local-shell", "qa-shared-ssh"]),

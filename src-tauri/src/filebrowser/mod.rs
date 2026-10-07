@@ -21,7 +21,7 @@ use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -566,7 +566,7 @@ pub async fn open_sftp_window(
     log::info!("Opening SFTP window with path: {}", path_str);
     let url = WebviewUrl::App(std::path::PathBuf::from(path_str));
     let title = title.unwrap_or_else(|| format!("SFTP — {}", session_id));
-    let builder = WebviewWindowBuilder::new(&app_handle, &label, url)
+    let builder = crate::windowing::window_builder(&app_handle, &label, url)
         .title(&title)
         .inner_size(1200.0, 760.0)
         .min_inner_size(720.0, 420.0)

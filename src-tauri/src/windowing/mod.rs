@@ -16,6 +16,31 @@ use tauri::{
     AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, utils::config::Color,
 };
 
+/// Share main's isolated storage and driver environment for every QA child.
+pub(crate) fn window_builder<'a>(
+    app: &'a AppHandle,
+    label: &str,
+    url: WebviewUrl,
+) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+    #[allow(unused_mut)]
+    let mut builder = WebviewWindowBuilder::new(app, label, url);
+    #[cfg(target_os = "windows")]
+    if cfg!(debug_assertions)
+        && app.config().identifier == crate::QA_APP_ID
+        && std::env::var_os("NEWMOB_DATA_DIR").is_some()
+    {
+        if let Ok(data_dir) = crate::resolved_app_data_dir(app) {
+            builder = builder.data_directory(data_dir.join("webview"));
+        }
+        if let Ok(arguments) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+            if !arguments.trim().is_empty() {
+                builder = builder.additional_browser_args(&arguments);
+            }
+        }
+    }
+    builder
+}
+
 /// Default size for a detached window, picked per kind. RDP/VNC need
 /// more breathing room than a shell.
 fn default_size(kind: &str) -> (f64, f64, f64, f64) {
@@ -106,7 +131,7 @@ pub async fn open_detached_window(
     let (default_w, default_h, min_w, min_h) = default_size(&kind);
     let final_w = width.unwrap_or(default_w);
     let final_h = height.unwrap_or(default_h);
-    let builder = WebviewWindowBuilder::new(&app_handle, &label, url)
+    let builder = window_builder(&app_handle, &label, url)
         .title(&resolved_title)
         .inner_size(final_w, final_h)
         .min_inner_size(min_w, min_h)

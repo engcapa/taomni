@@ -332,7 +332,7 @@ def step_vault_first_run(ctx: StepContext, args: Any) -> None:
     page = ctx.page  # type: ignore[attr-defined]
     setup = page.locator("[data-testid='vault-setup-dialog']")
     unlock = page.locator("[data-testid='vault-unlock-dialog']")
-    welcome = page.locator("[data-testid='welcome-panel']")
+    shell = page.locator("[data-testid='control-bar']")
     deadline = 20.0
     try:
         setup.wait_for(state="visible", timeout=deadline * 1000)
@@ -341,9 +341,9 @@ def step_vault_first_run(ctx: StepContext, args: Any) -> None:
             raise StepError(
                 "vault_first_run: vault is LOCKED with an unknown master password"
             )
-        if welcome.count():
+        if shell.count():
             return  # already unlocked
-        raise StepError("vault_first_run: neither vault dialog nor welcome-panel appeared")
+        raise StepError("vault_first_run: neither vault dialog nor app shell appeared")
     setup.locator("[data-testid='vault-setup-pw1']").fill(password)
     setup.locator("[data-testid='vault-setup-pw2']").fill(password)
     setup.locator("[data-testid='vault-setup-confirm']").click()
