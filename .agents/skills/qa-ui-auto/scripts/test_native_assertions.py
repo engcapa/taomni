@@ -215,8 +215,10 @@ class NativeAssertionsTest(TestCase):
     def test_terminal_input_reports_a_probe_that_never_appears(self):
         ctx = Mock()
         ctx.session.execute.return_value = {"found": True, "focused": True}
-        ctx.session.text.return_value = ""
-        with self.assertRaisesRegex(StepError, "after 2 attempt"):
+        # Windows can drop the leading byte; the failure must show the text that
+        # arrived rather than only that the regex missed.
+        ctx.session.text.return_value = "user@host:~$ cho ready\nuser@host:~$ "
+        with self.assertRaisesRegex(StepError, "observed tail:.*cho ready") as raised:
             run_native_step(ctx, "terminal_input", {
                 "selector": ".xterm-helper-textarea",
                 "text": "echo ready",
@@ -228,7 +230,18 @@ class NativeAssertionsTest(TestCase):
                     "attempts": 2,
                 },
             })
+        self.assertIn("sent 'echo ready'", str(raised.exception))
         self.assertEqual(ctx.session.execute.call_count, 2)
+
+    def test_assert_pattern_failure_reports_the_observed_text(self):
+        ctx = Mock()
+        ctx.session.text.return_value = "qa-shell$ "
+        with self.assertRaisesRegex(StepError, r"observed tail:.*qa-shell\$"):
+            run_native_step(ctx, "assert_pattern", {
+                "selector": "[data-testid=\"terminal-pane\"]",
+                "regex": r"(?m)^missing\r?$",
+                "timeout_sec": 0.2,
+            })
 
     def test_terminal_input_rejects_a_malformed_verify_block(self):
         ctx = Mock()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..evidence import text_tail
 from . import StepContext, StepError, verb
 
 # Patterns also enforced by JSON Schema; redundant defense-in-depth here so a
@@ -112,23 +113,28 @@ def step_assert_pattern(ctx: StepContext, args: Any) -> None:
     if ctx.dry_run:
         return
 
+    observed = ""
+
     def _check() -> bool:
+        nonlocal observed
         loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
         text = ""
         try:
             text = loc.text_content() or ""
         except Exception:
             text = ""
-        if pattern.search(text):
-            return True
         # xterm.js renders to canvas; the app mirrors its buffer here for QA reads.
         try:
-            attr = loc.get_attribute("data-terminal-text") or ""
-            return bool(pattern.search(attr))
+            text = text or loc.get_attribute("data-terminal-text") or ""
         except Exception:
-            return False
+            pass
+        observed = text
+        return bool(pattern.search(text))
 
-    _wait_for_match(ctx, _check, timeout, fail=f"{selector} text does not match {args['regex']!r}")
+    try:
+        _wait_for_match(ctx, _check, timeout, fail=f"{selector} text does not match {args['regex']!r}")
+    except StepError as error:
+        raise StepError(f"{error}; observed tail: {text_tail(observed)}") from error
 
 
 @verb("assert_text_equals")

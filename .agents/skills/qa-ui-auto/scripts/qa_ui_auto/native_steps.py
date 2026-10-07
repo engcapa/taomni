@@ -41,6 +41,7 @@ import stat
 import subprocess
 import sys
 from .deadline import budget_time as time, remaining_timeout
+from .evidence import text_tail
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable
@@ -1499,6 +1500,7 @@ def _do_type(ctx: NativeStepContext, args: Any) -> str:
 def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
     selector, text, submit, verify = _terminal_input_args(args)
     attempts = verify["attempts"] if verify else 1
+    observed = ""
     for attempt in range(attempts):
         if attempt:
             # Recover a truncated shell line or a probe now reading stdin.
@@ -1508,12 +1510,13 @@ def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
         _dispatch_terminal_input(ctx, selector, text, submit)
         if verify is None:
             break
-        if _terminal_output_matches(ctx, verify):
+        observed, matched = _terminal_output_matches(ctx, verify)
+        if matched:
             break
     else:
         raise StepError(
-            f"terminal_input: {verify['selector']} did not match {verify['regex']!r} "
-            f"after {attempts} attempt(s)"
+            f"terminal_input: sent {text!r}; {verify['selector']} did not match "
+            f"{verify['regex']!r} after {attempts} attempt(s); observed tail: {text_tail(observed)}"
         )
     return f"sent {len(text)} chars to xterm input" + (" and submitted" if submit else "")
 
@@ -1578,22 +1581,23 @@ def _dispatch_terminal_input(ctx: NativeStepContext, selector: str, text: str, s
         ctx.session.press_combo("Enter")
 
 
-def _terminal_output_matches(ctx: NativeStepContext, verify: dict[str, Any]) -> bool:
+def _terminal_output_matches(ctx: NativeStepContext, verify: dict[str, Any]) -> tuple[str, bool]:
     """Poll the pty buffer until the probe's own output shows up.
 
     Windows OpenSSH/ConPTY intermittently drops part of a terminal write (a
     missing leading byte, a truncated burst). An optional verify block lets the
     probe be re-sent instead of failing the case on that transport hiccup; the
-    case's own assertion still decides what the run proves.
+    case's own assertion still decides what the run proves. Returns the last
+    buffer text so a failed case can name what actually arrived.
     """
     pattern = re.compile(verify["regex"])
     deadline = time.monotonic() + verify["timeout_sec"]
     while True:
-        text = ctx.session.text(verify["selector"])
-        if pattern.search(text or ""):
-            return True
+        text = ctx.session.text(verify["selector"]) or ""
+        if pattern.search(text):
+            return text, True
         if time.monotonic() >= deadline:
-            return False
+            return text, False
         time.sleep(0.25)
 
 
@@ -1636,12 +1640,16 @@ def _do_assert_pattern(ctx: NativeStepContext, args: Any) -> str:
     pattern = re.compile(args["regex"])
     timeout = min(float(args.get("timeout_sec", 10)), remaining_timeout(float(args.get("timeout_sec", 10))))
     expires = time.monotonic() + timeout
+    observed = ""
     while time.monotonic() < expires:
-        text = ctx.session.text(args["selector"])
-        if pattern.search(text):
+        observed = ctx.session.text(args["selector"])
+        if pattern.search(observed):
             return f"pattern matched: {args['selector']}"
         time.sleep(0.25)
-    raise StepError(f"assert_pattern failed: {args['selector']} did not match {args['regex']!r}")
+    raise StepError(
+        f"assert_pattern failed: {args['selector']} did not match {args['regex']!r}; "
+        f"observed tail: {text_tail(observed)}"
+    )
 
 
 @_verb("assert_text_equals")
