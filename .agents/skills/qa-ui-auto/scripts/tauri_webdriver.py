@@ -190,10 +190,16 @@ def selector_strategy(selector: str, *, interactive: bool = False) -> tuple[str,
         ):
             text = text[1:-1]
         q = _quote_xpath_text(text)
+        # Match the innermost text owner. An ancestor section also contains
+        # the text, but clicking its centre can hit an unrelated control.
+        predicate = (
+            f"(contains(normalize-space(.), {q}) or contains(@aria-label, {q}))"
+            f" and not(.//*[contains(normalize-space(.), {q}) or contains(@aria-label, {q})])"
+        )
         if parent_sel.startswith('[data-testid="') and parent_sel.endswith('"]'):
             testid = parent_sel[14:-2]
-            return "xpath", f"//*[@data-testid='{testid}']//*[contains(normalize-space(.), {q}) or contains(@aria-label, {q})]"
-        return "xpath", f"//*[contains(normalize-space(.), {q})]"
+            return "xpath", f"//*[@data-testid='{testid}']//*[{predicate}]"
+        return "xpath", f"//*[{predicate}]"
     if selector.startswith("text="):
         text = selector[5:].strip()
         if (text.startswith('"') and text.endswith('"')) or (

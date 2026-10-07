@@ -15,43 +15,48 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-gate-password
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 30
 - wait: 8
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-directories"]'
 - wait_for: '[data-testid="welcome-local-directories"]'
 - assert_visible: '[data-testid="welcome-local-directory"]'
 - screenshot: F1.6-native-osc-cwd.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: 'Native: plain local terminal OSC 7 cwd records local-cwd directory use：按步骤执行后，所有声明的可观察结果均满足。'
     actions:
     - 1
     - 2
-    - 4
-    - 7
-    - 9
+    - 6
+    - 12
+    - 14
     checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 5
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
-    - step: 8
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 10
+    - step: 7
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
-    - step: 11
+    - step: 16
       expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory\"]"}'
     results:
-    - 10
-    - 11
+    - 15
+    - 16
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

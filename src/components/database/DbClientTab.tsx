@@ -146,6 +146,7 @@ interface DbClientTabProps {
   tabId: string;
   info: DbConnectInfo;
   visible: boolean;
+  initialView?: DbViewSnapshot;
   onDetach?: () => void;
   chatToggle?: {
     open: boolean;
@@ -233,6 +234,13 @@ interface PanelState {
   log: ExecutionLogRun[];
   /** The Log tab is shown instead of the active result sheet. */
   logActive: boolean;
+}
+
+/** Transient window handoff; query results are not written to the saved catalog. */
+export interface DbViewSnapshot {
+  panels: PanelState[];
+  activePanelId: string;
+  activeSchema: string | null;
 }
 
 interface QueryWorkspacePanelCache {
@@ -580,6 +588,7 @@ export default function DbClientTab({
   tabId,
   info,
   visible,
+  initialView,
   onDetach,
   chatToggle,
   detachedWindowControls,
@@ -795,6 +804,16 @@ export default function DbClientTab({
   useEffect(() => {
     let cancelled = false;
     setWorkspaceReady(false);
+    if (initialView?.panels.length) {
+      setPanels(initialView.panels);
+      setActivePanelId(initialView.activePanelId);
+      setActiveSchema(initialView.activeSchema);
+      for (const panel of initialView.panels) {
+        if (panel.savedQuery) savedQueriesRef.current[panel.id] = panel.savedQuery;
+      }
+      setWorkspaceReady(true);
+      return;
+    }
     void (async () => {
       const workspace = await dbLoadQueryWorkspace(workspaceSessionId);
       if (cancelled) return;
@@ -901,7 +920,7 @@ export default function DbClientTab({
     return () => {
       cancelled = true;
     };
-  }, [setStatusMessage, workspaceSessionId]);
+  }, [initialView, setStatusMessage, workspaceSessionId]);
 
   useEffect(() => {
     writeIntSetting(info.engine, "rowLimit", rowLimit);
@@ -1547,8 +1566,24 @@ export default function DbClientTab({
       insertQuery: insertQueryFromOutside,
       appendEchoSql: appendEchoSqlFromOutside,
       flushWorkspace,
+      captureView: () => {
+        if (panelsRef.current.some((panel) => panel.sheets.some((sheet) => sheet.running))) {
+          throw new Error("Wait for the running query to finish before moving this database window.");
+        }
+        if ((txStatusRef.current?.pending ?? 0) > 0) {
+          throw new Error("Commit or roll back pending changes before moving this database window.");
+        }
+        return {
+          panels: panelsRef.current.map((panel) => ({
+            ...panel,
+            doc: editorHandles.current[panel.id]?.getValue() ?? panel.doc,
+          })),
+          activePanelId: activePanelIdRef.current,
+          activeSchema,
+        };
+      },
     });
-  }, [appendEchoSqlFromOutside, flushWorkspace, info.engine, insertQueryFromOutside, queryRegistryTitle, tabId]);
+  }, [activeSchema, appendEchoSqlFromOutside, flushWorkspace, info.engine, insertQueryFromOutside, queryRegistryTitle, tabId]);
 
   const cancelQuery = useCallback((panelId?: string) => {
     for (const panel of panelsRef.current) {

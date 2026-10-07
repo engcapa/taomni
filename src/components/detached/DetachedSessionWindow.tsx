@@ -51,6 +51,7 @@ import {
   type TerminalReattachState,
 } from "../terminal/TerminalPanel";
 import { useAppStore } from "../../stores/appStore";
+import { getQueryTab } from "../../lib/queryRegistry";
 import { useAiStore } from "../../stores/aiStore";
 import { useChatStore } from "../../stores/chatStore";
 import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
@@ -109,6 +110,7 @@ export interface DetachedDbParams {
   tabId?: string;
   title?: string;
   info: DbConnectInfo;
+  view?: import("../database/DbClientTab").DbViewSnapshot;
 }
 
 interface DetachedChatTab {
@@ -293,6 +295,13 @@ export default function DetachedSessionWindow({
   const reattachingRef = useRef(false);
   const terminalReattachStateRef = useRef<TerminalReattachState>({});
   const mergeTerminalReattachState = useCallback((state?: TerminalReattachState) => {
+    if (kind === "database" && params) {
+      const current = params as DetachedDbParams;
+      return {
+        ...current,
+        view: getQueryTab(current.tabId ?? `detached-db-${id}`)?.captureView?.() ?? current.view,
+      } satisfies DetachedDbParams;
+    }
     if (kind !== "terminal") return params;
     const merged = {
       ...terminalReattachStateRef.current,
@@ -303,12 +312,18 @@ export default function DetachedSessionWindow({
       ...(params as DetachedTerminalParams),
       reattach: merged,
     } satisfies DetachedTerminalParams;
-  }, [kind, params]);
+  }, [id, kind, params]);
   const requestReattach = useCallback(async (state?: TerminalReattachState) => {
     if (reattachingRef.current) return;
     if (!params) return;
+    let payload;
+    try {
+      payload = mergeTerminalReattachState(state);
+    } catch (error) {
+      useAppStore.getState().setStatusMessage(String(error));
+      return;
+    }
     reattachingRef.current = true;
-    let payload = mergeTerminalReattachState(state);
     if (kind === "vnc") {
       const current = params as DetachedVncParams;
       const claimId = await vncCreateDetachClaim({
@@ -658,6 +673,7 @@ function renderInner(
           <DbClientTab
             tabId={p.tabId ?? `detached-db-${id}`}
             info={p.info}
+            initialView={p.view}
             visible
             detachedWindowControls={detachedWindowControls}
           />

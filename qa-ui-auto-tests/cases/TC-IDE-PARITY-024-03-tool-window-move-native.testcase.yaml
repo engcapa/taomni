@@ -1,6 +1,9 @@
 id: TC-IDE-PARITY-024-03-tool-window-move-native
 title: Native tool window Move to keeps the terminal session
-description: 'ED-PARITY-024 A2 native case: in the isolated QA app the Terminal tool window runs a real PTY; moving it to Right Top through the stripe context menu and back to Bottom Left through its ⋮ Options re-parents the same session — earlier output stays and new commands run in the moved window (rows right above the prompt may be redrawn by the shell on resize).
+description: 'ED-PARITY-024 A2 native case: in the isolated QA app the Terminal tool window runs a real PTY; moving
+  it to Right Top through the stripe context menu and back to Bottom Left through its ⋮ Options re-parents the same
+  session — earlier output stays and new commands run in the moved window (rows right above the prompt may be redrawn
+  by the shell on resize).
 
   '
 covers:
@@ -22,7 +25,7 @@ native_platforms:
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-gate-password
-- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="control-bar"]'
 - seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-ed024","name":"qa-ed024","roots":[{"id":"qa-ed024","name":"qa-ed024","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-ed024","path":"notes.txt"},"lastOpenedAt":1756500000000,"isGitRepo":false}]'
@@ -83,7 +86,7 @@ steps:
     regex: (?m)^QA_ED024_BOTTOM\r?$
     timeout_sec: 60
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: A2：真实 PTY 终端输出 QA_ED024_BEFORE 后，经侧栏按钮右键 Move to → Right Top 移到右上区，原输出保留，且在移动后的窗口继续执行命令输出 QA_ED024_RIGHT。
@@ -96,15 +99,20 @@ verification:
     - 19
     checkpoints:
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]",
+        "timeout_sec": 60}}'
     - step: 13
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 30}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
+        "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 30}}'
     - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-right-pane\"] [data-testid=\"code-workspace-terminal-dock\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-right-pane\"] [data-testid=\"code-workspace-terminal-dock\"]",
+        "timeout_sec": 15}}'
     - step: 18
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 30}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
+        "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 30}}'
     - step: 20
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_RIGHT\\r?$", "timeout_sec": 30}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
+        "regex": "(?m)^QA_ED024_RIGHT\\r?$", "timeout_sec": 30}}'
     results:
     - 11
     - 13
@@ -120,11 +128,14 @@ verification:
     - 27
     checkpoints:
     - step: 25
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"] [data-testid=\"code-workspace-terminal-dock\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"] [data-testid=\"code-workspace-terminal-dock\"]",
+        "timeout_sec": 15}}'
     - step: 26
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 30}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
+        "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 30}}'
     - step: 28
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BOTTOM\\r?$", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]",
+        "regex": "(?m)^QA_ED024_BOTTOM\\r?$", "timeout_sec": 60}}'
     results:
     - 25
     - 26

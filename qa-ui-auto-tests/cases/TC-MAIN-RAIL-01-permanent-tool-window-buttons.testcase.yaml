@@ -1,324 +1,445 @@
 id: TC-MAIN-RAIL-01
 title: Permanent Sessions, Tools and Settings share tool window icons and names without a duplicate Git action
-description: >-
-  Browser and packaged native acceptance for the title-bar grip and permanent
-  buttons. Native explicitly covers the requested WebView layout and interactions.
-  Names toggle in both directions from both the permanent and workspace menus;
-  preferences survive reload and permanent entries stay available across tabs/panels.
-  Settings follows the names toggle and opens by keyboard; local terminals and
-  Code Workspace do not add a separate Git action to the main sidebar.
-covers: [F1.2, F1.3, F1.9, F6.2, F25.5, F-Sockscap-1, F-I18n-1]
-tags: [main, sidebar, p1]
-modes: [browser, native]
-fixtures: [reset_db]
+description: Browser and packaged native acceptance for the title-bar grip and permanent buttons. Native explicitly
+  covers the requested WebView layout and interactions. Names toggle in both directions from both the permanent
+  and workspace menus; preferences survive reload and permanent entries stay available across tabs/panels. Settings
+  follows the names toggle and opens by keyboard; local terminals and Code Workspace do not add a separate Git action
+  to the main sidebar.
+covers:
+- F1.2
+- F1.3
+- F1.9
+- F6.2
+- F25.5
+- F-Sockscap-1
+- F-I18n-1
+tags:
+- main
+- sidebar
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
 timeout_sec: 240
 steps:
-  - open: ${cfg.app.base_url}
-  - vault_first_run: qa-main-rail-password
-  - wait_for: '[data-testid="welcome-panel"]'
-  - seed_storage: {key: taomni.sidebarCollapsed, value: 'false'}
-  - seed_storage: {key: taomni.sidebarCollapsedByGroup.v1, value: '{"code-workspace":true,"terminal":true}'}
-  - seed_storage: {key: taomni.mergeToolWindowRail, value: 'true'}
-  - seed_storage: {key: taomni.codeWorkspace.toolWindowStripes.v1, value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'}
-  - reload_window: null
-  - wait_for: '[data-testid="session-tree"]'
-  - click: '[data-testid="language-switcher"]'
-  - click: '[data-testid="language-option-en"]'
-  - assert_visible: '[data-testid="expanded-sidebar-panel"]'
-  - eval_readonly:
-      expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
-      expect_truthy: true
-  - eval_readonly:
-      expression: document.querySelector('.taomni-window-drag-handle').getBoundingClientRect().bottom <= document.querySelector('button[data-tool-window-id]').getBoundingClientRect().top
-      expect_truthy: true
-  - assert_count: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"] svg', equal: 1}
-  - assert_count: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"] svg', equal: 1}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: Sessions}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: Tools}
-  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', key: Enter}
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - assert_attribute: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', name: aria-pressed, equals: 'true'}
-  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', key: Space}
-  - wait_for: '[data-testid="collapsed-sidebar-rail"]'
-  - assert_attribute: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', name: aria-pressed, equals: 'false'}
-  - press: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]', key: Enter}
-  - wait_for: '[data-testid="session-tree"]'
-  - assert_attribute: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', name: aria-pressed, equals: 'true'}
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: ''}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: ''}
-  - assert_attribute: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', name: aria-label, equals: Sessions}
-  - assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"showNames":false'}
-  - reload_window: null
-  - wait_for: '[data-testid="session-tree"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: ''}
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: Tools}
-  - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-  - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
-  - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
-  - assert_element_geometry:
-      selector: '[data-testid="collapsed-sidebar-rail"] button[data-tool-window-id]'
-      min_count: 3
-      min_width: 32
-      min_height: 32
-      same_width: true
-      icon_size: 16
-  - screenshot: main-rail-workspace-names.png
-  - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
-  - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
-  - assert_not_visible: '[data-testid="code-workspace-tree-pane"]'
-  - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
-  - assert_visible: '[data-testid="code-workspace-tree-pane"]'
-  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
-  - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', equals: ''}
-  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]', equals: ''}
-  - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"] svg'
-  - assert_element_geometry:
-      selector: '[data-testid="collapsed-sidebar-rail"] button[data-tool-window-id]'
-      min_count: 3
-      min_width: 32
-      min_height: 32
-      same_width: true
-      icon_size: 16
-  - screenshot: main-rail-workspace-icons.png
-  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]', equals: Project}
-  - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
-  - wait_for: '[data-testid="session-tree"]'
-  - assert_visible: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
-  - dblclick: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
-  - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
-  - assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
-  - eval_readonly:
-      expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
-      expect_truthy: true
-  - screenshot: main-rail-welcome.png
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', equals: ''}
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', equals: Settings}
-  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', key: Enter}
-  - wait_for: '[data-testid="settings-panel"]'
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - click: '[data-testid="welcome-open-local-terminal"]'
-  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-  - assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]', equal: 0}
-  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]', equals: Settings}
-  - screenshot: main-rail-terminal-settings-names.png
-  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]', equals: ''}
-  - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
-  - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]', equals: Settings}
-  - screenshot: main-rail-terminal-footer.png
-  - click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
-  - assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]', equal: 0}
-  - assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]', equals: Settings}
-  - screenshot: main-rail-workspace-footer.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-main-rail-password
+- wait_for: '[data-testid="control-bar"]'
+- seed_storage:
+    key: taomni.sidebarCollapsed
+    value: 'false'
+- seed_storage:
+    key: taomni.sidebarCollapsedByGroup.v1
+    value: '{"code-workspace":true,"terminal":true}'
+- seed_storage:
+    key: taomni.mergeToolWindowRail
+    value: 'true'
+- seed_storage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height
+      <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.taomni-window-drag-handle').getBoundingClientRect().bottom <= document.querySelector('button[data-tool-window-id]').getBoundingClientRect().top
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"] svg'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"] svg'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+    equals: Sessions
+- assert_text_equals:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+    equals: Tools
+- press:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+    key: Enter
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- assert_attribute:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+    name: aria-pressed
+    equals: 'true'
+- press:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+    key: Space
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_attribute:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
+    name: aria-pressed
+    equals: 'false'
+- press:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
+    key: Enter
+- wait_for: '[data-testid="session-tree"]'
+- assert_attribute:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+    name: aria-pressed
+    equals: 'true'
+- right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+    equals: ''
+- assert_text_equals:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+    equals: ''
+- assert_attribute:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+    name: aria-label
+    equals: Sessions
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":false'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_text_equals:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+    equals: ''
+- right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+    equals: Tools
+- click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
+- assert_element_geometry:
+    selector: '[data-testid="collapsed-sidebar-rail"] button[data-tool-window-id]'
+    min_count: 3
+    min_width: 32
+    min_height: 32
+    same_width: true
+    icon_size: 16
+- screenshot: main-rail-workspace-names.png
+- assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
+- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+- assert_not_visible: '[data-testid="code-workspace-tree-pane"]'
+- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+- assert_visible: '[data-testid="code-workspace-tree-pane"]'
+- right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
+    equals: ''
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+    equals: ''
+- assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"] svg'
+- assert_element_geometry:
+    selector: '[data-testid="collapsed-sidebar-rail"] button[data-tool-window-id]'
+    min_count: 3
+    min_width: 32
+    min_height: 32
+    same_width: true
+    icon_size: 16
+- screenshot: main-rail-workspace-icons.png
+- right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+    equals: Project
+- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_visible: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+- dblclick: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height
+      <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
+    expect_truthy: true
+- screenshot: main-rail-welcome.png
+- right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+    equals: ''
+- right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+    equals: Settings
+- press:
+    selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+    key: Enter
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- assert_count:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]'
+    equal: 0
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+    equals: Settings
+- screenshot: main-rail-terminal-settings-names.png
+- right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+    equals: ''
+- right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+    equals: Settings
+- screenshot: main-rail-terminal-footer.png
+- click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+- assert_count:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]'
+    equal: 0
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
+    equals: Settings
+- screenshot: main-rail-workspace-footer.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: 标题栏抓手与常驻图标位于独立区域；名称、图标、选中态和键盘展开/收起正常。
     actions:
     - 1
     - 8
-    - 10
     - 11
-    - 19
-    - 22
-    - 25
+    - 12
+    - 20
+    - 23
+    - 26
     checkpoints:
     - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 9
+      expectation: The Workspace-first shell is ready; the retained workflow below has its own business assertions.
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 13
-      expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 14
-      expectation: 标题栏抓手位于侧栏常驻按钮上方，没有覆盖按钮的点击区域。
+      expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
     - step: 15
+      expectation: 标题栏抓手位于侧栏常驻按钮上方，没有覆盖按钮的点击区域。
+    - step: 16
       expectation: '{"assert_count": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]
         svg", "equal": 1}}'
-    - step: 16
+    - step: 17
       expectation: '{"assert_count": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]
         svg", "equal": 1}}'
-    - step: 17
+    - step: 18
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
         "equals": "Sessions"}}'
-    - step: 18
+    - step: 19
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
         "equals": "Tools"}}'
-    - step: 20
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
     - step: 21
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 22
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
         "name": "aria-pressed", "equals": "true"}}'
-    - step: 23
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
     - step: 24
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 25
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]",
         "name": "aria-pressed", "equals": "false"}}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 27
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 28
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
         "name": "aria-pressed", "equals": "true"}}'
     results:
     - 3
-    - 9
-    - 12
+    - 10
     - 13
     - 14
     - 15
     - 16
     - 17
     - 18
-    - 20
+    - 19
     - 21
-    - 23
+    - 22
     - 24
-    - 26
+    - 25
     - 27
+    - 28
   - id: R2
     requirement: 常驻名称菜单双向切换名称，图标模式保留可访问标签，设置经 reload 保持。
     actions:
-    - 28
     - 29
-    - 34
-    - 37
-    - 38
+    - 30
+    - 35
+    - 39
+    - 40
     checkpoints:
-    - step: 30
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
-        "equals": ""}}'
     - step: 31
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
         "equals": ""}}'
     - step: 32
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
+        "equals": ""}}'
+    - step: 33
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
         "name": "aria-label", "equals": "Sessions"}}'
-    - step: 33
+    - step: 34
       expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":false"}}'
-    - step: 35
+    - step: 37
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 36
+    - step: 38
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]",
         "equals": ""}}'
-    - step: 39
+    - step: 41
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]",
         "equals": "Tools"}}'
     results:
-    - 30
     - 31
     - 32
     - 33
-    - 35
-    - 36
-    - 39
+    - 34
+    - 37
+    - 38
+    - 41
   - id: R3
     requirement: 工作区与常驻按钮宽度一致且至少 32px；Project 可点击，两个菜单共享名称设置，侧栏/标签切换保留常驻入口。
     actions:
-    - 40
-    - 41
-    - 48
-    - 50
-    - 52
-    - 53
+    - 42
+    - 45
+    - 55
+    - 57
     - 59
     - 60
-    - 62
-    - 65
+    - 66
     - 67
+    - 69
+    - 72
+    - 75
     checkpoints:
-    - step: 42
+    - step: 49
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 43
+    - step: 50
       expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-sessions\"]"}'
-    - step: 44
+    - step: 51
       expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
-    - step: 45
+    - step: 52
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] button[data-tool-window-id]",
         "min_count": 3, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
-    - step: 47
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-bottom-tab-overflow\"]"}'
-    - step: 49
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
-    - step: 51
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
     - step: 54
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-bottom-tab-overflow\"]"}'
+    - step: 56
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
+    - step: 58
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
+    - step: 61
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]",
         "equals": ""}}'
-    - step: 55
+    - step: 62
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]",
         "equals": ""}}'
-    - step: 56
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-sessions\"] svg"}'
-    - step: 57
+    - step: 63
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-sessions\"]
+        svg"}'
+    - step: 64
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] button[data-tool-window-id]",
         "min_count": 3, "min_width": 32, "min_height": 32, "same_width": true, "icon_size": 16}}'
-    - step: 61
+    - step: 68
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]",
         "equals": "Project"}}'
-    - step: 63
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 64
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 66
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 68
-      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]"}'
-    - step: 69
-      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]"}'
     - step: 70
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 71
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 73
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 76
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]"}'
+    - step: 77
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]"}'
+    - step: 78
       expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
     results:
-    - 42
-    - 43
-    - 44
-    - 45
-    - 47
     - 49
+    - 50
     - 51
+    - 52
     - 54
-    - 55
     - 56
-    - 57
+    - 58
     - 61
+    - 62
     - 63
     - 64
-    - 66
     - 68
-    - 69
     - 70
+    - 71
+    - 73
+    - 76
+    - 77
+    - 78
   - id: R4
     requirement: Settings 与其他 action 一起显示/隐藏名称，仍可用键盘打开设置；终端和 Code Workspace 的左下角不再出现独立 Git panel action。
-    actions: [72, 73, 75, 76, 78, 80, 81, 86, 87, 89, 90, 93]
+    actions:
+    - 80
+    - 81
+    - 83
+    - 84
+    - 86
+    - 89
+    - 90
+    - 95
+    - 96
+    - 98
+    - 99
+    - 102
     checkpoints:
-    - {step: 74, expectation: Welcome hides the Settings name with all other action names.}
-    - {step: 77, expectation: Welcome restores the visible Settings name.}
-    - {step: 79, expectation: Enter on Settings opens the settings panel.}
-    - {step: 83, expectation: A local terminal adds no Git action to the main sidebar.}
-    - {step: 84, expectation: The terminal rail shows the Settings name.}
-    - {step: 88, expectation: The Settings context menu hides its name in the terminal rail.}
-    - {step: 91, expectation: The Settings context menu restores its name in the terminal rail.}
-    - {step: 94, expectation: Code Workspace adds no duplicate Git action to the main sidebar.}
-    - {step: 95, expectation: Code Workspace keeps the named Settings action in the main sidebar.}
-    results: [74, 77, 79, 83, 84, 88, 91, 94, 95]
+    - step: 82
+      expectation: Welcome hides the Settings name with all other action names.
+    - step: 85
+      expectation: Welcome restores the visible Settings name.
+    - step: 87
+      expectation: Enter on Settings opens the settings panel.
+    - step: 92
+      expectation: A local terminal adds no Git action to the main sidebar.
+    - step: 93
+      expectation: The terminal rail shows the Settings name.
+    - step: 97
+      expectation: The Settings context menu hides its name in the terminal rail.
+    - step: 100
+      expectation: The Settings context menu restores its name in the terminal rail.
+    - step: 103
+      expectation: Code Workspace adds no duplicate Git action to the main sidebar.
+    - step: 104
+      expectation: Code Workspace keeps the named Settings action in the main sidebar.
+    results:
+    - 82
+    - 85
+    - 87
+    - 92
+    - 93
+    - 97
+    - 100
+    - 103
+    - 104
   visual:
   - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual

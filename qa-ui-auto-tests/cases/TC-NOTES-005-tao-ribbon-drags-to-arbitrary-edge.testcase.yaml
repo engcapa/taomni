@@ -38,7 +38,7 @@ steps:
 - assert_localstorage:
     key: taomni.chatDrawer.layout.v1
     contains: bottom
-- hover: '[data-testid="welcome-panel"]'
+- hover: '[data-testid="workspace-header"]'
 - reload: null
 - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
 - assert_attribute:

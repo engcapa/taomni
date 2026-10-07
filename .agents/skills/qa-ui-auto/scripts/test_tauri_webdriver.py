@@ -63,6 +63,12 @@ class NativeSessionTransportTest(TestCase):
         xpath = "//span[normalize-space(.)='String']"
         self.assertEqual(selector_strategy("xpath=" + xpath, interactive=True), ("xpath", xpath))
 
+    def test_scoped_text_excludes_ancestor_containers(self):
+        strategy, xpath = selector_strategy('[data-testid="workspace-navigator"] >> text="QA database resource"', interactive=True)
+        self.assertEqual(strategy, "xpath")
+        self.assertTrue(xpath.startswith("//*[@data-testid='workspace-navigator']//*"))
+        self.assertIn("and not(.//*[", xpath)
+
     def test_per_case_java_runtime_does_not_leak_into_next_session(self):
         harness = NativeHarness({"app": {"tooling_java_home": "/jdk21"}}, Path("/qa/run"))
         harness.driver = Mock()

@@ -36,7 +36,7 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - fill:
     selector: '[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}
@@ -44,7 +44,7 @@ steps:
     selector: '[data-testid="sftp-remote-path"]'
     key: Enter
 - wait_for: '[data-testid="sftp-remote-pane"]'
-- click: '[data-testid="sftp-local-path"]'
+- click: '[data-testid="sftp-local-path-edit"]'
 - fill:
     selector: '[data-testid="sftp-local-path"]'
     value: ${fixture.workspace_catalog_root}
@@ -62,7 +62,7 @@ steps:
     contains: done
     timeout_sec: 60
 - assert_visible: '[data-testid="sftp-remote-pane"] tr[title$="qa-workspace-transfer.txt"]'
-- click: '[data-testid="sftp-local-path"]'
+- click: '[data-testid="sftp-local-path-edit"]'
 - fill:
     selector: '[data-testid="sftp-local-path"]'
     value: ${fixture.workspace_catalog_download}

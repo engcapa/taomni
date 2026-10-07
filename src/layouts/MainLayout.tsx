@@ -160,7 +160,7 @@ import { useChatStore, isChatCapableTabType } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
 import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
 import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
-import { listQueryTabs, setActiveQueryTab } from "../lib/queryRegistry";
+import { getQueryTab, listQueryTabs, setActiveQueryTab } from "../lib/queryRegistry";
 import { t as tr, useT } from "../lib/i18n";
 import { gitInitRepo, gitProbePath, gitRepoName } from "../lib/git";
 import { alertAppDialog, confirmAppDialog } from "../lib/appDialogs";
@@ -1446,10 +1446,18 @@ export function MainLayout() {
 
   const openDetachedDatabase = useCallback(
     (tabId: string, info: NonNullable<Tab["db"]>, title: string) => {
+      let view: DetachedDbParams["view"];
+      try {
+        view = getQueryTab(tabId)?.captureView?.();
+      } catch (error) {
+        setStatusMessage(String(error));
+        return;
+      }
       const detachedId = `${tabId}__detached`;
       const payload: DetachedDbParams = {
         tabId,
         title,
+        view,
         // Give the detached window its own connection handle so the source
         // tab's unmount disconnect cannot race and close the detached query
         // workspace connection.
@@ -1461,7 +1469,7 @@ export function MainLayout() {
       };
       openDetachedGenericWindow("database", tabId, detachedId, payload, title);
     },
-    [openDetachedGenericWindow],
+    [openDetachedGenericWindow, setStatusMessage],
   );
 
   const handleDetachActiveTab = useCallback(() => {
@@ -1670,6 +1678,7 @@ export function MainLayout() {
             title: p.title || `${p.info.engine} ${p.info.host}`,
             sessionId: reattachTabId,
             closable: true,
+            dbView: p.view,
             db: {
               ...p.info,
               sessionId: reattachTabId,
@@ -4987,6 +4996,8 @@ export function MainLayout() {
                         <DbClientTab
                           tabId={tab.id}
                           info={tab.db}
+                          initialView={tab.dbView}
+                          onDetach={() => openDetachedDatabase(tab.id, tab.db!, tab.title)}
                           visible={isActive}
                         />
                       </Suspense>

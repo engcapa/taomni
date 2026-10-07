@@ -415,6 +415,24 @@ describe("DbClientTab connection lifecycle", () => {
     }));
   });
 
+  it("keeps completed results and current SQL across window handoff without rerunning SQL", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select 1;";
+    const original = render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitForConnectedEditor();
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTestId("query-result-grid")).toBeInTheDocument());
+    const snapshot = getQueryTab("tab-1")!.captureView!();
+    expect(snapshot.panels[0].sheets[0].result?.rows).toEqual([["1"]]);
+    const executions = ipcMock.dbExecuteStream.mock.calls.length;
+    original.unmount();
+    render(<DbClientTab tabId="tab-returned" info={postgresInfo} initialView={snapshot} visible />);
+    await waitForConnectedEditor();
+    expect(screen.getByTestId("query-result-grid")).toBeInTheDocument();
+    expect(getQueryTab("tab-returned")!.captureView!().panels[0].sheets).toEqual(snapshot.panels[0].sheets);
+    expect(ipcMock.dbExecuteStream).toHaveBeenCalledTimes(executions);
+  });
+
   it("restores a saved-query link and flushes edits to both repositories", async () => {
     const savedQuery: DbSavedQuery = {
       id: "saved-query-1",

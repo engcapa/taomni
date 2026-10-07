@@ -15,6 +15,8 @@ timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-gate-password
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-new-session"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -31,7 +33,10 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 30
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- click: '[data-testid="context-menu-item-show-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - wait_for:
     selector: '[data-testid="welcome-restore-status"][data-state="available"]'
@@ -43,44 +48,44 @@ steps:
     expect_truthy: true
 - screenshot: F1.6-native-restore-localshell.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: 'Native: saved LocalShell run snapshot restores and locates the live tab：按步骤执行后，所有声明的可观察结果均满足。'
     actions:
     - 1
     - 2
-    - 4
     - 6
     - 8
     - 10
-    - 11
+    - 12
     - 13
     - 15
-    - 18
+    - 20
+    - 23
     checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 5
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"session-proto-shell\"][data-active=\"true\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-native-shell\"]"}'
-    - step: 14
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
-    - step: 16
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 17
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"session-proto-shell\"][data-active=\"true\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-native-shell\"]"}'
+    - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 22
       expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]",
         "timeout_sec": 20}}'
-    - step: 20
+    - step: 25
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type]'').length ===
         2", "expect_truthy": true}}'
     results:
-    - 20
+    - 25
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

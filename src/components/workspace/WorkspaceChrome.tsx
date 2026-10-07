@@ -138,7 +138,8 @@ export function WorkspaceDialogs({ onCommand, onConnectSession }: { onCommand: (
   const open = state.createDialogOpen || state.commandCenterOpen;
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k"
+        && !(event.target instanceof Element && event.target.closest('[data-testid="settings-screenshot-shortcut"][aria-pressed="true"]'))) {
         event.preventDefault(); event.stopImmediatePropagation(); useWorkspaceStore.setState({ commandCenterOpen: true });
       }
     };

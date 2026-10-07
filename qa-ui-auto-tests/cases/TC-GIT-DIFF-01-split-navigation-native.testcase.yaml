@@ -32,7 +32,7 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-gate-password
-- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="control-bar"]'
 - seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-git-diff","name":"qa-git-diff","roots":[{"id":"qa-git-root","name":"qa-git-diff","path":"${fixture.git_diff_repo}","kind":"git"}],"looseFiles":[],"lastOpenedAt":1756100000000,"lastActiveFile":{"kind":"root","rootId":"qa-git-root","path":"long-lines.txt"},"isGitRepo":true}]'
@@ -96,7 +96,7 @@ steps:
 - wait_for: .git-log-view [data-testid="git-diff-splitter"]
 - screenshot: tc-git-diff-native-split-navigation.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: Native Git diff split resize and line-start navigation：按步骤执行后，所有声明的可观察结果均满足。
@@ -124,7 +124,7 @@ verification:
     - 40
     checkpoints:
     - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+      expectation: The Workspace-first shell is ready; the retained workflow below has its own business assertions.
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 9

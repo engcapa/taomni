@@ -28,6 +28,7 @@ timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -70,42 +71,42 @@ steps:
     timeout_sec: 60
 - screenshot: 004-saved-ssh-connect.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: 保存的 SSH 会话可从树中打开，认证后执行命令并出现独立的精确输出行。
     actions:
     - 1
-    - 3
-    - 5
+    - 4
     - 6
     - 7
     - 8
     - 9
-    - 11
+    - 10
     - 12
-    - 14
+    - 13
     - 15
-    - 18
+    - 16
+    - 19
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 10
+    - step: 11
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 13
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-saved-ssh\"]"}'
-    - step: 16
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
     - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+    - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
         "timeout_sec": 20}}'
-    - step: 20
+    - step: 21
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-saved\\-ssh\\-live\\r?$",
         "timeout_sec": 15}}'
     results:
-    - 20
+    - 21
   visual:
   - check: 认证框和终端输出可读、焦点反馈清晰。
     method: manual

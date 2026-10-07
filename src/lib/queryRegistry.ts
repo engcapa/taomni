@@ -28,6 +28,7 @@ export interface QueryRegistryEntry {
   appendEchoSql: (sql: string, note?: string) => void;
   /** Persist the latest SQL editor buffers before the owning app tab unmounts. */
   flushWorkspace?: () => Promise<void>;
+  captureView?: () => import("../components/database/DbClientTab").DbViewSnapshot;
 }
 
 interface QueryRegistryShape {

@@ -446,6 +446,7 @@ export interface Tab {
   vnc?: VncConnectInfo;
   rdp?: RdpConnectInfo;
   db?: DbConnectInfo;
+  dbView?: import("../components/database/DbClientTab").DbViewSnapshot;
   hbase?: HBaseConnectInfo;
   fileBrowser?: FileBrowserTabInfo;
   proxyTest?: ProxyTestTabInfo;

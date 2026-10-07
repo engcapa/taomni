@@ -38,10 +38,12 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="control-bar"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
-- click: '[data-testid="sidebar-tool-code-workspace"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
@@ -87,66 +89,66 @@ steps:
     timeout_sec: 10
 - screenshot: tc-ide-c5-full-project-on-the-fly-only.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: Reference information V3 unavailable contracts (QuickDoc/Parameter/Static Data)：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 3
-    - 5
     - 7
     - 9
     - 11
-    - 14
-    - 17
-    - 18
-    - 22
-    - 26
+    - 13
+    - 16
+    - 19
+    - 20
+    - 24
     - 28
     - 30
-    - 31
     - 32
     - 33
-    - 36
+    - 34
+    - 35
     - 38
+    - 40
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+      expectation: The Workspace-first shell is ready; the retained workflow below has its own business assertions.
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
-    - step: 6
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 8
-      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 10
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
     - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
-    - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
     - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
+    - step: 17
       expectation: '{"wait_for": "[data-testid=\"code-workspace-analysis-panel\"]"}'
-    - step: 20
+    - step: 22
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-parameter-info\"]"}'
-    - step: 24
+    - step: 26
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-quick-doc\"]"}'
-    - step: 29
+    - step: 31
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 34
+    - step: 36
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Expression
         Static Data", "timeout_sec": 15}}'
-    - step: 37
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-problems-panel\"]"}'
     - step: 39
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-problems-panel\"]"}'
+    - step: 41
       expectation: '{"assert_visible": "[data-testid=\"problems-full-project-note\"]"}'
-    - step: 40
+    - step: 42
       expectation: '{"assert_text": {"selector": "[data-testid=\"problems-full-project-note\"]", "contains": "On-the-fly
         diagnostics only", "timeout_sec": 10}}'
     results:
-    - 39
-    - 40
+    - 41
+    - 42
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
