@@ -356,12 +356,7 @@ class TauriDriverProcess:
             return
 
         if self.proc is not None and self.proc.poll() is None:
-            self.proc.terminate()
-            try:
-                self.proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
-                self.proc.wait(timeout=5)
+            self.stop()
 
         deadline = time.time() + self.startup_timeout
         while _tcp_ok(self.host, self.port) and time.time() < deadline:
@@ -393,20 +388,26 @@ class TauriDriverProcess:
             self.proc.wait(timeout=5)
             self.proc = None
             return
-        if self.macos_lldb:
-            # The debugger and inferior share a job-owned process group.
-            with suppress(ProcessLookupError):
-                os.killpg(self.proc.pid, signal.SIGTERM)
-        elif self.proc.poll() is None:
+        if self.macos_lldb and self.proc.poll() is None:
+            # debugserver can give the inferior its own process group, and
+            # LLDB intercepts SIGTERM. Snapshot only this launcher's descendants
+            # while ownership is intact, then reap leaf-first with SIGKILL.
+            # Killing only LLDB leaves a stopped app holding the bridge port.
+            table = subprocess.check_output(["ps", "-axo", "pid=,ppid="], text=True, timeout=5)
+            parents = {int(pid): int(parent) for pid, parent in
+                       (line.split() for line in table.splitlines() if len(line.split()) == 2)}
+            owned = [self.proc.pid]
+            for parent in owned:
+                owned.extend(pid for pid, ppid in parents.items() if ppid == parent and pid not in owned)
+            for pid in reversed(owned[1:]):
+                with suppress(ProcessLookupError):
+                    os.kill(pid, signal.SIGKILL)
+        if self.proc.poll() is None:
             self.proc.terminate()
         try:
             self.proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            if self.macos_lldb:
-                with suppress(ProcessLookupError):
-                    os.killpg(self.proc.pid, signal.SIGKILL)
-            else:
-                self.proc.kill()
+            self.proc.kill()
             self.proc.wait(timeout=5)
         self.proc = None
 
@@ -1358,7 +1359,10 @@ class NativeHarness:
                             "profile": identity.get("profile")}, indent=2) + "\n",
                 encoding="utf-8",
             )
-            self.driver.start()
+            # A diagnostic debugger starts after the first fixture reset;
+            # no throwaway preflight inferior is needed before create_session.
+            if not self.driver.macos_lldb:
+                self.driver.start()
         except BaseException:
             self.__exit__(None, None, None)
             raise

@@ -2,6 +2,8 @@ import json
 import os
 from pathlib import Path
 import stat
+import socket
+import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -1219,14 +1221,54 @@ class MacosDebuggerProcessTest(TestCase):
             self.assertTrue(launch.call_args.kwargs["start_new_session"])
             self.assertEqual(launch.call_args.kwargs["env"]["TAOMNI_QA_WEBDRIVER_PORT"], "4444")
 
-    def test_debugger_cleanup_signals_only_its_owned_group(self):
+    def test_debugger_cleanup_reaps_only_owned_descendants_before_the_debugger(self):
         with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"), \
-                patch("tauri_webdriver.os.killpg") as kill:
+                patch("tauri_webdriver.subprocess.check_output", return_value="4321 1\n5000 4321\n5001 5000\n6000 1\n6001 6000\n"), \
+                patch("tauri_webdriver.os.kill") as kill:
             driver = TauriDriverProcess({"app": {"macos_lldb": True}}, Path(root))
             process = Mock(pid=4321)
+            process.poll.return_value = None
             driver.proc = process
             driver.stop()
-            self.assertEqual(kill.call_args.args[0], 4321)
-            process.terminate.assert_not_called()
+            self.assertEqual([call.args[0] for call in kill.call_args_list], [5001, 5000])
+            process.terminate.assert_called_once_with()
             process.wait.assert_called_once_with(timeout=5)
             self.assertIsNone(driver.proc)
+
+    def test_unresponsive_live_debugger_uses_owned_tree_cleanup_before_restart(self):
+        with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"), \
+                patch("tauri_webdriver._tcp_ok", return_value=False):
+            driver = TauriDriverProcess({"app": {"macos_lldb": True}}, Path(root))
+            driver.proc = Mock()
+            driver.proc.poll.return_value = None
+            driver.stop = Mock()
+            driver.start = Mock()
+            driver.ensure_running()
+            driver.stop.assert_called_once_with()
+            driver.start.assert_called_once_with()
+
+    @skipUnless(os.name == "posix", "requires a POSIX debugger process tree")
+    def test_cleanup_releases_a_real_inferior_port_in_a_separate_process_group(self):
+        child_code = ("import socket,time; s=socket.socket(); s.bind(('127.0.0.1',0)); "
+                      "s.listen(); print(s.getsockname()[1],flush=True); time.sleep(30)")
+        parent_code = ("import subprocess,sys; "
+                       f"p=subprocess.Popen([sys.executable,'-c',{child_code!r}], "
+                       "stdout=subprocess.PIPE,text=True,start_new_session=True); "
+                       "print(p.stdout.readline().strip(),flush=True); p.wait()")
+        process = subprocess.Popen([sys.executable, "-c", parent_code], stdout=subprocess.PIPE,
+                                   text=True, start_new_session=True)
+        try:
+            port = int(process.stdout.readline())
+            with socket.create_connection(("127.0.0.1", port), timeout=2):
+                pass
+            with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"):
+                driver = TauriDriverProcess({"app": {"macos_lldb": True}}, Path(root))
+                driver.proc = process
+                driver.stop()
+            with self.assertRaises(OSError):
+                socket.create_connection(("127.0.0.1", port), timeout=2)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+            process.stdout.close()

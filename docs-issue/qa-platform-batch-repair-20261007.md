@@ -124,3 +124,46 @@ an opt-in LLDB all-thread trace on this isolated QA process in a selected macOS
 run before making a speculative product change. Debugger use is recorded in the
 config and excluded from performance conclusions; remove the temporary workflow
 opt-in before normal validation/full measurement. No new full sweep yet.
+
+
+## Follow-up diagnostics and local checks
+
+Committed the desktop/watcher fix as `1fe14139`. TypeScript, the static audit,
+26 desktop checks, 64 transport/supervisor checks, two debugger ownership checks,
+and 12 mounted watcher/encoding/external-change regressions pass. Browser
+TC-IDE-C0-02 passes with stable identity in
+`qa-ui-auto-report/encoding-watcher-browser/run-20261007-204317-231804102`.
+
+The first macOS-only diagnostic (`37622669515`, `31a15ca5`) was cancelled in
+build, before any cases: the new diagnostic forced release compilation but
+its two-case selection chose a debug cache key. Its retained build log shows
+866 compiled crates. Fixed the cache selector in `39d915b0` and dispatched
+`37625238005` for N17/N20 only. GitHub records the prior release workspace
+cache accessed at 2026-10-07 13:08:06 UTC. Results remain pending.
+
+Add a default-off `native_release` dispatch/call/CLI option. It changes only
+the selected native entries' build capability, leaving cases, browser entries,
+default profile selection and production release builds intact. The planner
+therefore supplies the same profile to execution and cache keys. Use it for
+remaining targeted runs to reuse full-run release caches without adding
+unrelated RDP/performance cases. Twenty selection/supervisor/workflow checks
+pass. Remove the temporary workflow LLDB opt-in before full measurement.
+
+The first batch's Windows build took 22m31s; its seven cases took 229.1s,
+including 35.2s of session setup. For TC-143, TC-145 and N20, setup was about
+5.6s on Windows versus 1.6s on default Linux. These are different OS hosts and
+small selections, not an end-to-end performance improvement claim. Keep
+per-case isolation, prioritize matching builds and exact case selection.
+
+
+The cached diagnostic completed but both cases were **unrun**, failing session
+setup with port 4444 still occupied. LLDB's debugserver can place its inferior
+in a different process group, so terminating the launcher's group left the QA
+app stopped and listening. Fix cleanup to snapshot only the launcher's owned
+descendants and kill leaf-first before the debugger, including the restart
+path; defer the throwaway diagnostic preflight until after the first fixture
+reset. A real POSIX subprocess test proves a child in a separate process group
+releases its listening port; sibling-process exclusion and debugger restart
+are also tested. Four debugger tests and 19 isolation tests pass. The original
+macOS N20 close failure still requires its native trace; no product close change
+has been made on speculation. The matching QA build is available for reuse.
