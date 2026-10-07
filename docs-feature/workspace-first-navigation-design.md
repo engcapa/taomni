@@ -4,7 +4,7 @@
 
 - 类型：现有能力扩展 / UI 与导航模型重构
 - 文档位置：`docs-feature/workspace-first-navigation-design.md`
-- 设计状态：部分可实施
+- 设计状态：可实施（设计与测试交接完成；产品代码尚未实现）
 - 来源：用户确认的 Workspace-first 实体模型；交互原型 `docs-feature/ui-layout-refactor-prototype.html`
 - 调研基线：当前 `main` 分支，2026-10-07；工作区存在未提交的原型文件，不修改业务代码。
 - 平台与运行方式：Windows、macOS、Linux 三端 Tauri 桌面应用；浏览器用于辅助验证。
