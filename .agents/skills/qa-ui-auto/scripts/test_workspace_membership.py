@@ -8,11 +8,20 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from qa_ui_auto.fixtures.workspace_membership import setup
+from qa_ui_auto.fixtures.workspace_membership import setup, chat_history, seed_chat_db
 from tauri_webdriver import native_isolation_env
 
 
 class WorkspaceMembershipFixtureTests(unittest.TestCase):
+    def test_chat_history_has_distinct_persisted_workspace_owners(self):
+        threads, messages = chat_history()
+        with closing(sqlite3.connect(":memory:")) as db:
+            seed_chat_db(db, threads, messages)
+            for scope in ("main", "remote"):
+                rows = db.execute("SELECT m.content FROM ai_chat_messages m JOIN ai_chat_threads t ON t.id=m.thread_id WHERE t.workspace_id=? ORDER BY t.updated_at", (f"qa-workspace-{scope}",)).fetchall()
+                self.assertEqual(rows, [(f"QA {scope} persisted reply 1",), (f"QA {scope} persisted reply 2",)])
+            self.assertEqual(db.execute("SELECT count(*) FROM ai_chat_threads WHERE linked_session_id IS NOT NULL").fetchone()[0], 0)
+
     def test_refuses_native_profile_without_matching_isolation(self):
         with tempfile.TemporaryDirectory() as folder:
             ctx = SimpleNamespace(cfg={'app': {'mode': 'native'}}, report_root=folder, values={})

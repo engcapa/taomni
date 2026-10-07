@@ -1767,6 +1767,7 @@ function MailSettings({
 
       <Field label="IMAP security">
         <Select
+          ariaLabel="IMAP security"
           value={imapSecurity}
           className="w-32"
           options={["TLS", "STARTTLS", "None"]}
@@ -1821,6 +1822,7 @@ function MailSettings({
 
       <Field label="SMTP security">
         <Select
+          ariaLabel="SMTP security"
           value={smtpSecurity}
           className="w-32"
           options={["TLS", "STARTTLS", "None"]}

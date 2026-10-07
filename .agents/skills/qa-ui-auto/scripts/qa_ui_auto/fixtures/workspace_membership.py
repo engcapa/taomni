@@ -2,12 +2,56 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 import subprocess
+import time
 from contextlib import closing
 from typing import Any
 
 from .backup_policy import isolated_data_root
+
+
+def chat_history():
+    now = int(time.time())
+    threads = []
+    messages = {}
+    for scope in ("main", "remote"):
+        for index in (1, 2):
+            identity = f"qa-chat-{scope}-{index}"
+            threads.append({
+                "id": identity, "title": f"QA {scope} history {index}",
+                "provider_id": "deepseek", "created_at": now - 10 + index,
+                "updated_at": now - 10 + index, "linked_session_id": None,
+                "workspace_id": f"qa-workspace-{scope}", "source": "drawer", "mode": "chat",
+            })
+            messages[identity] = [{
+                "id": identity + "-reply", "thread_id": identity, "role": "assistant",
+                "content": f"QA {scope} persisted reply {index}",
+                "created_at": now - 10 + index, "redacted": False, "attachments": [],
+            }]
+    return threads, messages
+
+
+def seed_chat_db(db, threads, messages):
+    db.executescript("""
+        CREATE TABLE ai_chat_threads (
+            id TEXT PRIMARY KEY, title TEXT NOT NULL, provider_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+            linked_session_id TEXT, workspace_id TEXT, source TEXT NOT NULL,
+            mode TEXT NOT NULL DEFAULT 'chat'
+        );
+        CREATE TABLE ai_chat_messages (
+            id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, role TEXT NOT NULL,
+            content TEXT NOT NULL, created_at INTEGER NOT NULL,
+            redacted INTEGER NOT NULL DEFAULT 0
+        );
+    """)
+    for thread in threads:
+        db.execute(f"INSERT INTO ai_chat_threads({','.join(thread)}) VALUES({','.join('?' for _ in thread)})", list(thread.values()))
+        for message in messages[thread['id']]:
+            record = {k: v for k, v in message.items() if k != 'attachments'}
+            db.execute(f"INSERT INTO ai_chat_messages({','.join(record)}) VALUES({','.join('?' for _ in record)})", list(record.values()))
 
 
 def setup(ctx: Any) -> None:
@@ -22,6 +66,12 @@ def setup(ctx: Any) -> None:
         (project / "README.md").write_text("# QA workspace preview\n\nDurable workspace fixture.\n", encoding="utf-8")
         subprocess.run(["git", "init", str(project)], check=True, capture_output=True)
         root = project.as_posix()
+        if getattr(ctx, "case_id", "") == "TC-WS-NATIVE-008":
+            payload = ("Workspace transfer fixture: real SSH roundtrip.\n" * 4096).encode("utf-8")
+            (project / "qa-workspace-transfer.txt").write_bytes(payload)
+            (project / "downloads").mkdir()
+            ctx.values["workspace_catalog_download"] = (project / "downloads").as_posix()
+            ctx.values["workspace_transfer_sha256"] = hashlib.sha256(payload).hexdigest()
     sessions = [
         {"id": identity, "name": name, "session_type": kind, "group_path": "User sessions / QA",
          "host": "", "port": 22, "username": None, "auth_method": "None", "options_json": "{}",
@@ -37,6 +87,7 @@ def setup(ctx: Any) -> None:
     ssh = ctx.cfg.get("ssh") or {}
     if ssh.get("host") and ssh.get("port") and ssh.get("user"):
         sessions[1].update(host=ssh["host"], port=int(ssh["port"]), username=ssh["user"], auth_method="Password")
+    threads, messages = chat_history() if getattr(ctx, "case_id", "") in {"TC-WS-013", "TC-WS-NATIVE-006"} else ([], {})
     workspaces = []
     for index, (identity, name, members) in enumerate([
         ("qa-workspace-main", "QA Main", ["qa-local-shell", "qa-shared-ssh"]),
@@ -60,6 +111,8 @@ def setup(ctx: Any) -> None:
                 CREATE TABLE workspaces(id TEXT PRIMARY KEY,legacy_recent_id TEXT UNIQUE,revision INTEGER NOT NULL,record_json TEXT NOT NULL);
                 CREATE TABLE workspace_memberships(workspace_id TEXT NOT NULL,session_id TEXT NOT NULL,record_json TEXT NOT NULL,PRIMARY KEY(workspace_id,session_id));
             """)
+            if threads:
+                seed_chat_db(db, threads, messages)
             for session in sessions:
                 persisted = {**session, "auth_method": json.dumps(session["auth_method"])}
                 db.execute(f"INSERT INTO sessions({','.join(persisted)}) VALUES({','.join('?' for _ in persisted)})", list(persisted.values()))
@@ -69,9 +122,9 @@ def setup(ctx: Any) -> None:
                     db.execute("INSERT INTO workspace_memberships VALUES(?,?,?)", (workspace["id"], member["sessionId"], json.dumps(member)))
         ctx.values["workspace_catalog_db"] = str(data_root / "taomni.db")
     else:
-        seed = json.dumps({"sessions": sessions, "workspaces": workspaces})
+        seed = json.dumps({"sessions": sessions, "workspaces": workspaces, "threads": threads, "messages": messages})
         # Init-script ordering is not guaranteed by Playwright. If seed runs
         # first, prevent reset_db's later script from deleting seeded records.
-        script = "(() => { if (sessionStorage.getItem('qa.workspace.seeded')) return; sessionStorage.setItem('qa.workspace.seeded','1'); sessionStorage.setItem('qa-ui-auto.reset-complete','1'); const seed=" + seed + "; localStorage.setItem('taomni.sessions.v1',JSON.stringify(seed.sessions)); localStorage.setItem('taomni.stub.workspaces.v1',JSON.stringify(seed.workspaces)); })();"
+        script = "(() => { if (sessionStorage.getItem('qa.workspace.seeded')) return; sessionStorage.setItem('qa.workspace.seeded','1'); sessionStorage.setItem('qa-ui-auto.reset-complete','1'); const seed=" + seed + "; localStorage.setItem('taomni.sessions.v1',JSON.stringify(seed.sessions)); localStorage.setItem('taomni.stub.workspaces.v1',JSON.stringify(seed.workspaces)); if(seed.threads.length){localStorage.setItem('taomni.stub.chatThreads.v1',JSON.stringify(seed.threads));localStorage.setItem('taomni.stub.chatMessages.v1',JSON.stringify(seed.messages));} })();"
         ctx.page.context.add_init_script(script)
     ctx.values["workspace_catalog_root"] = root

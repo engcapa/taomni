@@ -1,0 +1,158 @@
+id: TC-WS-NATIVE-009
+title: 'AC-05: real VNC framebuffer and input survive Workspace switches and detached reattachment'
+covers:
+- F-Workspace-1
+- F9.6
+tags:
+- workspace-first
+- p1
+- vnc
+modes:
+- native
+fixtures:
+- reset_db
+- workspace_membership
+- vnc_required
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-workspace-test-password
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-vnc"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${fixture.vnc_host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.vnc_port}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA VNC resource
+- click: '[data-testid="session-save"]'
+- click: '[data-testid="side-tab-work"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- select_option:
+    selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
+    label: QA VNC resource
+- click: '[data-testid="workspace-navigator"] >> text="QA VNC resource"'
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 20
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 20
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_VNC_PASSWORD}
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
+    timeout_sec: 20
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "auth", "ok": true, "security": "VNCAuth"'
+- click: '[data-testid="workspace-surface-overview"]'
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- host_write_file:
+    path: ${fixture.vnc_control}
+    text: 'resize 1024 768
+
+      '
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-navigator"] >> text="QA VNC resource"'
+- wait_for: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
+- assert_count:
+    selector: '[data-testid="vnc-canvas"]'
+    equal: 1
+- click: '[data-testid="vnc-canvas"]'
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"type": "pointer"'
+- switch_native_window: main
+- click: '[data-testid="vnc-detach"]'
+- switch_native_window: detached
+- wait_for: '[data-testid="detached-session-window"][data-detached-kind="vnc"]'
+- wait_for: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
+- host_write_file:
+    path: ${fixture.vnc_control}
+    text: 'resize 900 600
+
+      '
+- wait_for: '[data-testid="vnc-canvas"][width="900"][height="600"]'
+- click: '[data-testid="detached-reattach"]'
+- switch_native_window: main
+- wait_for: '[data-testid="vnc-canvas"][width="900"][height="600"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: "Workspace \xB7 QA Main"
+- assert_count:
+    selector: '[data-testid="vnc-canvas"]'
+    equal: 1
+- screenshot: workspace-vnc-retained.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Keep the existing VNC connection reachable across scope changes.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 20
+    - 21
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 31
+    - 33
+    - 34
+    - 35
+    - 38
+    - 40
+    - 41
+    checkpoints:
+    - step: 23
+      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
+    - step: 30
+      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
+    - step: 32
+      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
+    - step: 43
+      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
+    - step: 44
+      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
+    results:
+    - 23
+    - 30
+    - 32
+    - 43
+    - 44
+  native:
+  - check: Tauri VNC relay and detached OS window lifecycle.
+    method: automated
+    reason: Browser uses the service bridge; native uses the packaged application and actual child windows.
+  visual:
+  - check: Inspect retained theme, Lucide icons, spacing and clipping in final screenshots.
+    method: manual
+    reason: Pending screenshot inspection; a captured screenshot alone is not a visual pass.
+native_platforms:
+- Windows
+- macOS
+- Linux

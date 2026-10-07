@@ -1,0 +1,104 @@
+id: TC-WS-NATIVE-007
+title: 'AC-05/09: native Preview reads disk, recovers from missing files and restores context focus'
+description: Uses the isolated project on real disk through Tauri IPC, including Markdown rendering and missing-file
+  recovery.
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-workspace-test-password
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-preview"]'
+- fill:
+    selector: '[data-testid="workspace-preview-path"]'
+    value: README.md
+- click: '[data-testid="workspace-preview-load"]'
+- assert_text:
+    selector: '[data-testid="workspace-preview-content"]'
+    contains: QA workspace preview
+- fill:
+    selector: '[data-testid="workspace-preview-path"]'
+    value: missing-qa.txt
+- click: '[data-testid="workspace-preview-load"]'
+- assert_visible: '[data-testid="workspace-preview"] [role="alert"]'
+- fill:
+    selector: '[data-testid="workspace-preview-path"]'
+    value: README.md
+- click: '[data-testid="workspace-preview-load"]'
+- assert_text:
+    selector: '[data-testid="workspace-preview-content"]'
+    contains: QA workspace preview
+- click: '[data-testid="workspace-context-toggle"]'
+- assert_visible: '[data-testid="workspace-context-pane"]'
+- click: '[data-testid="workspace-context-close"]'
+- assert_not_visible: '[data-testid="workspace-context-pane"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "workspace-context-toggle"
+    expect_truthy: true
+- click: '[data-testid="workspace-surface-overview"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-surface-overview"]'
+    name: aria-selected
+    equals: 'true'
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-05/09: native Preview reads disk, recovers from missing files and restores context focus'
+    actions:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    - 17
+    - 20
+    checkpoints:
+    - step: 8
+      expectation: The actual disk Preview, error recovery or focus result is visible after the preceding action.
+    - step: 11
+      expectation: The actual disk Preview, error recovery or focus result is visible after the preceding action.
+    - step: 14
+      expectation: The actual disk Preview, error recovery or focus result is visible after the preceding action.
+    - step: 16
+      expectation: The actual disk Preview, error recovery or focus result is visible after the preceding action.
+    - step: 18
+      expectation: The actual disk Preview, error recovery or focus result is visible after the preceding action.
+    - step: 19
+      expectation: The actual disk Preview, error recovery or focus result is visible after the preceding action.
+    - step: 21
+      expectation: The actual disk Preview, error recovery or focus result is visible after the preceding action.
+    results:
+    - 8
+    - 11
+    - 14
+    - 16
+    - 18
+    - 19
+    - 21
+  native:
+  - check: Read actual Markdown and surface missing-file errors through native IPC.
+    method: automated
+    reason: The fixture creates a real directory under the isolated QA profile.
+  visual:
+  - check: Inspect theme, Lucide icons, spacing and clipping in the execution screenshots
+    method: manual
+    reason: Review pending execution evidence.
+native_platforms:
+- Windows
+- macOS
+- Linux

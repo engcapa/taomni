@@ -25,7 +25,10 @@ def setup(ctx: Any) -> None:
     mode = (cfg.get("app") or {}).get("mode", "browser")
     values: dict[str, str] = getattr(ctx, "values")
     values["mail_mode"] = mode
+    values["mail_fixture_password"] = "qa-pass"
     if mode != "native":
+        values.update(mail_host="imap.example.com", mail_imap_port="993",
+                      mail_smtp_host="smtp.example.com", mail_smtp_port="465", mail_security="TLS")
         values["mail_quick_connect"] = "mail://qa%40example.com@imap.example.com:993"
         # The stub server model is protocol-agnostic; POP3 renders the same.
         values["mail_pop3_quick_connect"] = "pop3://qa%40example.com@pop.example.com:995"
@@ -41,6 +44,7 @@ def setup(ctx: Any) -> None:
     mail_fake_server.ACTIVE = server
     values["mail_imap_port"] = str(server.imap_port)
     values["mail_smtp_port"] = str(server.smtp_port)
+    values.update(mail_host="127.0.0.1", mail_smtp_host="127.0.0.1", mail_security="None")
     values["mail_quick_connect"] = (
         f"mail://qa%40example.com:qa-pass@127.0.0.1:{server.imap_port}"
         f"?security=none&smtp=127.0.0.1:{server.smtp_port}"

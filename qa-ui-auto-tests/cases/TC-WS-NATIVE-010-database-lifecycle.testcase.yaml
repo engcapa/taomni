@@ -1,0 +1,171 @@
+id: TC-WS-NATIVE-010
+title: 'AC-05: MySQL queries and result state survive Workspace switches and detached reattachment'
+covers:
+- F-Workspace-1
+- F-DB-1
+tags:
+- workspace-first
+- p1
+- database
+modes:
+- native
+native_platforms:
+- Windows
+- macOS
+- Linux
+fixtures:
+- reset_db
+- workspace_membership
+- mysql_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-workspace-test-password
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA database resource
+- click: '[data-testid="session-save"]'
+- vault_first_run: qa-workspace-test-password
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA database resource"]'
+- click: '[data-testid="side-tab-work"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- select_option:
+    selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
+    label: QA database resource
+- click: '[data-testid="workspace-navigator"] >> text="QA database resource"'
+- wait_for: '[data-testid="db-query-tab"]'
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT SLEEP(2), 'QA_QUERY_RETAINED' AS marker;
+- click: '[data-testid="db-run-all"]'
+- click: '[data-testid="workspace-surface-overview"]'
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-navigator"] >> text="QA database resource"'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: QA_QUERY_RETAINED
+- assert_count:
+    selector: '[data-testid="db-query-tab"]'
+    equal: 1
+- switch_native_window: main
+- click: '[data-testid="db-detach"]'
+- switch_native_window: detached
+- wait_for: '[data-testid="detached-session-window"][data-detached-kind="database"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: QA_QUERY_RETAINED
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT 'QA_QUERY_DETACHED' AS marker;
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: QA_QUERY_DETACHED
+- click: '[data-testid="detached-reattach"]'
+- switch_native_window: main
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: QA_QUERY_DETACHED
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: "Workspace \xB7 QA Main"
+- assert_count:
+    selector: '[data-testid="db-query-tab"]'
+    equal: 1
+- screenshot: workspace-query-reattached.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Preserve real query results and owning Workspace across visibility and window changes.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 20
+    - 21
+    - 22
+    - 23
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 35
+    - 36
+    - 37
+    - 40
+    - 41
+    - 42
+    - 43
+    - 45
+    - 46
+    checkpoints:
+    - step: 33
+      expectation: The actual MySQL result marker, original scope or unique query host is observable.
+    - step: 34
+      expectation: The actual MySQL result marker, original scope or unique query host is observable.
+    - step: 39
+      expectation: The actual MySQL result marker, original scope or unique query host is observable.
+    - step: 44
+      expectation: The actual MySQL result marker, original scope or unique query host is observable.
+    - step: 47
+      expectation: The actual MySQL result marker, original scope or unique query host is observable.
+    - step: 48
+      expectation: The actual MySQL result marker, original scope or unique query host is observable.
+    - step: 49
+      expectation: The actual MySQL result marker, original scope or unique query host is observable.
+    results:
+    - 33
+    - 34
+    - 39
+    - 44
+    - 47
+    - 48
+    - 49
+  native:
+  - check: A real MySQL server executes the queries before and after native window handoff.
+    method: automated
+    reason: Uses runner-provisioned MySQL credentials and the isolated QA application.
+  visual:
+  - check: Inspect retained theme, Lucide icons, spacing and clipping in final screenshots.
+    method: manual
+    reason: Pending screenshot inspection; a captured screenshot alone is not a visual pass.

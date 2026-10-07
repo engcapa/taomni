@@ -1,7 +1,7 @@
 id: TC-WS-NATIVE-002
 title: 'AC-05: a real local PTY survives workspace and surface switches'
-description: Real local shell output before and after switching Workspaces, with exactly one retained PTY renderer.
-  SSH/SFTP/DB/Mail/VNC/RDP require their separate service fixtures and retained lifecycle cases.
+description: Uses xterm text input and real native PTY output to verify lifecycle. This is not physical OS keyboard
+  evidence; whole-string input avoids WKWebView per-key synthesis truncation.
 covers:
 - F-Workspace-1
 tags:
@@ -20,14 +20,16 @@ steps:
 - wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
 - click: '[data-testid="workspace-row-qa-workspace-main"]'
 - click: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-qa-local-shell"] > button'
-- wait_for: '[data-testid="terminal-pane"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)[$#>%]\s*$
     timeout_sec: 30
 - click: '[data-testid="terminal-pane"]'
-- type: echo QA_WORKSPACE_PTY_BEFORE
-- press: Enter
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: echo QA_WORKSPACE_PTY_BEFORE
+    submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_WORKSPACE_PTY_BEFORE\s*$
@@ -36,7 +38,7 @@ steps:
 - click: '[data-testid="workspace-row-qa-workspace-remote"]'
 - click: '[data-testid="workspace-row-qa-workspace-main"]'
 - click: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-qa-local-shell"] > button'
-- wait_for: '[data-testid="terminal-pane"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
 - assert_count:
     selector: '[data-testid="terminal-pane"]'
     equal: 1
@@ -45,8 +47,10 @@ steps:
     regex: (?m)^QA_WORKSPACE_PTY_BEFORE\s*$
     timeout_sec: 15
 - click: '[data-testid="terminal-pane"]'
-- type: echo QA_WORKSPACE_PTY_AFTER
-- press: Enter
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: echo QA_WORKSPACE_PTY_AFTER
+    submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_WORKSPACE_PTY_AFTER\s*$
@@ -62,35 +66,33 @@ verification:
     - 6
     - 9
     - 10
-    - 11
+    - 12
     - 13
     - 14
     - 15
-    - 16
+    - 19
     - 20
-    - 21
-    - 22
     checkpoints:
     - step: 8
       expectation: '{''assert_pattern'': {''selector'': ''[data-testid="terminal-pane"]'', ''regex'': ''(?m)[$#>%]\\s*$'',
         ''timeout_sec'': 30}}'
-    - step: 12
+    - step: 11
       expectation: '{''assert_pattern'': {''selector'': ''[data-testid="terminal-pane"]'', ''regex'': ''(?m)^QA_WORKSPACE_PTY_BEFORE\\s*$'',
         ''timeout_sec'': 15}}'
-    - step: 18
+    - step: 17
       expectation: '{''assert_count'': {''selector'': ''[data-testid="terminal-pane"]'', ''equal'': 1}}'
-    - step: 19
+    - step: 18
       expectation: '{''assert_pattern'': {''selector'': ''[data-testid="terminal-pane"]'', ''regex'': ''(?m)^QA_WORKSPACE_PTY_BEFORE\\s*$'',
         ''timeout_sec'': 15}}'
-    - step: 23
+    - step: 21
       expectation: '{''assert_pattern'': {''selector'': ''[data-testid="terminal-pane"]'', ''regex'': ''(?m)^QA_WORKSPACE_PTY_AFTER\\s*$'',
         ''timeout_sec'': 15}}'
     results:
     - 8
-    - 12
+    - 11
+    - 17
     - 18
-    - 19
-    - 23
+    - 21
   visual:
   - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
     method: manual

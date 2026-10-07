@@ -1,0 +1,179 @@
+id: TC-WS-NATIVE-006
+title: 'AC-10: Workspace Tao message history remains scoped after switching and restart'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-workspace-test-password
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA main persisted reply 2
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA main history 1
+- assert_not_visible: '[data-testid="ai-chat-drawer"] >> text="QA remote history 1"'
+- click: '[data-testid="ai-chat-drawer"] >> text="QA main history 1"'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA main persisted reply 1
+- click: '[data-testid="ai-chat-drawer"] button[aria-label="New chat"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"] >> text="QA main persisted reply 1"'
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="QA main history 2"'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA remote persisted reply 2
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA remote history 1
+- assert_not_visible: '[data-testid="ai-chat-drawer"] >> text="QA main history 1"'
+- click: '[data-testid="ai-chat-drawer"] >> text="QA remote history 1"'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA remote persisted reply 1
+- click: '[data-testid="ai-chat-drawer"] button[aria-label="New chat"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"] >> text="QA remote persisted reply 1"'
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="QA remote history 2"'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA main persisted reply 2
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA main history 1
+- assert_not_visible: '[data-testid="ai-chat-drawer"] >> text="QA remote history 1"'
+- click: '[data-testid="ai-chat-drawer"] >> text="QA main history 1"'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA main persisted reply 1
+- click: '[data-testid="ai-chat-drawer"] button[aria-label="New chat"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"] >> text="QA main persisted reply 1"'
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="QA main history 2"'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- restart_native_app: null
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="QA remote history 1"'
+- assert_text:
+    selector: '[data-testid="ai-chat-drawer"]'
+    contains: QA remote persisted reply 1
+- screenshot: workspace-tao-persisted-history.png
+native_platforms:
+- Windows
+- macOS
+- Linux
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-10: Workspace Tao message history remains scoped after switching and restart'
+    actions:
+    - 3
+    - 4
+    - 6
+    - 9
+    - 11
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 19
+    - 22
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 32
+    - 35
+    - 37
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    checkpoints:
+    - step: 5
+      expectation: main opens its latest persisted reply, not another workspace thread.
+    - step: 7
+      expectation: History contains an older thread from this workspace.
+    - step: 8
+      expectation: History excludes the other workspace thread.
+    - step: 10
+      expectation: Selecting history loads the actual persisted message through the chat store.
+    - step: 12
+      expectation: A new thread has no previous thread messages.
+    - step: 18
+      expectation: remote opens its latest persisted reply, not another workspace thread.
+    - step: 20
+      expectation: History contains an older thread from this workspace.
+    - step: 21
+      expectation: History excludes the other workspace thread.
+    - step: 23
+      expectation: Selecting history loads the actual persisted message through the chat store.
+    - step: 25
+      expectation: A new thread has no previous thread messages.
+    - step: 31
+      expectation: main opens its latest persisted reply, not another workspace thread.
+    - step: 33
+      expectation: History contains an older thread from this workspace.
+    - step: 34
+      expectation: History excludes the other workspace thread.
+    - step: 36
+      expectation: Selecting history loads the actual persisted message through the chat store.
+    - step: 38
+      expectation: A new thread has no previous thread messages.
+    - step: 47
+      expectation: History and message ownership survive a fresh renderer/application.
+    results:
+    - 5
+    - 7
+    - 8
+    - 10
+    - 12
+    - 18
+    - 20
+    - 21
+    - 23
+    - 25
+    - 31
+    - 33
+    - 34
+    - 36
+    - 38
+    - 47
+  native:
+  - check: SQLite-backed chat threads and messages survive application restart.
+    method: automated
+    reason: Native case uses isolated SQLite; browser case proves renderer routing only.
+  visual:
+  - check: Inspect retained theme, Lucide icons, spacing and clipping in final screenshots.
+    method: manual
+    reason: Pending screenshot inspection; a captured screenshot alone is not a visual pass.
