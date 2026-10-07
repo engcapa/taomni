@@ -239,12 +239,15 @@ def make_plan(args) -> dict:
                 entry_id = f"{platform_key}-{mode}"
                 if profile_name and profile_name != DEFAULT_LINUX_PROFILE:
                     entry_id = f"linux-{profile_name}-{mode}"
+                entry_capabilities = capabilities(eligible, mode)
+                if mode == "native" and getattr(args, "native_release", False):
+                    entry_capabilities = sorted(set(entry_capabilities) | {"release"})
                 entries.append({"id": entry_id, "platform": target, "platform_key": platform_key,
                                 "runner": runner, "arch": arch, "mode": mode, "selected_ids": ids,
                                 "linux_profile": profile_name, "linux_wrapper": profile.wrapper if profile else "",
                                 "desktop": profile.identity(profile_name) if profile else {},
                                 "cache_key": profile_name if profile_name and profile_name != DEFAULT_LINUX_PROFILE else platform_key,
-                                "capabilities": capabilities(eligible, mode),
+                                "capabilities": entry_capabilities,
                                 "case_digests": {c.id: input_digest(c.source_path) for c in eligible}})
     # These Rust contracts do not depend on the desktop. Select one available
     # Linux native entry, including when a targeted run excludes the default.
@@ -258,7 +261,7 @@ def make_plan(args) -> dict:
     if not entries and args.scope != "impacted":
         raise ValueError("selection contains no runnable cases")
     return {"schema": "qa-ui-auto.ci-selection.v1", "head": head, "base": base,
-            "linux_profiles": linux_profiles,
+            "linux_profiles": linux_profiles, "native_release": bool(getattr(args, "native_release", False)),
             "merge_base": ancestor, "scope": args.scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
@@ -404,6 +407,8 @@ def main(argv=None):
                           ("linux_profiles", DEFAULT_LINUX_PROFILE),
                           ("case_ids", ""), ("features", ""), ("tags", "")]:
         plan.add_argument("--" + name.replace("_", "-"), default=os.environ.get("QA_" + name.upper()) or default)
+    plan.add_argument("--native-release", action="store_true",
+                      default=os.environ.get("QA_NATIVE_RELEASE", "").lower() in {"true", "1"})
     plan.add_argument("--output", type=Path, default=Path("qa-ui-auto-report/selection.json"))
     report = subs.add_parser("report")
     report.add_argument("--selection", type=Path, required=True)

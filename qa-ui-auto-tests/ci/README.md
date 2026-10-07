@@ -28,6 +28,14 @@ gh workflow run qa-ui-auto-platforms.yml --ref YOUR_BRANCH \
   -f linux_profiles=ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland
 ```
 
+For a targeted native rerun after a full release-profile run, add
+`-f native_release=true`. This keeps the QA build profile and cache consistent
+without selecting unrelated performance cases. The default is `false`: cases
+that require release still use it, and other native selections retain their
+existing debug profile. Browser selection and production release workflows are
+unchanged. The planner records the choice and the native `release` capability,
+so execution and cache keys cannot disagree about the profile.
+
 GitHub only registers `workflow_dispatch` on the default branch. Publishing the
 new file on a feature branch alone is insufficient. Branch validation can use a
 temporary branch-specific caller; do not merge that temporary push trigger.

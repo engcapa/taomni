@@ -18,6 +18,21 @@ def args(**overrides):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_release_override_changes_only_native_build_capability_not_case_selection(self):
+        selection = dict(scope="selected", platforms="linux", modes="browser,native",
+                         case_ids="TC-SHOT-N20,TC-SHOT-036")
+        default = make_plan(args(**selection))
+        release = make_plan(args(**selection, native_release=True))
+        self.assertFalse(default["native_release"])
+        self.assertTrue(release["native_release"])
+        self.assertEqual(default["gaps"], release["gaps"])
+        for before, after in zip(default["entries"], release["entries"]):
+            self.assertEqual(before["id"], after["id"])
+            self.assertEqual(before["selected_ids"], after["selected_ids"])
+            self.assertNotIn("release", before["capabilities"])
+            expected = set(before["capabilities"]) | ({"release"} if before["mode"] == "native" else set())
+            self.assertEqual(set(after["capabilities"]), expected)
+
     def test_only_mstsc_cases_require_windows_debugger_tools(self):
         client = SimpleNamespace(fixtures=["rdp_server_required"], steps=[{"open": "/"}], tags=[])
         self.assertNotIn("mstsc", capabilities([client], "native"))

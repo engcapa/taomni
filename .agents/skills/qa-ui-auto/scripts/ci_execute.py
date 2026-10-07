@@ -131,10 +131,6 @@ def main():
                 config["app"]["macos_lldb"] = True
                 config["webdriver"] = {"startup_timeout": 60}
             release = entry["mode"] == "native" and "release" in entry["capabilities"]
-            if config["app"].get("macos_lldb"):
-                # This diagnostic reproduces the failed release-profile pin
-                # run; it is not a performance measurement.
-                release = True
             if release:
                 from native_build import qa_binary as release_binary
                 config["app"]["native_binary"] = str(release_binary(release=True))
