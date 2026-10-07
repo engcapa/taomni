@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  type AppProxyConfig,
   vaultStatus,
   VAULT_LOCKED_EVENT,
   VAULT_LOCKED_ERROR,
@@ -16,6 +17,7 @@ export interface AsrProviderConfig {
 }
 
 export interface AsrConfig {
+  download_proxy?: { mode: "app" | "custom" | "none"; custom: AppProxyConfig };
   language?: string;
   active: string;
   providers: Record<string, AsrProviderConfig>;
@@ -357,6 +359,7 @@ interface AiStore {
 
 const DEFAULT_CONFIG: AiConfig = {
   asr: {
+    download_proxy: { mode: "app", custom: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" } },
     active: "whisper-base",
     providers: Object.fromEntries(["base", "small", "medium"].map((size) => [
       `whisper-${size}`, { engine: "whisper-rs", model: `ggml-${size}.bin` },
@@ -628,6 +631,7 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
     ...config,
     asr: {
       ...DEFAULT_CONFIG.asr,
+      download_proxy: config.asr?.download_proxy ?? DEFAULT_CONFIG.asr.download_proxy,
       active: ["whisper-base", "whisper-small", "whisper-medium"].includes(config.asr?.active) ? config.asr.active : "whisper-base",
       language: ["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].includes(config.asr?.language ?? "") ? config.asr.language : "auto",
     },

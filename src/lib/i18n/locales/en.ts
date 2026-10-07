@@ -2934,6 +2934,13 @@ const dict = {
     webSearchDeny: "Deny",
   },
   voice: {
+    downloadProxy: "Model download proxy",
+    proxyApp: "Use application proxy",
+    proxyCustom: "Custom proxy",
+    proxyHelp: "Application mode follows Settings → Application Proxy (direct when disabled). Custom settings only affect model downloads. No proxy ignores system proxy settings.",
+    proxySave: "Save download proxy",
+    proxyUnsaved: "Save proxy changes before downloading.",
+
     updateHelp: "All models support Chinese and other languages. Model versions are published with app updates. Checking verifies local files; updates are explicit and keep previous weights.",
     checkModels: "Check versions and integrity",
     checkComplete: "Check complete. Review each model below.",

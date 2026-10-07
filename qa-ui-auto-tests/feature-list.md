@@ -3612,6 +3612,12 @@ controls:
   - id: voice-settings-close
     selector: '[data-testid="voice-settings-close"]'
     kind: interactive
+  - id: asr-download-proxy-mode
+    selector: '[data-testid="asr-download-proxy-mode"]'
+    kind: interactive
+  - id: asr-download-proxy-save
+    selector: '[data-testid="asr-download-proxy-save"]'
+    kind: interactive
   - id: asr-check-models
     selector: '[data-testid="asr-check-models"]'
     kind: interactive

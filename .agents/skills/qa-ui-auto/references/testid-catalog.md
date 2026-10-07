@@ -97,6 +97,8 @@
 - `[data-testid="chat-voice-button"]` — interactive — F-AI-2.3.chat-voice-button
 - `[data-testid="chat-voice-button-cancel"]` — interactive — F-AI-2.3.chat-voice-cancel
 - `[data-testid="voice-settings-close"]` — interactive — F-AI-2.3.voice-settings-close
+- `[data-testid="asr-download-proxy-mode"]` — interactive — F-AI-2.3.asr-download-proxy-mode
+- `[data-testid="asr-download-proxy-save"]` — interactive — F-AI-2.3.asr-download-proxy-save
 - `[data-testid="asr-check-models"]` — interactive — F-AI-2.3.asr-check-models
 - `[data-testid="asr-language"]` — interactive — F-AI-2.3.asr-language
 - `[data-testid="asr-download-whisper-base"]` — interactive — F-AI-2.3.asr-download-base
