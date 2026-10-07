@@ -28,6 +28,7 @@ export function PinnedImage() {
   const [noteDraft, setNoteDraft] = useState("");
   const [pins, setPins] = useState<PinSummary[]>([]);
   const [confirmCloseAll, setConfirmCloseAll] = useState(false);
+  const [menuTab, setMenuTab] = useState<"pin" | "all">("pin");
   const busyRef = useRef(false);
   const sizeBusy = useRef(false);
   const expandedSize = useRef<LogicalSize | null>(null);
@@ -209,67 +210,90 @@ export function PinnedImage() {
     }
   };
 
-  const buttonClass = "w-7 h-7 flex items-center justify-center rounded hover:bg-white/20 disabled:opacity-40";
+  const buttonClass = "w-8 h-8 flex items-center justify-center rounded hover:bg-white/20 disabled:opacity-40";
+  const openMenu = () => { setMenuTab("pin"); setMenuOpen(true); };
   if (!init || !url) return error ? <div role="alert" className="fixed inset-0 p-3 bg-black/80 text-white text-[12px]" onDoubleClick={() => void close()}>{error}</div> : null;
 
   return <div data-testid="screenshot-pin-window" data-collapsed={collapsed} className="fixed inset-0 select-none group" style={{ cursor: "move" }}
     onMouseDown={handleMouseDown}
     onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest("[data-pin-controls]")) { if (collapsed || e.shiftKey) void collapse(); else void close(); } }}
-    onContextMenu={(e) => { e.preventDefault(); if (collapsed) void collapse(); else setMenuOpen(true); }}
+    onContextMenu={(e) => { e.preventDefault(); if (collapsed) void collapse(); else openMenu(); }}
     onWheel={(e) => { if ((e.target as HTMLElement).closest("[data-pin-controls]")) return; if (e.deltaY === 0) return; if (e.ctrlKey || e.metaKey) setOpacity((value) => Math.max(0.1, Math.min(1, value + (e.deltaY < 0 ? 0.1 : -0.1)))); else void resize(zoom + (e.deltaY < 0 ? 0.1 : -0.1)); }}
-    title={t("screenshot.pinHint")}>
+    title={collapsed && note ? note : t("screenshot.pinHint")}>
     <div data-testid="screenshot-pin-surface" className="absolute inset-0 flex items-center justify-center" style={{ opacity: collapsed ? 1 : opacity, backgroundColor: "#e2e2e2", backgroundImage: "conic-gradient(#c4c4c4 25%, transparent 0 50%, #c4c4c4 0 75%, transparent 0)", backgroundSize: "16px 16px" }}>
       <img data-testid="screenshot-pin-image" src={url} alt={t("screenshot.pin")} className="max-w-full max-h-full block pointer-events-none object-contain" style={collapsed ? { width: "100%", height: "100%" } : { width: init.width * zoom / (window.devicePixelRatio || 1), height: init.height * zoom / (window.devicePixelRatio || 1) }} draggable={false} />
     </div>
     <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 0 0 1px rgba(22,119,255,0.6)" }} />
-    {collapsed ? <button data-pin-controls data-testid="screenshot-pin-expand" title={t("screenshot.pinExpand")} aria-label={t("screenshot.pinExpand")} onClick={() => void collapse()}
-      className="absolute bottom-0 right-0 p-1 rounded-tl bg-black/75 text-white"><Maximize2 size={16} /></button> : <>
+    {collapsed ? <>
+      <button data-pin-controls data-testid="screenshot-pin-expand" title={t("screenshot.pinExpand")} aria-label={t("screenshot.pinExpand")} onClick={() => void collapse()}
+        className="absolute bottom-0 right-0 p-1 rounded-tl bg-black/75 text-white"><Maximize2 size={16} /></button>
+      {note && <p data-pin-controls data-testid="screenshot-pin-thumb-note" title={note}
+        className="absolute top-0 left-0 right-0 truncate bg-black/75 text-white text-[10px] leading-4 px-1 cursor-help">{note}</p>}
+    </> : <>
       <div data-pin-controls data-testid="screenshot-pin-toolbar" className="absolute top-1 right-1 flex gap-0.5 p-1 rounded-lg bg-black/80 text-white cursor-default">
-        <button data-testid="screenshot-pin-copy" className={buttonClass} title={`${t("screenshot.copy")} (Ctrl/Cmd+C)`} aria-label={t("screenshot.copy")} disabled={busy} onClick={() => void copy()}><Copy size={15} /></button>
-        <button data-testid="screenshot-pin-save" className={buttonClass} title={`${t("screenshot.save")} (Ctrl/Cmd+S)`} aria-label={t("screenshot.save")} disabled={busy} onClick={() => void save()}><Download size={15} /></button>
-        <button data-testid="screenshot-pin-favorite" className={buttonClass} title={t(favoriteId ? "screenshot.pinUnfavorite" : "screenshot.pinFavorite")} aria-label={t(favoriteId ? "screenshot.pinUnfavorite" : "screenshot.pinFavorite")} aria-pressed={!!favoriteId} disabled={busy} onClick={() => void favorite()}><Star size={15} fill={favoriteId ? "#faad14" : "none"} color={favoriteId ? "#faad14" : "currentColor"} /></button>
-        <button data-testid="screenshot-pin-collapse" className={buttonClass} title={t("screenshot.pinCollapse")} aria-label={t("screenshot.pinCollapse")} onClick={() => void collapse()}><Minimize2 size={15} /></button>
-        <button data-testid="screenshot-pin-menu-toggle" className={buttonClass} title={t("screenshot.pinOptions")} aria-label={t("screenshot.pinOptions")} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><MoreHorizontal size={15} /></button>
-        <button data-testid="screenshot-pin-close" className={buttonClass} title={t("screenshot.cancel")} aria-label={t("screenshot.cancel")} onClick={() => void close()}><X size={15} /></button>
+        <button data-testid="screenshot-pin-copy" className={buttonClass} title={`${t("screenshot.copy")} (Ctrl/Cmd+C)`} aria-label={t("screenshot.copy")} disabled={busy} onClick={() => void copy()}><Copy size={16} /></button>
+        <button data-testid="screenshot-pin-save" className={buttonClass} title={`${t("screenshot.save")} (Ctrl/Cmd+S)`} aria-label={t("screenshot.save")} disabled={busy} onClick={() => void save()}><Download size={16} /></button>
+        <button data-testid="screenshot-pin-favorite" className={buttonClass} title={t(favoriteId ? "screenshot.pinUnfavorite" : "screenshot.pinFavorite")} aria-label={t(favoriteId ? "screenshot.pinUnfavorite" : "screenshot.pinFavorite")} aria-pressed={!!favoriteId} disabled={busy} onClick={() => void favorite()}><Star size={16} fill={favoriteId ? "#faad14" : "none"} color={favoriteId ? "#faad14" : "currentColor"} /></button>
+        <button data-testid="screenshot-pin-collapse" className={buttonClass} title={t("screenshot.pinCollapse")} aria-label={t("screenshot.pinCollapse")} onClick={() => void collapse()}><Minimize2 size={16} /></button>
+        <button data-testid="screenshot-pin-menu-toggle" className={buttonClass} title={t("screenshot.pinOptions")} aria-label={t("screenshot.pinOptions")} aria-expanded={menuOpen} onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}><MoreHorizontal size={16} /></button>
+        <button data-testid="screenshot-pin-close" className={buttonClass} title={t("screenshot.cancel")} aria-label={t("screenshot.cancel")} onClick={() => void close()}><X size={16} /></button>
       </div>
-      {menuOpen && <div data-pin-controls data-testid="screenshot-pin-menu" className="absolute top-11 right-1 left-1 max-h-[calc(100%-48px)] overflow-auto rounded-lg p-3 bg-black/90 text-white text-[12px] cursor-default">
-        <div className="flex items-center gap-2 mb-2">{t("screenshot.pinZoom")}
-          <button data-testid="screenshot-pin-zoom-out" className={buttonClass} aria-label={t("screenshot.pinZoomOut")} onClick={() => void resize(zoom - 0.1)}>−</button>
-          <span data-testid="screenshot-pin-zoom" className="min-w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-          <button data-testid="screenshot-pin-zoom-in" className={buttonClass} aria-label={t("screenshot.pinZoomIn")} onClick={() => void resize(zoom + 0.1)}>+</button>
-          <button data-testid="screenshot-pin-reset" className="ml-auto rounded px-2 py-1 bg-white/15" onClick={() => { setOpacity(1); void resize(1); }}>{t("screenshot.pinReset")}</button>
+      {menuOpen && <div data-pin-controls data-testid="screenshot-pin-menu" className="absolute top-11 right-1 left-1 bottom-1 flex min-h-0 flex-col rounded-lg bg-black/90 text-white text-[12px] cursor-default">
+        <div role="tablist" aria-label={t("screenshot.pinOptions")} className="flex gap-1 p-2">
+          <button role="tab" data-testid="screenshot-pin-tab-pin" aria-selected={menuTab === "pin"} onClick={() => setMenuTab("pin")}
+            className={`flex-1 h-8 rounded ${menuTab === "pin" ? "bg-white/25 font-medium" : "bg-white/10 hover:bg-white/20"}`}>{t("screenshot.pinTabPin")}</button>
+          <button role="tab" data-testid="screenshot-pin-tab-all" aria-selected={menuTab === "all"} onClick={() => setMenuTab("all")}
+            className={`flex-1 h-8 rounded ${menuTab === "all" ? "bg-white/25 font-medium" : "bg-white/10 hover:bg-white/20"}`}>{t("screenshot.pinTabAll")}</button>
         </div>
-        <label className="flex items-center gap-2 mb-3">{t("screenshot.pinOpacity")}
-          <input data-testid="screenshot-pin-opacity" aria-label={t("screenshot.pinOpacity")} type="range" min={10} max={100} step={10} value={Math.round(opacity * 100)} onChange={(e) => setOpacity(Number(e.target.value) / 100)} className="min-w-0 flex-1" />
-          <span className="tabular-nums">{Math.round(opacity * 100)}%</span>
-        </label>
-        <label className="block mb-2">{t("screenshot.pinNote")}
-          <textarea data-testid="screenshot-pin-note-input" aria-label={t("screenshot.pinNote")} maxLength={500} rows={2} value={noteDraft}
-            onChange={(e) => setNoteDraft(e.target.value)} className="block w-full rounded p-2 bg-white/15 mt-1" />
-        </label>
-        <button data-testid="screenshot-pin-note-save" disabled={busy} className="rounded px-2 py-1 bg-white/15 mb-3" onClick={() => void saveNote()}>{t("screenshot.save")}</button>
-        <div className="flex flex-wrap gap-2 mb-3">
-          <button data-testid="screenshot-pin-edit" disabled={busy} onClick={() => void run(openPinEditor)}>{t("screenshot.editImage")}</button>
-          <button data-testid="screenshot-pin-external" disabled={busy} onClick={() => void editExternal(false)}>{t("screenshot.externalEditor")}</button>
-          <button data-testid="screenshot-pin-choose-editor" disabled={busy} onClick={() => void editExternal(true)}>{t("screenshot.chooseEditor")}</button>
-        </div>
-        <p className="mb-2">{t("screenshot.pinArrange")}</p>
-        <div className="flex flex-wrap gap-2 mb-3">{(["tile", "cascade", "stackRight", "stackBottom"] as const).map((mode) =>
-          <button key={mode} data-testid={`screenshot-pins-${mode}`} disabled={busy} className="rounded px-2 py-1 bg-white/15" onClick={() => void arrange(mode)}>{t(`screenshot.pin${mode[0].toUpperCase()}${mode.slice(1)}`)}</button>)}</div>
-        <div className="flex flex-wrap gap-2 mb-3">{(["collapse", "expand", "resetOpacity"] as const).map((action) =>
-          <button key={action} data-testid={`screenshot-pins-${action}`} disabled={busy} onClick={() => void batch(action)}>{t(`screenshot.batch${action[0].toUpperCase()}${action.slice(1)}`)}</button>)}
-          <button data-testid="screenshot-pins-close-all" onClick={() => setConfirmCloseAll(true)}>{t("screenshot.closeAllPins")}</button>
-          {confirmCloseAll && <div role="alert" className="w-full rounded p-2 bg-white/15">{t("screenshot.closeAllPinsConfirm")}
-            <button data-testid="screenshot-pins-close-confirm" disabled={busy} className="ml-2 underline" onClick={() => void batch("closeAll")}>{t("screenshot.done")}</button>
-            <button className="ml-2" onClick={() => setConfirmCloseAll(false)}>{t("screenshot.cancel")}</button></div>}
-        </div>
-        <ul data-testid="screenshot-pin-list" className="max-h-28 overflow-auto mb-3">{pins.map((pin) => <li key={pin.label}>
-          <button className="text-left truncate w-full hover:underline" data-testid="screenshot-pin-focus" onClick={() => void run(() => focusPin(pin.label))}>{pin.note || `${t("screenshot.pin")} ${pin.order}`} · {pin.width} × {pin.height}</button>
-        </li>)}</ul>
-        <p data-testid="screenshot-pin-help" className="leading-relaxed text-white/75">{t("screenshot.pinHelp")}</p>
+        {menuTab === "pin" ? <div className="min-h-0 flex-1 overflow-auto px-3 pb-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="shrink-0">{t("screenshot.pinZoom")}</span>
+            <button data-testid="screenshot-pin-zoom-out" className="w-8 h-8 shrink-0 rounded bg-white/15 hover:bg-white/25" aria-label={t("screenshot.pinZoomOut")} onClick={() => void resize(zoom - 0.1)}>−</button>
+            <span data-testid="screenshot-pin-zoom" className="min-w-12 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+            <button data-testid="screenshot-pin-zoom-in" className="w-8 h-8 shrink-0 rounded bg-white/15 hover:bg-white/25" aria-label={t("screenshot.pinZoomIn")} onClick={() => void resize(zoom + 0.1)}>+</button>
+            <button data-testid="screenshot-pin-reset" className="ml-auto h-8 px-3 rounded bg-white/15 hover:bg-white/25" onClick={() => { setOpacity(1); void resize(1); }}>{t("screenshot.pinReset")}</button>
+          </div>
+          <label className="flex items-center gap-2">{t("screenshot.pinOpacity")}
+            <input data-testid="screenshot-pin-opacity" aria-label={t("screenshot.pinOpacity")} type="range" min={10} max={100} step={10} value={Math.round(opacity * 100)} onChange={(e) => setOpacity(Number(e.target.value) / 100)} className="min-w-0 flex-1" />
+            <span className="tabular-nums w-9 text-right">{Math.round(opacity * 100)}%</span>
+          </label>
+          <label className="block">{t("screenshot.pinNote")}
+            <textarea data-testid="screenshot-pin-note-input" aria-label={t("screenshot.pinNote")} maxLength={500} rows={2} value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)} className="block w-full rounded p-2 bg-white/15 mt-1" />
+          </label>
+          <button data-testid="screenshot-pin-note-save" disabled={busy} className="w-full h-8 rounded bg-white/15 hover:bg-white/25 disabled:opacity-40" onClick={() => void saveNote()}>{t("screenshot.save")}</button>
+          <div className="space-y-1.5">
+            <button data-testid="screenshot-pin-edit" disabled={busy} className="w-full h-8 rounded bg-white/15 hover:bg-white/25 disabled:opacity-40" onClick={() => void run(openPinEditor)}>{t("screenshot.editImage")}</button>
+            <button data-testid="screenshot-pin-external" disabled={busy} className="w-full h-8 rounded bg-white/15 hover:bg-white/25 disabled:opacity-40" onClick={() => void editExternal(false)}>{t("screenshot.externalEditor")}</button>
+            <button data-testid="screenshot-pin-choose-editor" disabled={busy} className="w-full h-8 rounded bg-white/15 hover:bg-white/25 disabled:opacity-40" onClick={() => void editExternal(true)}>{t("screenshot.chooseEditor")}</button>
+          </div>
+          <p data-testid="screenshot-pin-help" className="leading-relaxed text-white/75">{t("screenshot.pinHelp")}</p>
+        </div> : <div className="min-h-0 flex-1 overflow-auto px-3 pb-3 space-y-3">
+          <div>
+            <p className="mb-1.5 text-white/60">{t("screenshot.pinArrange")}</p>
+            <div className="grid grid-cols-2 gap-1.5">{(["tile", "cascade", "stackRight", "stackBottom"] as const).map((mode) =>
+              <button key={mode} data-testid={`screenshot-pins-${mode}`} disabled={busy} className="h-8 rounded bg-white/15 hover:bg-white/25 disabled:opacity-40" onClick={() => void arrange(mode)}>{t(`screenshot.pin${mode[0].toUpperCase()}${mode.slice(1)}`)}</button>)}</div>
+          </div>
+          <div className="space-y-1.5">
+            {(["collapse", "expand", "resetOpacity"] as const).map((action) =>
+              <button key={action} data-testid={`screenshot-pins-${action}`} disabled={busy} className="w-full h-8 rounded bg-white/15 hover:bg-white/25 disabled:opacity-40" onClick={() => void batch(action)}>{t(`screenshot.batch${action[0].toUpperCase()}${action.slice(1)}`)}</button>)}
+            <button data-testid="screenshot-pins-close-all" className="w-full h-8 rounded bg-white/15 hover:bg-white/25" onClick={() => setConfirmCloseAll(true)}>{t("screenshot.closeAllPins")}</button>
+            {confirmCloseAll && <div role="alert" className="rounded p-2 bg-white/15 leading-relaxed">{t("screenshot.closeAllPinsConfirm")}
+              <div className="mt-1.5 flex gap-2">
+                <button data-testid="screenshot-pins-close-confirm" disabled={busy} className="flex-1 h-8 rounded bg-white/25 disabled:opacity-40" onClick={() => void batch("closeAll")}>{t("screenshot.done")}</button>
+                <button className="flex-1 h-8 rounded bg-white/15 hover:bg-white/25" onClick={() => setConfirmCloseAll(false)}>{t("screenshot.cancel")}</button>
+              </div></div>}
+          </div>
+          <div>
+            <p className="mb-1.5 text-white/60">{t("screenshot.pinFocusList")}</p>
+            <ul data-testid="screenshot-pin-list" className="max-h-28 overflow-auto space-y-1">{pins.map((pin) => <li key={pin.label}>
+              <button className="text-left truncate w-full h-8 px-2 rounded bg-white/10 hover:bg-white/20" data-testid="screenshot-pin-focus" onClick={() => void run(() => focusPin(pin.label))}>{pin.note || `${t("screenshot.pin")} ${pin.order}`} · {pin.width} × {pin.height}</button>
+            </li>)}</ul>
+          </div>
+        </div>}
       </div>}
     </>}
-    {!collapsed && note && !menuOpen && <p data-pin-controls data-testid="screenshot-pin-note" className="absolute bottom-1 left-1 right-1 max-h-[30%] overflow-auto whitespace-pre-wrap break-words rounded bg-black/80 text-white text-[12px] p-2 cursor-text select-text">{note}</p>}
+    {!collapsed && note && !menuOpen && <p data-pin-controls data-testid="screenshot-pin-note" title={note} className="absolute bottom-1 left-1 right-1 max-h-[30%] overflow-auto whitespace-pre-wrap break-words rounded bg-black/80 text-white text-[12px] p-2 cursor-text select-text">{note}</p>}
     {(error || notice) && <p data-pin-controls data-testid="screenshot-pin-notice" role={error ? "alert" : "status"} className="absolute bottom-1 left-1 right-1 rounded bg-black/85 text-white text-[11px] p-2 cursor-default break-words">{error ?? notice}</p>}
   </div>;
 }

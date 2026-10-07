@@ -65,6 +65,7 @@ import { useT } from "../../lib/i18n";
 import { writeText } from "../../lib/clipboard";
 import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
 import { DbObjectDetailDialog, type ObjectDetail } from "./DbObjectDetailDialog";
+import { DbTableDetailPanel } from "./DbTableDetailPanel";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 
 interface SchemaTreeProps {
@@ -174,6 +175,7 @@ export function SchemaTree({
   const confirmDialog = useConfirmDialog();
   const inputDialog = useTextInputDialog();
   const [detail, setDetail] = useState<ObjectDetail | null>(null);
+  const [tableDetail, setTableDetail] = useState<{ schema: string; table: string; kind: "table" | "view" | "materialized_view" } | null>(null);
 
   const [schemas, setSchemas] = useState<string[]>([]);
   const [databaseRootExpanded, setDatabaseRootExpanded] = useState(true);
@@ -549,6 +551,10 @@ export function SchemaTree({
     }
   };
 
+  const showTableDetail = (db: string, kind: "table" | "view" | "materialized_view", name: string) => {
+    setTableDetail({ schema: db, table: name, kind });
+  };
+
   const indexResult = (rows: DbIndex[]): DbQueryResult => ({
     columns: [
       { name: "Index", type: "text" },
@@ -706,8 +712,11 @@ export function SchemaTree({
       ),
   });
 
-  const tableMenu = (db: string, kind: ObjectKind, name: string): MenuItem[] => {
-    const items: MenuItem[] = [{ label: t("dbObjects.browse"), onClick: () => onQuickSelect?.(db, name) }];
+  const tableMenu = (db: string, kind: "table" | "view" | "materialized_view", name: string): MenuItem[] => {
+    const items: MenuItem[] = [
+      { label: t("dbObjects.openDetail"), onClick: () => showTableDetail(db, kind, name) },
+      { label: t("dbObjects.browse"), onClick: () => onQuickSelect?.(db, name) },
+    ];
     if (supportsInlineEdit(sqlEngine)) {
       items.push({ label: t("dbObjects.editData"), onClick: () => onQuickSelect?.(db, name) });
     }
@@ -1216,6 +1225,22 @@ export function SchemaTree({
       {inputDialog.render}
       {detail && (
         <DbObjectDetailDialog detail={detail} onClose={() => setDetail(null)} onStatus={onStatus} />
+      )}
+      {tableDetail && (
+        <DbTableDetailPanel
+          sessionId={sessionId}
+          schema={tableDetail.schema}
+          table={tableDetail.table}
+          kind={tableDetail.kind}
+          engine={engine}
+          catalog={catalog}
+          onClose={() => setTableDetail(null)}
+          onStatus={onStatus}
+          onOpenData={() => {
+            onQuickSelect?.(tableDetail.schema, tableDetail.table);
+            setTableDetail(null);
+          }}
+        />
       )}
     </div>
   );
