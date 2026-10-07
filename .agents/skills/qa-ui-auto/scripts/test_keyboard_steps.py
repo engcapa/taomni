@@ -155,6 +155,37 @@ class KeyboardStepsTest(TestCase):
             })
         self.assertEqual(locator.evaluate.call_count, 2)
 
+    def test_terminal_input_failure_names_the_sent_text_and_observed_output(self):
+        ctx, page, locator = self.context()
+        pane = Mock()
+        # A dropped leading byte is the exact symptom a rerun hides; the failure
+        # must show what the shell actually received.
+        pane.text_content.return_value = "rintf 'qa-ready'\nqa-shell$"
+        pane.get_attribute.return_value = ""
+        page.locator.side_effect = lambda selector: Mock(first=pane if selector == "#pane" else locator)
+        with self.assertRaises(StepError) as raised:
+            step_terminal_input(ctx, {
+                "selector": ".xterm-helper-textarea", "text": "printf 'qa-ready'\n",
+                "submit": True,
+                "verify": {"selector": "#pane", "regex": r"(?m)^qa\-ready\r?$", "timeout_sec": 0.1, "attempts": 2},
+            })
+        message = str(raised.exception)
+        self.assertIn("printf 'qa-ready'", message)
+        self.assertIn("rintf 'qa-ready'", message)
+
+    def test_terminal_input_failure_reports_an_empty_pane_as_empty(self):
+        ctx, page, locator = self.context()
+        pane = Mock()
+        pane.text_content.return_value = "   \n\n"
+        pane.get_attribute.return_value = ""
+        page.locator.side_effect = lambda selector: Mock(first=pane if selector == "#pane" else locator)
+        with self.assertRaisesRegex(StepError, r"observed tail: <empty>"):
+            step_terminal_input(ctx, {
+                "selector": ".xterm-helper-textarea", "text": "echo ready",
+                "submit": True,
+                "verify": {"selector": "#pane", "regex": r"(?m)^ready\r?$", "timeout_sec": 0.1, "attempts": 1},
+            })
+
     def test_terminal_input_rejects_a_malformed_verify_block(self):
         ctx, _, locator = self.context()
         with self.assertRaisesRegex(StepError, "verify expects"):

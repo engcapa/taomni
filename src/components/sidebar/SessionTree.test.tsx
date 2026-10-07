@@ -120,6 +120,18 @@ describe("SessionTree range selection and drag", () => {
     expect(useSessionStore.getState().selectedSessionId).toBe("b");
   });
 
+  it("keeps rapid modifier double-clicks in selection mode", () => {
+    const connect = vi.fn();
+    render(<SessionTree onConnectSession={connect} />);
+    openFolders();
+    for (const modifier of ["ctrlKey", "metaKey", "shiftKey", "altKey"]) {
+      fireEvent.doubleClick(sessionRow("a"), { [modifier]: true });
+    }
+    expect(connect).not.toHaveBeenCalled();
+    fireEvent.doubleClick(sessionRow("a"));
+    expect(connect).toHaveBeenCalledWith(sessions[0]);
+  });
+
   it("supports reverse ranges, additive Ctrl+Shift ranges, and Meta toggling", () => {
     render(<SessionTree />);
     openFolders();

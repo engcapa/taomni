@@ -4673,7 +4673,7 @@ controls:
 - 剪贴板按方向分级（off/text/rich/all，默认 all）：文本、CF_HTML、CF_DIB/CF_DIBV5 图片、文件（FileGroupDescriptorW + FileContents，暂存目录 + 上限 MB）；两方向都 off 时不提供 CLIPRDR 通道
 - CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
 - Windows：NAT-01/PERF-01 三端运行，Windows 上经 `platform_choice` 在系统远程桌面提示中选 Taomni；系统远程桌面分支由 TC-RDPS-NAT-06 覆盖，TermService 基线由 TC-RDPS-PERF-02 测量
-- 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 Background Music 虚拟设备
+- 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 BlackHole 虚拟设备
 
 ---
 

@@ -6,10 +6,10 @@ or release dependency. Default runners are Ubuntu 24.04 x64, Windows 2025 x64
 and macOS 15 ARM64. Each can run browser and native cases. Linux native supports
 the optional desktop profiles below; release builds and packaging are unchanged.
 
-macOS audio provisioning retains the Background Music HAL loopback device but
-stops the package's desktop controller. Its microphone consent dialog otherwise
-occludes screenshot targets and intercepts OS input. Provisioning checks that
-the HAL output remains available; the audio playback case verifies actual sound.
+macOS audio provisioning installs the BlackHole HAL loopback device without a
+controller application. Background Music's system microphone consent sheet
+survived controller shutdown in run 37528790204 and covered screenshot fixtures.
+The audio playback case verifies the real loopback with the same installed device.
 
 ## Trigger and select
 
@@ -165,7 +165,7 @@ retains the observed OS focus before and after. The harness still requires
 native CSS focus assertions.
 CI installs the Ubuntu GNOME session, theme and portal components explicitly
 with `--no-install-recommends`; provisioning runs noninteractively with a
-20-minute dependency timeout. Desktop application metapackages are unnecessary
+35-minute dependency timeout. Desktop application metapackages are unnecessary
 for the virtual monitor and add substantial downloads.
 
 Selection entries, cache keys and artifact directories identify the profile.

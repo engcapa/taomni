@@ -16,6 +16,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -394,6 +395,10 @@ class TauriDriverProcess:
 
 
 class NativeSession:
+    #: Non-empty when Linux desktop focus could not be recovered. Focus is a
+    #: case assertion, so this is reported and never fails the whole session.
+    focus_warning = ""
+
     def __init__(self, driver_url: str, application: Path, on_close: Any | None = None):
         self.driver_url = driver_url.rstrip("/")
         self.application = application
@@ -486,9 +491,38 @@ class NativeSession:
         # race that navigation; transient evaluation failures are retryable,
         # but the case deadline remains authoritative.
         self.wait_for_app_ready()
-        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND") == "wayland":
-            self.activate_wayland_window()
+        self.activate_linux_window()
         self.install_console_hook()
+
+    def activate_linux_window(self) -> None:
+        """Give the fresh/reloaded QA document real desktop focus.
+
+        X11 focus recovery is best effort: an unfocused window is a case
+        assertion, never a reason to abandon every remaining native case.
+        """
+        self.focus_warning = ""
+        if platform.system() != "Linux":
+            return
+        if os.environ.get("GDK_BACKEND") == "wayland":
+            self.activate_wayland_window()
+            return
+        if self.execute("return document.hasFocus();") is not True:
+            try:
+                from qa_ui_auto.native_steps import _activate_x11_application
+                _activate_x11_application(self.application)
+            except Exception as error:  # noqa: BLE001 - reported, never fatal
+                self.focus_warning = f"X11 activation unavailable: {error}"
+                print(f"[native] {self.focus_warning}", file=sys.stderr, flush=True)
+                return
+            handle = self.request("GET", self.endpoint("/window"))
+            self.request("POST", self.endpoint("/window"), {"handle": handle})
+            end = time.monotonic() + 5
+            while self.execute("return document.hasFocus();") is not True:
+                if time.monotonic() >= end:
+                    self.focus_warning = "X11 QA document did not receive native focus"
+                    print(f"[native] {self.focus_warning}", file=sys.stderr, flush=True)
+                    return
+                time.sleep(0.1)
 
     def activate_wayland_window(self, timeout: float = 5.0) -> None:
         # Headless Wayland can create a visible WebView whose page is not

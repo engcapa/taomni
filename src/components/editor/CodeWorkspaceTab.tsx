@@ -7208,7 +7208,16 @@ export function CodeWorkspaceTab({
       setStatusMessage(`Cannot read external change for ${file.subtitle}: ${errorMessage(error)}`);
       return;
     }
-    const latest = openFilesRef.current[file.key] ?? file;
+    const latest = openFilesRef.current[file.key];
+    if (!latest || latest.saving) return;
+    // A delayed watcher echo of our last save can arrive after the user
+    // chooses a new encoding/EOL without editing the logical text. Keep that
+    // unsaved policy while refreshing the disk guard.
+    const preservePolicy = latest.dirty && (
+      latest.eol !== disk.eol
+      || latest.encoding !== disk.encoding
+      || latest.bom !== disk.bom
+    );
     if (disk.text !== latest.text && disk.text !== latest.savedText) invalidateSemantics();
     if (disk.text === latest.text) {
       // Another process wrote exactly the buffer we already have. Accept the
@@ -7218,13 +7227,11 @@ export function CodeWorkspaceTab({
         [file.key]: {
           ...(current[file.key] ?? latest),
           savedText: disk.text,
-          eol: disk.eol,
-          encoding: disk.encoding,
-          bom: disk.bom,
+          ...(preservePolicy ? {} : { eol: disk.eol, encoding: disk.encoding, bom: disk.bom }),
           hash: disk.hash,
           mtime: disk.mtime,
           size: disk.size,
-          dirty: false,
+          dirty: preservePolicy,
           error: null,
         },
       }));
@@ -7237,9 +7244,7 @@ export function CodeWorkspaceTab({
         ...current,
         [file.key]: {
           ...(current[file.key] ?? latest),
-          eol: disk.eol,
-          encoding: disk.encoding,
-          bom: disk.bom,
+          ...(preservePolicy ? {} : { eol: disk.eol, encoding: disk.encoding, bom: disk.bom }),
           hash: disk.hash,
           mtime: disk.mtime,
           size: disk.size,
@@ -18022,6 +18027,20 @@ export function CodeWorkspaceTab({
     return null;
   }, [promptInlineName]);
 
+  // "The workspace changed" alone cannot separate a genuine concurrent edit
+  // from a watcher echo of the provider's own project metadata
+  // (.project/.classpath/.settings) arriving during a rename. Name it.
+  const describeSemanticInvalidation = useCallback((
+    snapshot: ReturnType<typeof semanticIndex.current>,
+    tokenRevision: number,
+  ): string => [
+    snapshot.staleReasons.length > 0 ? `reasons=${snapshot.staleReasons.join(",")}` : null,
+    snapshot.invalidatedPaths.length > 0
+      ? `paths=${snapshot.invalidatedPaths.slice(0, 3).join(",")}`
+      : null,
+    `revision=${snapshot.revision}/${tokenRevision}`,
+  ].filter(Boolean).join(" "), []);
+
   const renameSymbolAt = useCallback(async (
     file: OpenFileState,
     position: LspPosition,
@@ -18126,7 +18145,8 @@ export function CodeWorkspaceTab({
       // change and must not cancel a rename the user already confirmed.
       if (beforeRename.revision !== buildToken.revision) {
         semanticIndex.abandonBuild(buildToken);
-        const message = "Rename was cancelled because the workspace changed while the dialog was open";
+        const message = "Rename was cancelled because the workspace changed while the dialog was open "
+          + `(${describeSemanticInvalidation(beforeRename, buildToken.revision)})`;
         setStatusMessage(message);
         return { status: "stale", message };
       }
@@ -18158,9 +18178,14 @@ export function CodeWorkspaceTab({
       });
       if (
         !completion.accepted
-        || !workspaceSemanticIndexBuildIsCurrent(completion.snapshot, buildToken)
+        // Provider progress and an already-consumed invalidation can leave
+        // staleReasons populated without changing the pinned workspace
+        // revision. The rename response is still valid in that case; reject
+        // only a real revision change after the provider answered.
+        || !workspaceSemanticIndexTokenRevisionCurrent(completion.snapshot, buildToken)
       ) {
-        const message = "Rename result became stale because the workspace changed; run Rename again";
+        const message = "Rename result became stale because the workspace changed; run Rename again "
+          + `(${describeSemanticInvalidation(completion.snapshot, buildToken.revision)})`;
         setStatusMessage(message);
         return { status: "stale", message };
       }

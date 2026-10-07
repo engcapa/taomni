@@ -8,6 +8,7 @@ import time
 from contextlib import suppress
 from typing import Any
 
+from ..evidence import text_tail
 from . import StepContext, StepError, verb
 
 
@@ -72,11 +73,12 @@ def step_terminal_input(ctx: StepContext, args: Any) -> None:
         _dispatch_terminal_input(ctx, selector, text, submit)
         if verify is None:
             return
-        if _terminal_output_matches(ctx, verify):
+        observed, matched = _terminal_output_matches(ctx, verify)
+        if matched:
             return
     raise StepError(
-        f"terminal_input: {verify['selector']} did not match {verify['regex']!r} "
-        f"after {attempts} attempt(s)"
+        f"terminal_input: sent {text!r}; {verify['selector']} did not match "
+        f"{verify['regex']!r} after {attempts} attempt(s); observed tail: {text_tail(observed)}"
     )
 
 
@@ -104,13 +106,14 @@ def _dispatch_terminal_input(ctx: StepContext, selector: str, text: str, submit:
         ctx.page.locator(selector).first.press("Enter")
 
 
-def _terminal_output_matches(ctx: StepContext, verify: dict[str, Any]) -> bool:
+def _terminal_output_matches(ctx: StepContext, verify: dict[str, Any]) -> tuple[str, bool]:
     """Poll the pty buffer until the probe's own output shows up.
 
     Windows OpenSSH/ConPTY intermittently drops part of a terminal write (a
     missing leading byte, a truncated burst). An optional verify block lets the
     probe be re-sent instead of failing the case on that transport hiccup; the
-    case's own assertion still decides what the run proves.
+    case's own assertion still decides what the run proves. Returns the last
+    observed buffer text so a failed case can name what actually arrived.
     """
     pattern = re.compile(verify["regex"])
     deadline = time.monotonic() + verify["timeout_sec"]
@@ -122,9 +125,9 @@ def _terminal_output_matches(ctx: StepContext, verify: dict[str, Any]) -> bool:
         with suppress(Exception):
             candidates.append(locator.get_attribute("data-terminal-text") or "")
         if any(pattern.search(candidate) for candidate in candidates):
-            return True
+            return next(c for c in candidates if pattern.search(c)), True
         if time.monotonic() >= deadline:
-            return False
+            return "\n".join(c for c in candidates if c), False
         time.sleep(0.25)
 
 

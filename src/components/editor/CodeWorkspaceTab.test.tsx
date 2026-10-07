@@ -4570,6 +4570,40 @@ describe("CodeWorkspaceTab", () => {
     );
   });
 
+  it("preserves unsaved EOL and BOM choices when a save watcher echo arrives", async () => {
+    runtimeState.tauri = true;
+    const instance = "instance-watcher-policy";
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-watcher-policy",
+      workspaceInstanceId: instance, name: "Watcher policy",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [], initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "first\nsecond", {
+      hash: "watcher-original", encoding: "UTF-8", bom: false,
+    }));
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    const key = "root:app:src/main.ts";
+    const current = () => selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instance).openFiles[key];
+    await waitFor(() => expect(current()?.text).toBe("first\nsecond"));
+    await waitFor(() => expect(useCodeWorkspaceStatusStore.getState().actions?.cycleEol).toBeDefined());
+    act(() => {
+      useCodeWorkspaceStatusStore.getState().actions?.cycleEol?.();
+      useCodeWorkspaceStatusStore.getState().actions?.toggleBom?.();
+    });
+    await waitFor(() => expect(current()).toMatchObject({ eol: "CRLF", bom: true, dirty: true }));
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "first\nsecond", {
+      hash: "watcher-refreshed", encoding: "UTF-8", bom: false,
+    }));
+    await act(async () => {
+      await emit("lsp://external-file-change", { workspaceId: instance, path: "/repo/app/src/main.ts", type: 2 });
+    });
+    await waitFor(() => expect(current()?.hash).toBe("watcher-refreshed"));
+    expect(current()).toMatchObject({ eol: "CRLF", bom: true, dirty: true, text: "first\nsecond" });
+  });
+
   it("queues an external dirty-buffer conflict and applies a merge against the latest disk hash", async () => {
     runtimeState.tauri = true;
     const workspace: CodeWorkspaceTabInfo = {
@@ -14743,6 +14777,45 @@ end_of_record
       expect(fixture.text()).toContain("int sum = extracted(values);");
       expect(fixture.text()).toContain("private static int extracted(int[] values) {");
       expect(fixture.disk[HELPER_PATH]).toContain("// extract-cross-file");
+    });
+
+    it("a stale rename names the invalidation that cancelled it", async () => {
+      // "the workspace changed" alone cannot separate a real concurrent edit
+      // from a watcher echo, so the status must carry reason, path and revisions.
+      // The watcher listener is registered at mount, so the Tauri runtime must be
+      // on before the workspace renders for an external change to arrive.
+      runtimeState.tauri = true;
+      const fixture = setupExtract("instance-rename-stale-detail");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+
+      // Change an unrelated file on disk while the naming prompt is open: a real
+      // content change, so the confirmed rename must be refused with detail.
+      // The watcher event only reaches the tab in the Tauri runtime.
+      await act(async () => {
+        await emit("lsp://external-file-change", {
+          workspaceId: "instance-rename-stale-detail",
+          path: "/repo/app/src/main/java/demo/Unrelated.java",
+          type: 2,
+        });
+        await new Promise((resolve) => { window.setTimeout(resolve, 200); });
+      });
+      fireEvent.change(input, { target: { value: "sumOf" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        const message = useAppStore.getState().statusMessage ?? "";
+        expect(message).toContain("workspace changed");
+      });
+      const message = useAppStore.getState().statusMessage!;
+      expect(message).toMatch(/reasons=[a-z-]+/);
+      expect(message).toContain("Unrelated.java");
+      expect(message).toMatch(/revision=\d+\/\d+/);
+      expect(fixture.text()).not.toContain("sumOf");
+      runtimeState.tauri = false;
     });
 
     it("a view switch while the rename preview is open never renames the abandoned file", async () => {

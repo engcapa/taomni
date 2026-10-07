@@ -58,6 +58,8 @@ fixtures:
 - reset_db
 - workspace_root
 timeout_sec: 600
+# The save matrix also guards against delayed save-watcher echoes replacing
+# an unsaved EOL/BOM policy with the preceding disk encoding.
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-gate-password

@@ -102,6 +102,34 @@ class NativeSessionTransportTest(TestCase):
         session.execute.assert_called_with("return document.hasFocus();")
         session.install_console_hook.assert_called_once_with()
 
+    def test_x11_activation_requires_os_and_webview_focus(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock(side_effect=["qa-window", None])
+        session.execute = Mock(side_effect=[False, False, True])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+             patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+             patch("qa_ui_auto.native_steps._activate_x11_application") as activate, \
+             patch("tauri_webdriver.time.sleep"):
+            session.activate_linux_window()
+        activate.assert_called_once_with(session.application)
+        session.request.assert_called_with("POST", "/session/session-1/window", {"handle": "qa-window"})
+        self.assertEqual(session.focus_warning, "")
+
+    def test_x11_activation_failure_is_reported_instead_of_failing_the_session(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock()
+        session.execute = Mock(return_value=False)
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+             patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+             patch("qa_ui_auto.native_steps._activate_x11_application",
+                   side_effect=native_steps.StepError("native X11: no window belongs to taomni")), \
+             patch("tauri_webdriver.time.sleep"):
+            session.activate_linux_window()
+        self.assertIn("no window belongs to taomni", session.focus_warning)
+        session.request.assert_not_called()
+
     def test_wayland_unfocused_document_fails_before_starting_app_steps(self):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"
@@ -294,7 +322,7 @@ class NativeSessionTransportTest(TestCase):
                 session.execute = Mock(side_effect=[
                     WebDriverError("Failed to read the 'localStorage' property"), False, True])
                 session.install_console_hook = Mock()
-
+                session.activate_linux_window = Mock()
                 with patch("tauri_webdriver.platform.system", return_value=system), \
                      patch.dict(os.environ, {"NEWMOB_DATA_DIR": "/qa/run/native-appdata"}):
                     session.start()

@@ -3102,6 +3102,7 @@ export function TerminalPanel({
         let integrationInstalling = false;
         let startupCommandSent = false;
         let startupCommandOutputObserved = false;
+        let startupCommandSentAt = 0;
         let startupCommandPromptSnapshot: string | null = null;
         const snapshotPromptBuffer = (liveTerm: Terminal) => {
           const buffer = liveTerm.buffer.active;
@@ -3121,6 +3122,7 @@ export function TerminalPanel({
           if (pendingStartupCommand && !startupCommandSent) {
             if (!terminalAtIdlePrompt(liveTerm)) return false;
             startupCommandSent = true;
+            startupCommandSentAt = Date.now();
             startupCommandPromptSnapshot = snapshotPromptBuffer(liveTerm);
             writeTerminal(targetSid, encodeBase64(`${pendingStartupCommand}\r`)).catch((err) => {
               appendEvent("error", `Failed to send SSH startup command: ${String(err)}`);
@@ -3128,7 +3130,14 @@ export function TerminalPanel({
             return false;
           }
           if (pendingStartupCommand && !startupCommandOutputObserved) {
+            // xterm updates its buffer as soon as the command is echoed. That
+            // echo is not proof that the command completed; sending the cwd
+            // hook at that point races the shell and can swallow the startup
+            // command on slow SSH/ConPTY sessions. Give the shell a turn, then
+            // require an idle prompt and a changed buffer before continuing.
+            if (Date.now() - startupCommandSentAt < 500) return false;
             if (snapshotPromptBuffer(liveTerm) === startupCommandPromptSnapshot) return false;
+            if (!terminalAtIdlePrompt(liveTerm)) return false;
             startupCommandOutputObserved = true;
             automationInputSettlingRef.current = false;
             syncAutomationState();
