@@ -205,4 +205,20 @@ describe("ControlBar settings button", () => {
     renderControlBar(vi.fn(), {}, onDetach);
     expect(openTabsMocks.props.at(-1)?.onDetachActiveTab).toBe(onDetach);
   });
+
+  it("exposes Horizon v3 top command bar, workspace selector, agents status and zen toggle", () => {
+    const onCommand = vi.fn();
+    renderControlBar(onCommand);
+    expect(screen.getByTestId("shell-command-bar")).toBeInTheDocument();
+    expect(screen.getByTestId("shell-workspace-selector")).toBeInTheDocument();
+    expect(screen.getByTestId("shell-agents-status")).toBeInTheDocument();
+    expect(screen.getByTestId("shell-zen-toggle")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("shell-command-bar"));
+    expect(useShellLayoutStore.getState().overlay).toBe("actions");
+
+    fireEvent.click(screen.getByTestId("shell-zen-toggle"));
+    expect(useShellLayoutStore.getState().immersive).toBe(true);
+  });
 });
+

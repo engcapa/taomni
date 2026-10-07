@@ -26,6 +26,8 @@ import {
   X,
   GitBranch,
   Braces,
+  Maximize2,
+  Sparkles,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { TabBar } from "./TabBar";
@@ -234,6 +236,19 @@ export function ControlBar({
           <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
       </div>
+      <div className="shell-titlebar-workspace hidden sm:flex items-center shrink-0 pr-1">
+        <button
+          type="button"
+          data-testid="shell-workspace-selector"
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium max-w-[150px] truncate hover:bg-[var(--taomni-hover)] transition-colors"
+          style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-divider)", color: "var(--taomni-text)" }}
+          title={active?.title ? `${t("shell.workspaces")}: ${active.title}` : t("shell.workspaces")}
+          onClick={() => dispatchShellAction("shell.overview")}
+        >
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--taomni-accent)" }} />
+          <span className="truncate">{active?.title ?? "Workspace"}</span>
+        </button>
+      </div>
       <div className="shell-titlebar-tabs min-w-0 flex-1 self-stretch">
         <TabBar
           shellMode
@@ -244,9 +259,35 @@ export function ControlBar({
         />
       </div>
       <div className="shell-titlebar-actions flex items-center shrink-0 gap-1">
+        <button
+          type="button"
+          data-testid="shell-command-bar"
+          title={`${t("shell.actions")} · Ctrl+K`}
+          aria-label={t("shell.actions")}
+          className="hidden md:inline-flex items-center gap-1.5 px-2 h-6 rounded text-[11px] hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] transition-colors"
+          style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-divider)" }}
+          onClick={() => dispatchShellAction("shell.actions")}
+        >
+          <Search className="w-3 h-3 shrink-0" />
+          <span>{t("shell.search")}</span>
+          <kbd className="text-[10px] opacity-70 px-1 py-0.2 rounded" style={{ background: "var(--taomni-selected)" }}>Ctrl+K</kbd>
+        </button>
         <BarButton testId="shell-quick-switch" title={t("shell.quickSwitch")} icon={<Search className="w-4 h-4" />} onClick={() => dispatchShellAction("shell.quickSwitch")} />
         {panelAvailable && <BarButton testId="shell-panel-toggle" title={t(panelAvailable ? "shell.panel" : "shell.panelUnavailable")} icon={<PanelLeft className="w-4 h-4" />} onClick={() => dispatchShellAction("shell.panel.open")} />}
         <BarButton testId="shell-tao-toggle" title={t("shell.tao")} icon={<MessageSquare className="w-4 h-4" />} onClick={() => dispatchShellAction("shell.tao.toggle")} />
+        <button
+          type="button"
+          data-testid="shell-agents-status"
+          title={`${t("shell.tao")} · Agents Swarm`}
+          className="hidden sm:inline-flex items-center gap-1 px-1.5 h-6 rounded text-[11px] font-medium hover:bg-[var(--taomni-hover)] transition-colors"
+          style={{ background: "rgba(88,166,255,0.12)", color: "var(--taomni-accent)", border: "1px solid rgba(88,166,255,0.25)" }}
+          onClick={() => dispatchShellAction("shell.tao.toggle")}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <Sparkles className="w-3 h-3 shrink-0" />
+          <span>Agents</span>
+        </button>
+        <BarButton testId="shell-zen-toggle" title={t("shell.immersive")} icon={<Maximize2 className="w-3.5 h-3.5" />} onClick={() => dispatchShellAction("shell.immersive.toggle")} />
         <button type="button" data-testid="shell-overview-trigger" className="text-xs h-8 px-1 rounded hover:bg-[var(--taomni-hover)]" onClick={() => dispatchShellAction("shell.overview")}>{t("shell.overview")} <span>{tabs.length}</span></button>
       {/* Update hint sits just left of the tab-action group (centre-right of the
           bar). It only appears once a new version is staged. */}

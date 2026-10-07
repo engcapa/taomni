@@ -1,0 +1,56 @@
+id: TC-SHELL-B53
+title: Horizon v3 Top Command Bar and Zen Mode Controls
+description: Verifies Horizon v3 layout refactoring controls including centered command bar, workspace selector, agents status pill, and zen mode toggle.
+covers:
+- F-SHELL-1
+- F1.2
+- F1.6
+tags:
+- workspace-shell
+- horizon-v3
+- smoke
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- shell_browser_catalog
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="control-bar"]'
+- assert_visible: '[data-testid="shell-command-bar"]'
+- assert_visible: '[data-testid="shell-workspace-selector"]'
+- assert_visible: '[data-testid="shell-agents-status"]'
+- assert_visible: '[data-testid="shell-zen-toggle"]'
+- click: '[data-testid="shell-command-bar"]'
+- wait_for: '[data-testid="shell-action-palette"]'
+- assert_visible: '[data-testid="shell-action-search"]'
+- press:
+    selector: '[data-testid="shell-action-search"]'
+    key: Escape
+- assert_not_visible: '[data-testid="shell-action-palette"]'
+- click: '[data-testid="shell-agents-status"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- assert_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="shell-zen-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="shell-root"]'
+    name: data-immersive
+    equals: 'true'
+- assert_not_visible: '[data-testid="app-titlebar"]'
+- press: F1
+- wait_for: '[data-testid="shell-action-palette"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.immersive.toggle
+- click: '[data-testid="shell-action-result"][data-action-id="shell.immersive.toggle"]'
+- assert_attribute:
+    selector: '[data-testid="shell-root"]'
+    name: data-immersive
+    equals: 'false'
+- assert_visible: '[data-testid="app-titlebar"]'
+- assert_visible: '[data-testid="shell-command-bar"]'

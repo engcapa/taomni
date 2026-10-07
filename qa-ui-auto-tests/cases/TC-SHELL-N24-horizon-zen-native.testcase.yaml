@@ -1,0 +1,42 @@
+id: TC-SHELL-N24
+title: Packaged native desktop app supports Horizon Command Bar and Zen mode
+description: Native boundary test verifying that Horizon v3 controls and zen mode toggle function properly within the packaged Tauri window environment.
+covers:
+- F1.6
+- F-SHELL-1
+tags:
+- p1
+- workspace-shell
+- horizon-v3
+- native-boundary
+modes:
+- native
+fixtures:
+- reset_db
+- shell_native_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-shell-native-password
+- wait_for: '[data-testid="welcome-panel"]'
+- set_viewport:
+    width: 1280
+    height: 800
+- wait_for: '[data-testid="shell-root"]'
+- assert_visible: '[data-testid="control-bar"]'
+- assert_visible: '[data-testid="shell-command-bar"]'
+- assert_visible: '[data-testid="shell-workspace-selector"]'
+- assert_visible: '[data-testid="shell-agents-status"]'
+- assert_visible: '[data-testid="shell-zen-toggle"]'
+- click: '[data-testid="shell-zen-toggle"]'
+- wait_for: '[data-testid="shell-root"][data-immersive="true"]'
+- assert_not_visible: '[data-testid="app-titlebar"]'
+- press: F1
+- wait_for: '[data-testid="shell-action-palette"]'
+- fill:
+    selector: '[data-testid="shell-action-search"]'
+    value: shell.immersive.toggle
+- click: '[data-testid="shell-action-result"][data-action-id="shell.immersive.toggle"]'
+- wait_for: '[data-testid="shell-root"][data-immersive="false"]'
+- assert_visible: '[data-testid="app-titlebar"]'
+- assert_visible: '[data-testid="shell-command-bar"]'

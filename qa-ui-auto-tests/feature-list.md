@@ -11195,6 +11195,18 @@ files:
 - src/lib/shell/laneActions.ts
 - src/hooks/useNativeImmersive.ts
 controls:
+- id: shell-agents-status
+  selector: '[data-testid="shell-agents-status"]'
+  kind: interactive
+- id: shell-command-bar
+  selector: '[data-testid="shell-command-bar"]'
+  kind: interactive
+- id: shell-workspace-selector
+  selector: '[data-testid="shell-workspace-selector"]'
+  kind: interactive
+- id: shell-zen-toggle
+  selector: '[data-testid="shell-zen-toggle"]'
+  kind: interactive
 - id: shell-close-cancel
   selector: '[data-testid="shell-close-cancel"]'
   kind: interactive

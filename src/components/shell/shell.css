@@ -54,3 +54,11 @@
 [data-immersive-workspace="true"] > [data-testid="code-workspace-toolbar"],
 [data-immersive-workspace="true"] .taomni-tool-window-rail,
 [data-immersive-workspace="true"] [data-testid="code-workspace-bottom-dock"] { display: none; }
+
+/* Taomni Horizon v3 Top Command Bar & Badges */
+[data-testid="shell-command-bar"] { cursor: pointer; user-select: none; }
+[data-testid="shell-command-bar"]:hover { border-color: var(--taomni-accent); }
+[data-testid="shell-workspace-selector"] { cursor: pointer; user-select: none; }
+[data-testid="shell-workspace-selector"]:hover { border-color: var(--taomni-accent); }
+[data-testid="shell-agents-status"] { cursor: pointer; user-select: none; }
+

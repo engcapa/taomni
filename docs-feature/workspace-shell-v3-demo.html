@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taomni Horizon (v3) — Next-Gen Workspace Shell Prototype</title>
+  <style>
+    :root {
+      --bg-base: #0d1117;
+      --bg-surface: #161b22;
+      --bg-panel: #1c2128;
+      --bg-hover: #262c36;
+      --bg-active: #2d333b;
+      --border-color: #30363d;
+      --border-subtle: #21262d;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --text-faint: #6e7681;
+      --accent-blue: #58a6ff;
+      --accent-green: #3fb950;
+      --accent-purple: #bc8cff;
+      --accent-amber: #d29922;
+      --accent-red: #f85149;
+      --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-code: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace;
+      --shadow-dropdown: 0 12px 32px rgba(0, 0, 0, 0.45);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="light"] {
+      --bg-base: #f6f8fa;
+      --bg-surface: #ffffff;
+      --bg-panel: #f3f4f6;
+      --bg-hover: #eaeef2;
+      --bg-active: #e1e4e8;
+      --border-color: #d0d7de;
+      --border-subtle: #e1e4e8;
+      --text-main: #24292f;
+      --text-muted: #57606a;
+      --text-faint: #8c959f;
+      --accent-blue: #0969da;
+      --accent-green: #1a7f37;
+      --accent-purple: #8250df;
+      --accent-amber: #9a6700;
+      --accent-red: #cf222e;
+      --shadow-dropdown: 0 12px 32px rgba(0, 0, 0, 0.12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg-base);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 主应用框架：自上而下的流线网格 */
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* 1. 顶栏命令中心 (Top Command Bar) */
+    .top-command-bar {
+      height: 38px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+    .top-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text-main);
+    }
+    .brand-logo svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--accent-blue);
+    }
+    .workspace-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+    .workspace-pill:hover { background: var(--bg-hover); }
+
+    /* 全局命令居中检索 (Ctrl+K) */
+    .top-center {
+      flex: 1;
+      max-width: 500px;
+      margin: 0 16px;
+    }
+    .search-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      height: 26px;
+      padding: 0 10px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+    .search-trigger:hover {
+      border-color: var(--accent-blue);
+      color: var(--text-main);
+    }
+    .kbd-tag {
+      font-family: var(--font-code);
+      font-size: 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: var(--text-muted);
+    }
+
+    .top-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .agent-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      background: rgba(88, 166, 255, 0.12);
+      border: 1px solid rgba(88, 166, 255, 0.25);
+      border-radius: 99px;
+      font-size: 11px;
+      color: var(--accent-blue);
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(63, 185, 80, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
+    }
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+    .icon-btn:hover { background: var(--bg-hover); color: var(--text-main); }
+    .icon-btn.active { color: var(--accent-blue); background: var(--bg-active); }
+
+    /* 2. 主体区 (Main Workspace Layout) */
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* 左侧极简导轨 (Global Rail) */
+    .global-rail {
+      width: 44px;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      flex-shrink: 0;
+      transition: width var(--transition-fast), transform var(--transition-fast);
+      z-index: 30;
+    }
+    .rail-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+      align-items: center;
+    }
+    .rail-item {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      transition: var(--transition-fast);
+    }
+    .rail-item:hover {
+      background: var(--bg-hover);
+      color: var(--text-main);
+    }
+    .rail-item.active {
+      background: var(--bg-active);
+      color: var(--accent-blue);
+    }
+    .rail-item.active::before {
+      content: "";
+      position: absolute;
+      left: -6px;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      background: var(--accent-blue);
+      border-radius: 0 4px 4px 0;
+    }
+    .rail-badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: var(--accent-blue);
+      color: white;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 99px;
+    }
+
+    /* 二级导航抽屉 (Secondary Navigator) */
+    .secondary-navigator {
+      width: 240px;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width var(--transition-fast), margin-left var(--transition-fast);
+      z-index: 25;
+    }
+    .navigator-header {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .navigator-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 4px;
+    }
+    .tree-node {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+    .tree-node:hover { background: var(--bg-hover); }
+    .tree-node.active { background: var(--bg-active); color: var(--accent-blue); font-weight: 500; }
+    .node-icon { color: var(--text-muted); width: 14px; text-align: center; }
+
+    /* 中央主工作面 (Primary Workspace Canvas) */
+    .primary-canvas {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--bg-base);
+      position: relative;
+    }
+
+    /* 上下文标签栏 (Context Tabs Bar) */
+    .canvas-tabbar {
+      height: 36px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      overflow-x: auto;
+    }
+    .tab-strip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 100%;
+    }
+    .canvas-tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 28px;
+      padding: 0 10px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      white-space: nowrap;
+    }
+    .canvas-tab:hover { background: var(--bg-hover); color: var(--text-main); }
+    .canvas-tab.active {
+      background: var(--bg-base);
+      border-color: var(--border-color);
+      color: var(--text-main);
+      font-weight: 500;
+    }
+    .tab-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+    }
+    .tab-dot.green { background: var(--accent-green); }
+    .tab-dot.amber { background: var(--accent-amber); }
+    .tab-close {
+      opacity: 0.4;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .canvas-tab:hover .tab-close { opacity: 0.8; }
+    .tab-close:hover { opacity: 1; color: var(--accent-red); }
+
+    .canvas-toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* 画布内容视图 (Canvas Views) */
+    .canvas-viewport {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .view-content {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+    }
+    .view-content.active { display: flex; }
+
+    /* 终端视图样式 */
+    .terminal-container {
+      flex: 1;
+      background: #090d12;
+      color: #c9d1d9;
+      font-family: var(--font-code);
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .term-line { margin-bottom: 4px; }
+    .term-prompt { color: var(--accent-green); font-weight: 600; }
+    .term-cmd { color: #f0f6fc; }
+    .term-output { color: #8b949e; }
+    .term-badge { background: #1f6feb26; color: var(--accent-blue); padding: 1px 6px; border-radius: 4px; }
+
+    /* 编辑器视图样式 */
+    .editor-container {
+      flex: 1;
+      display: flex;
+      background: var(--bg-base);
+      font-family: var(--font-code);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .editor-gutter {
+      width: 48px;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      color: var(--text-faint);
+      padding: 12px 8px;
+      text-align: right;
+      user-select: none;
+    }
+    .editor-code {
+      flex: 1;
+      padding: 12px 16px;
+      color: #e6edf3;
+      overflow-y: auto;
+    }
+    .syntax-kw { color: #ff7b72; font-weight: 600; }
+    .syntax-fn { color: #d2a8ff; }
+    .syntax-str { color: #a5d6ff; }
+    .syntax-comment { color: #8b949e; font-style: italic; }
+
+    /* 数据库视图样式 */
+    .db-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-base);
+    }
+    .db-query-bar {
+      padding: 8px 12px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .db-query-input {
+      flex: 1;
+      height: 28px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-main);
+      font-family: var(--font-code);
+      font-size: 12px;
+      padding: 0 10px;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      text-align: left;
+    }
+    .data-table th {
+      background: var(--bg-surface);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .data-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-main);
+    }
+    .data-table tr:hover td { background: var(--bg-hover); }
+
+    /* 3. 统一协同侧翼 (Companion Wing) */
+    .companion-wing {
+      width: 380px;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width var(--transition-fast), margin-right var(--transition-fast);
+      z-index: 30;
+    }
+    .companion-tabs {
+      height: 36px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 4px;
+    }
+    .companion-tab-btn {
+      flex: 1;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+    .companion-tab-btn:hover { background: var(--bg-hover); color: var(--text-main); }
+    .companion-tab-btn.active {
+      background: var(--bg-panel);
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    /* 智能体任务流视图 (Agent Stream) */
+    .agent-stream-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .agent-task-header {
+      padding: 12px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .task-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .task-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 99px;
+      background: rgba(63, 185, 80, 0.15);
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+    .task-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .agent-messages-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .stream-bubble {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .stream-bubble.user {
+      background: rgba(88, 166, 255, 0.08);
+      border-color: rgba(88, 166, 255, 0.2);
+    }
+    .thinking-card {
+      background: rgba(0, 0, 0, 0.2);
+      border-left: 3px solid var(--accent-purple);
+      padding: 8px 10px;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .thinking-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 500;
+      color: var(--accent-purple);
+    }
+    .thinking-body {
+      margin-top: 6px;
+      line-height: 1.45;
+      display: none;
+    }
+    .thinking-card.open .thinking-body { display: block; }
+
+    .tool-invocation-card {
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-code);
+      font-size: 11px;
+    }
+    .tool-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--accent-amber);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .diff-preview-box {
+      margin-top: 8px;
+      background: #090d12;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-family: var(--font-code);
+      font-size: 11px;
+    }
+    .diff-del { color: var(--accent-red); background: rgba(248, 81, 73, 0.1); }
+    .diff-add { color: var(--accent-green); background: rgba(63, 185, 80, 0.1); }
+
+    .agent-input-dock {
+      padding: 10px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-meta-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .agent-textarea {
+      width: 100%;
+      height: 48px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-main);
+      padding: 8px;
+      font-family: var(--font-ui);
+      font-size: 12px;
+      resize: none;
+      outline: none;
+    }
+    .agent-textarea:focus { border-color: var(--accent-blue); }
+
+    /* 4. 底部极简状态栏 (Status Bar) */
+    .bottom-status-bar {
+      height: 22px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      z-index: 40;
+      flex-shrink: 0;
+    }
+    .status-group { display: flex; align-items: center; gap: 12px; }
+    .status-item { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .status-item:hover { color: var(--text-main); }
+
+    /* 5. 全局命令面板弹窗 (Command Palette Modal · Ctrl+K) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 12vh;
+      z-index: 100;
+    }
+    .modal-overlay.open { display: flex; }
+    .command-dialog {
+      width: 580px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-dropdown);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: modalSlide 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalSlide {
+      from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .command-input-wrapper {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .command-search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      font-size: 14px;
+      color: var(--text-main);
+      outline: none;
+    }
+    .command-list {
+      max-height: 340px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .command-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+    .command-item:hover, .command-item.selected {
+      background: var(--bg-hover);
+      color: var(--accent-blue);
+    }
+    .command-meta { font-size: 11px; color: var(--text-muted); }
+
+    /* 6. Zen 沉浸模式 (Immersive Focus Mode) */
+    body.zen-mode .top-command-bar { display: none; }
+    body.zen-mode .bottom-status-bar { display: none; }
+    body.zen-mode .global-rail {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      transform: translateX(-100%);
+      box-shadow: var(--shadow-dropdown);
+    }
+    body.zen-mode .global-rail:hover { transform: translateX(0); }
+    body.zen-mode .companion-wing {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      transform: translateX(100%);
+      box-shadow: var(--shadow-dropdown);
+    }
+    body.zen-mode .companion-wing:hover { transform: translateX(0); }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- 1. 顶栏命令中心 -->
+  <header class="top-command-bar">
+    <div class="top-left">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Taomni
+      </div>
+      <div class="workspace-pill" id="ws-switch-btn" title="点击切换活动工程/集群">
+        <span style="color:var(--accent-purple);">◆</span>
+        <strong>taomni-core-system</strong>
+        <span style="font-size:10px; color:var(--text-muted);">▾</span>
+      </div>
+    </div>
+
+    <!-- 居中全局 Quick Jump (Ctrl+K) -->
+    <div class="top-center">
+      <div class="search-trigger" id="cmd-palette-btn">
+        <span>🔍 搜索会话、文件、执行动作...</span>
+        <span class="kbd-tag">Ctrl + K</span>
+      </div>
+    </div>
+
+    <div class="top-right">
+      <div class="agent-status-pill" id="agent-pill-btn" title="2 个后台 Agent 运行中">
+        <span class="status-dot"></span>
+        <span>Agents (2)</span>
+      </div>
+      <button class="icon-btn" id="theme-toggle" title="切换明暗主题">🌓</button>
+      <button class="icon-btn" id="zen-toggle" title="Zen 专注沉浸模式 (F11)">🔲</button>
+      <button class="icon-btn" id="companion-toggle" title="展开/收起协同侧翼">◨</button>
+    </div>
+  </header>
+
+  <!-- 2. 主体区 -->
+  <div class="main-workspace">
+    <!-- 左侧极简导轨 (Global Rail) -->
+    <nav class="global-rail">
+      <div class="rail-group">
+        <button class="rail-item active" data-rail="sessions" title="终端与会话 (Terminal & SSH)">⚡</button>
+        <button class="rail-item" data-rail="files" title="工程与代码文件 (Workspace & Git)">📁</button>
+        <button class="rail-item" data-rail="database" title="数据库与对象存储 (DB Client)">🗄️</button>
+        <button class="rail-item" data-rail="agents" title="One System 自动化与智能体">🤖<span class="rail-badge">2</span></button>
+        <button class="rail-item" data-rail="network" title="网络诊断与 SocksCap">🌐</button>
+      </div>
+      <div class="rail-group">
+        <button class="rail-item" title="全局偏好与设置">⚙️</button>
+      </div>
+    </nav>
+
+    <!-- 二级导航抽屉 (Secondary Navigator) -->
+    <aside class="secondary-navigator" id="sec-nav">
+      <div class="navigator-header">
+        <span id="nav-title">SESSIONS & TERMINALS</span>
+        <button class="icon-btn" id="nav-collapse-btn" style="width:20px;height:20px;">✕</button>
+      </div>
+      <div class="navigator-tree" id="nav-tree-content">
+        <!-- 会话列表 -->
+        <div class="tree-node active" onclick="switchCanvasTab('term')">
+          <span class="node-icon">🟢</span>
+          <span>prod-k8s-node-01</span>
+        </div>
+        <div class="tree-node" onclick="switchCanvasTab('editor')">
+          <span class="node-icon">📄</span>
+          <span>db_client.go</span>
+        </div>
+        <div class="tree-node" onclick="switchCanvasTab('db')">
+          <span class="node-icon">🗄️</span>
+          <span>users_master (MySQL)</span>
+        </div>
+        <div class="tree-node">
+          <span class="node-icon">⚡</span>
+          <span>staging-gateway-02</span>
+        </div>
+        <div class="tree-node">
+          <span class="node-icon">🖥️</span>
+          <span>desktop-win11 (RDP)</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中央主工作面 (Primary Workspace Canvas) -->
+    <main class="primary-canvas">
+      <!-- 上下文标签栏 -->
+      <div class="canvas-tabbar">
+        <div class="tab-strip">
+          <div class="canvas-tab active" id="tab-btn-term" onclick="switchCanvasTab('term')">
+            <span class="tab-dot green"></span>
+            <span>⚡ prod-k8s-node-01</span>
+            <span class="tab-close">×</span>
+          </div>
+          <div class="canvas-tab" id="tab-btn-editor" onclick="switchCanvasTab('editor')">
+            <span class="tab-dot"></span>
+            <span>📄 db_client.go</span>
+            <span class="tab-close">×</span>
+          </div>
+          <div class="canvas-tab" id="tab-btn-db" onclick="switchCanvasTab('db')">
+            <span class="tab-dot amber"></span>
+            <span>🗄️ users_master</span>
+            <span class="tab-close">×</span>
+          </div>
+          <button class="icon-btn" style="width:24px;height:24px;" title="新建终端或标签">+</button>
+        </div>
+        <div class="canvas-toolbar-actions">
+          <button class="icon-btn" title="分屏 (Split Screen)">◫</button>
+          <button class="icon-btn" title="最大化工作区">⛶</button>
+        </div>
+      </div>
+
+      <!-- 画布内容多重视图 -->
+      <div class="canvas-viewport">
+        <!-- 1. 终端视图 -->
+        <div class="view-content active" id="view-term">
+          <div class="terminal-container">
+            <div class="term-line"><span class="term-prompt">root@prod-k8s-node-01:~#</span> <span class="term-cmd">uname -a</span></div>
+            <div class="term-line term-output">Linux prod-k8s-node-01 6.8.0-45-generic #45-Ubuntu SMP PREEMPT_DYNAMIC x86_64</div>
+            <div class="term-line"><span class="term-prompt">root@prod-k8s-node-01:~#</span> <span class="term-cmd">docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Status}}"</span></div>
+            <div class="term-line term-output">CONTAINER ID   NAMES               STATUS</div>
+            <div class="term-line term-output">a1b2c3d4e5f6   taomni-backend-api  Up 4 days (healthy)</div>
+            <div class="term-line term-output">f6e5d4c3b2a1   redis-cluster-01    Up 12 days</div>
+            <div class="term-line"><span class="term-prompt">root@prod-k8s-node-01:~#</span> <span class="term-cmd"><span class="term-badge">AI Agent Executing</span> netstat -tlpn | grep 8080</span></div>
+            <div class="term-line term-output">tcp        0      0 0.0.0.0:8080           0.0.0.0:*               LISTEN      42189/taomni-srv</div>
+            <div class="term-line"><span class="term-prompt">root@prod-k8s-node-01:~#</span> <span class="cursor-blink">█</span></div>
+          </div>
+        </div>
+
+        <!-- 2. 代码编辑器视图 -->
+        <div class="view-content" id="view-editor">
+          <div class="editor-container">
+            <div class="editor-gutter">
+              1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12<br>13<br>14<br>15
+            </div>
+            <div class="editor-code">
+              <span class="syntax-kw">package</span> main<br><br>
+              <span class="syntax-kw">import</span> (<br>
+              &nbsp;&nbsp;<span class="syntax-str">"database/sql"</span><br>
+              &nbsp;&nbsp;<span class="syntax-str">"time"</span><br>
+              )<br><br>
+              <span class="syntax-comment">// ConfigureConnectionPool sets production limits</span><br>
+              <span class="syntax-kw">func</span> <span class="syntax-fn">ConfigureConnectionPool</span>(db *sql.DB) {<br>
+              &nbsp;&nbsp;db.<span class="syntax-fn">SetMaxOpenConns</span>(<span class="syntax-str">100</span>)<br>
+              &nbsp;&nbsp;db.<span class="syntax-fn">SetMaxIdleConns</span>(<span class="syntax-str">25</span>)<br>
+              &nbsp;&nbsp;db.<span class="syntax-fn">SetConnMaxLifetime</span>(<span class="syntax-str">5</span> * time.Minute)<br>
+              }<br>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 数据库数据表视图 -->
+        <div class="view-content" id="view-db">
+          <div class="db-container">
+            <div class="db-query-bar">
+              <span style="color:var(--accent-blue); font-weight:700;">SQL</span>
+              <input type="text" class="db-query-input" value="SELECT id, username, email, role, created_at FROM users LIMIT 50;">
+              <button class="icon-btn" style="background:var(--accent-green); color:white; width:auto; padding:0 12px; font-weight:600;">▶ 执行</button>
+            </div>
+            <div style="flex:1; overflow:auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>USERNAME</th>
+                    <th>EMAIL</th>
+                    <th>ROLE</th>
+                    <th>CREATED_AT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>1001</td><td>admin</td><td>admin@taomni.dev</td><td>superadmin</td><td>2026-09-01 08:32:11</td></tr>
+                  <tr><td>1002</td><td>dev_lead</td><td>lead@taomni.dev</td><td>developer</td><td>2026-09-02 11:15:02</td></tr>
+                  <tr><td>1003</td><td>agent_runner</td><td>bot@taomni.internal</td><td>service_account</td><td>2026-09-15 14:20:44</td></tr>
+                  <tr><td>1004</td><td>qa_tester</td><td>qa@taomni.dev</td><td>tester</td><td>2026-10-01 09:12:00</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 3. 统一协同侧翼 (Companion Wing) -->
+    <aside class="companion-wing" id="companion-wing">
+      <!-- 协同三大选项卡 -->
+      <div class="companion-tabs">
+        <button class="companion-tab-btn active" id="c-tab-agent" onclick="switchCompanionTab('agent')">🤖 任务流</button>
+        <button class="companion-tab-btn" id="c-tab-tools" onclick="switchCompanionTab('tools')">🛠️ 会话工具</button>
+        <button class="companion-tab-btn" id="c-tab-notes" onclick="switchCompanionTab('notes')">📝 随手记</button>
+      </div>
+
+      <!-- Agent 实时执行流视图 -->
+      <div class="agent-stream-container" id="c-view-agent">
+        <div class="agent-task-header">
+          <div class="task-title">
+            <span>目标: 解决连接池偶发打满问题</span>
+            <span class="task-badge">运行中</span>
+          </div>
+          <div class="task-meta">
+            <span>执行者: DBA_Agent</span>
+            <span>已执行: 3 步骤</span>
+            <span>模型: DeepSeek-V3</span>
+          </div>
+        </div>
+
+        <div class="agent-messages-scroll">
+          <div class="stream-bubble user">
+            请帮我检查当前 prod 机器的连接数，并在 <code>db_client.go</code> 中调整连接池最大生存时间。
+          </div>
+
+          <div class="thinking-card open" onclick="this.classList.toggle('open')">
+            <div class="thinking-summary">
+              <span>✦ 思维链推演 (3 步已完成)</span>
+              <span>▾</span>
+            </div>
+            <div class="thinking-body">
+              1. 通过 SSH 运行 netstat 监控当前 8080 端口 TCP 连接。<br>
+              2. 发现连接未复用由于缺少 SetConnMaxLifetime 限制。<br>
+              3. 准备在 Go 代码中引入 5 分钟优雅超时。
+            </div>
+          </div>
+
+          <div class="tool-invocation-card">
+            <div class="tool-header">
+              <span>🔧 工具调用 · SSH Execute</span>
+              <span style="color:var(--accent-green);">✓ 成功 (14ms)</span>
+            </div>
+            <div style="color:var(--text-muted);">ssh.exec("netstat -tlpn | grep 8080")</div>
+          </div>
+
+          <div class="stream-bubble">
+            已定位到连接泄漏原因。正在向 <code>db_client.go</code> 应用补丁建议：
+            <div class="diff-preview-box">
+              <div class="diff-del">- db.SetConnMaxLifetime(0)</div>
+              <div class="diff-add">+ db.SetConnMaxLifetime(5 * time.Minute)</div>
+            </div>
+            <div style="margin-top:8px; display:flex; gap:6px;">
+              <button class="icon-btn" style="background:var(--accent-green); color:white; width:auto; padding:0 10px; font-weight:600;">应用变更</button>
+              <button class="icon-btn" style="background:var(--bg-hover); width:auto; padding:0 10px;">驳回</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="agent-input-dock">
+          <div class="input-meta-bar">
+            <span>当前上下文: <strong>prod-k8s-node-01 + db_client.go</strong></span>
+            <span style="color:var(--accent-blue); cursor:pointer;">权限: 变更需确认 ▾</span>
+          </div>
+          <textarea class="agent-textarea" placeholder="下达新任务指令或按 Enter 追问... (支持 @ 引用会话)"></textarea>
+        </div>
+      </div>
+
+      <!-- 会话工具视图 (SFTP / Git) -->
+      <div style="display:none; flex:1; padding:12px; font-size:12px;" id="c-view-tools">
+        <h4 style="font-size:12px; margin-bottom:8px; color:var(--text-muted);">内嵌 SFTP · prod-k8s-node-01</h4>
+        <div class="tree-node"><span class="node-icon">📁</span> /etc/taomni/</div>
+        <div class="tree-node"><span class="node-icon">📄</span> config.production.yaml</div>
+        <div class="tree-node"><span class="node-icon">📄</span> tls.cert</div>
+        <div style="margin-top:16px;">
+          <h4 style="font-size:12px; margin-bottom:8px; color:var(--text-muted);">后台传输任务 (0 挂起)</h4>
+          <div style="color:var(--text-faint);">当前无文件传输任务。</div>
+        </div>
+      </div>
+
+      <!-- 随手记视图 -->
+      <div style="display:none; flex:1; padding:12px;" id="c-view-notes">
+        <h4 style="font-size:12px; margin-bottom:8px; color:var(--text-muted);">会话关联便签 (Markdown)</h4>
+        <textarea style="width:100%; height:80%; background:transparent; border:none; color:var(--text-main); font-family:var(--font-code); font-size:12px; outline:none; resize:none;">
+## 生产维护备忘
+- 预计今晚 23:00 重启 prod-k8s-node-01 网关容器
+- 数据库连接池参数已经优化为 100/25
+- 注意观察 redis-cluster-01 内存水位
+        </textarea>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 4. 底部极简状态栏 -->
+  <footer class="bottom-status-bar">
+    <div class="status-group">
+      <div class="status-item"><span style="color:var(--accent-green);">●</span> 3 会话在线</div>
+      <div class="status-item">🔀 git: main</div>
+      <div class="status-item">UTF-8</div>
+      <div class="status-item">Go 1.23</div>
+    </div>
+    <div class="status-group">
+      <div class="status-item">🤖 One System: 2 任务调度中</div>
+      <div class="status-item">CPU: 12% · 内存: 1.4GB</div>
+    </div>
+  </footer>
+</div>
+
+<!-- 5. 全局命令面板弹窗 (Ctrl+K) -->
+<div class="modal-overlay" id="cmd-modal">
+  <div class="command-dialog">
+    <div class="command-input-wrapper">
+      <span style="color:var(--accent-blue);">🔍</span>
+      <input type="text" class="command-search-input" id="cmd-input" placeholder="输入指令 (>)、切换会话 (@) 或调度 Agent (#)..." autofocus>
+      <span class="kbd-tag">ESC 关闭</span>
+    </div>
+    <div class="command-list" id="cmd-items">
+      <div class="command-item selected" onclick="runCommand('switch-term')">
+        <span>⚡ 切换到活动终端: prod-k8s-node-01</span>
+        <span class="command-meta">Session</span>
+      </div>
+      <div class="command-item" onclick="runCommand('switch-editor')">
+        <span>📄 打开代码文件: db_client.go</span>
+        <span class="command-meta">Workspace</span>
+      </div>
+      <div class="command-item" onclick="runCommand('switch-db')">
+        <span>🗄️ 打开数据库客户端: users_master</span>
+        <span class="command-meta">Database</span>
+      </div>
+      <div class="command-item" onclick="runCommand('toggle-zen')">
+        <span>🔲 切换 Zen 专注沉浸模式</span>
+        <span class="command-meta">Action · F11</span>
+      </div>
+      <div class="command-item" onclick="runCommand('new-agent')">
+        <span>🤖 调度新智能体任务 (Spawn Agent)</span>
+        <span class="command-meta">One System</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 标签切换逻辑
+  function switchCanvasTab(type) {
+    document.querySelectorAll('.canvas-tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.view-content').forEach(el => el.classList.remove('active'));
+    document.getElementById(`tab-btn-${type}`).classList.add('active');
+    document.getElementById(`view-${type}`).classList.add('active');
+  }
+
+  // 协同侧翼选项卡切换
+  function switchCompanionTab(type) {
+    document.querySelectorAll('.companion-tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(`c-tab-${type}`).classList.add('active');
+    document.getElementById('c-view-agent').style.display = type === 'agent' ? 'flex' : 'none';
+    document.getElementById('c-view-tools').style.display = type === 'tools' ? 'flex' : 'none';
+    document.getElementById('c-view-notes').style.display = type === 'notes' ? 'flex' : 'none';
+  }
+
+  // Zen 模式切换
+  const zenToggle = document.getElementById('zen-toggle');
+  zenToggle.addEventListener('click', () => {
+    document.body.classList.toggle('zen-mode');
+  });
+
+  // 侧翼收起与展开
+  const companionToggle = document.getElementById('companion-toggle');
+  const companionWing = document.getElementById('companion-wing');
+  companionToggle.addEventListener('click', () => {
+    if (companionWing.style.display === 'none') {
+      companionWing.style.display = 'flex';
+      companionToggle.classList.add('active');
+    } else {
+      companionWing.style.display = 'none';
+      companionToggle.classList.remove('active');
+    }
+  });
+
+  // 二级导航收起
+  const navCollapseBtn = document.getElementById('nav-collapse-btn');
+  const secNav = document.getElementById('sec-nav');
+  navCollapseBtn.addEventListener('click', () => {
+    secNav.style.display = secNav.style.display === 'none' ? 'flex' : 'none';
+  });
+
+  // 主题切换
+  const themeToggle = document.getElementById('theme-toggle');
+  themeToggle.addEventListener('click', () => {
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  });
+
+  // Ctrl+K 全局命令面板
+  const cmdModal = document.getElementById('cmd-modal');
+  const cmdPaletteBtn = document.getElementById('cmd-palette-btn');
+  const cmdInput = document.getElementById('cmd-input');
+
+  function openCommandPalette() {
+    cmdModal.classList.add('open');
+    cmdInput.value = '';
+    cmdInput.focus();
+  }
+  function closeCommandPalette() {
+    cmdModal.classList.remove('open');
+  }
+
+  cmdPaletteBtn.addEventListener('click', openCommandPalette);
+  cmdModal.addEventListener('click', (e) => {
+    if (e.target === cmdModal) closeCommandPalette();
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      cmdModal.classList.contains('open') ? closeCommandPalette() : openCommandPalette();
+    }
+    if (e.key === 'Escape') closeCommandPalette();
+    if (e.key === 'F11') {
+      e.preventDefault();
+      document.body.classList.toggle('zen-mode');
+    }
+  });
+
+  function runCommand(cmd) {
+    closeCommandPalette();
+    if (cmd === 'switch-term') switchCanvasTab('term');
+    if (cmd === 'switch-editor') switchCanvasTab('editor');
+    if (cmd === 'switch-db') switchCanvasTab('db');
+    if (cmd === 'toggle-zen') document.body.classList.toggle('zen-mode');
+    if (cmd === 'new-agent') switchCompanionTab('agent');
+  }
+</script>
+</body>
+</html>
