@@ -73,6 +73,7 @@ pub fn init_db(conn: &Connection) -> SqlResult<()> {
 
     // Chat tables (v2.4).
     crate::chat::store::init_chat_tables(conn)?;
+    crate::workspace_catalog::init(conn)?;
     crate::database::history::init_history_tables(conn)?;
     crate::database::query_workspace::init_query_workspace_tables(conn)?;
     crate::database::saved_queries::init_saved_query_tables(conn)?;
@@ -159,8 +160,14 @@ pub fn save_session(conn: &Connection, config: &SessionConfig) -> SqlResult<()> 
 }
 
 pub fn delete_session(conn: &Connection, id: &str) -> SqlResult<()> {
-    conn.execute("DELETE FROM sessions WHERE id = ?1", params![id])?;
-    Ok(())
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("UPDATE workspaces SET revision=revision+1, record_json=json_set(record_json, '$.revision', revision+1) WHERE id IN (SELECT workspace_id FROM workspace_memberships WHERE session_id=?1)", [id])?;
+    tx.execute(
+        "DELETE FROM workspace_memberships WHERE session_id=?1",
+        [id],
+    )?;
+    tx.execute("DELETE FROM sessions WHERE id = ?1", params![id])?;
+    tx.commit()
 }
 
 pub fn update_last_connected(conn: &Connection, id: &str, ts: i64) -> SqlResult<()> {

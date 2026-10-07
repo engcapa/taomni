@@ -54,6 +54,7 @@ mod structural_search;
 mod voice;
 mod windowing;
 mod workspace;
+mod workspace_catalog;
 mod workspace_execution;
 mod workspace_fs;
 mod workspace_search;
@@ -523,6 +524,14 @@ pub fn run() {
             terminal::send_terminal_signal,
             terminal::close_terminal,
             session::list_sessions,
+            workspace_catalog::list_workspaces,
+            workspace_catalog::get_workspace,
+            workspace_catalog::save_workspace,
+            workspace_catalog::delete_workspace,
+            workspace_catalog::list_workspace_memberships,
+            workspace_catalog::upsert_workspace_membership,
+            workspace_catalog::remove_workspace_membership,
+            workspace_catalog::save_workspace_navigation,
             session::resume::get_welcome_run_snapshot,
             session::resume::commit_welcome_run_snapshot,
             session::resume::clear_welcome_run_snapshot,

@@ -235,6 +235,7 @@ interface StubChatThread {
   created_at: number;
   updated_at: number;
   linked_session_id: string | null;
+  workspace_id?: string | null;
   source: string;
   mode?: string | null;
   output_format?: string | null;
@@ -1739,6 +1740,10 @@ function stubSystemRdpStatus(): Record<string, unknown> {
 }
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (["list_workspaces", "get_workspace", "save_workspace", "delete_workspace", "list_workspace_memberships", "upsert_workspace_membership", "remove_workspace_membership", "save_workspace_navigation"].includes(cmd)) {
+    const { workspaceCatalogInvoke } = await import("./workspaceCatalog");
+    return workspaceCatalogInvoke(cmd, args ?? {}, loadSessions().map((s) => s.id)) as T;
+  }
   // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).
   if (parity008Handles(cmd, args)) return await parity008Invoke(cmd, args) as T;
   // MFA authenticator: localStorage mirror of mfa.db gated by the stub vault.
@@ -1774,6 +1779,12 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "delete_session": {
       const sessions = loadSessions();
       saveSessions(sessions.filter((s) => s.id !== (args?.id as string)));
+      const workspaces = JSON.parse(localStorage.getItem("taomni.stub.workspaces.v1") ?? "[]");
+      for (const workspace of workspaces) {
+        const retained = workspace.memberships.filter((m: { sessionId: string }) => m.sessionId !== args?.id);
+        if (retained.length !== workspace.memberships.length) { workspace.memberships = retained; workspace.revision++; }
+      }
+      localStorage.setItem("taomni.stub.workspaces.v1", JSON.stringify(workspaces));
       return undefined as T;
     }
     case "mark_session_connected": {
@@ -3993,6 +4004,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         created_at: now,
         updated_at: now,
         linked_session_id: ((args as InvokeArgs | undefined)?.linkedSessionId as string | null | undefined) ?? null,
+        workspace_id: args?.workspaceId ?? null,
         source: "drawer",
         mode,
         output_format: null,

@@ -424,6 +424,7 @@ export interface RecentWorkspace {
 
 export interface Tab {
   id: string;
+  surface?: import("./workspace").SurfaceDescriptor;
   /**
    * Stable id used for AI chat thread binding when it should outlive a visual
    * tab id change, e.g. detach -> reattach. Defaults to `id`.
