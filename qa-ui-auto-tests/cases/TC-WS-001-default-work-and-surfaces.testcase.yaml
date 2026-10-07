@@ -1,0 +1,84 @@
+id: TC-WS-001
+title: 'AC-01/02/05: Work is the default; workspace switching and scoped Files preserve one catalog'
+description: 'AC-01/02/05: Work is the default; workspace switching and scoped Files preserve one catalog'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-navigator"]'
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- assert_count:
+    selector: '[data-testid="control-bar"] [data-testid="tab-bar"]'
+    equal: 0
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: Workspace · QA Main
+- click: '[data-testid="workspace-surface-files"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="workspace-surface-overview"]'
+- wait_for: '[data-testid="workspace-canvas"]'
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: QA Remote
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: QA Main
+- click: '[data-testid="workspace-surface-changes"]'
+- wait_for: '[data-testid="git-panel"]'
+- click: '[data-testid="workspace-surface-overview"]'
+- assert_count:
+    selector: '[data-testid="workspace-navigator"] [data-testid^="workspace-reference-"]'
+    equal: 2
+- screenshot: workspace-overview.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-01/02/05: Work is the default; workspace switching and scoped Files preserve one catalog'
+    actions:
+    - 4
+    - 7
+    - 9
+    - 11
+    - 13
+    - 15
+    - 17
+    checkpoints:
+    - step: 5
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="control-bar"] [data-testid="tab-bar"]'', ''equal'':
+        0}}'
+    - step: 6
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'', ''contains'': ''Workspace
+        · QA Main''}}'
+    - step: 12
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'', ''contains'': ''QA Remote''}}'
+    - step: 14
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'', ''contains'': ''QA Main''}}'
+    - step: 18
+      expectation: Returning to Overview retains exactly two canonical session references.
+    results:
+    - 5
+    - 6
+    - 12
+    - 14
+    - 18
+  visual:
+  - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
+    method: manual
+    reason: Visual evidence must be inspected after execution; pending is not a pass.
+  native:
+  - check: Native IPC, process, disk and window boundaries require the TC-WS-NATIVE companion cases.
+    method: external
+    reason: This browser case verifies renderer and stub behavior only.

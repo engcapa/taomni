@@ -64,15 +64,33 @@ verification:
   requirements:
   - id: watermark-pin-workflow
     requirement: Watermark, editor, pin note and arrangement controls remain usable in one workflow.
-    actions: [9]
+    actions:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 19
+    - 22
+    - 23
+    - 24
     checkpoints:
-    - step: 9
-      expectation: 'assert_attribute: {"selector": "[data-testid=\"screenshot-watermark\"]", "name": "aria-pressed", "equals": "true"}'
+    - step: 8
+      expectation: 'assert_attribute: {"selector": "[data-testid=\"screenshot-watermark\"]", "name": "aria-pressed",
+        "equals": "true"}'
     - step: 25
-      expectation: 'assert_text: {"selector": "[data-testid=\"screenshot-pin-note\"]", "contains": "Compare with design"}'
-    results: [9, 25]
+      expectation: 'assert_text: {"selector": "[data-testid=\"screenshot-pin-note\"]", "contains": "Compare with
+        design"}'
+    results:
+    - 8
+    - 25
   visual:
-  - check: Tiled watermark controls, image edit undo/redo, external-editor handoff, pin note and batch menu remain usable.
+  - check: Tiled watermark controls, image edit undo/redo, external-editor handoff, pin note and batch menu remain
+      usable.
     method: automated
     reason: Browser uses IPC stubs for the screenshot surface.
   native:

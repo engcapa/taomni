@@ -1,3 +1,4 @@
+import { chatThreadBindingId } from "../../stores/chatStore";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import {
   Bell,
@@ -46,6 +47,7 @@ import {
   type LlmProviderCapability,
 } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { MessageBubble } from "./MessageBubble";
 import { CcToolCards } from "./CcToolCards";
 import { Composer } from "./Composer";
@@ -170,7 +172,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         ) ?? null
       : null,
   );
-  const linkedTabTitle = activeThread?.linked_session_id
+  const linkedWorkspace = useWorkspaceStore((s) => s.workspaces.find((w) => w.id === activeThread?.workspace_id));
+  const linkedTabTitle = activeThread?.workspace_id
+    ? `Workspace · ${linkedWorkspace?.name ?? activeThread.workspace_id}`
+    : activeThread?.linked_session_id
     ? (
         getTerminal(activeThread.linked_session_id)?.title
         ?? (linkedTab ? getTerminal(linkedTab.id)?.title : undefined)
@@ -188,8 +193,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     () => {
       const list = threads ?? [];
       return drawerTabId
-        ? list.filter((thread) => thread.linked_session_id === drawerTabId)
-        : list.filter((thread) => thread.linked_session_id);
+        ? list.filter((thread) => chatThreadBindingId(thread) === drawerTabId)
+        : list.filter((thread) => !chatThreadBindingId(thread));
     },
     [drawerTabId, threads],
   );
@@ -419,7 +424,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     setDraftProviderId(providerId);
     if (!activeThread) return;
     if (activeThreadMode === mode) return;
-    const linked = activeThread.linked_session_id ?? drawerTabId ?? activeChatTabId;
+    const linked = chatThreadBindingId(activeThread) ?? drawerTabId ?? activeChatTabId;
     if (!linked) {
       setError(t("chat.noTabBinding"));
       return;
@@ -499,6 +504,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     // currently focused terminal tab; final fallback is the legacy prop the
     // caller passed (kept for tests / programmatic use).
     const linked = activeThread?.linked_session_id ?? null;
+    if (activeThread?.workspace_id) return undefined;
     const entry = getTerminal(linked) ?? (linkedTab ? getTerminal(linkedTab.id) : null) ?? focusedTerminal;
     if (entry) {
       return entry.getLastLines(lines);
@@ -1008,10 +1014,11 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         {/* Mode + provider switcher */}
         <div className="px-2 py-1 text-[10px] text-[var(--taomni-text-muted)] border-b border-[var(--taomni-divider)] shrink-0 flex items-center gap-1.5 flex-wrap">
           {/* Scope badge: every visible thread is bound to a concrete app tab. */}
-          {activeThread?.linked_session_id && (
+          {(activeThread?.linked_session_id || activeThread?.workspace_id) && (
             <span
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--taomni-accent)]/10 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
-              title={t("chat.boundToTab", { id: activeThread.linked_session_id })}
+              data-testid="chat-scope-binding"
+              title={activeThread.workspace_id ? linkedTabTitle ?? undefined : t("chat.boundToTab", { id: activeThread.linked_session_id ?? "" })}
             >
               <Link2 className="w-2.5 h-2.5" />
               <span className="truncate max-w-[100px]">
@@ -1265,6 +1272,9 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
 export function ChatDrawerRibbon() {
   const t = useT();
+  const workspaceNavigation = useWorkspaceStore();
+  const workspace = workspaceNavigation.canvas === "workspace"
+    ? workspaceNavigation.workspaces.find((w) => w.id === workspaceNavigation.activeWorkspaceId) : undefined;
   const drawerOpen = useChatStore((s) => s.drawerOpen);
   const drawerPosition = useChatStore((s) => s.drawerPosition);
   const drawerPinned = useChatStore((s) => s.drawerPinned);
@@ -1343,8 +1353,8 @@ export function ChatDrawerRibbon() {
   const hostTab = activeTab && isChatCapableTabType(activeTab.type)
     ? activeTab
     : tabs.find((tab) => isChatCapableTabType(tab.type)) ?? activeTab;
-  const chatTabId = hostTab?.chatTabId ?? hostTab?.id ?? null;
-  const hostTitle = hostTab?.title ?? activeTab?.title ?? "Taomni";
+  const chatTabId = workspace ? `workspace:${workspace.id}` : hostTab?.chatTabId ?? hostTab?.id ?? null;
+  const hostTitle = workspace?.name ?? hostTab?.title ?? activeTab?.title ?? "Taomni";
   const ribbonTitle = hasAlerts ? t("tao.alertInboxTitle") : t("chat.ribbonOpenTitle", { title: hostTitle });
   const ribbonAria = ribbonTitle;
   const badgeText = alertBadgeCount > 99 ? "99+" : String(alertBadgeCount);
@@ -1362,7 +1372,7 @@ export function ChatDrawerRibbon() {
     [alertBadgeCount],
   );
 
-  if (drawerOpen || !activeTab || !chatTabId || (!hasAlerts && !isChatCapableTabType(activeTab.type))) return null;
+  if (drawerOpen || !chatTabId || (!workspace && (!activeTab || (!hasAlerts && !isChatCapableTabType(activeTab.type))))) return null;
 
   const placementClass = ribbonPlacementClass(drawerPosition, hasAlerts);
   const textClass = ribbonTextClass(drawerPosition);

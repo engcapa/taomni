@@ -1,94 +1,189 @@
 id: TC-MFA-101
 title: Native MFA codes come from Rust and survive a reload through mfa.db
-description: >-
-  V-19 (AC-02, AC-03, AC-09, AC-14). Isolated `com.taomni.app.qa` profile on
-  each desktop platform. The sidebar Tools entry opens MFA behind the real
-  vault setup. The RFC 4226 key yields 755 224 then 287 082 from the Rust
-  generator; an otpauth link with SHA256 and eight digits matches an
-  independent Python RFC 6238 code. After a WebView reload both accounts are
-  read back from the encrypted mfa.db with the HOTP counter kept, and copying
+description: V-19 (AC-02, AC-03, AC-09, AC-14). Isolated `com.taomni.app.qa` profile on each desktop platform. The
+  sidebar Tools entry opens MFA behind the real vault setup. The RFC 4226 key yields 755 224 then 287 082 from the
+  Rust generator; an otpauth link with SHA256 and eight digits matches an independent Python RFC 6238 code. After
+  a WebView reload both accounts are read back from the encrypted mfa.db with the HOTP counter kept, and copying
   a code through the desktop clipboard path is announced.
-covers: [F-MFA-1, F-MFA-2]
-tags: [mfa, native-boundary, p0]
-modes: [native]
-fixtures: [reset_db]
+covers:
+- F-MFA-1
+- F-MFA-2
+tags:
+- mfa
+- native-boundary
+- p0
+modes:
+- native
+fixtures:
+- reset_db
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-native-101}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-native-101}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-native-101
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-native-101
 - click: '[data-testid="vault-setup-confirm"]'
-- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
 - click: '[data-testid="mfa-add"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
-- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA Bank}
-- fill: {selector: '[data-testid="mfa-add-account"]', value: qa.hotp@example.com}
-- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA Bank
+- fill:
+    selector: '[data-testid="mfa-add-account"]'
+    value: qa.hotp@example.com
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
 - click: '[data-testid="mfa-add-advanced"]'
 - wait_for: '[data-testid="mfa-add-advanced-panel"]'
-- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
 - click: '[data-testid="mfa-add-submit"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)', equals: 755 224}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)'
+    equals: 755 224
 - click: '[data-testid="mfa-account-hotp-next"]:is([data-issuer="QA Bank"] *)'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)', equals: 287 082}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)'
+    equals: 287 082
 - click: '[data-testid="mfa-add"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
-- fill: {selector: '[data-testid="mfa-add-uri"]', value: 'otpauth://totp/QA%20TOTP:totp%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=QA%20TOTP&algorithm=SHA256&digits=8&period=30'}
-- assert_text: {selector: '[data-testid="mfa-add-notice"]', contains: Filled in from the otpauth link}
+- fill:
+    selector: '[data-testid="mfa-add-uri"]'
+    value: otpauth://totp/QA%20TOTP:totp%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=QA%20TOTP&algorithm=SHA256&digits=8&period=30
+- assert_text:
+    selector: '[data-testid="mfa-add-notice"]'
+    contains: Filled in from the otpauth link
 - click: '[data-testid="mfa-add-submit"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_totp_code: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA TOTP"] *)', secret: JBSWY3DPEHPK3PXP, digits: 8, algorithm: SHA256}
+- assert_totp_code:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA TOTP"] *)'
+    secret: JBSWY3DPEHPK3PXP
+    digits: 8
+    algorithm: SHA256
 - reload: null
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)', equals: 287 082, timeout_sec: 30}
-- assert_totp_code: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA TOTP"] *)', secret: JBSWY3DPEHPK3PXP, digits: 8, algorithm: SHA256}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)'
+    equals: 287 082
+    timeout_sec: 30
+- assert_totp_code:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA TOTP"] *)'
+    secret: JBSWY3DPEHPK3PXP
+    digits: 8
+    algorithm: SHA256
 - click: '[data-testid="mfa-account-copy"]:is([data-issuer="QA Bank"] *)'
-- assert_text: {selector: '[data-testid="mfa-status"]', contains: Copied QA Bank}
+- assert_text:
+    selector: '[data-testid="mfa-status"]'
+    contains: Copied QA Bank
 - screenshot: mfa-101-native-rows.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: The native sidebar entry opens MFA behind the real vault setup (AC-01, AC-02).
-    actions: [3, 5, 7, 8, 9]
+    actions:
+    - 2
+    - 3
+    - 5
+    - 7
+    - 9
+    - 10
+    - 11
     checkpoints:
-    - {step: 4, expectation: Tools panel shown}
-    - {step: 6, expectation: vault setup required first}
-    - {step: 10, expectation: empty MFA panel after setup}
-    results: [10]
+    - step: 6
+      expectation: Tools panel shown
+    - step: 8
+      expectation: vault setup required first
+    - step: 12
+      expectation: empty MFA panel after setup
+    results:
+    - 12
   - id: R2
     requirement: Rust generates RFC 4226 HOTP and RFC 6238 SHA256/8-digit TOTP codes (AC-03, AC-09).
-    actions: [11, 13, 14, 15, 16, 18, 19, 22, 24, 26, 28]
+    actions:
+    - 13
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 24
+    - 26
+    - 28
+    - 30
     checkpoints:
-    - {step: 20, expectation: dialog closed}
-    - {step: 21, expectation: 755 224}
-    - {step: 23, expectation: 287 082 after Next}
-    - {step: 27, expectation: link filled the form}
-    - {step: 29, expectation: dialog closed}
-    - {step: 30, expectation: TOTP equals the Python oracle}
-    results: [21, 23, 30]
+    - step: 22
+      expectation: dialog closed
+    - step: 23
+      expectation: 755 224
+    - step: 25
+      expectation: 287 082 after Next
+    - step: 29
+      expectation: link filled the form
+    - step: 31
+      expectation: dialog closed
+    - step: 32
+      expectation: TOTP equals the Python oracle
+    results:
+    - 23
+    - 25
+    - 32
   - id: R3
-    requirement: Accounts and the HOTP counter are read back from mfa.db after a reload and copying is announced (AC-09, AC-10, AC-14).
-    actions: [31, 32, 34, 37]
+    requirement: Accounts and the HOTP counter are read back from mfa.db after a reload and copying is announced
+      (AC-09, AC-10, AC-14).
+    actions:
+    - 33
+    - 34
+    - 36
+    - 39
     checkpoints:
-    - {step: 33, expectation: Tools panel shown after reload}
-    - {step: 35, expectation: counter kept at 287 082}
-    - {step: 36, expectation: TOTP still correct}
-    - {step: 38, expectation: copy announced}
-    results: [38]
+    - step: 35
+      expectation: Tools panel shown after reload
+    - step: 37
+      expectation: counter kept at 287 082
+    - step: 38
+      expectation: TOTP still correct
+    - step: 40
+      expectation: copy announced
+    results:
+    - 40
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 40
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 40
   visual:
   - check: Native WebView renders the MFA rows without clipping.
     method: manual
     reason: Screenshot needs human review per platform.
   native:
-  - check: Rust OTP, AES-GCM storage in mfa.db and vault-held key run in the packaged app; disk ciphertext is asserted by Rust unit tests.
+  - check: Rust OTP, AES-GCM storage in mfa.db and vault-held key run in the packaged app; disk ciphertext is asserted
+      by Rust unit tests.
     method: automated
     reason: Native mode drives the isolated QA build through WebDriver on Linux, Windows and macOS.

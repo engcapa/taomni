@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ControlBar } from "./ControlBar";
@@ -149,20 +150,18 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
-  it("uses the button before More to reveal tab details on hover", () => {
+  it("opens global search and workspace creation without business tabs", () => {
     renderControlBar(vi.fn());
-    const button = screen.getByTestId("tab-details-hover");
-
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
-    fireEvent.mouseEnter(button);
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(true);
-    fireEvent.mouseLeave(button);
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
+    expect(screen.queryByTestId("tab-bar")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("global-search"));
+    expect(useWorkspaceStore.getState().commandCenterOpen).toBe(true);
+    fireEvent.click(screen.getByTestId("global-new"));
+    expect(useWorkspaceStore.getState().createDialogOpen).toBe(true);
   });
 
-  it("preserves dragging and maximize gestures in the tab strip filler", () => {
+  it("preserves dragging and maximize gestures in the global header", () => {
     renderControlBar(vi.fn());
-    const handle = screen.getByTestId("tabbar-drag-region");
+    const handle = screen.getByTestId("window-drag-handle");
 
     fireEvent.mouseDown(handle, { button: 0, detail: 1 });
     expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);

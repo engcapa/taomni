@@ -1,82 +1,164 @@
 id: TC-MFA-102
 title: Locking the native vault hides MFA codes until the master password is entered
-description: >-
-  V-20 (AC-02, AC-14). Isolated native profile. After an HOTP account is added,
-  the vault is locked from Settings → Security. Returning to the MFA tab shows
-  the unlock dialog with the MFA reason and no account rows; a wrong master
-  password is refused; the right one restores the code read through the
-  vault-held data key.
-covers: [F-MFA-1]
-tags: [mfa, vault, native-boundary, p0]
-modes: [native]
-fixtures: [reset_db]
+description: V-20 (AC-02, AC-14). Isolated native profile. After an HOTP account is added, the vault is locked from
+  Settings → Security. Returning to the MFA tab shows the unlock dialog with the MFA reason and no account rows;
+  a wrong master password is refused; the right one restores the code read through the vault-held data key.
+covers:
+- F-MFA-1
+tags:
+- mfa
+- vault
+- native-boundary
+- p0
+modes:
+- native
+fixtures:
+- reset_db
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-native-102}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-native-102}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-native-102
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-native-102
 - click: '[data-testid="vault-setup-confirm"]'
-- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
 - click: '[data-testid="mfa-add"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
-- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA Lock}
-- fill: {selector: '[data-testid="mfa-add-secret"]', value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ}
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA Lock
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
 - click: '[data-testid="mfa-add-advanced"]'
 - wait_for: '[data-testid="mfa-add-advanced-panel"]'
-- select_option: {selector: '[data-testid="mfa-add-kind"]', value: hotp}
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
 - click: '[data-testid="mfa-add-submit"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Lock"] *)', equals: 755 224}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Lock"] *)'
+    equals: 755 224
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-security"]'
 - wait_for: '[data-testid="vault-lock-button"]'
 - click: '[data-testid="vault-lock-button"]'
-- assert_text_equals: {selector: '[data-testid="vault-state-badge"]', equals: locked}
+- assert_text_equals:
+    selector: '[data-testid="vault-state-badge"]'
+    equals: locked
 - click: '[data-testid="tab-item"][data-tab-type="mfa"]'
 - wait_for: '[data-testid="vault-unlock-dialog"]'
-- assert_text: {selector: '[data-testid="vault-unlock-reason"]', contains: MFA secrets are encrypted}
-- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 0}
-- fill: {selector: '[data-testid="vault-unlock-pw"]', value: wrong-master-password}
+- assert_text:
+    selector: '[data-testid="vault-unlock-reason"]'
+    contains: MFA secrets are encrypted
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: wrong-master-password
 - click: '[data-testid="vault-unlock-confirm"]'
 - assert_visible: '[data-testid="vault-unlock-error"]'
-- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-mfa-native-102}
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-mfa-native-102
 - click: '[data-testid="vault-unlock-confirm"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Lock"] *)', equals: 755 224, timeout_sec: 30}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Lock"] *)'
+    equals: 755 224
+    timeout_sec: 30
 - screenshot: mfa-102-unlocked.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: An account added behind the native vault shows its Rust-generated code (AC-02, AC-09).
-    actions: [3, 5, 7, 8, 9, 11, 13, 14, 15, 17, 18]
+    actions:
+    - 2
+    - 3
+    - 5
+    - 7
+    - 9
+    - 10
+    - 11
+    - 13
+    - 15
+    - 16
+    - 17
+    - 19
+    - 20
     checkpoints:
-    - {step: 6, expectation: vault setup first}
-    - {step: 10, expectation: empty panel after setup}
-    - {step: 19, expectation: code 755 224}
-    results: [19]
+    - step: 8
+      expectation: vault setup first
+    - step: 12
+      expectation: empty panel after setup
+    - step: 21
+      expectation: code 755 224
+    results:
+    - 21
   - id: R2
     requirement: Locking the vault hides MFA codes behind the unlock dialog with the MFA reason (AC-02, AC-14).
-    actions: [20, 22, 24, 26]
+    actions:
+    - 22
+    - 24
+    - 26
+    - 28
     checkpoints:
-    - {step: 21, expectation: settings shown}
-    - {step: 23, expectation: lock control shown}
-    - {step: 25, expectation: vault locked}
-    - {step: 27, expectation: unlock dialog on the MFA tab}
-    - {step: 28, expectation: MFA reason shown}
-    - {step: 29, expectation: no account rows while locked}
-    results: [27, 28, 29]
+    - step: 23
+      expectation: settings shown
+    - step: 25
+      expectation: lock control shown
+    - step: 27
+      expectation: vault locked
+    - step: 29
+      expectation: unlock dialog on the MFA tab
+    - step: 30
+      expectation: MFA reason shown
+    - step: 31
+      expectation: no account rows while locked
+    results:
+    - 29
+    - 30
+    - 31
   - id: R3
     requirement: A wrong master password is refused and the right one restores the codes (AC-14).
-    actions: [30, 31, 33, 34]
+    actions:
+    - 32
+    - 33
+    - 35
+    - 36
     checkpoints:
-    - {step: 32, expectation: error for the wrong password}
-    - {step: 35, expectation: code shown again after unlocking}
-    results: [35]
+    - step: 34
+      expectation: error for the wrong password
+    - step: 37
+      expectation: code shown again after unlocking
+    results:
+    - 37
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 37
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 37
   visual:
   - check: Unlock dialog over the MFA tab is legible.
     method: manual

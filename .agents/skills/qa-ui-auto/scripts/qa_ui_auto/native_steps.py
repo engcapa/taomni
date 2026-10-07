@@ -2586,6 +2586,41 @@ def _do_seed_storage(ctx: NativeStepContext, args: Any) -> str:
     return f"seeded {key}"
 
 
+@_verb("restart_native_app")
+def _do_restart_native_app(ctx: NativeStepContext, args: Any) -> str:
+    restart = getattr(ctx, "restart_application", None)
+    if restart is None:
+        raise StepError("restart_native_app requires the isolated runner's application owner")
+    old_id = ctx.session.session_id
+    restart()
+    ctx.main_window_handle = None
+    if not ctx.session.session_id or ctx.session.session_id == old_id:
+        raise StepError("restart_native_app did not establish a fresh native session")
+    return "Closed and relaunched isolated QA application; retained the same SQLite/profile directories"
+
+
+@_verb("switch_native_window")
+def _do_switch_native_window(ctx: NativeStepContext, args: Any) -> str:
+    """Switch real WebDriver window handles; never simulate detached DOMs."""
+    if args not in ("main", "detached"):
+        raise StepError("switch_native_window expects main or detached")
+    session = ctx.session
+    if not getattr(ctx, "main_window_handle", None):
+        ctx.main_window_handle = session.request("GET", session.endpoint("/window"))
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        handles = session.request("GET", session.endpoint("/window/handles"))
+        choices = [handle for handle in handles if (handle == ctx.main_window_handle) == (args == "main")]
+        if len(choices) == 1:
+            session.request("POST", session.endpoint("/window"), {"handle": choices[0]})
+            session.install_console_hook()
+            return f"Switched to real {args} window {choices[0]}"
+        if len(choices) > 1:
+            raise StepError("switch_native_window requires exactly one detached test window")
+        time.sleep(0.2)
+    raise StepError(f"No {args} native window appeared")
+
+
 @_verb("reload")
 @_verb("reload_window")
 def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
@@ -2595,10 +2630,10 @@ def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
         "window.setTimeout(() => window.location.reload(), 0); return true;"
     )
     time.sleep(2.0)  # document teardown; execute/sync is unavailable during it
-    ctx.session.find("[data-testid='welcome-panel']", timeout=60)
+    ctx.session.find("[data-testid='control-bar']", timeout=60)
     # The reload dropped the console hook along with the old document.
     ctx.session.install_console_hook()
-    return "reloaded; welcome-panel visible"
+    return "reloaded; app shell visible"
 
 
 # ED-PARITY-002 save-race time-point collector: QA-build-only verbs driving the
@@ -2869,11 +2904,11 @@ def _do_vault_first_run(ctx: NativeStepContext, args: Any) -> str:
                 "vault_first_run: vault is LOCKED with an unknown master "
                 "password; run against a fresh isolated profile"
             )
-        if _find_quiet(ctx, "[data-testid='welcome-panel']"):
+        if _find_quiet(ctx, "[data-testid='control-bar']"):
             return "vault already unlocked; no-op"
         time.sleep(0.5)
     else:
-        raise StepError("vault_first_run: neither vault dialog nor welcome-panel appeared")
+        raise StepError("vault_first_run: neither vault dialog nor app shell appeared")
     ctx.session.fill("[data-testid='vault-setup-pw1']", password)
     ctx.session.fill("[data-testid='vault-setup-pw2']", password)
     ctx.session.click("[data-testid='vault-setup-confirm']")

@@ -1,0 +1,360 @@
+id: TC-WS-PROTOTYPE-001
+title: Workspace navigation prototype routes and responsive layout
+description: Separate prototype verification; screenshots and console receipt must be reviewed. This does not certify
+  production behavior.
+covers:
+- F-WorkspacePrototype-1
+tags:
+- workspace-first
+- prototype
+modes:
+- browser
+fixtures: []
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}/docs-feature/ui-layout-refactor-prototype.html
+- set_viewport:
+    width: 1440
+    height: 900
+- assert_text:
+    selector: '#canvasTitle'
+    contains: Workspace
+- assert_count:
+    selector: .top-tab
+    equal: 0
+- eval_readonly:
+    expression: document.characterSet === "UTF-8" && document.querySelector("link").getAttribute("href") === "data:,"
+    expect_truthy: true
+- click: '[data-view="sessions"]'
+- assert_text:
+    selector: '#sessionList'
+    contains: canonical
+- click: '[data-view="tools"]'
+- assert_text:
+    selector: '#toolsList'
+    contains: Tools outside workspace
+- click: '[data-view="workspaces"]'
+- assert_text:
+    selector: '#sessionList'
+    contains: taomni
+- click: '[data-surface="overview"]'
+- assert_visible: '#overviewSurface'
+- click: '[data-surface="files"]'
+- assert_visible: '#filesSurface'
+- click: '[data-surface="preview"]'
+- assert_visible: '#previewSurface'
+- click: '[data-surface="chat"]'
+- assert_visible: '#chatSurface'
+- click: '[data-surface="changes"]'
+- assert_visible: '#changesSurface'
+- click: '[data-surface="mail"]'
+- assert_visible: '#mailSurface'
+- click: '[data-tool="overview"]'
+- assert_text:
+    selector: '#sideBody'
+    contains: scoped tool
+- click: '[data-tool="changes"]'
+- assert_text:
+    selector: '#sideBody'
+    contains: scoped tool
+- click: '[data-tool="tasks"]'
+- assert_text:
+    selector: '#sideBody'
+    contains: scoped tool
+- click: '[data-tool="notes"]'
+- assert_text:
+    selector: '#sideBody'
+    contains: scoped tool
+- click: '[data-view="tools"]'
+- click: '[data-global-tool="servers"]'
+- assert_text:
+    selector: '#toast'
+    contains: global scope
+- click: '[data-global-tool="network"]'
+- assert_text:
+    selector: '#toast'
+    contains: global scope
+- click: '[data-global-tool="capture"]'
+- assert_text:
+    selector: '#toast'
+    contains: global scope
+- click: '[data-global-tool="mfa"]'
+- assert_text:
+    selector: '#toast'
+    contains: global scope
+- click: '[data-global-tool="lan"]'
+- assert_text:
+    selector: '#toast'
+    contains: global scope
+- click: '[data-global-tool="git"]'
+- assert_visible: '#changesSurface'
+- click: '[data-global-tool="sftp"]'
+- assert_visible: '#filesSurface'
+- click: '[data-global-tool="mail"]'
+- assert_visible: '#mailSurface'
+- press: Control+k
+- assert_visible: '#commandOverlay'
+- fill:
+    selector: '#commandInput'
+    value: preview
+- click: '[data-command="preview"]'
+- assert_visible: '#previewSurface'
+- click: '#themeBtn'
+- assert_attribute:
+    selector: html
+    name: data-theme
+    equals: dark
+- click: '#newBtn'
+- assert_text:
+    selector: '#toast'
+    contains: New workspace
+- click: '#detachBtn'
+- assert_text:
+    selector: '#toast'
+    contains: native window
+- click: '#closeBtn'
+- assert_text:
+    selector: '#toast'
+    contains: Close active workspace
+- click: '#sideSearchBtn'
+- assert_text:
+    selector: '#toast'
+    contains: Search tools
+- click: '#sideCloseBtn'
+- assert_count:
+    selector: '#sidePane:not(.hidden)'
+    equal: 0
+- click: '#sideToggle'
+- assert_visible: '#sidePane'
+- set_viewport:
+    width: 1440
+    height: 900
+- click: '[data-view="workspaces"]'
+- click: '#collapseBtn'
+- assert_element_geometry:
+    selector: main.main
+    min_width: 250
+    min_height: 100
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    expect_truthy: true
+- click: '[data-view="workspaces"]'
+- assert_visible: '#sessionList'
+- screenshot: prototype-1440.png
+- set_viewport:
+    width: 980
+    height: 800
+- click: '[data-view="workspaces"]'
+- click: '#collapseBtn'
+- assert_element_geometry:
+    selector: main.main
+    min_width: 250
+    min_height: 100
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    expect_truthy: true
+- click: '[data-view="workspaces"]'
+- assert_visible: '#sessionList'
+- screenshot: prototype-980.png
+- set_viewport:
+    width: 400
+    height: 700
+- click: '[data-view="workspaces"]'
+- click: '#collapseBtn'
+- assert_element_geometry:
+    selector: main.main
+    min_width: 250
+    min_height: 100
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    expect_truthy: true
+- click: '[data-view="workspaces"]'
+- assert_visible: '#sessionList'
+- screenshot: prototype-400.png
+verification:
+  review: pending
+  requirements:
+  - id: prototype-navigation
+    requirement: Prototype scope, command, theme, pane and responsive controls produce observable state changes.
+    actions:
+    - 2
+    - 6
+    - 8
+    - 10
+    - 12
+    - 14
+    - 16
+    - 18
+    - 20
+    - 22
+    - 24
+    - 26
+    - 28
+    - 30
+    - 32
+    - 33
+    - 35
+    - 37
+    - 39
+    - 41
+    - 43
+    - 45
+    - 47
+    - 49
+    - 51
+    - 52
+    - 54
+    - 56
+    - 58
+    - 60
+    - 62
+    - 64
+    - 66
+    - 68
+    - 69
+    - 70
+    - 73
+    - 76
+    - 77
+    - 78
+    - 81
+    - 84
+    - 85
+    - 86
+    - 89
+    checkpoints:
+    - step: 3
+      expectation: The initial canvas belongs to a Workspace.
+    - step: 4
+      expectation: There are no top-level business tabs.
+    - step: 5
+      expectation: UTF-8 and inline favicon avoid encoding and favicon network failures.
+    - step: 7
+      expectation: sessions shows its own navigation content.
+    - step: 9
+      expectation: tools shows its own navigation content.
+    - step: 11
+      expectation: workspaces shows its own navigation content.
+    - step: 13
+      expectation: overview surface becomes visible.
+    - step: 15
+      expectation: files surface becomes visible.
+    - step: 17
+      expectation: preview surface becomes visible.
+    - step: 19
+      expectation: chat surface becomes visible.
+    - step: 21
+      expectation: changes surface becomes visible.
+    - step: 23
+      expectation: mail surface becomes visible.
+    - step: 25
+      expectation: overview updates the scoped tool pane.
+    - step: 27
+      expectation: changes updates the scoped tool pane.
+    - step: 29
+      expectation: tasks updates the scoped tool pane.
+    - step: 31
+      expectation: notes updates the scoped tool pane.
+    - step: 34
+      expectation: servers declares global ownership.
+    - step: 36
+      expectation: network declares global ownership.
+    - step: 38
+      expectation: capture declares global ownership.
+    - step: 40
+      expectation: mfa declares global ownership.
+    - step: 42
+      expectation: lan declares global ownership.
+    - step: 44
+      expectation: git routes to its scoped surface.
+    - step: 46
+      expectation: sftp routes to its scoped surface.
+    - step: 48
+      expectation: mail routes to its scoped surface.
+    - step: 50
+      expectation: The actual keyboard shortcut opens Command Center.
+    - step: 53
+      expectation: Filtered Command Center result opens Preview.
+    - step: 55
+      expectation: Theme switches to dark.
+    - step: 57
+      expectation: '#newBtn supplies honest prototype feedback.'
+    - step: 59
+      expectation: '#detachBtn supplies honest prototype feedback.'
+    - step: 61
+      expectation: '#closeBtn supplies honest prototype feedback.'
+    - step: 63
+      expectation: '#sideSearchBtn supplies honest prototype feedback.'
+    - step: 65
+      expectation: Right pane closes without affecting the canvas.
+    - step: 67
+      expectation: Right pane reopens.
+    - step: 71
+      expectation: 1440px collapsed layout retains usable canvas width.
+    - step: 72
+      expectation: 1440px layout has no document horizontal overflow.
+    - step: 74
+      expectation: Work rail restores the navigator at 1440px.
+    - step: 79
+      expectation: 980px collapsed layout retains usable canvas width.
+    - step: 80
+      expectation: 980px layout has no document horizontal overflow.
+    - step: 82
+      expectation: Work rail restores the navigator at 980px.
+    - step: 87
+      expectation: 400px collapsed layout retains usable canvas width.
+    - step: 88
+      expectation: 400px layout has no document horizontal overflow.
+    - step: 90
+      expectation: Work rail restores the navigator at 400px.
+    results:
+    - 3
+    - 4
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
+    - 34
+    - 36
+    - 38
+    - 40
+    - 42
+    - 44
+    - 46
+    - 48
+    - 50
+    - 53
+    - 55
+    - 57
+    - 59
+    - 61
+    - 63
+    - 65
+    - 67
+    - 71
+    - 72
+    - 74
+    - 79
+    - 80
+    - 82
+    - 87
+    - 88
+    - 90
+  visual:
+  - check: Desktop, medium and narrow screenshots remain legible and match the intended hierarchy.
+    method: manual
+    reason: Inspect the recorded screenshots and console report.
+  native:
+  - check: Prototype is browser-only.
+    method: not-applicable
+    reason: It does not implement native resources.

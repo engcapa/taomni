@@ -16,6 +16,7 @@ export interface ChatThread {
   created_at: number;
   updated_at: number;
   linked_session_id: string | null;
+  workspace_id?: string | null;
   source: string;
   mode?: ChatThreadMode | string | null;
   /** Per-thread output format override ("md" | "html" | "plain"). null = inherit AiConfig. */
@@ -343,7 +344,7 @@ interface ChatStore {
   composerDrafts: Record<string, ChatComposerDraft>;
 
   loadThreads: () => Promise<void>;
-  newThread: (providerId?: string, linkedSessionId?: string, mode?: ChatThreadMode) => Promise<ChatThread>;
+  newThread: (providerId?: string, linkedSessionId?: string, mode?: ChatThreadMode, activate?: boolean) => Promise<ChatThread>;
   deleteThread: (threadId: string) => Promise<void>;
   setThreadProvider: (threadId: string, providerId: string) => Promise<void>;
   setThreadCcModel: (threadId: string, model: string | null) => Promise<void>;
@@ -416,8 +417,15 @@ interface ChatStore {
   setRibbonPlacement: (position: ChatDrawerPosition, offsetRatio: number) => void;
 }
 
+export function chatThreadBindingId(thread: ChatThread | null | undefined): string | null {
+  return thread?.workspace_id ? `workspace:${thread.workspace_id}` : thread?.linked_session_id ?? null;
+}
+
+let drawerRequest = 0;
+const openingThreads = new Map<string, Promise<ChatThread>>();
+
 function latestTabThread(threads: ChatThread[], tabId: string): ChatThread | undefined {
-  const candidates = threads.filter((thread) => thread.linked_session_id === tabId);
+  const candidates = threads.filter((thread) => chatThreadBindingId(thread) === tabId);
   return candidates[0];
 }
 
@@ -429,7 +437,7 @@ function rememberedTabThread(
   const rememberedId = activeThreadIdByTabId[tabId];
   if (!rememberedId) return undefined;
   return threads.find(
-    (thread) => thread.id === rememberedId && thread.linked_session_id === tabId,
+    (thread) => thread.id === rememberedId && chatThreadBindingId(thread) === tabId,
   );
 }
 
@@ -438,8 +446,8 @@ function scopeForThread(thread: ChatThread | undefined | null): {
   drawerTabId: string | null;
 } {
   if (!thread) return { drawerScope: null, drawerTabId: null };
-  return thread.linked_session_id
-    ? { drawerScope: "tab", drawerTabId: thread.linked_session_id }
+  return chatThreadBindingId(thread)
+    ? { drawerScope: "tab", drawerTabId: chatThreadBindingId(thread) }
     : { drawerScope: null, drawerTabId: null };
 }
 
@@ -569,20 +577,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
-  newThread: async (providerId?: string, linkedSessionId?: string, mode?: ChatThreadMode) => {
+  newThread: async (providerId?: string, linkedSessionId?: string, mode?: ChatThreadMode, activate = true) => {
     const threadMode = mode ?? "chat";
     const resolvedProviderId = providerId ?? (await resolveDefaultProviderId(capabilityForThreadMode(threadMode)));
     const thread = await invoke<ChatThread>("chat_new_thread", {
       providerId: resolvedProviderId,
-      linkedSessionId: linkedSessionId ?? null,
+      linkedSessionId: linkedSessionId?.startsWith("workspace:") ? null : linkedSessionId ?? null,
+      ...(linkedSessionId?.startsWith("workspace:") ? { workspaceId: linkedSessionId.slice(10) } : {}),
       mode: threadMode,
     });
     const scope = scopeForThread(thread);
     set((s) => ({
       threads: [thread, ...s.threads],
-      activeThreadId: thread.id,
-      ...scope,
-      tabDrawerOpenByTabId: linkedSessionId
+      ...(activate ? { activeThreadId: thread.id, ...scope } : {}),
+      tabDrawerOpenByTabId: linkedSessionId && activate
         ? { ...s.tabDrawerOpenByTabId, [linkedSessionId]: true }
         : s.tabDrawerOpenByTabId,
       activeThreadIdByTabId: linkedSessionId
@@ -652,8 +660,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((s) => ({
       activeThreadId: threadId,
       ...scopeForThread(thread),
-      activeThreadIdByTabId: thread?.linked_session_id
-        ? { ...s.activeThreadIdByTabId, [thread.linked_session_id]: thread.id }
+      activeThreadIdByTabId: thread && chatThreadBindingId(thread)
+        ? { ...s.activeThreadIdByTabId, [chatThreadBindingId(thread)!]: thread.id }
         : s.activeThreadIdByTabId,
     }));
   },
@@ -745,6 +753,20 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // Current code workspace state for Codex/Claude Code turns bound to an
     // editor tab. This is context only; file writes still go through tools.
     let codeWorkspace: CodeWorkspaceContext | null = null;
+    if (thread?.workspace_id) {
+      const { useWorkspaceStore } = await import("./workspaceStore");
+      const { useAppStore } = await import("./appStore");
+      const workspace = useWorkspaceStore.getState().workspaces.find((w) => w.id === thread.workspace_id);
+      if (workspace) {
+        const app = useAppStore.getState();
+        const editor = app.tabs.find((tab) => tab.type === "code-workspace" && tab.codeWorkspace?.workspaceId === workspace.id);
+        codeWorkspace = (editor && app.codeWorkspaceByTab[editor.id]) || codeWorkspaceContextFromTab({
+          repoRoot: workspace.roots[0]?.path ?? "", roots: workspace.roots, looseFiles: workspace.looseFiles,
+          workspaceId: workspace.id,
+        });
+        cwd = codeWorkspace.repoRoot || null;
+      }
+    }
     {
       const tabId = get().threads.find((t) => t.id === threadId)?.linked_session_id ?? null;
       if (tabId) {
@@ -1045,6 +1067,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   toggleDrawer: () => {
+    drawerRequest++;
     const s = get();
     const tabId = s.drawerScope === "tab" ? s.drawerTabId : null;
     set({
@@ -1055,9 +1078,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     });
   },
   setDrawerOpen: (open) => {
+    drawerRequest++;
     set({ drawerOpen: open });
   },
   dismissDrawer: () => {
+    drawerRequest++;
     const s = get();
     const tabId = s.drawerScope === "tab" ? s.drawerTabId : null;
     set({
@@ -1104,18 +1129,26 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   openTabChat: async (tabId: string) => {
     if (!tabId) return;
+    const request = ++drawerRequest;
     if (!get().threadsLoaded) {
       await get().loadThreads();
     }
+    if (request !== drawerRequest) return;
     let thread = rememberedTabThread(
       get().threads,
       get().activeThreadIdByTabId,
       tabId,
     ) ?? latestTabThread(get().threads, tabId);
     if (!thread) {
-      const defaultProviderId = await resolveDefaultProviderId();
-      thread = await get().newThread(defaultProviderId ?? undefined, tabId);
+      let pending = openingThreads.get(tabId);
+      if (!pending) {
+        pending = get().newThread(undefined, tabId, undefined, false);
+        openingThreads.set(tabId, pending);
+      }
+      try { thread = await pending; }
+      finally { if (openingThreads.get(tabId) === pending) openingThreads.delete(tabId); }
     }
+    if (request !== drawerRequest) return;
     set((s) => ({
       activeThreadId: thread.id,
       drawerOpen: true,
@@ -1133,7 +1166,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   toggleTabChat: async (tabId: string) => {
     if (!tabId) return;
     const s = get();
-    if (s.drawerOpen && s.drawerScope === "tab" && s.drawerTabId === tabId) {
+      if (s.drawerOpen && s.drawerScope === "tab" && s.drawerTabId === tabId) {
+        drawerRequest++;
       set({
         drawerOpen: false,
         tabDrawerOpenByTabId: { ...s.tabDrawerOpenByTabId, [tabId]: false },
@@ -1144,6 +1178,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   syncTabChatWithActiveTab: async (tabId: string | null) => {
+    drawerRequest++;
     const s = get();
 
     if (!tabId) {

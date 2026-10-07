@@ -1,0 +1,101 @@
+id: TC-WS-010
+title: 'AC-10: Workspace Tao drafts and thread identities stay isolated across repeated switches'
+description: 'AC-10: Workspace Tao drafts and thread identities stay isolated across repeated switches'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- assert_text:
+    selector: '[data-testid="chat-scope-binding"]'
+    contains: Workspace · QA Main
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: QA Main private draft
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- assert_text:
+    selector: '[data-testid="chat-scope-binding"]'
+    contains: Workspace · QA Remote
+- eval_readonly:
+    expression: document.querySelector('textarea')?.value === ""
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="ai-chat-composer"] textarea'
+    value: QA Remote private draft
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- assert_text:
+    selector: '[data-testid="chat-scope-binding"]'
+    contains: Workspace · QA Main
+- eval_readonly:
+    expression: document.querySelector('textarea')?.value === "QA Main private
+      draft"
+    expect_truthy: true
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- eval_readonly:
+    expression: document.querySelector('textarea')?.value === "QA Remote private
+      draft"
+    expect_truthy: true
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-10: Workspace Tao drafts and thread identities stay isolated across repeated switches'
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 12
+    - 13
+    - 14
+    - 15
+    - 18
+    - 19
+    - 20
+    checkpoints:
+    - step: 5
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 10
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 11
+      expectation: The visible UI establishes the expected eval_readonly result after the preceding navigation action.
+    - step: 16
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 17
+      expectation: The visible UI establishes the expected eval_readonly result after the preceding navigation action.
+    - step: 21
+      expectation: The visible UI establishes the expected eval_readonly result after the preceding navigation action.
+    results:
+    - 5
+    - 10
+    - 11
+    - 16
+    - 17
+    - 21
+  native:
+  - check: Disk, IPC and runtime persistence
+    method: external
+    reason: Browser covers renderer behavior; companion native cases cover real resources.
+  visual:
+  - check: Inspect theme, Lucide icons, spacing and clipping in the execution screenshots
+    method: manual
+    reason: Review pending execution evidence.

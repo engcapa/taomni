@@ -71,7 +71,8 @@ function setTabScrollLeft(el: HTMLElement, left: number) {
   }
 }
 
-interface TabBarProps {
+export interface TabBarProps {
+  surfaceIds?: string[];
   onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
   onConnectSession: (session: SessionConfig) => void;
   onOpenSessionEditor: () => void;
@@ -92,6 +93,7 @@ export function TabBar({
   onOpenSessionEditor,
   onDuplicateTab,
   detailsRevealExternal = false,
+  surfaceIds,
 }: TabBarProps) {
   const {
     tabs,
@@ -299,8 +301,8 @@ export function TabBar({
   // Tabs actually rendered in the strip. The focus filter (issue #121) hides
   // non-matching tabs here without closing them; the `…` menu still lists all.
   const visibleTabs = useMemo(
-    () => filterVisibleTabs(tabs, sessions, tabFilter),
-    [tabs, sessions, tabFilter],
+    () => filterVisibleTabs(surfaceIds ? tabs.filter((tab) => surfaceIds.includes(tab.id)) : tabs, sessions, tabFilter),
+    [tabs, sessions, tabFilter, surfaceIds],
   );
 
   useEffect(() => {

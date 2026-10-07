@@ -1,71 +1,132 @@
 id: TC-MFA-106
 title: Scan screen hides Taomni, captures the desktop and imports the visible QR code
-description: >-
-  V-24 (AC-06). Packaged app on Linux (Xvfb + Openbox) and Windows. A separate
-  topmost window shows the RFC 4226 QR (`native_show_image_window`). Scan
-  screen hides Taomni, captures every display through the Rust capture path,
-  restores the window and opens the review step; QA Bank imports with
-  755 224. With the QR window closed a second scan reports that no QR code is
-  on screen and the dialog stays usable. macOS needs Screen Recording
-  permission and is covered manually (V-26).
-covers: [F-MFA-2]
-tags: [mfa, screen-capture, native-boundary, p1]
-modes: [native]
-native_platforms: [Linux, Windows]
-fixtures: [reset_db]
+description: V-24 (AC-06). Packaged app on Linux (Xvfb + Openbox) and Windows. A separate topmost window shows the
+  RFC 4226 QR (`native_show_image_window`). Scan screen hides Taomni, captures every display through the Rust capture
+  path, restores the window and opens the review step; QA Bank imports with 755 224. With the QR window closed a
+  second scan reports that no QR code is on screen and the dialog stays usable. macOS needs Screen Recording permission
+  and is covered manually (V-26).
+covers:
+- F-MFA-2
+tags:
+- mfa
+- screen-capture
+- native-boundary
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-native-106}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-native-106}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-native-106
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-native-106
 - click: '[data-testid="vault-setup-confirm"]'
-- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
-- native_show_image_window: {path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png}
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
+- native_show_image_window:
+    path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png
 - click: '[data-testid="mfa-empty-add-screen"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="screen"]'
 - click: '[data-testid="mfa-screen-scan"]'
-- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 60}
-- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Bank]}
+- wait_for:
+    selector: '[data-testid="mfa-import-preview"]'
+    timeout_sec: 60
+- assert_items:
+    selector: '[data-testid="mfa-import-item"]'
+    attribute: data-issuer
+    equals:
+    - QA Bank
 - click: '[data-testid="mfa-import-confirm"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)', equals: 755 224}
-- native_show_image_window: {action: close}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)'
+    equals: 755 224
+- native_show_image_window:
+    action: close
 - click: '[data-testid="mfa-add"]'
 - click: '[data-testid="mfa-add-mode-screen"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="screen"]'
 - click: '[data-testid="mfa-screen-scan"]'
-- assert_text: {selector: '[data-testid="mfa-screen-status"]', contains: No QR code found on screen, timeout_sec: 60}
+- assert_text:
+    selector: '[data-testid="mfa-screen-status"]'
+    contains: No QR code found on screen
+    timeout_sec: 60
 - assert_enabled: '[data-testid="mfa-screen-scan"]'
 - press: Escape
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
 - screenshot: mfa-106-screen-scan.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: Scan screen captures a QR shown in another window and imports it (AC-06).
-    actions: [11, 12, 14, 17]
+    actions:
+    - 2
+    - 3
+    - 13
+    - 14
+    - 16
+    - 19
     checkpoints:
-    - {step: 13, expectation: screen pane open}
-    - {step: 15, expectation: review step from the screen capture}
-    - {step: 16, expectation: QA Bank decoded}
-    - {step: 18, expectation: dialog closed}
-    - {step: 19, expectation: code 755 224}
-    results: [19]
+    - step: 15
+      expectation: screen pane open
+    - step: 17
+      expectation: review step from the screen capture
+    - step: 18
+      expectation: QA Bank decoded
+    - step: 20
+      expectation: dialog closed
+    - step: 21
+      expectation: code 755 224
+    results:
+    - 21
   - id: R2
     requirement: Without a QR on screen the scan reports it and Taomni is usable again afterwards (AC-06).
-    actions: [20, 21, 22, 24, 27]
+    actions:
+    - 22
+    - 23
+    - 24
+    - 26
+    - 29
     checkpoints:
-    - {step: 23, expectation: screen pane open}
-    - {step: 25, expectation: no QR code on screen}
-    - {step: 26, expectation: scan button usable again}
-    - {step: 28, expectation: Escape closed the dialog}
-    results: [28]
+    - step: 25
+      expectation: screen pane open
+    - step: 27
+      expectation: no QR code on screen
+    - step: 28
+      expectation: scan button usable again
+    - step: 30
+      expectation: Escape closed the dialog
+    results:
+    - 30
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 30
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 30
   visual:
   - check: The window visibly hides during the capture and returns in front.
     method: manual

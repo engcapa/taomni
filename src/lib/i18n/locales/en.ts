@@ -6,6 +6,21 @@ type Dict = {
 };
 
 const dict = {
+  workspace: {
+    recentSessions: "Recent sessions and restore",
+    work: "Work", alerts: "Alerts", workspaces: "Workspaces", new: "New", hide: "Hide", home: "Home", search: "Search",
+    searchWorkspaces: "Search workspaces", pinned: "Pinned workspaces", recent: "Recent workspaces",
+    create: "Create workspace", empty: "Create a workspace or select a recent project.",
+    references: "Session references", revealSession: "Reveal session", removeReference: "Remove reference",
+    retry: "Retry", noPrimary: "No primary session selected.", addSession: "Add to Workspace", selectSession: "Select a saved session",
+    primary: "Primary", attached: "Attached", reference: "Reference",
+    overview: "overview", files: "files", terminal: "terminal", preview: "preview", tao: "tao", changes: "changes", mail: "mail",
+    outside: "Outside workspace", workspaceTools: "Workspace tools", sessionTools: "Session tools",
+    chooseWorkspace: "Choose workspace", rename: "Rename", addFolder: "Add folder", removeFolder: "Remove folder", delete: "Delete workspace",
+    newWorkspace: "New workspace", name: "Workspace name", newSessionInstead: "New session instead", context: "Workspace context",
+    closeContext: "Close workspace context", commandCenter: "Command Center", commandsPlaceholder: "Search workspaces, sessions, surfaces and tools",
+    previewSaved: "Preview saved file", previewLoading: "Loading preview…", previewAddFolder: "Add a folder in Overview to preview files.",
+  },
   app: {
     name: "Taomni",
     title: "Taomni",

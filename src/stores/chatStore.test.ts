@@ -244,6 +244,49 @@ describe("chatStore new thread provider selection", () => {
     expect(JSON.parse(window.localStorage.getItem("taomni.chatDrawer.layout.v1") ?? "{}"))
       .toMatchObject({ floatingOpacity: 1 });
   });
+
+  it("keeps workspace history and drafts separate from a shared legacy session thread", async () => {
+    useChatStore.setState({ threads: [
+      makeThread({ id: "a", workspace_id: "A", linked_session_id: null }),
+      makeThread({ id: "b", workspace_id: "B", linked_session_id: null }),
+      makeThread({ id: "legacy", linked_session_id: "shared" }),
+    ] });
+    const store = useChatStore.getState();
+    store.setComposerDraft("thread:a", { text: "Draft A", selectedAttachments: [] });
+    store.setComposerDraft("thread:b", { text: "Draft B", selectedAttachments: [] });
+    await store.openTabChat("workspace:A");
+    expect(useChatStore.getState().activeThreadId).toBe("a");
+    await store.openTabChat("workspace:B");
+    expect(useChatStore.getState().activeThreadId).toBe("b");
+    await store.openTabChat("shared");
+    expect(useChatStore.getState().activeThreadId).toBe("legacy");
+    expect(useChatStore.getState().composerDrafts).toMatchObject({
+      "thread:a": { text: "Draft A" }, "thread:b": { text: "Draft B" },
+    });
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let a delayed workspace thread replace a newer workspace selection", async () => {
+    let finishA!: (thread: ChatThread) => void;
+    let startedA!: () => void;
+    const started = new Promise<void>((resolve) => { startedA = resolve; });
+    invokeMock.mockImplementation((command: string, args: { workspaceId?: string }) => {
+      expect(command).toBe("chat_new_thread");
+      if (args.workspaceId === "A") {
+        startedA();
+        return new Promise<ChatThread>((resolve) => { finishA = resolve; });
+      }
+      return Promise.resolve(makeThread({ id: "b", workspace_id: "B", linked_session_id: null }));
+    });
+    const opening = useChatStore.getState().openTabChat("workspace:A");
+    await started;
+    await useChatStore.getState().openTabChat("workspace:B");
+    finishA(makeThread({ id: "a", workspace_id: "A", linked_session_id: null }));
+    await opening;
+    expect(useChatStore.getState()).toMatchObject({ activeThreadId: "b", drawerTabId: "workspace:B" });
+    expect(useChatStore.getState().threads.map((thread) => thread.id).sort()).toEqual(["a", "b"]);
+    expect(invokeMock).toHaveBeenCalledWith("chat_new_thread", expect.objectContaining({ workspaceId: "A", linkedSessionId: null }));
+  });
 });
 
 describe("chatStore media generation", () => {

@@ -10,6 +10,8 @@ pub struct ChatThread {
     pub created_at: i64,
     pub updated_at: i64,
     pub linked_session_id: Option<String>,
+    #[serde(default)]
+    pub workspace_id: Option<String>,
     pub source: String,
     #[serde(default = "default_thread_mode")]
     pub mode: String,
@@ -114,6 +116,10 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
         "ALTER TABLE ai_chat_threads ADD COLUMN acp_session_id TEXT",
         [],
     );
+    let _ = conn.execute(
+        "ALTER TABLE ai_chat_threads ADD COLUMN workspace_id TEXT",
+        [],
+    );
     // Idempotent column add for the per-thread chat output-format override.
     let _ = conn.execute(
         "ALTER TABLE ai_chat_threads ADD COLUMN output_format TEXT",
@@ -135,14 +141,14 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
 
 pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
     conn.execute(
-        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model, mode, acp_session_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model, mode, acp_session_id, workspace_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             thread.id, thread.title, thread.provider_id,
             thread.created_at, thread.updated_at,
             thread.linked_session_id, thread.source,
             thread.output_format, thread.cc_model, thread.mode,
-            thread.acp_session_id,
+            thread.acp_session_id, thread.workspace_id,
         ],
     )?;
     Ok(())
@@ -150,7 +156,7 @@ pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
 
 pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id, workspace_id
          FROM ai_chat_threads WHERE id = ?1",
     )?;
     let mut rows = stmt.query(params![id])?;
@@ -164,6 +170,7 @@ pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> 
         created_at: row.get(3)?,
         updated_at: row.get(4)?,
         linked_session_id: row.get(5)?,
+        workspace_id: row.get(12)?,
         source: row.get(6)?,
         cc_session_id: row.get(7).ok(),
         acp_session_id: row.get(11).ok(),
@@ -177,7 +184,7 @@ pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> 
 
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id, workspace_id
          FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
@@ -188,6 +195,7 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             created_at: row.get(3)?,
             updated_at: row.get(4)?,
             linked_session_id: row.get(5)?,
+            workspace_id: row.get(12)?,
             source: row.get(6)?,
             cc_session_id: row.get(7).ok(),
             acp_session_id: row.get(11).ok(),
@@ -396,6 +404,7 @@ mod tests {
             created_at: 1,
             updated_at: 1,
             linked_session_id: None,
+            workspace_id: None,
             source: "drawer".into(),
             mode: "chat".into(),
             cc_session_id: None,
@@ -447,6 +456,7 @@ mod tests {
             created_at: 1,
             updated_at: 1,
             linked_session_id: None,
+            workspace_id: None,
             source: "drawer".into(),
             mode: "chat".into(),
             cc_session_id: None,

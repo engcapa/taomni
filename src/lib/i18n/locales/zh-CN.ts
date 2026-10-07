@@ -5,6 +5,21 @@ import type { en } from "./en";
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export const zhCN: DeepPartial<typeof en> = {
+  workspace: {
+    recentSessions: "最近会话与恢复",
+    work: "工作区", alerts: "通知", workspaces: "工作区", new: "新建", hide: "收起", home: "首页", search: "搜索",
+    searchWorkspaces: "搜索工作区", pinned: "置顶工作区", recent: "最近工作区",
+    create: "创建工作区", empty: "创建工作区或选择最近的项目。",
+    references: "会话引用", revealSession: "定位会话", removeReference: "移除引用",
+    retry: "重试", noPrimary: "尚未选择主会话。", addSession: "添加到工作区", selectSession: "选择已保存的会话",
+    primary: "主会话", attached: "附加", reference: "引用",
+    overview: "概览", files: "文件", terminal: "终端", preview: "预览", tao: "Tao", changes: "变更", mail: "邮件",
+    outside: "全局工具", workspaceTools: "工作区工具", sessionTools: "会话工具",
+    chooseWorkspace: "选择工作区", rename: "重命名", addFolder: "添加文件夹", removeFolder: "移除文件夹", delete: "删除工作区",
+    newWorkspace: "新建工作区", name: "工作区名称", newSessionInstead: "改为新建会话", context: "工作区上下文",
+    closeContext: "关闭工作区上下文", commandCenter: "命令中心", commandsPlaceholder: "搜索工作区、会话、视图及工具",
+    previewSaved: "预览已保存的文件", previewLoading: "正在加载预览…", previewAddFolder: "请先在概览中添加文件夹以预览文件。",
+  },
   app: {
     name: "Taomni",
     title: "Taomni",

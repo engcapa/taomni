@@ -20,6 +20,8 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - dblclick: '[data-testid="tab-title"] >> nth=1'
@@ -77,57 +79,69 @@ steps:
     equals: Terminal 1
 - screenshot: 108-tab-context-menu-move-actions.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: Tab context menu moves tabs to fixed positions：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 2
+    - 3
     - 4
     - 6
-    - 7
+    - 8
     - 9
     - 11
-    - 14
-    - 17
-    - 20
+    - 13
+    - 16
+    - 19
     - 22
-    - 25
+    - 24
     - 27
-    - 30
+    - 29
     - 32
+    - 34
     checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 5
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 7
       expectation: '{"wait_for": "[data-testid=\"tab-title-input\"]"}'
-    - step: 13
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 4}}'
     - step: 15
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 4}}'
+    - step: 17
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 16
+    - step: 18
       expectation: '{"assert_menu_items": ["Move to first", "Move left", "Move right", "Move to last"]}'
-    - step: 19
+    - step: 21
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=3", "name": "data-tab-title",
         "equals": "Terminal 1"}}'
-    - step: 21
+    - step: 23
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 24
+    - step: 26
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "name": "data-tab-title",
         "equals": "Terminal 1"}}'
-    - step: 26
+    - step: 28
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 29
+    - step: 31
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
         "equals": "Terminal 1"}}'
-    - step: 31
+    - step: 33
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 34
+    - step: 36
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=1", "name": "data-tab-title",
         "equals": "Terminal 1"}}'
     results:
-    - 34
+    - 36
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 36
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 36
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

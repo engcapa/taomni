@@ -1,0 +1,135 @@
+id: TC-WS-NATIVE-004
+title: Workspace terminal detach and reattach retains the real PTY and canonical reference
+description: Uses real OS WebDriver windows and terminal output to verify scope, canonical identity, and resource
+  continuity across reattachment.
+covers:
+- F-Workspace-1
+- F-Detach-1
+tags:
+- workspace-first
+- native
+- detach
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-workspace-test-password
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-qa-local-shell"] > button'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- click: '[data-testid="terminal-pane"]'
+- type: echo QA_DETACH_BEFORE
+- press: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_DETACH_BEFORE\s*$
+    timeout_sec: 20
+- switch_native_window: main
+- click: '[data-testid="terminal-detach"]'
+- switch_native_window: detached
+- wait_for: '[data-testid="detached-session-window"][data-detached-kind="terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_DETACH_BEFORE\s*$
+    timeout_sec: 20
+- click: '[data-testid="terminal-pane"]'
+- type: echo QA_DETACHED_LIVE
+- press: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_DETACHED_LIVE\s*$
+    timeout_sec: 20
+- screenshot: detached-workspace-terminal.png
+- click: '[data-testid="detached-reattach"]'
+- switch_native_window: main
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: Workspace · QA Main
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_DETACHED_LIVE\s*$
+    timeout_sec: 20
+- click: '[data-testid="terminal-pane"]'
+- type: echo QA_REATTACHED_LIVE
+- press: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_REATTACHED_LIVE\s*$
+    timeout_sec: 20
+- click: '[data-testid="side-tab-sessions"]'
+- assert_count:
+    selector: '[data-testid="session-tree-item"][data-session-id="qa-local-shell"]'
+    equal: 1
+- click: '[data-testid="side-tab-work"]'
+- assert_count:
+    selector: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-qa-local-shell"]'
+    equal: 1
+- screenshot: reattached-workspace-terminal.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: The original PTY continues output in a detached OS window and after reattachment, retaining Workspace
+      scope and one canonical membership.
+    actions:
+    - 5
+    - 8
+    - 12
+    - 13
+    - 18
+    - 22
+    - 23
+    - 29
+    checkpoints:
+    - step: 10
+      expectation: The original terminal executes the first marker command.
+    - step: 14
+      expectation: The selected real native window is the detached terminal shell.
+    - step: 16
+      expectation: Detached terminal retains output produced before detach.
+    - step: 20
+      expectation: The detached native window displays output from the live adopted PTY.
+    - step: 25
+      expectation: Reattached surface belongs to QA Main.
+    - step: 26
+      expectation: Exactly one terminal renderer exists after reattachment.
+    - step: 27
+      expectation: Reattached terminal retains output produced while detached.
+    - step: 31
+      expectation: The reattached native terminal still executes commands.
+    - step: 35
+      expectation: Exactly one original canonical session reference remains.
+    - step: 33
+      expectation: Exactly one canonical local session remains in Sessions.
+    results:
+    - 10
+    - 14
+    - 16
+    - 20
+    - 25
+    - 26
+    - 27
+    - 31
+    - 33
+    - 35
+  native:
+  - check: Uses real OS WebDriver windows and terminal output to verify scope, canonical identity, and resource
+      continuity across reattachment.
+    method: automated
+    reason: Runs the isolated QA application against actual Tauri IPC and native resources; browser stubs cannot
+      replace this evidence.
+  visual:
+  - check: Detached and reattached terminal screenshots retain the existing toolbar icons and readable output.
+    method: manual
+    reason: Screenshots must be reviewed after actual native execution.

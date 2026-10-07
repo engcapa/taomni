@@ -14,6 +14,7 @@ fixtures:
 - ssh_required
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -83,81 +84,81 @@ steps:
 - assert_not_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-menu (copy)"]'
 - screenshot: 013-session-tree-right-menu.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: 创建、筛选、复制会话，复制项可编辑并取消；删除确认前仍存在，确认后仅复制项消失
     actions:
     - 2
-    - 11
-    - 13
-    - 15
+    - 3
+    - 12
+    - 14
     - 16
-    - 38
+    - 17
     - 39
-    - 41
-    - 44
-    - 47
+    - 40
+    - 42
+    - 45
+    - 48
     checkpoints:
-    - step: 12
+    - step: 13
       expectation: '{"wait_for": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-menu\""}'
-    - step: 14
+    - step: 15
       expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"}'
-    - step: 17
+    - step: 18
       expectation: '{"wait_for": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-menu (copy)\""}'
-    - step: 40
+    - step: 41
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 42
+    - step: 43
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
         5}}'
-    - step: 45
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
     - step: 46
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 47
       expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu
         (copy)\"]"}'
-    - step: 49
-      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"}'
     - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"}'
+    - step: 51
       expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu
         (copy)\"]"}'
     results:
-    - 49
     - 50
+    - 51
   - id: R2
     requirement: 会话右键菜单及命令复制子菜单具有指定入口
     actions:
-    - 18
-    - 22
-    - 25
+    - 19
+    - 23
+    - 26
     checkpoints:
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 20
-      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Connect\""}'
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Connect\""}'
+    - step: 22
       expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-connection-command\"]"}'
-    - step: 23
-      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix\"]"}'
     - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix\"]"}'
+    - step: 25
       expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-powershell\"]"}'
-    - step: 26
-      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-basic\"]"}'
     - step: 27
-      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-jump\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-basic\"]"}'
     - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-forwards\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-jump\"]"}'
     - step: 29
-      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-full\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-forwards\"]"}'
     - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Edit...\""}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-full\"]"}'
     - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Duplicate\""}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Edit...\""}'
     - step: 32
-      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Move to folder\""}'
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Duplicate\""}'
     - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Move to folder\""}'
+    - step: 34
       expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Delete\""}'
     results:
-    - 26
     - 27
     - 28
     - 29
@@ -165,6 +166,16 @@ verification:
     - 31
     - 32
     - 33
+    - 34
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    checkpoints:
+    - step: 51
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 51
   visual:
   - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
     method: manual

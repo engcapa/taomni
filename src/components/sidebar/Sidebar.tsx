@@ -1,3 +1,9 @@
+import { WorkspaceNavigator } from "./WorkspaceNavigator";
+import { useWorkspaceStore, type NavigationSection } from "../../stores/workspaceStore";
+import { openWorkspaceView } from "../workspace/WorkspaceChrome";
+import { openScreenshotOverlay } from "../../lib/screenshot";
+import { useChatStore } from "../../stores/chatStore";
+import { useTaoHubStore } from "../../stores/taoHubStore";
 import {
   Search,
   Plus,
@@ -17,15 +23,20 @@ import {
   Inbox,
   KeyRound,
   PanelsTopLeft,
+  Bell,
+  FolderOpen,
+  Camera,
+  Terminal,
+  Eye,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { SessionTree } from "./SessionTree";
+import { SessionTree, workspaceDeletionImpact } from "./SessionTree";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { useAppStore, type SideTab } from "../../stores/appStore";
+import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import type { SessionConfig } from "../../lib/ipc";
-import { useT, type TranslateFn } from "../../lib/i18n";
+import { useT } from "../../lib/i18n";
 import type { AppCommand } from "../menubar/commands";
 import { ContextMenu } from "../ContextMenu";
 import { ToolWindowRailButton, ToolWindowRailResizeHandle } from "../editor/workspace/panels/ToolWindowRail";
@@ -36,7 +47,7 @@ interface SidebarProps {
   onNewSession?: (groupPath?: string | null) => void;
   onNewSftpSession?: () => void;
   onEditSession?: (session: SessionConfig) => void;
-  onConnectSession?: (session: SessionConfig) => void;
+  onConnectSession?: (session: SessionConfig, workspaceId?: string) => void;
   onOpenSettings?: () => void;
   onCommand?: (command: AppCommand) => void;
   compact?: boolean;
@@ -51,10 +62,15 @@ export function Sidebar({
   compact = false,
 }: SidebarProps) {
   const {
-    activeSideTab,
-    setActiveSideTab,
     setSidebarCollapsed,
   } = useAppStore();
+  const activeSideTab = useWorkspaceStore((s) => s.section);
+  const setActiveSideTab = (section: NavigationSection) => {
+    useWorkspaceStore.setState({ section });
+    if (section === "sessions" || section === "tools") useAppStore.getState().setActiveSideTab(section);
+    if (section === "work") useWorkspaceStore.setState({ canvas: "workspace" });
+    if (section === "alerts") { useTaoHubStore.getState().setHubTab("notifications"); useChatStore.getState().setDrawerOpen(true); }
+  };
   const {
     sessions,
     selectedSessionIds,
@@ -85,7 +101,7 @@ export function Sidebar({
     void moveSessionsToGroup(selectedSessionIds, "User sessions / Favorites");
   };
 
-  const handleSideTabClick = (tab: SideTab, clickCount = 0) => {
+  const handleSideTabClick = (tab: NavigationSection, clickCount = 0) => {
     // The first click can swap the expanded Sidebar for its compact mount.
     // Keep the second click of the same gesture from reopening that panel.
     if (clickCount > 1) {
@@ -128,15 +144,15 @@ export function Sidebar({
         onContextMenu={handleSideTabContextMenu}
       >
         <div className="flex shrink-0 flex-col gap-1 px-1 py-1">
-          {(["sessions", "tools"] as const).map((tab) => {
-            const label = labelForSideTab(t, tab);
+          {(["work", "sessions", "tools", "alerts"] as const).map((tab) => {
+            const label = tab === "work" ? t("workspace.work") : tab === "alerts" ? t("workspace.alerts") : tab === "sessions" ? t("sidebar.sideTabSessions") : t("sidebar.sideTabTools");
             return (
               <ToolWindowRailButton
                 key={tab}
                 item={{
                   id: tab,
                   label,
-                  icon: tab === "sessions" ? <PanelsTopLeft /> : <Wrench />,
+                  icon: tab === "work" ? <FolderOpen /> : tab === "alerts" ? <Bell /> : tab === "sessions" ? <PanelsTopLeft /> : <Wrench />,
                   active: activeSideTab === tab && !compact,
                   testId: `side-tab-${tab}`,
                   onSelect: () => handleSideTabClick(tab),
@@ -186,7 +202,7 @@ export function Sidebar({
       {compact && null}
       {!compact && (
       <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--taomni-sidebar-bg)", borderRight: "1px solid var(--taomni-sidebar-border)" }}>
-        {activeSideTab === "sessions" ? (
+        {activeSideTab === "work" ? <WorkspaceNavigator onConnectSession={onConnectSession} /> : activeSideTab === "sessions" ? (
           <>
             <div className="h-7 flex items-center gap-1 px-1.5 border-b shrink-0" style={{ borderColor: "var(--taomni-divider)" }}>
               <IconBtn testId="session-new" title={t("sidebar.newSessionTitle")} icon={<Plus className="w-3.5 h-3.5" />} onClick={() => onNewSession?.()} />
@@ -211,10 +227,14 @@ export function Sidebar({
                 />
               </div>
             </div>
+            <div className="flex overflow-x-auto text-xs" data-testid="session-kind-filters">
+              {["All", "Terminal", "Remote", "Mail", "Database"].map((kind) => <button key={kind} className="px-2 py-1" onClick={() => useWorkspaceStore.setState({ sessionKindFilter: kind })}>{kind}</button>)}
+            </div>
+            <button data-testid="session-recents" className="text-xs text-left px-2 py-1 hover:bg-[var(--taomni-hover)]" onClick={() => onCommand?.("recent-sessions")}>{t("workspace.recentSessions")}</button>
             <SessionTree onNewSession={onNewSession} onConnectSession={onConnectSession} onEditSession={onEditSession} />
           </>
         ) : (
-          <ToolsPanel onCommand={onCommand} />
+          <ToolsPanel onCommand={onCommand} onConnectSession={onConnectSession} />
         )}
       </div>
       )}
@@ -236,9 +256,9 @@ export function Sidebar({
       <ConfirmDialog
         title={t("sidebar.confirmDeleteSessionTitle")}
         message={
-          deleteConfirm.length === 1
+          (deleteConfirm.length === 1
             ? t("sidebar.confirmDeleteSession", { name: deleteConfirm[0].name })
-            : t("sidebar.confirmDeleteSessions", { count: deleteConfirm.length })
+            : t("sidebar.confirmDeleteSessions", { count: deleteConfirm.length })) + workspaceDeletionImpact(deleteConfirm.map((s) => s.id))
         }
         confirmLabel={t("common.delete")}
         danger
@@ -255,8 +275,17 @@ export function Sidebar({
 }
 
 /** Tool entries mirror the main menu Tools items (without packages/macros). */
-function ToolsPanel({ onCommand }: { onCommand?: (command: AppCommand) => void }) {
+function ToolsPanel({ onCommand, onConnectSession }: Pick<SidebarProps, "onCommand" | "onConnectSession">) {
   const t = useT();
+  const sessions = useSessionStore((s) => s.sessions);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const workspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const [sessionTool, setSessionTool] = useState<"terminal" | "sftp" | "mail" | null>(null);
+  const [workspaceTool, setWorkspaceTool] = useState<"files" | "changes" | "preview" | null>(null);
+  const routeWorkspace = (view: "files" | "changes" | "preview") => {
+    if (!workspaceId) setWorkspaceTool(view);
+    else openWorkspaceView(view);
+  };
   const items: Array<{
     id: AppCommand;
     label: string;
@@ -326,22 +355,48 @@ function ToolsPanel({ onCommand }: { onCommand?: (command: AppCommand) => void }
         style={{ borderColor: "var(--taomni-divider)", fontSize: "var(--taomni-ui-font-size)" }}
       >
         <Wrench className="w-3.5 h-3.5" />
-        {t("sidebar.utilityToolsTitle")}
+        {t("sidebar.sideTabTools")}
       </div>
       <div className="flex-1 overflow-y-auto p-1.5">
-        {items.map((item) => (
+        {(["global", "workspace"] as const).map((scope) => <section key={scope} data-testid={`tools-group-${scope}`}>
+          <h3 className="px-2 py-2 text-xs text-[var(--taomni-text-muted)]">{scope === "global" ? t("workspace.outside") : t("workspace.workspaceTools")}</h3>
+        {items.filter((item) => (item.id === "git" || item.id === "code-workspace" ? "workspace" : "global") === scope).map((item) => (
           <button
             key={item.id}
             type="button"
             data-testid={item.testId}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
             style={{ fontSize: "var(--taomni-ui-font-size)" }}
-            onClick={() => onCommand?.(item.id)}
+            onClick={() => {
+              if (item.id === "git") routeWorkspace("changes");
+              else if (item.id === "code-workspace") routeWorkspace("files");
+              else onCommand?.(item.id);
+            }}
           >
             <span className="text-[var(--taomni-text-muted)]">{item.icon}</span>
-            <span className="truncate">{item.label}</span>
+            <span className="truncate flex-1">{item.label}</span>
+            <small>{item.id === "git" || item.id === "code-workspace" ? "workspace" : "global"}</small>
           </button>
         ))}
+        {scope === "global" && <button data-testid="sidebar-tool-screenshot" className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[var(--taomni-hover)]" onClick={() => void openScreenshotOverlay().catch((error) => useWorkspaceStore.setState({ error: String(error) }))}><Camera className="w-4 h-4" /><span className="flex-1 text-left">{t("screenshot.tooltip")}</span><small>global</small></button>}
+        {scope === "workspace" && <button data-testid="sidebar-tool-preview" className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[var(--taomni-hover)]" onClick={() => routeWorkspace("preview")}><Eye className="w-4 h-4" /><span className="flex-1 text-left">Preview</span><small>workspace</small></button>}
+        </section>)}
+        <section data-testid="tools-group-session">
+          <h3 className="px-2 py-2 text-xs text-[var(--taomni-text-muted)]">{t("workspace.sessionTools")}</h3>
+          {(["terminal", "sftp", "mail"] as const).map((tool) => <button key={tool} data-testid={`sidebar-tool-session-${tool}`} className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[var(--taomni-hover)]" onClick={() => setSessionTool(tool)}>{tool === "terminal" ? <Terminal className="w-4 h-4" /> : tool === "mail" ? <Inbox className="w-4 h-4" /> : <FolderOpen className="w-4 h-4" />}<span className="flex-1 text-left capitalize">{tool}</span><small>session</small></button>)}
+        </section>
+        {sessionTool && <section data-testid="session-tool-picker" aria-label="Choose session" className="m-1 border border-[var(--taomni-divider)] rounded p-2">
+          <h3>Choose session · {sessionTool}</h3>
+          {sessions.filter((s) => sessionTool === "mail" ? s.session_type === "Mail" : sessionTool === "sftp" ? s.session_type === "SFTP" : ["SSH", "Local", "LocalShell", "Telnet", "Serial", "Command"].includes(s.session_type)).map((s) => <button key={s.id} data-testid={`session-tool-choice-${s.id}`} className="block w-full text-left p-2 rounded hover:bg-[var(--taomni-hover)]" onClick={() => { onConnectSession?.(s); setSessionTool(null); }}>{s.name}</button>)}
+          <button className="p-2" onClick={() => { setSessionTool(null); onCommand?.(sessionTool === "sftp" ? "new-sftp" : "new-session"); }}>{t("common.new")}</button>
+          <button className="p-2" onClick={() => setSessionTool(null)}>{t("common.cancel")}</button>
+        </section>}
+        {workspaceTool && <section data-testid="workspace-tool-picker" aria-label="Choose workspace" className="m-1 border border-[var(--taomni-divider)] rounded p-2">
+          <h3>{t("workspace.chooseWorkspace")}</h3>
+          {workspaces.map((w) => <button key={w.id} className="block w-full text-left p-2 rounded hover:bg-[var(--taomni-hover)]" onClick={() => { useWorkspaceStore.getState().selectWorkspace(w.id); openWorkspaceView(workspaceTool); setWorkspaceTool(null); }}>{w.name}</button>)}
+          <button className="p-2" onClick={() => { setWorkspaceTool(null); useWorkspaceStore.setState({ createDialogOpen: true }); }}>{t("workspace.create")}</button>
+          <button className="p-2" onClick={() => setWorkspaceTool(null)}>{t("common.cancel")}</button>
+        </section>}
       </div>
     </div>
   );
@@ -374,11 +429,3 @@ function IconBtn({
   );
 }
 
-function labelForSideTab(t: TranslateFn, tab: SideTab): string {
-  switch (tab) {
-    case "sessions":
-      return t("sidebar.sideTabSessions");
-    case "tools":
-      return t("sidebar.sideTabTools");
-  }
-}

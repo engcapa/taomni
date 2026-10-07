@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StatusBar } from "./StatusBar";
 import { useAppStore } from "../../stores/appStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useCodeWorkspaceStatusStore } from "../../stores/codeWorkspaceStatusStore";
 
 vi.mock("../../lib/i18n", async (importOriginal) => {
@@ -55,6 +56,7 @@ describe("StatusBar code-workspace segments", () => {
   });
 
   beforeEach(() => {
+    useWorkspaceStore.setState({ canvas: "runtime", workspaces: [], activeWorkspaceId: null });
     useAppStore.setState({
       tabs: [{
         id: "ws-tab",

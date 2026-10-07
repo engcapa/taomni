@@ -2,6 +2,7 @@ import type { SessionConfig } from "./ipc";
 import { tabHost } from "./tabFilter";
 import type { Tab } from "../types";
 import type { TerminalRuntimeInfo } from "../stores/appStore";
+import { tabToSurfaceDescriptor } from "./workspaceScope";
 
 type Translate = (key: string, args?: Record<string, string | number>) => string;
 
@@ -123,6 +124,11 @@ export function formatTabSessionInfo(
     `Connection: ${summary.connectionLabel}`,
     `Session: ${summary.sessionLabel}`,
   ];
+  const surface = tabToSurfaceDescriptor(tab);
+  lines.push(`Surface: ${surface.surfaceId}`, `Scope: ${surface.scope}`);
+  if ("workspaceId" in surface && surface.workspaceId) lines.push(`Workspace: ${surface.workspaceId}`);
+  if (surface.scope === "session") lines.push(surface.sessionRef.kind === "canonical"
+    ? `Session ID: ${surface.sessionRef.sessionId}` : `Runtime ID: ${surface.sessionRef.runtimeId}`);
 
   if (summary.endpoint) lines.push(`Endpoint: ${summary.endpoint}`);
   if (host) lines.push(`Host: ${host}`);

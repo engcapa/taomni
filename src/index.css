@@ -10,7 +10,28 @@
 @import "@fontsource/inter/600.css";
 @import "@fontsource/inter/700.css";
 
-@import "tailwindcss";
+/* Product classes live under src; reports, Rust fixtures and design prototypes
+   must not participate in the application's utility scan. */
+@import "tailwindcss" source("./");
+@source "../index.html";
+
+/* Narrow windows use an overlay navigator; the active canvas keeps its width. */
+@media (max-width: 760px) {
+  .workspace-main-layout { position: relative; }
+  .workspace-main-layout > #sidebar {
+    position: absolute !important;
+    inset: 0 auto 0 0;
+    width: min(320px, 100%) !important;
+    max-width: 100% !important;
+    z-index: 40;
+    pointer-events: none;
+  }
+  .workspace-main-layout > #sidebar [data-testid="expanded-sidebar-panel"] {
+    pointer-events: auto;
+  }
+  .workspace-main-layout > #content { flex: 1 1 100% !important; min-width: 0; }
+  .workspace-main-layout > #main-sidebar-resize-handle { display: none; }
+}
 
 :root {
   --taomni-color-scheme: light;

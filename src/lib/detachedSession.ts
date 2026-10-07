@@ -25,6 +25,20 @@
  * sitting in localStorage indefinitely.
  */
 
+import type { SurfaceDescriptor } from "../types/workspace";
+
+const detachedSurfaces = new Map<string, SurfaceDescriptor>();
+export function rememberDetachedSurface(kind: DetachedKind, id: string, surface: SurfaceDescriptor) {
+  detachedSurfaces.set(`${kind}.${id}`, surface);
+}
+function scopedPayload<T>(kind: DetachedKind, id: string, payload: T): T {
+  const surface = detachedSurfaces.get(`${kind}.${id}`);
+  return surface && payload && typeof payload === "object" ? { ...payload, surface, surfaceId: surface.surfaceId, surfaceKind: surface.kind,
+    ...("workspaceId" in surface ? { workspaceId: surface.workspaceId } : {}),
+    ...(surface.scope === "session" ? { sessionRef: surface.sessionRef } : {}),
+  } : payload;
+}
+
 export type DetachedKind =
   | "sftp"
   | "rdp"
@@ -64,7 +78,7 @@ export function writeDetachedHandoff<T>(
 ): void {
   try {
     const env: HandoffEnvelope<T> = {
-      payload: sanitizeDetachedPayload(kind, payload),
+      payload: sanitizeDetachedPayload(kind, scopedPayload(kind, id, payload)),
       createdAt: Date.now(),
     };
     localStorage.setItem(handoffKey(kind, id), JSON.stringify(env));
@@ -129,6 +143,8 @@ export function consumeDetachedHandoff<T>(
       }
       continue;
     }
+    const surface = (env.payload as { surface?: SurfaceDescriptor })?.surface;
+    if (surface) rememberDetachedSurface(kind, id, surface);
     return env.payload;
   }
   return null;
@@ -305,6 +321,7 @@ export function broadcastReattach<T>(
   id: string,
   payload: T,
 ): void {
+  payload = scopedPayload(kind, id, payload);
   try {
     const env: HandoffEnvelope<T> = { payload, createdAt: Date.now() };
     localStorage.setItem(reattachKey(kind, id), JSON.stringify(env));

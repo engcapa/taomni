@@ -1,0 +1,115 @@
+id: TC-WS-012
+title: 'AC-01/07/12: an empty catalog offers creation and explicit scope pickers without fabricating membership'
+description: 'AC-01/07/12: an empty catalog offers creation and explicit scope pickers without fabricating membership'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-navigator"]'
+- assert_count:
+    selector: '[data-testid^="workspace-row-"]'
+    equal: 0
+- assert_visible: '[data-testid="workspace-empty-create"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-preview"]'
+- assert_visible: '[data-testid="workspace-tool-picker"]'
+- click: '[data-testid="workspace-tool-picker"] button:has-text("Cancel")'
+- click: '[data-testid="sidebar-tool-session-terminal"]'
+- assert_visible: '[data-testid="session-tool-picker"]'
+- click: '[data-testid="session-tool-picker"] button:has-text("Cancel")'
+- click: '[data-testid="side-tab-work"]'
+- click: '[data-testid="workspace-empty-create"]'
+- fill:
+    selector: '[data-testid="workspace-name-input"]'
+    value: QA Empty
+- click: '[data-testid="workspace-create-submit"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: QA Empty
+- assert_count:
+    selector: '[data-testid="workspace-navigator"] [data-testid^="workspace-reference-"]'
+    equal: 0
+- click: '[data-testid="workspace-delete"]'
+- assert_visible: '[role="alertdialog"]'
+- click: '[role="alertdialog"] button:has-text("Cancel")'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: QA Empty
+- click: '[data-testid="workspace-delete"]'
+- click: '[data-testid="workspace-delete-confirm"]'
+- assert_visible: '[data-testid="workspace-empty-create"]'
+- assert_count:
+    selector: '[data-testid^="workspace-row-"]'
+    equal: 0
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-01/07/12: an empty catalog offers creation and explicit scope pickers without fabricating membership'
+    actions:
+    - 5
+    - 6
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 18
+    - 20
+    - 22
+    - 23
+    checkpoints:
+    - step: 3
+      expectation: The visible UI establishes the expected assert_count result after the preceding navigation action.
+    - step: 4
+      expectation: The visible UI establishes the expected assert_visible result after the preceding navigation
+        action.
+    - step: 7
+      expectation: The visible UI establishes the expected assert_visible result after the preceding navigation
+        action.
+    - step: 10
+      expectation: The visible UI establishes the expected assert_visible result after the preceding navigation
+        action.
+    - step: 16
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 17
+      expectation: The visible UI establishes the expected assert_count result after the preceding navigation action.
+    - step: 19
+      expectation: The visible UI establishes the expected assert_visible result after the preceding navigation
+        action.
+    - step: 21
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 24
+      expectation: The visible UI establishes the expected assert_visible result after the preceding navigation
+        action.
+    - step: 25
+      expectation: The visible UI establishes the expected assert_count result after the preceding navigation action.
+    results:
+    - 3
+    - 4
+    - 7
+    - 10
+    - 16
+    - 17
+    - 19
+    - 21
+    - 24
+    - 25
+  native:
+  - check: Disk, IPC and runtime persistence
+    method: external
+    reason: Browser covers renderer behavior; companion native cases cover real resources.
+  visual:
+  - check: Inspect theme, Lucide icons, spacing and clipping in the execution screenshots
+    method: manual
+    reason: Review pending execution evidence.

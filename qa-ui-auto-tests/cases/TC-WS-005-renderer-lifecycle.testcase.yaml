@@ -1,0 +1,76 @@
+id: TC-WS-005
+title: 'AC-05/10: Files remains mounted across Overview and Tao surface switches'
+description: Renderer host retention and scoped Tao entry only. Thread data isolation is also covered by unit tests;
+  real PTY lifetime is TC-WS-NATIVE-002.
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-navigator"]'
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-files"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="workspace-surface-overview"]'
+- assert_not_visible: '[data-testid="code-workspace-tab"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- click: '[data-testid="workspace-surface-tao"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- click: '[data-testid="workspace-surface-tao"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-files"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- screenshot: workspace-files-restored.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-05/10: Files remains mounted across Overview and Tao surface switches'
+    actions:
+    - 4
+    - 5
+    - 7
+    - 10
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 18
+    checkpoints:
+    - step: 8
+      expectation: '{''assert_not_visible'': ''[data-testid="code-workspace-tab"]''}'
+    - step: 9
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-tab"]'', ''equal'': 1}}'
+    - step: 20
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-tab"]'', ''equal'': 1}}'
+    results:
+    - 8
+    - 9
+    - 20
+  visual:
+  - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
+    method: manual
+    reason: Visual evidence must be inspected after execution; pending is not a pass.
+  native:
+  - check: Native IPC, process, disk and window boundaries require the TC-WS-NATIVE companion cases.
+    method: external
+    reason: This browser case verifies renderer and stub behavior only.

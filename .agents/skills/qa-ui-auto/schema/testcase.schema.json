@@ -61,6 +61,7 @@
       "items": {
         "enum": [
           "reset_db",
+          "workspace_membership",
           "backup_policy",
           "path_completion",
           "ssh_required",
@@ -726,6 +727,8 @@
           },
           "description": "Controlled persistence fixture: write one localStorage entry so native cases can enter a workspace without the undrivable native folder picker."
         },
+        "restart_native_app": {"type": "null"},
+        "switch_native_window": {"enum": ["main", "detached"]},
         "reload_window": {
           "oneOf": [
             {

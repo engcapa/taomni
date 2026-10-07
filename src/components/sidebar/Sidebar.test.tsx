@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
@@ -7,6 +8,7 @@ import { useToolWindowStripeStore } from "../editor/workspace/toolWindowStripeSt
 import { defaultStripeSettings } from "../editor/workspace/toolWindowLayout";
 
 beforeEach(() => {
+  useWorkspaceStore.setState({ section: "sessions" });
   useAppStore.setState({ activeSideTab: "sessions", sidebarCollapsed: false });
   useToolWindowStripeStore.setState({ settings: defaultStripeSettings() });
 });

@@ -14,6 +14,7 @@ import {
 } from "../../lib/detachedSession";
 
 interface DetachedSftpParams {
+  surface?: import("../../types/workspace").SurfaceDescriptor;
   /**
    * Session id used by the detached window for its OWN SFTP attach. We
    * deliberately make this distinct from the parent window's session id

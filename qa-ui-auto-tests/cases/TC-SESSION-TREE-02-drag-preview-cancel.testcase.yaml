@@ -1,10 +1,11 @@
 id: TC-SESSION-TREE-02
 title: Session tree drag count, text selection, Escape, batch and single move
-description: 'Runs real held-pointer gestures in the browser and Windows/Linux packaged WebViews. Inspects the active ghost,
-  its count, destination highlight and empty text selection before release; verifies cancellation and reload persistence.
-  macOS native held gestures are explicitly outside the bridge capability. The target folder is prepared through the editor
-  New folder button: WebKitGTK 2.52 loses the released non-primary W3C button, so a setup context click contaminates the subsequent
-  held-pointer input. TC-SESSION-TREE-01 independently verifies real right-click batch Move.'
+description: 'Runs real held-pointer gestures in the browser and Windows/Linux packaged WebViews. Inspects the active
+  ghost, its count, destination highlight and empty text selection before release; verifies cancellation and reload
+  persistence. macOS native held gestures are explicitly outside the bridge capability. The target folder is prepared
+  through the editor New folder button: WebKitGTK 2.52 loses the released non-primary W3C button, so a setup context
+  click contaminates the subsequent held-pointer input. TC-SESSION-TREE-01 independently verifies real right-click
+  batch Move.'
 covers:
 - F6.2
 - F-Sidebar-1
@@ -26,6 +27,7 @@ native_platforms:
 - Windows
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -175,6 +177,7 @@ steps:
     expression: window.getSelection()?.toString().length === 0
     expect_truthy: true
 - reload: null
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
 - click: '[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]'
 - assert_items:
@@ -244,135 +247,146 @@ steps:
     - qa-selection-target
 - screenshot: session-drag-moved.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
-    requirement: A selected row drags the whole two-session selection with a visible count and destination highlight; tree
-      text is never selected and Escape cancels without moving sessions.
+    requirement: A selected row drags the whole two-session selection with a visible count and destination highlight;
+      tree text is never selected and Escape cancels without moving sessions.
     actions:
-    - 42
+    - 2
     - 43
-    - 45
+    - 44
     - 46
     - 47
-    - 50
-    - 53
-    - 54
-    checkpoints:
-    - step: 44
-      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n    selector:\
-        \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
-    - step: 48
-      expectation: '{assert_text_equals: {equals: Move 2 sessions, selector: ''[data-custom-drag-ghost="true"]''}}'
-    - step: 49
-      expectation: "{eval_readonly: {expect_truthy: true, expression: 'window.getSelection()?.toString().length\n      ===\
-        \ 0'}}"
-    - step: 51
-      expectation: '{assert_attribute: {equals: ''true'', name: data-drag-over, selector: ''[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]''}}'
-    - step: 55
-      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
-    - step: 56
-      expectation: "{assert_items: {attribute: data-group-path, equals: ['', '', ''], selector: '[data-testid=\"session-tree-item\"\
-        ][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"\
-        ], [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-c\"]'}}"
-    - step: 57
-      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n    selector:\
-        \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
-    results:
-    - 44
     - 48
-    - 49
     - 51
+    - 54
     - 55
+    checkpoints:
+    - step: 45
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n  \
+        \  selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 49
+      expectation: '{assert_text_equals: {equals: Move 2 sessions, selector: ''[data-custom-drag-ghost="true"]''}}'
+    - step: 50
+      expectation: "{eval_readonly: {expect_truthy: true, expression: 'window.getSelection()?.toString().length\n\
+        \      === 0'}}"
+    - step: 52
+      expectation: '{assert_attribute: {equals: ''true'', name: data-drag-over, selector: ''[data-testid="session-tree-folder"][data-folder-path="qa-selection-target"]''}}'
+    - step: 56
+      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
+    - step: 57
+      expectation: "{assert_items: {attribute: data-group-path, equals: ['', '', ''], selector: '[data-testid=\"\
+        session-tree-item\"][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"session-tree-item\"][data-session-name=\"\
+        qa-selection-b\"], [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-c\"]'}}"
+    - step: 58
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n  \
+        \  selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    results:
+    - 45
+    - 49
+    - 50
+    - 52
     - 56
     - 57
-  - id: R2
-    requirement: Dropping a selected session onto the folder moves exactly the two selected sessions, clears the ghost and
-      highlight, preserves selection and persists both group paths after reload.
-    actions:
     - 58
+  - id: R2
+    requirement: Dropping a selected session onto the folder moves exactly the two selected sessions, clears the
+      ghost and highlight, preserves selection and persists both group paths after reload.
+    actions:
     - 59
     - 60
-    - 62
-    - 68
-    - 70
-    checkpoints:
-    - step: 61
-      expectation: '{assert_text_equals: {equals: Move 2 sessions, selector: ''[data-custom-drag-ghost="true"]''}}'
-    - step: 63
-      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
-    - step: 64
-      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target],\n    selector:\
-        \ '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"session-tree-item\"\
-        ][data-session-name=\"qa-selection-c\"]'}}"
-    - step: 65
-      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-b"]''}}'
-    - step: 66
-      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n    selector:\
-        \ '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
-    - step: 67
-      expectation: "{eval_readonly: {expect_truthy: true, expression: 'window.getSelection()?.toString().length\n      ===\
-        \ 0'}}"
-    - step: 71
-      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target],\n    selector:\
-        \ '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"session-tree-item\"\
-        ][data-session-name=\"qa-selection-c\"]'}}"
-    - step: 72
-      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-b"]''}}'
-    results:
     - 61
     - 63
+    - 69
+    - 72
+    checkpoints:
+    - step: 62
+      expectation: '{assert_text_equals: {equals: Move 2 sessions, selector: ''[data-custom-drag-ghost="true"]''}}'
+    - step: 64
+      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
+    - step: 65
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target],\n\
+        \    selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"\
+        session-tree-item\"][data-session-name=\"qa-selection-c\"]'}}"
+    - step: 66
+      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-b"]''}}'
+    - step: 67
+      expectation: "{assert_items: {attribute: data-session-name, equals: [qa-selection-a, qa-selection-c],\n  \
+        \  selector: '[data-testid=\"session-tree-item\"][data-selected=\"true\"]'}}"
+    - step: 68
+      expectation: "{eval_readonly: {expect_truthy: true, expression: 'window.getSelection()?.toString().length\n\
+        \      === 0'}}"
+    - step: 73
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target],\n\
+        \    selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n      [data-testid=\"\
+        session-tree-item\"][data-session-name=\"qa-selection-c\"]'}}"
+    - step: 74
+      expectation: '{assert_items: {attribute: data-group-path, equals: [''''], selector: ''[data-testid="session-tree-item"][data-session-name="qa-selection-b"]''}}'
+    results:
+    - 62
     - 64
     - 65
     - 66
     - 67
-    - 71
-    - 72
-  - id: R3
-    requirement: Dragging an unselected row selects and moves only that row; releasing over a non-folder performs no move
-      or button activation and clears drag tracking.
-    actions:
+    - 68
     - 73
     - 74
+  - id: R3
+    requirement: Dragging an unselected row selects and moves only that row; releasing over a non-folder performs
+      no move or button activation and clears drag tracking.
+    actions:
     - 75
-    - 78
-    - 80
-    - 81
-    - 82
-    - 83
-    checkpoints:
-    - step: 76
-      expectation: '{assert_text_equals: {equals: qa-selection-b, selector: ''[data-custom-drag-ghost="true"]''}}'
-    - step: 77
-      expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-b], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
-    - step: 79
-      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n     \
-        \ qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n  \
-        \    [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
-        ][data-session-name=\"qa-selection-c\"]'}}"
-    - step: 84
-      expectation: '{assert_not_visible: ''[data-testid="session-editor"]''}'
-    - step: 85
-      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
-    - step: 86
-      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n     \
-        \ qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"],\n  \
-        \    [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
-        ][data-session-name=\"qa-selection-c\"]'}}"
-    results:
     - 76
     - 77
-    - 79
+    - 80
+    - 82
+    - 83
     - 84
     - 85
+    checkpoints:
+    - step: 78
+      expectation: '{assert_text_equals: {equals: qa-selection-b, selector: ''[data-custom-drag-ghost="true"]''}}'
+    - step: 79
+      expectation: '{assert_items: {attribute: data-session-name, equals: [qa-selection-b], selector: ''[data-testid="session-tree-item"][data-selected="true"]''}}'
+    - step: 81
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
+        \      qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"\
+        ],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
+        ][data-session-name=\"qa-selection-c\"]'}}"
+    - step: 86
+      expectation: '{assert_not_visible: ''[data-testid="session-editor"]''}'
+    - step: 87
+      expectation: '{assert_not_visible: ''[data-custom-drag-ghost="true"]''}'
+    - step: 88
+      expectation: "{assert_items: {attribute: data-group-path, equals: [qa-selection-target, qa-selection-target,\n\
+        \      qa-selection-target], selector: '[data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-a\"\
+        ],\n      [data-testid=\"session-tree-item\"][data-session-name=\"qa-selection-b\"], [data-testid=\"session-tree-item\"\
+        ][data-session-name=\"qa-selection-c\"]'}}"
+    results:
+    - 78
+    - 79
+    - 81
     - 86
+    - 87
+    - 88
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 70
+    checkpoints:
+    - step: 88
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 88
   visual:
   - check: Selected rows and the drag count remain legible; drop destination is highlighted.
     method: manual
     reason: Inspect the retained screenshots; functional assertions alone do not establish visual clarity.
   native:
-  - check: Real Windows WebView2/Linux WebKitGTK held pointer drag, text-selection suppression, Escape and persistent batch
-      move.
+  - check: Real Windows WebView2/Linux WebKitGTK held pointer drag, text-selection suppression, Escape and persistent
+      batch move.
     method: automated
-    reason: Native uses the isolated QA app and real IPC/database. Browser uses stubs. macOS uses packaged WebView event input
-      for selection; held-pointer drag is not supported by its stateless bridge.
+    reason: Native uses the isolated QA app and real IPC/database. Browser uses stubs. macOS uses packaged WebView
+      event input for selection; held-pointer drag is not supported by its stateless bridge.

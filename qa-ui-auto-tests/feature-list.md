@@ -11,6 +11,187 @@
 
 ## 1. 应用框架与主界面
 
+### Workspace-first 导航 🟡
+
+<!-- feature
+id: F-Workspace-1
+status: partial
+area: main/workspace
+components:
+- WorkspaceNavigator
+- WorkspaceChrome
+- WorkspaceCanvas
+- WorkspaceDialogs
+- WorkspacePreview
+- WorkspaceContextPane
+files:
+- src/components/workspace/WorkspaceChrome.tsx
+- src/components/workspace/WorkspacePreview.tsx
+- src/components/sidebar/WorkspaceNavigator.tsx
+- src/stores/workspaceStore.ts
+- src-tauri/src/workspace_catalog.rs
+controls:
+- id: side-tab-work
+  selector: '[data-testid="side-tab-work"]'
+  kind: interactive
+- id: side-tab-alerts
+  selector: '[data-testid="side-tab-alerts"]'
+  kind: interactive
+- id: workspace-navigator
+  selector: '[data-testid="workspace-navigator"]'
+  kind: display
+- id: workspace-create
+  selector: '[data-testid="workspace-create"]'
+  kind: interactive
+- id: workspace-hide
+  selector: '[data-testid="workspace-hide"]'
+  kind: interactive
+- id: workspace-search
+  selector: '[data-testid="workspace-search"]'
+  kind: interactive
+- id: workspace-row
+  selector: '[data-testid^="workspace-row-"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="workspace-row-qa-workspace-main"]'
+  - '[data-testid="workspace-row-qa-workspace-remote"]'
+- id: workspace-references
+  selector: '[data-testid="workspace-references"]'
+  kind: display
+- id: workspace-add-session
+  selector: '[data-testid="workspace-add-session"]'
+  kind: interactive
+- id: workspace-header
+  selector: '[data-testid="workspace-header"]'
+  kind: display
+- id: surface-scope
+  selector: '[data-testid="surface-scope"]'
+  kind: display
+- id: workspace-surface-strip
+  selector: '[data-testid="workspace-surface-strip"]'
+  kind: display
+- id: workspace-surface
+  selector: '[data-testid^="workspace-surface-"][role="tab"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="workspace-surface-overview"]'
+  - '[data-testid="workspace-surface-files"]'
+  - '[data-testid="workspace-surface-terminal"]'
+  - '[data-testid="workspace-surface-preview"]'
+  - '[data-testid="workspace-surface-tao"]'
+  - '[data-testid="workspace-surface-changes"]'
+  - '[data-testid="workspace-surface-mail"]'
+- id: workspace-context-toggle
+  selector: '[data-testid="workspace-context-toggle"]'
+  kind: interactive
+- id: workspace-context-close
+  selector: '[data-testid="workspace-context-close"]'
+  kind: interactive
+  optional: true
+- id: workspace-preview-load
+  selector: '[data-testid="workspace-preview-load"]'
+  kind: interactive
+  optional: true
+- id: workspace-home
+  selector: '[data-testid="workspace-home"]'
+  kind: interactive
+- id: global-search
+  selector: '[data-testid="global-search"]'
+  kind: interactive
+- id: global-new
+  selector: '[data-testid="global-new"]'
+  kind: interactive
+- id: command-center
+  selector: '[data-testid="command-center"]'
+  kind: display
+  optional: true
+- id: command-center-search
+  selector: '[data-testid="command-center-search"]'
+  kind: interactive
+  optional: true
+- id: session-tool-picker
+  selector: '[data-testid="session-tool-picker"]'
+  kind: display
+  optional: true
+- id: workspace-tool-picker
+  selector: '[data-testid="workspace-tool-picker"]'
+  kind: display
+  optional: true
+- id: workspace-canvas
+  selector: '[data-testid="workspace-canvas"]'
+  kind: display
+- id: workspace-create-dialog
+  selector: '[data-testid="workspace-create-dialog"]'
+  kind: display
+- id: workspace-create-submit
+  selector: '[data-testid="workspace-create-submit"]'
+  kind: interactive
+- id: workspace-name-input
+  selector: '[data-testid="workspace-name-input"]'
+  kind: interactive
+- id: workspace-rename
+  selector: '[data-testid="workspace-rename"]'
+  kind: interactive
+- id: workspace-rename-input
+  selector: '[data-testid="workspace-rename-input"]'
+  kind: interactive
+- id: workspace-context-pane
+  selector: '[data-testid="workspace-context-pane"]'
+  kind: display
+- id: workspace-preview
+  selector: '[data-testid="workspace-preview"]'
+  kind: display
+- id: workspace-preview-path
+  selector: '[data-testid="workspace-preview-path"]'
+  kind: interactive
+- id: workspace-preview-content
+  selector: '[data-testid="workspace-preview-content"]'
+  kind: display
+- id: workspace-empty-create
+  selector: '[data-testid="workspace-empty-create"]'
+  kind: interactive
+- id: workspace-delete
+  selector: '[data-testid="workspace-delete"]'
+  kind: interactive
+- id: workspace-delete-confirm
+  selector: '[data-testid="workspace-delete-confirm"]'
+  kind: interactive
+- id: workspace-add-folder
+  selector: '[data-testid="workspace-add-folder"]'
+  kind: interactive
+- id: session-kind-filters
+  selector: '[data-testid="session-kind-filters"]'
+  kind: interactive
+- id: sidebar-tool-network-tools
+  selector: '[data-testid="sidebar-tool-network-tools"]'
+  kind: interactive
+- id: sidebar-tool-preview
+  selector: '[data-testid="sidebar-tool-preview"]'
+  kind: interactive
+- id: sidebar-tool-screenshot
+  selector: '[data-testid="sidebar-tool-screenshot"]'
+  kind: interactive
+- id: session-recents
+  selector: '[data-testid="session-recents"]'
+  kind: interactive
+- id: chat-scope-binding
+  selector: '[data-testid="chat-scope-binding"]'
+  kind: display
+- id: sidebar-tool-session-terminal
+  selector: '[data-testid="sidebar-tool-session-terminal"]'
+  kind: interactive
+- id: sidebar-tool-session-sftp
+  selector: '[data-testid="sidebar-tool-session-sftp"]'
+  kind: interactive
+- id: sidebar-tool-session-mail
+  selector: '[data-testid="sidebar-tool-session-mail"]'
+  kind: interactive
+-->
+
+- Work 默认导航、独立 Session 目录、分 scope 工具入口与画布内 Surface strip 已接入主界面，沿用原 TabBar 和常驻 runtime host。
+- Workspace UUID、membership、导航状态由 SQLite 持久化；Tao 线程支持独立 Workspace binding。
+- 正在补齐并执行 `TC-WS-*`、`TC-WS-NATIVE-*` 与受影响回归；此处部分完成标记不代表跨平台验收通过。
+
 ### 1.1 工程基座 ✅
 - Tauri 2 + React 19 + TypeScript + Vite 桌面工程已搭建
 - Rust 后端模块拆分：`terminal / session / filebrowser / tunnel / appearance / config / state`
@@ -11025,3 +11206,245 @@ controls:
 > - Ribbon `Tools`（除 Tunneling 之外的网络工具）
 > - Ribbon `Packages`、`Macros`
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
+
+### Workspace navigation prototype (separate from product verification)
+
+<!-- feature
+id: F-WorkspacePrototype-1
+status: partial
+area: prototype/workspace
+components: []
+files:
+- docs-feature/ui-layout-refactor-prototype.html
+controls:
+- id: prototype-1
+  selector: '#app'
+  kind: display
+- id: prototype-2
+  selector: '#homeBtn'
+  kind: interactive
+- id: prototype-3
+  selector: '#commandBtn'
+  kind: interactive
+- id: prototype-4
+  selector: '#newBtn'
+  kind: interactive
+- id: prototype-5
+  selector: '#themeBtn'
+  kind: interactive
+- id: prototype-6
+  selector: '#moreBtn'
+  kind: interactive
+- id: prototype-7
+  selector: '#workspaceShell'
+  kind: display
+- id: prototype-8
+  selector: '[data-view="workspaces"]'
+  kind: interactive
+- id: prototype-9
+  selector: '[data-view="sessions"]'
+  kind: interactive
+- id: prototype-10
+  selector: '[data-view="tools"]'
+  kind: interactive
+- id: prototype-11
+  selector: '[data-view="notifications"]'
+  kind: interactive
+- id: prototype-12
+  selector: '[data-view="settings"]'
+  kind: interactive
+- id: prototype-13
+  selector: '#collapseBtn'
+  kind: interactive
+- id: prototype-14
+  selector: '#sessionSearch'
+  kind: interactive
+- id: prototype-15
+  selector: '#statusFilters'
+  kind: display
+- id: prototype-16
+  selector: '[data-filter="all"]'
+  kind: interactive
+- id: prototype-17
+  selector: '[data-filter="running"]'
+  kind: interactive
+- id: prototype-18
+  selector: '[data-filter="attention"]'
+  kind: interactive
+- id: prototype-19
+  selector: '[data-filter="done"]'
+  kind: interactive
+- id: prototype-20
+  selector: '#sessionKindFilters'
+  kind: display
+- id: prototype-21
+  selector: '[data-kind-filter="all"]'
+  kind: interactive
+- id: prototype-22
+  selector: '[data-kind-filter="terminal"]'
+  kind: interactive
+- id: prototype-23
+  selector: '[data-kind-filter="ssh"]'
+  kind: interactive
+- id: prototype-24
+  selector: '[data-kind-filter="mail"]'
+  kind: interactive
+- id: prototype-25
+  selector: '#sessionList'
+  kind: display
+- id: prototype-26
+  selector: '#toolsList'
+  kind: display
+- id: prototype-27
+  selector: '[data-global-tool="servers"]'
+  kind: interactive
+- id: prototype-28
+  selector: '[data-global-tool="network"]'
+  kind: interactive
+- id: prototype-29
+  selector: '[data-global-tool="capture"]'
+  kind: interactive
+- id: prototype-30
+  selector: '[data-global-tool="mfa"]'
+  kind: interactive
+- id: prototype-31
+  selector: '[data-global-tool="lan"]'
+  kind: interactive
+- id: prototype-32
+  selector: '[data-global-tool="git"]'
+  kind: interactive
+- id: prototype-33
+  selector: '[data-global-tool="sftp"]'
+  kind: interactive
+- id: prototype-34
+  selector: '[data-global-tool="mail"]'
+  kind: interactive
+- id: prototype-35
+  selector: '#settingsBtn'
+  kind: interactive
+- id: prototype-36
+  selector: '#helpBtn'
+  kind: interactive
+- id: prototype-37
+  selector: '#canvasTitle'
+  kind: display
+- id: prototype-38
+  selector: '#canvasSubtitle'
+  kind: display
+- id: prototype-39
+  selector: '#contextChip'
+  kind: display
+- id: prototype-40
+  selector: '#sideToggle'
+  kind: interactive
+- id: prototype-41
+  selector: '#detachBtn'
+  kind: interactive
+- id: prototype-42
+  selector: '#closeBtn'
+  kind: interactive
+- id: prototype-43
+  selector: '#surfaceTabs'
+  kind: display
+- id: prototype-44
+  selector: '[data-surface="overview"]'
+  kind: interactive
+- id: prototype-45
+  selector: '[data-surface="files"]'
+  kind: interactive
+- id: prototype-46
+  selector: '[data-surface="preview"]'
+  kind: interactive
+- id: prototype-47
+  selector: '[data-surface="chat"]'
+  kind: interactive
+- id: prototype-48
+  selector: '[data-surface="changes"]'
+  kind: interactive
+- id: prototype-49
+  selector: '[data-surface="mail"]'
+  kind: interactive
+- id: prototype-50
+  selector: '#overviewSurface'
+  kind: display
+- id: prototype-51
+  selector: '#terminalSurface'
+  kind: display
+- id: prototype-52
+  selector: '#filesSurface'
+  kind: display
+- id: prototype-53
+  selector: '#previewSurface'
+  kind: display
+- id: prototype-54
+  selector: '#chatSurface'
+  kind: display
+- id: prototype-55
+  selector: '#changesSurface'
+  kind: display
+- id: prototype-56
+  selector: '#mailSurface'
+  kind: display
+- id: prototype-57
+  selector: '#sidePane'
+  kind: display
+- id: prototype-58
+  selector: '#sideTitle'
+  kind: display
+- id: prototype-59
+  selector: '#sideSearchBtn'
+  kind: interactive
+- id: prototype-60
+  selector: '#sideCloseBtn'
+  kind: interactive
+- id: prototype-61
+  selector: '[data-tool="overview"]'
+  kind: interactive
+- id: prototype-62
+  selector: '[data-tool="changes"]'
+  kind: interactive
+- id: prototype-63
+  selector: '[data-tool="tasks"]'
+  kind: interactive
+- id: prototype-64
+  selector: '[data-tool="notes"]'
+  kind: interactive
+- id: prototype-65
+  selector: '#sideBody'
+  kind: display
+- id: prototype-66
+  selector: '#toast'
+  kind: display
+- id: prototype-67
+  selector: '#commandOverlay'
+  kind: display
+- id: prototype-68
+  selector: '#commandClose'
+  kind: interactive
+- id: prototype-69
+  selector: '#commandInput'
+  kind: interactive
+- id: prototype-70
+  selector: '#commandRows'
+  kind: display
+- id: prototype-71
+  selector: '[data-command="new"]'
+  kind: interactive
+- id: prototype-72
+  selector: '[data-command="preview"]'
+  kind: interactive
+- id: prototype-73
+  selector: '[data-command="diff"]'
+  kind: interactive
+- id: prototype-74
+  selector: '[data-command="chat"]'
+  kind: interactive
+- id: prototype-75
+  selector: '[data-command="settings"]'
+  kind: interactive
+- id: prototype-removed-top-tabs
+  selector: .top-tab
+  kind: display
+-->
+
+Prototype-only controls; no native or product coverage is inferred from them.

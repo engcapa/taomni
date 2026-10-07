@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "./workspaceStore";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import {
   listSessions,
@@ -32,6 +33,7 @@ interface SessionState {
   sessions: SessionConfig[];
   groups: SessionGroup[];
   loading: boolean;
+  hydrated: boolean;
   // Anchor selection (last clicked). Kept for single-selection consumers.
   selectedSessionId: string | null;
   // Full multi-selection. Always includes the anchor when non-empty.
@@ -105,6 +107,7 @@ export const useSessionStore: UseBoundStore<StoreApi<SessionState>> = create<Ses
   sessions: [],
   groups: [],
   loading: false,
+  hydrated: false,
   selectedSessionId: null,
   selectedSessionIds: [],
   searchQuery: "",
@@ -120,7 +123,7 @@ export const useSessionStore: UseBoundStore<StoreApi<SessionState>> = create<Ses
           listSessionGroups(),
         ]);
         const { selectedSessionIds, selectedSessionId } = useSessionStore.getState();
-        set({ sessions, groups, loading: false, ...pruneSelection(sessions, selectedSessionIds, selectedSessionId) });
+        set({ sessions, groups, loading: false, hydrated: true, ...pruneSelection(sessions, selectedSessionIds, selectedSessionId) });
       } catch (err) {
         console.error("Failed to load sessions:", err);
         set({ loading: false });
@@ -151,6 +154,10 @@ export const useSessionStore: UseBoundStore<StoreApi<SessionState>> = create<Ses
     for (const id of targets) {
       await deleteSession(id);
     }
+    useWorkspaceStore.setState((state) => ({ workspaces: state.workspaces.map((workspace) => {
+      const memberships = workspace.memberships.filter((member) => !targets.includes(member.sessionId));
+      return memberships.length === workspace.memberships.length ? workspace : { ...workspace, memberships, revision: workspace.revision + targets.filter((id) => workspace.memberships.some((m) => m.sessionId === id)).length };
+    }) }));
     const removed = new Set(targets);
     set((s) => ({
       sessions: s.sessions.filter((x) => !removed.has(x.id)),

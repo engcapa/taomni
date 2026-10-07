@@ -1,78 +1,152 @@
 id: TC-MFA-005
 title: Pasting a screenshot imports an account from the button and from Ctrl/Cmd+V on the tab
-description: >-
-  V-14 (AC-05). Browser stub; the clipboard holds a real PNG written through
-  Chromium's async clipboard (`seed_clipboard_image`). Paste screenshot with a
-  text-only clipboard explains that no image is present; with the RFC 4226
-  QR it opens the review step and imports QA Bank (755 224). Pressing the
-  platform paste shortcut on the MFA tab itself jumps straight to the review
-  step for a second QR (QA Paste, 295 272).
-covers: [F-MFA-1, F-MFA-2]
-tags: [mfa, clipboard, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: V-14 (AC-05). Browser stub; the clipboard holds a real PNG written through Chromium's async clipboard
+  (`seed_clipboard_image`). Paste screenshot with a text-only clipboard explains that no image is present; with
+  the RFC 4226 QR it opens the review step and imports QA Bank (755 224). Pressing the platform paste shortcut on
+  the MFA tab itself jumps straight to the review step for a second QR (QA Paste, 295 272).
+covers:
+- F-MFA-1
+- F-MFA-2
+tags:
+- mfa
+- clipboard
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-005}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-005}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-master-005
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-master-005
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
 - click: '[data-testid="mfa-empty-add-image"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
 - seed_clipboard: plain text without an image
 - click: '[data-testid="mfa-image-paste"]'
-- assert_text: {selector: '[data-testid="mfa-image-status"]', contains: clipboard has no image}
-- seed_clipboard_image: {path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png}
+- assert_text:
+    selector: '[data-testid="mfa-image-status"]'
+    contains: clipboard has no image
+- seed_clipboard_image:
+    path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png
 - click: '[data-testid="mfa-image-paste"]'
-- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 20}
-- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Bank]}
+- wait_for:
+    selector: '[data-testid="mfa-import-preview"]'
+    timeout_sec: 20
+- assert_items:
+    selector: '[data-testid="mfa-import-item"]'
+    attribute: data-issuer
+    equals:
+    - QA Bank
 - click: '[data-testid="mfa-import-confirm"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)', equals: 755 224}
-- seed_clipboard_image: {path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-paste.png}
-- press: {key: Mod+V, selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)'}
-- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 20}
-- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Paste]}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)'
+    equals: 755 224
+- seed_clipboard_image:
+    path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-paste.png
+- press:
+    key: Mod+V
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)'
+- wait_for:
+    selector: '[data-testid="mfa-import-preview"]'
+    timeout_sec: 20
+- assert_items:
+    selector: '[data-testid="mfa-import-item"]'
+    attribute: data-issuer
+    equals:
+    - QA Paste
 - click: '[data-testid="mfa-import-confirm"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Paste"] *)', equals: 295 272}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [QA Bank, QA Paste]}
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Paste"] *)'
+    equals: 295 272
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - QA Bank
+    - QA Paste
 - screenshot: mfa-005-paste-import.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: Paste screenshot reports a clipboard without an image and imports a pasted QR image (AC-05).
-    actions: [11, 13, 14, 16, 17, 20]
+    actions:
+    - 2
+    - 3
+    - 13
+    - 15
+    - 16
+    - 18
+    - 19
+    - 22
     checkpoints:
-    - {step: 12, expectation: image pane open}
-    - {step: 15, expectation: no image on the clipboard}
-    - {step: 18, expectation: review step from the pasted image}
-    - {step: 19, expectation: QA Bank decoded}
-    - {step: 21, expectation: dialog closed}
-    - {step: 22, expectation: QA Bank shows 755 224}
-    results: [22]
+    - step: 14
+      expectation: image pane open
+    - step: 17
+      expectation: no image on the clipboard
+    - step: 20
+      expectation: review step from the pasted image
+    - step: 21
+      expectation: QA Bank decoded
+    - step: 23
+      expectation: dialog closed
+    - step: 24
+      expectation: QA Bank shows 755 224
+    results:
+    - 24
   - id: R2
-    requirement: The platform paste shortcut on the MFA tab opens the review step directly and imports the pasted account (AC-05, AC-17).
-    actions: [23, 24, 27]
+    requirement: The platform paste shortcut on the MFA tab opens the review step directly and imports the pasted
+      account (AC-05, AC-17).
+    actions:
+    - 25
+    - 26
+    - 29
     checkpoints:
-    - {step: 25, expectation: review step opened by the shortcut}
-    - {step: 26, expectation: QA Paste decoded}
-    - {step: 28, expectation: dialog closed}
-    - {step: 29, expectation: QA Paste shows 295 272}
-    - {step: 30, expectation: both accounts listed in order}
-    results: [29, 30]
+    - step: 27
+      expectation: review step opened by the shortcut
+    - step: 28
+      expectation: QA Paste decoded
+    - step: 30
+      expectation: dialog closed
+    - step: 31
+      expectation: QA Paste shows 295 272
+    - step: 32
+      expectation: both accounts listed in order
+    results:
+    - 31
+    - 32
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 32
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 32
   visual:
   - check: Status text and review step are legible.
     method: manual
     reason: Screenshot needs human review.
   native:
-  - check: The desktop OS clipboard image path (arboard) is proven by TC-MFA-105 on Linux/X11; Windows and macOS remain unverified.
+  - check: The desktop OS clipboard image path (arboard) is proven by TC-MFA-105 on Linux/X11; Windows and macOS
+      remain unverified.
     method: external
     reason: Chromium's clipboard is not the OS clipboard read by the desktop app.

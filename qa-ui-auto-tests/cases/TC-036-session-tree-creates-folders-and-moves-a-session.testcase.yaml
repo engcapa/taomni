@@ -14,6 +14,7 @@ fixtures:
 - ssh_required
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -60,49 +61,59 @@ steps:
     expect_truthy: true
 - screenshot: 036-session-tree-folders.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: 创建文件夹后经右键移动会话，保存的 group_path 精确指向新建文件夹。
     actions:
     - 1
     - 2
-    - 4
+    - 3
     - 5
     - 6
     - 7
     - 8
-    - 10
+    - 9
     - 11
-    - 13
-    - 15
-    - 17
+    - 12
+    - 14
+    - 16
     - 18
-    - 20
-    - 22
-    - 24
+    - 19
+    - 21
+    - 23
+    - 25
     checkpoints:
-    - step: 3
+    - step: 4
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 9
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 12
+    - step: 13
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-folder-target\"]"}'
-    - step: 14
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 16
+    - step: 17
       expectation: '{"wait_for": "[data-testid=\"folder-name-dialog\"]"}'
-    - step: 21
+    - step: 22
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 23
+    - step: 24
       expectation: '{"wait_for": "[data-testid=\"context-menu\"] >> text=/qa-ui-auto-group/"}'
-    - step: 26
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-group\""}'
     - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-group\""}'
+    - step: 28
       expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0]?.group_path
         === \"User sessions / qa-ui-auto-group\"", "expect_truthy": true}}'
     results:
-    - 26
+    - 27
+    - 28
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    checkpoints:
+    - step: 27
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
     - 27
   visual:
   - check: 文件夹树缩进与会话归属易辨认。

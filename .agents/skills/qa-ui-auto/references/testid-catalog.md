@@ -1450,6 +1450,64 @@
 - `[data-testid="window-max"]` — display — F1.3.window-max
 - `[data-testid="window-close"]` — display — F1.3.window-close
 
+## main/workspace (F-Workspace-1)
+
+- `[data-testid="side-tab-work"]` — interactive — F-Workspace-1.side-tab-work
+- `[data-testid="side-tab-alerts"]` — interactive — F-Workspace-1.side-tab-alerts
+- `[data-testid="workspace-navigator"]` — display — F-Workspace-1.workspace-navigator
+- `[data-testid="workspace-create"]` — interactive — F-Workspace-1.workspace-create
+- `[data-testid="workspace-hide"]` — interactive — F-Workspace-1.workspace-hide
+- `[data-testid="workspace-search"]` — interactive — F-Workspace-1.workspace-search
+- `[data-testid^="workspace-row-"]` — interactive — F-Workspace-1.workspace-row
+  ↳ `[data-testid="workspace-row-qa-workspace-main"]` — alias
+  ↳ `[data-testid="workspace-row-qa-workspace-remote"]` — alias
+- `[data-testid="workspace-references"]` — display — F-Workspace-1.workspace-references
+- `[data-testid="workspace-add-session"]` — interactive — F-Workspace-1.workspace-add-session
+- `[data-testid="workspace-header"]` — display — F-Workspace-1.workspace-header
+- `[data-testid="surface-scope"]` — display — F-Workspace-1.surface-scope
+- `[data-testid="workspace-surface-strip"]` — display — F-Workspace-1.workspace-surface-strip
+- `[data-testid^="workspace-surface-"][role="tab"]` — interactive — F-Workspace-1.workspace-surface
+  ↳ `[data-testid="workspace-surface-overview"]` — alias
+  ↳ `[data-testid="workspace-surface-files"]` — alias
+  ↳ `[data-testid="workspace-surface-terminal"]` — alias
+  ↳ `[data-testid="workspace-surface-preview"]` — alias
+  ↳ `[data-testid="workspace-surface-tao"]` — alias
+  ↳ `[data-testid="workspace-surface-changes"]` — alias
+  ↳ `[data-testid="workspace-surface-mail"]` — alias
+- `[data-testid="workspace-context-toggle"]` — interactive — F-Workspace-1.workspace-context-toggle
+- `[data-testid="workspace-context-close"]` — interactive [optional] — F-Workspace-1.workspace-context-close
+- `[data-testid="workspace-preview-load"]` — interactive [optional] — F-Workspace-1.workspace-preview-load
+- `[data-testid="workspace-home"]` — interactive — F-Workspace-1.workspace-home
+- `[data-testid="global-search"]` — interactive — F-Workspace-1.global-search
+- `[data-testid="global-new"]` — interactive — F-Workspace-1.global-new
+- `[data-testid="command-center"]` — display [optional] — F-Workspace-1.command-center
+- `[data-testid="command-center-search"]` — interactive [optional] — F-Workspace-1.command-center-search
+- `[data-testid="session-tool-picker"]` — display [optional] — F-Workspace-1.session-tool-picker
+- `[data-testid="workspace-tool-picker"]` — display [optional] — F-Workspace-1.workspace-tool-picker
+- `[data-testid="workspace-canvas"]` — display — F-Workspace-1.workspace-canvas
+- `[data-testid="workspace-create-dialog"]` — display — F-Workspace-1.workspace-create-dialog
+- `[data-testid="workspace-create-submit"]` — interactive — F-Workspace-1.workspace-create-submit
+- `[data-testid="workspace-name-input"]` — interactive — F-Workspace-1.workspace-name-input
+- `[data-testid="workspace-rename"]` — interactive — F-Workspace-1.workspace-rename
+- `[data-testid="workspace-rename-input"]` — interactive — F-Workspace-1.workspace-rename-input
+- `[data-testid="workspace-context-pane"]` — display — F-Workspace-1.workspace-context-pane
+- `[data-testid="workspace-preview"]` — display — F-Workspace-1.workspace-preview
+- `[data-testid="workspace-preview-path"]` — interactive — F-Workspace-1.workspace-preview-path
+- `[data-testid="workspace-preview-content"]` — display — F-Workspace-1.workspace-preview-content
+- `[data-testid="workspace-empty-create"]` — interactive — F-Workspace-1.workspace-empty-create
+- `[data-testid="workspace-delete"]` — interactive — F-Workspace-1.workspace-delete
+- `[data-testid="workspace-delete-confirm"]` — interactive — F-Workspace-1.workspace-delete-confirm
+- `[data-testid="workspace-add-folder"]` — interactive — F-Workspace-1.workspace-add-folder
+- `[data-testid="session-kind-filters"]` — interactive — F-Workspace-1.session-kind-filters
+- `[data-testid="sidebar-tool-network-tools"]` — interactive — F-Workspace-1.sidebar-tool-network-tools
+- `[data-testid="sidebar-tool-preview"]` — interactive — F-Workspace-1.sidebar-tool-preview
+- `[data-testid="sidebar-tool-screenshot"]` — interactive — F-Workspace-1.sidebar-tool-screenshot
+- `[data-testid="session-recents"]` — interactive — F-Workspace-1.session-recents
+- `[data-testid="chat-scope-binding"]` — display — F-Workspace-1.chat-scope-binding
+- `[data-testid="sidebar-tool-session-terminal"]` — interactive — F-Workspace-1.sidebar-tool-session-terminal
+- `[data-testid="sidebar-tool-session-sftp"]` — interactive — F-Workspace-1.sidebar-tool-session-sftp
+- `[data-testid="sidebar-tool-session-mail"]` — interactive — F-Workspace-1.sidebar-tool-session-mail
+
 ## network/sockscap (F-Sockscap-1)
 
 - `[data-testid="side-tab-tools"]` — interactive — F-Sockscap-1.tools-side-tab
@@ -1534,6 +1592,85 @@
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
 - `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
 - `[data-testid="tao-ribbon-badge"]` — display [optional] — F-TAO-1.tao-ribbon-badge
+
+## prototype/workspace (F-WorkspacePrototype-1)
+
+- `#app` — display — F-WorkspacePrototype-1.prototype-1
+- `#homeBtn` — interactive — F-WorkspacePrototype-1.prototype-2
+- `#commandBtn` — interactive — F-WorkspacePrototype-1.prototype-3
+- `#newBtn` — interactive — F-WorkspacePrototype-1.prototype-4
+- `#themeBtn` — interactive — F-WorkspacePrototype-1.prototype-5
+- `#moreBtn` — interactive — F-WorkspacePrototype-1.prototype-6
+- `#workspaceShell` — display — F-WorkspacePrototype-1.prototype-7
+- `[data-view="workspaces"]` — interactive — F-WorkspacePrototype-1.prototype-8
+- `[data-view="sessions"]` — interactive — F-WorkspacePrototype-1.prototype-9
+- `[data-view="tools"]` — interactive — F-WorkspacePrototype-1.prototype-10
+- `[data-view="notifications"]` — interactive — F-WorkspacePrototype-1.prototype-11
+- `[data-view="settings"]` — interactive — F-WorkspacePrototype-1.prototype-12
+- `#collapseBtn` — interactive — F-WorkspacePrototype-1.prototype-13
+- `#sessionSearch` — interactive — F-WorkspacePrototype-1.prototype-14
+- `#statusFilters` — display — F-WorkspacePrototype-1.prototype-15
+- `[data-filter="all"]` — interactive — F-WorkspacePrototype-1.prototype-16
+- `[data-filter="running"]` — interactive — F-WorkspacePrototype-1.prototype-17
+- `[data-filter="attention"]` — interactive — F-WorkspacePrototype-1.prototype-18
+- `[data-filter="done"]` — interactive — F-WorkspacePrototype-1.prototype-19
+- `#sessionKindFilters` — display — F-WorkspacePrototype-1.prototype-20
+- `[data-kind-filter="all"]` — interactive — F-WorkspacePrototype-1.prototype-21
+- `[data-kind-filter="terminal"]` — interactive — F-WorkspacePrototype-1.prototype-22
+- `[data-kind-filter="ssh"]` — interactive — F-WorkspacePrototype-1.prototype-23
+- `[data-kind-filter="mail"]` — interactive — F-WorkspacePrototype-1.prototype-24
+- `#sessionList` — display — F-WorkspacePrototype-1.prototype-25
+- `#toolsList` — display — F-WorkspacePrototype-1.prototype-26
+- `[data-global-tool="servers"]` — interactive — F-WorkspacePrototype-1.prototype-27
+- `[data-global-tool="network"]` — interactive — F-WorkspacePrototype-1.prototype-28
+- `[data-global-tool="capture"]` — interactive — F-WorkspacePrototype-1.prototype-29
+- `[data-global-tool="mfa"]` — interactive — F-WorkspacePrototype-1.prototype-30
+- `[data-global-tool="lan"]` — interactive — F-WorkspacePrototype-1.prototype-31
+- `[data-global-tool="git"]` — interactive — F-WorkspacePrototype-1.prototype-32
+- `[data-global-tool="sftp"]` — interactive — F-WorkspacePrototype-1.prototype-33
+- `[data-global-tool="mail"]` — interactive — F-WorkspacePrototype-1.prototype-34
+- `#settingsBtn` — interactive — F-WorkspacePrototype-1.prototype-35
+- `#helpBtn` — interactive — F-WorkspacePrototype-1.prototype-36
+- `#canvasTitle` — display — F-WorkspacePrototype-1.prototype-37
+- `#canvasSubtitle` — display — F-WorkspacePrototype-1.prototype-38
+- `#contextChip` — display — F-WorkspacePrototype-1.prototype-39
+- `#sideToggle` — interactive — F-WorkspacePrototype-1.prototype-40
+- `#detachBtn` — interactive — F-WorkspacePrototype-1.prototype-41
+- `#closeBtn` — interactive — F-WorkspacePrototype-1.prototype-42
+- `#surfaceTabs` — display — F-WorkspacePrototype-1.prototype-43
+- `[data-surface="overview"]` — interactive — F-WorkspacePrototype-1.prototype-44
+- `[data-surface="files"]` — interactive — F-WorkspacePrototype-1.prototype-45
+- `[data-surface="preview"]` — interactive — F-WorkspacePrototype-1.prototype-46
+- `[data-surface="chat"]` — interactive — F-WorkspacePrototype-1.prototype-47
+- `[data-surface="changes"]` — interactive — F-WorkspacePrototype-1.prototype-48
+- `[data-surface="mail"]` — interactive — F-WorkspacePrototype-1.prototype-49
+- `#overviewSurface` — display — F-WorkspacePrototype-1.prototype-50
+- `#terminalSurface` — display — F-WorkspacePrototype-1.prototype-51
+- `#filesSurface` — display — F-WorkspacePrototype-1.prototype-52
+- `#previewSurface` — display — F-WorkspacePrototype-1.prototype-53
+- `#chatSurface` — display — F-WorkspacePrototype-1.prototype-54
+- `#changesSurface` — display — F-WorkspacePrototype-1.prototype-55
+- `#mailSurface` — display — F-WorkspacePrototype-1.prototype-56
+- `#sidePane` — display — F-WorkspacePrototype-1.prototype-57
+- `#sideTitle` — display — F-WorkspacePrototype-1.prototype-58
+- `#sideSearchBtn` — interactive — F-WorkspacePrototype-1.prototype-59
+- `#sideCloseBtn` — interactive — F-WorkspacePrototype-1.prototype-60
+- `[data-tool="overview"]` — interactive — F-WorkspacePrototype-1.prototype-61
+- `[data-tool="changes"]` — interactive — F-WorkspacePrototype-1.prototype-62
+- `[data-tool="tasks"]` — interactive — F-WorkspacePrototype-1.prototype-63
+- `[data-tool="notes"]` — interactive — F-WorkspacePrototype-1.prototype-64
+- `#sideBody` — display — F-WorkspacePrototype-1.prototype-65
+- `#toast` — display — F-WorkspacePrototype-1.prototype-66
+- `#commandOverlay` — display — F-WorkspacePrototype-1.prototype-67
+- `#commandClose` — interactive — F-WorkspacePrototype-1.prototype-68
+- `#commandInput` — interactive — F-WorkspacePrototype-1.prototype-69
+- `#commandRows` — display — F-WorkspacePrototype-1.prototype-70
+- `[data-command="new"]` — interactive — F-WorkspacePrototype-1.prototype-71
+- `[data-command="preview"]` — interactive — F-WorkspacePrototype-1.prototype-72
+- `[data-command="diff"]` — interactive — F-WorkspacePrototype-1.prototype-73
+- `[data-command="chat"]` — interactive — F-WorkspacePrototype-1.prototype-74
+- `[data-command="settings"]` — interactive — F-WorkspacePrototype-1.prototype-75
+- `.top-tab` — display — F-WorkspacePrototype-1.prototype-removed-top-tabs
 
 ## rdp (F9.7)
 

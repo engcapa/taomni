@@ -1,3 +1,5 @@
+import { useWorkspaceStore } from "./workspaceStore";
+import { tabToSurfaceDescriptor } from "../lib/workspaceScope";
 import { create } from "zustand";
 import type {
   CodeWorkspaceFileRef,
@@ -950,6 +952,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addTab: (tab) =>
     set((s) => {
+      tab = { ...tab, surface: tabToSurfaceDescriptor(tab) };
+      const descriptor = tab.surface!;
+      useWorkspaceStore.setState({ canvas: "runtime", ...("workspaceId" in descriptor && descriptor.workspaceId ? { activeWorkspaceId: descriptor.workspaceId } : {}) });
       const nextTabs = [...s.tabs, tab];
       const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
@@ -1021,6 +1026,8 @@ export const useAppStore = create<AppState>((set, get) => ({
               }
             : source.codeWorkspace,
       };
+      copy.surface = { ...tabToSurfaceDescriptor(source), surfaceId: copy.id };
+      useWorkspaceStore.setState({ canvas: "runtime" });
       const next = s.tabs.slice();
       next.splice(idx + 1, 0, copy);
       const recentResult = upsertRecentWorkspaceForTab(
@@ -1194,6 +1201,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveTab: (id) =>
     set((s) => {
       const tab = s.tabs.find((item) => item.id === id);
+      const descriptor = tab && tabToSurfaceDescriptor(tab);
+      useWorkspaceStore.setState({ canvas: "runtime", ...(descriptor && "workspaceId" in descriptor && descriptor.workspaceId ? { activeWorkspaceId: descriptor.workspaceId } : {}) });
       const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
         s.recentWorkspaceIdByWorkspaceInstance,
@@ -1250,6 +1259,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ sidebarCollapsed: collapsed, ...rememberSidebarForActiveGroup(s, collapsed) }));
   },
   setActiveSideTab: (tab) => {
+    useWorkspaceStore.setState({ section: tab });
     set((s) => ({ activeSideTab: tab, sidebarCollapsed: false, ...rememberSidebarForActiveGroup(s, false) }));
   },
   setMergeToolWindowRail: (value) => {

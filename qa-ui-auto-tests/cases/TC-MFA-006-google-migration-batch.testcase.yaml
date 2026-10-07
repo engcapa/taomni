@@ -1,98 +1,199 @@
 id: TC-MFA-006
 title: A Google Authenticator export QR imports several accounts once
-description: >-
-  V-15 (AC-05, AC-08). Browser stub. A pasted otpauth-migration QR (QA Mail
-  TOTP + QA Git HOTP) is pasted into the image drop zone with the platform
-  shortcut and previews two accounts; unchecking one updates the Import count;
-  both are imported into one group with RFC-correct codes. Importing the same
-  export again marks both as already added, disables Import, and Back plus
-  Escape leave the list unchanged.
-covers: [F-MFA-1, F-MFA-2]
-tags: [mfa, import, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: V-15 (AC-05, AC-08). Browser stub. A pasted otpauth-migration QR (QA Mail TOTP + QA Git HOTP) is pasted
+  into the image drop zone with the platform shortcut and previews two accounts; unchecking one updates the Import
+  count; both are imported into one group with RFC-correct codes. Importing the same export again marks both as
+  already added, disables Import, and Back plus Escape leave the list unchanged.
+covers:
+- F-MFA-1
+- F-MFA-2
+tags:
+- mfa
+- import
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-006}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-006}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-master-006
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-master-006
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
 - click: '[data-testid="mfa-empty-add-image"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
-- seed_clipboard_image: {path: qa-ui-auto-tests/synthetic-fixtures/mfa/migration-two.png}
-- press: {key: Mod+V, selector: '[data-testid="mfa-image-dropzone"]'}
-- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 20}
-- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Mail, QA Git]}
-- assert_text: {selector: '[data-testid="mfa-import-preview"]', contains: 2 account(s) found}
-- assert_count: {selector: '[data-testid="mfa-import-issuer"]', equal: 0}
+- seed_clipboard_image:
+    path: qa-ui-auto-tests/synthetic-fixtures/mfa/migration-two.png
+- press:
+    key: Mod+V
+    selector: '[data-testid="mfa-image-dropzone"]'
+- wait_for:
+    selector: '[data-testid="mfa-import-preview"]'
+    timeout_sec: 20
+- assert_items:
+    selector: '[data-testid="mfa-import-item"]'
+    attribute: data-issuer
+    equals:
+    - QA Mail
+    - QA Git
+- assert_text:
+    selector: '[data-testid="mfa-import-preview"]'
+    contains: 2 account(s) found
+- assert_count:
+    selector: '[data-testid="mfa-import-issuer"]'
+    equal: 0
 - click: '[data-testid="mfa-import-item-check"]:is([data-issuer="QA Git"] *)'
-- assert_text_equals: {selector: '[data-testid="mfa-import-confirm"]', equals: Import 1}
+- assert_text_equals:
+    selector: '[data-testid="mfa-import-confirm"]'
+    equals: Import 1
 - click: '[data-testid="mfa-import-item-check"]:is([data-issuer="QA Git"] *)'
-- assert_text_equals: {selector: '[data-testid="mfa-import-confirm"]', equals: Import 2}
-- fill: {selector: '[data-testid="mfa-import-group"]', value: Migrated}
+- assert_text_equals:
+    selector: '[data-testid="mfa-import-confirm"]'
+    equals: Import 2
+- fill:
+    selector: '[data-testid="mfa-import-group"]'
+    value: Migrated
 - click: '[data-testid="mfa-import-confirm"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [QA Mail, QA Git]}
-- assert_totp_code: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Mail"] *)', secret: OFQS23LJM5ZGC5DJN5XC23LBNFWC2MBR}
-- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Git"] *)', equals: 691 157}
-- assert_items: {selector: '[data-testid="mfa-account-group"]', equals: [Migrated, Migrated]}
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - QA Mail
+    - QA Git
+- assert_totp_code:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Mail"] *)'
+    secret: OFQS23LJM5ZGC5DJN5XC23LBNFWC2MBR
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Git"] *)'
+    equals: 691 157
+- assert_items:
+    selector: '[data-testid="mfa-account-group"]'
+    equals:
+    - Migrated
+    - Migrated
 - click: '[data-testid="mfa-add"]'
 - click: '[data-testid="mfa-add-mode-image"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
-- seed_clipboard_image: {path: qa-ui-auto-tests/synthetic-fixtures/mfa/migration-two.png}
+- seed_clipboard_image:
+    path: qa-ui-auto-tests/synthetic-fixtures/mfa/migration-two.png
 - click: '[data-testid="mfa-image-paste"]'
-- wait_for: {selector: '[data-testid="mfa-import-all-duplicates"]', timeout_sec: 20}
-- assert_count: {selector: '[data-testid="mfa-import-duplicate"]', equal: 2}
+- wait_for:
+    selector: '[data-testid="mfa-import-all-duplicates"]'
+    timeout_sec: 20
+- assert_count:
+    selector: '[data-testid="mfa-import-duplicate"]'
+    equal: 2
 - assert_disabled: '[data-testid="mfa-import-confirm"]'
 - click: '[data-testid="mfa-import-back"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
 - press: Escape
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 2}
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 2
 - screenshot: mfa-006-migration-import.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
-    requirement: A migration QR pasted into the drop zone previews every account it carries, and selection changes the Import count (AC-05, AC-08).
-    actions: [11, 13, 14, 19, 21]
+    requirement: A migration QR pasted into the drop zone previews every account it carries, and selection changes
+      the Import count (AC-05, AC-08).
+    actions:
+    - 2
+    - 3
+    - 13
+    - 15
+    - 16
+    - 21
+    - 23
     checkpoints:
-    - {step: 12, expectation: image pane open}
-    - {step: 15, expectation: review step from the shortcut paste}
-    - {step: 16, expectation: QA Mail and QA Git in export order}
-    - {step: 17, expectation: two accounts found}
-    - {step: 18, expectation: no single-account name fields for a batch}
-    - {step: 20, expectation: unchecking one leaves Import 1}
-    - {step: 22, expectation: re-checking restores Import 2}
-    results: [22]
+    - step: 14
+      expectation: image pane open
+    - step: 17
+      expectation: review step from the shortcut paste
+    - step: 18
+      expectation: QA Mail and QA Git in export order
+    - step: 19
+      expectation: two accounts found
+    - step: 20
+      expectation: no single-account name fields for a batch
+    - step: 22
+      expectation: unchecking one leaves Import 1
+    - step: 24
+      expectation: re-checking restores Import 2
+    results:
+    - 24
   - id: R2
     requirement: Both accounts are imported into the chosen group with correct TOTP and HOTP codes (AC-05, AC-09).
-    actions: [23, 24]
+    actions:
+    - 25
+    - 26
     checkpoints:
-    - {step: 25, expectation: dialog closed}
-    - {step: 26, expectation: two rows in order}
-    - {step: 27, expectation: QA Mail matches RFC 6238}
-    - {step: 28, expectation: QA Git counter-0 code 691 157}
-    - {step: 29, expectation: both in group Migrated}
-    results: [26, 27, 28, 29]
+    - step: 27
+      expectation: dialog closed
+    - step: 28
+      expectation: two rows in order
+    - step: 29
+      expectation: QA Mail matches RFC 6238
+    - step: 30
+      expectation: QA Git counter-0 code 691 157
+    - step: 31
+      expectation: both in group Migrated
+    results:
+    - 28
+    - 29
+    - 30
+    - 31
   - id: R3
     requirement: Re-importing the export flags every account as already added and changes nothing (AC-08).
-    actions: [30, 31, 33, 34, 38, 40]
+    actions:
+    - 32
+    - 33
+    - 35
+    - 36
+    - 40
+    - 42
     checkpoints:
-    - {step: 32, expectation: image pane via the mode tab}
-    - {step: 35, expectation: all-duplicates notice}
-    - {step: 36, expectation: both items flagged}
-    - {step: 37, expectation: Import disabled}
-    - {step: 39, expectation: Back returned to the image pane}
-    - {step: 41, expectation: Escape closed the dialog}
-    - {step: 42, expectation: still two accounts}
-    results: [42]
+    - step: 34
+      expectation: image pane via the mode tab
+    - step: 37
+      expectation: all-duplicates notice
+    - step: 38
+      expectation: both items flagged
+    - step: 39
+      expectation: Import disabled
+    - step: 41
+      expectation: Back returned to the image pane
+    - step: 43
+      expectation: Escape closed the dialog
+    - step: 44
+      expectation: still two accounts
+    results:
+    - 44
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 44
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 44
   visual:
   - check: Batch review list with checkboxes and duplicate badges is legible.
     method: manual

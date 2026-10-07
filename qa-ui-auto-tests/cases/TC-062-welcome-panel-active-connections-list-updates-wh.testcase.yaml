@@ -22,37 +22,55 @@ description: 'The former "Active connections" welcome column was removed from th
   '
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - assert_visible: '[data-testid="welcome-open-local-terminal"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - wait: 1
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="tab-more"]'
+- click: '[data-testid="open-tabs-tab-welcome"]'
 - wait: 1
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
     contains: Start local terminal
 - screenshot: 062-welcome-active-connections.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: Welcome panel stays intact after opening a local terminal：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 4
-    - 7
+    - 2
+    - 3
+    - 6
+    - 9
+    - 10
     checkpoints:
-    - step: 2
+    - step: 4
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 3
-      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
     - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+    - step: 7
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
-    - step: 9
+    - step: 12
       expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
     results:
+    - 12
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
     - 9
+    - 10
+    checkpoints:
+    - step: 12
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 12
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

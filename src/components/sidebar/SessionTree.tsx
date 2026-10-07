@@ -1,3 +1,4 @@
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Terminal as TerminalIcon,
@@ -181,9 +182,16 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
     loadSessions();
   }, [loadSessions]);
 
+  const kindFilter = useWorkspaceStore((s) => s.sessionKindFilter);
   const filteredSessions = useMemo(
-    () => filterSessions(sessions, searchQuery),
-    [sessions, searchQuery],
+    () => filterSessions(sessions, searchQuery).filter((session) => {
+      if (kindFilter === "All") return true;
+      if (kindFilter === "Mail") return session.session_type === "Mail";
+      if (kindFilter === "Remote") return ["SSH", "SFTP", "RDP", "VNC"].includes(session.session_type);
+      if (kindFilter === "Terminal") return ["SSH", "Local", "LocalShell", "Telnet", "Serial", "Command"].includes(session.session_type);
+      return ["MySQL", "PostgreSQL", "Oracle", "SQLServer", "SQLite", "ClickHouse", "Presto", "Redis", "HBase"].includes(session.session_type);
+    }),
+    [sessions, searchQuery, kindFilter],
   );
   const tree = useMemo(
     () => buildSessionTree(filteredSessions, searchQuery ? [] : groups),
@@ -1470,6 +1478,19 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         { label: "", separator: true },
       ] satisfies MenuItem[] : []),
       { label: t("sessionTree.contextConnect"), icon: <Play className="w-3 h-3" />, onClick: () => onConnectSession?.(session), disabled: !onConnectSession },
+      {
+        label: t("workspace.addSession"),
+        testId: "context-menu-add-to-workspace",
+        children: useWorkspaceStore.getState().workspaces.map((workspace) => ({
+          label: workspace.name,
+          testId: `context-menu-add-to-workspace-${workspace.id}`,
+          onClick: () => {
+            void Promise.all(targetIds.map((id) => useWorkspaceStore.getState().addMembership(workspace.id, id)))
+              .catch((error) => setStatusMessage(String(error)));
+          },
+        })),
+        disabled: useWorkspaceStore.getState().workspaces.length === 0,
+      },
       ...(copyCommandItem ? [copyCommandItem] : []),
       { label: t("sessionTree.contextEdit"), icon: <Edit3 className="w-3 h-3" />, onClick: () => onEditSession?.(session), disabled: !onEditSession },
       {
@@ -1494,7 +1515,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           if (hasMultiSelection) {
             setConfirmPrompt({
               title: t("sessionTree.confirmDeleteSelectedTitle"),
-              message: t("sessionTree.confirmDeleteSelected", { count: targetIds.length }),
+              message: t("sessionTree.confirmDeleteSelected", { count: targetIds.length }) + workspaceDeletionImpact(targetIds),
               confirmLabel: t("sessionTree.deleteAction"),
               danger: true,
               onConfirm: () => {
@@ -1505,7 +1526,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
           } else {
             setConfirmPrompt({
               title: t("sessionTree.confirmDeleteTitle"),
-              message: t("sessionTree.confirmDelete", { name: session.name }),
+              message: t("sessionTree.confirmDelete", { name: session.name }) + workspaceDeletionImpact([session.id]),
               confirmLabel: t("sessionTree.deleteAction"),
               danger: true,
               onConfirm: () => {
@@ -1778,6 +1799,9 @@ function SessionItem({
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const [referencesOpen, setReferencesOpen] = useState(false);
+  const references = workspaces.filter((w) => w.memberships.some((m) => m.sessionId === session.id));
   const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
   const icon = sessionIcon(typeLabel);
   return (
@@ -1806,6 +1830,8 @@ function SessionItem({
           </span>
         )}
       </span>
+      {references.length > 0 && <button className="text-[var(--taomni-text-muted)] text-[10px]" aria-expanded={referencesOpen} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setReferencesOpen(!referencesOpen); }}>Used by {references.length} workspaces</button>}
+      {referencesOpen && <span className="flex flex-col">{references.map((workspace) => <button key={workspace.id} onClick={(e) => { e.stopPropagation(); useWorkspaceStore.getState().selectWorkspace(workspace.id); }}>{workspace.name}</button>)}</span>}
       <span
         className="px-1 rounded"
         style={{ fontSize: "calc(var(--taomni-ui-font-size) - 2px)", background: "#e1ecfa", color: "#1e3a5f" }}
@@ -1955,4 +1981,9 @@ function filterSessions(sessions: SessionConfig[], query: string): SessionConfig
     ].join(" ").toLowerCase();
     return haystack.includes(q);
   });
+}
+
+export function workspaceDeletionImpact(ids: string[]): string {
+  const count = useWorkspaceStore.getState().workspaces.filter((workspace) => workspace.memberships.some((member) => ids.includes(member.sessionId))).length;
+  return count ? ` Referenced by ${count} workspaces. Deleting removes these references.` : "";
 }

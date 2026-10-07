@@ -45,6 +45,6 @@ def step_reload_window(ctx: StepContext, args: Any) -> None:
     # after setTimeout(location.reload) can return before navigation starts.
     ctx.page.reload(wait_until="domcontentloaded")  # type: ignore[attr-defined]
     try:
-        ctx.page.wait_for_selector("[data-testid='welcome-panel']", timeout=30_000)  # type: ignore[attr-defined]
+        ctx.page.wait_for_selector("[data-testid='control-bar']", timeout=30_000)  # type: ignore[attr-defined]
     except Exception as e:  # noqa: BLE001
         raise StepError(f"reload_window: page did not come back up ({e})") from e

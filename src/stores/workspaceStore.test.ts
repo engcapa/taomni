@@ -19,6 +19,39 @@ beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [], activeWorkspaceId: null, hydrated: false, error: null, section: "work", canvas: "workspace" });
 });
 describe("workspace catalog", () => {
+  it("does not flash an older surface while rapid selections and pane changes persist", async () => {
+    const store = useWorkspaceStore.getState();
+    const workspace = await store.create("Rapid navigation");
+    store.selectView("files");
+    store.selectView("preview");
+    const observed: string[] = [];
+    const unsubscribe = useWorkspaceStore.subscribe((state) => {
+      observed.push(state.workspaces[0].navigation.activeSurface);
+    });
+    await store.patch(workspace.id, { navigation: { rightPaneOpen: true } });
+    unsubscribe();
+    expect(observed.every((view) => view === "preview")).toBe(true);
+    expect(backend.records[0].navigation).toMatchObject({ activeSurface: "preview", rightPaneOpen: true });
+  });
+  it("serializes concurrent migrations and preserves the user's selection", async () => {
+    const store = useWorkspaceStore.getState();
+    const selected = await store.create("Selected");
+    const recent = { id: "concurrent-root", name: "Legacy", roots: [], looseFiles: [], lastOpenedAt: 1, isGitRepo: false };
+    const [first, second] = await Promise.all([
+      store.create("Legacy", recent, false), store.create("Legacy", recent, false), store.load(),
+    ]);
+    expect(first.id).toBe(second.id);
+    expect(backend.records).toHaveLength(2);
+    expect(useWorkspaceStore.getState().workspaces).toHaveLength(2);
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe(selected.id);
+  });
+  it("keeps a queued reload and deletion ordered with membership writes", async () => {
+    const store = useWorkspaceStore.getState();
+    const workspace = await store.create("Temporary");
+    await Promise.all([store.addMembership(workspace.id, "shared"), store.load(), store.remove(workspace.id)]);
+    expect(backend.records).toEqual([]);
+    expect(useWorkspaceStore.getState().workspaces).toEqual([]);
+  });
   it("shares canonical IDs without copying session config and removes only one reference", async () => {
     const store = useWorkspaceStore.getState();
     const a = await store.create("A"); const b = await store.create("B");

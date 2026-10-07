@@ -1,98 +1,201 @@
 id: TC-MFA-003
 title: Secret-key form validates input, fills from otpauth links and rejects duplicates
-description: >-
-  V-12 (AC-03, AC-04, AC-09). Browser stub. Empty name, missing, non-Base32
-  and short secrets, an unsupported algorithm link and an out-of-range digit
-  count each show their own error. A valid otpauth link fills the form; the
-  created TOTP row matches an independent Python RFC 6238 code and shows a
-  countdown. Adding the same link again is refused and cancel keeps one row.
-covers: [F-MFA-1, F-MFA-2]
-tags: [mfa, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: V-12 (AC-03, AC-04, AC-09). Browser stub. Empty name, missing, non-Base32 and short secrets, an unsupported
+  algorithm link and an out-of-range digit count each show their own error. A valid otpauth link fills the form;
+  the created TOTP row matches an independent Python RFC 6238 code and shows a countdown. Adding the same link again
+  is refused and cancel keeps one row.
+covers:
+- F-MFA-1
+- F-MFA-2
+tags:
+- mfa
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-003}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-003}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-master-003
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-master-003
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
 - click: '[data-testid="mfa-add"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
 - click: '[data-testid="mfa-add-submit"]'
-- assert_text: {selector: '[data-testid="mfa-add-error"]', contains: Enter an issuer or an account name}
-- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA TOTP}
+- assert_text:
+    selector: '[data-testid="mfa-add-error"]'
+    contains: Enter an issuer or an account name
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA TOTP
 - click: '[data-testid="mfa-add-submit"]'
-- assert_text: {selector: '[data-testid="mfa-add-error"]', contains: Enter the secret key}
-- fill: {selector: '[data-testid="mfa-add-secret"]', value: JBSWY3DPEHPK3PX1}
+- assert_text:
+    selector: '[data-testid="mfa-add-error"]'
+    contains: Enter the secret key
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: JBSWY3DPEHPK3PX1
 - click: '[data-testid="mfa-add-submit"]'
-- assert_text: {selector: '[data-testid="mfa-add-error"]', contains: Base32}
-- fill: {selector: '[data-testid="mfa-add-secret"]', value: JBSWY3DP}
+- assert_text:
+    selector: '[data-testid="mfa-add-error"]'
+    contains: Base32
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: JBSWY3DP
 - click: '[data-testid="mfa-add-submit"]'
-- assert_text: {selector: '[data-testid="mfa-add-error"]', contains: too short}
-- fill: {selector: '[data-testid="mfa-add-uri"]', value: 'otpauth://totp/Bad?secret=JBSWY3DPEHPK3PXP&algorithm=MD5'}
-- assert_text: {selector: '[data-testid="mfa-add-error"]', contains: unsupported algorithm}
-- fill: {selector: '[data-testid="mfa-add-uri"]', value: 'otpauth://totp/QA%20TOTP:totp%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=QA%20TOTP&digits=9'}
+- assert_text:
+    selector: '[data-testid="mfa-add-error"]'
+    contains: too short
+- fill:
+    selector: '[data-testid="mfa-add-uri"]'
+    value: otpauth://totp/Bad?secret=JBSWY3DPEHPK3PXP&algorithm=MD5
+- assert_text:
+    selector: '[data-testid="mfa-add-error"]'
+    contains: unsupported algorithm
+- fill:
+    selector: '[data-testid="mfa-add-uri"]'
+    value: otpauth://totp/QA%20TOTP:totp%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=QA%20TOTP&digits=9
 - wait_for: '[data-testid="mfa-add-advanced-panel"]'
 - click: '[data-testid="mfa-add-submit"]'
-- assert_text: {selector: '[data-testid="mfa-add-error"]', contains: 'Digits must be 6, 7 or 8'}
-- fill: {selector: '[data-testid="mfa-add-uri"]', value: 'otpauth://totp/QA%20TOTP:totp%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=QA%20TOTP&algorithm=SHA1&digits=6&period=30'}
-- assert_text: {selector: '[data-testid="mfa-add-notice"]', contains: Filled in from the otpauth link}
-- assert_attribute: {selector: '[data-testid="mfa-add-account"]', name: value, equals: totp@example.com}
-- assert_attribute: {selector: '[data-testid="mfa-add-secret"]', name: value, equals: JBSWY3DPEHPK3PXP}
+- assert_text:
+    selector: '[data-testid="mfa-add-error"]'
+    contains: Digits must be 6, 7 or 8
+- fill:
+    selector: '[data-testid="mfa-add-uri"]'
+    value: otpauth://totp/QA%20TOTP:totp%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=QA%20TOTP&algorithm=SHA1&digits=6&period=30
+- assert_text:
+    selector: '[data-testid="mfa-add-notice"]'
+    contains: Filled in from the otpauth link
+- assert_attribute:
+    selector: '[data-testid="mfa-add-account"]'
+    name: value
+    equals: totp@example.com
+- assert_attribute:
+    selector: '[data-testid="mfa-add-secret"]'
+    name: value
+    equals: JBSWY3DPEHPK3PXP
 - click: '[data-testid="mfa-add-submit"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_totp_code: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA TOTP"] *)', secret: JBSWY3DPEHPK3PXP}
-- assert_attribute: {selector: '[data-testid="mfa-account-countdown"]:is([data-issuer="QA TOTP"] *)', name: data-remaining, matches: '[1-9]|[12][0-9]|30'}
+- assert_totp_code:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA TOTP"] *)'
+    secret: JBSWY3DPEHPK3PXP
+- assert_attribute:
+    selector: '[data-testid="mfa-account-countdown"]:is([data-issuer="QA TOTP"] *)'
+    name: data-remaining
+    matches: '[1-9]|[12][0-9]|30'
 - click: '[data-testid="mfa-add"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
-- fill: {selector: '[data-testid="mfa-add-uri"]', value: 'otpauth://totp/QA%20TOTP:totp%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=QA%20TOTP&algorithm=SHA1&digits=6&period=30'}
+- fill:
+    selector: '[data-testid="mfa-add-uri"]'
+    value: otpauth://totp/QA%20TOTP:totp%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=QA%20TOTP&algorithm=SHA1&digits=6&period=30
 - click: '[data-testid="mfa-add-submit"]'
-- assert_text: {selector: '[data-testid="mfa-add-error"]', contains: already exists}
+- assert_text:
+    selector: '[data-testid="mfa-add-error"]'
+    contains: already exists
 - click: '[data-testid="mfa-add-cancel"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
+- assert_count:
+    selector: '[data-testid="mfa-account-row"]'
+    equal: 1
 - screenshot: mfa-003-totp-row.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: Invalid manual input is refused with a specific message for each fault (AC-03, AC-04).
-    actions: [13, 15, 16, 18, 19, 21, 22, 24, 26, 28]
+    actions:
+    - 2
+    - 3
+    - 15
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 28
+    - 30
     checkpoints:
-    - {step: 14, expectation: name required}
-    - {step: 17, expectation: secret required}
-    - {step: 20, expectation: non-Base32 secret refused}
-    - {step: 23, expectation: short secret refused}
-    - {step: 25, expectation: unsupported algorithm link refused}
-    - {step: 27, expectation: non-default digits expand the advanced options}
-    - {step: 29, expectation: nine digits refused}
-    results: [29]
+    - step: 16
+      expectation: name required
+    - step: 19
+      expectation: secret required
+    - step: 22
+      expectation: non-Base32 secret refused
+    - step: 25
+      expectation: short secret refused
+    - step: 27
+      expectation: unsupported algorithm link refused
+    - step: 29
+      expectation: non-default digits expand the advanced options
+    - step: 31
+      expectation: nine digits refused
+    results:
+    - 31
   - id: R2
-    requirement: A valid otpauth link fills the form and the created TOTP row matches RFC 6238 with a running countdown (AC-04, AC-09).
-    actions: [30, 34]
+    requirement: A valid otpauth link fills the form and the created TOTP row matches RFC 6238 with a running countdown
+      (AC-04, AC-09).
+    actions:
+    - 32
+    - 36
     checkpoints:
-    - {step: 31, expectation: notice that the link filled the form}
-    - {step: 32, expectation: account taken from the label}
-    - {step: 33, expectation: secret taken from the link}
-    - {step: 35, expectation: dialog closed}
-    - {step: 36, expectation: displayed code equals the Python RFC 6238 code}
-    - {step: 37, expectation: countdown between 1 and 30 seconds}
-    results: [36, 37]
+    - step: 33
+      expectation: notice that the link filled the form
+    - step: 34
+      expectation: account taken from the label
+    - step: 35
+      expectation: secret taken from the link
+    - step: 37
+      expectation: dialog closed
+    - step: 38
+      expectation: displayed code equals the Python RFC 6238 code
+    - step: 39
+      expectation: countdown between 1 and 30 seconds
+    results:
+    - 38
+    - 39
   - id: R3
     requirement: The same secret cannot be added twice; cancelling leaves one account (AC-03).
-    actions: [38, 40, 41, 43]
+    actions:
+    - 40
+    - 42
+    - 43
+    - 45
     checkpoints:
-    - {step: 39, expectation: add dialog reopened}
-    - {step: 42, expectation: duplicate refused}
-    - {step: 44, expectation: dialog closed}
-    - {step: 45, expectation: still exactly one account}
-    results: [45]
+    - step: 41
+      expectation: add dialog reopened
+    - step: 44
+      expectation: duplicate refused
+    - step: 46
+      expectation: dialog closed
+    - step: 47
+      expectation: still exactly one account
+    results:
+    - 47
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 47
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 47
   visual:
   - check: Error and notice lines are readable and the TOTP row countdown is not clipped.
     method: manual

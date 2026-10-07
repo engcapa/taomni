@@ -1,128 +1,348 @@
 id: TC-MFA-010
 title: MFA accounts sort six ways, pin to the top, reorder by menu and drag, and keep the order
-description: >-
-  V-17b (AC-12). Browser stub. Four exported accounts are copied in a known
-  pattern so issuer, account, recently used, most used, recently added and
-  custom orders are all distinct. Reordering is only offered in custom order;
-  a pinned account stays first; Move up, Move down and dragging the handle
-  change the custom order; the sort choice, pin and order survive a reload;
-  unpinning returns the account to its custom position.
-covers: [F-MFA-1]
-tags: [mfa, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: V-17b (AC-12). Browser stub. Four exported accounts are copied in a known pattern so issuer, account,
+  recently used, most used, recently added and custom orders are all distinct. Reordering is only offered in custom
+  order; a pinned account stays first; Move up, Move down and dragging the handle change the custom order; the sort
+  choice, pin and order survive a reload; unpinning returns the account to its custom position.
+covers:
+- F-MFA-1
+tags:
+- mfa
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 150
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-010}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-010}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-master-010
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-master-010
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
 - click: '[data-testid="mfa-empty-add-image"]'
 - wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
-- upload_file: {selector: '[data-testid="mfa-image-file"]', path: qa-ui-auto-tests/synthetic-fixtures/mfa/migration-four.png}
-- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 20}
+- upload_file:
+    selector: '[data-testid="mfa-image-file"]'
+    path: qa-ui-auto-tests/synthetic-fixtures/mfa/migration-four.png
+- wait_for:
+    selector: '[data-testid="mfa-import-preview"]'
+    timeout_sec: 20
 - click: '[data-testid="mfa-import-confirm"]'
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Zeta Cloud, Alpha Mail, Mid Bank, Beta Git]}
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Zeta Cloud
+    - Alpha Mail
+    - Mid Bank
+    - Beta Git
 - click: '[data-testid="mfa-account-code"]:is([data-issuer="Alpha Mail"] *)'
 - click: '[data-testid="mfa-account-code"]:is([data-issuer="Alpha Mail"] *)'
 - click: '[data-testid="mfa-account-code"]:is([data-issuer="Mid Bank"] *)'
 - click: '[data-testid="mfa-account-code"]:is([data-issuer="Zeta Cloud"] *)'
-- select_option: {selector: '[data-testid="mfa-sort-mode"]', value: issuer}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Alpha Mail, Beta Git, Mid Bank, Zeta Cloud]}
-- select_option: {selector: '[data-testid="mfa-sort-mode"]', value: account}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Zeta Cloud, Beta Git, Mid Bank, Alpha Mail]}
-- select_option: {selector: '[data-testid="mfa-sort-mode"]', value: recent}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Zeta Cloud, Mid Bank, Alpha Mail, Beta Git]}
-- select_option: {selector: '[data-testid="mfa-sort-mode"]', value: frequent}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Alpha Mail, Zeta Cloud, Mid Bank, Beta Git]}
-- select_option: {selector: '[data-testid="mfa-sort-mode"]', value: added}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Beta Git, Mid Bank, Alpha Mail, Zeta Cloud]}
-- assert_count: {selector: '[data-testid="mfa-account-drag"]', equal: 0}
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: issuer
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Alpha Mail
+    - Beta Git
+    - Mid Bank
+    - Zeta Cloud
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: account
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Zeta Cloud
+    - Beta Git
+    - Mid Bank
+    - Alpha Mail
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: recent
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Zeta Cloud
+    - Mid Bank
+    - Alpha Mail
+    - Beta Git
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: frequent
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Alpha Mail
+    - Zeta Cloud
+    - Mid Bank
+    - Beta Git
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: added
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Beta Git
+    - Mid Bank
+    - Alpha Mail
+    - Zeta Cloud
+- assert_count:
+    selector: '[data-testid="mfa-account-drag"]'
+    equal: 0
 - click: '[data-testid="mfa-account-menu"]:is([data-issuer="Mid Bank"] *)'
 - assert_disabled: '[data-testid="mfa-menu-move-up"]'
 - press: Escape
 - assert_not_visible: '[data-testid="context-menu"]'
-- select_option: {selector: '[data-testid="mfa-sort-mode"]', value: custom}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Zeta Cloud, Alpha Mail, Mid Bank, Beta Git]}
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: custom
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Zeta Cloud
+    - Alpha Mail
+    - Mid Bank
+    - Beta Git
 - click: '[data-testid="mfa-account-pin"]:is([data-issuer="Mid Bank"] *)'
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Zeta Cloud, Alpha Mail, Beta Git]}
-- assert_attribute: {selector: '[data-testid="mfa-account-row"][data-issuer="Mid Bank"]', name: data-pinned, equals: 'true'}
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Mid Bank
+    - Zeta Cloud
+    - Alpha Mail
+    - Beta Git
+- assert_attribute:
+    selector: '[data-testid="mfa-account-row"][data-issuer="Mid Bank"]'
+    name: data-pinned
+    equals: 'true'
 - click: '[data-testid="mfa-account-menu"]:is([data-issuer="Beta Git"] *)'
 - click: '[data-testid="mfa-menu-move-up"]'
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Zeta Cloud, Beta Git, Alpha Mail]}
-- drag_to: {from: '[data-testid="mfa-account-drag"]:is([data-issuer="Alpha Mail"] *)', to: '[data-testid="mfa-account-row"][data-issuer="Zeta Cloud"]'}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Alpha Mail, Zeta Cloud, Beta Git]}
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Mid Bank
+    - Zeta Cloud
+    - Beta Git
+    - Alpha Mail
+- drag_to:
+    from: '[data-testid="mfa-account-drag"]:is([data-issuer="Alpha Mail"] *)'
+    to: '[data-testid="mfa-account-row"][data-issuer="Zeta Cloud"]'
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Mid Bank
+    - Alpha Mail
+    - Zeta Cloud
+    - Beta Git
 - click: '[data-testid="mfa-account-menu"]:is([data-issuer="Zeta Cloud"] *)'
 - click: '[data-testid="mfa-menu-move-down"]'
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Alpha Mail, Beta Git, Zeta Cloud]}
-- select_option: {selector: '[data-testid="mfa-sort-mode"]', value: account}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Zeta Cloud, Beta Git, Alpha Mail]}
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Mid Bank
+    - Alpha Mail
+    - Beta Git
+    - Zeta Cloud
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: account
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Mid Bank
+    - Zeta Cloud
+    - Beta Git
+    - Alpha Mail
 - reload: null
 - wait_for: '[data-testid="app-main-menu"]'
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-mfa"]'
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Zeta Cloud, Beta Git, Alpha Mail]}
-- assert_attribute: {selector: '[data-testid="mfa-sort-mode"]', name: value, equals: account}
-- select_option: {selector: '[data-testid="mfa-sort-mode"]', value: custom}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank, Alpha Mail, Beta Git, Zeta Cloud]}
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Mid Bank
+    - Zeta Cloud
+    - Beta Git
+    - Alpha Mail
+- assert_attribute:
+    selector: '[data-testid="mfa-sort-mode"]'
+    name: value
+    equals: account
+- select_option:
+    selector: '[data-testid="mfa-sort-mode"]'
+    value: custom
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Mid Bank
+    - Alpha Mail
+    - Beta Git
+    - Zeta Cloud
 - click: '[data-testid="mfa-account-menu"]:is([data-issuer="Mid Bank"] *)'
 - click: '[data-testid="mfa-menu-pin"]'
-- assert_attribute: {selector: '[data-testid="mfa-account-row"][data-issuer="Mid Bank"]', name: data-pinned, equals: 'false'}
-- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Alpha Mail, Beta Git, Zeta Cloud, Mid Bank]}
+- assert_attribute:
+    selector: '[data-testid="mfa-account-row"][data-issuer="Mid Bank"]'
+    name: data-pinned
+    equals: 'false'
+- assert_items:
+    selector: '[data-testid="mfa-account-row"]'
+    attribute: data-issuer
+    equals:
+    - Alpha Mail
+    - Beta Git
+    - Zeta Cloud
+    - Mid Bank
 - screenshot: mfa-010-sorted.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
-    requirement: Issuer, account, recently used, most used and recently added orders follow names, copy history and creation time (AC-12).
-    actions: [11, 13, 15, 18, 19, 20, 21, 22, 24, 26, 28, 30]
+    requirement: Issuer, account, recently used, most used and recently added orders follow names, copy history
+      and creation time (AC-12).
+    actions:
+    - 2
+    - 3
+    - 13
+    - 15
+    - 17
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 26
+    - 28
+    - 30
+    - 32
     checkpoints:
-    - {step: 17, expectation: export order}
-    - {step: 23, expectation: issuer A–Z}
-    - {step: 25, expectation: account A–Z}
-    - {step: 27, expectation: last copied first}
-    - {step: 29, expectation: most copied first}
-    - {step: 31, expectation: newest first}
-    results: [23, 25, 27, 29, 31]
+    - step: 19
+      expectation: export order
+    - step: 25
+      expectation: issuer A–Z
+    - step: 27
+      expectation: account A–Z
+    - step: 29
+      expectation: last copied first
+    - step: 31
+      expectation: most copied first
+    - step: 33
+      expectation: newest first
+    results:
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
   - id: R2
-    requirement: Reordering is offered only in custom order; pins stay on top; Move up, Move down and drag reorder (AC-12).
-    actions: [33, 35, 37, 39, 42, 43, 45, 47, 48]
+    requirement: Reordering is offered only in custom order; pins stay on top; Move up, Move down and drag reorder
+      (AC-12).
+    actions:
+    - 35
+    - 37
+    - 39
+    - 41
+    - 44
+    - 45
+    - 47
+    - 49
+    - 50
     checkpoints:
-    - {step: 32, expectation: no drag handles outside custom order}
-    - {step: 34, expectation: Move up disabled outside custom order}
-    - {step: 36, expectation: menu closed by Escape}
-    - {step: 38, expectation: custom order restored}
-    - {step: 40, expectation: pinned Mid Bank first}
-    - {step: 41, expectation: row marked pinned}
-    - {step: 44, expectation: Beta Git moved up}
-    - {step: 46, expectation: Alpha Mail dropped onto Zeta Cloud's slot}
-    - {step: 49, expectation: Zeta Cloud moved down}
-    results: [49]
+    - step: 34
+      expectation: no drag handles outside custom order
+    - step: 36
+      expectation: Move up disabled outside custom order
+    - step: 38
+      expectation: menu closed by Escape
+    - step: 40
+      expectation: custom order restored
+    - step: 42
+      expectation: pinned Mid Bank first
+    - step: 43
+      expectation: row marked pinned
+    - step: 46
+      expectation: Beta Git moved up
+    - step: 48
+      expectation: Alpha Mail dropped onto Zeta Cloud's slot
+    - step: 51
+      expectation: Zeta Cloud moved down
+    results:
+    - 51
   - id: R3
-    requirement: Sort choice, pin and custom order persist across a reload, and unpinning restores the custom position (AC-12).
-    actions: [50, 52, 54, 55, 56, 59, 61, 62]
+    requirement: Sort choice, pin and custom order persist across a reload, and unpinning restores the custom position
+      (AC-12).
+    actions:
+    - 52
+    - 54
+    - 56
+    - 57
+    - 58
+    - 61
+    - 63
+    - 64
     checkpoints:
-    - {step: 51, expectation: account order with the pin first}
-    - {step: 53, expectation: app back after reload}
-    - {step: 57, expectation: same order after reload}
-    - {step: 58, expectation: sort choice persisted}
-    - {step: 60, expectation: custom order persisted}
-    - {step: 63, expectation: Mid Bank unpinned}
-    - {step: 64, expectation: Mid Bank back in its custom slot}
-    results: [64]
+    - step: 53
+      expectation: account order with the pin first
+    - step: 55
+      expectation: app back after reload
+    - step: 59
+      expectation: same order after reload
+    - step: 60
+      expectation: sort choice persisted
+    - step: 62
+      expectation: custom order persisted
+    - step: 65
+      expectation: Mid Bank unpinned
+    - step: 66
+      expectation: Mid Bank back in its custom slot
+    results:
+    - 66
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 66
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 66
   visual:
   - check: Pin star, drag handle and context menu render correctly.
     method: manual
     reason: Screenshot needs human review.
   native:
-  - check: Rust sort/pin/reorder persistence in mfa.db is covered by Rust unit tests; packaged WebView drag is not automated.
+  - check: Rust sort/pin/reorder persistence in mfa.db is covered by Rust unit tests; packaged WebView drag is not
+      automated.
     method: external
     reason: Browser stub evidence is not native.

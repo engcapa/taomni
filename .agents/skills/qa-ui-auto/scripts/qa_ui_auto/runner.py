@@ -492,6 +492,14 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                             reset_native_renderer(ctx_ns, session)
                             r["timings"]["renderer_reset_sec"] = time.monotonic() - renderer_reset_started
                         nctx = NativeStepContext(session, case_dir, cfg)
+                        def restart_application():
+                            nonlocal session
+                            session.close()
+                            harness.deadline = deadline
+                            session = harness.create_session(tooling_java_home=java25_home)
+                            nctx.session = session
+                            session.install_console_hook()
+                        nctx.restart_application = restart_application
                         last_step, last_verb, last_args = 0, "<setup>", None
                         for i, step in enumerate(c.steps, start=1):
                             ctx_ns.step_index = i

@@ -1,0 +1,81 @@
+id: TC-WS-004
+title: 'AC-06/07: global tools do not acquire workspace membership'
+description: 'AC-06/07: global tools do not acquire workspace membership'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-navigator"]'
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-network-tools"]'
+- assert_text:
+    selector: '[data-testid="surface-scope"]'
+    contains: global
+- click: '[data-testid="side-tab-work"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- assert_count:
+    selector: '[data-testid="workspace-navigator"] [data-testid^="workspace-reference-"]'
+    equal: 2
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_text:
+    selector: '[data-testid="surface-scope"]'
+    contains: global
+- click: '[data-testid="vault-setup-cancel"]'
+- click: '[data-testid="side-tab-work"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- assert_count:
+    selector: '[data-testid="workspace-navigator"] [data-testid^="workspace-reference-"]'
+    equal: 2
+- screenshot: workspace-global-return.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-06/07: global tools do not acquire workspace membership'
+    actions:
+    - 4
+    - 5
+    - 6
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    checkpoints:
+    - step: 7
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="surface-scope"]'', ''contains'': ''global''}}'
+    - step: 10
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="workspace-navigator"] [data-testid^="workspace-reference-"]'',
+        ''equal'': 2}}'
+    - step: 13
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="surface-scope"]'', ''contains'': ''global''}}'
+    - step: 17
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="workspace-navigator"] [data-testid^="workspace-reference-"]'',
+        ''equal'': 2}}'
+    results:
+    - 7
+    - 10
+    - 13
+    - 17
+  visual:
+  - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
+    method: manual
+    reason: Visual evidence must be inspected after execution; pending is not a pass.
+  native:
+  - check: Native IPC, process, disk and window boundaries require the TC-WS-NATIVE companion cases.
+    method: external
+    reason: This browser case verifies renderer and stub behavior only.

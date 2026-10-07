@@ -1,3 +1,8 @@
+import { rememberDetachedSurface } from "../lib/detachedSession";
+import type { SurfaceDescriptor } from "../types/workspace";
+import { useWorkspaceStore, subscribeWorkspaceChanges } from "../stores/workspaceStore";
+import { WorkspaceChrome, WorkspaceCanvas, WorkspaceContextPane, WorkspaceDialogs, openWorkspaceView } from "../components/workspace/WorkspaceChrome";
+import { tabToSurfaceDescriptor } from "../lib/workspaceScope";
 import {
   Fragment,
   lazy,
@@ -99,7 +104,6 @@ import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/wo
 import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
 import { useToolWindowStripeStore } from "../components/editor/workspace/toolWindowStripeStore";
 import { useMainRailHostStore } from "../stores/mainRailHostStore";
-import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
 import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { normalizeLocalStartCwd, terminalCwdTitlePrefix } from "../lib/terminalCwd";
@@ -202,6 +206,7 @@ type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
 
 /** Connect-queue entry carrying optional Welcome restore context. */
 interface ConnectQueueEntry {
+  workspaceId?: string;
   session: SessionConfig;
   resume?: ResumeQueueContext;
 }
@@ -773,12 +778,45 @@ export function MainLayout() {
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  // ED-PARITY-027 A: every tab group restores its own sidebar state (tool
-  // window tabs start collapsed to the rail).
-  const activeRailGroup = sidebarRailGroup(activeTab?.type);
+  const workspaceNavigation = useWorkspaceStore();
+  const workspaceCanvasVisible = workspaceNavigation.canvas === "workspace";
+  const selectedWorkspace = workspaceNavigation.workspaces.find((w) => w.id === workspaceNavigation.activeWorkspaceId);
   useEffect(() => {
-    useAppStore.getState().applySidebarForActiveTab();
-  }, [activeRailGroup, mergeToolWindowRail]);
+    if (!workspaceCanvasVisible || !selectedWorkspace) return;
+    if (["files", "changes", "mail"].includes(selectedWorkspace.navigation.activeSurface)) openWorkspaceView(selectedWorkspace.navigation.activeSurface);
+  }, [workspaceCanvasVisible, selectedWorkspace?.id, selectedWorkspace?.navigation.activeSurface]);
+  const restoredWorkspaceLayout = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedWorkspace || restoredWorkspaceLayout.current === selectedWorkspace.id) return;
+    restoredWorkspaceLayout.current = selectedWorkspace.id;
+    setSidebarCollapsed(selectedWorkspace.navigation.navigatorCollapsed);
+  }, [selectedWorkspace?.id, setSidebarCollapsed]);
+  useEffect(() => {
+    if (!selectedWorkspace || restoredWorkspaceLayout.current !== selectedWorkspace.id || selectedWorkspace.navigation.navigatorCollapsed === sidebarCollapsed) return;
+    void useWorkspaceStore.getState().patch(selectedWorkspace.id, { navigation: { navigatorCollapsed: sidebarCollapsed } }).catch(() => {});
+  }, [sidebarCollapsed]);
+  const migratingWorkspaceTabs = useRef(new Set<string>());
+  useEffect(() => {
+    if (!workspaceNavigation.hydrated) return;
+    for (const tab of tabs) {
+      if (tab.type !== "code-workspace" && tab.type !== "git") continue;
+      const id = tab.codeWorkspace?.workspaceId ?? tab.git?.sourceWorkspaceId;
+      if (workspaceNavigation.workspaces.some((w) => w.id === id) || migratingWorkspaceTabs.current.has(tab.id)) continue;
+      migratingWorkspaceTabs.current.add(tab.id);
+      const roots = tab.codeWorkspace?.roots ?? (tab.git?.repoRoot ? [{ id: "root", name: tab.title, path: tab.git.repoRoot, kind: "git" as const }] : []);
+      const looseFiles = tab.codeWorkspace?.looseFiles ?? [];
+      const legacyId = recentWorkspaceIdFromParts(roots, looseFiles);
+      void useWorkspaceStore.getState().create(tab.codeWorkspace?.name ?? tab.title, { id: legacyId, name: tab.title, roots, looseFiles, lastOpenedAt: Date.now(), isGitRepo: tab.type === "git" }, false).then((workspace) => {
+        useAppStore.setState((state) => ({ tabs: state.tabs.map((candidate) => candidate.id === tab.id ? {
+          ...candidate,
+          surface: { scope: "workspace", kind: tab.type === "git" ? "changes" : "files", surfaceId: candidate.surface?.surfaceId ?? candidate.id, workspaceId: workspace.id },
+          ...(candidate.codeWorkspace ? { codeWorkspace: { ...candidate.codeWorkspace, workspaceId: workspace.id } } : {}),
+          ...(candidate.git ? { git: { ...candidate.git, sourceWorkspaceId: workspace.id } } : {}),
+        } : candidate) }));
+        if (useAppStore.getState().activeTabId === tab.id) useWorkspaceStore.setState({ activeWorkspaceId: workspace.id, canvas: "runtime" });
+      }).catch((error) => useWorkspaceStore.setState({ error: String(error) })).finally(() => migratingWorkspaceTabs.current.delete(tab.id));
+    }
+  }, [tabs, workspaceNavigation.hydrated, workspaceNavigation.workspaces]);
   const terminalProfilesBySessionId = useMemo(() => {
     const profiles = new Map<string, TerminalProfile | undefined>();
     for (const session of sessions) {
@@ -915,6 +953,18 @@ export function MainLayout() {
   const [vaultUnlockReason, setVaultUnlockReason] = useState<string | null>(null);
   const pendingVaultActionRef = useRef<(() => void) | null>(null);
   const connectQueueRef = useRef<ConnectQueueEntry[]>([]);
+  const pendingWorkspaceScope = useRef<{ sessionId: string; workspaceId?: string } | null>(null);
+  useEffect(() => useAppStore.subscribe((next, previous) => {
+    const pending = pendingWorkspaceScope.current;
+    if (!pending || next.tabs === previous.tabs) return;
+    const added = next.tabs.find((tab) => tab.sessionId === pending.sessionId && !previous.tabs.some((old) => old.id === tab.id));
+    if (!added) return;
+    pendingWorkspaceScope.current = null;
+    const surface = tabToSurfaceDescriptor(added);
+    if (surface.scope !== "session" || !pending.workspaceId) return;
+    useAppStore.setState({ tabs: next.tabs.map((tab) => tab.id === added.id ? { ...tab, surface: { ...surface, workspaceId: pending.workspaceId } } : tab) });
+    useWorkspaceStore.setState({ activeWorkspaceId: pending.workspaceId, canvas: "runtime" });
+  }), []);
   const connectQueueRunningRef = useRef(false);
   /// Pending Welcome local-terminal launches keyed by tab id (design §4.1.5).
   const pendingLocalLaunchesRef = useRef<Map<string, (outcome: LocalLaunchOutcome) => void>>(new Map());
@@ -1202,6 +1252,13 @@ export function MainLayout() {
     // The suffix is stable per parent so re-clicking "Detach" focuses the
     // existing popup instead of opening a second one.
     const detachedSessionId = `${params.sessionId}__detached`;
+    const source = useAppStore.getState().tabs.find((tab) => tab.sftp?.sessionId === params.sessionId || tab.id === params.sessionId);
+    if (source) {
+      const surface = tabToSurfaceDescriptor(source);
+      if (surface.scope === "session") rememberDetachedSurface("sftp", detachedSessionId, {
+        ...surface, kind: "sftp", surfaceId: source.type === "sftp" ? surface.surfaceId : `sftp:${detachedSessionId}`,
+      });
+    }
     writeDetachedHandoff({
       ...params,
       sessionId: detachedSessionId,
@@ -1248,6 +1305,8 @@ export function MainLayout() {
       payload: T,
       title: string,
     ) => {
+      const source = useAppStore.getState().tabs.find((tab) => tab.id === sourceTabId);
+      if (source) rememberDetachedSurface(kind, detachedId, tabToSurfaceDescriptor(source));
       writeGenericHandoff(kind, detachedId, payload);
       if (isTauriRuntime()) {
         void openDetachedWindow({
@@ -1439,7 +1498,32 @@ export function MainLayout() {
     const recentReattach = new Map<string, number>();
     const BURST_WINDOW_MS = 1500;
     const handle = async (msg: ReattachMessage) => {
-      const burstKey = `${msg.kind}.${msg.id}`;
+      const carriedSurface = (msg.payload as { surface?: SurfaceDescriptor })?.surface;
+      let surface = carriedSurface;
+      if (surface && "workspaceId" in surface && surface.workspaceId) {
+        const workspaceId = surface.workspaceId;
+        const workspace = useWorkspaceStore.getState().workspaces.find((w) => w.id === workspaceId);
+        if (!workspace) surface = { scope: "unavailable", kind: surface.kind, surfaceId: surface.surfaceId, workspaceId: surface.workspaceId, reason: "missing-workspace" };
+        else if (surface.scope === "session" && surface.sessionRef.kind === "canonical") {
+          const sessionId = surface.sessionRef.sessionId;
+          if (!workspace.memberships.some((m) => m.sessionId === sessionId)) surface = { ...surface, workspaceId: undefined };
+        }
+      }
+      if (surface?.scope === "session" && surface.sessionRef.kind === "canonical") {
+        const sessionId = surface.sessionRef.sessionId;
+        await useSessionStore.getState().loadSessions();
+        if (!useSessionStore.getState().sessions.some((session) => session.id === sessionId)) surface = { scope: "unavailable", kind: surface.kind, surfaceId: surface.surfaceId, sessionId, reason: "missing-session" };
+      }
+      if (surface?.scope === "unavailable") {
+        const id = `unavailable-${surface.surfaceId}`;
+        if (!useAppStore.getState().tabs.some((tab) => tab.id === id)) addTab({ id, type: "placeholder", surface, title: "Unavailable surface", message: surface.reason, closable: true });
+        else setActiveTab(id);
+        clearReattachHandoff(msg.kind, msg.id);
+        return;
+      }
+      const existingSurface = surface && useAppStore.getState().tabs.find((tab) => tab.type === msg.kind && tab.surface?.surfaceId === surface.surfaceId);
+      if (existingSurface) { setActiveTab(existingSurface.id); clearReattachHandoff(msg.kind, msg.id); return; }
+      const burstKey = `${msg.kind}.${surface?.surfaceId ?? msg.id}`;
       const now = Date.now();
       const last = recentReattach.get(burstKey);
       if (last !== undefined && now - last < BURST_WINDOW_MS) {
@@ -1489,6 +1573,7 @@ export function MainLayout() {
           if (!p?.host) return;
           addTab({
             id: reattachTabId,
+            surface,
             type: "rdp",
             title: p.title || `${p.host}:${p.port}`,
             sessionId: p.sessionId,
@@ -1527,6 +1612,7 @@ export function MainLayout() {
           if (!p?.host) return;
           addTab({
             id: reattachTabId,
+            surface,
             type: "vnc",
             title: p.title || `${p.host}:${p.port}`,
             sessionId: p.sessionId,
@@ -1558,6 +1644,7 @@ export function MainLayout() {
             : undefined;
           addTab({
             id: reattachTabId,
+            surface,
             type: "terminal",
             title: p.title || tr("tabs.localTerminal"),
             terminalTitleMode: p.terminalTitleMode,
@@ -1578,6 +1665,7 @@ export function MainLayout() {
           if (!p?.info) return;
           addTab({
             id: reattachTabId,
+            surface,
             type: "database",
             title: p.title || `${p.info.engine} ${p.info.host}`,
             sessionId: reattachTabId,
@@ -1595,6 +1683,12 @@ export function MainLayout() {
           /* SFTP reattach not wired — SFTP detach is co-existing, not exclusive. */
           break;
       }
+      if (surface) {
+        useAppStore.setState((state) => ({ tabs: state.tabs.map((tab) => tab.id === reattachTabId ? {
+          ...tab, surface,
+          ...(surface.scope === "session" && surface.sessionRef.kind === "canonical" ? { sessionId: surface.sessionRef.sessionId } : {}),
+        } : tab) }));
+      }
       clearReattachHandoff(msg.kind, msg.id);
     };
     const unsub = subscribeReattach((msg) => { void handle(msg); });
@@ -1605,7 +1699,19 @@ export function MainLayout() {
   }, [addTab, setActiveTab, setStatusMessage]);
 
   useEffect(() => {
-    void loadSessions();
+    let disposed = false;
+    let unsubscribe: (() => void) | undefined;
+    void loadSessions().then(async () => {
+      if (disposed) return;
+      if (!useSessionStore.getState().hydrated) {
+        useWorkspaceStore.setState({ error: "Unable to load canonical sessions. Retry before resolving workspace references." });
+        return;
+      }
+      await useWorkspaceStore.getState().load();
+      const stop = await subscribeWorkspaceChanges();
+      if (disposed) stop(); else unsubscribe = stop;
+    });
+    return () => { disposed = true; unsubscribe?.(); };
   }, [loadSessions]);
 
   // Probe the local X server once at startup so the status pill reflects
@@ -1628,9 +1734,10 @@ export function MainLayout() {
     const terminalTabId = activeTab?.type === "terminal" ? activeTabId : null;
     setActiveTerminalTab(terminalTabId);
     setActiveQueryTab(activeTab?.type === "database" ? activeTabId : null);
-    const chatBoundTabId = chatBindingIdForTab(activeTab);
+    const chatBoundTabId = workspaceCanvasVisible && workspaceNavigation.activeWorkspaceId
+      ? `workspace:${workspaceNavigation.activeWorkspaceId}` : chatBindingIdForTab(activeTab);
     void syncTabChatWithActiveTab(chatBoundTabId);
-  }, [activeTab, activeTabId, syncTabChatWithActiveTab]);
+  }, [activeTab, activeTabId, syncTabChatWithActiveTab, workspaceCanvasVisible, workspaceNavigation.activeWorkspaceId]);
 
   useEffect(() => {
     tabsRef.current = tabs;
@@ -1772,6 +1879,7 @@ export function MainLayout() {
     terminalProfile?: TerminalProfile,
     localShell?: LocalShellSelection,
     initialCwd?: string,
+    workspaceId?: string,
   ): Promise<LocalLaunchOutcome> => {
     // UUID-based tab id: callers of the structured launch outcome correlate
     // by tab id, so same-millisecond ids must never collide.
@@ -1788,6 +1896,7 @@ export function MainLayout() {
     addTab({
       id,
       type: "terminal",
+      surface: workspaceId ? { scope: "session", kind: "terminal", surfaceId: id, workspaceId, sessionRef: sessionId ? { kind: "canonical", sessionId } : { kind: "ephemeral", runtimeId: id } } : undefined,
       title: resolvedTitle,
       sessionId,
       localShell,
@@ -2693,6 +2802,7 @@ export function MainLayout() {
       while (connectQueueRef.current.length > 0) {
         const entry = connectQueueRef.current.shift();
         if (!entry) continue;
+        pendingWorkspaceScope.current = { sessionId: entry.session.id, workspaceId: entry.workspaceId };
         const outcome = openQueuedSession(entry.session, undefined, entry.resume);
         if (outcome !== "opened") return;
       }
@@ -3085,8 +3195,15 @@ export function MainLayout() {
     commitRunSnapshotSoon();
   }, [tabs, activeTabId, terminalCwds, commitRunSnapshotSoon]);
 
-  const handleConnectSession = useCallback((session: SessionConfig) => {
-    connectQueueRef.current.push({ session });
+  const handleConnectSession = useCallback((session: SessionConfig, workspaceId?: string) => {
+    if (workspaceId) {
+      const existing = useAppStore.getState().tabs.find((tab) => {
+        const surface = tabToSurfaceDescriptor(tab);
+        return surface.scope === "session" && surface.workspaceId === workspaceId && surface.sessionRef.kind === "canonical" && surface.sessionRef.sessionId === session.id;
+      });
+      if (existing) { useAppStore.getState().setActiveTab(existing.id); return; }
+    }
+    connectQueueRef.current.push({ session, workspaceId });
     continueConnectQueue();
   }, [continueConnectQueue]);
 
@@ -3569,7 +3686,11 @@ export function MainLayout() {
 
   /** Unified mail across every saved mail account (TASK-16, DEC-12). */
   const openUnifiedMailTab = useCallback(() => {
-    const existing = tabsRef.current.find((tab) => tab.type === "mail-unified");
+    const existing = tabsRef.current.find((tab) => {
+      if (tab.type !== "mail-unified") return false;
+      const surface = tabToSurfaceDescriptor(tab);
+      return surface.scope === "global" && !surface.contextWorkspaceId;
+    });
     if (existing) {
       setActiveTab(existing.id);
       return;
@@ -3681,7 +3802,11 @@ export function MainLayout() {
         useServersStore.getState().openDialog(tr("servers.dialogTitle"));
         break;
       case "sessions":
+        useWorkspaceStore.setState({ section: "sessions" });
         setSidebarCollapsed(false);
+        break;
+      case "recent-sessions":
+        setActiveTab("welcome");
         break;
       case "split":
         toggleTerminalSplit();
@@ -3692,6 +3817,7 @@ export function MainLayout() {
       case "exit":
         requestAppExit();
         break;
+      case "tools":
       case "tunneling": {
         const existing = tabsRef.current.find((tab) => tab.type === "nettools");
         if (existing) {
@@ -3720,9 +3846,6 @@ export function MainLayout() {
         }
         break;
       }
-      case "tools":
-        openPlaceholderTab(t("tabs.networkTools"), t("status.commandUnavailable"));
-        break;
       case "git":
         void openGitRepository();
         break;
@@ -4139,6 +4262,7 @@ export function MainLayout() {
           slotRef={setTabActionSlot}
         />
       </div>
+      <WorkspaceDialogs onCommand={handleCommand} onConnectSession={handleConnectSession} />
       {quickConnectVisible && (
         <QuickConnect
           onConnectInput={handleQuickConnect}
@@ -4180,7 +4304,7 @@ export function MainLayout() {
           id="main-layout"
           defaultLayout={loadResizableLayout("main-layout", ["sidebar", "content"])}
           onLayoutChanged={saveResizableLayout("main-layout")}
-          className="flex-1 min-w-0"
+          className="workspace-main-layout flex-1 min-w-0"
           // Size the resize hit target to match the 6px visible divider.
           // Sizing the hit target to the divider width keeps it from bleeding onto content/terminal.
           resizeTargetMinimumSize={{ coarse: 6, fine: 6 }}
@@ -4231,6 +4355,7 @@ export function MainLayout() {
             <div className="h-full flex min-w-0">
               {chatDrawerInline && chatDrawerPosition === "left" && <ChatDrawer />}
               <div className="h-full flex flex-col min-w-0 flex-1">
+              <WorkspaceChrome onStartLocalTerminal={(shell) => openLocalTab(shell?.name ?? tr("tabs.localTerminal"), undefined, undefined, shell, undefined, workspaceNavigation.section === "work" ? workspaceNavigation.activeWorkspaceId ?? undefined : undefined)} onConnectSession={handleConnectSession} onOpenSessionEditor={() => handleNewSession()} onDuplicateTab={handleDuplicateTab} />
               {multiExecActive && (
                 <MultiExecBar
                   selectedCount={effectiveMultiExecSelectedCount}
@@ -4242,6 +4367,8 @@ export function MainLayout() {
                 />
               )}
               <div className="flex-1 min-h-0 overflow-hidden relative">
+                {workspaceCanvasVisible && <WorkspaceCanvas onConnectSession={handleConnectSession} />}
+                <div className="absolute inset-0" style={{ visibility: workspaceCanvasVisible ? "hidden" : "visible", pointerEvents: workspaceCanvasVisible ? "none" : undefined }}>
                 {/* Welcome stays mounted so filters, scroll, and shell
                     selections survive switching to another tab. */}
                 <div
@@ -4310,7 +4437,7 @@ export function MainLayout() {
                       : undefined}
                   >
                     {terminalTabs.map((tab, index) => {
-                      const isActive = activeTabId === tab.id;
+                      const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                       const inputLocked = terminalSplitVisible && terminalSplitInputLockedTabIds.has(tab.id);
                       const sidebarOpen = !terminalSplitVisible && !!attachedSidebars[tab.id] && !!tab.ssh;
                       const liveTerminalProfile = terminalProfileOverrides[tab.id]
@@ -4620,7 +4747,7 @@ export function MainLayout() {
                     even when the user switches to another tab. */}
                 {sftpTabs.map((tab) => {
                   if (!tab.sftp) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4645,7 +4772,7 @@ export function MainLayout() {
                 })}
 
                 {settingsTabs.map((tab) => {
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4662,7 +4789,7 @@ export function MainLayout() {
                     scroll position survive switching to another app tab. */}
                 {gitTabs.map((tab) => {
                   if (!tab.git) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   const workspaceRoots = tab.git.workspaceRoots ?? [];
                   return (
                     <div
@@ -4691,7 +4818,7 @@ export function MainLayout() {
 
                 {codeWorkspaceTabs.map((tab) => {
                   if (!tab.codeWorkspace) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4712,21 +4839,22 @@ export function MainLayout() {
 
                 {activeTab?.type === "lan-chat" && <LanChatGate />}
 
-                {tabs.some((tab) => tab.type === "mail-unified") && (
-                  <div className="absolute inset-0" style={{ display: activeTab?.type === "mail-unified" ? "block" : "none" }}>
-                    <MailUnifiedTab
-                      accounts={unifiedMailAccounts}
-                      visible={activeTab?.type === "mail-unified"}
-                      onOpenAccount={openMailAccountById}
-                    />
-                  </div>
-                )}
+                {tabs.filter((tab) => tab.type === "mail-unified").map((tab) => {
+                  const surface = tabToSurfaceDescriptor(tab);
+                  const workspaceId = surface.scope === "global" ? surface.contextWorkspaceId : undefined;
+                  const members = workspaceNavigation.workspaces.find((w) => w.id === workspaceId)?.memberships ?? [];
+                  const visible = !workspaceCanvasVisible && activeTabId === tab.id;
+                  return <div key={tab.id} className="absolute inset-0" style={{ display: visible ? "block" : "none" }}>
+                    <MailUnifiedTab accounts={workspaceId ? unifiedMailAccounts.filter((account) => members.some((m) => m.sessionId === account.sessionId)) : unifiedMailAccounts}
+                      visible={visible} onOpenAccount={openMailAccountById} />
+                  </div>;
+                })}
 
                 {/* VNC tabs — always mounted so connection survives tab switches */}
                 {vncTabs.map((tab) => {
                   const vnc = tab.vnc;
                   if (!vnc) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4763,7 +4891,7 @@ export function MainLayout() {
                 {rdpTabs.map((tab) => {
                   const rdp = tab.rdp;
                   if (!rdp) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4790,7 +4918,7 @@ export function MainLayout() {
                 {/* Embedded local file-browser tabs (File session type). */}
                 {fileBrowserTabs.map((tab) => {
                   if (!tab.fileBrowser) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4809,7 +4937,7 @@ export function MainLayout() {
                     mounted so in-flight transfers survive tab switches. */}
                 {objectStorageTabs.map((tab) => {
                   if (!tab.objectStorage) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4827,7 +4955,7 @@ export function MainLayout() {
 
                 {mailTabs.map((tab) => {
                   if (!tab.mail) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4848,7 +4976,7 @@ export function MainLayout() {
                     keep running across tab switches. */}
                 {dbTabs.map((tab) => {
                   if (!tab.db) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4869,7 +4997,7 @@ export function MainLayout() {
                 {/* Redis client tabs — always mounted (CLI/monitor stay alive). */}
                 {redisTabs.map((tab) => {
                   if (!tab.db) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4891,7 +5019,7 @@ export function MainLayout() {
                     active REST sessions survive tab switches. */}
                 {hbaseTabs.map((tab) => {
                   if (!tab.hbase) return null;
-                  const isActive = activeTabId === tab.id;
+                  const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   return (
                     <div
                       key={tab.id}
@@ -4949,6 +5077,8 @@ export function MainLayout() {
                   activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}
+                </div>
+                <WorkspaceContextPane onConnectSession={handleConnectSession} />
               </div>
               </div>
               {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}

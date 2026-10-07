@@ -26,10 +26,13 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use serde_json::{Value, json};
 use std::sync::Mutex as StdMutex;
 
-use tauri::{AppHandle, Runtime, WebviewWindow};
+use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
 use tokio::sync::{Mutex, oneshot};
 
-const SESSION_ID: &str = "taomni-qa-macos";
+fn bridge_session_id() -> &'static str {
+    static SESSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    SESSION.get_or_init(|| format!("taomni-qa-macos-{}", uuid::Uuid::new_v4()))
+}
 static BRIDGE_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[derive(Clone)]
@@ -41,7 +44,7 @@ struct ElementRef {
 
 struct DriverState<R: Runtime> {
     app: AppHandle<R>,
-    window: WebviewWindow<R>,
+    window_label: Arc<StdMutex<String>>,
     elements: Arc<Mutex<HashMap<String, ElementRef>>>,
     next_element: Arc<AtomicU64>,
 }
@@ -50,10 +53,22 @@ impl<R: Runtime> Clone for DriverState<R> {
     fn clone(&self) -> Self {
         Self {
             app: self.app.clone(),
-            window: self.window.clone(),
+            window_label: self.window_label.clone(),
             elements: self.elements.clone(),
             next_element: self.next_element.clone(),
         }
+    }
+}
+
+impl<R: Runtime> DriverState<R> {
+    fn current_window(&self) -> Result<WebviewWindow<R>, String> {
+        let label = self
+            .window_label
+            .lock()
+            .map_err(|_| "window selection lock poisoned")?;
+        self.app
+            .get_webview_window(&label)
+            .ok_or_else(|| format!("no such window: {label}"))
     }
 }
 
@@ -149,7 +164,7 @@ async fn eval_js<R: Runtime>(state: &DriverState<R>, body: String) -> Result<Val
     let sender = Arc::new(StdMutex::new(Some(sender)));
     let callback_sender = sender.clone();
     state
-        .window
+        .current_window()?
         .eval_with_callback(script, move |result| {
             if let Ok(mut sender) = callback_sender.lock() {
                 if let Some(sender) = sender.take() {
@@ -179,13 +194,76 @@ async fn status() -> Response {
 
 async fn create_session(Json(_payload): Json<Value>) -> Response {
     ok(json!({
-        "sessionId": SESSION_ID,
+        "sessionId": bridge_session_id(),
         "capabilities": {"browserName": "taomni-wkwebview", "platformName": "macOS"}
     }))
 }
 
 fn session_is_valid(session_id: &str) -> bool {
-    session_id == SESSION_ID
+    session_id == bridge_session_id()
+}
+
+async fn window_handles<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    if !session_is_valid(&session_id) {
+        return error("unknown WebDriver session");
+    }
+    let mut handles: Vec<String> = state.app.webview_windows().keys().cloned().collect();
+    handles.sort();
+    ok(json!(handles))
+}
+
+async fn current_window<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    if !session_is_valid(&session_id) {
+        return error("unknown WebDriver session");
+    }
+    match state.current_window() {
+        Ok(window) => ok(json!(window.label())),
+        Err(message) => error(message),
+    }
+}
+
+async fn switch_window<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+    Json(payload): Json<Value>,
+) -> Response {
+    if !session_is_valid(&session_id) {
+        return error("unknown WebDriver session");
+    }
+    let Some(handle) = payload.get("handle").and_then(Value::as_str) else {
+        return error("window handle is required");
+    };
+    if state.app.get_webview_window(handle).is_none() {
+        return error("no such window");
+    }
+    match state.window_label.lock() {
+        Ok(mut label) => *label = handle.to_string(),
+        Err(_) => return error("window selection lock poisoned"),
+    }
+    state.elements.lock().await.clear();
+    ok(Value::Null)
+}
+
+async fn close_window<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    if !session_is_valid(&session_id) {
+        return error("unknown WebDriver session");
+    }
+    match state
+        .current_window()
+        .and_then(|window| window.close().map_err(|e| e.to_string()))
+    {
+        Ok(()) => window_handles(State(state), Path(session_id)).await,
+        Err(message) => error(message),
+    }
 }
 
 async fn delete_session<R: Runtime>(
@@ -664,7 +742,11 @@ async fn refresh<R: Runtime>(
     if !session_is_valid(&session_id) {
         return error("unknown WebDriver session");
     }
-    match state.window.eval("window.location.reload()") {
+    match state.current_window().and_then(|window| {
+        window
+            .eval("window.location.reload()")
+            .map_err(|e| e.to_string())
+    }) {
         Ok(()) => ok(Value::Null),
         Err(e) => error(format!("failed to reload WebView: {e}")),
     }
@@ -721,7 +803,11 @@ async fn screenshot<R: Runtime>(
 
         let (tx, rx) = oneshot::channel::<Result<String, String>>();
         let sender = Arc::new(StdMutex::new(Some(tx)));
-        let started = state.window.with_webview(move |webview| unsafe {
+        let window = match state.current_window() {
+            Ok(window) => window,
+            Err(message) => return error(message),
+        };
+        let started = window.with_webview(move |webview| unsafe {
             let completion = RcBlock::new(move |image: *mut AnyObject, err: *mut AnyObject| {
                 let result = (|| {
                     if image.is_null() || !err.is_null() {
@@ -868,7 +954,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
     }
     let state = DriverState {
         app,
-        window,
+        window_label: Arc::new(StdMutex::new(window.label().to_string())),
         elements: Arc::new(Mutex::new(HashMap::new())),
         next_element: Arc::new(AtomicU64::new(1)),
     };
@@ -885,6 +971,16 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             .route("/status", get(status))
             .route("/session", post(create_session))
             .route("/session/{session_id}", delete(delete_session::<R>))
+            .route(
+                "/session/{session_id}/window/handles",
+                get(window_handles::<R>),
+            )
+            .route(
+                "/session/{session_id}/window",
+                get(current_window::<R>)
+                    .post(switch_window::<R>)
+                    .delete(close_window::<R>),
+            )
             .route("/session/{session_id}/element", post(find_element::<R>))
             .route("/session/{session_id}/elements", post(find_elements::<R>))
             .route(

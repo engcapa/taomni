@@ -6,6 +6,7 @@ import { emit } from "@tauri-apps/api/event";
 import { MainLayout } from "./MainLayout";
 import { useAppStore, recentWorkspaceIdFromParts } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useMainRailHostStore } from "../stores/mainRailHostStore";
 import { commitWelcomeRunSnapshot, exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
@@ -446,6 +447,11 @@ vi.mock("../stores/vaultStore", () => ({
     { getState: () => ({ state: vaultMock.state }) },
   ),
 }));
+
+beforeEach(() => {
+  // These retained tests explicitly start with an existing runtime surface.
+  useWorkspaceStore.setState({ workspaces: [], activeWorkspaceId: null, canvas: "runtime", section: "sessions", hydrated: false });
+});
 
 describe("MainLayout attached SFTP sidebar", () => {
   beforeEach(() => {
@@ -1867,11 +1873,11 @@ describe("MainLayout ED-PARITY-027 single tool window bar", () => {
     useMainRailHostStore.setState({ host: null });
   });
 
-  it("collapses the sidebar for a terminal tab and restores it for other tabs", async () => {
+  it("preserves navigator visibility while switching runtime kinds", async () => {
     render(<MainLayout />);
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
     act(() => useAppStore.getState().setActiveTab("ssh-tab"));
-    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
     act(() => useAppStore.getState().setActiveTab("welcome"));
     await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
   });
@@ -1892,13 +1898,14 @@ describe("MainLayout ED-PARITY-027 single tool window bar", () => {
     expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
   });
 
-  it("remembers a manual expand for terminal tabs only", async () => {
+  it("retains a manual navigator hide and restore across terminal and Home surfaces", async () => {
     render(<MainLayout />);
     act(() => useAppStore.getState().setActiveTab("ssh-tab"));
-    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
     act(() => useAppStore.getState().toggleSidebar());
-    expect(useAppStore.getState().sidebarCollapsedByGroup.terminal).toBe(false);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
     act(() => useAppStore.getState().setActiveTab("welcome"));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    act(() => useAppStore.getState().toggleSidebar());
     act(() => useAppStore.getState().setActiveTab("ssh-tab"));
     await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
     expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(true);
@@ -1907,6 +1914,7 @@ describe("MainLayout ED-PARITY-027 single tool window bar", () => {
   it("moves the terminal's SFTP and Chat toggles into the collapsed rail", async () => {
     render(<MainLayout />);
     act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    act(() => useAppStore.getState().setSidebarCollapsed(true));
     await waitFor(() => expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).not.toBeNull());
     expect(host.querySelector('[data-testid="tab-chat-toggle"]')).not.toBeNull();
     const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);

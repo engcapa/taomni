@@ -124,12 +124,12 @@ describe("WelcomePanel", () => {
 
     const historyTabs = within(screen.getByRole("tablist", { name: "Welcome shortcuts and history" })).getAllByRole("tab");
     expect(historyTabs.map((tab) => tab.getAttribute("data-testid"))).toEqual([
-      "welcome-history-tab-sessions",
       "welcome-history-tab-workspaces",
+      "welcome-history-tab-sessions",
       "welcome-history-tab-directories",
     ]);
     expect(historyTabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("welcome-recent-sessions")).toBeInTheDocument();
+    expect(screen.getByTestId("welcome-recent-workspaces")).toBeInTheDocument();
     expect(screen.queryByTestId("welcome-local-directories")).not.toBeInTheDocument();
   });
 
@@ -219,6 +219,7 @@ describe("WelcomePanel", () => {
       expect(screen.getByText("PowerShell")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByTestId("welcome-history-tab-sessions"));
     expect(screen.getByTestId("welcome-recent-sessions")).toBeInTheDocument();
     expect(screen.getAllByTestId("welcome-recent-session-row")).toHaveLength(3);
 
@@ -358,6 +359,7 @@ describe("WelcomePanel", () => {
       expect(screen.getByText("PowerShell")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByTestId("welcome-history-tab-sessions"));
     expect(screen.getByTestId("welcome-recent-sessions")).toBeInTheDocument();
 
     const rows = screen.getAllByTestId("welcome-recent-session-row");

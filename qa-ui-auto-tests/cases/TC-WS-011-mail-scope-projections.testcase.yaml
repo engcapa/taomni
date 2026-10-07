@@ -1,0 +1,99 @@
+id: TC-WS-011
+title: 'AC-05/06: workspace Mail membership filtering remains independent of global Unified Mail'
+description: 'AC-05/06: workspace Mail membership filtering remains independent of global Unified Mail'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-mail"]'
+- assert_text:
+    selector: '[data-testid="mail-unified-count"]'
+    contains: 0 accounts
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mail-unified"]'
+- assert_text:
+    selector: '[data-testid="surface-scope"]'
+    contains: global
+- assert_text:
+    selector: '[data-testid="mail-unified-tab"]:visible [data-testid="mail-unified-count"]'
+    contains: 1 account
+- click: '[data-testid="side-tab-work"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-overview"]'
+- select_option:
+    selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
+    value: qa-mail
+- click: '[data-testid="workspace-surface-mail"]'
+- assert_text:
+    selector: '[data-testid="mail-unified-tab"]:visible [data-testid="mail-unified-count"]'
+    contains: 1 account
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- click: '[data-testid="workspace-surface-mail"]'
+- assert_text:
+    selector: '[data-testid="mail-unified-tab"]:visible [data-testid="mail-unified-count"]'
+    contains: 0 accounts
+- click: '[data-testid="side-tab-sessions"]'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: QA mailbox
+- assert_count:
+    selector: '[data-testid="session-tree-item"]'
+    equal: 1
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-05/06: workspace Mail membership filtering remains independent of global Unified Mail'
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 19
+    - 20
+    checkpoints:
+    - step: 5
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 8
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 9
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 15
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 18
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 21
+      expectation: The visible UI establishes the expected assert_count result after the preceding navigation action.
+    results:
+    - 5
+    - 8
+    - 9
+    - 15
+    - 18
+    - 21
+  native:
+  - check: Disk, IPC and runtime persistence
+    method: external
+    reason: Browser covers renderer behavior; companion native cases cover real resources.
+  visual:
+  - check: Inspect theme, Lucide icons, spacing and clipping in the execution screenshots
+    method: manual
+    reason: Review pending execution evidence.

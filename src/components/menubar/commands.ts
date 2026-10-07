@@ -12,6 +12,7 @@ export type AppCommand =
   | "servers"
   | "tools"
   | "sessions"
+  | "recent-sessions"
   | "view"
   | "split"
   | "multiexec"

@@ -22,6 +22,8 @@ import { useAppTheme } from "../../lib/appTheme";
 import { writeText } from "../../lib/clipboard";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { tabToSurfaceDescriptor } from "../../lib/workspaceScope";
 import { useAiStore } from "../../stores/aiStore";
 import {
   useCodeWorkspaceStatusStore,
@@ -211,6 +213,12 @@ export function StatusBar() {
   const { mode, resolvedTheme } = useAppTheme();
   const [online, setOnline] = useState(navigator.onLine);
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
+  const workspaceNavigation = useWorkspaceStore();
+  const surface = activeTab && tabToSurfaceDescriptor(activeTab);
+  const contextWorkspaceId = workspaceNavigation.canvas === "workspace" ? workspaceNavigation.activeWorkspaceId
+    : surface && "workspaceId" in surface ? surface.workspaceId
+    : surface?.scope === "global" && surface.kind === "mail-unified" ? surface.contextWorkspaceId : undefined;
+  const contextWorkspace = workspaceNavigation.workspaces.find((w) => w.id === contextWorkspaceId);
   const selected = sessions.find((session) => session.id === selectedSessionId);
   const aiConfig = useAiStore((s) => s.config);
   const activeProvider = aiConfig?.llm.active ?? "—";
@@ -222,7 +230,7 @@ export function StatusBar() {
   const searchEnabled = !!aiConfig?.web_search.client_enabled;
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
-  const showWorkspaceSegments = activeTab?.type === "code-workspace"
+  const showWorkspaceSegments = workspaceNavigation.canvas === "runtime" && activeTab?.type === "code-workspace"
     && workspaceStatus?.tabId === activeTabId;
 
   useEffect(() => {
@@ -241,6 +249,7 @@ export function StatusBar() {
 
   return (
     <div data-testid="status-bar" className="taomni-status min-h-6 flex items-center px-2 gap-3">
+      {contextWorkspace && <CopyableText testId="status-bar-workspace" text={contextWorkspace.name} className="truncate min-w-0 max-w-[30%]">Workspace · {contextWorkspace.name}</CopyableText>}
       {/* ED-PARITY-010 DEC-010-06: a focused code workspace owns the status
           bar like IDEA — navigation bar left, editor widgets right. */}
       {showWorkspaceSegments && workspaceStatus ? (

@@ -145,7 +145,7 @@ export function WelcomePanel({
   const [recentSort, setRecentSort] = useState<RecentSessionSort>("last-desc");
   const [selectedRecentIds, setSelectedRecentIds] = useState<string[]>([]);
   const [workspaceQuery, setWorkspaceQuery] = useState("");
-  const [historyTab, setHistoryTab] = useState<WelcomeHistoryTab>("sessions");
+  const [historyTab, setHistoryTab] = useState<WelcomeHistoryTab>("workspaces");
   const { setStatusMessage } = useAppStore();
   const t = useT();
 
@@ -739,16 +739,16 @@ function WelcomeHistoryPanel({
     icon: React.ReactNode;
   }> = [
     {
-      id: "sessions",
-      label: t("welcome.recentSessionsHeading"),
-      count: sessionCount,
-      icon: <History className="w-3.5 h-3.5" />,
-    },
-    {
       id: "workspaces",
       label: t("welcome.recentWorkspacesHeading"),
       count: workspaceCount,
       icon: <Folder className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "sessions",
+      label: t("welcome.recentSessionsHeading"),
+      count: sessionCount,
+      icon: <History className="w-3.5 h-3.5" />,
     },
     {
       id: "directories",

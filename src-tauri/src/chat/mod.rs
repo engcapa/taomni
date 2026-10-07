@@ -395,6 +395,7 @@ fn build_system_prompt(format: &str) -> String {
 /// Create a new chat thread.
 #[tauri::command]
 pub async fn chat_new_thread(
+    workspace_id: Option<String>,
     provider_id: Option<String>,
     linked_session_id: Option<String>,
     mode: Option<String>,
@@ -410,6 +411,7 @@ pub async fn chat_new_thread(
         created_at: now(),
         updated_at: now(),
         linked_session_id,
+        workspace_id,
         source: "drawer".into(),
         mode,
         cc_session_id: None,

@@ -1,0 +1,107 @@
+id: TC-WS-002
+title: 'AC-03/04/08: canonical filtering and deletion cancellation preserve shared references'
+description: 'AC-03/04/08: canonical filtering and deletion cancellation preserve shared references'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-navigator"]'
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: QA shared SSH
+- assert_count:
+    selector: '[data-testid="session-tree-item"][data-session-id="qa-shared-ssh"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="session-tree-item"][data-session-id="qa-shared-ssh"]'
+    contains: Used by 2 workspaces
+- click: '[data-testid="session-tree-item"][data-session-id="qa-shared-ssh"] > span.truncate'
+- click: '[data-testid="session-delete"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: 2 workspaces
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_count:
+    selector: '[data-testid="session-tree-item"][data-session-id="qa-shared-ssh"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: ''
+- click: '[data-testid="session-kind-filters"] button:has-text("Mail")'
+- assert_count:
+    selector: '[data-testid="session-tree-item"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="session-tree"]'
+    contains: QA mailbox
+- click: '[data-testid="session-kind-filters"] button:has-text("All")'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: no-match-workspace-qa
+- assert_count:
+    selector: '[data-testid="session-tree-item"]'
+    equal: 0
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-03/04/08: canonical filtering and deletion cancellation preserve shared references'
+    actions:
+    - 4
+    - 5
+    - 7
+    - 10
+    - 11
+    - 13
+    - 15
+    - 16
+    - 19
+    - 20
+    checkpoints:
+    - step: 8
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="session-tree-item"][data-session-id="qa-shared-ssh"]'',
+        ''equal'': 1}}'
+    - step: 9
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="session-tree-item"][data-session-id="qa-shared-ssh"]'',
+        ''contains'': ''Used by 2 workspaces''}}'
+    - step: 12
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="confirm-dialog-message"]'', ''contains'': ''2
+        workspaces''}}'
+    - step: 14
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="session-tree-item"][data-session-id="qa-shared-ssh"]'',
+        ''equal'': 1}}'
+    - step: 17
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="session-tree-item"]'', ''equal'': 1}}'
+    - step: 18
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="session-tree"]'', ''contains'': ''QA mailbox''}}'
+    - step: 21
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="session-tree-item"]'', ''equal'': 0}}'
+    results:
+    - 8
+    - 9
+    - 12
+    - 14
+    - 17
+    - 18
+    - 21
+  visual:
+  - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
+    method: manual
+    reason: Visual evidence must be inspected after execution; pending is not a pass.
+  native:
+  - check: Native IPC, process, disk and window boundaries require the TC-WS-NATIVE companion cases.
+    method: external
+    reason: This browser case verifies renderer and stub behavior only.

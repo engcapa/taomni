@@ -28,6 +28,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-mail"]'
@@ -41,36 +42,47 @@ steps:
 - click: '[data-testid="mail-autoconfig"]'
 - assert_text:
     selector: '[data-testid="mail-autoconfig-result"]'
-    contains: 'imap.qq.com:993 / smtp.qq.com:465'
+    contains: imap.qq.com:993 / smtp.qq.com:465
     timeout_sec: 15
 - assert_text:
     selector: '[data-testid="mail-autoconfig-result"]'
     contains: built-in
 - screenshot: mail-autoconf-01-detected.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: 输入 qq.com 邮箱并关闭在线查询后点 Detect settings，自动填入 imap.qq.com:993 与 smtp.qq.com:465，来源为内置表（AC-43，不向第三方发送域名）。
     actions:
     - 1
     - 2
-    - 4
-    - 6
+    - 3
+    - 5
     - 7
     - 8
+    - 9
     checkpoints:
-    - step: 3
+    - step: 4
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 5
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"] input[aria-label=\"Mail email or username\"]"}'
-    - step: 9
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-autoconfig-result\"]", "contains": "imap.qq.com:993 / smtp.qq.com:465", "timeout_sec": 15}}'
     - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-autoconfig-result\"]", "contains": "imap.qq.com:993
+        / smtp.qq.com:465", "timeout_sec": 15}}'
+    - step: 11
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-autoconfig-result\"]", "contains": "built-in"}}'
     results:
-    - 9
     - 10
+    - 11
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    checkpoints:
+    - step: 11
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 11
   visual:
   - check: 截图中 IMAP/SMTP 字段已填好，结果提示来源为内置表。
     method: manual

@@ -16,53 +16,69 @@ interface WorkspaceState {
   commandCenterOpen: boolean;
   sessionKindFilter: string;
   load: () => Promise<void>;
-  create: (name: string, recent?: RecentWorkspace) => Promise<Workspace>;
-  patch: (id: string, patch: Partial<Pick<Workspace, "name" | "description" | "roots" | "looseFiles" | "pinned" | "navigation" | "lastOpenedAt">>) => Promise<void>;
+  create: (name: string, recent?: RecentWorkspace, activate?: boolean) => Promise<Workspace>;
+  patch: (id: string, patch: Partial<Pick<Workspace, "name" | "description" | "roots" | "looseFiles" | "pinned" | "lastOpenedAt">> & { navigation?: Partial<Workspace["navigation"]> }) => Promise<void>;
   remove: (id: string) => Promise<void>;
   addMembership: (id: string, sessionId: string, role?: WorkspaceMembership["role"]) => Promise<void>;
   removeMembership: (id: string, sessionId: string) => Promise<void>;
+  patchMembership: (id: string, sessionId: string, patch: Partial<Pick<WorkspaceMembership, "role" | "order" | "pinned" | "defaultSurface">>) => Promise<void>;
   selectWorkspace: (id: string) => void;
   selectView: (view: WorkspaceView) => void;
 }
 
 // Serialize local mutations; re-read and reapply only the requested patch on conflict.
 let writeQueue: Promise<unknown> = Promise.resolve();
+const pendingViews = new Map<string, { view: WorkspaceView; token: symbol }>();
+function projectPendingView(workspace: Workspace): Workspace {
+  const pending = pendingViews.get(workspace.id);
+  return pending ? { ...workspace, navigation: { ...workspace.navigation, activeSurface: pending.view } } : workspace;
+}
+function enqueue<T>(operation: () => Promise<T>): Promise<T> {
+  const result = writeQueue.catch(() => {}).then(operation).catch((error: unknown) => {
+    useWorkspaceStore.setState({ error: String(error) });
+    throw error;
+  });
+  writeQueue = result;
+  return result;
+}
+
+async function reload() {
+  const workspaces = (await persistence.listWorkspaces()).map(projectPendingView);
+  useWorkspaceStore.setState((state) => ({
+    workspaces, hydrated: true, error: null,
+    activeWorkspaceId: workspaces.some((w) => w.id === state.activeWorkspaceId)
+      ? state.activeWorkspaceId
+      : [...workspaces].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)[0]?.id ?? null,
+  }));
+}
+
 function mutate(id: string, update: (workspace: Workspace) => Workspace) {
-  const operation = writeQueue.catch(() => {}).then(async () => {
+  return enqueue(async () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       const current = useWorkspaceStore.getState().workspaces.find((w) => w.id === id);
       if (!current) throw new Error("Workspace unavailable");
       try {
         const saved = await persistence.saveWorkspace({ ...update(current), updatedAt: Date.now() });
-        useWorkspaceStore.setState((state) => ({ error: null, workspaces: state.workspaces.map((w) => w.id === id ? saved : w) }));
+        useWorkspaceStore.setState((state) => ({ error: null, workspaces: state.workspaces.map((w) => w.id === id ? projectPendingView(saved) : w) }));
         return;
       } catch (error) {
         if (!String(error).includes("conflict") || attempt === 2) throw error;
-        await useWorkspaceStore.getState().load();
+        await reload();
       }
     }
-  }).catch((error: unknown) => {
-    useWorkspaceStore.setState({ error: String(error) });
-    throw error;
   });
-  writeQueue = operation;
-  return operation;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [], hydrated: false, error: null, section: "work", activeWorkspaceId: null,
   canvas: "workspace", createDialogOpen: false, commandCenterOpen: false, sessionKindFilter: "All",
-  load: async () => {
-    try {
-      const workspaces = await persistence.listWorkspaces();
-      set((s) => ({ workspaces, hydrated: true, error: null, activeWorkspaceId:
-        workspaces.some((w) => w.id === s.activeWorkspaceId) ? s.activeWorkspaceId
-          : [...workspaces].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)[0]?.id ?? null }));
-    } catch (error) { set({ error: String(error) }); }
-  },
-  create: async (name, recent) => {
+  load: () => enqueue(reload).catch(() => {}),
+  create: (name, recent, activate = true) => enqueue(async () => {
     const existing = recent && get().workspaces.find((w) => w.legacyRecentId === recent.id);
-    if (existing) return existing;
+    if (existing) {
+      if (activate) set({ activeWorkspaceId: existing.id, canvas: "workspace", section: "work" });
+      return existing;
+    }
     const now = Date.now();
     const workspace = await persistence.saveWorkspace({
       id: crypto.randomUUID(), name: name.trim(), description: "", roots: recent?.roots ?? [], looseFiles: recent?.looseFiles ?? [],
@@ -70,17 +86,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       createdAt: now, updatedAt: now, lastOpenedAt: now,
       navigation: { activeSurface: "overview", navigatorCollapsed: false, rightPaneOpen: false }, memberships: [],
     });
-    set((s) => ({ workspaces: [...s.workspaces, workspace], activeWorkspaceId: workspace.id, canvas: "workspace", section: "work", error: null }));
+    set((s) => ({ workspaces: [...s.workspaces.filter((w) => w.id !== workspace.id), workspace],
+      ...(activate ? { activeWorkspaceId: workspace.id, canvas: "workspace" as const, section: "work" as const } : {}), error: null }));
     return workspace;
-  },
-  patch: (id, patch) => mutate(id, (w) => ({ ...w, ...patch })),
-  remove: async (id) => {
-    await writeQueue.catch(() => {});
+  }),
+  patch: (id, patch) => mutate(id, (w) => ({ ...w, ...patch, navigation: { ...w.navigation, ...patch.navigation } })),
+  remove: (id) => enqueue(async () => {
     const workspace = get().workspaces.find((w) => w.id === id);
     if (!workspace) return;
     await persistence.deleteWorkspace(workspace);
-    await get().load();
-  },
+    await reload();
+  }),
   addMembership: (id, sessionId, role = "reference") => {
     if (get().workspaces.find((w) => w.id === id)?.memberships.some((m) => m.sessionId === sessionId)) return Promise.resolve();
     return mutate(id, (w) => w.memberships.some((m) => m.sessionId === sessionId) ? w : ({ ...w, memberships: [...w.memberships, {
@@ -88,6 +104,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }] }));
   },
   removeMembership: (id, sessionId) => mutate(id, (w) => ({ ...w, memberships: w.memberships.filter((m) => m.sessionId !== sessionId) })),
+  patchMembership: (id, sessionId, patch) => mutate(id, (w) => ({ ...w, memberships: w.memberships.map((m) => m.sessionId === sessionId ? { ...m, ...patch } : m) })),
   selectWorkspace: (id) => {
     if (!get().workspaces.some((w) => w.id === id)) return;
     set({ activeWorkspaceId: id, canvas: "workspace", section: "work" });
@@ -96,8 +113,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   selectView: (view) => {
     const workspace = get().workspaces.find((w) => w.id === get().activeWorkspaceId);
     if (!workspace) return;
-    set({ canvas: "workspace" });
-    void get().patch(workspace.id, { navigation: { ...workspace.navigation, activeSurface: view } }).catch(() => {});
+    const token = Symbol();
+    pendingViews.set(workspace.id, { view, token });
+    set((state) => ({ canvas: "workspace", workspaces: state.workspaces.map((w) => w.id === workspace.id
+      ? { ...w, navigation: { ...w.navigation, activeSurface: view } } : w) }));
+    void get().patch(workspace.id, { navigation: { activeSurface: view } }).catch(() => {}).finally(() => {
+      if (pendingViews.get(workspace.id)?.token === token) pendingViews.delete(workspace.id);
+    });
   },
 }));
 
@@ -106,6 +128,11 @@ export async function subscribeWorkspaceChanges() {
   return listen<{ workspaceId: string; revision: number }>("workspace-state-changed", ({ payload }) => {
     const state = useWorkspaceStore.getState();
     const current = state.workspaces.find((w) => w.id === payload.workspaceId);
-    if (state.hydrated && (!current || current.revision < payload.revision)) void state.load();
+    if (state.hydrated && (!current || current.revision < payload.revision)) {
+      void import("./sessionStore").then(async ({ useSessionStore }) => {
+        await useSessionStore.getState().loadSessions();
+        await state.load();
+      });
+    }
   });
 }

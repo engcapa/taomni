@@ -1,19 +1,26 @@
 id: TC-MFA-001
 title: MFA opens from Tools and the sidebar behind the vault gate
-description: >-
-  V-10 (AC-01, AC-02). Browser stub. The Tools menu keeps its existing entries
-  and opens one MFA tab. An empty vault shows the setup dialog; cancelling
-  leaves a placeholder whose action reopens it; setting the master password
-  mounts the empty MFA panel with its toolbar and four add entries, each of
-  which opens the add dialog in its own mode and closes by Escape, close or
-  cancel. The sidebar entry re-activates the same tab instead of adding one.
-covers: [F-MFA-1, F-MFA-2]
-tags: [mfa, smoke, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: V-10 (AC-01, AC-02). Browser stub. The Tools menu keeps its existing entries and opens one MFA tab.
+  An empty vault shows the setup dialog; cancelling leaves a placeholder whose action reopens it; setting the master
+  password mounts the empty MFA panel with its toolbar and four add entries, each of which opens the add dialog
+  in its own mode and closes by Escape, close or cancel. The sidebar entry re-activates the same tab instead of
+  adding one.
+covers:
+- F-MFA-1
+- F-MFA-2
+tags:
+- mfa
+- smoke
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
@@ -24,11 +31,17 @@ steps:
 - click: '[data-testid="vault-setup-cancel"]'
 - wait_for: '[data-testid="vault-gate-placeholder"]'
 - assert_not_visible: '[data-testid="vault-setup-dialog"]'
-- assert_count: {selector: '[data-testid="mfa-panel"]', equal: 0}
+- assert_count:
+    selector: '[data-testid="mfa-panel"]'
+    equal: 0
 - click: '[data-testid="vault-gate-action"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-001}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-001}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-mfa-master-001
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-mfa-master-001
 - click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="mfa-empty"]'
 - assert_visible: '[data-testid="mfa-search"]'
@@ -57,54 +70,116 @@ steps:
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="mfa-empty"]'
-- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mfa"]', equal: 1}
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="mfa"]'
+    equal: 1
 - screenshot: mfa-001-empty-panel.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: Tools → MFA authenticator opens the MFA tab while the existing Tools entries stay listed (AC-01).
-    actions: [3, 4, 6]
+    actions:
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
     checkpoints:
-    - {step: 5, expectation: Tunneling is still listed in the Tools submenu}
-    - {step: 7, expectation: the MFA tab is shown}
-    results: [7]
+    - step: 7
+      expectation: Tunneling is still listed in the Tools submenu
+    - step: 9
+      expectation: the MFA tab is shown
+    results:
+    - 9
   - id: R2
-    requirement: An empty vault blocks the panel with the setup dialog; cancel leaves a placeholder whose action reopens setup; a master password mounts the panel (AC-02).
-    actions: [9, 13, 15, 16, 17]
+    requirement: An empty vault blocks the panel with the setup dialog; cancel leaves a placeholder whose action
+      reopens setup; a master password mounts the panel (AC-02).
+    actions:
+    - 11
+    - 15
+    - 17
+    - 18
+    - 19
     checkpoints:
-    - {step: 10, expectation: placeholder shown after cancelling setup}
-    - {step: 11, expectation: setup dialog closed}
-    - {step: 12, expectation: MFA panel not mounted while the vault is not set up}
-    - {step: 14, expectation: the placeholder action reopens setup}
-    - {step: 18, expectation: empty MFA panel after the master password is set}
-    results: [18]
+    - step: 12
+      expectation: placeholder shown after cancelling setup
+    - step: 13
+      expectation: setup dialog closed
+    - step: 14
+      expectation: MFA panel not mounted while the vault is not set up
+    - step: 16
+      expectation: the placeholder action reopens setup
+    - step: 20
+      expectation: empty MFA panel after the master password is set
+    results:
+    - 20
   - id: R3
-    requirement: The toolbar and each empty-state add entry are usable; every entry opens the add dialog in its mode and Escape, close and cancel dismiss it (AC-01, AC-17).
-    actions: [23, 25, 27, 29, 31, 33, 35, 37, 39]
+    requirement: The toolbar and each empty-state add entry are usable; every entry opens the add dialog in its
+      mode and Escape, close and cancel dismiss it (AC-01, AC-17).
+    actions:
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
+    - 41
     checkpoints:
-    - {step: 19, expectation: search box visible}
-    - {step: 20, expectation: group filter visible}
-    - {step: 21, expectation: sort selector visible}
-    - {step: 22, expectation: add button visible}
-    - {step: 24, expectation: image mode}
-    - {step: 26, expectation: Escape closed the dialog}
-    - {step: 28, expectation: screen mode}
-    - {step: 30, expectation: close button closed the dialog}
-    - {step: 32, expectation: camera mode}
-    - {step: 34, expectation: mode tab switched to secret entry}
-    - {step: 36, expectation: cancel closed the dialog}
-    - {step: 38, expectation: secret mode from the empty state}
-    - {step: 40, expectation: dialog closed}
-    results: [40]
+    - step: 21
+      expectation: search box visible
+    - step: 22
+      expectation: group filter visible
+    - step: 23
+      expectation: sort selector visible
+    - step: 24
+      expectation: add button visible
+    - step: 26
+      expectation: image mode
+    - step: 28
+      expectation: Escape closed the dialog
+    - step: 30
+      expectation: screen mode
+    - step: 32
+      expectation: close button closed the dialog
+    - step: 34
+      expectation: camera mode
+    - step: 36
+      expectation: mode tab switched to secret entry
+    - step: 38
+      expectation: cancel closed the dialog
+    - step: 40
+      expectation: secret mode from the empty state
+    - step: 42
+      expectation: dialog closed
+    results:
+    - 42
   - id: R4
     requirement: The sidebar entry re-activates the existing MFA tab instead of opening a second one (AC-01).
-    actions: [41, 43]
+    actions:
+    - 43
+    - 45
     checkpoints:
-    - {step: 42, expectation: Tools sidebar panel shown}
-    - {step: 44, expectation: MFA panel shown}
-    - {step: 45, expectation: exactly one MFA tab}
-    results: [45]
+    - step: 44
+      expectation: Tools sidebar panel shown
+    - step: 46
+      expectation: MFA panel shown
+    - step: 47
+      expectation: exactly one MFA tab
+    results:
+    - 47
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    - 3
+    checkpoints:
+    - step: 47
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
+    - 47
   visual:
   - check: Empty state, toolbar and placeholder have no clipped text in the screenshot.
     method: manual

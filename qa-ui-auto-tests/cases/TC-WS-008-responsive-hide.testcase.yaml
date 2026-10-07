@@ -1,0 +1,118 @@
+id: TC-WS-008
+title: 'AC-09/13: Hide preserves canvas width at desktop, medium and 400px viewports'
+description: 'AC-09/13: Hide preserves canvas width at desktop, medium and 400px viewports'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-navigator"]'
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- set_viewport:
+    width: 1440
+    height: 900
+- click: '[data-testid="workspace-hide"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-canvas"]'
+    min_width: 180
+    min_height: 100
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    expect_truthy: true
+- click: '[data-testid="side-tab-work"]'
+- wait_for: '[data-testid="workspace-navigator"]'
+- screenshot: workspace-1440.png
+- set_viewport:
+    width: 980
+    height: 800
+- click: '[data-testid="workspace-hide"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-canvas"]'
+    min_width: 180
+    min_height: 100
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    expect_truthy: true
+- click: '[data-testid="side-tab-work"]'
+- wait_for: '[data-testid="workspace-navigator"]'
+- screenshot: workspace-980.png
+- set_viewport:
+    width: 400
+    height: 700
+- click: '[data-testid="workspace-hide"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-canvas"]'
+    min_width: 180
+    min_height: 100
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    expect_truthy: true
+- click: '[data-testid="side-tab-work"]'
+- wait_for: '[data-testid="workspace-navigator"]'
+- screenshot: workspace-400.png
+- assert_visible: '[data-testid="workspace-navigator"]'
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-09/13: Hide preserves canvas width at desktop, medium and 400px viewports'
+    actions:
+    - 4
+    - 5
+    - 6
+    - 10
+    - 13
+    - 14
+    - 18
+    - 21
+    - 22
+    - 26
+    checkpoints:
+    - step: 8
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]'', ''min_width'':
+        180, ''min_height'': 100}}'
+    - step: 9
+      expectation: '{''eval_readonly'': {''expression'': ''document.documentElement.scrollWidth <= document.documentElement.clientWidth'',
+        ''expect_truthy'': True}}'
+    - step: 16
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]'', ''min_width'':
+        180, ''min_height'': 100}}'
+    - step: 17
+      expectation: '{''eval_readonly'': {''expression'': ''document.documentElement.scrollWidth <= document.documentElement.clientWidth'',
+        ''expect_truthy'': True}}'
+    - step: 24
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]'', ''min_width'':
+        180, ''min_height'': 100}}'
+    - step: 25
+      expectation: '{''eval_readonly'': {''expression'': ''document.documentElement.scrollWidth <= document.documentElement.clientWidth'',
+        ''expect_truthy'': True}}'
+    - step: 29
+      expectation: The navigator can be restored at 400px width.
+    results:
+    - 8
+    - 9
+    - 16
+    - 17
+    - 24
+    - 25
+    - 29
+  visual:
+  - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
+    method: manual
+    reason: Visual evidence must be inspected after execution; pending is not a pass.
+  native:
+  - check: Native IPC, process, disk and window boundaries require the TC-WS-NATIVE companion cases.
+    method: external
+    reason: This browser case verifies renderer and stub behavior only.

@@ -87,6 +87,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_screenshot_mask` | `{selector, crop:{x,y,width,height}, polygon:[{x,y},...]}` | Browser-only: decodes the exported PNG and independently masks the retained original with the testcase's fixed crop-local physical polygon. Exact nonboundary interior/exterior alpha and fixed lossless RGB tile thresholds; 2px edge-only tolerance. Retains original/expected/actual/difference/metrics on failure too. Does not prove OS capture, clipboard or native window effects. |
 | `assert_menu_items` | `[label, label, ...]` | Browser/native. After `right_click`; checks each label visible inside `[data-testid="context-menu"]` using substring matching. |
 
+| `restart_native_app` | `null` | Native only: closes the owned QA application and launches a fresh WebDriver session, preserving the run-isolated SQLite/profile directories. Does not reseed fixtures. |
+
 ## App-specific helpers (use these instead of inlining selector chains)
 
 | Verb | Args | Notes |
@@ -260,6 +262,8 @@ Relative paths resolve from the repository root.
 | `native_show_image_window` | `{path, x?, y?}` or `{action: close}` | Native Linux/X11 and Windows. Shows a topmost Tk window with the PNG so a real screen capture contains the QR; records geometry in `native-image-window.json`; closed automatically after the case. |
 
 ## Last-resort escape hatch
+
+`switch_native_window: main|detached` switches real W3C window handles in native mode. Call `main` before detaching to capture the main handle. Exactly one detached window is required; ambiguous or missing windows fail. The macOS QA bridge targets the selected WKWebView for DOM actions and screenshots. This verb does not fabricate a browser popup or invoke product actions.
 
 | Verb | Args | Notes |
 |------|------|-------|

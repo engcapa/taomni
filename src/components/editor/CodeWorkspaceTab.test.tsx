@@ -7028,12 +7028,12 @@ describe("CodeWorkspaceTab", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
 
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
-    });
-
     // WebView2 drops DOM focus to the body when the focused menu node leaves
     // the document, after the restore that ran before the unmount commit.
+    // fireEvent has committed the removal synchronously. Simulate the reset
+    // before yielding to the post-commit microtask/paint recovery; waitFor here
+    // can run both recoveries before we inject the event we meant to test.
+    expect(document.querySelector("[data-taomni-context-menu]")).toBeNull();
     (document.activeElement as HTMLElement | null)?.blur();
 
     await waitFor(() => {
@@ -8160,9 +8160,8 @@ describe("CodeWorkspaceTab", () => {
     ).toBe(editedSource));
     await waitFor(() => expect(changeCalls).toBe(1), { timeout: 2_000 });
 
-    await act(async () => {
-      await registrationRef.current?.executeAction("workspace.gotoDefinition");
-      await Promise.resolve();
+    act(() => {
+      void registrationRef.current?.executeAction("workspace.gotoDefinition");
     });
     expect(lspMocks.lspDefinition).not.toHaveBeenCalled();
 
@@ -8329,9 +8328,8 @@ describe("CodeWorkspaceTab", () => {
       await waitFor(() => expect(changeCalls).toBe(blockedCall), { timeout: 2_000 });
 
       let actionResult: unknown;
-      await act(async () => {
+      act(() => {
         actionResult = registrationRef.current?.executeAction(commandId);
-        await Promise.resolve();
       });
       expect(provider).not.toHaveBeenCalled();
 
@@ -14427,7 +14425,7 @@ end_of_record
       expect(screen.queryByTestId("code-workspace-intention-extract")).not.toBeInTheDocument();
     });
 
-    it("Enter renames call site and declaration; Escape keeps the default name", async () => {
+    it("Enter renames both the extracted call site and declaration", async () => {
       const fixture = setupExtract("instance-extract-enter");
       const { pane, content } = await mountExtract(fixture);
       selectExtractRange(content);
@@ -14448,10 +14446,9 @@ end_of_record
       await waitFor(() => expect(
         view.state.doc.lineAt(view.state.selection.main.head).text,
       ).toBe("        int sum = sumOf(values);"));
+    });
 
-      // Fresh setup: the watcher echo of the extract's own save, delivered while
-      // the naming prompt is open, is not a workspace change (no stale cancel).
-      await cleanup();
+    it("accepts a watcher echo of the extract's own save while naming", async () => {
       runtimeState.tauri = true;
       const echoed = setupExtract("instance-extract-echo");
       const echo = await mountExtract(echoed);
@@ -14467,10 +14464,9 @@ end_of_record
       fireEvent.keyDown(echoInput, { key: "Enter" });
       await waitFor(() => expect(echoed.text()).toBe(B2));
       expect(useAppStore.getState().statusMessage).not.toContain("workspace changed");
-      runtimeState.tauri = false;
+    });
 
-      // Fresh setup: Escape keeps the provider default name and adds no history.
-      await cleanup();
+    it("Escape keeps the extracted default name without another rename transaction", async () => {
       const escaped = setupExtract("instance-extract-escape");
       const second = await mountExtract(escaped);
       selectExtractRange(second.content);

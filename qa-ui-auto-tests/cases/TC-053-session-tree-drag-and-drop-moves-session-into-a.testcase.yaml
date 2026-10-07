@@ -15,6 +15,7 @@ fixtures:
 - ssh_required
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -60,43 +61,53 @@ steps:
     expect_truthy: true
 - screenshot: 053-session-tree-drag-drop.png
 verification:
-  review: reviewed
+  review: pending
   requirements:
   - id: R1
     requirement: 将会话拖放进新文件夹后，保存的 group_path 精确指向该文件夹。
     actions:
     - 1
     - 2
-    - 4
+    - 3
     - 5
     - 6
-    - 8
+    - 7
     - 9
-    - 11
+    - 10
     - 12
-    - 14
-    - 16
-    - 18
+    - 13
+    - 15
+    - 17
     - 19
-    - 21
+    - 20
+    - 22
     checkpoints:
-    - step: 3
+    - step: 4
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 10
+    - step: 11
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 13
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-dnd-target\"]"}'
-    - step: 15
+    - step: 16
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 17
+    - step: 18
       expectation: '{"wait_for": "[data-testid=\"folder-name-dialog\"]"}'
-    - step: 23
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-dnd-group\""}'
     - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-dnd-group\""}'
+    - step: 25
       expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0]?.group_path
         === \"User sessions / qa-ui-auto-dnd-group\"", "expect_truthy": true}}'
     results:
-    - 23
+    - 24
+    - 25
+  - id: workspace-navigation
+    requirement: Explicit navigation preserves access to the original workflow in the Workspace-first shell.
+    actions:
+    - 2
+    checkpoints:
+    - step: 24
+      expectation: The original final visible result remains reachable after the navigation migration.
+    results:
     - 24
   visual:
   - check: 拖放目标、文件夹展开层级与会话位置清晰。

@@ -1,0 +1,102 @@
+id: TC-WS-009
+title: 'AC-05/09/13: Preview reads selected files; context pane closes and returns keyboard focus'
+description: 'AC-05/09/13: Preview reads selected files; context pane closes and returns keyboard focus'
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-surface-preview"]'
+- fill:
+    selector: '[data-testid="workspace-preview-path"]'
+    value: README.txt
+- click: '[data-testid="workspace-preview-load"]'
+- assert_text:
+    selector: '[data-testid="workspace-preview-content"]'
+    contains: Browser preview uses an in-memory virtual local filesystem.
+- fill:
+    selector: '[data-testid="workspace-preview-path"]'
+    value: missing-qa.txt
+- click: '[data-testid="workspace-preview-load"]'
+- assert_visible: '[data-testid="workspace-preview"] [role="alert"]'
+- fill:
+    selector: '[data-testid="workspace-preview-path"]'
+    value: README.txt
+- click: '[data-testid="workspace-preview-load"]'
+- assert_text:
+    selector: '[data-testid="workspace-preview-content"]'
+    contains: Browser preview
+- click: '[data-testid="workspace-context-toggle"]'
+- assert_visible: '[data-testid="workspace-context-pane"]'
+- click: '[data-testid="workspace-context-close"]'
+- assert_not_visible: '[data-testid="workspace-context-pane"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "workspace-context-toggle"
+    expect_truthy: true
+- click: '[data-testid="workspace-surface-overview"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-surface-overview"]'
+    name: aria-selected
+    equals: 'true'
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: 'AC-05/09/13: Preview reads selected files; context pane closes and returns keyboard focus'
+    actions:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 16
+    - 19
+    checkpoints:
+    - step: 7
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 10
+      expectation: The visible UI establishes the expected assert_visible result after the preceding navigation
+        action.
+    - step: 13
+      expectation: The visible UI establishes the expected assert_text result after the preceding navigation action.
+    - step: 15
+      expectation: The visible UI establishes the expected assert_visible result after the preceding navigation
+        action.
+    - step: 17
+      expectation: The visible UI establishes the expected assert_not_visible result after the preceding navigation
+        action.
+    - step: 18
+      expectation: The visible UI establishes the expected eval_readonly result after the preceding navigation action.
+    - step: 20
+      expectation: The visible UI establishes the expected assert_attribute result after the preceding navigation
+        action.
+    results:
+    - 7
+    - 10
+    - 13
+    - 15
+    - 17
+    - 18
+    - 20
+  native:
+  - check: Disk, IPC and runtime persistence
+    method: external
+    reason: Browser covers renderer behavior; companion native cases cover real resources.
+  visual:
+  - check: Inspect theme, Lucide icons, spacing and clipping in the execution screenshots
+    method: manual
+    reason: Review pending execution evidence.
