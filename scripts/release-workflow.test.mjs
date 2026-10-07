@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
-const workflow = readFileSync(fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)), "utf8");
+const workflow = readFileSync(fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)), "utf8").replaceAll("\r\n", "\n");
 test("artifact-only selection controls builders and cannot enter the publishing job", () => {
   assert(workflow.includes("    if: needs.plan.outputs.build_desktop == 'true'"));
   const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
@@ -75,14 +75,14 @@ if (args[1] === "upload" && process.env.TEST_GH_UPLOAD_FAIL && !args[3].endsWith
   chmodSync(gh, 0o755);
   const trace = join(root, "gh-trace");
   const env = {
-    ...process.env, PATH: `${dirname(gh)}:${process.env.PATH}`,
+    ...process.env, TEST_GH_MOCK: gh, TEST_NODE: process.execPath,
     TAG: tag, GH_REPO: "engcapa/taomni", GITHUB_REPOSITORY: "engcapa/taomni", GITHUB_SHA: "fixture-commit",
     TEST_GH_TRACE: trace, RELEASE_NOTES: "",
   };
   return {
     root, signedPaths,
     calls: () => existsSync(trace) ? readFileSync(trace, "utf8").trim().split("\n").map(JSON.parse) : [],
-    run: (overrides = {}) => spawnSync("bash", ["-c", publishScript], { cwd: root, env: { ...env, ...overrides }, encoding: "utf8" }),
+    run: (overrides = {}) => spawnSync("bash", ["-c", 'gh() { "$TEST_NODE" "$TEST_GH_MOCK" "$@"; };\n' + publishScript], { cwd: root, env: { ...env, ...overrides }, encoding: "utf8", timeout: 60_000 }),
   };
 }
 

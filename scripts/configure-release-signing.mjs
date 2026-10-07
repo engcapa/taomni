@@ -1,7 +1,7 @@
 import { randomBytes, X509Certificate } from "node:crypto";
 import { appendFileSync, chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { validateTestVersion } from "./resolve-release-build.mjs";
@@ -164,7 +164,7 @@ export function cleanupMacosCertificate(env, runSecurity = security) {
   if (!workDir) return;
   // Cleanup only the directory allocated by this script under RUNNER_TEMP.
   const tempRoot = resolve(env.RUNNER_TEMP || tmpdir());
-  if (!resolve(workDir).startsWith(`${tempRoot}/taomni-signing-`) || resolve(workDir).slice(tempRoot.length + 1).includes("/")) {
+  if (dirname(resolve(workDir)) !== tempRoot || !basename(resolve(workDir)).startsWith("taomni-signing-")) {
     throw new Error("Refusing to clean an unexpected signing directory.");
   }
   const certificatePath = join(workDir, "certificate.pem");

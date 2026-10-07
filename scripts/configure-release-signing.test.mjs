@@ -114,8 +114,10 @@ test("imports an ordinary self-signed certificate and checks its private key bef
   const root = mkdtempSync(join(tmpdir(), "taomni-signing-unit-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const pemPath = join(root, "test.pem");
+  const configPath = join(root, "openssl.cnf");
+  writeFileSync(configPath, "[req]\ndistinguished_name = dn\n[dn]\n");
   // This disposable test key never touches a host keychain or signs an app.
-  execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", join(root, "test.key"), "-out", pemPath, "-days", "2", "-subj", "/CN=Taomni Local Code Signing"], { stdio: "ignore" });
+  execFileSync("openssl", ["req", "-config", configPath, "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", join(root, "test.key"), "-out", pemPath, "-days", "2", "-subj", "/CN=Taomni Local Code Signing"], { stdio: "ignore" });
   const pem = readFileSync(pemPath, "utf8");
   const sha1 = new X509Certificate(pem).fingerprint.replaceAll(":", "");
   const env = macos({ RUNNER_TEMP: root, GITHUB_ENV: join(root, "github-env"), MACOS_SIGNING_CERT_SHA1: sha1 });

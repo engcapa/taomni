@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
@@ -20,8 +20,8 @@ function fixture(t) {
     writeFileSync(path, bytes);
     if (executable) chmodSync(path, 0o755);
   };
-  put(join(app, "Contents/MacOS/taomni"), "app executable", true);
-  put(join(app, "Contents/Resources/sockscap/macos/xray"), "xray executable", true);
+  put(join(app, "Contents/MacOS/taomni"), "#!/bin/sh\n# app executable\n", true);
+  put(join(app, "Contents/Resources/sockscap/macos/xray"), "#!/bin/sh\n# xray executable\n", true);
   for (const name of ["Mitmproxy Redirector.app.tar", "manifest.json", "LICENSE"]) {
     const relative = `sockscap/macos/redirector/0.12.11/${name}`;
     put(join(root, "src-tauri/resources", relative), `pinned ${name}`);
@@ -51,11 +51,12 @@ if (name === "codesign") {
   if (args.includes("-r-")) console.error('designated => identifier "com.taomni.app" and ' + (process.env.TEST_CDHASH ? 'cdhash H"binary-hash"' : 'anchor H"' + (updater && process.env.TEST_DIFFERENT_REQUIREMENT ? "changed-anchor" : "fixed-anchor") + '"'));
 }
 if (name === "spctl") console.error(process.env.TEST_UNNOTARIZED ? "source=Developer ID" : "source=Notarized Developer ID");
+if (name === "shasum") console.log(require("node:crypto").createHash("sha1").update(fs.readFileSync(args.at(-1))).digest("hex") + "  " + args.at(-1));
 `;
-  for (const name of ["lipo", "codesign", "spctl", "xcrun"]) put(join(bin, name), tool, true);
+  for (const name of ["lipo", "codesign", "spctl", "xcrun", "shasum"]) put(join(bin, name), tool, true);
   const trace = join(root, "trace");
   const env = {
-    ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: root,
+    ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, RUNNER_TEMP: root.replaceAll("\\", "/"),
     MACOS_SIGNING_MODE: "self-signed", MACOS_NOTARIZE: "false",
     MACOS_SIGNING_CERT_SHA1: createHash("sha1").update("fixed certificate").digest("hex").toUpperCase(),
     APPLE_TEAM_ID: "", RELEASE_TAG: "v0.4.30", TEST_TRACE: trace,
