@@ -37,6 +37,19 @@ class ScreenshotMaskTest(TestCase):
             self.assertEqual(metrics["alphaMismatches"], 1)
             self.assertFalse(metrics["passed"])
 
+    def test_watermark_mode_requires_marks_and_still_rejects_alpha_leaks(self):
+        self.assertFalse(compare_mask(self.expected, self.source, self.crop, self.polygon,
+                                      watermarked=True)[0]["passed"])
+        marked = self.expected.copy()
+        for y in range(20, 28):
+            for x in range(20, 28):
+                marked.putpixel((x, y), (255, 255, 255, 255))
+        self.assertTrue(compare_mask(marked, self.source, self.crop, self.polygon,
+                                     watermarked=True)[0]["passed"])
+        marked.putpixel((120, 150), (255, 255, 255, 128))
+        self.assertFalse(compare_mask(marked, self.source, self.crop, self.polygon,
+                                      watermarked=True)[0]["passed"])
+
     def test_black_interior_and_missing_tile_fail_rgb_oracle(self):
         corrupt = self.expected.copy()
         for y in range(24, 48):

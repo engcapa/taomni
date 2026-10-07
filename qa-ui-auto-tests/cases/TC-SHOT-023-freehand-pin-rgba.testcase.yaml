@@ -15,9 +15,9 @@ steps:
     selector: '[data-testid="screenshot-select-layer"]'
     points: [{x: 100, y: 100}, {x: 500, y: 100}, {x: 500, y: 220}, {x: 220, y: 220}, {x: 220, y: 400}, {x: 100, y: 400}]
 - wait_for: '[data-testid="screenshot-toolbar"]'
-# Start on the accepted contour boundary; the shape and watermark lie in the notch.
-# The final exported interior must still match the original, and the notch must
-# have zero alpha: leaked annotations/watermark cannot be hidden by RGB checks.
+# Start on the accepted contour boundary; the shape lies in the notch.
+# Cancel the pending watermark before checking pristine interior RGB. Scattered
+# watermarks intentionally change that interior and are checked separately.
 - click: '[data-testid="screenshot-tool-rect"]'
 - drag_to:
     from: '[data-testid="screenshot-annotation-layer"]'
@@ -29,7 +29,7 @@ steps:
 - type:
     selector: '[data-testid="screenshot-watermark-text"]'
     text: QA
-- click: '[data-testid="screenshot-watermark-apply"]'
+- click: '[data-testid="screenshot-watermark"]'
 - click: '[data-testid="screenshot-pin"]'
 - wait_for: '[data-testid="screenshot-pin-image"]'
 - eval_readonly:
@@ -67,6 +67,59 @@ steps:
 - click: '[data-testid="screenshot-pin-close"]'
 - wait_for: '[data-testid="system-screenshot"]'
 - assert_not_visible: '[data-testid="screenshot-pin-window"]'
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport:
+    width: 1000
+    height: 750
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- screenshot_reference:
+    selector: '[data-testid="screenshot-base-image"]'
+- click: '[data-testid="screenshot-selection-freehand"]'
+- drag_path:
+    selector: '[data-testid="screenshot-select-layer"]'
+    points:
+    - x: 100
+      y: 100
+    - x: 500
+      y: 100
+    - x: 500
+      y: 220
+    - x: 220
+      y: 220
+    - x: 220
+      y: 400
+    - x: 100
+      y: 400
+- click: '[data-testid="screenshot-watermark"]'
+- fill:
+    selector: '[data-testid="screenshot-watermark-text"]'
+    value: QA
+- click: '[data-testid="screenshot-watermark-apply"]'
+- click: '[data-testid="screenshot-pin"]'
+- wait_for: '[data-testid="screenshot-pin-image"]'
+- assert_screenshot_mask:
+    selector: '[data-testid="screenshot-pin-image"]'
+    crop:
+      x: 40
+      y: 40
+      width: 160
+      height: 120
+    polygon:
+    - x: 0
+      y: 0
+    - x: 160
+      y: 0
+    - x: 160
+      y: 48
+    - x: 48
+      y: 48
+    - x: 48
+      y: 120
+    - x: 0
+      y: 120
+    watermarked: true
+- click: '[data-testid="screenshot-pin-close"]'
+- wait_for: '[data-testid="system-screenshot"]'
 verification:
   review: reviewed
   requirements:
@@ -76,7 +129,7 @@ verification:
     checkpoints:
     - {step: 10, expectation: A boundary-started annotation extends into the empty notch before export.}
     - {step: 16, expectation: The pinned PNG has decoded to the exact 160x120 crop.}
-    - {step: 17, expectation: 'Independent original/polygon comparison passes dimensions, fixed RGB tile thresholds and exact nonboundary alpha even with annotation and watermark drawn into the notch; original/expected/actual/difference/metrics are retained.'}
+    - {step: 17, expectation: 'Independent original/polygon comparison passes dimensions, fixed RGB tile thresholds and exact nonboundary alpha with the annotation extending into the notch and pending watermark cancelled; original/expected/actual/difference/metrics are retained.'}
     - {step: 18, expectation: Public Pin closes the source overlay.}
     - {step: 21, expectation: Escape closes the retained pin route.}
     results: [10, 16, 17, 18, 21]
@@ -89,6 +142,28 @@ verification:
     - {step: 32, expectation: Every interior RGB tile matches the original and exterior alpha is zero under the independent even-odd polygon.}
     - {step: 35, expectation: The close button closes the second retained pin.}
     results: [28, 31, 32, 35]
+  - id: R3
+    requirement: Scattered watermark changes interior RGB while freehand clipping preserves
+      opaque interior and transparent exterior; most source background remains unchanged.
+    actions:
+    - 36
+    - 37
+    - 39
+    - 40
+    - 42
+    - 43
+    - 44
+    - 45
+    - 48
+    checkpoints:
+    - step: 47
+      expectation: Independent PNG evidence shows visible watermark pixels, preserved
+        source background and exact nonboundary alpha.
+    - step: 49
+      expectation: Watermarked pin closes normally.
+    results:
+    - 47
+    - 49
   visual:
   - {check: Real exported PNG content and alpha, method: automated, reason: 'Pillow compares retained original bytes against actual browser canvas exports using independent fixed shapes, including a crossed contour; artifacts are retained even on failure.'}
   native:
