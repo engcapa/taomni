@@ -40,10 +40,6 @@ steps:
     label: QA VNC resource
 - click: '[data-testid="workspace-navigator"] >> text="QA VNC resource"'
 - wait_for:
-    selector: '[data-testid="vnc-unencrypted-continue"]'
-    timeout_sec: 20
-- click: '[data-testid="vnc-unencrypted-continue"]'
-- wait_for:
     selector: '[data-testid="vnc-auth-password"]'
     timeout_sec: 20
 - fill:
