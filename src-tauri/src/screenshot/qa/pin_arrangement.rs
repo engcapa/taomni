@@ -30,11 +30,6 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
             return image()?.naturalWidth === 320 && image()?.naturalHeight === 240;
         "#, Duration::from_secs(10)).await?;
         anyhow::ensure!(ready == true, "pin {index} did not load its original image");
-        // WebKitGTK needs several compositor turns between top-level
-        // surfaces on X11/VNC. Creating both transparent pins back-to-back
-        // can tear down the driver page while the second WebView is still
-        // being mapped; Xtigervnc is slower than Xvfb here.
-        tokio::time::sleep(Duration::from_millis(2000)).await;
         let pinned = super::super::tool_state()
             .pins
             .get(&label)
@@ -148,9 +143,9 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         }
         json!({"board":content,"size":size,"pinsRestored":true})
     } else {
-        let monitor = windows[0]
-            .current_monitor()?
-            .context("pin monitor missing")?;
+        let monitor = super::super::pins::pin_monitor(app, windows[0].clone())
+            .await
+            .map_err(anyhow::Error::msg)?;
         let work = monitor.work_area();
         let area = [
             work.position.x,

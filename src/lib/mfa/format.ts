@@ -13,9 +13,11 @@ export function formatSecretKey(secret: string): string {
 }
 
 /** Whole seconds left in a TOTP window (never below zero). */
-export function remainingSeconds(validUntilMs: number | null, nowMs: number): number {
+export function remainingSeconds(validUntilMs: number | null, nowMs: number, validFromMs: number | null = null): number {
   if (validUntilMs === null) return 0;
-  return Math.max(0, Math.ceil((validUntilMs - nowMs) / 1000));
+  // A refreshed code can arrive before the UI clock ticks past its boundary.
+  const effectiveNow = Math.max(nowMs, validFromMs ?? nowMs);
+  return Math.max(0, Math.ceil((validUntilMs - effectiveNow) / 1000));
 }
 
 /** Known backend error codes; anything else is shown verbatim. */

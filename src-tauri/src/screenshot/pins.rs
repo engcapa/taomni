@@ -246,6 +246,29 @@ pub async fn screenshot_set_pin_note(
     Ok(note)
 }
 
+/// GDK monitor/work-area queries can issue Xlib requests. Always snapshot them
+/// on the UI thread, including calls made by asynchronous commands and QA.
+pub(super) async fn pin_monitor(
+    app: &AppHandle,
+    window: WebviewWindow,
+) -> Result<tauri::Monitor, String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let monitor = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .or_else(|| window.primary_monitor().ok().flatten())
+            .ok_or_else(|| "no monitor for pin arrangement".to_string());
+        let _ = tx.send(monitor);
+    })
+    .map_err(|e| e.to_string())?;
+    tokio::time::timeout(std::time::Duration::from_secs(5), rx)
+        .await
+        .map_err(|_| "monitor query timed out".to_string())?
+        .map_err(|e| e.to_string())?
+}
+
 /// Move and size every open pin according to `mode` on the monitor showing
 /// `anchor` (the requesting pin), or the primary monitor.
 #[tauri::command]
@@ -265,12 +288,7 @@ pub async fn screenshot_arrange_pins(
     let anchor_window = anchor
         .and_then(|label| app.get_webview_window(&label))
         .unwrap_or_else(|| pins[0].1.clone());
-    let monitor = anchor_window
-        .current_monitor()
-        .ok()
-        .flatten()
-        .or_else(|| anchor_window.primary_monitor().ok().flatten())
-        .ok_or("no monitor for pin arrangement")?;
+    let monitor = pin_monitor(&app, anchor_window).await?;
     let work = monitor.work_area();
     let area = Rect {
         x: work.position.x as f64,
