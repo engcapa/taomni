@@ -21,7 +21,7 @@ export function ScrollCaptureBar() {
     }).catch(() => undefined);
     return () => { active = false; elements.forEach((el, i) => { el.style.background = backgrounds[i]; }); };
   }, []);
-  const [mode, setMode] = useState<ScrollMode>("auto");
+  const [mode, setMode] = useState<ScrollMode>("manual");
   const [needsOverlap, setNeedsOverlap] = useState(false);
   const [changingMode, setChangingMode] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -33,7 +33,7 @@ export function ScrollCaptureBar() {
     const update = (status: ScrollStatus) => {
       if (disposed) return;
       setFrames((n) => Math.max(n, status.frames));
-      setMode(status.mode ?? "auto");
+      setMode(status.mode ?? "manual");
       setNeedsOverlap(status.needsOverlap ?? false);
       setInputError(status.inputError ?? null);
     };

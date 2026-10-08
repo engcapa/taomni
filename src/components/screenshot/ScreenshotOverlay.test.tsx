@@ -90,7 +90,8 @@ describe("ScreenshotOverlay", () => {
     await open();
     drag("screenshot-select-layer", [100, 100], [500, 450]);
     fireEvent.click(screen.getByTestId("screenshot-scroll-capture"));
-    fireEvent.click(screen.getByTestId("screenshot-scroll-mode-manual"));
+    // Manual is the default choice.
+    expect(screen.getByTestId("screenshot-scroll-mode-manual")).toBeChecked();
     api.scrollCapture.mockRejectedValueOnce(new Error("scroll capture cancelled"));
     await waitFor(() => expect(screen.getByTestId("screenshot-scroll-start")).toBeEnabled());
     fireEvent.click(screen.getByTestId("screenshot-scroll-start"));

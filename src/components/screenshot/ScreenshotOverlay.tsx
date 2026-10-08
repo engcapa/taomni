@@ -361,7 +361,7 @@ export function ScreenshotOverlay() {
   const [canRedo, setCanRedo] = useState(false);
   const [annotationSelected, setAnnotationSelected] = useState(false);
   const [scrollConfirm, setScrollConfirm] = useState(false);
-  const [scrollMode, setScrollMode] = useState<ScrollMode>("auto");
+  const [scrollMode, setScrollMode] = useState<ScrollMode>("manual");
   const [plannedRegion, setPlannedRegion] = useState<PhysicalRect | null>(null);
   const [planningScroll, setPlanningScroll] = useState(false);
   const onAnnotationSelection = useCallback((shape: Shape | null) => {
