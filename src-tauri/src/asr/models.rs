@@ -434,10 +434,14 @@ pub async fn voice_install_sherpa_model(
                 if std::fs::metadata(&legacy).is_ok_and(|m| m.len() == *bytes)
                     && crate::models::downloader::sha256_file(&legacy).is_ok_and(|hash| hash == *sha256) {
                     tokio::fs::copy(&legacy, &part).await.map_err(|e| e.to_string())?;
-                } else if std::fs::metadata(&legacy_part).is_ok_and(|m| m.len() <= *bytes) {
+                } else if !dir.join(format!("{filename}.legacy-part-imported")).exists()
+                    && std::fs::metadata(&legacy_part).is_ok_and(|m| m.len() <= *bytes) {
                     // Copy, never move, so a cancelled migration leaves the old
                     // installer state intact. Final hash still validates the prefix.
                     tokio::fs::copy(&legacy_part, &part).await.map_err(|e| e.to_string())?;
+                    // A rejected old prefix must not be copied back on every retry.
+                    tokio::fs::write(dir.join(format!("{filename}.legacy-part-imported")), b"")
+                        .await.map_err(|e| e.to_string())?;
                 }
             }
             let url = format!("{SHERPA_UPSTREAM_REPOSITORY}/resolve/{SHERPA_UPSTREAM_REVISION}/{filename}?download=true");
