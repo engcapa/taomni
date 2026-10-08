@@ -13,6 +13,17 @@ python qa-ui-auto-report/workspace-first/run-mysql-fixture.py
 python qa-ui-auto-report/workspace-first/run-vnc-fixture.py
 ```
 
+Probe the persistent lease without starting or stopping anything:
+
+```powershell
+$env:QA_SSH_PASSWORD = (Get-Content qa-ui-auto-report/workspace-first/ssh-fixture.secret -Raw).Trim()
+$env:QA_VNC_PASSWORD = (Get-Content qa-ui-auto-report/workspace-first/vnc-fixture.secret -Raw).Trim()
+$env:TAOMNI_TEST_MYSQL_PASSWORD = (Get-Content qa-ui-auto-report/workspace-first/mysql-fixture/password.secret -Raw).Trim()
+$env:QA_CAPABILITIES = '["ssh","mysql","vnc"]'
+python .agents/skills/qa-ui-auto/scripts/ci_services.py probe-reused `
+  --config qa-ui-auto-report/workspace-first/browser-full-services.config.yaml
+```
+
 Those scripts keep their generated credentials under the ignored
 `qa-ui-auto-report/workspace-first/` directory. `run-services.py` can be used to
 load the environment references without printing credentials. The fixed local

@@ -38,7 +38,8 @@ steps:
 - select_option:
     selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
     label: QA VNC resource
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA VNC resource"]:visible'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA VNC
+    resource"]:visible'
 - wait_for:
     selector: '[data-testid="vnc-unencrypted-continue"]'
     timeout_sec: 20
@@ -64,8 +65,11 @@ steps:
 
       '
 - click: '[data-testid="workspace-row-qa-workspace-main"]'
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA VNC resource"]:visible'
-- wait_for: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA VNC
+    resource"]:visible'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
+    timeout_sec: 30
 - assert_count:
     selector: '[data-testid="vnc-canvas"]'
     equal: 1
@@ -77,16 +81,22 @@ steps:
 - click: '[data-testid="vnc-detach"]'
 - switch_native_window: detached
 - wait_for: '[data-testid="detached-session-window"][data-detached-kind="vnc"]'
-- wait_for: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
+    timeout_sec: 30
 - host_write_file:
     path: ${fixture.vnc_control}
     text: 'resize 900 600
 
       '
-- wait_for: '[data-testid="vnc-canvas"][width="900"][height="600"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="900"][height="600"]'
+    timeout_sec: 30
 - click: '[data-testid="detached-reattach"]'
 - switch_native_window: main
-- wait_for: '[data-testid="vnc-canvas"][width="900"][height="600"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="900"][height="600"]'
+    timeout_sec: 30
 - assert_text:
     selector: '[data-testid="workspace-header"]'
     contains: Workspace · QA Main
@@ -129,9 +139,11 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]", "timeout_sec":
         20}}'
     - step: 29
-      expectation: '{"wait_for": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]", "timeout_sec":
+        30}}'
     - step: 42
-      expectation: '{"wait_for": "[data-testid=\"vnc-canvas\"][width=\"900\"][height=\"600\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"900\"][height=\"600\"]", "timeout_sec":
+        30}}'
     - step: 43
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "Workspace ·
         QA Main"}}'

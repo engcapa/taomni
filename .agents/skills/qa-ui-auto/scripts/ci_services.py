@@ -187,6 +187,9 @@ def retry(probe, seconds=120):
 def probe_reused_services(root: Path, capabilities, config):
     """Authenticate to persistent local fixtures without owning their lifetime."""
     caps = set(capabilities) & {"ssh", "mysql", "vnc", "ard"}
+    local_deps = Path("qa-ui-auto-report/workspace-first/python-deps").resolve()
+    if local_deps.is_dir() and str(local_deps) not in sys.path:
+        sys.path.insert(0, str(local_deps))
     if "ard" in caps:
         raise RuntimeError("reused ARD fixtures are not supported")
     facts = {"ownership": "external-local-fixtures", "platform": platform.system()}
@@ -247,7 +250,7 @@ def probe_reused_services(root: Path, capabilities, config):
             raise RuntimeError("the scriptable VNC fixture must use 127.0.0.1")
         width, height, _ = rfb_probe(int(cfg["port"]), password)
         response = vnc_control(int(cfg["control_port"]), "stats")
-        if not response or not isinstance(json.loads(response[0]), dict):
+        if not response or not isinstance(json.loads(response[0]), (dict, list)):
             raise RuntimeError("reused VNC fixture control probe failed")
         facts["vnc"] = {"authentication": True, "server_init": [width, height], "port": cfg["port"]}
     write_json(Path(root) / "lease.json", facts)
@@ -716,11 +719,17 @@ class Services:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["install", "probe"])
+    parser.add_argument("command", choices=["install", "probe", "probe-reused"])
+    parser.add_argument("--config", type=Path, help="Local fixture config for probe-reused")
     args = parser.parse_args()
     caps = json.loads(os.environ.get("QA_CAPABILITIES", '["ssh", "mysql"]'))
     if args.command == "install":
         install(caps)
+    elif args.command == "probe-reused":
+        if not args.config:
+            raise SystemExit("probe-reused requires --config")
+        cfg = yaml.safe_load(args.config.read_text(encoding="utf-8"))
+        print(json.dumps(probe_reused_services(Path("qa-ui-auto-report/service-probe"), caps, cfg), indent=2))
     else:
         with Services(Path("qa-ui-auto-report/service-probe"), caps, {}):
             print(f"service protocol probes passed: {', '.join(sorted(caps))}")
