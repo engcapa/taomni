@@ -19,6 +19,8 @@ interface Installation {
   phase: "connecting" | "downloading" | "importing" | "verifying" | "complete" | "failed" | "cancelled";
   error?: string | null;
 }
+interface SherpaStatus { model_id: string; revision: string; files: { filename: string; bytes: number; downloaded: number; installed: boolean }[]; total_bytes: number; downloaded_bytes: number; installed: boolean }
+interface SherpaProgress { revision: number; job_id: string; model_id: string; bytes: number; total: number; phase: "connecting" | "downloading" | "verifying" | "complete" | "failed" | "cancelled"; file?: string | null; error?: string | null }
 const isRunning = (job: Installation | null) => !!job && !["complete", "failed", "cancelled"].includes(job.phase);
 const megabytes = (bytes: number) => (bytes / 1e6).toFixed(1);
 
@@ -35,7 +37,11 @@ export function AsrPanel() {
   const [checked, setChecked] = useState(false);
   const [error, setError] = useState("");
   const [supported, setSupported] = useState(true);
+  const [sherpa, setSherpa] = useState<SherpaStatus | null>(null);
+  const [sherpaProgress, setSherpaProgress] = useState<SherpaProgress | null>(null);
   const savedProxy = config?.asr.download_proxy;
+  const [providerDraft, setProviderDraft] = useState<Record<string, AsrConfig["providers"][string]>>({});
+  useEffect(() => { if (config?.asr.providers) setProviderDraft(config.asr.providers); }, [config?.asr.providers]);
   const [downloadProxy, setDownloadProxy] = useState(savedProxy);
   useEffect(() => { setDownloadProxy(savedProxy); }, [savedProxy]);
   const proxyDirty = JSON.stringify(downloadProxy) !== JSON.stringify(savedProxy);
@@ -59,15 +65,17 @@ export function AsrPanel() {
       if (!isRunning(job)) void refresh().catch(fail);
     };
     void refresh().catch(fail);
+    void invoke<SherpaStatus>("voice_sherpa_model_status").then((value) => { if (!disposed) setSherpa(value); }).catch(fail);
     void invoke<boolean>("voice_capture_supported").then((value) => { if (!disposed) setSupported(value); }).catch(fail);
     const snapshot = () => { void invoke<Installation | null>("voice_model_installation").then(accept).catch(fail); };
     // Subscribe before the initial snapshot; revisions discard stale responses.
     const unlisten = listen<Installation>("voice-model-progress", ({ payload }) => accept(payload));
+    const sherpaUnlisten = listen<SherpaProgress>("voice-sherpa-model-progress", ({ payload }) => { if (!disposed) { setSherpaProgress(payload); void invoke<SherpaStatus>("voice_sherpa_model_status").then(setSherpa).catch(fail); } });
     void unlisten.then(snapshot).catch(fail);
     snapshot();
     // Also recovers missed events and observes jobs started in another window.
     const poll = setInterval(snapshot, 1000);
-    return () => { disposed = true; clearInterval(poll); void unlisten.then((fn) => fn()).catch(() => undefined); };
+    return () => { disposed = true; clearInterval(poll); void unlisten.then((fn) => fn()).catch(() => undefined); void sherpaUnlisten.then((fn) => fn()).catch(() => undefined); };
   }, [refresh]);
   const downloading = isRunning(installation);
   const blocked = !!busy || downloading || !statusReady;
@@ -95,6 +103,13 @@ export function AsrPanel() {
     catch (e) { setError(String(e)); }
     finally { setBusy(""); }
   };
+  const installSherpa = async () => {
+    if (blocked) return;
+    setBusy("sherpa"); setError("");
+    try { await invoke("voice_install_sherpa_model"); setSherpa(await invoke<SherpaStatus>("voice_sherpa_model_status")); }
+    catch (e) { if (String(e) !== "CANCELLED") setError(String(e)); }
+    finally { setBusy(""); }
+  };
   const select = async (patch: Partial<AsrConfig>) => {
     if (!config) return;
     setError(""); setBusy("config");
@@ -118,6 +133,33 @@ export function AsrPanel() {
       <p className="flex items-start gap-2 text-[var(--taomni-text-muted)]"><ShieldCheck className="h-4 w-4 shrink-0" />{t("voice.privacy")}</p>
     </header>
     {!supported && <p role="alert">{t("voice.unsupported")}</p>}
+    <section className="rounded-lg border border-[var(--taomni-divider)] p-3 space-y-3" data-testid="asr-realtime-settings">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <strong>{t("voice.realtimeTitle")}</strong>
+        <select className="taomni-input" data-testid="asr-realtime-provider" value={config?.asr.active ?? "whisper-base"} disabled={blocked}
+          onChange={(e) => { const id = e.target.value; void select({ active: id, mode: ["whisper-base", "whisper-small", "whisper-medium", "sherpa-zipformer-zh-en"].includes(id) ? "local" : "online" }); }}>
+          <option value="whisper-base">Whisper Base (batch)</option>
+          <option value="sherpa-zipformer-zh-en">Local Zipformer (streaming)</option>
+          <option value="aliyun">Aliyun Paraformer Realtime</option>
+          <option value="deepgram">Deepgram Nova-3</option>
+          <option value="gemini">Google Gemini Transcribe Live</option>
+        </select>
+      </div>
+      {config?.asr.active === "sherpa-zipformer-zh-en" && <div className="space-y-2"><p className="text-[var(--taomni-text-muted)] leading-relaxed">Local streaming uses the verified Zipformer bundle in the application cache. GPU acceleration remains a later task.</p><div className="flex items-center gap-2"><span>{sherpa?.installed ? "Zipformer installed" : `Zipformer ${megabytes(sherpa?.downloaded_bytes ?? 0)} / ${megabytes(sherpa?.total_bytes ?? 0)} MB`}</span><button type="button" className="taomni-btn px-2 py-1" disabled={blocked || (!!sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase))} onClick={() => void installSherpa()}>{sherpa?.installed ? "Reinstall Zipformer" : "Install Zipformer"}</button>{sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase) && <button type="button" className="taomni-btn px-2 py-1" onClick={() => void invoke("voice_cancel_sherpa_model_installation", { jobId: sherpaProgress.job_id })}>Cancel</button>}</div>{sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase) && <progress className="block h-2 w-full accent-[var(--taomni-accent)]" max={100} value={Math.floor((sherpaProgress.bytes * 100) / Math.max(1, sherpaProgress.total))} />}{sherpaProgress?.error && <p className="text-red-400 break-words">{sherpaProgress.error}</p>}</div>}
+      {config?.asr.mode === "online" && config.asr.providers[config.asr.active] && (() => {
+        const id = config.asr.active;
+        const provider = providerDraft[id] ?? config.asr.providers[id];
+        const updateProvider = (patch: Partial<typeof provider>) => setProviderDraft((current) => ({ ...current, [id]: { ...provider, ...patch } }));
+        return <div className="grid gap-2 md:grid-cols-2">
+          <label className="space-y-1">Model<input className="taomni-input w-full" value={provider.model} onChange={(e) => updateProvider({ model: e.target.value })} /></label>
+          <label className="space-y-1">API key<input className="taomni-input w-full" type="password" placeholder={provider.api_key?.startsWith("vault:") ? "Stored in credential vault" : "Required"} value={provider.api_key?.startsWith("vault:") ? "" : provider.api_key ?? ""} onChange={(e) => updateProvider({ api_key: e.target.value })} /></label>
+          <label className="space-y-1">Proxy<select className="taomni-input w-full" value={provider.proxy_mode ?? "app"} onChange={(e) => updateProvider({ proxy_mode: e.target.value })}><option value="app">Application proxy</option><option value="custom">Feature proxy</option><option value="none">No proxy</option></select></label>
+          {provider.proxy_mode === "custom" && <label className="space-y-1">Proxy URL<input className="taomni-input w-full" value={provider.proxy_url ?? ""} placeholder="http://10.1.0.80:3228" onChange={(e) => updateProvider({ proxy_url: e.target.value })} /></label>}
+          <button type="button" className="taomni-btn px-2 py-1 justify-self-start" disabled={blocked} onClick={() => void select({ providers: providerDraft })}>Save provider</button>
+          <p className="md:col-span-2 text-[var(--taomni-text-muted)]">Keys are encrypted in the credential vault when saved. A configured proxy failure is surfaced; the provider never silently falls back to a direct connection.</p>
+        </div>;
+      })()}
+    </section>
     {installation && <section data-testid="asr-installation-progress" role="status" className={`rounded-lg border p-3 space-y-2 ${installation.phase === "failed" ? "border-red-400/40" : "border-[var(--taomni-accent)]/30 bg-[var(--taomni-accent)]/5"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <strong>{installation.model_id.replace("whisper-", "Whisper ")} · {phaseLabel(installation.phase)}</strong>

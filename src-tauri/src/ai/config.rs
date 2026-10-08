@@ -97,6 +97,10 @@ pub struct AsrConfig {
     pub download_proxy: crate::asr::models::DownloadProxyConfig,
     pub active: String,
     pub providers: HashMap<String, AsrProviderConfig>,
+    /// `local` (default) keeps audio on-device. `online` uses the selected
+    /// realtime provider over its WebSocket API.
+    #[serde(default = "default_asr_mode")]
+    pub mode: String,
     pub warm_on_startup: bool,
     pub vad: String,
     #[serde(default = "asr_auto_language")]
@@ -105,14 +109,36 @@ pub struct AsrConfig {
 fn asr_auto_language() -> String {
     "auto".into()
 }
+fn default_asr_mode() -> String {
+    "local".into()
+}
 impl AsrConfig {
     pub fn normalize(&mut self) {
         // Previous releases advertised unimplemented engines/quantized files.
         // Migrate them to the runnable multilingual Base without downloading.
-        if !["whisper-base", "whisper-small", "whisper-medium"].contains(&self.active.as_str()) {
+        if ![
+            "whisper-base",
+            "whisper-small",
+            "whisper-medium",
+            "sherpa-zipformer-zh-en",
+            "aliyun",
+            "deepgram",
+            "gemini",
+        ]
+        .contains(&self.active.as_str())
+        {
             self.active = "whisper-base".into();
         }
-        self.providers = Self::default().providers;
+        self.mode = if ["aliyun", "deepgram", "gemini"].contains(&self.active.as_str()) {
+            "online"
+        } else {
+            "local"
+        }
+        .into();
+        let defaults = Self::default().providers;
+        for (id, provider) in defaults {
+            self.providers.entry(id).or_insert(provider);
+        }
         if !["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].contains(&self.language.as_str()) {
             self.language = "auto".into();
         }
@@ -125,18 +151,63 @@ impl Default for AsrConfig {
         Self {
             download_proxy: Default::default(),
             active: "whisper-base".into(),
-            providers: ["base", "small", "medium"]
-                .into_iter()
-                .map(|size| {
-                    (
-                        format!("whisper-{size}"),
-                        AsrProviderConfig {
-                            engine: "whisper-rs".into(),
-                            model: format!("ggml-{size}.bin"),
-                        },
-                    )
-                })
-                .collect(),
+            providers: {
+                let mut providers = ["base", "small", "medium"]
+                    .into_iter()
+                    .map(|size| {
+                        (
+                            format!("whisper-{size}"),
+                            AsrProviderConfig {
+                                engine: "whisper-rs".into(),
+                                model: format!("ggml-{size}.bin"),
+                                endpoint: String::new(),
+                                api_key: String::new(),
+                                proxy_mode: default_asr_proxy_mode(),
+                                proxy_url: String::new(),
+                            },
+                        )
+                    })
+                    .collect::<HashMap<_, _>>();
+                providers.insert(
+                    "sherpa-zipformer-zh-en".into(),
+                    AsrProviderConfig {
+                        engine: "sherpa-onnx".into(),
+                        model: "streaming-zipformer-bilingual-zh-en-2023-02-20".into(),
+                        endpoint: String::new(),
+                        api_key: String::new(),
+                        proxy_mode: default_asr_proxy_mode(),
+                        proxy_url: String::new(),
+                    },
+                );
+                providers.insert(
+                    "aliyun".into(),
+                    AsrProviderConfig {
+                        engine: "aliyun-dashscope".into(),
+                        model: "paraformer-realtime-v2".into(),
+                        endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/inference/".into(),
+                        api_key: String::new(),
+                        proxy_mode: default_asr_proxy_mode(),
+                        proxy_url: String::new(),
+                    },
+                );
+                providers.insert(
+                    "deepgram".into(),
+                    AsrProviderConfig {
+                        engine: "deepgram".into(),
+                        model: "nova-3".into(),
+                        endpoint: "wss://api.deepgram.com/v1/listen".into(),
+                        api_key: String::new(),
+                        proxy_mode: default_asr_proxy_mode(),
+                        proxy_url: String::new(),
+                    },
+                );
+                providers.insert("gemini".into(), AsrProviderConfig {
+                    engine: "gemini".into(), model: "gemini-3.5-transcribe-live".into(),
+                    endpoint: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent".into(), api_key: String::new(), proxy_mode: default_asr_proxy_mode(), proxy_url: String::new(),
+                });
+                providers
+            },
+            mode: default_asr_mode(),
             warm_on_startup: false,
             vad: "none".into(),
             language: "auto".into(),
@@ -147,6 +218,20 @@ impl Default for AsrConfig {
 pub struct AsrProviderConfig {
     pub engine: String,
     pub model: String,
+    #[serde(default)]
+    pub endpoint: String,
+    /// A `vault:<id>` reference. Plaintext keys are accepted only transiently
+    /// by the UI and must be moved to the credential vault before persistence.
+    #[serde(default)]
+    pub api_key: String,
+    #[serde(default = "default_asr_proxy_mode")]
+    pub proxy_mode: String,
+    #[serde(default)]
+    pub proxy_url: String,
+}
+
+fn default_asr_proxy_mode() -> String {
+    "app".into()
 }
 
 // ── LLM ──────────────────────────────────────────────────────────────────────
@@ -556,14 +641,18 @@ mod asr_migration_tests {
     #[test]
     fn legacy_asr_migrates_without_enabling_download_or_warmup() {
         let mut config = AsrConfig::default();
-        config.active = "sherpa-zipformer-zh-en".into();
+        config.active = "legacy-unavailable-engine".into();
         config.language = "invalid".into();
         config.warm_on_startup = true;
         config.normalize();
         assert_eq!(config.active, "whisper-base");
         assert_eq!(config.language, "auto");
         assert!(!config.warm_on_startup);
-        assert_eq!(config.providers.len(), 3);
+        assert!(config.providers.contains_key("whisper-base"));
+        assert!(config.providers.contains_key("sherpa-zipformer-zh-en"));
+        assert!(config.providers.contains_key("aliyun"));
+        assert!(config.providers.contains_key("deepgram"));
+        assert!(config.providers.contains_key("gemini"));
         config.active = "whisper-small".into();
         config.normalize();
         assert_eq!(config.active, "whisper-small");

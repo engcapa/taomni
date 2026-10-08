@@ -2979,6 +2979,7 @@ const dict = {
     "close": "Close",
     "privacy": "Speech recognition runs on this device. Audio is not uploaded. Review the text before sending.",
     "modelHelp": "Base supports Chinese. For Chinese dictation, choose 中文; upgrade to Small/Medium if accuracy is insufficient. Small and Medium may improve accuracy but use more memory and take longer. Click once to record and again to transcribe; Esc cancels.",
+    "realtimeTitle": "Realtime speech to text",
     "language": "Speech language",
     "autoLanguage": "Auto detect",
     "installed": "Downloaded (verified when loaded)",
