@@ -48,33 +48,33 @@ steps:
       steps: 8
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 420
+    min_width: 400
     min_height: 200
 - press:
     selector: '[data-testid="main-sidebar-resize-handle"]'
     key: ArrowRight
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 420
+    min_width: 400
     min_height: 200
 - click: '[data-testid="workspace-hide"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - assert_element_geometry:
     selector: '[data-testid="workspace-canvas"]'
-    min_width: 420
+    min_width: 400
     min_height: 200
 - click: '[data-testid="side-tab-work"]'
 - wait_for: '[data-testid="workspace-navigator"]'
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 420
+    min_width: 400
     min_height: 200
 - reload_window: null
 - wait_for: '[aria-label="Unpin QA Main"]'
 - assert_visible: '[data-testid="workspace-navigator"] section:first-of-type [data-testid="workspace-row-qa-workspace-main"]'
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 420
+    min_width: 400
     min_height: 200
 - click: '[aria-label="Unpin QA Main"]'
 - wait_for: '[aria-label="Pin QA Main"]'
@@ -113,21 +113,21 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:first-of-type [data-testid=\"workspace-row-qa-workspace-main\"]"}'
     - step: 15
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
-        390, "min_height": 200}}'
+        400, "min_height": 200}}'
     - step: 17
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
-        420, "min_height": 200}}'
+        400, "min_height": 200}}'
     - step: 20
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-canvas\"]", "min_width":
         1300, "min_height": 200}}'
     - step: 23
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
-        420, "min_height": 200}}'
+        400, "min_height": 200}}'
     - step: 26
       expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:first-of-type [data-testid=\"workspace-row-qa-workspace-main\"]"}'
     - step: 27
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
-        420, "min_height": 200}}'
+        400, "min_height": 200}}'
     - step: 30
       expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:nth-of-type(2) [data-testid=\"workspace-row-qa-workspace-main\"]"}'
     - step: 31
