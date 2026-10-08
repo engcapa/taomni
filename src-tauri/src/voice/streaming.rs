@@ -48,6 +48,9 @@ pub async fn run_local(
     mut chunks: tokio::sync::mpsc::Receiver<Vec<f32>>,
     language: String,
 ) -> Result<(), String> {
+    if !["auto", "zh", "en"].contains(&language.as_str()) {
+        return Err("ASR_LANGUAGE: Zipformer partials support Chinese and English; select Auto local for other languages".into());
+    }
     let dir = sherpa_model_dir();
     let encoder = dir.join("encoder-epoch-99-avg-1.int8.onnx");
     let decoder = dir.join("decoder-epoch-99-avg-1.onnx");
@@ -86,10 +89,14 @@ pub async fn run_local(
     .await
     .map_err(|e| e.to_string())??;
 
+    let sense = crate::asr::sensevoice::SenseVoice::default();
+    let refine = sense.prepare(&language).await.is_ok();
+    let mut utterance = Vec::new();
     let started = std::time::Instant::now();
     let mut last = String::new();
     while let Some(chunk) = chunks.recv().await {
         let pcm = chunk;
+        utterance.extend_from_slice(&pcm);
         let (text, endpoint) = tokio::task::block_in_place(|| {
             stream.accept_waveform(16_000, &pcm);
             while recognizer.is_ready(&stream) {
@@ -101,6 +108,18 @@ pub async fn run_local(
                 .unwrap_or_default();
             (result, recognizer.is_endpoint(&stream))
         });
+        let text = if endpoint && refine {
+            sense
+                .transcribe(
+                    utterance.clone(),
+                    &language,
+                    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                )
+                .await
+                .unwrap_or(text)
+        } else {
+            text
+        };
         if !text.trim().is_empty() && (text != last || endpoint) {
             last = text.clone();
             emit(
@@ -121,6 +140,7 @@ pub async fn run_local(
         if endpoint {
             recognizer.reset(&stream);
             last.clear();
+            utterance.clear();
         }
     }
     // Flush the feature extraction tail before marking input complete.
@@ -129,7 +149,17 @@ pub async fn run_local(
     while recognizer.is_ready(&stream) {
         recognizer.decode(&stream);
     }
-    if let Some(result) = recognizer.get_result(&stream) {
+    if let Some(mut result) = recognizer.get_result(&stream) {
+        if refine && !utterance.is_empty() {
+            result.text = sense
+                .transcribe(
+                    utterance,
+                    &language,
+                    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                )
+                .await
+                .unwrap_or(result.text);
+        }
         if !result.text.trim().is_empty() {
             emit(
                 &app,
@@ -227,6 +257,72 @@ pub async fn run_online(
         }
         other => Err(format!("STREAMING_PROVIDER_UNAVAILABLE: {other}")),
     }
+}
+
+/// Local routing is explicit and never uploads audio. Zipformer can provide
+/// Chinese/English partials; other languages use silence-delimited final decode.
+pub async fn run_routed_local(
+    app: AppHandle,
+    session_id: String,
+    mut chunks: tokio::sync::mpsc::Receiver<Vec<f32>>,
+    language: String,
+    engine: std::sync::Arc<crate::asr::manager::AsrManager>,
+    cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> Result<(), String> {
+    if engine.model_id == "sensevoice-small"
+        && ["zh", "en"].contains(&language.as_str())
+        && crate::asr::models::voice_sherpa_model_status().installed
+    {
+        return run_local(app, session_id, chunks, language).await;
+    }
+    engine.prepare().await?;
+    let mut utterance = Vec::new();
+    let mut silence = 0usize;
+    while let Some(chunk) = chunks.recv().await {
+        let quiet =
+            chunk.iter().map(|s| s * s).sum::<f32>() / (chunk.len().max(1) as f32) < 0.00001;
+        silence = if quiet { silence + chunk.len() } else { 0 };
+        utterance.extend(chunk);
+        if (silence >= 12800 && utterance.len() >= 16000) || utterance.len() >= 20 * 16000 {
+            let started = std::time::Instant::now();
+            match engine
+                .transcribe(std::mem::take(&mut utterance), cancel.clone())
+                .await
+            {
+                Ok(text) => emit(
+                    &app,
+                    TranscriptEvent {
+                        session_id: session_id.clone(),
+                        text,
+                        final_text: true,
+                        processing_ms: started.elapsed().as_millis() as u64,
+                        provider: engine.model_id.clone(),
+                    },
+                ),
+                Err(e) if e.starts_with("NO_SPEECH") => {}
+                Err(e) => return Err(e),
+            }
+            silence = 0;
+        }
+    }
+    if !utterance.is_empty() {
+        let started = std::time::Instant::now();
+        match engine.transcribe(utterance, cancel).await {
+            Ok(text) => emit(
+                &app,
+                TranscriptEvent {
+                    session_id,
+                    text,
+                    final_text: true,
+                    processing_ms: started.elapsed().as_millis() as u64,
+                    provider: engine.model_id.clone(),
+                },
+            ),
+            Err(e) if e.starts_with("NO_SPEECH") => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
 }
 
 async fn connect_ws(

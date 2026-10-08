@@ -96,6 +96,8 @@ pub struct AsrConfig {
     #[serde(default)]
     pub download_proxy: crate::asr::models::DownloadProxyConfig,
     pub active: String,
+    #[serde(default = "default_language_prior")]
+    pub language_prior: String,
     pub providers: HashMap<String, AsrProviderConfig>,
     /// `local` (default) keeps audio on-device. `online` uses the selected
     /// realtime provider over its WebSocket API.
@@ -106,6 +108,9 @@ pub struct AsrConfig {
     #[serde(default = "asr_auto_language")]
     pub language: String,
 }
+fn default_language_prior() -> String {
+    "zh".into()
+}
 fn asr_auto_language() -> String {
     "auto".into()
 }
@@ -113,10 +118,34 @@ fn default_asr_mode() -> String {
     "local".into()
 }
 impl AsrConfig {
+    pub fn routed_language(&self) -> &str {
+        if self.language == "auto" && self.active == "local-auto" {
+            &self.language_prior
+        } else {
+            &self.language
+        }
+    }
+    pub fn routed_model(&self) -> &str {
+        if self.active == "local-auto" {
+            if ["es", "fr", "it", "de"].contains(&self.routed_language()) {
+                "whisper-small-q8"
+            } else {
+                "sensevoice-small"
+            }
+        } else {
+            &self.active
+        }
+    }
     pub fn normalize(&mut self) {
         // Previous releases advertised unimplemented engines/quantized files.
         // Migrate them to the runnable multilingual Base without downloading.
         if ![
+            "local-auto",
+            "sensevoice-small",
+            "whisper-base-q8",
+            "whisper-small-q8",
+            "whisper-medium-q8",
+            "whisper-turbo-q5",
             "whisper-base",
             "whisper-small",
             "whisper-medium",
@@ -127,7 +156,7 @@ impl AsrConfig {
         ]
         .contains(&self.active.as_str())
         {
-            self.active = "whisper-base".into();
+            self.active = "local-auto".into();
         }
         self.mode = if ["aliyun", "deepgram", "gemini"].contains(&self.active.as_str()) {
             "online"
@@ -139,8 +168,17 @@ impl AsrConfig {
         for (id, provider) in defaults {
             self.providers.entry(id).or_insert(provider);
         }
-        if !["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].contains(&self.language.as_str()) {
+        if ![
+            "auto", "zh", "yue", "en", "ja", "ko", "fr", "de", "es", "it",
+        ]
+        .contains(&self.language.as_str())
+        {
             self.language = "auto".into();
+        }
+        if !["zh", "yue", "en", "ja", "ko", "fr", "de", "es", "it"]
+            .contains(&self.language_prior.as_str())
+        {
+            self.language_prior = default_language_prior();
         }
         self.warm_on_startup = false;
         self.vad = "none".into();
@@ -150,7 +188,8 @@ impl Default for AsrConfig {
     fn default() -> Self {
         Self {
             download_proxy: Default::default(),
-            active: "whisper-base".into(),
+            active: "local-auto".into(),
+            language_prior: default_language_prior(),
             providers: {
                 let mut providers = ["base", "small", "medium"]
                     .into_iter()
@@ -168,6 +207,23 @@ impl Default for AsrConfig {
                         )
                     })
                     .collect::<HashMap<_, _>>();
+                for model in crate::asr::catalog::MODELS {
+                    providers
+                        .entry(model.id.into())
+                        .or_insert(AsrProviderConfig {
+                            engine: if model.id == "sensevoice-small" {
+                                "sherpa-onnx"
+                            } else {
+                                "whisper-rs"
+                            }
+                            .into(),
+                            model: model.filename.into(),
+                            endpoint: String::new(),
+                            api_key: String::new(),
+                            proxy_mode: default_asr_proxy_mode(),
+                            proxy_url: String::new(),
+                        });
+                }
                 providers.insert(
                     "sherpa-zipformer-zh-en".into(),
                     AsrProviderConfig {
@@ -639,13 +695,40 @@ mod tests {
 mod asr_migration_tests {
     use super::*;
     #[test]
+    fn local_route_preserves_cantonese_and_covers_eight_languages() {
+        let mut config = AsrConfig::default();
+        for language in ["zh", "yue", "en", "ja", "ko", "es", "fr", "it"] {
+            config.language = language.into();
+            config.normalize();
+            assert_eq!(config.language, language);
+            assert_eq!(
+                config.routed_model(),
+                if ["es", "fr", "it"].contains(&language) {
+                    "whisper-small-q8"
+                } else {
+                    "sensevoice-small"
+                }
+            );
+        }
+        config.language = "auto".into();
+        config.language_prior = "it".into();
+        assert_eq!(config.routed_model(), "whisper-small-q8");
+        config.active = "whisper-base".into();
+        config.normalize();
+        assert_eq!(
+            config.routed_model(),
+            "whisper-base",
+            "do not silently replace a legacy selection"
+        );
+    }
+    #[test]
     fn legacy_asr_migrates_without_enabling_download_or_warmup() {
         let mut config = AsrConfig::default();
         config.active = "legacy-unavailable-engine".into();
         config.language = "invalid".into();
         config.warm_on_startup = true;
         config.normalize();
-        assert_eq!(config.active, "whisper-base");
+        assert_eq!(config.active, "local-auto");
         assert_eq!(config.language, "auto");
         assert!(!config.warm_on_startup);
         assert!(config.providers.contains_key("whisper-base"));

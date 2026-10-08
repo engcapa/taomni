@@ -109,3 +109,22 @@ Validation: 27 focused DictationButton/Composer tests and 8 native voice tests p
 TypeScript checks pass. TC-VOICE-006 passes with a 700 ms delayed final and exact draft
 preservation on cancel. Live provider finalization and microphone hardware remain
 unverified; socket fixture results must not be read as vendor acceptance.
+
+## Stage 5 — local model and routing implementation
+
+Added pinned SenseVoice int8, independent Whisper q8 tiers, Turbo q5 and explicit
+f16 replacement. Default Auto local routes five supported languages to SenseVoice
+and es/fr/it to Small q8; auto uses the last selected/UI language prior. Existing
+selections are preserved. Optional installed Zipformer supplies zh/en partials and
+SenseVoice final refinement, with local Zipformer final fallback when SenseVoice
+cannot load. Other languages receive bounded silence-delimited finals. These
+endpoint defaults are provisional until the full P0 latency/noise gate passes.
+
+Settings expose exact sizes, license, recommended downloads and explicit migration;
+Medium f16 is retired from new selection. Browser TC-VOICE-001/002/007 pass (3/3),
+31 focused frontend tests pass, and TypeScript checks pass. Native ASR, routing and
+voice suites pass on the compiled implementation. Additional retirement regression
+and final build are included in the subsequent combined native verification.
+SenseVoice has decoded the existing real Mandarin fixture through AsrManager;
+expanded 160-recording public corpus measurements are in progress. This is an
+implementation milestone, not completion of eight-language acceptance or P0.

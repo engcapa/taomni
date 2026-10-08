@@ -39,7 +39,7 @@ async fn decode_fixture() {
     let result = serde_json::json!({
         "text": text,
         "engine": model_id,
-        "quantization": "f16",
+        "quantization": if model_id == "sensevoice-small" { "int8" } else if model_id.ends_with("-q8") { "q8_0" } else if model_id.ends_with("-q5") { "q5_0" } else { "f16" },
         "model_sha256": model.sha256,
         "threads": std::thread::available_parallelism().map(|n| n.get().min(4)).unwrap_or(2),
         "cold_load_ms": cold_load_ms,

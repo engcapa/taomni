@@ -1,3 +1,4 @@
+import { getLocale } from "../lib/i18n";
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -23,6 +24,7 @@ export interface AsrProviderConfig {
 export interface AsrConfig {
   download_proxy?: { mode: "app" | "custom" | "none"; custom: AppProxyConfig };
   language?: string;
+  language_prior?: string;
   mode?: "local" | "online" | string;
   active: string;
   providers: Record<string, AsrProviderConfig>;
@@ -365,10 +367,14 @@ interface AiStore {
 const DEFAULT_CONFIG: AiConfig = {
   asr: {
     download_proxy: { mode: "app", custom: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" } },
-    active: "whisper-base",
+    active: "local-auto",
+    language_prior: "zh",
     mode: "local",
     providers: {
       ...Object.fromEntries(["base", "small", "medium"].map((size) => [`whisper-${size}`, { engine: "whisper-rs", model: `ggml-${size}.bin` }])),
+      ...Object.fromEntries(["base", "small", "medium"].map((size) => [`whisper-${size}-q8`, { engine: "whisper-rs", model: `ggml-${size}-q8_0.bin` }])),
+      "whisper-turbo-q5": { engine: "whisper-rs", model: "ggml-large-v3-turbo-q5_0.bin" },
+      "sensevoice-small": { engine: "sherpa-onnx", model: "model.int8.onnx" },
       "sherpa-zipformer-zh-en": { engine: "sherpa-onnx", model: "streaming-zipformer-bilingual-zh-en-2023-02-20", endpoint: "", api_key: "", proxy_mode: "app" },
       aliyun: { engine: "aliyun-dashscope", model: "paraformer-realtime-v2", endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/inference/", api_key: "", proxy_mode: "app" },
       deepgram: { engine: "deepgram", model: "nova-3", endpoint: "wss://api.deepgram.com/v1/listen", api_key: "", proxy_mode: "app" },
@@ -650,8 +656,9 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
       providers: { ...DEFAULT_CONFIG.asr.providers, ...config.asr?.providers },
       download_proxy: config.asr?.download_proxy ?? DEFAULT_CONFIG.asr.download_proxy,
       mode: ["aliyun", "deepgram", "gemini"].includes(config.asr?.active) ? "online" : "local",
-      active: ["whisper-base", "whisper-small", "whisper-medium", "sherpa-zipformer-zh-en", "aliyun", "deepgram", "gemini"].includes(config.asr?.active) ? config.asr.active : "whisper-base",
-      language: ["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].includes(config.asr?.language ?? "") ? config.asr.language : "auto",
+      active: ["local-auto", "sensevoice-small", "whisper-base-q8", "whisper-small-q8", "whisper-medium-q8", "whisper-turbo-q5", "whisper-base", "whisper-small", "whisper-medium", "sherpa-zipformer-zh-en", "aliyun", "deepgram", "gemini"].includes(config.asr?.active) ? config.asr.active : "local-auto",
+      language_prior: config.asr?.language_prior ?? (getLocale().startsWith("zh") ? "zh" : "en"),
+      language: ["auto", "yue", "it", "zh", "en", "ja", "ko", "fr", "de", "es"].includes(config.asr?.language ?? "") ? config.asr.language : "auto",
     },
     llm: {
       ...config.llm,

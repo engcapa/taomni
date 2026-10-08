@@ -167,7 +167,7 @@ pub async fn voice_start_stream(
         let asr = &ai.config.asr;
         (
             asr.active.clone(),
-            asr.language.clone(),
+            asr.routed_language().to_owned(),
             asr.providers.get(&asr.active).cloned(),
             ai.config.full_local_mode,
             ai.config.fully_disabled,
@@ -221,7 +221,7 @@ pub async fn voice_start_stream(
     {
         let ai = state.ai_ctx.read().await;
         if ai.config.asr.active != active
-            || ai.config.asr.language != language
+            || ai.config.asr.routed_language() != language
             || ai.config.asr.providers.get(&active) != provider_config.as_ref()
             || ai.config.fully_disabled
             || ai.config.full_local_mode != full_local_mode
@@ -241,6 +241,17 @@ pub async fn voice_start_stream(
     tokio::spawn(async move {
         let backend = async {
             match active.as_str() {
+                "local-auto" | "sensevoice-small" => {
+                    crate::voice::streaming::run_routed_local(
+                        app.clone(),
+                        session_id.clone(),
+                        chunks,
+                        language,
+                        session.engine.clone(),
+                        session.cancel.clone(),
+                    )
+                    .await
+                }
                 "sherpa-zipformer-zh-en" => {
                     crate::voice::streaming::run_local(
                         app.clone(),

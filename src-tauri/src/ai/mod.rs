@@ -36,7 +36,7 @@ impl AppAiCtx {
         vault: Arc<Vault>,
         proxy_db: Option<&rusqlite::Connection>,
     ) -> Self {
-        let asr = AsrManager::configured(&cfg.asr.active, &cfg.asr.language);
+        let asr = AsrManager::configured(cfg.asr.routed_model(), cfg.asr.routed_language());
 
         let llm = build_router_from_ai_with_proxy_db(&cfg, Some(vault.as_ref()), proxy_db);
         Self {
@@ -52,7 +52,7 @@ impl AppAiCtx {
     pub fn reload(&mut self, cfg: AiConfig) {
         self.llm = build_router_from_ai(&cfg, Some(self.vault.as_ref()));
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(&cfg.asr.active, &cfg.asr.language));
+            self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), cfg.asr.routed_language()));
         }
         self.config = cfg;
     }
@@ -60,7 +60,7 @@ impl AppAiCtx {
     pub fn reload_with_proxy_db(&mut self, cfg: AiConfig, proxy_db: Option<&rusqlite::Connection>) {
         self.llm = build_router_from_ai_with_proxy_db(&cfg, Some(self.vault.as_ref()), proxy_db);
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(&cfg.asr.active, &cfg.asr.language));
+            self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), cfg.asr.routed_language()));
         }
         self.config = cfg;
     }
@@ -68,7 +68,7 @@ impl AppAiCtx {
     pub fn reload_with_router(&mut self, cfg: AiConfig, llm: LlmRouter) {
         self.llm = llm;
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(&cfg.asr.active, &cfg.asr.language));
+            self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), cfg.asr.routed_language()));
         }
         self.config = cfg;
     }

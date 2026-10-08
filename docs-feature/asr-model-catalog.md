@@ -34,3 +34,45 @@ Whisper 与 Zipformer 共用设置页模型卡片、下载/续传/更新/重新�
 5. 随应用发布目录与变更说明，写明语言、大小、硬件需求和可能的内存/性能变化。运行时不自动清理历史权重；用户可在应用退出后自行清理不需要的缓存版本。
 
 后续若需要独立于应用更新模型目录，先增加受信目录签名/固定分发源、引擎兼容版本范围、目录回退与离线目录导入；不能简单将下载 URL 指向可变 latest。
+
+## Quantized and SenseVoice catalog (2026-10-asr-2)
+
+Quantization is an independent entry with its own filename, exact bytes and hash.
+Existing f16 entries remain readable for explicit migration; Medium f16 is hidden
+from new model selection unless already installed/selected. The replacement action
+downloads the matching q8 tier, verifies it, saves the new selection, then removes
+old f16 artifacts. Failure or cancellation before publication retains the old file.
+Medium q8 is a migration target only; Turbo q5 is the recommended high quality tier.
+
+Whisper upstream remains revision `5359861c739e955e79d9a303bcbc70fb988958b1`:
+
+| Entry | Bytes | SHA-256 |
+|---|---:|---|
+| Base q8_0 | 81,768,585 | `c577b9a86e7e048a0b7eada054f4dd79a56bbfa911fbdacf900ac5b567cbb7d9` |
+| Small q8_0 | 264,464,607 | `49c8fb02b65e6049d5fa6c04f81f53b867b5ec9540406812c643f177317f779f` |
+| Medium q8_0 (migration) | 823,369,779 | `42a1ffcbe4167d224232443396968db4d02d4e8e87e213d3ee2e03095dea6502` |
+| Turbo q5_0 | 574,041,195 | `394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2` |
+
+SenseVoice source: `csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17`
+at revision `2365baeacb507f821a0c8120fcee3d484dba7a07` (Hugging Face).
+Weights: 239,233,841 bytes, SHA-256
+`c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51`.
+Tokens: 315,894 bytes, SHA-256
+`f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc`.
+The official API's LFS metadata and downloaded token hash were checked through the
+configured application proxy. Runtime verifies both before loading the recognizer.
+The token file is published in the weight's content-addressed directory before
+weights become visible; interrupted installation cannot report an incomplete
+bundle ready. Offline import requires tokens.txt beside model.int8.onnx.
+
+The exact recommended total is **504,014,342 bytes (480.7 MiB)**, including tokens.
+The design's 493 MB was an estimate mixing size conventions. SenseVoice uses the
+accepted FunASR Model License v1.1 and is downloaded on demand, never bundled.
+It supports zh/yue/en/ja/ko; Small q8 adds es/fr/it (and existing de support).
+Small/Base map Cantonese to Whisper's legacy zh token; SenseVoice/Turbo are the
+paths with distinct yue support. CPU greedy decoding remains capped at 4 threads.
+
+Domestic mirror evaluation: no independently verified redistribution permission,
+stability history and matching pinned artifacts were established. No mirror is
+advertised or selected. The official source works through the application proxy;
+future mirror enablement must satisfy D10 and must remain an explicit user choice.

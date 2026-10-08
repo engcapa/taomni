@@ -12,6 +12,7 @@ interface Model {
   id: string; filename: string; bytes: number; installed: boolean; license: string;
   download_url?: string; resumable_bytes?: number;
   streaming?: boolean;
+  replacement?: string;
   available_version?: string; installed_version?: string | null;
   update_available?: boolean; integrity?: "missing" | "unverified" | "verified" | "corrupt";
 }
@@ -105,14 +106,15 @@ export function AsrPanel() {
   const downloading = isRunning(installation);
   const sherpaDownloading = !!sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase);
   const blocked = !!busy || downloading || sherpaDownloading || !statusReady || !sherpaStatusReady;
-  const install = async (model: Model, offline: boolean) => {
+  const install = async (model: Model, offline: boolean, replaceModelId?: string) => {
     if (submitting.current || blocked) return;
     submitting.current = true;
     setBusy(model.id); setError("");
     try {
-      const sourcePath = offline ? await open({ multiple: false, filters: [{ name: "Whisper", extensions: ["bin"] }] }) : null;
+      const sourcePath = offline ? await open({ multiple: false, filters: [{ name: "Whisper", extensions: ["bin", "onnx"] }] }) : null;
       if (offline && !sourcePath) return;
-      await invoke("voice_install_model", { modelId: model.id, sourcePath });
+      await invoke("voice_install_model", { modelId: model.id, sourcePath, replaceModelId });
+      if (replaceModelId) await loadConfig();
       await refresh();
     } catch (e) { if (String(e) !== "CANCELLED") setError(String(e)); }
     finally { submitting.current = false; setBusy(""); }
@@ -154,7 +156,7 @@ export function AsrPanel() {
   const select = async (patch: Partial<AsrConfig>) => {
     if (!config) return;
     setError(""); setBusy("config");
-    try { await saveConfig({ ...config, asr: { ...config.asr, ...patch, warm_on_startup: false, vad: "none" } }); }
+    try { await saveConfig({ ...config, asr: { ...config.asr, ...patch, language_prior: patch.language && patch.language !== "auto" ? patch.language : config.asr.language_prior, warm_on_startup: false, vad: "none" } }); }
     catch (e) { setError(String(e)); }
     finally { setBusy(""); }
   };
@@ -167,14 +169,14 @@ export function AsrPanel() {
     connecting: t("voice.connecting"), downloading: t("voice.downloading"), importing: t("voice.importing"),
     verifying: t("voice.verifying"), complete: t("voice.verified"), failed: t("voice.downloadFailed"), cancelled: t("voice.downloadPaused"),
   })[phase];
-  const localModels: Model[] = [...models, ...(sherpa ? [{
+  const localModels: Model[] = [...models.filter((m) => !["whisper-medium", "whisper-medium-q8"].includes(m.id) || m.installed || config?.asr.active === m.id), ...(sherpa ? [{
     id: sherpa.model_id, filename: "", bytes: sherpa.total_bytes, installed: sherpa.installed,
     license: "", streaming: true, download_url: sherpa.download_url,
     resumable_bytes: !sherpa.installed ? sherpa.downloaded_bytes : 0,
     available_version: sherpa.available_version, installed_version: sherpa.installed_version,
     update_available: sherpa.update_available, integrity: sherpa.integrity,
   }] : [])];
-  const modelTitle = (id: string) => id === "sherpa-zipformer-zh-en" ? "Zipformer" : id.replace("whisper-", "Whisper ");
+  const modelTitle = (id: string) => id === "sensevoice-small" ? "SenseVoice Small int8" : id === "sherpa-zipformer-zh-en" ? "Zipformer" : id.replace("whisper-", "Whisper ");
   const jobs = [installation, sherpaProgress].filter((job): job is Installation => !!job);
   return <div className="space-y-4 text-xs" data-testid="asr-settings">
     <header className="pr-10 space-y-2">
@@ -185,16 +187,31 @@ export function AsrPanel() {
     <section className="rounded-lg border border-[var(--taomni-divider)] p-3 space-y-3" data-testid="asr-realtime-settings">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <strong>{t("voice.realtimeTitle")}</strong>
-        <select className="taomni-input" data-testid="asr-realtime-provider" value={config?.asr.active ?? "whisper-base"} disabled={blocked}
-          onChange={(e) => { const id = e.target.value; void select({ active: id, mode: ["whisper-base", "whisper-small", "whisper-medium", "sherpa-zipformer-zh-en"].includes(id) ? "local" : "online" }); }}>
-          {["whisper-base", "whisper-small", "whisper-medium"].map((id) => <option key={id} value={id}>{modelTitle(id)} · {t("voice.batchRecognition")}</option>)}
+        <select className="taomni-input" data-testid="asr-realtime-provider" value={config?.asr.active ?? "local-auto"} disabled={blocked}
+          onChange={(e) => { const id = e.target.value; void select({ active: id, mode: ["aliyun", "deepgram", "gemini"].includes(id) ? "online" : "local" }); }}>
+          <option value="local-auto">Auto local · SenseVoice + Whisper Small q8</option>
+          <option value="sensevoice-small">SenseVoice Small int8 · 中 / 粵 / EN / 日本語 / 한국어</option>
+          {["whisper-small-q8", "whisper-base-q8", "whisper-turbo-q5", ...models.filter((m) => ["whisper-base", "whisper-small", "whisper-medium", "whisper-medium-q8"].includes(m.id) && (m.installed || config?.asr.active === m.id)).map((m) => m.id)].map((id) => <option key={id} value={id}>{modelTitle(id)} · {t("voice.batchRecognition")}</option>)}
           <option value="sherpa-zipformer-zh-en">Zipformer · {t("voice.streamingRecognition")}</option>
           <option value="aliyun">Aliyun Paraformer Realtime</option>
           <option value="deepgram">Deepgram Nova-3</option>
           <option value="gemini">Google Gemini Transcribe Live</option>
         </select>
       </div>
-      <p className="text-[var(--taomni-text-muted)] leading-relaxed">{t("voice.localModelHelp")}</p>
+      <p className="text-[var(--taomni-text-muted)] leading-relaxed">Auto local uses SenseVoice for Chinese, Cantonese, English, Japanese and Korean; Whisper for Spanish, French and Italian. Optional Zipformer adds Chinese/English partials. Audio stays on this device.</p>
+      <p>Recommended: SenseVoice + Small q8, 504 MB. Single model: Small q8, 264 MB. Small/Base use the zh token for Cantonese; use SenseVoice or Turbo for distinct yue recognition.</p>
+      <button type="button" className="taomni-btn px-2 py-1" data-testid="asr-download-recommended" disabled={blocked || proxyDirty} onClick={() => void (async () => {
+        if (submitting.current) return;
+        submitting.current = true;
+        try {
+          setBusy("recommended");
+          for (const id of ["sensevoice-small", "whisper-small-q8"]) {
+            if (!models.find((m) => m.id === id)?.installed) await invoke("voice_install_model", { modelId: id });
+          }
+          await refresh();
+        } catch (e) { if (String(e) !== "CANCELLED") setError(String(e)); }
+        finally { submitting.current = false; setBusy(""); }
+      })()}>Download recommended models</button>
       {config?.asr.mode === "online" && config.asr.providers[config.asr.active] && (() => {
         const id = config.asr.active;
         const provider = providerDraft[id] ?? config.asr.providers[id];
@@ -229,10 +246,10 @@ export function AsrPanel() {
       <section className="space-y-3 rounded-lg bg-[var(--taomni-bg)] p-3">
         <label className="flex items-center justify-between gap-3 font-medium">{t("voice.language")}
           <select className="taomni-input" data-testid="asr-language" value={config?.asr.language ?? "auto"} disabled={blocked} onChange={(e) => void select({ language: e.target.value })}>
-            {["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].map((language) => <option key={language} value={language}>{language === "auto" ? t("voice.autoLanguage") : ({ zh: "中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español" } as Record<string, string>)[language]}</option>)}
+            {["auto", "zh", "yue", "en", "ja", "ko", "fr", "de", "es", "it"].map((language) => <option key={language} value={language}>{language === "auto" ? t("voice.autoLanguage") : ({ yue: "粵語", it: "Italiano", zh: "中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español" } as Record<string, string>)[language]}</option>)}
           </select>
         </label>
-        <p className="leading-relaxed text-[var(--taomni-text-muted)]">{t("voice.modelHelp")}</p>
+        <p className="leading-relaxed text-[var(--taomni-text-muted)]">Auto local language prior: {config?.asr.language_prior ?? "zh"}. Choosing a language updates this prior; automatic detection stays within the selected engine’s languages.</p>
       </section>
       {downloadProxy && <fieldset disabled={blocked} className="rounded-lg border border-[var(--taomni-divider)] p-3 space-y-2 min-w-0" data-testid="asr-download-proxy">
         <label className="flex flex-wrap items-center justify-between gap-2 font-medium">{t("voice.downloadProxy")}
@@ -261,6 +278,11 @@ export function AsrPanel() {
         <p>{m.update_available ? t("voice.updateAvailable") : m.integrity === "corrupt" ? t("voice.corrupt") : m.integrity === "verified" ? t("voice.verified") : m.installed ? t("voice.installed") : t("voice.notInstalled")}</p>
         {!!m.resumable_bytes && <p className="text-[var(--taomni-text-muted)]">{t("voice.partialDownload")} {megabytes(m.resumable_bytes)} MB</p>}
         {m.available_version && <p className="text-[10px] text-[var(--taomni-text-muted)]">{t("voice.version")} {m.available_version}{m.installed_version && m.installed_version !== m.available_version ? ` ← ${m.installed_version}` : ""}</p>}
+        {m.id === "sensevoice-small" && <p>Supports zh/yue/en/ja/ko only. Downloading accepts FunASR Model License v1.1; weights are not bundled with the application.</p>}
+        {m.replacement && m.installed && <button type="button" className="taomni-btn p-2" data-testid={`asr-replace-${m.id}`} disabled={blocked || proxyDirty} onClick={() => {
+          const replacement = models.find((candidate) => candidate.id === m.replacement);
+          if (replacement) void install(replacement, false, m.id);
+        }}>Replace f16 with q8 · remove old weights after verification</button>}
         <div className="mt-auto grid grid-cols-2 gap-2">
           <button type="button" className="taomni-btn px-2 py-1.5" disabled={blocked || !supported || proxyDirty || !config} data-testid={`asr-download-${m.id}`} onClick={() => void (m.streaming ? installSherpa() : install(m, false))}>{isRunning(job) && job?.model_id === m.id ? phaseLabel(job.phase) : m.resumable_bytes ? t("voice.resumeDownload") : m.update_available ? t("voice.updateModel") : m.installed || m.integrity === "corrupt" ? t("voice.reinstall") : t("voice.download")}</button>
           {!m.streaming && <button type="button" className="taomni-btn px-2 py-1.5" disabled={blocked || !supported} onClick={() => void install(m, true)}>{t("voice.import")}</button>}

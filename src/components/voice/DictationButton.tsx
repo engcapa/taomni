@@ -23,6 +23,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
   const t = useT();
   const fullyDisabled = useAiStore((s) => !!s.config?.fully_disabled);
   const active = useAiStore((s) => s.config?.asr?.active ?? "whisper-base");
+  const prior = useAiStore((s) => s.config?.asr?.language_prior ?? "zh");
   const language = useAiStore((s) => s.config?.asr?.language);
   const finishing = useRef(false);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -31,7 +32,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
   const session = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mounted = useRef(true);
-  const streamingMode = active === "sherpa-zipformer-zh-en" || ["aliyun", "deepgram", "gemini"].includes(active);
+  const streamingMode = ["local-auto", "sensevoice-small", "sherpa-zipformer-zh-en"].includes(active) || ["aliyun", "deepgram", "gemini"].includes(active);
   const [interim, setInterim] = useState("");
   const applyStreamText = useCallback((text: string, finalText: boolean) => {
     setInterim(finalText ? "" : text);
@@ -70,7 +71,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
     });
     return () => { disposed = true; void unlisten.then((fn) => fn()); void unlistenError.then((fn) => fn()); };
   }, [applyStreamText, streamingMode, cancel]);
-  useEffect(() => { cancel(); }, [contextKey, active, language, fullyDisabled, disabled, cancel]);
+  useEffect(() => { cancel(); }, [contextKey, active, language, prior, fullyDisabled, disabled, cancel]);
   useEffect(() => {
     const hide = () => { if (document.hidden) cancel(); };
     const escape = (event: KeyboardEvent) => {
@@ -137,10 +138,11 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
     setPhase("preparing");
     try {
       if (!await invoke<boolean>("voice_capture_supported")) throw new Error(t("voice.unsupported"));
-      if (!streamingMode) {
+      if (!streamingMode || ["local-auto", "sensevoice-small"].includes(active)) {
         const models = await invoke<{ id: string; installed: boolean }[]>("voice_models");
         if (session.current !== id) return;
-        if (!models.find((m) => m.id === active)?.installed) {
+        const effective = active === "local-auto" ? (["es", "fr", "it", "de"].includes(language === "auto" ? prior : language ?? prior) ? "whisper-small-q8" : "sensevoice-small") : active;
+        if (!models.find((m) => m.id === effective)?.installed) {
           session.current = null;
           setPhase("idle");
           setSetup(true);

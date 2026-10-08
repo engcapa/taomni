@@ -186,6 +186,7 @@ pub struct ModelStatus {
     #[serde(flatten)]
     model: catalog::Model,
     installed: bool,
+    replacement: Option<&'static str>,
     download_url: String,
     resumable_bytes: u64,
     license: &'static str,
@@ -431,12 +432,24 @@ pub async fn voice_install_sherpa_model(
     }
     result
 }
+fn retire_replaced_model(root: &std::path::Path, old: &catalog::Model, new: &catalog::Model) -> Result<(), String> {
+    catalog::verify(new, &catalog::version_path(root, new))?;
+    for old_path in [catalog::version_path(root, old), root.join(old.id).join(old.filename)] {
+        if old_path.is_file() { std::fs::remove_file(old_path).map_err(|e| format!("Replacement ready; old model removal failed: {e}"))?; }
+    }
+    Ok(())
+}
+
 fn inventory(m: &catalog::Model, root: &std::path::Path, verify: bool) -> ModelStatus {
     let target = catalog::version_path(root, m);
     let exists = target.is_file();
     let mut installed = std::fs::metadata(&target)
         .map(|v| v.len() == m.bytes)
         .unwrap_or(false);
+    if m.id == "sensevoice-small" {
+        installed &=
+            catalog::verify(&catalog::SENSE_TOKENS, &target.with_file_name("tokens.txt")).is_ok();
+    }
     let integrity = if !exists {
         "missing"
     } else if !installed {
@@ -471,13 +484,18 @@ fn inventory(m: &catalog::Model, root: &std::path::Path, verify: bool) -> ModelS
     let legacy = root.join(m.id).join(m.filename).is_file();
     ModelStatus {
         model: m.clone(),
+        replacement: catalog::replacement(m.id),
         download_url: catalog::download_url(m),
         resumable_bytes: std::fs::metadata(target.with_extension("bin.part"))
             .map(|v| v.len())
             .ok()
             .filter(|n| *n <= m.bytes)
             .unwrap_or(0),
-        license: "MIT",
+        license: if m.id == "sensevoice-small" {
+            "FunASR Model License v1.1"
+        } else {
+            "MIT"
+        },
         catalog_version: catalog::CATALOG_VERSION,
         available_version: &m.sha256[..12],
         installed_version: if exists {
@@ -518,11 +536,20 @@ pub async fn voice_install_model(
     state: tauri::State<'_, AppState>,
     model_id: String,
     source_path: Option<String>,
+    replace_model_id: Option<String>,
 ) -> Result<(), String> {
     let _lock = INSTALL
         .try_lock()
         .map_err(|_| "A model installation is already running")?;
     let m = catalog::model(&model_id)?;
+    let previous = if let Some(old) = replace_model_id.as_deref() {
+        if catalog::replacement(old) != Some(m.id) {
+            return Err("Invalid model replacement".into());
+        }
+        Some(catalog::model(old)?)
+    } else {
+        None
+    };
     let target = catalog::path(m);
     let offline = source_path.is_some();
     let part = target.with_extension(if offline {
@@ -552,6 +579,38 @@ pub async fn voice_install_model(
     let result: Result<(), String> = async {
         std::fs::create_dir_all(target.parent().ok_or("Invalid model directory")?)
             .map_err(|e| e.to_string())?;
+        if m.id == "sensevoice-small" {
+            let token_model = &catalog::SENSE_TOKENS;
+            let token_target = target.with_file_name("tokens.txt");
+            if catalog::verify(token_model, &token_target).is_err() {
+                let token_part = token_target.with_extension("txt.part");
+                if let Some(source) = source_path.as_ref() {
+                    let source_tokens = std::path::Path::new(source).with_file_name("tokens.txt");
+                    tokio::fs::copy(source_tokens, &token_part).await.map_err(
+                        |_| "MODEL_MISSING: place tokens.txt beside the imported SenseVoice model",
+                    )?;
+                } else {
+                    let settings = state.ai_ctx.read().await.config.asr.download_proxy.clone();
+                    let proxy = resolve_download_proxy(&state, &settings)?;
+                    let client = download_client(proxy.as_ref())?;
+                    download_to_part(
+                        &client,
+                        &catalog::download_url(token_model),
+                        token_model.bytes,
+                        &token_part,
+                        &cancel,
+                        |phase, _| reporter.report(phase, 0, None),
+                    )
+                    .await?;
+                }
+                publish_verified_cancellable(
+                    token_model,
+                    &token_part,
+                    &token_target,
+                    Some(&cancel),
+                )?;
+            }
+        }
         if let Some(source) = source_path {
             if tokio::fs::metadata(&source)
                 .await
@@ -622,6 +681,24 @@ pub async fn voice_install_model(
         })
         .await
         .map_err(|e| e.to_string())??;
+        if let Some(old) = previous {
+            // Explicit replacement only. Publication and verification precede
+            // any config migration or removal of the user's working f16 file.
+            let mut ai = state.ai_ctx.write().await;
+            if ai.config.asr.active == old.id {
+                let mut updated = ai.config.clone();
+                updated.asr.active = m.id.into();
+                updated
+                    .save(&crate::ai::config::default_ai_config_path())
+                    .map_err(|e| e.to_string())?;
+                ai.config = updated;
+                ai.asr = std::sync::Arc::new(super::manager::AsrManager::configured(
+                    m.id,
+                    &ai.config.asr.language,
+                ));
+            }
+            retire_replaced_model(&crate::models::store::models_root(), old, m)?;
+        }
         Ok(())
     }
     .await;
@@ -784,6 +861,26 @@ fn publish_verified_cancellable(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn replacement_keeps_working_weights_until_new_hash_is_verified() {
+        let root = tempfile::tempdir().unwrap();
+        let old = catalog::Model { id: "old", filename: "old.bin", bytes: 3, sha256: "old" };
+        let new = catalog::Model { id: "new", filename: "new.bin", bytes: 3,
+            sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" };
+        let old_path = catalog::version_path(root.path(), &old);
+        let new_path = catalog::version_path(root.path(), &new);
+        std::fs::create_dir_all(old_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(new_path.parent().unwrap()).unwrap();
+        std::fs::write(&old_path, b"old").unwrap();
+        assert!(retire_replaced_model(root.path(), &old, &new).is_err());
+        std::fs::write(&new_path, b"bad").unwrap();
+        assert!(retire_replaced_model(root.path(), &old, &new).is_err());
+        assert_eq!(std::fs::read(&old_path).unwrap(), b"old");
+        std::fs::write(&new_path, b"abc").unwrap();
+        retire_replaced_model(root.path(), &old, &new).unwrap();
+        assert!(!old_path.exists());
+        assert_eq!(std::fs::read(new_path).unwrap(), b"abc");
+    }
     #[test]
     fn stale_download_cancel_does_not_stop_a_new_job() {
         let token = CancellationToken::new();
