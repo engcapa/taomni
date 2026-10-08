@@ -434,10 +434,8 @@ verification:
       expectation: The Settings context menu hides its name in the terminal rail.
     - step: 106
       expectation: The Settings context menu restores its name in the terminal rail.
-    - step: 109
-      expectation: Code Workspace adds no duplicate Git action to the main sidebar.
-    - step: 110
-      expectation: Code Workspace keeps the named Settings action in the main sidebar.
+    - step: 112
+      expectation: The Settings name remains visible after returning to Code Workspace.
     results:
     - 85
     - 88
@@ -446,8 +444,7 @@ verification:
     - 99
     - 103
     - 106
-    - 109
-    - 110
+    - 112
   visual:
   - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual

@@ -1,99 +1,120 @@
 id: TC-IDE-PARITY-008-01
 title: Multi-repository Changes diff switches repo-a to repo-b and returns to a dirty editor
-description: >-
-  ED-PARITY-008 V-008-01/V-008-02 browser half. The parity008_git fixture serves the F3 two-repository
-  manifest (repo-a staged+worktree+untracked, repo-b worktree) through the stub invoke channel; the
-  production Code Workspace → Git tab → Changes → DiffPane chain renders it. Proves grouping, branch,
-  path, HEAD oid/worktree labels, 1/3→3/3 file navigation, identity of the rendered diff, zero Git
-  writes requested by the renderer, and that the editor's dirty text and selection survive the round
-  trip. Real Git bytes and on-disk zero writes are TC-IDE-PARITY-008-03 (native).
-covers: [F26.2]
-tags: [git, code-workspace, parity008, p1]
-modes: [browser]
-fixtures: [reset_db, parity008_git]
+description: ED-PARITY-008 V-008-01/V-008-02 browser half. The parity008_git fixture serves the F3 two-repository
+  manifest (repo-a staged+worktree+untracked, repo-b worktree) through the stub invoke channel; the production Code
+  Workspace → Git tab → Changes → DiffPane chain renders it. Proves grouping, branch, path, HEAD oid/worktree labels,
+  1/3→3/3 file navigation, identity of the rendered diff, zero Git writes requested by the renderer, and that the
+  editor's dirty text and selection survive the round trip. Real Git bytes and on-disk zero writes are TC-IDE-PARITY-008-03
+  (native).
+covers:
+- F26.2
+tags:
+- git
+- code-workspace
+- parity008
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity008_git
 timeout_sec: 180
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
-  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: 'edit-kept'
-  - press: Shift+Home
-  - assert_items:
-      selector: '[data-testid="code-workspace-editor"] .cm-line'
-      equals: ['repo-a WORKTREE', 'shared line', 'edit-kept']
-  - wait_for: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
-  - wait_for: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
-  - click: '[data-testid="code-workspace-git-panel-toggle"]'
-  - wait_for: '[data-testid="workspace-git-manager"]'
-  - wait_for: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
-  - assert_items:
-      selector: '[data-testid="workspace-change-row"]'
-      attribute: aria-label
-      equals: ['repo-a same.txt Staged', 'repo-a untracked.txt Untracked', 'repo-b same.txt Modified']
-  - assert_items:
-      selector: '[data-testid="workspace-flat-repo-header"]'
-      equals: ['repo-amain2/2', 'repo-bmain1/1']
-  - click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="same.txt"]'
-  - wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="same.txt"]'
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-title"]'
-      equals: repo-a / same.txt
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-file-position"]'
-      equals: 1/3 files
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-old-label"]'
-      equals: HEAD 8748e377 · same.txt
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-new-label"]'
-      equals: Working tree · same.txt
-  - assert_pattern:
-      selector: '[data-testid="git-diff-viewer"]'
-      regex: '(?s)repo-a HEAD.*shared line.*repo-a WORKTREE.*shared line'
-  - assert_disabled: '[data-testid="workspace-diff-prev-file"]'
-  - screenshot: tc-ide-parity-008-01-repo-a.png
-  - click: '[data-testid="workspace-diff-next-file"]'
-  - wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="untracked.txt"]'
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-file-position"]'
-      equals: 2/3 files
-  - click: '[data-testid="workspace-diff-next-file"]'
-  - wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-title"]'
-      equals: repo-b / same.txt
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-file-position"]'
-      equals: 3/3 files
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-old-label"]'
-      equals: HEAD 909b2b27 · same.txt
-  - assert_pattern:
-      selector: '[data-testid="git-diff-viewer"]'
-      regex: '(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'
-  - assert_disabled: '[data-testid="workspace-diff-next-file"]'
-  - assert_attribute:
-      selector: '[data-testid="workspace-change-row"][data-active="true"]'
-      name: data-repo-root
-      equals: ${fixture.parity008_root}/repo-b
-  - screenshot: tc-ide-parity-008-01-repo-b.png
-  - parity008_trace: {writes: 0, pending: 0, last_pair_repo: '${fixture.parity008_root}/repo-b'}
-  - click: '[data-testid="app-main-menu"]'
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: edit-kept
+- press: Shift+Home
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - edit-kept
+- wait_for: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+- wait_for: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
+- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- wait_for: '[data-testid="workspace-git-manager"]'
+- wait_for: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
+- assert_items:
+    selector: '[data-testid="workspace-change-row"]'
+    attribute: aria-label
+    equals:
+    - repo-a same.txt Staged
+    - repo-a untracked.txt Untracked
+    - repo-b same.txt Modified
+- assert_items:
+    selector: '[data-testid="workspace-flat-repo-header"]'
+    equals:
+    - repo-amain2/2
+    - repo-bmain1/1
+- click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="same.txt"]'
+- wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="same.txt"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-title"]'
+    equals: repo-a / same.txt
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-file-position"]'
+    equals: 1/3 files
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-old-label"]'
+    equals: HEAD 8748e377 · same.txt
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-new-label"]'
+    equals: Working tree · same.txt
+- assert_pattern:
+    selector: '[data-testid="git-diff-viewer"]'
+    regex: (?s)repo-a HEAD.*shared line.*repo-a WORKTREE.*shared line
+- assert_disabled: '[data-testid="workspace-diff-prev-file"]'
+- screenshot: tc-ide-parity-008-01-repo-a.png
+- click: '[data-testid="workspace-diff-next-file"]'
+- wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="untracked.txt"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-file-position"]'
+    equals: 2/3 files
+- click: '[data-testid="workspace-diff-next-file"]'
+- wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-title"]'
+    equals: repo-b / same.txt
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-file-position"]'
+    equals: 3/3 files
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-old-label"]'
+    equals: HEAD 909b2b27 · same.txt
+- assert_pattern:
+    selector: '[data-testid="git-diff-viewer"]'
+    regex: (?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE
+- assert_disabled: '[data-testid="workspace-diff-next-file"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-change-row"][data-active="true"]'
+    name: data-repo-root
+    equals: ${fixture.parity008_root}/repo-b
+- screenshot: tc-ide-parity-008-01-repo-b.png
+- parity008_trace:
+    writes: 0
+    pending: 0
+    last_pair_repo: ${fixture.parity008_root}/repo-b
+- click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_items:
-      selector: '[data-testid="code-workspace-editor"] .cm-line'
-      equals: ['repo-a WORKTREE', 'shared line', 'edit-kept']
-  - assert_visible: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
-  - assert_count:
-      selector: '[data-testid="code-workspace-editor"] .cm-selectionBackground'
-      min: 1
-  - screenshot: tc-ide-parity-008-01-editor-returned.png
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - edit-kept
+- assert_visible: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-selectionBackground'
+    min: 1
+- screenshot: tc-ide-parity-008-01-editor-returned.png
 verification:
   review: reviewed
   requirements:
@@ -108,8 +129,8 @@ verification:
     - 30
     checkpoints:
     - step: 16
-      expectation: '{assert_items: {attribute: aria-label, equals: [repo-a same.txt Staged, repo-a untracked.txt Untracked,
-        repo-b same.txt Modified], selector: ''[data-testid="workspace-change-row"]''}}'
+      expectation: '{assert_items: {attribute: aria-label, equals: [repo-a same.txt Staged, repo-a untracked.txt
+        Untracked, repo-b same.txt Modified], selector: ''[data-testid="workspace-change-row"]''}}'
     - step: 17
       expectation: '{assert_items: {equals: [repo-amain2/2, repo-bmain1/1], selector: ''[data-testid="workspace-flat-repo-header"]''}}'
     - step: 20
@@ -121,7 +142,8 @@ verification:
     - step: 23
       expectation: '{assert_text_equals: {equals: Working tree · same.txt, selector: ''[data-testid="workspace-diff-new-label"]''}}'
     - step: 24
-      expectation: '{assert_pattern: {regex: ''(?s)repo-a HEAD.*shared line.*repo-a WORKTREE.*shared line'', selector: ''[data-testid="git-diff-viewer"]''}}'
+      expectation: '{assert_pattern: {regex: ''(?s)repo-a HEAD.*shared line.*repo-a WORKTREE.*shared line'', selector:
+        ''[data-testid="git-diff-viewer"]''}}'
     - step: 29
       expectation: '{assert_text_equals: {equals: 2/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
     - step: 32
@@ -135,7 +157,8 @@ verification:
     - step: 36
       expectation: '{assert_disabled: ''[data-testid="workspace-diff-next-file"]''}'
     - step: 39
-      expectation: '{parity008_trace: {last_pair_repo: ''${fixture.parity008_root}/repo-b'', pending: 0, writes: 0}}'
+      expectation: '{parity008_trace: {last_pair_repo: ''${fixture.parity008_root}/repo-b'', pending: 0, writes:
+        0}}'
     results:
     - 35
     - 36
@@ -155,15 +178,11 @@ verification:
         .cm-line''}}'
     - step: 11
       expectation: '{wait_for: ''[data-editor-tab-key][data-active="true"][data-dirty="true"]''}'
-    - step: 42
-      expectation: '{assert_items: {equals: [repo-a WORKTREE, shared line, edit-kept], selector: ''[data-testid="code-workspace-editor"]
-        .cm-line''}}'
     - step: 43
       expectation: '{assert_visible: ''[data-editor-tab-key][data-active="true"][data-dirty="true"]''}'
     - step: 44
       expectation: '{assert_count: {min: 1, selector: ''[data-testid="code-workspace-editor"] .cm-selectionBackground''}}'
     results:
-    - 42
     - 43
     - 44
   visual:
