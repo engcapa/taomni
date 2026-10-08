@@ -65,7 +65,7 @@ steps:
 - select_option:
     selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
     label: QA Mail resource
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA Mail resource"]:visible'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA Mail resource"]'
 - wait_for: '[data-testid="mail-client-tab"]'
 - mail_server_assert_list_matches:
     timeout_sec: 60
@@ -79,7 +79,7 @@ steps:
 - select_option:
     selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
     label: QA Mail resource
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA Mail resource"]:visible'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA Mail resource"]'
 - wait_for: '[data-testid="mail-client-tab"]'
 - mail_server_assert_list_matches:
     timeout_sec: 60
@@ -97,7 +97,7 @@ steps:
     equals: 1
     timeout_sec: 20
 - click: '[data-testid="workspace-row-qa-workspace-main"]'
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA Mail resource"]:visible'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA Mail resource"]'
 - mail_server_assert_list_matches:
     timeout_sec: 30
 - assert_text:
@@ -118,7 +118,7 @@ steps:
 - mail_server_assert_idle_clients:
     equals: 1
     timeout_sec: 20
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA Mail resource"]:visible'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA Mail resource"]'
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
     contains: WorkspacePush 0002

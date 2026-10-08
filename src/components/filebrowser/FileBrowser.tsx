@@ -715,7 +715,7 @@ export function FileBrowser(props: FileBrowserProps) {
   const showCwdToolbar = !!props.onRequestTerminalCwd || props.cwdHint != null;
 
   return (
-    <div data-testid="sftp-browser" className="w-full h-full flex flex-col" style={{ background: "var(--taomni-bg)" }}>
+    <div data-testid="sftp-browser" data-sftp-attached={session?.attached ? "true" : "false"} className="w-full h-full flex flex-col" style={{ background: "var(--taomni-bg)" }}>
       {props.showHeader && (
         <div
           className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0 gap-1"
