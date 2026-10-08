@@ -1,5 +1,7 @@
 # Taomni Workspace-first 导航与实体模型详细设计
 
+> 实施进度与实际测试结果见 [实施与验证记录](workspace-first-navigation-implementation.md)。下文保留原设计基线和验收契约。
+
 ## 1. 设计摘要与范围
 
 - 类型：现有能力扩展 / UI 与导航模型重构

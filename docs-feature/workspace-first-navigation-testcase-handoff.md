@@ -1,6 +1,6 @@
 # Workspace-first 导航测试用例交接
 
-> 状态：计划/未执行。本文不表示产品代码已实现、case 已注册或测试已通过。
+> 本文为实施前用例规格；当前实现、已注册用例和真实执行结果见 [实施与验证记录](workspace-first-navigation-implementation.md)。规格本身不表示测试通过。
 > 关联设计：`workspace-first-navigation-design.md`。
 > 目标分支：`feat/workspace-first-navigation-cc-astra-max`。
 
