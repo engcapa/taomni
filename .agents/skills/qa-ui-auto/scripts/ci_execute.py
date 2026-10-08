@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from urllib.parse import urlparse
 
 import yaml
 
@@ -65,6 +66,8 @@ def main():
     parser.add_argument("--selection", type=Path, required=True)
     parser.add_argument("--entry", required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--local-config", type=Path,
+                        help="Reuse authenticated loopback fixtures; preserve the hosted selection/receipt flow")
     args = parser.parse_args()
     args.report.mkdir(parents=True, exist_ok=True)
     outcome = {"head": None, "entry": args.entry, "exit_code": 2, "stage": "selection"}
@@ -114,7 +117,30 @@ def main():
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
                       "worker": {"parallel": 1 if serial else 2},
                       "report": {"dir": str(args.report), "keep_runs": 0}}
-            if set(entry["capabilities"]) & {"ssh", "mysql", "vnc", "ard"}:
+            if args.local_config:
+                local = yaml.safe_load(args.local_config.read_text(encoding="utf-8"))
+                if not isinstance(local, dict):
+                    raise ValueError("local config must be a mapping")
+                for key in ("app", "webdriver", "ssh", "sftp", "mysql", "database", "vnc"):
+                    if key in local:
+                        config.setdefault(key, {}).update(local[key])
+                config["app"]["mode"] = entry["mode"]
+                # Hosted artifacts contain only environment references, never
+                # resolved credentials. Apply the same rule to local receipts.
+                def check_credentials(value):
+                    if isinstance(value, dict):
+                        for key, item in value.items():
+                            if any(word in key.lower() for word in ("password", "token", "secret")) and item:
+                                if not isinstance(item, str) or not item.startswith("${env.") or not item.endswith("}"):
+                                    raise ValueError("local credentials must use environment references")
+                            check_credentials(item)
+                    elif isinstance(value, list):
+                        for item in value:
+                            check_credentials(item)
+                check_credentials(config)
+                from ci_services import probe_reused_services
+                probe_reused_services(args.report / "services", entry["capabilities"], config)
+            elif set(entry["capabilities"]) & {"ssh", "mysql", "vnc", "ard"}:
                 from ci_services import Services
                 stack.enter_context(Services(args.report / "services", entry["capabilities"], config))
             if "java" in entry["capabilities"]:
@@ -135,13 +161,13 @@ def main():
                 from native_build import qa_binary as release_binary
                 config["app"]["native_binary"] = str(release_binary(release=True))
             if entry["mode"] == "native" and platform.system() == "Windows":
-                driver = shutil.which("msedgedriver.exe")
+                driver = config.get("webdriver", {}).get("native_driver") or shutil.which("msedgedriver.exe")
                 if not driver:
                     raise RuntimeError("WebView2 driver not found")
                 wrapper = args.report.resolve() / "webview-driver.cmd"
                 log_path = args.report.resolve() / "webview-driver.log"
                 wrapper.write_text(f'@echo off\n"{driver}" --verbose "--log-path={log_path}" %*\n', encoding="utf-8")
-                config["webdriver"] = {"native_driver": str(wrapper)}
+                config.setdefault("webdriver", {})["native_driver"] = str(wrapper)
             cfg_path = args.report / "config.yaml"
             cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
             if entry["mode"] == "native":
@@ -172,12 +198,18 @@ def main():
                 pnpm = shutil.which("pnpm")
                 if not pnpm:
                     raise RuntimeError("pnpm not found")
-                process = launch(stack, [pnpm, "dev", "--host", "127.0.0.1", "--strictPort"],
-                                           stdout=log, stderr=subprocess.STDOUT,
-                                           env={**os.environ, "DEV_PROXY_ALLOW_PRIVATE": "1"})
+                url = urlparse(config["app"]["base_url"])
+                if url.hostname not in {"127.0.0.1", "localhost"} or url.scheme != "http":
+                    raise ValueError("the supervised browser server must use a local HTTP URL")
+                reuse = args.local_config and os.environ.get("QA_LOCAL_REUSE_SERVER") == "1"
+                process = None
+                if not reuse:
+                    process = launch(stack, [pnpm, "dev", "--host", "127.0.0.1", "--port", str(url.port or 5000), "--strictPort"],
+                                     stdout=log, stderr=subprocess.STDOUT,
+                                     env={**os.environ, "DEV_PROXY_ALLOW_PRIVATE": "1"})
                 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
                 for _ in range(90):
-                    if process.poll() is not None:
+                    if process is not None and process.poll() is not None:
                         raise RuntimeError("Vite exited; see vite.log")
                     try:
                         with opener.open(config["app"]["base_url"], timeout=2) as response:

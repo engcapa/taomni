@@ -57,7 +57,7 @@ steps:
 - select_option:
     selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
     label: QA database resource
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA database resource"]'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA database resource"]:visible'
 - wait_for: '[data-testid="db-query-tab"]'
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
@@ -66,7 +66,7 @@ steps:
 - click: '[data-testid="workspace-surface-overview"]'
 - click: '[data-testid="workspace-row-qa-workspace-remote"]'
 - click: '[data-testid="workspace-row-qa-workspace-main"]'
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA database resource"]'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA database resource"]:visible'
 - assert_text:
     selector: '[data-testid="query-result-grid"]'
     contains: QA_QUERY_RETAINED

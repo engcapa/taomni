@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import secrets
 import shutil
 import socket
@@ -181,6 +182,76 @@ def retry(probe, seconds=120):
             if time.monotonic() >= end:
                 raise RuntimeError(f"service protocol readiness timed out: {type(exc).__name__}: {exc}") from exc
             time.sleep(1)
+
+
+def probe_reused_services(root: Path, capabilities, config):
+    """Authenticate to persistent local fixtures without owning their lifetime."""
+    caps = set(capabilities) & {"ssh", "mysql", "vnc", "ard"}
+    if "ard" in caps:
+        raise RuntimeError("reused ARD fixtures are not supported")
+    facts = {"ownership": "external-local-fixtures", "platform": platform.system()}
+
+    def endpoint(name):
+        cfg = config.get(name, {})
+        if cfg.get("host") not in {"127.0.0.1", "localhost", "::1"}:
+            raise RuntimeError(f"reused {name} fixture must use a loopback endpoint")
+        reference = cfg.get("password", "")
+        match = re.fullmatch(r"\$\{env\.([A-Za-z_][A-Za-z0-9_]*)\}", reference)
+        if not match or not os.environ.get(match[1]):
+            raise RuntimeError(f"reused {name} fixture needs a populated environment password reference")
+        return cfg, os.environ[match[1]]
+
+    if "ssh" in caps:
+        import paramiko
+        cfg, password = endpoint("ssh")
+        with paramiko.SSHClient() as client:
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(cfg["host"], port=int(cfg["port"]), username=cfg["user"], password=password,
+                           look_for_keys=False, allow_agent=False, timeout=10, auth_timeout=10, banner_timeout=10)
+            _, stdout, _ = client.exec_command("echo qa-fixture-ready", timeout=10)
+            if stdout.read().strip() != b"qa-fixture-ready" or stdout.channel.recv_exit_status() != 0:
+                raise RuntimeError("reused SSH fixture exec failed")
+        sftp_cfg, sftp_password = endpoint("sftp")
+        with paramiko.SSHClient() as client:
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(sftp_cfg["host"], port=int(sftp_cfg["port"]), username=sftp_cfg["user"], password=sftp_password,
+                           look_for_keys=False, allow_agent=False, timeout=10, auth_timeout=10, banner_timeout=10)
+            with client.open_sftp() as sftp:
+                path = sftp_cfg["remote_test_dir"].rstrip("/") + "/qa-probe-" + secrets.token_hex(8)
+                try:
+                    with sftp.open(path, "wb") as stream:
+                        stream.write(b"qa-fixture-ready")
+                    with sftp.open(path, "rb") as stream:
+                        if stream.read() != b"qa-fixture-ready":
+                            raise RuntimeError("reused SFTP fixture roundtrip failed")
+                finally:
+                    sftp.remove(path)
+        facts["ssh"] = {"authentication": True, "exec": True, "sftp_roundtrip": True, "port": cfg["port"]}
+    if "mysql" in caps:
+        import pymysql
+        cfg, password = endpoint("mysql")
+        with pymysql.connect(host=cfg["host"], port=int(cfg["port"]), user=cfg["user"], password=password,
+                             database=cfg["database"], connect_timeout=10, read_timeout=10, write_timeout=10) as db:
+            with db.cursor() as cursor:
+                cursor.execute("CREATE TEMPORARY TABLE qa_fixture_probe (id INT PRIMARY KEY, value VARCHAR(20))")
+                cursor.execute("INSERT INTO qa_fixture_probe VALUES (1, 'ready')")
+                cursor.execute("UPDATE qa_fixture_probe SET value='updated' WHERE id=1")
+                cursor.execute("SELECT value FROM qa_fixture_probe WHERE id=1")
+                if cursor.fetchone() != ("updated",):
+                    raise RuntimeError("reused MySQL fixture DML roundtrip failed")
+                cursor.execute("DELETE FROM qa_fixture_probe WHERE id=1")
+        facts["mysql"] = {"authentication": True, "dml_roundtrip": True, "port": cfg["port"]}
+    if "vnc" in caps:
+        cfg, password = endpoint("vnc")
+        if cfg["host"] != "127.0.0.1":
+            raise RuntimeError("the scriptable VNC fixture must use 127.0.0.1")
+        width, height, _ = rfb_probe(int(cfg["port"]), password)
+        response = vnc_control(int(cfg["control_port"]), "stats")
+        if not response or not isinstance(json.loads(response[0]), dict):
+            raise RuntimeError("reused VNC fixture control probe failed")
+        facts["vnc"] = {"authentication": True, "server_init": [width, height], "port": cfg["port"]}
+    write_json(Path(root) / "lease.json", facts)
+    return facts
 
 
 def install(capabilities):
