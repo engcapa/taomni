@@ -16,6 +16,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use url::Url;
 
+#[path = "providers.rs"]
+mod providers;
+use providers::{run_soniox, run_volcengine};
+
 #[derive(Clone, Debug, Serialize)]
 pub struct TranscriptEvent {
     pub session_id: String,
@@ -33,8 +37,14 @@ fn pcm16(chunk: &[f32]) -> Vec<u8> {
     out
 }
 
-fn emit(app: &AppHandle, event: TranscriptEvent) {
-    let _ = app.emit("voice-transcript", event);
+pub type TranscriptSink = std::sync::Arc<dyn Fn(TranscriptEvent) + Send + Sync>;
+pub fn event_sink(app: AppHandle) -> TranscriptSink {
+    std::sync::Arc::new(move |event| {
+        let _ = app.emit("voice-transcript", event);
+    })
+}
+fn emit(sink: &TranscriptSink, event: TranscriptEvent) {
+    sink(event);
 }
 
 /// Run the local streaming Zipformer backend. Model files are deliberately
@@ -43,11 +53,15 @@ fn emit(app: &AppHandle, event: TranscriptEvent) {
 /// bundle produces an actionable error and never falls back to a cloud call.
 #[cfg(feature = "asr-sherpa")]
 pub async fn run_local(
-    app: AppHandle,
+    app: TranscriptSink,
     session_id: String,
     mut chunks: tokio::sync::mpsc::Receiver<Vec<f32>>,
     language: String,
+    decode_language: String,
 ) -> Result<(), String> {
+    if !["auto", "zh", "en"].contains(&language.as_str()) {
+        return Err("ASR_LANGUAGE: Zipformer partials support Chinese and English; select Auto local for other languages".into());
+    }
     let dir = sherpa_model_dir();
     let encoder = dir.join("encoder-epoch-99-avg-1.int8.onnx");
     let decoder = dir.join("decoder-epoch-99-avg-1.onnx");
@@ -74,7 +88,8 @@ pub async fn run_local(
         cfg.enable_endpoint = true;
         cfg.rule1_min_trailing_silence = 1.2;
         cfg.rule2_min_trailing_silence = 0.8;
-        cfg.rule3_min_utterance_length = 0.5;
+        // Rule 3 is a maximum utterance length, not trailing silence.
+        cfg.rule3_min_utterance_length = 20.0;
         cfg.decoding_method = Some("greedy_search".into());
         let recognizer = sherpa_onnx::OnlineRecognizer::create(&cfg).ok_or_else(|| {
             "STREAMING_MODEL_LOAD: unable to create Zipformer recognizer".to_string()
@@ -85,10 +100,14 @@ pub async fn run_local(
     .await
     .map_err(|e| e.to_string())??;
 
+    let sense = crate::asr::sensevoice::SenseVoice::cached(&decode_language);
+    let refine = sense.prepare(&decode_language).await.is_ok();
+    let mut utterance = Vec::new();
     let started = std::time::Instant::now();
     let mut last = String::new();
     while let Some(chunk) = chunks.recv().await {
         let pcm = chunk;
+        utterance.extend_from_slice(&pcm);
         let (text, endpoint) = tokio::task::block_in_place(|| {
             stream.accept_waveform(16_000, &pcm);
             while recognizer.is_ready(&stream) {
@@ -100,6 +119,18 @@ pub async fn run_local(
                 .unwrap_or_default();
             (result, recognizer.is_endpoint(&stream))
         });
+        let text = if endpoint && refine {
+            sense
+                .transcribe(
+                    utterance.clone(),
+                    &decode_language,
+                    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                )
+                .await
+                .unwrap_or(text)
+        } else {
+            text
+        };
         if !text.trim().is_empty() && (text != last || endpoint) {
             last = text.clone();
             emit(
@@ -116,18 +147,31 @@ pub async fn run_local(
                     },
                 },
             );
-            if endpoint {
-                recognizer.reset(&stream);
-                last.clear();
-            }
+        }
+        if endpoint {
+            recognizer.reset(&stream);
+            last.clear();
+            utterance.clear();
         }
     }
+    // Flush the feature extraction tail before marking input complete.
+    stream.accept_waveform(16_000, &vec![0.0; 4800]);
     stream.input_finished();
     while recognizer.is_ready(&stream) {
         recognizer.decode(&stream);
     }
-    if let Some(result) = recognizer.get_result(&stream) {
-        if !result.text.trim().is_empty() && result.text != last {
+    if let Some(mut result) = recognizer.get_result(&stream) {
+        if refine && !utterance.is_empty() {
+            result.text = sense
+                .transcribe(
+                    utterance,
+                    &decode_language,
+                    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                )
+                .await
+                .unwrap_or(result.text);
+        }
+        if !result.text.trim().is_empty() {
             emit(
                 &app,
                 TranscriptEvent {
@@ -145,10 +189,11 @@ pub async fn run_local(
 
 #[cfg(not(feature = "asr-sherpa"))]
 pub async fn run_local(
-    _app: AppHandle,
+    _app: TranscriptSink,
     _session_id: String,
     _chunks: tokio::sync::mpsc::Receiver<Vec<f32>>,
     _language: String,
+    _decode_language: String,
 ) -> Result<(), String> {
     Err("STREAMING_MODEL_UNAVAILABLE: build with the asr-sherpa feature".into())
 }
@@ -162,71 +207,228 @@ fn sherpa_model_dir() -> PathBuf {
 /// interim/final event contract. Direct connections are used only when the
 /// user explicitly selects `proxy_mode = "none"`; application/custom proxy
 /// resolution is handled by the caller and an unavailable proxy is surfaced.
-pub async fn run_online(
-    app: AppHandle,
-    session_id: String,
-    mut chunks: tokio::sync::mpsc::Receiver<Vec<f32>>,
-    provider: String,
-    model: String,
-    endpoint: String,
-    api_key: String,
-    language: String,
-    proxy: Option<ResolvedProxy>,
-) -> Result<(), String> {
-    if api_key.is_empty() || api_key.starts_with("vault:") {
-        return Err(
-            "ASR_API_KEY_MISSING: unlock the credential vault and configure an API key".into(),
-        );
-    }
-    let started = std::time::Instant::now();
-    match provider.as_str() {
-        "deepgram" => {
-            run_deepgram(
-                app,
-                session_id,
-                &mut chunks,
-                &model,
-                &endpoint,
-                &api_key,
-                &language,
-                started,
-                proxy.as_ref(),
-            )
-            .await
+/// Stop sending after five seconds of microphone silence. This is a billing
+/// guard for short dictation, not speech detection or a keepalive connection.
+async fn forward_until_idle(
+    mut source: tokio::sync::mpsc::Receiver<Vec<f32>>,
+    target: tokio::sync::mpsc::Sender<Vec<f32>>,
+) {
+    let mut quiet_samples = 0usize;
+    loop {
+        let chunk =
+            match tokio::time::timeout(std::time::Duration::from_secs(5), source.recv()).await {
+                Ok(Some(chunk)) => chunk,
+                _ => break,
+            };
+        if chunk.iter().map(|v| v * v).sum::<f32>() / (chunk.len().max(1) as f32) < 0.00001 {
+            quiet_samples += chunk.len();
+        } else {
+            quiet_samples = 0;
         }
-        "gemini" => {
-            run_gemini(
-                app,
-                session_id,
-                &mut chunks,
-                &model,
-                &endpoint,
-                &api_key,
-                &language,
-                started,
-                proxy.as_ref(),
-            )
-            .await
+        if target.send(chunk).await.is_err() || quiet_samples >= 5 * 16000 {
+            break;
         }
-        "aliyun" => {
-            run_aliyun(
-                app,
-                session_id,
-                &mut chunks,
-                &model,
-                &endpoint,
-                &api_key,
-                &language,
-                started,
-                proxy.as_ref(),
-            )
-            .await
-        }
-        other => Err(format!("STREAMING_PROVIDER_UNAVAILABLE: {other}")),
     }
 }
 
+pub async fn run_online(
+    app: TranscriptSink,
+    session_id: String,
+    chunks: tokio::sync::mpsc::Receiver<Vec<f32>>,
+    provider: String,
+    config: crate::ai::config::AsrProviderConfig,
+    api_key: String,
+    language: String,
+    proxy: Option<ResolvedProxy>,
+    hotwords: Vec<String>,
+) -> Result<(), String> {
+    if api_key.is_empty() || api_key.starts_with("vault:") {
+        return Err("ASR_API_KEY_MISSING: configure an API key".into());
+    }
+    let words = super::vocabulary::validate(&hotwords)?;
+    let vocabulary =
+        super::vocabulary::prepare(&provider, &config, &api_key, &words, proxy.as_ref()).await?;
+    let (sender, receiver) = tokio::sync::mpsc::channel(4);
+    let forwarding = forward_until_idle(chunks, sender);
+    let backend = async {
+        let mut chunks = receiver;
+        let started = std::time::Instant::now();
+        match provider.as_str() {
+            "soniox" => {
+                run_soniox(
+                    app,
+                    session_id,
+                    &mut chunks,
+                    &config,
+                    &api_key,
+                    &language,
+                    &words,
+                    started,
+                    proxy.as_ref(),
+                )
+                .await
+            }
+            "volcengine" => {
+                run_volcengine(
+                    app,
+                    session_id,
+                    &mut chunks,
+                    &config,
+                    &api_key,
+                    &vocabulary,
+                    started,
+                    proxy.as_ref(),
+                )
+                .await
+            }
+            "deepgram" => {
+                run_deepgram(
+                    app,
+                    session_id,
+                    &mut chunks,
+                    &config.model,
+                    &config.endpoint,
+                    &api_key,
+                    &language,
+                    started,
+                    proxy.as_ref(),
+                    &words,
+                )
+                .await
+            }
+            "aliyun" => {
+                run_aliyun(
+                    app,
+                    session_id,
+                    &mut chunks,
+                    &config.model,
+                    &config.endpoint,
+                    &api_key,
+                    &language,
+                    started,
+                    proxy.as_ref(),
+                    &vocabulary,
+                )
+                .await
+            }
+            "gemini" => {
+                run_gemini(
+                    app,
+                    session_id,
+                    &mut chunks,
+                    &config.model,
+                    &config.endpoint,
+                    &api_key,
+                    &language,
+                    started,
+                    proxy.as_ref(),
+                )
+                .await
+            }
+            _ => Err("ASR_PROVIDER_UNAVAILABLE".into()),
+        }
+    };
+    tokio::pin!(backend);
+    tokio::pin!(forwarding);
+    tokio::select! {
+        result = &mut backend => result,
+        _ = &mut forwarding => tokio::time::timeout(std::time::Duration::from_secs(15), &mut backend)
+            .await.unwrap_or_else(|_| Err("ASR_FINAL_TIMEOUT: no provider completion after audio ended".into())),
+    }
+}
+
+/// Local routing is explicit and never uploads audio. Zipformer can provide
+/// Chinese/English partials; other languages use silence-delimited final decode.
+pub async fn run_routed_local(
+    app: TranscriptSink,
+    session_id: String,
+    mut chunks: tokio::sync::mpsc::Receiver<Vec<f32>>,
+    language: String,
+    engine: std::sync::Arc<crate::asr::manager::AsrManager>,
+    cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> Result<(), String> {
+    if engine.model_id == "sensevoice-small"
+        && ["zh", "en"].contains(&language.as_str())
+        && crate::asr::models::voice_sherpa_model_status().installed
+    {
+        return run_local(
+            app,
+            session_id,
+            chunks,
+            language,
+            engine.language().to_owned(),
+        )
+        .await;
+    }
+    engine.prepare().await?;
+    let mut utterance = Vec::new();
+    let mut silence = 0usize;
+    while let Some(chunk) = chunks.recv().await {
+        let quiet =
+            chunk.iter().map(|s| s * s).sum::<f32>() / (chunk.len().max(1) as f32) < 0.00001;
+        silence = if quiet { silence + chunk.len() } else { 0 };
+        utterance.extend(chunk);
+        if (silence >= 12800 && utterance.len() >= 16000) || utterance.len() >= 20 * 16000 {
+            let started = std::time::Instant::now();
+            match engine
+                .transcribe(std::mem::take(&mut utterance), cancel.clone())
+                .await
+            {
+                Ok(text) => emit(
+                    &app,
+                    TranscriptEvent {
+                        session_id: session_id.clone(),
+                        text,
+                        final_text: true,
+                        processing_ms: started.elapsed().as_millis() as u64,
+                        provider: engine.model_id.clone(),
+                    },
+                ),
+                Err(e) if e.starts_with("NO_SPEECH") => {}
+                Err(e) => return Err(e),
+            }
+            silence = 0;
+        }
+    }
+    if !utterance.is_empty() {
+        let started = std::time::Instant::now();
+        match engine.transcribe(utterance, cancel).await {
+            Ok(text) => emit(
+                &app,
+                TranscriptEvent {
+                    session_id,
+                    text,
+                    final_text: true,
+                    processing_ms: started.elapsed().as_millis() as u64,
+                    provider: engine.model_id.clone(),
+                },
+            ),
+            Err(e) if e.starts_with("NO_SPEECH") => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
 async fn connect_ws(
+    request: tungstenite::http::Request<()>,
+    proxy: Option<&ResolvedProxy>,
+) -> Result<
+    (
+        tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>,
+        tungstenite::http::Response<Option<Vec<u8>>>,
+    ),
+    String,
+> {
+    tokio::time::timeout(
+        std::time::Duration::from_secs(20),
+        connect_ws_inner(request, proxy),
+    )
+    .await
+    .map_err(|_| "ASR_CONNECT_TIMEOUT: check the provider and proxy settings".to_string())?
+}
+
+async fn connect_ws_inner(
     request: tungstenite::http::Request<()>,
     proxy: Option<&ResolvedProxy>,
 ) -> Result<
@@ -259,7 +461,9 @@ async fn connect_ws(
     };
     tokio_tungstenite::client_async_tls(request, stream)
         .await
-        .map_err(|e| format!("ASR_CONNECT: {e}"))
+        .map_err(|_| {
+            "ASR_CONNECT: WebSocket handshake failed; check endpoint and credentials".into()
+        })
 }
 
 async fn http_connect(
@@ -407,15 +611,29 @@ fn ws_request(
     url: &str,
     headers: &[(&str, &str)],
 ) -> Result<tungstenite::http::Request<()>, String> {
-    let mut builder = tungstenite::http::Request::builder().uri(url);
-    for (name, value) in headers {
-        builder = builder.header(*name, *value);
+    use tungstenite::client::IntoClientRequest;
+    let endpoint = Url::parse(url).map_err(|_| "ASR_WS_REQUEST: invalid endpoint")?;
+    if !matches!(endpoint.scheme(), "ws" | "wss") || endpoint.host_str().is_none() {
+        return Err("ASR_WS_REQUEST: endpoint must use ws:// or wss:// with a host".into());
     }
-    builder.body(()).map_err(|e| format!("ASR_WS_REQUEST: {e}"))
+    // A manually built HTTP request does not acquire the required WebSocket
+    // upgrade headers in client_async_tls. Let tungstenite generate a fresh
+    // Sec-WebSocket-Key, Host, Connection, Upgrade and version for each session.
+    let mut request = url
+        .into_client_request()
+        .map_err(|_| "ASR_WS_REQUEST: invalid WebSocket endpoint")?;
+    for (name, value) in headers {
+        let name = tungstenite::http::HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| "ASR_WS_REQUEST: invalid header name")?;
+        let value = tungstenite::http::HeaderValue::from_str(value)
+            .map_err(|_| "ASR_WS_REQUEST: invalid header value")?;
+        request.headers_mut().insert(name, value);
+    }
+    Ok(request)
 }
 
 async fn run_deepgram(
-    app: AppHandle,
+    app: TranscriptSink,
     session_id: String,
     chunks: &mut tokio::sync::mpsc::Receiver<Vec<f32>>,
     model: &str,
@@ -424,32 +642,52 @@ async fn run_deepgram(
     language: &str,
     started: std::time::Instant,
     proxy: Option<&ResolvedProxy>,
+    hotwords: &[String],
 ) -> Result<(), String> {
-    let url = format!(
-        "{}?model={}&encoding=linear16&sample_rate=16000&channels=1&interim_results=true&endpointing=300&language={}",
-        endpoint.trim_end_matches('/'),
-        urlencoding::encode(model),
-        urlencoding::encode(if language == "auto" {
-            "multi"
-        } else {
-            language
-        })
-    );
-    let req = ws_request(&url, &[("Authorization", &format!("Token {api_key}"))])?;
+    let mut url = Url::parse(endpoint).map_err(|_| "ASR_WS_URL: invalid Deepgram endpoint")?;
+    {
+        let mut query = url.query_pairs_mut();
+        query.extend_pairs([
+            ("model", model),
+            ("encoding", "linear16"),
+            ("sample_rate", "16000"),
+            ("channels", "1"),
+            ("interim_results", "true"),
+            ("endpointing", "300"),
+            (
+                "language",
+                if language == "auto" {
+                    "multi"
+                } else {
+                    language
+                },
+            ),
+        ]);
+        for word in hotwords {
+            query.append_pair("keyterm", word);
+        }
+    }
+    let req = ws_request(
+        url.as_str(),
+        &[("Authorization", &format!("Token {api_key}"))],
+    )?;
     let (mut ws, _) = connect_ws(req, proxy).await?;
+    let mut finishing = false;
     loop {
         tokio::select! {
-            chunk = chunks.recv() => match chunk {
+            chunk = chunks.recv(), if !finishing => match chunk {
                     Some(chunk) => ws.send(tungstenite::Message::Binary(pcm16(&chunk).into())).await.map_err(|e| format!("ASR_SEND: {e}"))?,
-                None => { let _ = ws.send(tungstenite::Message::Close(None)).await; break; }
+                None => { finishing = true; ws.send(tungstenite::Message::Text(r#"{"type":"CloseStream"}"#.into())).await.map_err(|_| "ASR_SEND: cannot finalize stream")?; }
             },
             msg = ws.next() => match msg {
                 Some(Ok(tungstenite::Message::Text(text))) => {
                     let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+                    if value.get("type").and_then(|v| v.as_str()) == Some("Error") { return Err("ASR_PROVIDER: Deepgram rejected the stream".into()); }
+                    if finishing && value.get("type").and_then(|v| v.as_str()) == Some("Metadata") { break; }
                     let text = value.pointer("/channel/alternatives/0/transcript").and_then(|v| v.as_str()).unwrap_or("");
                     if !text.is_empty() { emit(&app, TranscriptEvent { session_id: session_id.clone(), text: text.into(), final_text: value.get("is_final").and_then(|v| v.as_bool()).unwrap_or(false), processing_ms: started.elapsed().as_millis() as u64, provider: "deepgram".into() }); }
                 }
-                Some(Ok(tungstenite::Message::Close(_))) | None => break,
+                Some(Ok(tungstenite::Message::Close(_))) | None => return Err("ASR_RECEIVE: Deepgram closed before final acknowledgement".into()),
                 Some(Err(e)) => return Err(format!("ASR_RECEIVE: {e}")),
                 _ => {}
             }
@@ -459,7 +697,7 @@ async fn run_deepgram(
 }
 
 async fn run_gemini(
-    app: AppHandle,
+    app: TranscriptSink,
     session_id: String,
     chunks: &mut tokio::sync::mpsc::Receiver<Vec<f32>>,
     model: &str,
@@ -500,7 +738,7 @@ async fn run_gemini(
 }
 
 async fn run_aliyun(
-    app: AppHandle,
+    app: TranscriptSink,
     session_id: String,
     chunks: &mut tokio::sync::mpsc::Receiver<Vec<f32>>,
     model: &str,
@@ -509,6 +747,7 @@ async fn run_aliyun(
     language: &str,
     started: std::time::Instant,
     proxy: Option<&ResolvedProxy>,
+    vocabulary: &str,
 ) -> Result<(), String> {
     let req = ws_request(
         endpoint,
@@ -519,27 +758,282 @@ async fn run_aliyun(
     )?;
     let (mut ws, _) = connect_ws(req, proxy).await?;
     let task_id = uuid::Uuid::new_v4().to_string();
-    let run = serde_json::json!({"header":{"action":"run-task","task_id":task_id,"streaming":"duplex"},"payload":{"model":model,"parameters":{"sample_rate":16000,"format":"pcm","language_hints":if language == "auto" { vec!["zh","en"] } else { vec![language] }}}});
+    let mut run = serde_json::json!({"header":{"action":"run-task","task_id":task_id,"streaming":"duplex"},"payload":{"task_group":"audio","task":"asr","function":"recognition","input":{},"model":model,"parameters":{"sample_rate":16000,"format":"pcm","language_hints":if language == "auto" { vec!["zh","en"] } else { vec![language] }}}});
+    if !vocabulary.is_empty() {
+        run["payload"]["parameters"]["vocabulary_id"] = vocabulary.into();
+    }
     ws.send(tungstenite::Message::Text(run.to_string().into()))
         .await
         .map_err(|e| format!("ASR_SETUP: {e}"))?;
+    let mut ready = false;
+    let mut finishing = false;
     loop {
         tokio::select! {
-            chunk = chunks.recv() => match chunk {
+            chunk = chunks.recv(), if ready && !finishing => match chunk {
                 Some(chunk) => ws.send(tungstenite::Message::Binary(pcm16(&chunk).into())).await.map_err(|e| format!("ASR_SEND: {e}"))?,
-                None => { let finish = serde_json::json!({"header":{"action":"finish-task","task_id":task_id}}); let _ = ws.send(tungstenite::Message::Text(finish.to_string().into())).await; break; }
+                None => { finishing = true; let finish = serde_json::json!({"header":{"action":"finish-task","task_id":task_id,"streaming":"duplex"},"payload":{"input":{}}}); ws.send(tungstenite::Message::Text(finish.to_string().into())).await.map_err(|_| "ASR_SEND: cannot finalize task")?; }
             },
             msg = ws.next() => match msg {
                 Some(Ok(tungstenite::Message::Text(text))) => {
                     let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
-                    let output = value.get("output").or_else(|| value.get("payload")).unwrap_or(&serde_json::Value::Null);
+                    match value.pointer("/header/event").and_then(|v| v.as_str()) {
+                        Some("task-started") => ready = true,
+                        Some("task-finished") => break,
+                        Some("task-failed") => return Err("ASR_PROVIDER: Aliyun rejected the task; check model and credentials".into()),
+                        _ => {}
+                    }
+                    let output = value.pointer("/payload/output").unwrap_or(&serde_json::Value::Null);
                     if let Some(sentence) = output.get("sentence") { let text = sentence.get("text").and_then(|v| v.as_str()).unwrap_or(""); if !text.is_empty() { emit(&app, TranscriptEvent { session_id: session_id.clone(), text: text.into(), final_text: sentence.get("sentence_end").and_then(|v| v.as_bool()).unwrap_or(false), processing_ms: started.elapsed().as_millis() as u64, provider: "aliyun".into() }); } }
                 }
-                Some(Ok(tungstenite::Message::Close(_))) | None => break,
+                Some(Ok(tungstenite::Message::Close(_))) | None => return Err("ASR_RECEIVE: Aliyun closed before task-finished".into()),
                 Some(Err(e)) => return Err(format!("ASR_RECEIVE: {e}")),
                 _ => {}
             }
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+    use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn existing_providers_drain_finals_and_reject_early_disconnects() {
+        for aliyun in [false, true] {
+            for early_close in [false, true] {
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let endpoint = format!("ws://{}", listener.local_addr().unwrap());
+                let server = tokio::spawn(async move {
+                    let (socket, _) = listener.accept().await.unwrap();
+                    let mut ws = tokio_tungstenite::accept_async(socket).await.unwrap();
+                    if aliyun {
+                        let start = ws.next().await.unwrap().unwrap().into_text().unwrap();
+                        let start: serde_json::Value = serde_json::from_str(&start).unwrap();
+                        assert_eq!(start["header"]["action"], "run-task");
+                        assert_eq!(
+                            start["payload"]["parameters"]["vocabulary_id"],
+                            "fixture-vocabulary"
+                        );
+                        ws.send(tungstenite::Message::Text(
+                            r#"{"header":{"event":"task-started"}}"#.into(),
+                        ))
+                        .await
+                        .unwrap();
+                    }
+                    assert!(ws.next().await.unwrap().unwrap().is_binary());
+                    if early_close {
+                        ws.close(None).await.unwrap();
+                        return;
+                    }
+                    let finish = ws.next().await.unwrap().unwrap().into_text().unwrap();
+                    assert!(finish.contains(if aliyun { "finish-task" } else { "CloseStream" }));
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                    let final_message = if aliyun {
+                        r#"{"payload":{"output":{"sentence":{"text":"final words","sentence_end":true}}}}"#
+                    } else {
+                        r#"{"type":"Results","is_final":true,"channel":{"alternatives":[{"transcript":"final words"}]}}"#
+                    };
+                    ws.send(tungstenite::Message::Text(final_message.into()))
+                        .await
+                        .unwrap();
+                    let done = if aliyun {
+                        r#"{"header":{"event":"task-finished"}}"#
+                    } else {
+                        r#"{"type":"Metadata"}"#
+                    };
+                    ws.send(tungstenite::Message::Text(done.into()))
+                        .await
+                        .unwrap();
+                });
+                let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+                let received = events.clone();
+                let sink: TranscriptSink =
+                    std::sync::Arc::new(move |event| received.lock().unwrap().push(event));
+                let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+                tx.send(vec![0.2; 1600]).await.unwrap();
+                drop(tx);
+                let run = async {
+                    if aliyun {
+                        run_aliyun(
+                            sink,
+                            "fixture".into(),
+                            &mut rx,
+                            "paraformer-realtime-v2",
+                            &endpoint,
+                            "key",
+                            "zh",
+                            std::time::Instant::now(),
+                            None,
+                            "fixture-vocabulary",
+                        )
+                        .await
+                    } else {
+                        run_deepgram(
+                            sink,
+                            "fixture".into(),
+                            &mut rx,
+                            "nova-3",
+                            &endpoint,
+                            "key",
+                            "en",
+                            std::time::Instant::now(),
+                            None,
+                            &["src/main.rs".into()],
+                        )
+                        .await
+                    }
+                };
+                let result = tokio::time::timeout(Duration::from_secs(3), run)
+                    .await
+                    .unwrap();
+                server.await.unwrap();
+                if early_close {
+                    assert!(result.is_err());
+                } else {
+                    result.unwrap();
+                    let events = events.lock().unwrap();
+                    assert_eq!(events.len(), 1);
+                    assert!(events[0].final_text);
+                    assert_eq!(events[0].text, "final words");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn online_silence_closes_input_without_waiting_for_capture_owner() {
+        let (tx, rx) = tokio::sync::mpsc::channel(2);
+        let (target, mut received) = tokio::sync::mpsc::channel(2);
+        tx.send(vec![0.0; 5 * 16000]).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(1), forward_until_idle(rx, target))
+            .await
+            .unwrap();
+        assert_eq!(received.recv().await.unwrap().len(), 80000);
+        assert!(received.recv().await.is_none());
+        assert!(tx.send(vec![0.2; 1600]).await.is_err());
+    }
+
+    async fn handshake_through(route: &str) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let route = route.to_owned();
+        let proxy = (!route.is_empty()).then(|| ResolvedProxy {
+            host: "127.0.0.1".into(),
+            port,
+            kind: route.clone(),
+            username: String::new(),
+            password: String::new(),
+        });
+        // A deliberately unresolvable destination proves the selected proxy
+        // handles origin DNS. The fixture terminates the tunnel as a WS server.
+        let endpoint = if proxy.is_some() {
+            "ws://asr-fixture.invalid:8080/listen?language=zh".to_owned()
+        } else {
+            format!("ws://127.0.0.1:{port}/listen?language=zh")
+        };
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            match route.as_str() {
+                "http" => {
+                    let mut header = Vec::new();
+                    while !header.ends_with(b"\r\n\r\n") {
+                        assert!(header.len() < 4096);
+                        header.push(stream.read_u8().await.unwrap());
+                    }
+                    assert!(
+                        String::from_utf8(header)
+                            .unwrap()
+                            .starts_with("CONNECT asr-fixture.invalid:8080 HTTP/1.1\r\n")
+                    );
+                    stream
+                        .write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                        .await
+                        .unwrap();
+                }
+                "socks5" => {
+                    let mut greeting = [0; 3];
+                    stream.read_exact(&mut greeting).await.unwrap();
+                    assert_eq!(greeting, [5, 1, 0]);
+                    stream.write_all(&[5, 0]).await.unwrap();
+                    let mut header = [0; 5];
+                    stream.read_exact(&mut header).await.unwrap();
+                    assert_eq!(&header[..4], &[5, 1, 0, 3]);
+                    let mut domain = vec![0; header[4] as usize];
+                    stream.read_exact(&mut domain).await.unwrap();
+                    assert_eq!(domain, b"asr-fixture.invalid");
+                    assert_eq!(stream.read_u16().await.unwrap(), 8080);
+                    stream
+                        .write_all(&[5, 0, 0, 1, 127, 0, 0, 1, 0, 0])
+                        .await
+                        .unwrap();
+                }
+                "" => {}
+                _ => panic!("unknown fixture route"),
+            }
+            let mut ws = tokio_tungstenite::accept_hdr_async(
+                stream,
+                |request: &tungstenite::handshake::server::Request, response| {
+                    assert_eq!(request.uri().path(), "/listen");
+                    assert_eq!(request.uri().query(), Some("language=zh"));
+                    assert_eq!(request.headers()["Authorization"], "Token fixture-key");
+                    Ok(response)
+                },
+            )
+            .await
+            .unwrap();
+            let audio = ws.next().await.unwrap().unwrap();
+            assert_eq!(audio.into_data().as_ref(), &[0u8, 1, 2, 3]);
+            ws.send(tungstenite::Message::Text("fixture transcript".into()))
+                .await
+                .unwrap();
+        });
+        let exchange = async {
+            let request = ws_request(&endpoint, &[("Authorization", "Token fixture-key")]).unwrap();
+            let (mut client, response) = connect_ws(request, proxy.as_ref()).await.unwrap();
+            assert_eq!(response.status(), 101);
+            client
+                .send(tungstenite::Message::Binary(vec![0, 1, 2, 3].into()))
+                .await
+                .unwrap();
+            assert_eq!(
+                client.next().await.unwrap().unwrap().into_text().unwrap(),
+                "fixture transcript"
+            );
+            server.await.unwrap();
+        };
+        tokio::time::timeout(Duration::from_secs(5), exchange)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn online_handshake_direct() {
+        handshake_through("").await;
+    }
+
+    #[tokio::test]
+    async fn online_handshake_http_proxy() {
+        handshake_through("http").await;
+    }
+
+    #[tokio::test]
+    async fn online_handshake_socks5_proxy() {
+        handshake_through("socks5").await;
+    }
+
+    #[test]
+    fn request_rejects_invalid_endpoint_and_header_without_exposing_credentials() {
+        assert!(ws_request("https://asr.example.test/listen", &[]).is_err());
+        assert!(ws_request("ws:///", &[]).is_err());
+        let error = ws_request(
+            "wss://asr.example.test/listen",
+            &[("Authorization", "secret\r\ninjected")],
+        )
+        .unwrap_err();
+        assert!(error.starts_with("ASR_WS_REQUEST:"));
+        assert!(!error.contains("secret"));
+    }
 }

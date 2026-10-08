@@ -34,7 +34,7 @@ steps:
 - screenshot: model-download-narrow.png
 - assert_element_geometry: {selector: '[data-testid="voice-settings-close"]', min_width: 28, min_height: 26, icon_size: 16, tolerance: 2, viewport_margin: 8}
 - set_viewport: {width: 1280, height: 900}
-- select_option: {selector: '[data-testid="asr-realtime-provider"]', value: whisper-small}
+- select_option: {selector: '[data-testid="asr-realtime-provider"]', value: whisper-small-q8}
 - assert_attribute: {selector: '[data-testid="asr-download-url-sherpa-zipformer-zh-en"]', name: href, equals: 'https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tree/98590b7ed6443e77b714204da2757d75e1a642f4'}
 - click: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]'
 - assert_text: {selector: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]', contains: Copied}

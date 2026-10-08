@@ -1,0 +1,108 @@
+covers:
+- F-AI-2.3
+tags:
+- ai
+- voice
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+id: TC-VOICE-008
+title: Volcengine and Soniox selection, neutral hotwords and experimental Gemini
+steps:
+- open: ${cfg.app.base_url}/?voiceFixture=1
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="asr-settings"]'
+- select_option:
+    selector: '[data-testid="asr-realtime-provider"]'
+    value: volcengine
+- assert_attribute:
+    selector: '[data-testid="asr-provider-endpoint"]'
+    name: value
+    equals: wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async
+- fill:
+    selector: '[data-testid="asr-hotwords"]'
+    value: 'Taomni
+
+      src/main.rs
+
+      Taomni'
+- click: '[data-testid="asr-hotwords-save"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"hotwords":["Taomni","src/main.rs"]'
+- select_option:
+    selector: '[data-testid="asr-realtime-provider"]'
+    value: soniox
+- assert_attribute:
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Model") input'
+    name: value
+    equals: stt-rt-v5
+- assert_not_visible: '[data-testid="asr-realtime-provider"] option[value="gemini"]'
+- click: '[data-testid="asr-experimental"]'
+- select_option:
+    selector: '[data-testid="asr-realtime-provider"]'
+    value: gemini
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"active":"gemini"'
+- screenshot: online-providers.png
+- fill:
+    selector: '[data-testid="asr-provider-endpoint"]'
+    value: wss://example.invalid/experimental
+- click: '[data-testid="asr-realtime-settings"] button:has-text("Save provider")'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: wss://example.invalid/experimental
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Volcengine and Soniox selection, neutral hotwords and experimental
+      Gemini
+    actions:
+    - 5
+    - 7
+    - 8
+    - 10
+    - 13
+    - 14
+    checkpoints:
+    - step: 6
+      expectation: Volcengine uses the official async endpoint.
+    - step: 9
+      expectation: Duplicate terms are removed before persistence.
+    - step: 11
+      expectation: Soniox uses a realtime model.
+    - step: 12
+      expectation: Gemini is hidden by default.
+    - step: 15
+      expectation: Explicit experimental selection persists.
+    results:
+    - 6
+    - 9
+    - 11
+    - 12
+    - 15
+  - id: R2
+    requirement: Custom endpoints persist only after explicitly saving the provider.
+    actions:
+    - 17
+    - 18
+    checkpoints:
+    - step: 19
+      expectation: Saved endpoint is retained in the provider configuration.
+    results:
+    - 19
+  visual:
+  - method: manual
+    reason: Inspect retained screenshots.
+    check: Settings and original transcript remain readable
+  native:
+  - method: external
+    reason: Native socket/config/cleanup tests establish backend behavior; browser
+      fixtures do not validate vendor service availability.
+    check: Provider transport, credentials and LLM protection

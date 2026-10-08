@@ -2956,6 +2956,7 @@ export const zhCN: DeepPartial<typeof en> = {
     "stop": "停止并识别",
     "cancel": "取消语音输入",
     "close": "关闭",
+    "privacyOnline": "听写时音频会发送到所选在线供应商。识别结果仅填入草稿，请确认后发送。",
     "privacy": "语音识别在本机运行，不上传音频。识别结果仅填入草稿，请确认后发送。",
     "modelHelp": "Base 支持中文。中文听写建议选择“中文”；准确率不足时可升级 Small/Medium。Small 和 Medium 可能提高准确率，但需要更多内存和识别时间。单击开始录音，再次单击停止识别；Esc 取消。",
     "realtimeTitle": "实时语音转文字",

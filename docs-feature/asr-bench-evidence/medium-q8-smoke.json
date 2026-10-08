@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-08T15:27:59.175322+00:00",
+  "host": {
+    "cpu": "Intel(R) Core(TM) i7-6700K CPU @ 4.00GHz",
+    "logical_cpus": 8,
+    "platform": "Linux-6.14.0-37-generic-x86_64-with-glibc2.39",
+    "python": "3.12.4"
+  },
+  "source_revision": "d706ef2a0f825431569c9cf8f5dc1d64cc2466e8",
+  "source_dirty": true,
+  "source_files": {
+    "src-tauri/src/asr/manager.rs": "be1898e18c6ac7b5ed136826a740a36cc78afd72fb623e2417e2b705bda823f4",
+    "src-tauri/src/asr/catalog.rs": "d9f6b732311476da03445824e7b02764c45ba18a5865cefa4d67875a1abc60c2",
+    "src-tauri/src/asr/sensevoice.rs": "3aa68bdd4ad35e948a6ebb2e54ab33647243b87f1c410861346444edf9121bec",
+    "src-tauri/src/voice/streaming.rs": "19970a8dd48a8cd34919f9ccbc9d3a90513f1bad63bfb4c7c9cb18411eac7cb6",
+    "src-tauri/src/asr/benchmark.rs": "7931a81dc0253358818679a3f59ccb56a36c0d9bfbf6d8f9406b2b3fc41e090a",
+    "src-tauri/Cargo.lock": "d7dd22024e045d62b48892259a6292cffa1304e546714950d09633d9626a82b2",
+    "scripts/asr-bench/bench.py": "f49c3c6d36c116bfa8d8c185ae178b9812880e6cc1b4e5fde27e6bc79e92e237"
+  },
+  "manifest_sha256": "140f365bc83afe7c2080ae2bafce80f8cb79fd20a66be1634339e52bb1336a40",
+  "adapter_sha256": "cede465b7315baf1c91a129906bc956f7f4857cce08e81f07dafb687df112a0a",
+  "executable_sha256": "21dcd068814b261cf0912f82ede645513a60365b4d39883bdaf2c8a6b56a8015",
+  "corpus_gaps": [
+    "zh: 1/20 speech recordings",
+    "yue: 0/20 speech recordings",
+    "en: 1/20 speech recordings",
+    "ja: 0/20 speech recordings",
+    "es: 0/20 speech recordings",
+    "fr: 0/20 speech recordings",
+    "it: 0/20 speech recordings",
+    "ko: 0/20 speech recordings",
+    "mixed: 0/20 recordings",
+    "code: 0/10 recordings",
+    "noise: 0/1 recordings",
+    "silence: 0/1 recordings"
+  ],
+  "results": [
+    {
+      "id": "zh-zh-10026684690566417990",
+      "path": "zh-10026684690566417990.wav",
+      "sha256": "a72c0b59fdba80850552af7991de07f9f4940846d2d70f0890eeb153c40f164b",
+      "language": "zh",
+      "category": "speech",
+      "reference": "“这并不是告别。这是一个篇章的结束，也是新篇章的开始。”",
+      "duration_s": 10.38,
+      "source": "google/fleurs@70bb2e84b976b7e960aa89f1c648e09c59f894dd cmn_hans_cn test id=1906 file=10026684690566417990.wav",
+      "license": "CC-BY-4.0; Google FLEURS / FLEURS contributors",
+      "status": "ok",
+      "measurement": {
+        "cold_load_ms": 29938.57532,
+        "endpoint_to_final_ms": null,
+        "engine": "whisper-medium-q8",
+        "first_partial_ms": null,
+        "inference_ms": 22026.565467,
+        "model_sha256": "42a1ffcbe4167d224232443396968db4d02d4e8e87e213d3ee2e03095dea6502",
+        "peak_rss_bytes": 1410035712,
+        "quantization": "q8_0",
+        "text": "這並不是告別這是一個篇章的結束也是新篇章的開始",
+        "threads": 4
+      },
+      "scores": {
+        "character_errors": 7,
+        "reference_characters": 23,
+        "cer": 0.30434782608695654,
+        "word_errors": 1,
+        "reference_words": 1,
+        "wer": 1.0,
+        "unexpected_text": false
+      },
+      "rtf": 2.1220197945086707,
+      "process_wall_ms": 52147.71492300133
+    },
+    {
+      "id": "en-en-1003119935936341070",
+      "path": "en-1003119935936341070.wav",
+      "sha256": "33aca50159ec2e3cbcc894eb26faa916d6badb1b49fb75994973561540a7f012",
+      "language": "en",
+      "category": "speech",
+      "reference": "However, due to the slow communication channels, styles in the west could lag behind by 25 to 30 year.",
+      "duration_s": 10.56,
+      "source": "google/fleurs@70bb2e84b976b7e960aa89f1c648e09c59f894dd en_us test id=1904 file=1003119935936341070.wav",
+      "license": "CC-BY-4.0; Google FLEURS / FLEURS contributors",
+      "status": "ok",
+      "measurement": {
+        "cold_load_ms": 32820.4495,
+        "endpoint_to_final_ms": null,
+        "engine": "whisper-medium-q8",
+        "first_partial_ms": null,
+        "inference_ms": 22811.257918,
+        "model_sha256": "42a1ffcbe4167d224232443396968db4d02d4e8e87e213d3ee2e03095dea6502",
+        "peak_rss_bytes": 1410260992,
+        "quantization": "q8_0",
+        "text": "However, due to the slow communication channels, styles in the West could lag behind by 25 to 30 years.",
+        "threads": 4
+      },
+      "scores": {
+        "character_errors": 1,
+        "reference_characters": 81,
+        "cer": 0.012345679012345678,
+        "word_errors": 1,
+        "reference_words": 19,
+        "wer": 0.05263157894736842,
+        "unexpected_text": false
+      },
+      "rtf": 2.160156999810606,
+      "process_wall_ms": 55857.15754800185
+    }
+  ],
+  "aggregates": [
+    {
+      "engine": "whisper-medium-q8",
+      "language": "zh",
+      "category": "speech",
+      "samples": 1,
+      "failed": 0,
+      "character_errors": 7,
+      "reference_characters": 23,
+      "word_errors": 1,
+      "reference_words": 1,
+      "unexpected_text_samples": 0,
+      "cer": 0.30434782608695654,
+      "wer": 1.0
+    },
+    {
+      "engine": "whisper-medium-q8",
+      "language": "en",
+      "category": "speech",
+      "samples": 1,
+      "failed": 0,
+      "character_errors": 1,
+      "reference_characters": 81,
+      "word_errors": 1,
+      "reference_words": 19,
+      "unexpected_text_samples": 0,
+      "cer": 0.012345679012345678,
+      "wer": 0.05263157894736842
+    }
+  ],
+  "original_report_sha256": "bc10f6c47c64fb40a80a92bb97f073864f2c69ce86b024c08c9565ff48fb1ee2"
+}

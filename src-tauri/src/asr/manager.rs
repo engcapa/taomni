@@ -9,6 +9,7 @@ use std::sync::{
 pub struct AsrManager {
     pub model_id: String,
     language: String,
+    sense: super::sensevoice::SenseVoice,
     #[cfg(feature = "asr-whisper")]
     context: Arc<std::sync::Mutex<Option<whisper_rs::WhisperContext>>>,
 }
@@ -30,15 +31,23 @@ impl AsrManager {
         }
     }
 
+    pub(crate) fn language(&self) -> &str {
+        &self.language
+    }
+
     pub fn configured(model_id: &str, language: &str) -> Self {
         Self {
             model_id: model_id.into(),
             language: language.into(),
+            sense: Default::default(),
             #[cfg(feature = "asr-whisper")]
             context: Arc::new(std::sync::Mutex::new(None)),
         }
     }
     pub async fn prepare(&self) -> Result<(), String> {
+        if self.model_id == "sensevoice-small" {
+            return self.sense.prepare(&self.language).await;
+        }
         if !Self::supported() {
             return Err(
                 "Whisper requires a supported build and CPU (AVX2/FMA/F16C/SSE4.2 on x86).".into(),
@@ -84,6 +93,9 @@ impl AsrManager {
         if pcm.len() < 1600 || pcm.iter().all(|s| s.abs() < 0.001) {
             return Err("NO_SPEECH: No speech detected.".into());
         }
+        if self.model_id == "sensevoice-small" {
+            return self.sense.transcribe(pcm, &self.language, cancel).await;
+        }
         self.prepare().await?;
         if cancel.load(Ordering::Relaxed) {
             return Err("Cancelled".into());
@@ -91,7 +103,11 @@ impl AsrManager {
         #[cfg(feature = "asr-whisper")]
         {
             let context = self.context.clone();
-            let language = self.language.clone();
+            let language = if self.language == "yue" && self.model_id != "whisper-turbo-q5" {
+                "zh".into()
+            } else {
+                self.language.clone()
+            };
             tokio::task::spawn_blocking(move || {
                 let guard = context.lock().map_err(|_| "Recognizer lock failed")?;
                 if cancel.load(Ordering::Relaxed) {

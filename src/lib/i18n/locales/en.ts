@@ -2979,6 +2979,7 @@ const dict = {
     "stop": "Stop and transcribe",
     "cancel": "Cancel voice input",
     "close": "Close",
+    "privacyOnline": "Audio is sent to the selected online provider during dictation. Review the draft before sending.",
     "privacy": "Speech recognition runs on this device. Audio is not uploaded. Review the text before sending.",
     "modelHelp": "Base supports Chinese. For Chinese dictation, choose 中文; upgrade to Small/Medium if accuracy is insufficient. Small and Medium may improve accuracy but use more memory and take longer. Click once to record and again to transcribe; Esc cancels.",
     "realtimeTitle": "Realtime speech to text",

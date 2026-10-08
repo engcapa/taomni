@@ -2,6 +2,11 @@ import { emit } from "./tauri-event";
 /** Browser-only opt-in fixture. Never represents actual microphone/Whisper support. */
 const enabled = () => new URLSearchParams(window.location.search).get("voiceFixture") === "1";
 const models = [
+  { id: "sensevoice-small", filename: "model.int8.onnx", bytes: 239233841 },
+  { id: "whisper-small-q8", filename: "ggml-small-q8_0.bin", bytes: 264464607 },
+  { id: "whisper-base-q8", filename: "ggml-base-q8_0.bin", bytes: 81768585 },
+  { id: "whisper-medium-q8", filename: "ggml-medium-q8_0.bin", bytes: 823369779 },
+  { id: "whisper-turbo-q5", filename: "ggml-large-v3-turbo-q5_0.bin", bytes: 574041195 },
   { id: "whisper-base", filename: "ggml-base.bin", bytes: 147951465 },
   { id: "whisper-small", filename: "ggml-small.bin", bytes: 487601967 },
   { id: "whisper-medium", filename: "ggml-medium.bin", bytes: 1533763059 },
@@ -39,9 +44,9 @@ export async function voiceStub(command: string, args?: Record<string, unknown>)
   if (command === "voice_models" || command === "voice_check_models") return models.map((m) => {
     const installed = enabled() && sessionStorage.getItem(`voice-fixture:${m.id}`) === "installed";
     const update = m.id === "whisper-base" && new URLSearchParams(window.location.search).get("voiceOldBase") === "1" && !installed;
-    return { ...m,
+    return { ...m, replacement: ({ "whisper-base": "whisper-base-q8", "whisper-small": "whisper-small-q8", "whisper-medium": "whisper-medium-q8" } as Record<string, string>)[m.id],
       download_url: `https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/${m.filename}?download=true`,
-      resumable_bytes: Number(sessionStorage.getItem(`voice-partial:${m.id}`) || 0), license: "MIT", installed, available_version: "fixture-v2",
+      resumable_bytes: Number(sessionStorage.getItem(`voice-partial:${m.id}`) || 0), license: m.id === "sensevoice-small" ? "FunASR Model License v1.1" : "MIT", installed, available_version: "fixture-v2",
       installed_version: installed ? "fixture-v2" : update ? "fixture-v1" : null,
       update_available: update, integrity: installed ? command === "voice_check_models" ? "verified" : "unverified" : "missing" };
   });
@@ -78,16 +83,34 @@ export async function voiceStub(command: string, args?: Record<string, unknown>)
     await report("verifying");
     sessionStorage.setItem(`voice-fixture:${model.id}`, "installed");
     sessionStorage.removeItem(`voice-partial:${model.id}`);
+    if (args?.replaceModelId) {
+      sessionStorage.removeItem(`voice-fixture:${args.replaceModelId}`);
+      const saved = JSON.parse(localStorage.getItem("taomni.ai.config.v1") || "{}");
+      if (saved.asr?.active === args.replaceModelId) { saved.asr.active = model.id; localStorage.setItem("taomni.ai.config.v1", JSON.stringify(saved)); }
+    }
     await report("complete");
     return null;
   }
-  if (command === "voice_start_capture") {
+  if (command === "voice_cancel_cleanup") return null;
+  if (command === "voice_cleanup_text") return { original: String(args?.text ?? ""), text: String(args?.text ?? "").replace("Final stream fixture.", "Cleaned stream fixture."), notice: null };
+  if (command === "voice_start_capture" || command === "voice_start_stream") {
     if (session) throw new Error("Voice input is busy");
     session = String(args?.sessionId);
+    if (command === "voice_start_stream") await emit("voice-transcript", { session_id: session, text: "Provisional fixture", final_text: false });
     return null;
   }
   if (command === "voice_stop_capture") {
     if (session === args?.sessionId) session = null;
+    return null;
+  }
+  if (command === "voice_stop_stream") {
+    const id = session;
+    if (!id || id !== args?.sessionId) throw new Error("Recording expired");
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    if (session === id) {
+      await emit("voice-transcript", { session_id: id, text: "Final stream fixture.", final_text: true });
+      session = null;
+    }
     return null;
   }
   if (command === "voice_stop_and_transcribe") {

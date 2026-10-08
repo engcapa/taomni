@@ -10,7 +10,7 @@ pub struct Model {
     pub sha256: &'static str,
 }
 pub const UPSTREAM_REVISION: &str = "5359861c739e955e79d9a303bcbc70fb988958b1";
-pub const CATALOG_VERSION: &str = "2026-10-whisper-1";
+pub const CATALOG_VERSION: &str = "2026-10-asr-2";
 
 pub const MODELS: &[Model] = &[
     Model {
@@ -31,8 +31,61 @@ pub const MODELS: &[Model] = &[
         bytes: 1533763059,
         sha256: "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208",
     },
+    Model {
+        id: "whisper-base-q8",
+        filename: "ggml-base-q8_0.bin",
+        bytes: 81768585,
+        sha256: "c577b9a86e7e048a0b7eada054f4dd79a56bbfa911fbdacf900ac5b567cbb7d9",
+    },
+    Model {
+        id: "whisper-small-q8",
+        filename: "ggml-small-q8_0.bin",
+        bytes: 264464607,
+        sha256: "49c8fb02b65e6049d5fa6c04f81f53b867b5ec9540406812c643f177317f779f",
+    },
+    Model {
+        id: "whisper-medium-q8",
+        filename: "ggml-medium-q8_0.bin",
+        bytes: 823369779,
+        sha256: "42a1ffcbe4167d224232443396968db4d02d4e8e87e213d3ee2e03095dea6502",
+    },
+    Model {
+        id: "whisper-turbo-q5",
+        filename: "ggml-large-v3-turbo-q5_0.bin",
+        bytes: 574041195,
+        sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+    },
+    Model {
+        id: "sensevoice-small",
+        filename: "model.int8.onnx",
+        bytes: 239233841,
+        sha256: "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+    },
 ];
+pub const SENSE_REVISION: &str = "2365baeacb507f821a0c8120fcee3d484dba7a07";
+pub const SENSE_REPOSITORY: &str =
+    "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17";
+pub const SENSE_TOKENS: Model = Model {
+    id: "sensevoice-small",
+    filename: "tokens.txt",
+    bytes: 315894,
+    sha256: "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+};
+pub fn replacement(id: &str) -> Option<&'static str> {
+    match id {
+        "whisper-base" => Some("whisper-base-q8"),
+        "whisper-small" => Some("whisper-small-q8"),
+        "whisper-medium" => Some("whisper-medium-q8"),
+        _ => None,
+    }
+}
 pub fn download_url(m: &Model) -> String {
+    if m.id == "sensevoice-small" {
+        return format!(
+            "{SENSE_REPOSITORY}/resolve/{SENSE_REVISION}/{}?download=true",
+            m.filename
+        );
+    }
     format!(
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/{UPSTREAM_REVISION}/{}?download=true",
         m.filename

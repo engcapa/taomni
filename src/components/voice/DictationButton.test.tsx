@@ -3,10 +3,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VoiceSettingsDialog, useVoiceSettingsStore } from "./VoiceSettingsDialog";
 import { DictationButton } from "./DictationButton";
-import { useAiStore } from "../../stores/aiStore";
+import { useAiStore, type AiConfig } from "../../stores/aiStore";
 const ipc = vi.hoisted(() => vi.fn());
+const events = vi.hoisted(() => new Map<string, (event: { payload: unknown }) => void>());
 vi.mock("@tauri-apps/api/core", () => ({ invoke: ipc }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async (name, cb) => { events.set(name, cb); return () => events.delete(name); }) }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 function Input({ context = "one", disabled = false }: { context?: string; disabled?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -20,6 +21,7 @@ async function record() {
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((r) => { resolve = r; }); return { promise, resolve }; }
 describe("local dictation lifecycle", () => {
   beforeEach(() => {
+    events.clear();
     useAiStore.setState({ config: null });
     useVoiceSettingsStore.setState({ open: false });
     ipc.mockReset().mockImplementation(async (command: string) => {
@@ -95,4 +97,91 @@ describe("local dictation lifecycle", () => {
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(ipc.mock.calls.some(([c]) => c === "voice_install_model" || c === "voice_start_capture")).toBe(false);
   });
+  it("keeps partials out of the draft and waits for an acknowledged final", async () => {
+    useAiStore.setState({ config: { asr: { active: "deepgram" } } as AiConfig });
+    const stopped = deferred<void>();
+    ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_stop_stream" ? stopped.promise : null);
+    render(<Input />);
+    await record();
+    const id = ipc.mock.calls.find(([c]) => c === "voice_start_stream")![1].sessionId;
+    const transcript = (text: string, final_text: boolean) => act(() => events.get("voice-transcript")!({ payload: { session_id: id, text, final_text } }));
+    transcript("temporary", false);
+    const input = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(input.value).toBe("hello world");
+    expect(screen.getByTestId("dictation-button-interim")).toHaveTextContent("temporary");
+    fireEvent.click(screen.getByTestId("dictation-button"));
+    expect(screen.getByTestId("dictation-button")).toHaveAttribute("data-state", "transcribing");
+    fireEvent.change(input, { target: { value: "edited " } });
+    input.setSelectionRange(7, 7);
+    transcript("final", true);
+    await waitFor(() => expect(input.value).toBe("edited final"));
+    await act(async () => stopped.resolve());
+    await waitFor(() => expect(screen.getByTestId("dictation-button")).toHaveAttribute("data-state", "idle"));
+    transcript("late", true);
+    expect(input.value).toBe("edited final");
+  });
+  it("cancels streaming without committing the provisional text", async () => {
+    useAiStore.setState({ config: { asr: { active: "deepgram" } } as AiConfig });
+    render(<Input />); await record();
+    const id = ipc.mock.calls.find(([c]) => c === "voice_start_stream")![1].sessionId;
+    act(() => events.get("voice-transcript")!({ payload: { session_id: id, text: "discard", final_text: false } }));
+    fireEvent.click(screen.getByTestId("dictation-button-cancel"));
+    act(() => events.get("voice-transcript")!({ payload: { session_id: id, text: "late", final_text: true } }));
+    expect(screen.getByRole("textbox")).toHaveValue("hello world");
+    expect(ipc).toHaveBeenCalledWith("voice_stop_capture", { sessionId: id });
+    expect(ipc.mock.calls.some(([c]) => c === "voice_stop_stream")).toBe(false);
+  });
+
+  it("retains the original and can undo optional cleanup without overwriting later edits", async () => {
+    useAiStore.setState({ config: { asr: { active: "whisper-base", cleanup: "full" } } as AiConfig });
+    ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_models" ? [{ id: "whisper-base", installed: true }] : c === "voice_stop_and_transcribe" ? { transcript: "嗯你好" } : c === "voice_cleanup_text" ? { text: "你好。", original: "嗯你好" } : null);
+    render(<Input />); await record(); fireEvent.click(screen.getByTestId("dictation-button"));
+    await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue("你好。hello world"));
+    expect(screen.getByTestId("dictation-button-original")).toHaveTextContent("嗯你好");
+    fireEvent.click(screen.getByTestId("dictation-button-undo"));
+    expect(screen.getByRole("textbox")).toHaveValue("嗯你好hello world");
+  });
+  it("discards cleanup results after context cancellation", async () => {
+    const pending = deferred<{ text: string; original: string }>();
+    useAiStore.setState({ config: { asr: { active: "whisper-base", cleanup: "light" } } as AiConfig });
+    ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_models" ? [{ id: "whisper-base", installed: true }] : c === "voice_stop_and_transcribe" ? { transcript: "raw" } : c === "voice_cleanup_text" ? pending.promise : null);
+    const view = render(<Input />); await record(); fireEvent.click(screen.getByTestId("dictation-button"));
+    await waitFor(() => expect(ipc.mock.calls.some(([c]) => c === "voice_cleanup_text")).toBe(true));
+    view.rerender(<Input context="two" />);
+    await act(async () => pending.resolve({ text: "late", original: "raw" }));
+    expect(screen.getByRole("textbox")).toHaveValue("hello world");
+    expect(ipc.mock.calls.some(([c]) => c === "voice_cancel_cleanup")).toBe(true);
+  });
+
+  it("does not upload queued finals after cancellation", async () => {
+    const pending = deferred<{ text: string; original: string }>();
+    useAiStore.setState({ config: { asr: { active: "deepgram", cleanup: "full" } } as AiConfig });
+    ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_cleanup_text" ? pending.promise : null);
+    render(<Input />); await record();
+    const id = ipc.mock.calls.find(([c]) => c === "voice_start_stream")![1].sessionId;
+    act(() => {
+      for (const text of ["first", "queued"])
+        events.get("voice-transcript")!({ payload: { session_id: id, text, final_text: true } });
+    });
+    await waitFor(() => expect(ipc.mock.calls.filter(([c]) => c === "voice_cleanup_text")).toHaveLength(1));
+    fireEvent.click(screen.getByTestId("dictation-button-cancel"));
+    await act(async () => pending.resolve({ text: "clean", original: "first" }));
+    expect(ipc.mock.calls.filter(([c]) => c === "voice_cleanup_text")).toHaveLength(1);
+    expect(screen.getByRole("textbox")).toHaveValue("hello world");
+  });
+
+  it("serializes adjacent finals and undoes the whole uninterrupted cleanup", async () => {
+    useAiStore.setState({ config: { asr: { active: "deepgram", cleanup: "full" } } as AiConfig });
+    ipc.mockImplementation(async (c, args) => c === "voice_capture_supported" ? true : c === "voice_cleanup_text" ? { text: args.text.toUpperCase(), original: args.text } : null);
+    render(<Input />); await record();
+    const id = ipc.mock.calls.find(([c]) => c === "voice_start_stream")![1].sessionId;
+    act(() => {
+      for (const text of ["first", "second"])
+        events.get("voice-transcript")!({ payload: { session_id: id, text, final_text: true } });
+    });
+    await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue("FIRSTSECONDhello world"));
+    fireEvent.click(screen.getByTestId("dictation-button-undo"));
+    expect(screen.getByRole("textbox")).toHaveValue("firstsecondhello world");
+  });
+
 });

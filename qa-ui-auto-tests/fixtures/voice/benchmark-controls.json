@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "samples": [
+    {
+      "id": "synthetic-silence-3s",
+      "path": "benchmark-silence.wav",
+      "sha256": "d303811b8c84619667cd0501342f84ec6cbe69f7aa3856dcf52fabda374c92b8",
+      "language": "auto",
+      "category": "silence",
+      "reference": "",
+      "duration_s": 3.0,
+      "source": "Taomni deterministic PCM16 control: silence or LCG(1664525,1013904223), seed 1729, amplitude 655/32768. Not human speech.",
+      "license": "CC0-1.0 (generated test signal)"
+    },
+    {
+      "id": "synthetic-noise-3s",
+      "path": "benchmark-noise.wav",
+      "sha256": "8c3a3749dca7907671d4e2bf78f6be397c35b78161b4da8784c35cfd347b5111",
+      "language": "auto",
+      "category": "noise",
+      "reference": "",
+      "duration_s": 3.0,
+      "source": "Taomni deterministic PCM16 control: silence or LCG(1664525,1013904223), seed 1729, amplitude 655/32768. Not human speech.",
+      "license": "CC0-1.0 (generated test signal)"
+    }
+  ]
+}

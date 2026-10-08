@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "description": "Exploratory smoke corpus only; does not satisfy the P0 language/sample gate.",
+  "samples": [
+    {
+      "id": "fleurs-zh-1906",
+      "path": "fleurs-cmn-hans-cn-1906.wav",
+      "sha256": "a72c0b59fdba80850552af7991de07f9f4940846d2d70f0890eeb153c40f164b",
+      "language": "zh",
+      "category": "speech",
+      "reference": "这并不是告别。这是一个篇章的结束，也是新篇章的开始。",
+      "duration_s": 10.38,
+      "source": "google/fleurs@70bb2e84b976b7e960aa89f1c648e09c59f894dd cmn_hans_cn test id=1906",
+      "license": "CC-BY-4.0; Google FLEURS / FLEURS contributors"
+    }
+  ]
+}

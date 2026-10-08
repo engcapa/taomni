@@ -65,45 +65,46 @@ verification:
   review: reviewed
   requirements:
   - id: permission-error
-    requirement: Scroll permission failure explains Accessibility remediation and preserves selection/annotation; explicit
-      close and Escape both return to main.
+    requirement: Scroll permission failure explains Accessibility remediation and preserves selection/annotation;
+      explicit close and Escape both return to main.
     actions:
     - 1
     - 4
     - 5
     - 6
     - 7
-    - 9
-    - 15
-    - 17
-    - 19
+    - 10
+    - 16
+    - 18
     - 20
     - 21
-    - 23
+    - 22
+    - 25
     checkpoints:
-    - step: 10
-      expectation: '{''assert_visible'': ''[data-testid="screenshot-scroll-error"]''}'
     - step: 11
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="screenshot-scroll-error"]'', ''contains'': ''Accessibility''}}'
-    - step: 12
-      expectation: '{''assert_visible'': ''[data-testid="screenshot-selection"]''}'
-    - step: 13
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''1''}}'
-    - step: 16
-      expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
-    - step: 22
       expectation: '{''assert_visible'': ''[data-testid="screenshot-scroll-error"]''}'
+    - step: 12
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="screenshot-scroll-error"]'', ''contains'':
+        ''Accessibility''}}'
+    - step: 13
+      expectation: '{''assert_visible'': ''[data-testid="screenshot-selection"]''}'
+    - step: 14
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''1''}}'
+    - step: 17
+      expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
     - step: 24
+      expectation: '{''assert_visible'': ''[data-testid="screenshot-scroll-error"]''}'
+    - step: 26
       expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
     results:
-    - 10
     - 11
     - 12
     - 13
-    - 16
-    - 22
+    - 14
+    - 17
     - 24
+    - 26
   visual:
   - check: Permission error readability
     method: automated

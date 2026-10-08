@@ -1,3 +1,4 @@
+import { getLocale } from "../lib/i18n";
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -18,11 +19,19 @@ export interface AsrProviderConfig {
   api_key?: string;
   proxy_mode?: "app" | "custom" | "none" | string;
   proxy_url?: string;
+  custom_proxy?: AppProxyConfig;
+  app_id?: string;
+  resource_id?: string;
+  vocabulary_endpoint?: string;
 }
 
 export interface AsrConfig {
   download_proxy?: { mode: "app" | "custom" | "none"; custom: AppProxyConfig };
   language?: string;
+  language_prior?: string;
+  hotwords?: string[];
+  experimental?: boolean;
+  cleanup?: "off" | "light" | "full";
   mode?: "local" | "online" | string;
   active: string;
   providers: Record<string, AsrProviderConfig>;
@@ -365,12 +374,21 @@ interface AiStore {
 const DEFAULT_CONFIG: AiConfig = {
   asr: {
     download_proxy: { mode: "app", custom: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" } },
-    active: "whisper-base",
+    active: "local-auto",
+    language_prior: "zh",
+    hotwords: [],
+    experimental: false,
+    cleanup: "off",
     mode: "local",
     providers: {
       ...Object.fromEntries(["base", "small", "medium"].map((size) => [`whisper-${size}`, { engine: "whisper-rs", model: `ggml-${size}.bin` }])),
+      ...Object.fromEntries(["base", "small", "medium"].map((size) => [`whisper-${size}-q8`, { engine: "whisper-rs", model: `ggml-${size}-q8_0.bin` }])),
+      "whisper-turbo-q5": { engine: "whisper-rs", model: "ggml-large-v3-turbo-q5_0.bin" },
+      "sensevoice-small": { engine: "sherpa-onnx", model: "model.int8.onnx" },
       "sherpa-zipformer-zh-en": { engine: "sherpa-onnx", model: "streaming-zipformer-bilingual-zh-en-2023-02-20", endpoint: "", api_key: "", proxy_mode: "app" },
       aliyun: { engine: "aliyun-dashscope", model: "paraformer-realtime-v2", endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/inference/", api_key: "", proxy_mode: "app" },
+      volcengine: { engine: "volcengine", model: "bigmodel", endpoint: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async", resource_id: "volc.seedasr.sauc.duration", api_key: "", proxy_mode: "app" },
+      soniox: { engine: "soniox", model: "stt-rt-v5", endpoint: "wss://stt-rt.soniox.com/transcribe-websocket", api_key: "", proxy_mode: "app" },
       deepgram: { engine: "deepgram", model: "nova-3", endpoint: "wss://api.deepgram.com/v1/listen", api_key: "", proxy_mode: "app" },
       gemini: { engine: "gemini", model: "gemini-3.5-transcribe-live", endpoint: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent", api_key: "", proxy_mode: "app" },
     } as Record<string, AsrProviderConfig>,
@@ -645,10 +663,17 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
     ...config,
     asr: {
       ...DEFAULT_CONFIG.asr,
+      // Preserve stored credentials, custom endpoints and feature proxies.
+      // Defaults only fill providers absent from older configurations.
+      providers: { ...DEFAULT_CONFIG.asr.providers, ...config.asr?.providers },
       download_proxy: config.asr?.download_proxy ?? DEFAULT_CONFIG.asr.download_proxy,
-      mode: config.asr?.mode === "online" ? "online" : "local",
-      active: ["whisper-base", "whisper-small", "whisper-medium", "sherpa-zipformer-zh-en", "aliyun", "deepgram", "gemini"].includes(config.asr?.active) ? config.asr.active : "whisper-base",
-      language: ["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].includes(config.asr?.language ?? "") ? config.asr.language : "auto",
+      mode: ["aliyun", "volcengine", "soniox", "deepgram", "gemini"].includes(config.asr?.active) ? "online" : "local",
+      active: ["local-auto", "sensevoice-small", "whisper-base-q8", "whisper-small-q8", "whisper-medium-q8", "whisper-turbo-q5", "whisper-base", "whisper-small", "whisper-medium", "sherpa-zipformer-zh-en", "aliyun", "volcengine", "soniox", "deepgram", "gemini"].includes(config.asr?.active) ? config.asr.active : "local-auto",
+      hotwords: config.asr?.hotwords ?? [],
+      experimental: config.asr?.experimental ?? false,
+      cleanup: ["off", "light", "full"].includes(config.asr?.cleanup ?? "") ? config.asr.cleanup : "off",
+      language_prior: config.asr?.language_prior ?? (getLocale().startsWith("zh") ? "zh" : "en"),
+      language: ["auto", "yue", "it", "zh", "en", "ja", "ko", "fr", "de", "es"].includes(config.asr?.language ?? "") ? config.asr.language : "auto",
     },
     llm: {
       ...config.llm,
