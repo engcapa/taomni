@@ -33,6 +33,15 @@ class StartupNavigationTest(TestCase):
             self.assertEqual(page.goto.call_count, 1)
             self.assertFalse((Path(directory) / "startup-network-retries.log").exists())
 
+    def test_static_html_prototype_uses_body_mount_gate(self):
+        with TemporaryDirectory() as directory:
+            page = Mock()
+            page.wait_for_selector.side_effect = [RuntimeError("no React root"), None]
+            ctx = StepContext(page, "TC-prototype", Path(directory), {}, {})
+            step_open(ctx, "http://127.0.0.1:5000/docs-feature/ui-layout-refactor-prototype.html")
+            self.assertEqual(page.wait_for_selector.call_args_list[0].args[0], "#root > *")
+            self.assertEqual(page.wait_for_selector.call_args_list[1].args[0], "body > *")
+
     def test_persistent_network_failure_remains_a_failure(self):
         with TemporaryDirectory() as directory:
             page = Mock()

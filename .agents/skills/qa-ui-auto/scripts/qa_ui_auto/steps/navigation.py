@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from . import StepContext, StepError, verb
 
@@ -47,7 +48,16 @@ def step_open(ctx: StepContext, args: Any) -> None:
             failures.clear()
             try:
                 ctx.page.goto(url, wait_until="domcontentloaded")
-                ctx.page.wait_for_selector("#root > *", state="attached", timeout=30_000)
+                try:
+                    ctx.page.wait_for_selector("#root > *", state="attached", timeout=30_000)
+                except Exception:
+                    # Standalone HTML design/prototype pages intentionally do
+                    # not mount the React root. Keep the product startup gate
+                    # strict while allowing those documented static routes to
+                    # prove their own selectors in the following steps.
+                    if not urlparse(url).path.lower().endswith(".html"):
+                        raise
+                    ctx.page.wait_for_selector("body > *", state="attached", timeout=30_000)
                 if not failures:
                     return
                 raise StepError("startup network failure: " + ", ".join(sorted(set(failures))))
