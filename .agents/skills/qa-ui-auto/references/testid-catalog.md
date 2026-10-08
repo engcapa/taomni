@@ -107,6 +107,14 @@
 - `[data-testid="asr-download-proxy-save"]` — interactive — F-AI-2.3.asr-download-proxy-save
 - `[data-testid="asr-check-models"]` — interactive — F-AI-2.3.asr-check-models
 - `[data-testid="asr-language"]` — interactive — F-AI-2.3.asr-language
+- `[data-testid="asr-realtime-provider"]` — interactive — F-AI-2.3.asr-realtime-provider
+- `[data-testid="asr-sherpa-installation-progress"]` — display — F-AI-2.3.asr-sherpa-installation-progress
+- `[data-testid="asr-cancel-sherpa-download"]` — interactive — F-AI-2.3.asr-cancel-sherpa-download
+- `[data-testid="asr-download-sherpa-zipformer-zh-en"]` — interactive — F-AI-2.3.asr-download-sherpa
+- `[data-testid="asr-select-sherpa-zipformer-zh-en"]` — interactive — F-AI-2.3.asr-select-sherpa
+- `[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]` — interactive — F-AI-2.3.asr-copy-url-sherpa
+- `[data-testid="asr-open-url-sherpa-zipformer-zh-en"]` — interactive — F-AI-2.3.asr-open-url-sherpa
+- `[data-testid="asr-download-url-sherpa-zipformer-zh-en"]` — interactive — F-AI-2.3.asr-download-url-sherpa
 - `[data-testid="asr-download-whisper-base"]` — interactive — F-AI-2.3.asr-download-base
 - `[data-testid="asr-download-whisper-small"]` — interactive — F-AI-2.3.asr-download-small
 - `[data-testid="asr-select-whisper-base"]` — interactive — F-AI-2.3.asr-select-base

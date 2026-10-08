@@ -3848,6 +3848,30 @@ controls:
   - id: asr-language
     selector: '[data-testid="asr-language"]'
     kind: interactive
+  - id: asr-realtime-provider
+    selector: '[data-testid="asr-realtime-provider"]'
+    kind: interactive
+  - id: asr-sherpa-installation-progress
+    selector: '[data-testid="asr-sherpa-installation-progress"]'
+    kind: display
+  - id: asr-cancel-sherpa-download
+    selector: '[data-testid="asr-cancel-sherpa-download"]'
+    kind: interactive
+  - id: asr-download-sherpa
+    selector: '[data-testid="asr-download-sherpa-zipformer-zh-en"]'
+    kind: interactive
+  - id: asr-select-sherpa
+    selector: '[data-testid="asr-select-sherpa-zipformer-zh-en"]'
+    kind: interactive
+  - id: asr-copy-url-sherpa
+    selector: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]'
+    kind: interactive
+  - id: asr-open-url-sherpa
+    selector: '[data-testid="asr-open-url-sherpa-zipformer-zh-en"]'
+    kind: interactive
+  - id: asr-download-url-sherpa
+    selector: '[data-testid="asr-download-url-sherpa-zipformer-zh-en"]'
+    kind: interactive
   - id: asr-download-base
     selector: '[data-testid="asr-download-whisper-base"]'
     kind: interactive
