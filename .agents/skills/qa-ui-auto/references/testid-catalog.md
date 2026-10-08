@@ -1480,7 +1480,7 @@
   ↳ `[data-testid="workspace-row-qa-workspace-main"]` — alias
   ↳ `[data-testid="workspace-row-qa-workspace-remote"]` — alias
 - `[data-testid="workspace-references"]` — display — F-Workspace-1.workspace-references
-- `[data-testid="workspace-reference-open"]` — interactive — F-Workspace-1.workspace-reference-open
+- `[data-testid="workspace-open-reference"]` — interactive — F-Workspace-1.workspace-open-reference
 - `[data-testid="workspace-add-session"]` — interactive — F-Workspace-1.workspace-add-session
 - `[data-testid="workspace-header"]` — display — F-Workspace-1.workspace-header
 - `[data-testid="surface-scope"]` — display — F-Workspace-1.surface-scope

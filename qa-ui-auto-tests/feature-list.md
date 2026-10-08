@@ -58,8 +58,8 @@ controls:
 - id: workspace-references
   selector: '[data-testid="workspace-references"]'
   kind: display
-- id: workspace-reference-open
-  selector: '[data-testid="workspace-reference-open"]'
+- id: workspace-open-reference
+  selector: '[data-testid="workspace-open-reference"]'
   kind: interactive
 - id: workspace-add-session
   selector: '[data-testid="workspace-add-session"]'

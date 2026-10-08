@@ -38,7 +38,7 @@ steps:
 - select_option:
     selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
     label: QA VNC resource
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-open"][data-session-name="QA VNC resource"]'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA VNC resource"]'
 - wait_for:
     selector: '[data-testid="vnc-unencrypted-continue"]'
     timeout_sec: 20
@@ -64,7 +64,7 @@ steps:
 
       '
 - click: '[data-testid="workspace-row-qa-workspace-main"]'
-- click: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-open"][data-session-name="QA VNC resource"]'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-open-reference"][data-session-name="QA VNC resource"]'
 - wait_for: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
 - assert_count:
     selector: '[data-testid="vnc-canvas"]'
