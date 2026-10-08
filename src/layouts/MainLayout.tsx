@@ -753,6 +753,7 @@ export function MainLayout() {
     moveTabToIndex,
     toggleSidebar,
     setSidebarCollapsed,
+    applySidebarForActiveTab,
     setActiveSideTab,
     toggleXServer,
     setStatusMessage,
@@ -1732,6 +1733,13 @@ export function MainLayout() {
   useEffect(() => {
     if (activeTabId) setTabHasNewOutput(activeTabId, false);
   }, [activeTabId, setTabHasNewOutput]);
+
+  // Workspace-first keeps each runtime tab's preferred navigator state. Apply
+  // the remembered group when a tab becomes active so terminal/editor rail
+  // handoffs collapse the main navigator immediately after opening.
+  useEffect(() => {
+    applySidebarForActiveTab();
+  }, [activeTabId, activeTab?.type, applySidebarForActiveTab]);
 
   // Track which tab the AI Chat Drawer should consider "active" when the user
   // types `@terminal:last-N` or sends generated SQL back to a query tab.
