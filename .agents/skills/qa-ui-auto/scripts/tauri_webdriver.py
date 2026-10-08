@@ -387,7 +387,9 @@ class TauriDriverProcess:
         if platform.system() == "Windows" and self.proc.poll() is None:
             result = subprocess.run(
                 ["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
-                capture_output=True, text=True, timeout=20,
+                # taskkill uses the Windows OEM encoding even when Python runs
+                # in UTF-8 mode. Preserve cleanup status without reader crashes.
+                capture_output=True, text=True, errors="replace", timeout=20,
             )
             if result.returncode and self.proc.poll() is None:
                 raise WebDriverError(f"Could not stop owned native driver tree: {result.stderr}")

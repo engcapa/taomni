@@ -477,7 +477,7 @@ class NativeIsolationTest(unittest.TestCase):
                     session.close()
                 kill.assert_called_once_with(
                     ["taskkill", "/PID", "31415", "/T", "/F"],
-                    capture_output=True, text=True, timeout=20,
+                    capture_output=True, text=True, errors="replace", timeout=20,
                 )
                 process.wait.assert_called_once_with(timeout=5)
                 self.assertIsNone(driver.proc)
