@@ -201,8 +201,8 @@ const SHERPA_MODEL_ID: &str = "sherpa-zipformer-zh-en";
 const SHERPA_FILES: &[(&str, u64, &str)] = &[
     (
         "encoder-epoch-99-avg-1.int8.onnx",
-        43_687_936,
-        "d9d00f6d64d01e6ae1a1de8381cb4114be5ce04283f4830abadd130aac528ecf",
+        181_895_032,
+        "8fa764187a261844f859d7143ebaa563af5d10adfece4c18a8f414c88cba2a9b",
     ),
     (
         "decoder-epoch-99-avg-1.onnx",
@@ -361,7 +361,7 @@ pub async fn voice_install_sherpa_model(
                 continue;
             }
             let part = dir.join(format!("{filename}.part"));
-            let url = format!("https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-zh-en-2023-02-20/resolve/{SHERPA_UPSTREAM_REVISION}/{filename}?download=true");
+            let url = format!("https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/{SHERPA_UPSTREAM_REVISION}/{filename}?download=true");
             sherpa_progress(&app, &job_id, "connecting", completed, Some((*filename).into()), None);
             download_to_part(&client, &url, *bytes, &part, &cancel, |phase, bytes_done| {
                 sherpa_progress(&app, &job_id, phase, completed + bytes_done, Some((*filename).into()), None);

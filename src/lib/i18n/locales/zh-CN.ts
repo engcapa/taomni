@@ -2957,6 +2957,8 @@ export const zhCN: DeepPartial<typeof en> = {
     "privacy": "语音识别在本机运行，不上传音频。识别结果仅填入草稿，请确认后发送。",
     "modelHelp": "Base 支持中文。中文听写建议选择“中文”；准确率不足时可升级 Small/Medium。Small 和 Medium 可能提高准确率，但需要更多内存和识别时间。单击开始录音，再次单击停止识别；Esc 取消。",
     "realtimeTitle": "实时语音转文字",
+    "localModelHelp": "Whisper 的 Base/Small/Medium 是停止录音后批量识别的模型，下载的是对应的本地权重；Zipformer 不依赖 Whisper，是另一套能边说边输出临时文本和定稿文本的流式模型。两者都在本机运行，不会上传音频。",
+    "zipformerDownloadHelp": "Zipformer 下载的是流式识别所需的 4 个文件：编码器、解码器、Joiner 和 tokens 词表，合计约 199 MB。文件会校验 SHA-256 后保存到本地模型缓存。",
     "language": "语音语言",
     "autoLanguage": "自动检测",
     "installed": "已下载（加载时校验）",
