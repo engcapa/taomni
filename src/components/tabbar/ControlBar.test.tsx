@@ -76,11 +76,12 @@ function renderControlBar(
     onCommand?: (commandId: string) => void;
   } = {},
   onDetachActiveTab?: () => void,
+  nativeMenu = false,
 ) {
   return render(
     <ControlBar
       activeTabClosable
-      nativeMenu={false}
+      nativeMenu={nativeMenu}
       xServerEnabled={false}
       quickConnectVisible={false}
       workspaceCommands={workspace.commands}
@@ -157,6 +158,15 @@ describe("ControlBar settings button", () => {
     expect(useWorkspaceStore.getState().commandCenterOpen).toBe(true);
     fireEvent.click(screen.getByTestId("global-new"));
     expect(useWorkspaceStore.getState().createDialogOpen).toBe(true);
+  });
+
+  it("keeps the header More actions available alongside the native macOS menu", () => {
+    const onCommand = vi.fn();
+    renderControlBar(onCommand, {}, undefined, true);
+    fireEvent.click(screen.getByTestId("app-main-menu"));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-tools"));
+    fireEvent.click(screen.getByTestId("context-menu-item-code-workspace"));
+    expect(onCommand).toHaveBeenCalledWith("code-workspace");
   });
 
   it("preserves dragging and maximize gestures in the global header", () => {

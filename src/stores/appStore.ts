@@ -901,13 +901,15 @@ function rememberSidebarForActiveGroup(
   s: Pick<AppState, "mergeToolWindowRail" | "sidebarCollapsedByGroup" | "tabs" | "activeTabId">,
   collapsed: boolean,
 ): Partial<Pick<AppState, "sidebarCollapsedByGroup">> {
+  // Workspace-first persists the explicit navigator choice for every surface.
+  // Keep the group keys in sync for compatibility, without applying them on
+  // runtime switches in the shell.
+  writeSidebarCollapsed(collapsed);
   if (!s.mergeToolWindowRail) {
-    writeSidebarCollapsed(collapsed);
     return {};
   }
   const active = s.tabs.find((tab) => tab.id === s.activeTabId);
   const group = sidebarRailGroup(active?.type);
-  if (group === "other") writeSidebarCollapsed(collapsed);
   if (s.sidebarCollapsedByGroup[group] === collapsed) return {};
   const sidebarCollapsedByGroup = { ...s.sidebarCollapsedByGroup, [group]: collapsed };
   if (group !== "other") writeSidebarCollapsedByGroup(sidebarCollapsedByGroup);

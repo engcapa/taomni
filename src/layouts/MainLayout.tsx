@@ -753,7 +753,6 @@ export function MainLayout() {
     moveTabToIndex,
     toggleSidebar,
     setSidebarCollapsed,
-    applySidebarForActiveTab,
     setActiveSideTab,
     toggleXServer,
     setStatusMessage,
@@ -1734,14 +1733,8 @@ export function MainLayout() {
     if (activeTabId) setTabHasNewOutput(activeTabId, false);
   }, [activeTabId, setTabHasNewOutput]);
 
-  // Workspace-first keeps the navigator global while preserving the legacy
-  // compact handoff for editor and local-shell surfaces. Remote session tabs
-  // leave the user's current navigator choice untouched.
-  useEffect(() => {
-    const autoCompact = activeTab?.type === "code-workspace"
-      || (activeTab?.type === "terminal" && Boolean(activeTab.localShell));
-    if (autoCompact) applySidebarForActiveTab();
-  }, [activeTabId, activeTab?.type, activeTab?.localShell, applySidebarForActiveTab]);
+  // Navigator visibility belongs to the shell/workspace layout. Switching
+  // runtime kinds must not overwrite the user's explicit hide/restore choice.
 
   // Track which tab the AI Chat Drawer should consider "active" when the user
   // types `@terminal:last-N` or sends generated SQL back to a query tab.

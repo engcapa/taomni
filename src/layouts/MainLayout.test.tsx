@@ -1874,12 +1874,19 @@ describe("MainLayout ED-PARITY-027 single tool window bar", () => {
   });
 
   it("preserves navigator visibility while switching runtime kinds", async () => {
+    useAppStore.setState((state) => ({ tabs: [...state.tabs,
+      { id: "local-tab", type: "terminal", title: "Local", closable: true, localShell: { id: "pwsh", name: "PowerShell" } },
+      { id: "editor-tab", type: "code-workspace", title: "Editor", closable: true },
+    ] }));
     render(<MainLayout />);
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
-    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
-    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
-    act(() => useAppStore.getState().setActiveTab("welcome"));
-    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
+    for (const collapsed of [false, true]) {
+      act(() => useAppStore.getState().setSidebarCollapsed(collapsed));
+      for (const id of ["ssh-tab", "local-tab", "editor-tab", "welcome"]) {
+        act(() => useAppStore.getState().setActiveTab(id));
+        await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(collapsed));
+      }
+    }
   });
 
   it("keeps the store's state over a restored collapsed layout and syncs later drags", async () => {

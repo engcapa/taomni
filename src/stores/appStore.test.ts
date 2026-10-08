@@ -926,11 +926,11 @@ describe("appStore.sidebar per tab group (ED-PARITY-027)", () => {
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
   });
 
-  it("remembers manual changes per group and keeps only the other group in the legacy key", () => {
+  it("persists explicit navigator changes from every runtime and retains compatibility group keys", () => {
     useAppStore.setState({ activeTabId: "t1", sidebarCollapsed: true });
     useAppStore.getState().setSidebarCollapsed(false);
     expect(useAppStore.getState().sidebarCollapsedByGroup).toEqual({ "code-workspace": true, terminal: false, other: false });
-    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("false");
     expect(JSON.parse(window.localStorage.getItem("taomni.sidebarCollapsedByGroup.v1") ?? "null"))
       .toEqual({ "code-workspace": true, terminal: false });
 
@@ -939,7 +939,7 @@ describe("appStore.sidebar per tab group (ED-PARITY-027)", () => {
     expect(useAppStore.getState().sidebarCollapsed).toBe(true);
     useAppStore.getState().setActiveSideTab("tools");
     expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(false);
-    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("false");
 
     useAppStore.setState({ activeTabId: "welcome" });
     useAppStore.getState().toggleSidebar();

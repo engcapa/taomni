@@ -46,7 +46,7 @@ export function WorkspaceReferences({ workspace, sessions, onConnectSession }: {
     {workspace.memberships.map((member) => {
       const session = sessions.find((s) => s.id === member.sessionId);
       return <div key={member.sessionId} data-testid={`workspace-reference-${member.sessionId}`} className="py-2 border-b border-[var(--taomni-divider)]">
-        <button className={buttonClass} disabled={!session} onClick={() => session && onConnectSession?.(session, workspace.id)}>{session?.name ?? `${member.sessionId} · unavailable`}</button>
+        <button data-testid="workspace-reference-open" data-session-name={session?.name} className={buttonClass} disabled={!session} onClick={() => session && onConnectSession?.(session, workspace.id)}>{session?.name ?? `${member.sessionId} · unavailable`}</button>
         <select aria-label={`Role for ${session?.name ?? member.sessionId}`} className="taomni-input max-w-full" value={member.role} onChange={(e) => void store.patchMembership(workspace.id, member.sessionId, { role: e.target.value as typeof member.role }).catch(() => {})}>
           <option value="primary">{t("workspace.primary")}</option><option value="attached">{t("workspace.attached")}</option><option value="reference">{t("workspace.reference")}</option>
         </select>

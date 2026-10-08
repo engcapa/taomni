@@ -2,6 +2,36 @@
 
 Navigation-only migration; execution status remains pending until the matching run is reviewed.
 
+## Navigator and editor rail reconciliation (2026-10-08)
+
+The design §2 replaces the per-runtime sidebar policy, and §4.3 makes Hide/restore
+an explicit navigator action. Runtime switches therefore retain the current
+navigator choice, including local shell and Code Workspace. Explicit changes
+persist to the global compatibility key; the old group keys remain readable and
+are updated for compatibility. Workspace canvas layout restoration stays scoped
+to the selected Workspace. The merge setting, Project pane width, tool actions,
+icon/name menu and the Settings action remain functional.
+
+`TC-IDE-PARITY-027-01/02/03` and `TC-MAIN-RAIL-01` now explicitly hide the navigator
+before testing rail integration. The terminal return path uses More → open
+surface, since Home no longer displays session tabs. Editor selectors distinguish
+the visible instance from intentionally mounted background editors. The macOS
+header exposes More alongside the native menu, using the existing Lucide icon and
+command menu. Reference lifecycle cases target the reference button instead of
+text that can also match an option during asynchronous membership persistence.
+
+Windows browser receipt `windows-browser-rail-v3/run-20261008-112856-437429700`:
+5 passed, 0 failed, 0 skipped, stable identity. It covers the two browser IDEA rail
+cases, main rail, VNC resource lifecycle and Mail IDLE lifecycle, using the local
+WSL OpenSSH, portable MySQL and VNC fixtures. Focused unit verification: 99 store,
+ChatDrawer and ControlBar tests passed; 3 shell navigator tests passed. Native and
+full-suite verification remain pending on this revision.
+
+Hosted run `37717056113` is **not an acceptance pass**: Linux browser 6/9,
+Linux native 10/14, macOS browser 6/9, macOS native 9/14 passed. The workflow's
+`report_ok` gate validates evidence completeness; its green state does not mean
+all cases passed. Inspect `passed`, case totals and failure details on every run.
+
 | Case | Old → new entry | Retained results | Modes | Evidence |
 |---|---|---|---|---|
 | TC-013 | Initial Work → Sessions | All existing business assertions retained | browser | Pending rerun |

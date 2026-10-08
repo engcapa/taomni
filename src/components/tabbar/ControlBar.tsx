@@ -220,6 +220,7 @@ export function ControlBar({
         <button data-testid="global-search" className="px-2 text-xs" onClick={() => useWorkspaceStore.setState({ commandCenterOpen: true })}>{t("workspace.search")}</button>
         <button data-testid="global-new" className="px-2 text-xs" onClick={() => useWorkspaceStore.setState({ createDialogOpen: true })}>{t("workspace.new")}</button>
         <AppThemeIconButton />
+        {nativeMenu && <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<MoreHorizontal className="w-4 h-4" />} onClick={openMainMenu} />}
       </div>
       {/* Update hint sits just left of the tab-action group (centre-right of the
           bar). It only appears once a new version is staged. */}

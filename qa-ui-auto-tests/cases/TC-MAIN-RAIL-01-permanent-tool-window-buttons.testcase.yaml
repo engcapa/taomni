@@ -197,6 +197,7 @@ steps:
 - click: '[data-testid="session-recents"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="side-tab-sessions"]'
 - assert_count:
     selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]'
     equal: 0
@@ -240,15 +241,19 @@ verification:
     - 26
     checkpoints:
     - step: 3
-      expectation: The Workspace-first shell is ready; the retained workflow below has its own business assertions.
+      expectation: '{"wait_for": "[data-testid=\"control-bar\"]"}'
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 14
-      expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-control-bar .taomni-window-drag-handle'').getBoundingClientRect().height
+        <= 32 && getComputedStyle(document.querySelector(''.taomni-main-window'')).paddingLeft === ''0px''", "expect_truthy":
+        true}}'
     - step: 15
-      expectation: 标题栏抓手位于侧栏常驻按钮上方，没有覆盖按钮的点击区域。
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-window-drag-handle'').getBoundingClientRect().bottom
+        <= document.querySelector(''button[data-tool-window-id]'').getBoundingClientRect().top", "expect_truthy":
+        true}}'
     - step: 16
       expectation: '{"assert_count": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-sessions\"]
         svg", "equal": 1}}'
@@ -384,7 +389,9 @@ verification:
     - step: 80
       expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"side-tab-tools\"]"}'
     - step: 81
-      expectation: 窗口抓手在 control-bar 内，高度不超过 32px，主窗口左侧 padding 为 0。
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-control-bar .taomni-window-drag-handle'').getBoundingClientRect().height
+        <= 32 && getComputedStyle(document.querySelector(''.taomni-main-window'')).paddingLeft === ''0px''", "expect_truthy":
+        true}}'
     results:
     - 49
     - 50
@@ -414,37 +421,44 @@ verification:
     - 89
     - 95
     - 96
-    - 101
     - 102
-    - 104
+    - 103
     - 105
-    - 108
+    - 106
+    - 109
     checkpoints:
     - step: 85
-      expectation: Welcome hides the Settings name with all other action names.
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"ribbon-settings\"]",
+        "equals": ""}}'
     - step: 88
-      expectation: Welcome restores the visible Settings name.
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"expanded-sidebar-panel\"] [data-testid=\"ribbon-settings\"]",
+        "equals": "Settings"}}'
     - step: 90
-      expectation: Enter on Settings opens the settings panel.
-    - step: 98
-      expectation: A local terminal adds no Git action to the main sidebar.
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
     - step: 99
-      expectation: The terminal rail shows the Settings name.
-    - step: 103
-      expectation: The Settings context menu hides its name in the terminal rail.
-    - step: 106
-      expectation: The Settings context menu restores its name in the terminal rail.
-    - step: 112
-      expectation: The Settings name remains visible after returning to Code Workspace.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-git\"]",
+        "equal": 0}}'
+    - step: 100
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]",
+        "equals": "Settings"}}'
+    - step: 104
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]",
+        "equals": ""}}'
+    - step: 107
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]",
+        "equals": "Settings"}}'
+    - step: 113
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]",
+        "equals": "Settings"}}'
     results:
     - 85
     - 88
     - 90
-    - 98
     - 99
-    - 103
-    - 106
-    - 112
+    - 100
+    - 104
+    - 107
+    - 113
   visual:
   - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual

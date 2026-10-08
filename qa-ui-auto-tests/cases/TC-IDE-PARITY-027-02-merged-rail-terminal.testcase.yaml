@@ -1,12 +1,7 @@
 id: TC-IDE-PARITY-027-02
 title: SSH terminal tool windows (SFTP, Chat) live in the collapsed sidebar rail like Code Workspace
-description: 'ED-PARITY-027 browser + native case. Activating an SSH terminal collapses the main sidebar to its
-  rail and moves the terminal''s tool windows (attached SFTP, Chat) from the control bar''s tab actions into that
-  rail while actions such as Detach stay in the control bar; the rail SFTP button opens and closes the attached
-  browser without losing the terminal. Expanding the sidebar returns the toggles to the terminal and is remembered
-  for terminal tabs only.
-
-  '
+description: Explicit navigator collapse merges the SSH SFTP/Chat tools; restore returns them to the terminal. Switching
+  via the open-surfaces menu preserves the global navigator choice and compatibility keys.
 covers:
 - F1.2
 - F7.1
@@ -110,7 +105,8 @@ steps:
 - click: '[data-testid="context-menu-item-show-sessions"]'
 - click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="tab-more"]'
+- click: '[data-testid="open-tabs-menu"] button[title^="qa-ui-auto-ed027-rail"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - assert_visible: '[data-testid="session-tree"]'
 - assert_localstorage:
@@ -172,7 +168,7 @@ verification:
     actions:
     - 38
     - 46
-    - 48
+    - 49
     checkpoints:
     - step: 39
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
@@ -184,23 +180,23 @@ verification:
         "timeout_sec": 5}}'
     - step: 47
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 50
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 51
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
     - step: 52
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
+    - step: 53
       expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
     results:
     - 39
     - 40
     - 41
     - 47
-    - 49
     - 50
     - 51
     - 52
+    - 53
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

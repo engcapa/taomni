@@ -1,10 +1,8 @@
 id: TC-IDE-PARITY-027-01
 title: Code Workspace merges its tool window bar into the collapsed sidebar rail and remembers the sidebar state
-description: "ED-PARITY-027 (PROP-026-01 B + A) browser case. Opening a Code Workspace collapses the main sidebar\
-  \ to its rail and moves the workspace's left tool window bar into that rail (one bar instead of two); stripe buttons\
-  \ keep working there. Expanding the sidebar returns the bar to the workspace and is remembered for Code Workspace\
-  \ tabs while other tabs keep their own state; a relaunch starts Welcome from its own state; the Settings toggle\
-  \ restores the old layout.\n\n  Mode: browser.\n"
+description: Workspace-first keeps explicit navigator visibility across runtime kinds. Manually hiding the navigator
+  merges the editor tool rail; restoring returns the rail to the editor. Project width, tool actions, global persistence
+  and the merge setting remain protected.
 covers:
 - F1.2
 - F25.5
@@ -101,7 +99,7 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-code-workspace"]'
-- wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible [data-testid="code-workspace-tool-rail-left"]'
 - assert_localstorage:
     key: taomni.sidebarCollapsed
     equals: 'false'
@@ -121,6 +119,7 @@ steps:
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]:visible'
+- click: '[data-testid="side-tab-tools"]:visible'
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
@@ -144,13 +143,14 @@ verification:
   review: pending
   requirements:
   - id: R1
-    requirement: A：从工具面板打开 Code Workspace 后，主侧栏自动折叠为左侧工具条（会话树隐藏）。
+    requirement: Explicitly hide the navigator after opening Code Workspace; the session tree hides and the editor
+      remains visible.
     actions:
     - 6
     - 9
     checkpoints:
     - step: 10
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]:visible"}'
     - step: 14
       expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 5}}'
     - step: 15
@@ -169,10 +169,10 @@ verification:
     - step: 16
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 17
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]",
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]:visible [data-testid=\"code-workspace-tool-rail-left\"]",
         "equal": 0}}'
     - step: 18
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-right\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"]:visible [data-testid=\"code-workspace-tool-rail-right\"]"}'
     - step: 23
       expectation: '{"eval_readonly": {"expression": "(document.querySelector(\"[data-testid\" + String.fromCharCode(61)
         + \"\\\"code-workspace-tree-pane\\\"]\").getBoundingClientRect().width > 300) && (document.querySelector(\"[data-testid\"
@@ -195,7 +195,8 @@ verification:
     - 28
     - 29
   - id: R3
-    requirement: A：在工作区里展开主侧栏后工具条回到工作区，且该选择对 Code Workspace 标签记忆（切到 Welcome 再回来仍展开）；再次折叠后工具条重新合并，且同样被记住。
+    requirement: Manual expand/hide works, and switching Home and editor surfaces retains the current navigator
+      choice.
     actions:
     - 30
     - 39
@@ -210,15 +211,15 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec":
         5}}'
     - step: 33
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]:visible [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 34
       expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":false"}}'
     - step: 40
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 45
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 5}}'
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
     - step: 54
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     results:
     - 31
     - 32
@@ -232,16 +233,16 @@ verification:
     actions:
     - 71
     - 73
-    - 74
-    - 76
+    - 75
+    - 77
     checkpoints:
-    - step: 79
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]",
-        "equal": 0}}'
+    - step: 80
+      expectation: '{"assert_localstorage": {"key": "taomni.mergeToolWindowRail", "equals": "false"}}'
     results:
-    - 79
+    - 80
   - id: R5
-    requirement: A：工作区折叠侧栏时重新加载（等同重启），Welcome 仍按自己的状态展开侧栏（旧键 taomni.sidebarCollapsed 保持 false），再开工作区仍折叠合并。
+    requirement: Reload restores the explicit global navigator preference; opening another editor does not override
+      it.
     actions:
     - 60
     - 61
@@ -259,14 +260,14 @@ verification:
     - step: 68
       expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "equal": 0}}'
     - step: 73
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 74
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]:visible"}'
+    - step: 75
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     results:
     - 59
     - 68
     - 73
-    - 74
+    - 75
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

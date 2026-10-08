@@ -38,7 +38,18 @@ steps:
 - select_option:
     selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
     label: QA VNC resource
-- click: '[data-testid="workspace-navigator"] >> text="QA VNC resource"'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-open"][data-session-name="QA VNC resource"]'
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 20
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 20
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_VNC_PASSWORD}
+- click: '[data-testid="vnc-auth-ok"]'
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
     timeout_sec: 20
@@ -53,7 +64,7 @@ steps:
 
       '
 - click: '[data-testid="workspace-row-qa-workspace-main"]'
-- click: '[data-testid="workspace-navigator"] >> text="QA VNC resource"'
+- click: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-open"][data-session-name="QA VNC resource"]'
 - wait_for: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
 - assert_count:
     selector: '[data-testid="vnc-canvas"]'
@@ -101,32 +112,34 @@ verification:
     - 14
     - 15
     - 16
-    - 18
-    - 19
-    - 20
-    - 21
-    - 22
-    - 25
-    - 27
-    - 28
-    - 29
-    - 32
-    - 34
-    - 35
-    checkpoints:
-    - step: 17
-      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    - step: 24
-      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    - step: 37
-      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    - step: 38
-      expectation: The real fixture response, unique canvas or owning Workspace is observable after navigation.
-    results:
-    - 17
+    - 23
     - 24
+    - 25
+    - 26
+    - 27
+    - 30
+    - 32
+    - 33
+    - 34
     - 37
-    - 38
+    - 39
+    - 40
+    checkpoints:
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]", "timeout_sec":
+        20}}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"vnc-canvas\"][width=\"900\"][height=\"600\"]"}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "Workspace ·
+        QA Main"}}'
+    results:
+    - 22
+    - 29
+    - 42
+    - 43
   native:
   - check: Tauri VNC relay and detached OS window lifecycle.
     method: automated
