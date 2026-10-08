@@ -6,11 +6,30 @@ const models = [
   { id: "whisper-small", filename: "ggml-small.bin", bytes: 487601967 },
   { id: "whisper-medium", filename: "ggml-medium.bin", bytes: 1533763059 },
 ];
+const sherpaModel = { id: "sherpa-zipformer-zh-en", filename: "encoder-epoch-99-avg-1.int8.onnx", bytes: 199056205 };
+const sherpaUrl = "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tree/98590b7ed6443e77b714204da2757d75e1a642f4";
 let session: string | null = null;
 let revision = 0;
-let installation: { revision: number; job_id: string; model_id: string; bytes: number; total: number; phase: string; error: null } | null = null;
+type FixtureInstallation = { revision: number; job_id: string; model_id: string; bytes: number; total: number; phase: string; error: null };
+let installation: FixtureInstallation | null = null;
+let sherpaInstallation: FixtureInstallation | null = null;
 let cancelDownload: (() => void) | null = null;
 export async function voiceStub(command: string, args?: Record<string, unknown>): Promise<unknown> {
+  if (command === "voice_sherpa_model_installation") return sherpaInstallation;
+  if (command === "voice_sherpa_model_status") {
+    const installed = enabled() && sessionStorage.getItem(`voice-fixture:${sherpaModel.id}`) === "installed";
+    const downloaded = Number(sessionStorage.getItem(`voice-partial:${sherpaModel.id}`) || 0);
+    return { model_id: sherpaModel.id, revision: "fixture-v2", download_url: sherpaUrl,
+      available_version: "fixture-v2", installed_version: installed ? "fixture-v2" : null,
+      update_available: false, integrity: installed ? "verified" : "missing", installed,
+      total_bytes: sherpaModel.bytes, downloaded_bytes: installed ? sherpaModel.bytes : downloaded,
+      files: [{ filename: sherpaModel.filename, bytes: sherpaModel.bytes, downloaded, installed }],
+    };
+  }
+  if (command === "voice_cancel_sherpa_model_installation") {
+    if (sherpaInstallation?.job_id === args?.jobId) cancelDownload?.();
+    return null;
+  }
   if (command === "voice_model_installation") return installation;
   if (command === "voice_cancel_model_installation") {
     if (installation?.job_id === args?.jobId) cancelDownload?.();
@@ -27,15 +46,18 @@ export async function voiceStub(command: string, args?: Record<string, unknown>)
       update_available: update, integrity: installed ? command === "voice_check_models" ? "verified" : "unverified" : "missing" };
   });
   if (!enabled()) throw new Error("Voice is unavailable in browser preview. Use the desktop app.");
-  if (command === "voice_install_model") {
-    const model = models.find((m) => m.id === args?.modelId);
+  if (command === "voice_install_model" || command === "voice_install_sherpa_model") {
+    const streaming = command === "voice_install_sherpa_model";
+    const model = streaming ? sherpaModel : models.find((m) => m.id === args?.modelId);
     if (!model) throw new Error("Unknown model");
     if (cancelDownload) throw new Error("A model installation is already running");
     const jobId = crypto.randomUUID();
     let bytes = args?.sourcePath ? 0 : Number(sessionStorage.getItem(`voice-partial:${model.id}`) || 0);
     const report = async (phase: string) => {
-      installation = { revision: ++revision, job_id: jobId, model_id: model.id, bytes, total: model.bytes, phase, error: null };
-      await emit("voice-model-progress", installation);
+      const job = { revision: ++revision, job_id: jobId, model_id: model.id, bytes, total: model.bytes, phase, error: null };
+      if (streaming) sherpaInstallation = job;
+      else installation = job;
+      await emit(streaming ? "voice-sherpa-model-progress" : "voice-model-progress", job);
     };
     await report("downloading");
     if (new URLSearchParams(window.location.search).get("voiceDownloadSlow") === "1") {

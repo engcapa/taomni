@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AsrPanel } from "./AsrPanel";
 import { useAiStore } from "../../stores/aiStore";
@@ -6,7 +6,14 @@ const ipc = vi.hoisted(() => vi.fn());
 const picker = vi.hoisted(() => vi.fn());
 const progressListeners = vi.hoisted(() => new Set<(event: { payload: unknown }) => void>());
 vi.mock("@tauri-apps/api/core", () => ({ invoke: ipc }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async (_event, callback) => { progressListeners.add(callback); return () => progressListeners.delete(callback); }) }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async (event, callback) => {
+  const listener = (data: { payload: unknown }) => {
+    const streaming = (data.payload as { model_id?: string }).model_id === "sherpa-zipformer-zh-en";
+    if (event === (streaming ? "voice-sherpa-model-progress" : "voice-model-progress")) callback(data);
+  };
+  progressListeners.add(listener);
+  return () => progressListeners.delete(listener);
+}) }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: picker }));
 beforeEach(async () => {
   ipc.mockReset(); picker.mockReset(); progressListeners.clear(); localStorage.clear();
@@ -119,6 +126,77 @@ it("copies and opens the exact pinned download address", async () => {
   fireEvent.click(screen.getByTestId("asr-open-url-whisper-base"));
   await waitFor(() => expect(ipc).toHaveBeenCalledWith("open_external_url", { url: downloadUrl }));
   expect(ipc.mock.calls.some(([c]) => c === "voice_install_model")).toBe(false);
+});
+it("shows and copies the backend-provided Zipformer repository address", async () => {
+  const current = useAiStore.getState().config!;
+  useAiStore.setState({ config: { ...current, asr: { ...current.asr, active: "sherpa-zipformer-zh-en", mode: "local" } } });
+  const downloadUrl = "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tree/98590b7ed6443e77b714204da2757d75e1a642f4";
+  ipc.mockImplementation(async (c) => c === "voice_models" ? [] : c === "voice_capture_supported" ? true : c === "voice_sherpa_model_status" ? {
+    model_id: "sherpa-zipformer-zh-en", revision: "98590b7ed6443e77b714204da2757d75e1a642f4", download_url: downloadUrl,
+    available_version: "98590b7ed644", installed_version: null, update_available: false, integrity: "missing",
+    files: [], total_bytes: 199056205, downloaded_bytes: 0, installed: false,
+  } : null);
+  render(<AsrPanel />);
+  expect(await screen.findByTestId("asr-download-url-sherpa-zipformer-zh-en")).toHaveAttribute("href", downloadUrl);
+  fireEvent.click(screen.getByTestId("asr-copy-url-sherpa-zipformer-zh-en"));
+  expect(await screen.findByText("Copied")).toBeVisible();
+  expect(ipc).toHaveBeenCalledWith("clipboard_write_text", { text: downloadUrl });
+  fireEvent.click(screen.getByTestId("asr-open-url-sherpa-zipformer-zh-en"));
+  await waitFor(() => expect(ipc).toHaveBeenCalledWith("open_external_url", { url: downloadUrl }));
+});
+const sherpaStatus = {
+  model_id: "sherpa-zipformer-zh-en", revision: "fixture-v2", available_version: "fixture-v2",
+  installed_version: null, update_available: false, integrity: "missing",
+  files: [{ filename: "encoder.onnx", bytes: 199_056_205, downloaded: 25_000_000, installed: false }],
+  total_bytes: 199_056_205, downloaded_bytes: 25_000_000, installed: false,
+};
+it("restores Zipformer progress after reopening, cancels, and resumes through the shared card", async () => {
+  let job = { revision: 4, job_id: "sherpa-job", model_id: sherpaStatus.model_id, bytes: 25_000_000, total: 199_056_205, phase: "downloading" };
+  ipc.mockImplementation(async (c) => {
+    if (c === "voice_models") return [baseModel];
+    if (c === "voice_capture_supported") return true;
+    if (c === "voice_sherpa_model_status") return sherpaStatus;
+    if (c === "voice_sherpa_model_installation") return { ...job };
+    if (c === "voice_cancel_sherpa_model_installation") {
+      job = { ...job, revision: 5, phase: "cancelled" };
+      for (const callback of progressListeners) callback({ payload: job });
+    }
+    return null;
+  });
+  const view = render(<AsrPanel />);
+  expect(await screen.findByRole("progressbar")).toHaveAttribute("value", "12");
+  view.unmount(); render(<AsrPanel />);
+  expect(await screen.findByTestId("asr-sherpa-installation-progress")).toHaveTextContent("25.0 / 199.1 MB");
+  expect(screen.getByTestId("asr-download-whisper-base")).toBeDisabled();
+  expect(screen.getByTestId("asr-download-sherpa-zipformer-zh-en")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("asr-cancel-sherpa-download"));
+  await waitFor(() => expect(ipc).toHaveBeenCalledWith("voice_cancel_sherpa_model_installation", { jobId: "sherpa-job" }));
+  await waitFor(() => expect(screen.getByTestId("asr-download-sherpa-zipformer-zh-en")).toBeEnabled());
+  expect(screen.getByTestId("asr-download-sherpa-zipformer-zh-en")).toHaveTextContent("Resume download");
+  expect(within(screen.getByTestId("asr-model-sherpa-zipformer-zh-en")).getByRole("button", { name: "Use this model" })).toBeDisabled();
+  fireEvent.click(screen.getByTestId("asr-download-sherpa-zipformer-zh-en"));
+  fireEvent.click(screen.getByTestId("asr-download-sherpa-zipformer-zh-en"));
+  await waitFor(() => expect(ipc.mock.calls.filter(([c]) => c === "voice_install_sherpa_model")).toHaveLength(1));
+});
+it("protects Zipformer from stale snapshots, shows failure, and blocks both downloads for unsaved proxy edits", async () => {
+  let resolve!: (value: unknown) => void;
+  const pending = new Promise((done) => { resolve = done; });
+  ipc.mockImplementation(async (c) => c === "voice_models" ? [baseModel] : c === "voice_capture_supported" ? true : c === "voice_sherpa_model_status" ? sherpaStatus : c === "voice_sherpa_model_installation" ? pending : null);
+  render(<AsrPanel />);
+  await screen.findByTestId("asr-download-sherpa-zipformer-zh-en");
+  const job = { revision: 2, job_id: "sherpa-job", model_id: sherpaStatus.model_id, bytes: 199_056_205, total: 199_056_205, phase: "verifying" };
+  await act(async () => { for (const callback of progressListeners) callback({ payload: job }); });
+  await act(async () => resolve({ ...job, revision: 1, bytes: 10, phase: "downloading" }));
+  expect(screen.getByRole("progressbar")).toHaveAttribute("value", "100");
+  expect(screen.getByTestId("asr-cancel-sherpa-download")).toBeDisabled();
+  await act(async () => { for (const callback of progressListeners) callback({ payload: { ...job, revision: 3, phase: "failed", error: "Connection lost" } }); });
+  expect(screen.getByTestId("asr-sherpa-installation-progress")).toHaveTextContent("Connection lost");
+  expect(screen.getByTestId("asr-download-sherpa-zipformer-zh-en")).toBeEnabled();
+  fireEvent.change(screen.getByTestId("asr-download-proxy-mode"), { target: { value: "none" } });
+  expect(screen.getByTestId("asr-download-whisper-base")).toBeDisabled();
+  expect(screen.getByTestId("asr-download-sherpa-zipformer-zh-en")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("asr-download-proxy-save"));
+  await waitFor(() => expect(screen.getByTestId("asr-download-sherpa-zipformer-zh-en")).toBeEnabled());
 });
 it("restores backend progress on reopening, cancels the same job and resumes its partial file", async () => {
   let job = { revision: 1, job_id: "job-1", model_id: "whisper-base", bytes: 30_000_000, total: 100_000_000, phase: "downloading" };
