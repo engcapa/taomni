@@ -43,6 +43,7 @@ steps:
 - wait_for:
     selector: '[data-testid="vnc-unencrypted-continue"]'
     timeout_sec: 20
+- click: '[data-testid="vnc-unencrypted-dont-warn"]'
 - click: '[data-testid="vnc-unencrypted-continue"]'
 - wait_for:
     selector: '[data-testid="vnc-auth-password"]'
@@ -122,36 +123,36 @@ verification:
     - 14
     - 15
     - 16
-    - 23
     - 24
     - 25
     - 26
     - 27
-    - 30
-    - 32
+    - 28
+    - 31
     - 33
     - 34
-    - 37
-    - 39
+    - 35
+    - 38
     - 40
+    - 41
     checkpoints:
-    - step: 22
+    - step: 23
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]", "timeout_sec":
         20}}'
-    - step: 29
+    - step: 30
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]", "timeout_sec":
         30}}'
-    - step: 42
+    - step: 43
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"900\"][height=\"600\"]", "timeout_sec":
         30}}'
-    - step: 43
+    - step: 44
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "Workspace ·
         QA Main"}}'
     results:
-    - 22
-    - 29
-    - 42
+    - 23
+    - 30
     - 43
+    - 44
   native:
   - check: Tauri VNC relay and detached OS window lifecycle.
     method: automated

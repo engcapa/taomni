@@ -71,6 +71,7 @@ steps:
 - wait_for: '[data-testid="workspace-context-pane"]'
 - assert_visible: '[data-testid="workspace-context-close"]'
 - click: '[data-testid="workspace-context-close"]'
+- wait_for: '[data-testid="workspace-context-toggle"][aria-expanded="false"]'
 - assert_count:
     selector: '[data-testid="workspace-context-pane"]'
     equal: 0
@@ -124,7 +125,7 @@ verification:
       expectation: Context pane is open.
     - step: 32
       expectation: Context pane close affordance is visible.
-    - step: 34
+    - step: 35
       expectation: Context pane closes and leaves the workspace canvas usable.
     results:
     - 4
@@ -137,7 +138,7 @@ verification:
     - 28
     - 31
     - 32
-    - 34
+    - 35
   visual:
   - check: Dialog width, input affordance, shell spacing, rail density and context pane close affordance remain legible without clipping or crowding.
     method: manual
