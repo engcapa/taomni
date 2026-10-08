@@ -32,28 +32,29 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mounted = useRef(true);
   const streamingMode = active === "sherpa-zipformer-zh-en" || ["aliyun", "deepgram", "gemini"].includes(active);
-  const streamBase = useRef("");
-  const streamSuffix = useRef("");
-  const streamCommitted = useRef("");
-  const streamInterim = useRef("");
+  const [interim, setInterim] = useState("");
   const applyStreamText = useCallback((text: string, finalText: boolean) => {
-    if (finalText) {
-      streamCommitted.current += text;
-      streamInterim.current = "";
-    } else {
-      streamInterim.current = text;
-    }
-    const value = streamBase.current + streamCommitted.current + streamInterim.current + streamSuffix.current;
-    if (targetRef?.current) onText?.(value); else if (finalText) onTranscript?.(text);
+    setInterim(finalText ? "" : text);
+    if (!finalText) return;
+    const target = targetRef?.current;
+    if (targetRef) {
+      if (!target?.isConnected || target.disabled || target.readOnly) return;
+      const start = target.selectionStart ?? target.value.length;
+      const end = target.selectionEnd ?? start;
+      onText?.(target.value.slice(0, start) + text + target.value.slice(end));
+      requestAnimationFrame(() => {
+        if (target.isConnected) target.setSelectionRange(start + text.length, start + text.length);
+      });
+    } else onTranscript?.(text);
   }, [onText, onTranscript, targetRef]);
   const cancel = useCallback(() => {
     const id = session.current;
     session.current = null;
     finishing.current = false;
     clearTimeout(timer.current);
-    if (id) void invoke(streamingMode ? "voice_stop_stream" : "voice_stop_capture", { sessionId: id }).catch(() => undefined);
-    if (mounted.current) setPhase("idle");
-  }, [streamingMode]);
+    if (id) void invoke("voice_stop_capture", { sessionId: id }).catch(() => undefined);
+    if (mounted.current) { setPhase("idle"); setInterim(""); }
+  }, []);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; cancel(); };
@@ -65,10 +66,10 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
       if (!disposed && payload.session_id === session.current) applyStreamText(payload.text, payload.final_text);
     });
     const unlistenError = listen<{ session_id: string; error: string }>("voice-transcript-error", ({ payload }) => {
-      if (!disposed && payload.session_id === session.current) setError(payload.error);
+      if (!disposed && payload.session_id === session.current) { setError(payload.error); cancel(); }
     });
     return () => { disposed = true; void unlisten.then((fn) => fn()); void unlistenError.then((fn) => fn()); };
-  }, [applyStreamText, streamingMode]);
+  }, [applyStreamText, streamingMode, cancel]);
   useEffect(() => { cancel(); }, [contextKey, active, language, fullyDisabled, disabled, cancel]);
   useEffect(() => {
     const hide = () => { if (document.hidden) cancel(); };
@@ -90,11 +91,16 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
     finishing.current = true;
     clearTimeout(timer.current);
     if (streamingMode) {
-      await invoke("voice_stop_stream", { sessionId: id }).catch((e) => setError(String(e)));
-      // Let the provider flush the last PCM window and emit its final result.
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      session.current = null;
-      if (mounted.current) setPhase("idle");
+      setPhase("transcribing");
+      try { await invoke("voice_stop_stream", { sessionId: id }); }
+      catch (e) { if (session.current === id && mounted.current) setError(String(e)); }
+      finally {
+        if (session.current === id) {
+          session.current = null;
+          finishing.current = false;
+          if (mounted.current) { setPhase("idle"); setInterim(""); }
+        }
+      }
       return;
     }
     setPhase("transcribing");
@@ -127,14 +133,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
     session.current = id;
     finishing.current = false;
     setError("");
-    if (streamingMode) {
-      const target = targetRef?.current;
-      const start = target?.selectionStart ?? target?.value.length ?? 0;
-      streamBase.current = target?.value.slice(0, start) ?? "";
-      streamSuffix.current = target?.value.slice(target?.selectionEnd ?? start) ?? "";
-      streamCommitted.current = "";
-      streamInterim.current = "";
-    }
+    setInterim("");
     setPhase("preparing");
     try {
       if (!await invoke<boolean>("voice_capture_supported")) throw new Error(t("voice.unsupported"));
@@ -150,7 +149,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
       }
       await invoke(streamingMode ? "voice_start_stream" : "voice_start_capture", { sessionId: id });
       if (session.current !== id) {
-        void invoke(streamingMode ? "voice_stop_stream" : "voice_stop_capture", { sessionId: id }).catch(() => undefined);
+        void invoke("voice_stop_capture", { sessionId: id }).catch(() => undefined);
         return;
       }
       setPhase("recording");
@@ -173,6 +172,7 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
       {phase === "recording" ? <Square className="h-4 w-4 text-red-400" /> : phase === "idle" ? <Mic className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
     </button>
     {phase !== "idle" && <button type="button" title={t("voice.cancel")} aria-label={t("voice.cancel")} data-testid={`${testId}-cancel`} onClick={cancel}><X className="h-4 w-4" /></button>}
+    {interim && <span role="status" data-testid={`${testId}-interim`} className="max-w-64 truncate text-xs text-[var(--taomni-text-muted)]">{interim}</span>}
     {error && createPortal(<div role="alert" className="fixed top-14 right-4 z-[10001] w-80 rounded border bg-[var(--taomni-panel-bg)] p-3 text-xs text-red-400">
       {error}<button type="button" className="ml-2 underline" onClick={() => { setError(""); setSetup(true); }}>{t("voice.settings")}</button>
       <button type="button" aria-label={t("voice.close")} onClick={() => setError("")}><X className="h-4 w-4" /></button>

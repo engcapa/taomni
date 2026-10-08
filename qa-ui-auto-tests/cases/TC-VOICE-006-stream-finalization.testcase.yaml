@@ -1,0 +1,80 @@
+id: TC-VOICE-006
+title: Streaming dictation waits for final acknowledgement and cancels provisional
+  text
+description: Browser fixture delays the final by 700 ms; native sockets and microphone
+  are validated separately.
+covers:
+- F-AI-2.3
+tags:
+- ai
+- voice
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}/?voiceFixture=1
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="asr-settings"]'
+- select_option:
+    selector: '[data-testid="asr-realtime-provider"]'
+    value: sherpa-zipformer-zh-en
+- click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="ptt-button"][data-state="recording"]'
+- assert_text:
+    selector: '[data-testid="ptt-button-interim"]'
+    contains: Provisional fixture
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="chat-composer-textarea"]'
+- eval_readonly:
+    expression: document.querySelector("#chat-composer-textarea").value
+    contains: Final stream fixture.
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="chat-voice-button"][data-state="recording"]'
+- click: '[data-testid="chat-voice-button-cancel"]'
+- assert_attribute:
+    selector: '[data-testid="chat-voice-button"]'
+    name: data-state
+    equals: idle
+- eval_readonly:
+    expression: document.querySelector("#chat-composer-textarea").value === "Final
+      stream fixture."
+    expect_truthy: true
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A delayed final is delivered and cancellation retains the draft.
+    actions:
+    - 5
+    - 7
+    - 10
+    - 13
+    - 15
+    checkpoints:
+    - step: 9
+      expectation: Partial text is visible separately.
+    - step: 12
+      expectation: The delayed final reaches the editable draft.
+    - step: 16
+      expectation: Cancellation ends the session.
+    - step: 17
+      expectation: Provisional text did not alter the draft.
+    results:
+    - 9
+    - 12
+    - 16
+    - 17
+  visual:
+  - check: Provisional transcript is visibly separated from the draft
+    method: manual
+    reason: Inspect the live status adjacent to the recording control.
+  native:
+  - check: Native provider flush and socket cancellation
+    method: external
+    reason: Browser fixture does not establish provider or microphone behavior; focused
+      Rust tests cover native boundaries.

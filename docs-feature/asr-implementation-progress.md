@@ -88,3 +88,24 @@ unrelated modules (for example `bin/sockscap-helper/capture.rs`); no broad forma
 churn was included. Global QA/CI failures above remain outstanding integration
 work. The completed increments are committed locally; P0/P1/P2/P3/P4/P5 as a whole
 are not marked complete.
+
+## Stage 4 — explicit streaming finish and cancellation
+
+Streaming finish now waits for backend completion (bounded to 15 seconds), while
+cancel drops the backend future/socket and stops capture. Provider configuration,
+credentials and proxy are validated before microphone acquisition; local streaming
+does not resolve a network proxy. Deepgram sends CloseStream and drains final
+responses; Aliyun waits for task-started, uses the documented duplex envelope and
+reads payload.output before draining task-finished. Zipformer flushes unchanged
+final text and resets empty endpoints; its maximum utterance rule is corrected
+from 0.5 to 20 seconds (latency tuning remains subject to P0 measurements).
+
+Partials appear separately and only finals enter the current editable draft.
+Cancelled and stale results cannot modify it. Batch capture no longer fills an
+unconsumed streaming channel. The composer consumes staged text atomically to avoid duplicate insertion when
+React replays mount effects; the event stub also snapshots its subscribers.
+
+Validation: 27 focused DictationButton/Composer tests and 8 native voice tests pass;
+TypeScript checks pass. TC-VOICE-006 passes with a 700 ms delayed final and exact draft
+preservation on cancel. Live provider finalization and microphone hardware remain
+unverified; socket fixture results must not be read as vendor acceptance.

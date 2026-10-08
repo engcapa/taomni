@@ -41,7 +41,9 @@ export async function emit(event: string, payload?: unknown): Promise<void> {
   const handlers = listeners.get(event);
   if (!handlers) return;
   const e = { event, payload, id: 0, windowLabel: "main" } as Event<unknown>;
-  for (const cb of handlers) {
+  // A callback may synchronously re-render and subscribe another listener.
+  // Match an event dispatch snapshot; new subscriptions receive the next event.
+  for (const cb of [...handlers]) {
     cb(e);
   }
 }

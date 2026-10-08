@@ -74,7 +74,8 @@ pub async fn run_local(
         cfg.enable_endpoint = true;
         cfg.rule1_min_trailing_silence = 1.2;
         cfg.rule2_min_trailing_silence = 0.8;
-        cfg.rule3_min_utterance_length = 0.5;
+        // Rule 3 is a maximum utterance length, not trailing silence.
+        cfg.rule3_min_utterance_length = 20.0;
         cfg.decoding_method = Some("greedy_search".into());
         let recognizer = sherpa_onnx::OnlineRecognizer::create(&cfg).ok_or_else(|| {
             "STREAMING_MODEL_LOAD: unable to create Zipformer recognizer".to_string()
@@ -116,18 +117,20 @@ pub async fn run_local(
                     },
                 },
             );
-            if endpoint {
-                recognizer.reset(&stream);
-                last.clear();
-            }
+        }
+        if endpoint {
+            recognizer.reset(&stream);
+            last.clear();
         }
     }
+    // Flush the feature extraction tail before marking input complete.
+    stream.accept_waveform(16_000, &vec![0.0; 4800]);
     stream.input_finished();
     while recognizer.is_ready(&stream) {
         recognizer.decode(&stream);
     }
     if let Some(result) = recognizer.get_result(&stream) {
-        if !result.text.trim().is_empty() && result.text != last {
+        if !result.text.trim().is_empty() {
             emit(
                 &app,
                 TranscriptEvent {
@@ -236,6 +239,24 @@ async fn connect_ws(
     ),
     String,
 > {
+    tokio::time::timeout(
+        std::time::Duration::from_secs(20),
+        connect_ws_inner(request, proxy),
+    )
+    .await
+    .map_err(|_| "ASR_CONNECT_TIMEOUT: check the provider and proxy settings".to_string())?
+}
+
+async fn connect_ws_inner(
+    request: tungstenite::http::Request<()>,
+    proxy: Option<&ResolvedProxy>,
+) -> Result<
+    (
+        tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>,
+        tungstenite::http::Response<Option<Vec<u8>>>,
+    ),
+    String,
+> {
     let uri = request.uri().to_string();
     let url = Url::parse(&uri).map_err(|e| format!("ASR_WS_URL: {e}"))?;
     let host = url.host_str().ok_or("ASR_WS_URL: missing host")?;
@@ -259,7 +280,9 @@ async fn connect_ws(
     };
     tokio_tungstenite::client_async_tls(request, stream)
         .await
-        .map_err(|e| format!("ASR_CONNECT: {e}"))
+        .map_err(|_| {
+            "ASR_CONNECT: WebSocket handshake failed; check endpoint and credentials".into()
+        })
 }
 
 async fn http_connect(
@@ -451,15 +474,18 @@ async fn run_deepgram(
     );
     let req = ws_request(&url, &[("Authorization", &format!("Token {api_key}"))])?;
     let (mut ws, _) = connect_ws(req, proxy).await?;
+    let mut finishing = false;
     loop {
         tokio::select! {
-            chunk = chunks.recv() => match chunk {
+            chunk = chunks.recv(), if !finishing => match chunk {
                     Some(chunk) => ws.send(tungstenite::Message::Binary(pcm16(&chunk).into())).await.map_err(|e| format!("ASR_SEND: {e}"))?,
-                None => { let _ = ws.send(tungstenite::Message::Close(None)).await; break; }
+                None => { finishing = true; ws.send(tungstenite::Message::Text(r#"{"type":"CloseStream"}"#.into())).await.map_err(|_| "ASR_SEND: cannot finalize stream")?; }
             },
             msg = ws.next() => match msg {
                 Some(Ok(tungstenite::Message::Text(text))) => {
                     let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+                    if value.get("type").and_then(|v| v.as_str()) == Some("Error") { return Err("ASR_PROVIDER: Deepgram rejected the stream".into()); }
+                    if finishing && value.get("type").and_then(|v| v.as_str()) == Some("Metadata") { break; }
                     let text = value.pointer("/channel/alternatives/0/transcript").and_then(|v| v.as_str()).unwrap_or("");
                     if !text.is_empty() { emit(&app, TranscriptEvent { session_id: session_id.clone(), text: text.into(), final_text: value.get("is_final").and_then(|v| v.as_bool()).unwrap_or(false), processing_ms: started.elapsed().as_millis() as u64, provider: "deepgram".into() }); }
                 }
@@ -533,20 +559,28 @@ async fn run_aliyun(
     )?;
     let (mut ws, _) = connect_ws(req, proxy).await?;
     let task_id = uuid::Uuid::new_v4().to_string();
-    let run = serde_json::json!({"header":{"action":"run-task","task_id":task_id,"streaming":"duplex"},"payload":{"model":model,"parameters":{"sample_rate":16000,"format":"pcm","language_hints":if language == "auto" { vec!["zh","en"] } else { vec![language] }}}});
+    let run = serde_json::json!({"header":{"action":"run-task","task_id":task_id,"streaming":"duplex"},"payload":{"task_group":"audio","task":"asr","function":"recognition","input":{},"model":model,"parameters":{"sample_rate":16000,"format":"pcm","language_hints":if language == "auto" { vec!["zh","en"] } else { vec![language] }}}});
     ws.send(tungstenite::Message::Text(run.to_string().into()))
         .await
         .map_err(|e| format!("ASR_SETUP: {e}"))?;
+    let mut ready = false;
+    let mut finishing = false;
     loop {
         tokio::select! {
-            chunk = chunks.recv() => match chunk {
+            chunk = chunks.recv(), if ready && !finishing => match chunk {
                 Some(chunk) => ws.send(tungstenite::Message::Binary(pcm16(&chunk).into())).await.map_err(|e| format!("ASR_SEND: {e}"))?,
-                None => { let finish = serde_json::json!({"header":{"action":"finish-task","task_id":task_id}}); let _ = ws.send(tungstenite::Message::Text(finish.to_string().into())).await; break; }
+                None => { finishing = true; let finish = serde_json::json!({"header":{"action":"finish-task","task_id":task_id,"streaming":"duplex"},"payload":{"input":{}}}); ws.send(tungstenite::Message::Text(finish.to_string().into())).await.map_err(|_| "ASR_SEND: cannot finalize task")?; }
             },
             msg = ws.next() => match msg {
                 Some(Ok(tungstenite::Message::Text(text))) => {
                     let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
-                    let output = value.get("output").or_else(|| value.get("payload")).unwrap_or(&serde_json::Value::Null);
+                    match value.pointer("/header/event").and_then(|v| v.as_str()) {
+                        Some("task-started") => ready = true,
+                        Some("task-finished") => break,
+                        Some("task-failed") => return Err("ASR_PROVIDER: Aliyun rejected the task; check model and credentials".into()),
+                        _ => {}
+                    }
+                    let output = value.pointer("/payload/output").unwrap_or(&serde_json::Value::Null);
                     if let Some(sentence) = output.get("sentence") { let text = sentence.get("text").and_then(|v| v.as_str()).unwrap_or(""); if !text.is_empty() { emit(&app, TranscriptEvent { session_id: session_id.clone(), text: text.into(), final_text: sentence.get("sentence_end").and_then(|v| v.as_bool()).unwrap_or(false), processing_ms: started.elapsed().as_millis() as u64, provider: "aliyun".into() }); } }
                 }
                 Some(Ok(tungstenite::Message::Close(_))) | None => break,

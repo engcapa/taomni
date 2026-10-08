@@ -81,13 +81,24 @@ export async function voiceStub(command: string, args?: Record<string, unknown>)
     await report("complete");
     return null;
   }
-  if (command === "voice_start_capture") {
+  if (command === "voice_start_capture" || command === "voice_start_stream") {
     if (session) throw new Error("Voice input is busy");
     session = String(args?.sessionId);
+    if (command === "voice_start_stream") await emit("voice-transcript", { session_id: session, text: "Provisional fixture", final_text: false });
     return null;
   }
   if (command === "voice_stop_capture") {
     if (session === args?.sessionId) session = null;
+    return null;
+  }
+  if (command === "voice_stop_stream") {
+    const id = session;
+    if (!id || id !== args?.sessionId) throw new Error("Recording expired");
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    if (session === id) {
+      await emit("voice-transcript", { session_id: id, text: "Final stream fixture.", final_text: true });
+      session = null;
+    }
     return null;
   }
   if (command === "voice_stop_and_transcribe") {

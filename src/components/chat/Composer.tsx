@@ -120,8 +120,10 @@ export function Composer({
   // Pick up text staged by the SelectionToolbar's "Send to AI".
   useEffect(() => {
     if (pending && pending.length > 0) {
-      setText((cur) => (cur ? `${cur}\n\n${pending}` : pending));
-      consumePending();
+      // Consume atomically: StrictMode may replay this effect on mount.
+      const staged = consumePending();
+      if (!staged) return;
+      setText((cur) => (cur ? `${cur}\n\n${staged}` : staged));
       setTimeout(() => textareaRef.current?.focus(), 0);
     }
   }, [pending, consumePending]);

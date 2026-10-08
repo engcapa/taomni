@@ -349,6 +349,7 @@ cases:
 - TC-VOICE-003
 - TC-VOICE-004
 - TC-VOICE-005
+- TC-VOICE-006
 - TC-auto-F-AI-2-3
 - TC-auto-F-AI-2-4-grok-media-provider
 - TC-auto-F-AI-2-7-acp-grok-settings
