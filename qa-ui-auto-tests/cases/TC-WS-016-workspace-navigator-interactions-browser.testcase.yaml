@@ -1,0 +1,156 @@
+id: TC-WS-016
+title: Workspace navigator search, pinning and pointer/keyboard width persist across hide and reload
+covers:
+- F-Workspace-1
+- F1.2
+tags:
+- workspace-first
+- shell-layout
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- set_viewport:
+    width: 1440
+    height: 900
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- fill:
+    selector: '[data-testid="workspace-search"]'
+    value: QA Remote
+- assert_visible: '[data-testid="workspace-row-qa-workspace-remote"]'
+- assert_count:
+    selector: '[data-testid="workspace-row-qa-workspace-main"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="workspace-search"]'
+    value: missing-workspace-name
+- assert_count:
+    selector: '[data-testid^="workspace-row-"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="workspace-search"]'
+    value: ''
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[aria-label="Pin QA Main"]'
+- wait_for: '[aria-label="Unpin QA Main"]'
+- assert_visible: '[data-testid="workspace-navigator"] section:first-of-type [data-testid="workspace-row-qa-workspace-main"]'
+- drag_to:
+    from: '[data-testid="main-sidebar-resize-handle"]'
+    by:
+      dx: 100
+      dy: 0
+      steps: 8
+- assert_element_geometry:
+    selector: '[data-testid="expanded-sidebar-panel"]'
+    min_width: 390
+    min_height: 200
+- press:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    key: ArrowRight
+- assert_element_geometry:
+    selector: '[data-testid="expanded-sidebar-panel"]'
+    min_width: 420
+    min_height: 200
+- click: '[data-testid="workspace-hide"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-canvas"]'
+    min_width: 1300
+    min_height: 200
+- click: '[data-testid="side-tab-work"]'
+- wait_for: '[data-testid="workspace-navigator"]'
+- assert_element_geometry:
+    selector: '[data-testid="expanded-sidebar-panel"]'
+    min_width: 420
+    min_height: 200
+- reload_window: null
+- wait_for: '[aria-label="Unpin QA Main"]'
+- assert_visible: '[data-testid="workspace-navigator"] section:first-of-type [data-testid="workspace-row-qa-workspace-main"]'
+- assert_element_geometry:
+    selector: '[data-testid="expanded-sidebar-panel"]'
+    min_width: 420
+    min_height: 200
+- click: '[aria-label="Unpin QA Main"]'
+- wait_for: '[aria-label="Pin QA Main"]'
+- assert_visible: '[data-testid="workspace-navigator"] section:nth-of-type(2) [data-testid="workspace-row-qa-workspace-main"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: Workspace · QA Main
+- screenshot: workspace-navigator-resized.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Search handles matches and no results; pin/unpin moves the row; actual sidebar width grows with
+      pointer and keyboard, survives hide/restore and reload without switching workspace.
+    actions:
+    - 4
+    - 7
+    - 9
+    - 10
+    - 11
+    - 14
+    - 16
+    - 18
+    - 21
+    - 24
+    - 28
+    checkpoints:
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"workspace-row-qa-workspace-remote\"]"}'
+    - step: 6
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-row-qa-workspace-main\"]", "equal":
+        0}}'
+    - step: 8
+      expectation: '{"assert_count": {"selector": "[data-testid^=\"workspace-row-\"]", "equal": 0}}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:first-of-type [data-testid=\"workspace-row-qa-workspace-main\"]"}'
+    - step: 15
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
+        390, "min_height": 200}}'
+    - step: 17
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
+        420, "min_height": 200}}'
+    - step: 20
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-canvas\"]", "min_width":
+        1300, "min_height": 200}}'
+    - step: 23
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
+        420, "min_height": 200}}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:first-of-type [data-testid=\"workspace-row-qa-workspace-main\"]"}'
+    - step: 27
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
+        420, "min_height": 200}}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:nth-of-type(2) [data-testid=\"workspace-row-qa-workspace-main\"]"}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "Workspace ·
+        QA Main"}}'
+    results:
+    - 5
+    - 6
+    - 8
+    - 13
+    - 15
+    - 17
+    - 20
+    - 23
+    - 26
+    - 27
+    - 30
+    - 31
+  visual:
+  - check: Inspect input width, reference actions and canvas spacing after the navigator is widened.
+    method: manual
+    reason: Geometry does not establish visual balance.
+  native:
+  - check: Renderer-only interactions; durable native workspace records use TC-WS-NATIVE-001.
+    method: external
+    reason: This case does not certify native storage.
