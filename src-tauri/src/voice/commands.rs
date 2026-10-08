@@ -162,7 +162,7 @@ pub async fn voice_start_stream(
     app: AppHandle,
 ) -> Result<(), String> {
     // Resolve one configuration snapshot before acquiring the microphone.
-    let (active, language, provider_config, full_local_mode, disabled) = {
+    let (active, language, provider_config, full_local_mode, disabled, hotwords) = {
         let ai = state.ai_ctx.read().await;
         let asr = &ai.config.asr;
         (
@@ -171,12 +171,14 @@ pub async fn voice_start_stream(
             asr.providers.get(&asr.active).cloned(),
             ai.config.full_local_mode,
             ai.config.fully_disabled,
+            asr.hotwords.clone(),
         )
     };
     if disabled {
         return Err("AI is fully disabled".into());
     }
-    let online = ["aliyun", "deepgram", "gemini"].contains(&active.as_str());
+    let online =
+        ["aliyun", "volcengine", "soniox", "deepgram", "gemini"].contains(&active.as_str());
     if full_local_mode && online {
         return Err(
             "FULL_LOCAL_MODE: online ASR is disabled while full local mode is enabled".into(),
@@ -190,7 +192,18 @@ pub async fn voice_start_stream(
             "app" => {
                 crate::proxy::resolve_default(&state).map_err(|e| format!("ASR_PROXY: {e}"))?
             }
-            "custom" => parse_asr_proxy_url(&config.proxy_url)?,
+            "custom" => {
+                if let Some(custom) = &config.custom_proxy {
+                    let mut custom = custom.clone();
+                    custom.enabled = true;
+                    crate::proxy::resolve(&state, &custom)
+                        .map_err(|e| format!("ASR_PROXY: {e}"))?
+                        .ok_or("ASR_PROXY: configure a feature proxy")
+                        .map(Some)?
+                } else {
+                    parse_asr_proxy_url(&config.proxy_url)?
+                }
+            }
             "none" | "" => None,
             _ => return Err("ASR_PROXY: unknown ASR proxy mode".into()),
         };
@@ -211,6 +224,9 @@ pub async fn voice_start_stream(
     } else {
         (None, String::new())
     };
+    // Validate terms before microphone acquisition; uploads remain cancellable
+    // inside the session-owned backend task.
+    crate::voice::vocabulary::validate(&hotwords)?;
     voice_start_capture_inner(&session_id, &state, false).await?;
     let session = current()
         .lock()
@@ -225,6 +241,7 @@ pub async fn voice_start_stream(
             || ai.config.asr.providers.get(&active) != provider_config.as_ref()
             || ai.config.fully_disabled
             || ai.config.full_local_mode != full_local_mode
+            || ai.config.asr.hotwords != hotwords
         {
             voice_stop_capture(session_id);
             return Err("ASR_CONFIG_CHANGED: voice configuration changed".into());
@@ -243,7 +260,7 @@ pub async fn voice_start_stream(
             match active.as_str() {
                 "local-auto" | "sensevoice-small" => {
                     crate::voice::streaming::run_routed_local(
-                        app.clone(),
+                        crate::voice::streaming::event_sink(app.clone()),
                         session_id.clone(),
                         chunks,
                         language,
@@ -254,25 +271,26 @@ pub async fn voice_start_stream(
                 }
                 "sherpa-zipformer-zh-en" => {
                     crate::voice::streaming::run_local(
-                        app.clone(),
+                        crate::voice::streaming::event_sink(app.clone()),
                         session_id.clone(),
                         chunks,
+                        language.clone(),
                         language,
                     )
                     .await
                 }
-                "aliyun" | "deepgram" | "gemini" => {
+                "aliyun" | "volcengine" | "soniox" | "deepgram" | "gemini" => {
                     let config = provider_config.ok_or("ASR_PROVIDER_MISSING")?;
                     crate::voice::streaming::run_online(
-                        app.clone(),
+                        crate::voice::streaming::event_sink(app.clone()),
                         session_id.clone(),
                         chunks,
                         active,
-                        config.model,
-                        config.endpoint,
+                        config,
                         key,
                         language,
                         proxy,
+                        hotwords,
                     )
                     .await
                 }
@@ -291,6 +309,15 @@ pub async fn voice_start_stream(
             let _ = capture.stop.send(());
         }
         session.completed.send_replace(Some(result.clone()));
+        if result.is_ok()
+            && !session.finishing.load(Ordering::SeqCst)
+            && !session.stop_task.is_cancelled()
+        {
+            let _ = app.emit(
+                "voice-transcript-complete",
+                serde_json::json!({"session_id":session_id}),
+            );
+        }
         if let Err(error) = result {
             if session.stop_task.is_cancelled() {
                 return;

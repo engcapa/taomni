@@ -256,3 +256,12 @@ it("requires an explicit verified q8 replacement action for installed f16", asyn
   fireEvent.click(replace);
   await waitFor(() => expect(ipc).toHaveBeenCalledWith("voice_install_model", { modelId: "whisper-small-q8", sourcePath: null, replaceModelId: "whisper-small" }));
 });
+
+it("discloses online audio upload when a cloud provider is selected", async () => {
+  const config = useAiStore.getState().config!;
+  useAiStore.setState({ config: { ...config, asr: { ...config.asr, active: "soniox", mode: "online" } } });
+  ipc.mockImplementation(async (command) => command === "voice_models" ? [] : command === "voice_capture_supported" ? true : null);
+  render(<AsrPanel />);
+  expect(await screen.findByText(/Audio is sent to the selected online provider/)).toBeVisible();
+  expect(screen.queryByText(/Audio is not uploaded/)).not.toBeInTheDocument();
+});

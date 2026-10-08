@@ -91,6 +91,8 @@ export async function voiceStub(command: string, args?: Record<string, unknown>)
     await report("complete");
     return null;
   }
+  if (command === "voice_cancel_cleanup") return null;
+  if (command === "voice_cleanup_text") return { original: String(args?.text ?? ""), text: String(args?.text ?? "").replace("Final stream fixture.", "Cleaned stream fixture."), notice: null };
   if (command === "voice_start_capture" || command === "voice_start_stream") {
     if (session) throw new Error("Voice input is busy");
     session = String(args?.sessionId);

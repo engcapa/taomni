@@ -46,6 +46,8 @@ export function AsrPanel() {
   const savedProxy = config?.asr.download_proxy;
   const [providerDraft, setProviderDraft] = useState<Record<string, AsrConfig["providers"][string]>>({});
   useEffect(() => { if (config?.asr.providers) setProviderDraft(config.asr.providers); }, [config?.asr.providers]);
+  const [hotwords, setHotwords] = useState(config?.asr.hotwords?.join("\n") ?? "");
+  useEffect(() => { setHotwords(config?.asr.hotwords?.join("\n") ?? ""); }, [config?.asr.hotwords]);
   const [downloadProxy, setDownloadProxy] = useState(savedProxy);
   useEffect(() => { setDownloadProxy(savedProxy); }, [savedProxy]);
   const proxyDirty = JSON.stringify(downloadProxy) !== JSON.stringify(savedProxy);
@@ -181,21 +183,23 @@ export function AsrPanel() {
   return <div className="space-y-4 text-xs" data-testid="asr-settings">
     <header className="pr-10 space-y-2">
       <div className="flex items-center gap-2 text-base font-semibold"><Mic className="h-5 w-5 text-[var(--taomni-accent)]" />{t("aiSettings.asrTitle")}</div>
-      <p className="flex items-start gap-2 text-[var(--taomni-text-muted)]"><ShieldCheck className="h-4 w-4 shrink-0" />{t("voice.privacy")}</p>
+      <p className="flex items-start gap-2 text-[var(--taomni-text-muted)]"><ShieldCheck className="h-4 w-4 shrink-0" />{t(config?.asr.mode === "online" ? "voice.privacyOnline" : "voice.privacy")}</p>
     </header>
     {!supported && <p role="alert">{t("voice.unsupported")}</p>}
     <section className="rounded-lg border border-[var(--taomni-divider)] p-3 space-y-3" data-testid="asr-realtime-settings">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <strong>{t("voice.realtimeTitle")}</strong>
         <select className="taomni-input" data-testid="asr-realtime-provider" value={config?.asr.active ?? "local-auto"} disabled={blocked}
-          onChange={(e) => { const id = e.target.value; void select({ active: id, mode: ["aliyun", "deepgram", "gemini"].includes(id) ? "online" : "local" }); }}>
+          onChange={(e) => { const id = e.target.value; void select({ active: id, mode: ["aliyun", "volcengine", "soniox", "deepgram", "gemini"].includes(id) ? "online" : "local" }); }}>
           <option value="local-auto">Auto local · SenseVoice + Whisper Small q8</option>
           <option value="sensevoice-small">SenseVoice Small int8 · 中 / 粵 / EN / 日本語 / 한국어</option>
           {["whisper-small-q8", "whisper-base-q8", "whisper-turbo-q5", ...models.filter((m) => ["whisper-base", "whisper-small", "whisper-medium", "whisper-medium-q8"].includes(m.id) && (m.installed || config?.asr.active === m.id)).map((m) => m.id)].map((id) => <option key={id} value={id}>{modelTitle(id)} · {t("voice.batchRecognition")}</option>)}
           <option value="sherpa-zipformer-zh-en">Zipformer · {t("voice.streamingRecognition")}</option>
           <option value="aliyun">Aliyun Paraformer Realtime</option>
+          <option value="volcengine">Volcengine Seed-ASR 2.0</option>
+          <option value="soniox">Soniox Realtime</option>
           <option value="deepgram">Deepgram Nova-3</option>
-          <option value="gemini">Google Gemini Transcribe Live</option>
+          {(config?.asr.experimental || config?.asr.active === "gemini") && <option value="gemini">Google Gemini Live · Experimental</option>}
         </select>
       </div>
       <p className="text-[var(--taomni-text-muted)] leading-relaxed">Auto local uses SenseVoice for Chinese, Cantonese, English, Japanese and Korean; Whisper for Spanish, French and Italian. Optional Zipformer adds Chinese/English partials. Audio stays on this device.</p>
@@ -212,6 +216,14 @@ export function AsrPanel() {
         } catch (e) { if (String(e) !== "CANCELLED") setError(String(e)); }
         finally { submitting.current = false; setBusy(""); }
       })()}>Download recommended models</button>
+      <label className="flex gap-2 items-center"><input type="checkbox" data-testid="asr-experimental" checked={!!config?.asr.experimental} onChange={(e) => void select({ experimental: e.target.checked })} />Show experimental providers</label>
+      <label className="block space-y-1">Hotwords · one term per line (up to 2000)<textarea data-testid="asr-hotwords" className="taomni-input w-full" rows={3} value={hotwords} onChange={(e) => setHotwords(e.target.value)} /></label>
+      <p className="text-[var(--taomni-text-muted)]">Terms are sent only to the selected online provider. Aliyun requires its workspace vocabulary endpoint; Volcengine requires an App ID to create a table. Local hotword biasing is not enabled.</p>
+      <button type="button" data-testid="asr-hotwords-save" className="taomni-btn px-2 py-1" disabled={blocked} onClick={() => {
+        const words = [...new Set(hotwords.split("\n").map((s) => s.trim()).filter(Boolean))];
+        if (words.length > 2000 || words.some((w) => w.length > 100)) { setError("Use at most 2000 terms of at most 100 characters each."); return; }
+        void select({ hotwords: words });
+      }}>Save hotwords</button>
       {config?.asr.mode === "online" && config.asr.providers[config.asr.active] && (() => {
         const id = config.asr.active;
         const provider = providerDraft[id] ?? config.asr.providers[id];
@@ -220,7 +232,17 @@ export function AsrPanel() {
           <label className="space-y-1">Model<input className="taomni-input w-full" value={provider.model} onChange={(e) => updateProvider({ model: e.target.value })} /></label>
           <label className="space-y-1">API key<input className="taomni-input w-full" type="password" placeholder={provider.api_key?.startsWith("vault:") ? "Stored in credential vault" : "Required"} value={provider.api_key?.startsWith("vault:") ? "" : provider.api_key ?? ""} onChange={(e) => updateProvider({ api_key: e.target.value })} /></label>
           <label className="space-y-1">Proxy<select className="taomni-input w-full" value={provider.proxy_mode ?? "app"} onChange={(e) => updateProvider({ proxy_mode: e.target.value })}><option value="app">Application proxy</option><option value="custom">Feature proxy</option><option value="none">No proxy</option></select></label>
-          {provider.proxy_mode === "custom" && <label className="space-y-1">Proxy URL<input className="taomni-input w-full" value={provider.proxy_url ?? ""} placeholder="http://10.1.0.80:3228" onChange={(e) => updateProvider({ proxy_url: e.target.value })} /></label>}
+          <label className="space-y-1">Endpoint<input data-testid="asr-provider-endpoint" className="taomni-input w-full" value={provider.endpoint ?? ""} onChange={(e) => updateProvider({ endpoint: e.target.value })} /></label>
+          {id === "volcengine" && <>
+            <label>App ID (hotword tables)<input className="taomni-input w-full" value={provider.app_id ?? ""} onChange={(e) => updateProvider({ app_id: e.target.value })} /></label>
+            <label>Resource ID<input className="taomni-input w-full" value={provider.resource_id ?? ""} onChange={(e) => updateProvider({ resource_id: e.target.value })} /></label>
+          </>}
+          {id === "aliyun" && <label className="md:col-span-2">Vocabulary HTTPS endpoint<input className="taomni-input w-full" value={provider.vocabulary_endpoint ?? ""} placeholder="https://WORKSPACE.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/asr/customization" onChange={(e) => updateProvider({ vocabulary_endpoint: e.target.value })} /></label>}
+          {provider.proxy_mode === "custom" && <div className="md:col-span-2">
+            <AppProxyPanel value={provider.custom_proxy ?? { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" }}
+              onSave={async (custom_proxy) => updateProvider({ custom_proxy, proxy_url: "" })} testHost="example.com" />
+            {!provider.custom_proxy && <label className="space-y-1">Legacy proxy URL<input className="taomni-input w-full" value={provider.proxy_url ?? ""} onChange={(e) => updateProvider({ proxy_url: e.target.value })} /></label>}
+          </div>}
           <button type="button" className="taomni-btn px-2 py-1 justify-self-start" disabled={blocked} onClick={() => void select({ providers: providerDraft })}>Save provider</button>
           <p className="md:col-span-2 text-[var(--taomni-text-muted)]">Keys are encrypted in the credential vault when saved. A configured proxy failure is surfaced; the provider never silently falls back to a direct connection.</p>
         </div>;
@@ -242,6 +264,12 @@ export function AsrPanel() {
         {job.error && <p className="text-red-400 break-words">{job.error}</p>}
       </section>;
     })}
+    <label className="flex gap-3 items-center">Text cleanup
+      <select data-testid="asr-cleanup" className="taomni-input" disabled={blocked} value={config?.asr.cleanup ?? "off"} onChange={(e) => void select({ cleanup: e.target.value as AsrConfig["cleanup"] })}>
+        <option value="off">Off · keep original</option><option value="light">Light · fillers and punctuation</option><option value="full">Full · repair disfluencies</option>
+      </select>
+      <span className="text-[var(--taomni-text-muted)]">Uses the configured text model. Original is retained; code, paths and numbers are protected.</span>
+    </label>
     <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))]">
       <section className="space-y-3 rounded-lg bg-[var(--taomni-bg)] p-3">
         <label className="flex items-center justify-between gap-3 font-medium">{t("voice.language")}

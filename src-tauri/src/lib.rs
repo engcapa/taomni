@@ -1064,6 +1064,8 @@ pub fn run() {
             voice::commands::voice_capture_supported,
             voice::commands::voice_start_capture,
             voice::commands::voice_start_stream,
+            voice::cleanup::voice_cleanup_text,
+            voice::cleanup::voice_cancel_cleanup,
             voice::commands::voice_stop_capture,
             voice::commands::voice_stop_stream,
             voice::commands::voice_stop_and_transcribe,

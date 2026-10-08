@@ -114,9 +114,9 @@ describe("local dictation lifecycle", () => {
     fireEvent.change(input, { target: { value: "edited " } });
     input.setSelectionRange(7, 7);
     transcript("final", true);
-    expect(input.value).toBe("edited final");
+    await waitFor(() => expect(input.value).toBe("edited final"));
     await act(async () => stopped.resolve());
-    expect(screen.getByTestId("dictation-button")).toHaveAttribute("data-state", "idle");
+    await waitFor(() => expect(screen.getByTestId("dictation-button")).toHaveAttribute("data-state", "idle"));
     transcript("late", true);
     expect(input.value).toBe("edited final");
   });
@@ -130,6 +130,58 @@ describe("local dictation lifecycle", () => {
     expect(screen.getByRole("textbox")).toHaveValue("hello world");
     expect(ipc).toHaveBeenCalledWith("voice_stop_capture", { sessionId: id });
     expect(ipc.mock.calls.some(([c]) => c === "voice_stop_stream")).toBe(false);
+  });
+
+  it("retains the original and can undo optional cleanup without overwriting later edits", async () => {
+    useAiStore.setState({ config: { asr: { active: "whisper-base", cleanup: "full" } } as AiConfig });
+    ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_models" ? [{ id: "whisper-base", installed: true }] : c === "voice_stop_and_transcribe" ? { transcript: "嗯你好" } : c === "voice_cleanup_text" ? { text: "你好。", original: "嗯你好" } : null);
+    render(<Input />); await record(); fireEvent.click(screen.getByTestId("dictation-button"));
+    await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue("你好。hello world"));
+    expect(screen.getByTestId("dictation-button-original")).toHaveTextContent("嗯你好");
+    fireEvent.click(screen.getByTestId("dictation-button-undo"));
+    expect(screen.getByRole("textbox")).toHaveValue("嗯你好hello world");
+  });
+  it("discards cleanup results after context cancellation", async () => {
+    const pending = deferred<{ text: string; original: string }>();
+    useAiStore.setState({ config: { asr: { active: "whisper-base", cleanup: "light" } } as AiConfig });
+    ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_models" ? [{ id: "whisper-base", installed: true }] : c === "voice_stop_and_transcribe" ? { transcript: "raw" } : c === "voice_cleanup_text" ? pending.promise : null);
+    const view = render(<Input />); await record(); fireEvent.click(screen.getByTestId("dictation-button"));
+    await waitFor(() => expect(ipc.mock.calls.some(([c]) => c === "voice_cleanup_text")).toBe(true));
+    view.rerender(<Input context="two" />);
+    await act(async () => pending.resolve({ text: "late", original: "raw" }));
+    expect(screen.getByRole("textbox")).toHaveValue("hello world");
+    expect(ipc.mock.calls.some(([c]) => c === "voice_cancel_cleanup")).toBe(true);
+  });
+
+  it("does not upload queued finals after cancellation", async () => {
+    const pending = deferred<{ text: string; original: string }>();
+    useAiStore.setState({ config: { asr: { active: "deepgram", cleanup: "full" } } as AiConfig });
+    ipc.mockImplementation(async (c) => c === "voice_capture_supported" ? true : c === "voice_cleanup_text" ? pending.promise : null);
+    render(<Input />); await record();
+    const id = ipc.mock.calls.find(([c]) => c === "voice_start_stream")![1].sessionId;
+    act(() => {
+      for (const text of ["first", "queued"])
+        events.get("voice-transcript")!({ payload: { session_id: id, text, final_text: true } });
+    });
+    await waitFor(() => expect(ipc.mock.calls.filter(([c]) => c === "voice_cleanup_text")).toHaveLength(1));
+    fireEvent.click(screen.getByTestId("dictation-button-cancel"));
+    await act(async () => pending.resolve({ text: "clean", original: "first" }));
+    expect(ipc.mock.calls.filter(([c]) => c === "voice_cleanup_text")).toHaveLength(1);
+    expect(screen.getByRole("textbox")).toHaveValue("hello world");
+  });
+
+  it("serializes adjacent finals and undoes the whole uninterrupted cleanup", async () => {
+    useAiStore.setState({ config: { asr: { active: "deepgram", cleanup: "full" } } as AiConfig });
+    ipc.mockImplementation(async (c, args) => c === "voice_capture_supported" ? true : c === "voice_cleanup_text" ? { text: args.text.toUpperCase(), original: args.text } : null);
+    render(<Input />); await record();
+    const id = ipc.mock.calls.find(([c]) => c === "voice_start_stream")![1].sessionId;
+    act(() => {
+      for (const text of ["first", "second"])
+        events.get("voice-transcript")!({ payload: { session_id: id, text, final_text: true } });
+    });
+    await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue("FIRSTSECONDhello world"));
+    fireEvent.click(screen.getByTestId("dictation-button-undo"));
+    expect(screen.getByRole("textbox")).toHaveValue("firstsecondhello world");
   });
 
 });

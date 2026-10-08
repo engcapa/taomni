@@ -3585,7 +3585,7 @@ controls:
 - `Enable AI command rewrite (Ctrl+K)` 开关 + 自定义快捷键输入框
 - 选择 `+ai` 时按需下载 FIM 模型（约 400 MB）；本地 PowerShell 终端忽略此功能避免与 PSReadLine 冲突
 
-### 14.3 本地 Whisper 语音输入 ✅
+### 14.3 本地与在线语音输入 ✅
 
 <!-- feature
 id: F-AI-2.3
@@ -3678,11 +3678,93 @@ controls:
   - id: asr-select-small
     selector: '[data-testid="asr-select-whisper-small"]'
     kind: interactive
+  - id: asr-settings
+    selector: '[data-testid="asr-settings"]'
+    kind: display
+  - id: asr-download-proxy
+    selector: '[data-testid="asr-download-proxy"]'
+    kind: display
+  - id: asr-proxy-port
+    selector: '[data-testid="asr-download-proxy"] input[placeholder="Port"]'
+    kind: interactive
+  - id: asr-proxy-host
+    selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]'
+    kind: interactive
+  - id: asr-provider-model
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Model") input'
+    kind: interactive
+  - id: asr-provider-key
+    selector: '[data-testid="asr-realtime-settings"] input[type="password"]'
+    kind: interactive
+  - id: asr-provider-proxy
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy") select'
+    kind: interactive
+  - id: asr-provider-proxy-url
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input'
+    kind: interactive
+  - id: asr-provider-save
+    selector: '[data-testid="asr-realtime-settings"] button:has-text("Save provider")'
+    kind: interactive
+  - id: voice-composer-draft
+    selector: '[data-testid="chat-composer-textarea"]'
+    kind: display
+  - id: voice-composer-original
+    selector: '[data-testid="composer-voice-original"]'
+    kind: display
+  - id: voice-composer-original-open
+    selector: '[data-testid="composer-voice-original"] summary'
+    kind: interactive
+  - id: voice-composer-original-undo
+    selector: '[data-testid="composer-voice-original"] button'
+    kind: interactive
+  - id: asr-download-recommended
+    selector: '[data-testid="asr-download-recommended"]'
+    kind: interactive
+  - id: asr-replace-whisper-small
+    selector: '[data-testid="asr-replace-whisper-small"]'
+    kind: interactive
+  - id: asr-hotwords
+    selector: '[data-testid="asr-hotwords"]'
+    kind: interactive
+  - id: asr-hotwords-save
+    selector: '[data-testid="asr-hotwords-save"]'
+    kind: interactive
+  - id: asr-experimental
+    selector: '[data-testid="asr-experimental"]'
+    kind: interactive
+  - id: asr-cleanup
+    selector: '[data-testid="asr-cleanup"]'
+    kind: interactive
+  - id: asr-provider-endpoint
+    selector: '[data-testid="asr-provider-endpoint"]'
+    kind: interactive
+  - id: asr-model-sensevoice-small
+    selector: '[data-testid="asr-model-sensevoice-small"]'
+    kind: display
+  - id: asr-model-sherpa-zipformer-zh-en
+    selector: '[data-testid="asr-model-sherpa-zipformer-zh-en"]'
+    kind: display
+  - id: asr-model-whisper-base
+    selector: '[data-testid="asr-model-whisper-base"]'
+    kind: display
+  - id: asr-model-whisper-small
+    selector: '[data-testid="asr-model-whisper-small"]'
+    kind: display
+  - id: asr-model-whisper-small-q8
+    selector: '[data-testid="asr-model-whisper-small-q8"]'
+    kind: display
+  - id: ptt-button-interim
+    selector: '[data-testid="ptt-button-interim"]'
+    kind: display
+  - id: asr-gemini-option
+    selector: '[data-testid="asr-realtime-provider"] option[value="gemini"]'
+    kind: display
 -->
 
 - 单击开始，再次单击停止识别；Esc、取消、切换上下文或窗口失焦会取消。最长 120 秒。
 - 模型设置提供完整下载地址、复制与浏览器打开；后端进度支持关闭重开恢复，取消保留断点，再次下载按 Range 续传。宽窄窗口自适应，标题栏入口卸载不关闭设置。
-- 默认 Whisper Base，多语言 Small/Medium 可选；首次显式下载或离线导入，校验 SHA-256。多语言权重支持中文；模型版本目录按哈希隔离，支持显式检查完整性与更新。
+- 默认本地 SenseVoice + Small q8 组合，按语种路由；Turbo q5 可选。旧 f16 显式一键替换，校验成功后删除旧权重。模型按需下载或离线导入，版本目录按哈希隔离。
+- 在线阿里／火山／Deepgram／Soniox，共享代理和 vault；Gemini 默认隐藏为实验项。清理默认关，可选轻／全并保留原文和撤销。
 - 标题栏和 Chat、LAN 聊天、终端 AI 改写说明共用听写组件，只填入可编辑文本，不自动发送或执行。
 - AI 全局禁用时隐藏入口。浏览器语音 fixture 仅验证交互；原生采集与跨平台权限需真机检查。
 

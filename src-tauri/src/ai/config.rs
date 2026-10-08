@@ -98,6 +98,12 @@ pub struct AsrConfig {
     pub active: String,
     #[serde(default = "default_language_prior")]
     pub language_prior: String,
+    #[serde(default)]
+    pub hotwords: Vec<String>,
+    #[serde(default)]
+    pub experimental: bool,
+    #[serde(default = "default_cleanup")]
+    pub cleanup: String,
     pub providers: HashMap<String, AsrProviderConfig>,
     /// `local` (default) keeps audio on-device. `online` uses the selected
     /// realtime provider over its WebSocket API.
@@ -107,6 +113,9 @@ pub struct AsrConfig {
     pub vad: String,
     #[serde(default = "asr_auto_language")]
     pub language: String,
+}
+fn default_cleanup() -> String {
+    "off".into()
 }
 fn default_language_prior() -> String {
     "zh".into()
@@ -151,6 +160,8 @@ impl AsrConfig {
             "whisper-medium",
             "sherpa-zipformer-zh-en",
             "aliyun",
+            "volcengine",
+            "soniox",
             "deepgram",
             "gemini",
         ]
@@ -158,7 +169,9 @@ impl AsrConfig {
         {
             self.active = "local-auto".into();
         }
-        self.mode = if ["aliyun", "deepgram", "gemini"].contains(&self.active.as_str()) {
+        self.mode = if ["aliyun", "volcengine", "soniox", "deepgram", "gemini"]
+            .contains(&self.active.as_str())
+        {
             "online"
         } else {
             "local"
@@ -180,6 +193,9 @@ impl AsrConfig {
         {
             self.language_prior = default_language_prior();
         }
+        if !["off", "light", "full"].contains(&self.cleanup.as_str()) {
+            self.cleanup = default_cleanup();
+        }
         self.warm_on_startup = false;
         self.vad = "none".into();
     }
@@ -190,6 +206,9 @@ impl Default for AsrConfig {
             download_proxy: Default::default(),
             active: "local-auto".into(),
             language_prior: default_language_prior(),
+            hotwords: Vec::new(),
+            experimental: false,
+            cleanup: default_cleanup(),
             providers: {
                 let mut providers = ["base", "small", "medium"]
                     .into_iter()
@@ -203,10 +222,33 @@ impl Default for AsrConfig {
                                 api_key: String::new(),
                                 proxy_mode: default_asr_proxy_mode(),
                                 proxy_url: String::new(),
+                                ..Default::default()
                             },
                         )
                     })
                     .collect::<HashMap<_, _>>();
+                providers.insert(
+                    "volcengine".into(),
+                    AsrProviderConfig {
+                        engine: "volcengine".into(),
+                        model: "bigmodel".into(),
+                        endpoint: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
+                            .into(),
+                        resource_id: "volc.seedasr.sauc.duration".into(),
+                        proxy_mode: default_asr_proxy_mode(),
+                        ..Default::default()
+                    },
+                );
+                providers.insert(
+                    "soniox".into(),
+                    AsrProviderConfig {
+                        engine: "soniox".into(),
+                        model: "stt-rt-v5".into(),
+                        endpoint: "wss://stt-rt.soniox.com/transcribe-websocket".into(),
+                        proxy_mode: default_asr_proxy_mode(),
+                        ..Default::default()
+                    },
+                );
                 for model in crate::asr::catalog::MODELS {
                     providers
                         .entry(model.id.into())
@@ -222,6 +264,7 @@ impl Default for AsrConfig {
                             api_key: String::new(),
                             proxy_mode: default_asr_proxy_mode(),
                             proxy_url: String::new(),
+                            ..Default::default()
                         });
                 }
                 providers.insert(
@@ -233,6 +276,7 @@ impl Default for AsrConfig {
                         api_key: String::new(),
                         proxy_mode: default_asr_proxy_mode(),
                         proxy_url: String::new(),
+                        ..Default::default()
                     },
                 );
                 providers.insert(
@@ -244,6 +288,7 @@ impl Default for AsrConfig {
                         api_key: String::new(),
                         proxy_mode: default_asr_proxy_mode(),
                         proxy_url: String::new(),
+                        ..Default::default()
                     },
                 );
                 providers.insert(
@@ -255,11 +300,12 @@ impl Default for AsrConfig {
                         api_key: String::new(),
                         proxy_mode: default_asr_proxy_mode(),
                         proxy_url: String::new(),
+                        ..Default::default()
                     },
                 );
                 providers.insert("gemini".into(), AsrProviderConfig {
                     engine: "gemini".into(), model: "gemini-3.5-transcribe-live".into(),
-                    endpoint: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent".into(), api_key: String::new(), proxy_mode: default_asr_proxy_mode(), proxy_url: String::new(),
+                    endpoint: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent".into(), api_key: String::new(), proxy_mode: default_asr_proxy_mode(), proxy_url: String::new(), ..Default::default()
                 });
                 providers
             },
@@ -270,7 +316,7 @@ impl Default for AsrConfig {
         }
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct AsrProviderConfig {
     pub engine: String,
     pub model: String,
@@ -284,6 +330,14 @@ pub struct AsrProviderConfig {
     pub proxy_mode: String,
     #[serde(default)]
     pub proxy_url: String,
+    #[serde(default)]
+    pub custom_proxy: Option<crate::proxy::AppProxyConfig>,
+    #[serde(default)]
+    pub app_id: String,
+    #[serde(default)]
+    pub resource_id: String,
+    #[serde(default)]
+    pub vocabulary_endpoint: String,
 }
 
 fn default_asr_proxy_mode() -> String {
