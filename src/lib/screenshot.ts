@@ -157,7 +157,7 @@ export async function captureFull(displayId?: string): Promise<ScreenshotFile> {
 export async function scrollCapture(
   displayId: string | undefined,
   region: PhysicalRect,
-  mode: ScrollMode = "auto",
+  mode: ScrollMode = "manual",
 ): Promise<ScrollCaptureResult> {
   return invoke<ScrollCaptureResult>("screenshot_scroll_capture", {
     displayId: displayId ?? null,

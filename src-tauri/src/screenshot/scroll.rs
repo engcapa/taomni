@@ -31,6 +31,8 @@ const INITIAL_SETTLE: Duration = Duration::from_millis(350);
 const SETTLE_DELAY: Duration = Duration::from_millis(450);
 /// Consecutive unchanged frames that end the capture (page bottom).
 const STILL_LIMIT: u32 = 6;
+/// Consecutive one-notch steps without overlap before manual takeover.
+const LOST_LIMIT: u32 = 3;
 const MANUAL_POLL: Duration = Duration::from_millis(120);
 /// Columns sampled per row for matching (frames are column-averaged to this).
 const MATCH_COLUMNS: usize = 128;
@@ -55,8 +57,9 @@ pub struct ScrollCaptureResult {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ScrollMode {
-    #[default]
     Auto,
+    /// Default: manual scrolling needs no input synthesis or permissions.
+    #[default]
     Manual,
 }
 
@@ -71,7 +74,7 @@ pub struct ScrollControl {
 
 impl Default for ScrollControl {
     fn default() -> Self {
-        Self::new(ScrollMode::Auto)
+        Self::new(ScrollMode::default())
     }
 }
 
@@ -153,7 +156,14 @@ pub fn scroll_capture_with(
     region: (u32, u32, u32, u32),
     max_frames: u32,
 ) -> anyhow::Result<ScrollCaptureResult> {
-    scroll_capture_controlled(app, display, region, max_frames, &ScrollControl::default())
+    // Uncontrolled captures have no UI to scroll from: always automatic.
+    scroll_capture_controlled(
+        app,
+        display,
+        region,
+        max_frames,
+        &ScrollControl::new(ScrollMode::Auto),
+    )
 }
 
 pub fn scroll_capture_controlled(
@@ -224,6 +234,7 @@ fn capture_frames(
     // the region is undone and retried with a single notch.
     let mut notches: i32 = if stitcher.frame_h >= 600 { 3 } else { 1 };
     let mut still = 0u32;
+    let mut lost = 0u32;
     let mut previous_mode = control.mode();
 
     while !control.stop.load(Ordering::SeqCst)
@@ -269,6 +280,7 @@ fn capture_frames(
         match step {
             Step::Appended => {
                 still = 0;
+                lost = 0;
                 control.needs_overlap.store(false, Ordering::SeqCst);
                 progress(stitcher.frames);
             }
@@ -293,7 +305,12 @@ fn capture_frames(
                 still = 0;
                 control.needs_overlap.store(true, Ordering::SeqCst);
                 if mode == ScrollMode::Auto && control.mode() == ScrollMode::Auto {
-                    scroll(-notches)?;
+                    if let Err(error) = scroll(-notches) {
+                        control.set_input_error(format!("{error:#}"));
+                        control.set_mode(ScrollMode::Manual);
+                        progress(stitcher.frames);
+                        continue;
+                    }
                     wait(SETTLE_DELAY);
                     if control.stop.load(Ordering::SeqCst) {
                         break;
@@ -301,11 +318,21 @@ fn capture_frames(
                     // Never rebase on an unverified frame: that would silently
                     // skip content or duplicate rows in the accumulated image.
                     let back = stitcher.push(grab()?);
-                    if notches > 1 && !matches!(back, Step::Lost) {
+                    if matches!(back, Step::Lost) {
+                        control.set_mode(ScrollMode::Manual);
+                    } else if notches > 1 {
                         notches = 1;
                         control.needs_overlap.store(false, Ordering::SeqCst);
                     } else {
-                        control.set_mode(ScrollMode::Manual);
+                        // Already at one notch: lazy loading or late layout
+                        // can break a single step. Retry a few times before
+                        // asking the user to take over.
+                        lost += 1;
+                        if lost >= LOST_LIMIT {
+                            control.set_mode(ScrollMode::Manual);
+                        } else {
+                            control.needs_overlap.store(false, Ordering::SeqCst);
+                        }
                     }
                 }
                 progress(stitcher.frames);
@@ -402,19 +429,11 @@ impl Wheel {
             // SetCursorPos takes virtual-desktop physical pixels (the app is
             // per-monitor DPI aware), so any display works.
             let _ = &mut self.enigo;
-            use windows::Win32::UI::WindowsAndMessaging::{SetCursorPos, WindowFromPoint, GetAncestor, GA_ROOT, GetForegroundWindow, SetForegroundWindow};
-            use windows::Win32::Foundation::POINT;
+            use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
             unsafe {
                 SetCursorPos(gx, gy).map_err(|e| anyhow::anyhow!("move pointer: {e}"))?;
-                // SendInput wheel events otherwise go to the old focused app
-                // when Windows 'scroll inactive windows' is disabled. Activate
-                // the window under the crop without clicking its content.
-                let target = GetAncestor(WindowFromPoint(POINT { x: gx, y: gy }), GA_ROOT);
-                if !target.is_invalid() && target != GetForegroundWindow() {
-                    anyhow::ensure!(SetForegroundWindow(target).as_bool(), "Windows could not activate the scroll target. Click the target once and retry, or use manual scrolling; elevated targets require matching permissions.");
-                    std::thread::sleep(Duration::from_millis(80));
-                }
             }
+            activate_scroll_target(gx, gy);
             Ok(())
         }
         #[cfg(not(target_os = "windows"))]
@@ -442,6 +461,52 @@ impl Wheel {
         self.enigo
             .scroll(notches, Axis::Vertical)
             .map_err(|e| anyhow::anyhow!("synthesize scroll: {e}"))
+    }
+}
+
+/// Best-effort activation of the window under the crop. SendInput wheel
+/// events go to the old focused app when Windows "Scroll inactive windows"
+/// is disabled, so try to activate the target without clicking its content.
+/// The foreground lock routinely rejects this once our overlay has hidden;
+/// that must not stop the capture: with the default setting Windows routes
+/// the wheel to the hovered window anyway, and real non-delivery is caught
+/// by the unchanged-frame detection.
+#[cfg(target_os = "windows")]
+fn activate_scroll_target(gx: i32, gy: i32) {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GA_ROOTOWNER, GetAncestor, GetForegroundWindow, GetWindowThreadProcessId,
+        SetForegroundWindow, WindowFromPoint,
+    };
+    unsafe {
+        // Tooltips and menus that appear under the parked pointer resolve to
+        // the window that owns them, not to a separate popup root.
+        let target = GetAncestor(WindowFromPoint(POINT { x: gx, y: gy }), GA_ROOTOWNER);
+        if target.is_invalid() {
+            return;
+        }
+        let foreground = GetForegroundWindow();
+        if target == foreground {
+            return;
+        }
+        let mut activated = SetForegroundWindow(target).as_bool();
+        if !activated && !foreground.is_invalid() {
+            // Sharing the foreground thread's input state lifts the lock.
+            let current = GetCurrentThreadId();
+            let owner = GetWindowThreadProcessId(foreground, None);
+            if owner != 0 && owner != current && AttachThreadInput(current, owner, true).as_bool() {
+                activated = SetForegroundWindow(target).as_bool();
+                let _ = AttachThreadInput(current, owner, false);
+            }
+        }
+        if activated {
+            std::thread::sleep(Duration::from_millis(80));
+        } else {
+            log::debug!(
+                "scroll capture: could not activate target window; relying on hover wheel routing"
+            );
+        }
     }
 }
 
@@ -705,7 +770,7 @@ mod tests {
     #[test]
     fn automatic_capture_waits_through_two_unchanged_frames_before_motion() {
         let page = page(64, 1000);
-        let control = ScrollControl::default();
+        let control = ScrollControl::new(ScrollMode::Auto);
         let mut reads = 0;
         let mut wheels = Vec::new();
         let out = capture_frames(
@@ -734,7 +799,7 @@ mod tests {
     #[test]
     fn automatic_capture_rereads_a_transient_unmatchable_frame_without_scrolling_again() {
         let page = page(64, 1000);
-        let control = ScrollControl::default();
+        let control = ScrollControl::new(ScrollMode::Auto);
         let mut reads = 0;
         let mut wheels = Vec::new();
         let out = capture_frames(
@@ -762,6 +827,52 @@ mod tests {
         .unwrap();
         assert_eq!(wheels, [1]);
         assert_eq!(out.image, crop(&page, 0, 0, 64, 420));
+    }
+
+    #[test]
+    fn manual_is_the_default_mode() {
+        assert_eq!(ScrollMode::default(), ScrollMode::Manual);
+        assert_eq!(ScrollControl::default().mode(), ScrollMode::Manual);
+    }
+
+    #[test]
+    fn automatic_capture_survives_a_single_lost_step_at_one_notch() {
+        let page = page(64, 2000);
+        let control = ScrollControl::new(ScrollMode::Auto);
+        // Scroll position follows the wheel; one forward step lands on an
+        // unmatchable (lazy-rendering) frame, then recovers.
+        let position = std::cell::Cell::new(0i32);
+        let mut reads = 0;
+        let mut glitch = true;
+        let out = capture_frames(
+            &mut || {
+                reads += 1;
+                if position.get() == 240 && glitch {
+                    glitch = reads < 6;
+                    return Ok(RgbaImage::from_pixel(64, 300, image::Rgba([0, 0, 0, 255])));
+                }
+                Ok(view(&page, position.get() as u32, 300, 0, 0))
+            },
+            &mut |n| {
+                position.set((position.get() + n * 120).max(0));
+                Ok(())
+            },
+            &mut |_| {},
+            &mut |frames| {
+                if frames == 4 {
+                    control.request_stop(false);
+                }
+            },
+            MAX_FRAMES,
+            &control,
+        )
+        .unwrap();
+        assert_eq!(
+            control.mode(),
+            ScrollMode::Auto,
+            "one lost step must not force manual mode"
+        );
+        assert_eq!(out.image, crop(&page, 0, 0, 64, 660));
     }
 
     #[test]
