@@ -788,14 +788,14 @@ export function MainLayout() {
   }, [workspaceCanvasVisible, selectedWorkspace?.id, selectedWorkspace?.navigation.activeSurface]);
   const restoredWorkspaceLayout = useRef<string | null>(null);
   useEffect(() => {
-    if (!selectedWorkspace || restoredWorkspaceLayout.current === selectedWorkspace.id) return;
+    if (workspaceNavigation.canvas !== "workspace" || !selectedWorkspace || restoredWorkspaceLayout.current === selectedWorkspace.id) return;
     restoredWorkspaceLayout.current = selectedWorkspace.id;
     setSidebarCollapsed(selectedWorkspace.navigation.navigatorCollapsed);
-  }, [selectedWorkspace?.id, setSidebarCollapsed]);
+  }, [workspaceNavigation.canvas, selectedWorkspace?.id, setSidebarCollapsed]);
   useEffect(() => {
-    if (!selectedWorkspace || restoredWorkspaceLayout.current !== selectedWorkspace.id || selectedWorkspace.navigation.navigatorCollapsed === sidebarCollapsed) return;
+    if (workspaceNavigation.canvas !== "workspace" || !selectedWorkspace || restoredWorkspaceLayout.current !== selectedWorkspace.id || selectedWorkspace.navigation.navigatorCollapsed === sidebarCollapsed) return;
     void useWorkspaceStore.getState().patch(selectedWorkspace.id, { navigation: { navigatorCollapsed: sidebarCollapsed } }).catch(() => {});
-  }, [sidebarCollapsed]);
+  }, [workspaceNavigation.canvas, sidebarCollapsed]);
   const migratingWorkspaceTabs = useRef(new Set<string>());
   useEffect(() => {
     if (!workspaceNavigation.hydrated) return;

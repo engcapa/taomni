@@ -564,6 +564,7 @@
 
 - `[data-testid="sidebar-tool-code-workspace"]` — interactive — F25.1.sidebar-entry
 - `[data-testid="code-workspace-tab"]` — display — F25.1.workspace
+  ↳ `[data-testid="code-workspace-tab"]:visible` — alias
 - `[data-testid="code-workspace-git-panel-toggle"]` — interactive [optional] — F25.1.git-panel-toggle
 - `[data-testid="code-workspace-tree"]` — display [optional] — F25.1.tree-container
 - `[data-testid="debug-subtab-breakpoints"]` — interactive [optional] — F25.1.debug-subtab-breakpoints

@@ -7177,6 +7177,8 @@ controls:
   - id: workspace
     selector: '[data-testid="code-workspace-tab"]'
     kind: display
+    aliases:
+    - '[data-testid="code-workspace-tab"]:visible'
   - id: git-panel-toggle
     selector: '[data-testid="code-workspace-git-panel-toggle"]'
     kind: interactive

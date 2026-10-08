@@ -30,7 +30,7 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-code-workspace"]'
-- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible'
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-view"]'
 - click: '[data-testid="context-menu-item-toggle-sidebar"]'
@@ -40,9 +40,9 @@ steps:
 - assert_not_visible: '[data-testid="session-tree"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
-    selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+    selector: '[data-testid="code-workspace-tab"]:visible [data-testid="code-workspace-tool-rail-left"]'
     equal: 0
-- assert_visible: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-right"]'
+- assert_visible: '[data-testid="code-workspace-tab"]:visible [data-testid="code-workspace-tool-rail-right"]'
 - click: '[data-testid="code-workspace-tree-add-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - click: '[data-testid="text-input-dialog-confirm"]'
@@ -72,7 +72,7 @@ steps:
     selector: '[data-testid="collapsed-sidebar-rail"]'
     state: detached
     timeout_sec: 5
-- wait_for: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible [data-testid="code-workspace-tool-rail-left"]'
 - assert_localstorage:
     key: taomni.sidebarCollapsedByGroup.v1
     contains: '"code-workspace":false'
@@ -85,7 +85,7 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-code-workspace"]'
-- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible'
 - assert_visible: '[data-testid="session-tree"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for:
@@ -120,7 +120,7 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-code-workspace"]'
-- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible'
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
@@ -134,8 +134,8 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-code-workspace"]'
-- wait_for: '[data-testid="code-workspace-tab"]'
-- wait_for: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible'
+- wait_for: '[data-testid="code-workspace-tab"]:visible [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
     selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
     equal: 0
