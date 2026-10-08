@@ -19,6 +19,7 @@ steps:
 - wait_for: '[data-testid="screenshot-hint"]'
 - click: '[data-testid="screenshot-fullscreen"]'
 - click: '[data-testid="screenshot-scroll-capture"]'
+- assert_visible: '[data-testid="screenshot-scroll-mode-manual"]:checked'
 - click: '[data-testid="screenshot-scroll-mode-auto"]'
 - click: '[data-testid="screenshot-scroll-start"]'
 - wait_for: '[data-testid="screenshot-scroll-result"]'
@@ -123,110 +124,116 @@ verification:
   review: reviewed
   requirements:
   - id: preview-annotation
-    requirement: Direct preview marks survive fit/100% switches and undo/redo; draw below the initial viewport, Done copies
-      full natural dimensions and Escape discards without copying.
+    requirement: Direct preview marks survive fit/100% switches and undo/redo; draw below the initial viewport,
+      Done copies full natural dimensions and Escape discards without copying. Manual mode is selected by default
+      before explicitly choosing automatic capture.
     actions:
     - 1
     - 2
     - 4
     - 5
-    - 6
-    - 10
-    - 11
+    - 7
+    - 8
+    - 12
     - 13
     - 15
     - 17
     - 19
-    - 20
     - 21
+    - 22
     - 23
-    - 26
-    - 31
-    - 34
+    - 25
+    - 28
+    - 33
     - 36
-    - 37
     - 38
+    - 39
     - 40
     - 41
     - 43
+    - 44
+    - 46
     checkpoints:
     - step: 3
       expectation: '{''wait_for'': ''[data-testid="screenshot-hint"]''}'
-    - step: 7
-      expectation: '{''wait_for'': ''[data-testid="screenshot-scroll-result"]''}'
-    - step: 8
-      expectation: '{''assert_visible'': ''[data-testid="screenshot-toolbar"]''}'
+    - step: 6
+      expectation: Manual mode is checked on the first confirmation.
     - step: 9
+      expectation: '{''wait_for'': ''[data-testid="screenshot-scroll-result"]''}'
+    - step: 10
+      expectation: '{''assert_visible'': ''[data-testid="screenshot-toolbar"]''}'
+    - step: 11
       expectation: '{''assert_not_visible'': ''[data-testid="screenshot-hint"]''}'
-    - step: 12
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''1''}}'
     - step: 14
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''1''}}'
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''1''}}'
     - step: 16
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''0''}}'
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''1''}}'
     - step: 18
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''1''}}'
-    - step: 22
-      expectation: Keyboard scrolling reaches the bottom before drawing; scrollTop exceeds 1000 and remaining distance is
-        below 2 pixels.
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''0''}}'
+    - step: 20
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''1''}}'
     - step: 24
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''2''}}'
-    - step: 27
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''2''}}'
-    - step: 28
+      expectation: Keyboard scrolling reaches the bottom before drawing; scrollTop exceeds 1000 and remaining distance
+        is below 2 pixels.
+    - step: 26
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''2''}}'
+    - step: 29
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''2''}}'
+    - step: 30
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector("[data-testid" + String.fromCharCode(61)
         + "\\"screenshot-scroll-result-viewport\\"]").scrollTop === 0''}}'
-    - step: 29
+    - step: 31
       expectation: '{''assert_visible'': ''[data-testid="screenshot-scroll-result-copy"]''}'
-    - step: 32
+    - step: 34
       expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
-    - step: 33
+    - step: 35
       expectation: '{''eval_readonly'': {''expression'': ''window.__taomniStubScreenshotCalls.at(-3).cmd === "screenshot_save_data_url"
         && window.__taomniStubScreenshotCalls.at(-3).args.width === 400 && window.__taomniStubScreenshotCalls.at(-3).args.height
         === 1800''}}'
-    - step: 35
+    - step: 37
       expectation: '{''wait_for'': ''[data-testid="screenshot-hint"]''}'
-    - step: 39
-      expectation: '{''wait_for'': ''[data-testid="screenshot-scroll-result"]''}'
     - step: 42
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''1''}}'
-    - step: 44
-      expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
+      expectation: '{''wait_for'': ''[data-testid="screenshot-scroll-result"]''}'
     - step: 45
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''1''}}'
+    - step: 47
+      expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
+    - step: 48
       expectation: Escape exits the marked preview without invoking screenshot_copy_image.
     results:
     - 3
-    - 7
-    - 8
+    - 6
     - 9
-    - 12
+    - 10
+    - 11
     - 14
     - 16
     - 18
-    - 22
+    - 20
     - 24
-    - 27
-    - 28
+    - 26
     - 29
-    - 32
-    - 33
+    - 30
+    - 31
+    - 34
     - 35
-    - 39
+    - 37
     - 42
-    - 44
     - 45
+    - 47
+    - 48
   visual:
   - check: Marked long-image preview
     method: automated
-    reason: Retained fit and scrolled screenshots, shape history and full export dimensions; N12 verifies actual exported
-      pixels.
+    reason: Retained fit and scrolled screenshots, shape history and full export dimensions; N12 verifies actual
+      exported pixels.
   native:
   - check: Full-resolution clipboard pixels
     method: external

@@ -38,6 +38,7 @@ steps:
       y: 240
 - click: '[data-testid="screenshot-scroll-capture"]'
 - wait_for: '[data-testid="screenshot-scroll-confirm"]'
+- assert_visible: '[data-testid="screenshot-scroll-mode-manual"]:checked'
 - click: '[data-testid="screenshot-scroll-mode-auto"]'
 - click: '[data-testid="screenshot-scroll-start"]'
 - assert_visible: '[data-testid="screenshot-scroll-error"]'
@@ -65,45 +66,52 @@ verification:
   review: reviewed
   requirements:
   - id: permission-error
-    requirement: Scroll permission failure explains Accessibility remediation and preserves selection/annotation; explicit
-      close and Escape both return to main.
+    requirement: Scroll permission failure explains Accessibility remediation and preserves selection/annotation;
+      explicit close and Escape both return to main. Manual mode is selected by default before explicitly choosing
+      automatic capture.
     actions:
     - 1
     - 4
     - 5
     - 6
     - 7
-    - 9
-    - 15
-    - 17
-    - 19
-    - 20
-    - 21
-    - 23
-    checkpoints:
-    - step: 10
-      expectation: '{''assert_visible'': ''[data-testid="screenshot-scroll-error"]''}'
-    - step: 11
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="screenshot-scroll-error"]'', ''contains'': ''Accessibility''}}'
-    - step: 12
-      expectation: '{''assert_visible'': ''[data-testid="screenshot-selection"]''}'
-    - step: 13
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'': ''data-shapes'',
-        ''equals'': ''1''}}'
-    - step: 16
-      expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
-    - step: 22
-      expectation: '{''assert_visible'': ''[data-testid="screenshot-scroll-error"]''}'
-    - step: 24
-      expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
-    results:
     - 10
     - 11
+    - 17
+    - 19
+    - 21
+    - 22
+    - 23
+    - 24
+    - 26
+    checkpoints:
+    - step: 9
+      expectation: Manual mode is checked on the first confirmation.
+    - step: 12
+      expectation: '{''assert_visible'': ''[data-testid="screenshot-scroll-error"]''}'
+    - step: 13
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="screenshot-scroll-error"]'', ''contains'':
+        ''Accessibility''}}'
+    - step: 14
+      expectation: '{''assert_visible'': ''[data-testid="screenshot-selection"]''}'
+    - step: 15
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="screenshot-annotation-canvas"]'', ''name'':
+        ''data-shapes'', ''equals'': ''1''}}'
+    - step: 18
+      expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
+    - step: 25
+      expectation: '{''assert_visible'': ''[data-testid="screenshot-scroll-error"]''}'
+    - step: 27
+      expectation: '{''wait_for'': ''[data-testid="system-screenshot"]''}'
+    results:
+    - 9
     - 12
     - 13
-    - 16
-    - 22
-    - 24
+    - 14
+    - 15
+    - 18
+    - 25
+    - 27
   visual:
   - check: Permission error readability
     method: automated
