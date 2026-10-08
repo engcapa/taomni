@@ -193,6 +193,7 @@ def run(args, samples):
         "source_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)),
         "source_files": {str(path.relative_to(ROOT)): sha256(path) for path in [
             ROOT / "src-tauri/src/asr/manager.rs", ROOT / "src-tauri/src/asr/catalog.rs",
+            ROOT / "src-tauri/src/asr/sensevoice.rs", ROOT / "src-tauri/src/voice/streaming.rs",
             ROOT / "src-tauri/src/asr/benchmark.rs", ROOT / "src-tauri/Cargo.lock", Path(__file__).resolve(),
         ]},
         "manifest_sha256": sha256(args.manifest), "adapter_sha256": sha256(args.adapter),

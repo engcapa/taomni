@@ -56,9 +56,9 @@ Read the `executable` from the `compiler-artifact` message for `taomni_lib` with
 
 For an isolated cache add `NEWMOB_CACHE_DIR` using the existing QA cache layout;
 the default reads the installed app cache without modifying it. Repeat with
-`whisper-small` for the other existing installed model. The current production
-adapter covers pinned f16 Base/Small/Medium only; future q8/SenseVoice/streaming
-adapters must identify actual weights and preserve production settings.
+`whisper-small` for the other existing installed model. The production adapter covers the pinned Whisper f16/q8/q5 catalog and SenseVoice int8.
+Use `sensevoice-small`, `whisper-small-q8` or another catalog ID in the adapter.
+Streaming measurements require a separate adapter and remain unverified.
 
 ```bash
 python scripts/asr-bench/bench.py \
@@ -105,3 +105,24 @@ P0 acceptance additionally needs a modern CPU run, the full corpus, matched
 online-provider opt-in runs and q8/SenseVoice candidate runs. This harness does
 not infer any of those results from one machine or one sentence. Never choose
 P1 defaults or latency/accuracy thresholds from this exploratory smoke alone.
+
+## Expanded public subset
+
+The pinned `benchmark-fleurs.json` contains 160 independent recordings, 20 per
+language. Audio stays outside Git; the fetcher verifies every committed hash:
+
+```bash
+python scripts/asr-bench/fetch_fleurs.py --output /tmp/asr-fleurs --no-proxy
+python scripts/asr-bench/bench.py --manifest /tmp/asr-fleurs/manifest.json --validate-only
+```
+
+Pass `--proxy URL` instead to use an explicit proxy. Environment proxies are
+disabled; errors never fall back to direct. Retries reuse complete verified WAVs
+and restart the TAR stream for missing recordings. The downloader only accesses
+pinned Google FLEURS archives and never reads private audio. Select five supported
+languages for SenseVoice; do not send es/fr/it to that engine. Mixed/code/private
+recordings and a second CPU are still required for the full P0 gate.
+
+`benchmark-controls.json` adds deterministic 3-second PCM16 silence and noise,
+with CC0 provenance. Its independent empty reference exposes hallucinated text
+as `unexpected_text`; it does not count toward any human-speech quota.

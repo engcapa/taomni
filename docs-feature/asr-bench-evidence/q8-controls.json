@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-08T15:12:05.181970+00:00",
+  "host": {
+    "cpu": "Intel(R) Core(TM) i7-6700K CPU @ 4.00GHz",
+    "logical_cpus": 8,
+    "platform": "Linux-6.14.0-37-generic-x86_64-with-glibc2.39",
+    "python": "3.12.4"
+  },
+  "source_revision": "73958172a803bca8fd3f107fa7aa6b15ef222774",
+  "source_dirty": true,
+  "source_files": {
+    "src-tauri/src/asr/manager.rs": "be1898e18c6ac7b5ed136826a740a36cc78afd72fb623e2417e2b705bda823f4",
+    "src-tauri/src/asr/catalog.rs": "d9f6b732311476da03445824e7b02764c45ba18a5865cefa4d67875a1abc60c2",
+    "src-tauri/src/asr/sensevoice.rs": "3aa68bdd4ad35e948a6ebb2e54ab33647243b87f1c410861346444edf9121bec",
+    "src-tauri/src/voice/streaming.rs": "19970a8dd48a8cd34919f9ccbc9d3a90513f1bad63bfb4c7c9cb18411eac7cb6",
+    "src-tauri/src/asr/benchmark.rs": "7931a81dc0253358818679a3f59ccb56a36c0d9bfbf6d8f9406b2b3fc41e090a",
+    "src-tauri/Cargo.lock": "d7dd22024e045d62b48892259a6292cffa1304e546714950d09633d9626a82b2",
+    "scripts/asr-bench/bench.py": "f49c3c6d36c116bfa8d8c185ae178b9812880e6cc1b4e5fde27e6bc79e92e237"
+  },
+  "manifest_sha256": "ad7d82c3eb9ec09d3512a1b7c4ce95fd557bb00c077264d67b9d3f83dd44864c",
+  "adapter_sha256": "b32743857dbae065f391a41fdb7bd73d01797c7ca7042939d886c3ee8093537b",
+  "executable_sha256": "21dcd068814b261cf0912f82ede645513a60365b4d39883bdaf2c8a6b56a8015",
+  "corpus_gaps": [
+    "zh: 0/20 speech recordings",
+    "yue: 0/20 speech recordings",
+    "en: 0/20 speech recordings",
+    "ja: 0/20 speech recordings",
+    "es: 0/20 speech recordings",
+    "fr: 0/20 speech recordings",
+    "it: 0/20 speech recordings",
+    "ko: 0/20 speech recordings",
+    "mixed: 0/20 recordings",
+    "code: 0/10 recordings"
+  ],
+  "results": [
+    {
+      "id": "synthetic-silence-3s",
+      "path": "benchmark-silence.wav",
+      "sha256": "d303811b8c84619667cd0501342f84ec6cbe69f7aa3856dcf52fabda374c92b8",
+      "language": "auto",
+      "category": "silence",
+      "reference": "",
+      "duration_s": 3.0,
+      "source": "Taomni deterministic PCM16 control: silence or LCG(1664525,1013904223), seed 1729, amplitude 655/32768. Not human speech.",
+      "license": "CC0-1.0 (generated test signal)",
+      "status": "ok",
+      "measurement": {
+        "cold_load_ms": 12841.26747,
+        "endpoint_to_final_ms": null,
+        "engine": "whisper-small-q8",
+        "first_partial_ms": null,
+        "inference_ms": 0.359296,
+        "model_sha256": "49c8fb02b65e6049d5fa6c04f81f53b867b5ec9540406812c643f177317f779f",
+        "peak_rss_bytes": 355504128,
+        "quantization": "q8_0",
+        "text": "",
+        "threads": 4
+      },
+      "scores": {
+        "character_errors": 0,
+        "reference_characters": 0,
+        "cer": null,
+        "word_errors": 0,
+        "reference_words": 0,
+        "wer": null,
+        "unexpected_text": false
+      },
+      "rtf": 0.00011976533333333334,
+      "process_wall_ms": 13027.35163199759
+    },
+    {
+      "id": "synthetic-noise-3s",
+      "path": "benchmark-noise.wav",
+      "sha256": "8c3a3749dca7907671d4e2bf78f6be397c35b78161b4da8784c35cfd347b5111",
+      "language": "auto",
+      "category": "noise",
+      "reference": "",
+      "duration_s": 3.0,
+      "source": "Taomni deterministic PCM16 control: silence or LCG(1664525,1013904223), seed 1729, amplitude 655/32768. Not human speech.",
+      "license": "CC0-1.0 (generated test signal)",
+      "status": "ok",
+      "measurement": {
+        "cold_load_ms": 11760.594453,
+        "endpoint_to_final_ms": null,
+        "engine": "whisper-small-q8",
+        "first_partial_ms": null,
+        "inference_ms": 29217.816675000002,
+        "model_sha256": "49c8fb02b65e6049d5fa6c04f81f53b867b5ec9540406812c643f177317f779f",
+        "peak_rss_bytes": 654327808,
+        "quantization": "q8_0",
+        "text": "ស្្្្្្",
+        "threads": 4
+      },
+      "scores": {
+        "character_errors": 7,
+        "reference_characters": 0,
+        "cer": null,
+        "word_errors": 1,
+        "reference_words": 0,
+        "wer": null,
+        "unexpected_text": true
+      },
+      "rtf": 9.739272225,
+      "process_wall_ms": 41127.03084000168
+    }
+  ],
+  "aggregates": [
+    {
+      "engine": "whisper-small-q8",
+      "language": "auto",
+      "category": "silence",
+      "samples": 1,
+      "failed": 0,
+      "character_errors": 0,
+      "reference_characters": 0,
+      "word_errors": 0,
+      "reference_words": 0,
+      "unexpected_text_samples": 0,
+      "cer": null,
+      "wer": null
+    },
+    {
+      "engine": "whisper-small-q8",
+      "language": "auto",
+      "category": "noise",
+      "samples": 1,
+      "failed": 0,
+      "character_errors": 7,
+      "reference_characters": 0,
+      "word_errors": 1,
+      "reference_words": 0,
+      "unexpected_text_samples": 1,
+      "cer": null,
+      "wer": null
+    }
+  ],
+  "original_report_sha256": "a985869fd3214593b64f90a9a85ef0c864688bb2d7d00427c9e7bf278da9ea54"
+}
