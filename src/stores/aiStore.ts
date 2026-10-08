@@ -645,8 +645,11 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
     ...config,
     asr: {
       ...DEFAULT_CONFIG.asr,
+      // Preserve stored credentials, custom endpoints and feature proxies.
+      // Defaults only fill providers absent from older configurations.
+      providers: { ...DEFAULT_CONFIG.asr.providers, ...config.asr?.providers },
       download_proxy: config.asr?.download_proxy ?? DEFAULT_CONFIG.asr.download_proxy,
-      mode: config.asr?.mode === "online" ? "online" : "local",
+      mode: ["aliyun", "deepgram", "gemini"].includes(config.asr?.active) ? "online" : "local",
       active: ["whisper-base", "whisper-small", "whisper-medium", "sherpa-zipformer-zh-en", "aliyun", "deepgram", "gemini"].includes(config.asr?.active) ? config.asr.active : "whisper-base",
       language: ["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].includes(config.asr?.language ?? "") ? config.asr.language : "auto",
     },
