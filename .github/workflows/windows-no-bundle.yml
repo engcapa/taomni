@@ -4,6 +4,22 @@ name: Windows No-Bundle Binary
 # bundle), for hand testing. Builds the production identifier in release
 # profile via `pnpm tauri build --no-bundle` and uploads taomni.exe as a
 # workflow artifact.
+#
+# Two variants are built in parallel because current main (sherpa-onnx
+# landed 2026-10-08 in the ASR work) mixes CRT flavours on Windows:
+# sherpa-onnx's prebuilt onnxruntime is MT (static CRT) while whisper-rs
+# builds MD (dynamic CRT), which fails the release link with
+# LNK2038/LNK1169 when both are linked with the default configuration.
+#   - full:      default features, RUSTFLAGS=+crt-static so the Rust and
+#                C/C++ objects align on MT with sherpa's prebuilt libs.
+#   - nosherpa:  default features minus asr-sherpa (whisper + online ASR
+#                stay), the CRT-consistent configuration that the
+#                v0.4.34 release build proved. Fallback if `full` still
+#                fails to link.
+# The SocksCap helper is intentionally not pre-staged here: staging it
+# runs a bare `cargo build` of the whole package (including the cdylib
+# link that fails above) before the app build even starts. WinDivert is
+# still fetched into resources so the bundled resource files are present.
 
 on:
   workflow_dispatch:
@@ -17,9 +33,21 @@ concurrency:
 
 jobs:
   build-windows-no-bundle:
-    name: Windows no-bundle (taomni.exe)
+    name: Windows no-bundle (${{ matrix.variant }})
     runs-on: windows-latest
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: full
+            rustflags: "-C target-feature=+crt-static"
+            build_args: ""
+          - variant: nosherpa
+            rustflags: ""
+            build_args: "-- --no-default-features --features hbase-kerberos,rdp-server-audio,voice-capture,asr-whisper"
+    env:
+      RUSTFLAGS: ${{ matrix.rustflags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +76,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          shared-key: windows-no-bundle-${{ matrix.variant }}
 
       - name: Ensure Strawberry Perl (OpenSSL build)
         shell: pwsh
@@ -98,19 +127,12 @@ jobs:
           Copy-Item -Force (Join-Path $x64 "WinDivert.dll") $dest
           Copy-Item -Force (Join-Path $x64 "WinDivert64.sys") $dest
 
-      - name: Stage Windows SocksCap helper (release)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $true
-          pwsh scripts/stage-sockscap-windows.ps1 -Configuration release
-          pwsh scripts/stage-sockscap-windows.ps1 --check
-
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build standalone binary (no bundle, release)
-        run: pnpm tauri build --no-bundle
+        shell: bash
+        run: pnpm tauri build --no-bundle ${{ matrix.build_args }}
 
       - name: Collect standalone binary
         shell: pwsh
@@ -120,9 +142,10 @@ jobs:
           if (-not (Test-Path $exe)) { throw "Binary not found at $exe" }
           New-Item -ItemType Directory -Force -Path 'no-bundle' | Out-Null
           Copy-Item $exe 'no-bundle/taomni.exe'
-          # Resources (SocksCap helper / WinDivert / xray) sit next to the exe
-          # in the release dir; include them when present so features that
-          # need them work from the same folder.
+          # Resources (WinDivert etc.) sit next to the exe in the release
+          # dir; include them when present so features that need them work
+          # from the same folder. The SocksCap helper exe is not part of
+          # this hand-test build.
           $res = 'src-tauri/target/release/resources'
           if (Test-Path $res) { Copy-Item -Recurse $res 'no-bundle/resources' }
           Get-FileHash 'no-bundle/taomni.exe' -Algorithm SHA256 |
@@ -133,7 +156,7 @@ jobs:
       - name: Upload standalone binary
         uses: actions/upload-artifact@v4
         with:
-          name: taomni-windows-no-bundle-${{ github.sha }}
+          name: taomni-windows-no-bundle-${{ matrix.variant }}-${{ github.sha }}
           path: no-bundle/
           if-no-files-found: error
           retention-days: 14
