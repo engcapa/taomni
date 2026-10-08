@@ -1512,6 +1512,8 @@
 - `[data-testid="workspace-preview-path"]` — interactive — F-Workspace-1.workspace-preview-path
 - `[data-testid="workspace-preview-content"]` — display — F-Workspace-1.workspace-preview-content
 - `[data-testid="workspace-empty-create"]` — interactive — F-Workspace-1.workspace-empty-create
+- `[role="alertdialog"]` — display — F-Workspace-1.workspace-empty-folder-dialog
+- `[role="alertdialog"] button:has-text("Cancel")` — interactive — F-Workspace-1.workspace-empty-folder-dialog-cancel
 - `[data-testid="workspace-delete"]` — interactive — F-Workspace-1.workspace-delete
 - `[data-testid="workspace-delete-confirm"]` — interactive — F-Workspace-1.workspace-delete-confirm
 - `[data-testid="workspace-add-folder"]` — interactive — F-Workspace-1.workspace-add-folder

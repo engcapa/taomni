@@ -150,6 +150,12 @@ controls:
 - id: workspace-empty-create
   selector: '[data-testid="workspace-empty-create"]'
   kind: interactive
+- id: workspace-empty-folder-dialog
+  selector: '[role="alertdialog"]'
+  kind: display
+- id: workspace-empty-folder-dialog-cancel
+  selector: '[role="alertdialog"] button:has-text("Cancel")'
+  kind: interactive
 - id: workspace-delete
   selector: '[data-testid="workspace-delete"]'
   kind: interactive
