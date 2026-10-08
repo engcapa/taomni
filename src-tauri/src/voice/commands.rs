@@ -403,7 +403,9 @@ mod tests {
 
     #[test]
     fn asr_proxy_url_requires_supported_explicit_route() {
-        let proxy = parse_asr_proxy_url("http://user:pass@10.1.0.80:3228").unwrap().unwrap();
+        let proxy = parse_asr_proxy_url("http://user:pass@10.1.0.80:3228")
+            .unwrap()
+            .unwrap();
         assert_eq!(proxy.kind, "http");
         assert_eq!(proxy.host, "10.1.0.80");
         assert_eq!(proxy.port, 3228);

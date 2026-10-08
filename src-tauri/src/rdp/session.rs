@@ -2736,7 +2736,11 @@ fn negotiation_error(error: connector::ConnectorError) -> String {
     }
     format!(
         "rdp negotiation failed{}: {}",
-        if transient { " (transient transport)" } else { "" },
+        if transient {
+            " (transient transport)"
+        } else {
+            ""
+        },
         error.report()
     )
 }
@@ -3032,10 +3036,8 @@ mod tests {
             let message = negotiation_error(error);
             assert!(is_retryable_rdp_error(&message), "{message}");
         }
-        let error = connector::custom_err!(
-            "read frame by hint",
-            std::io::Error::other("invalid PDU")
-        );
+        let error =
+            connector::custom_err!("read frame by hint", std::io::Error::other("invalid PDU"));
         assert!(!is_retryable_rdp_error(&negotiation_error(error)));
     }
 
