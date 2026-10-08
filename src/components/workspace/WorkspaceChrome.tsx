@@ -21,6 +21,13 @@ export function openWorkspaceView(view: WorkspaceView) {
   const workspace = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
   if (!workspace) { useWorkspaceStore.setState({ section: "work", canvas: "workspace" }); useAppStore.getState().setSidebarCollapsed(false); return; }
   state.selectView(view);
+  // Workspace canvas views keep the Work navigator available. Opening a
+  // Files/Changes surface may collapse the shared rail for its editor, so
+  // returning to the canvas must restore the navigator before the next
+  // workspace selection.
+  if (["overview", "preview", "terminal", "tao"].includes(view)) {
+    useAppStore.getState().setSidebarCollapsed(false);
+  }
   if (view === "tao") { void useChatStore.getState().openTabChat(`workspace:${workspace.id}`); return; }
   if (!["files", "changes", "mail"].includes(view)) return;
   if ((view === "files" || view === "changes") && !workspace.roots.length && !workspace.looseFiles.length) return;

@@ -37,6 +37,7 @@ steps:
 - select_option:
     selector: '[data-testid="workspace-navigator"] [data-testid="workspace-add-session"]'
     value: qa-shared-ssh
+- wait_for: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-qa-shared-ssh"]'
 - assert_count:
     selector: '[data-testid="workspace-navigator"] [data-testid="workspace-reference-qa-shared-ssh"]'
     equal: 1
@@ -66,6 +67,8 @@ verification:
       expectation: '{''assert_text'': {''selector'': ''[data-testid="session-tree-item"][data-session-id="qa-shared-ssh"]'',
         ''contains'': ''Used by 1 workspaces''}}'
     - step: 16
+      expectation: '{''wait_for'': ''[data-testid="workspace-navigator"] [data-testid="workspace-reference-qa-shared-ssh"]''}'
+    - step: 17
       expectation: '{''assert_count'': {''selector'': ''[data-testid="workspace-navigator"] [data-testid="workspace-reference-qa-shared-ssh"]'',
         ''equal'': 1}}'
     results:
@@ -74,6 +77,7 @@ verification:
     - 11
     - 12
     - 16
+    - 17
   visual:
   - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
     method: manual
