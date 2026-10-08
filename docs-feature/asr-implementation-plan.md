@@ -1,6 +1,6 @@
 # ASR 后续开发方案（指导 Agent 执行）
 
-- 状态：已定版。2026-10-08 用户确认第 8 节 D1–D10 全部按推荐值定案，按本方案分阶段实施
+- 状态：已定版。2026-10-08 用户先确认 D1–D10 全部按推荐值定案，随后修订其中两项：D3 改为升级一键替换 q8，D4 改为火山与 Soniox 并行接入；其余八项维持推荐定案。按本方案分阶段实施
 - 基线：`main` @ `4c96d552`（v0.4.34，PR #684 `feat/asr-online-api` 合入后）
 - 本文档所在分支：`docs/asr-research-plan`（仅文档，不含代码改动）
 - 证据来源（同目录，均为调研原件，引用数据以原件为准）：
@@ -86,7 +86,7 @@
 1. 接入 SenseVoiceSmall（sherpa-onnx 离线 recognizer，与现有 `asr-sherpa` feature 同一运行时）：新增模型条目（int8，约 229 MB）、安装/校验/状态查询，复用 sherpa 安装器的进度事件模式。
 2. 双路定稿：Zipformer 继续出 partial；端点（现有 endpoint 规则）触发 SenseVoice 对本句音频重解出 final 并替换。SenseVoice 不可用时回退 Zipformer 自身 final（不得回退云端）。
 3. 语种路由：`zh/yue/en/ja/ko` 走 SenseVoice；`es/fr/it` 走 Whisper；`auto` 时先以界面语言/上次语种为先验，LID 只作纠偏。粤语在 SenseVoice 路径按 `yue` 处理，避免 Whisper 老版 `zh` 单标签问题。
-4. Whisper 目录量化改造：新增 Small q8_0（264 MB）为默认 Whisper 档；新增 large-v3-turbo q5_0（574 MB）为高精度可选档（自带粤语码）；Medium f16 下架与存量迁移按 D3 执行。`catalog.rs` 需支持量化条目（现有文档「不要把量化权重混入同一条目」的规则要同步修订为「量化独立条目、独立哈希」）。
+4. Whisper 目录量化改造：新增 Small q8_0（264 MB）为默认 Whisper 档；新增 large-v3-turbo q5_0（574 MB）为高精度可选档（自带粤语码）；Medium f16 下架。存量 f16 按 D3 定案做**升级一键替换**：应用升级后检测到旧 f16 文件时提示一键替换，流程为下载对应 q8 版本 → SHA-256 校验通过 → 删除旧 f16 文件；下载失败、取消或校验不通过时保留旧 f16 不删除，且旧版在替换完成前仍可用。`catalog.rs` 需支持量化条目（现有文档「不要把量化权重混入同一条目」的规则要同步修订为「量化独立条目、独立哈希」）。
 5. 线程策略：PC 端维持上限 4 线程但以 P0 数据复核（线程数、内存带宽拐点）；解码维持 greedy；VAD/端点参数（Zipformer rule1/2/3、SenseVoice 分段）以「端点→final 总延迟 ≤ 500 ms 为目标、静音误触发可控」调参并记录。
 
 涉及文件：`src-tauri/src/asr/{catalog,manager,models}.rs`、`src-tauri/src/voice/{streaming,commands,capture}.rs`、`src-tauri/src/ai/config.rs`、`src/components/settings/AsrPanel.tsx`、`src/stores/aiStore.ts`、`src/stubs/`、对应 `*.test.*` 与 `qa-ui-auto-tests/cases/TC-VOICE-*` 扩展（含 policy 同步，见第 7 节）。
@@ -97,7 +97,7 @@
 
 任务：
 1. 新增火山引擎 Seed-ASR 2.0（`bigmodel_async` 模式）：实现其二进制 WebSocket 帧协议（4 字节头 + gzip JSON），热词表 ≤ 2000 词映射；接入前先在控制台核实其现行计费（原件 01 中其价格未核实，不得按传闻实现计费相关逻辑）。
-2. Soniox 试点接入（同一契约）：作为海外低价通道，与 Deepgram 在 P0 音频集上做中英混说 A/B，结论写回裁决记录后再定默认。
+2. Soniox 接入（同一契约，与火山并行，D4 定案）：作为海外低价通道，与 Deepgram 在 P0 音频集上做中英混说 A/B，结论写回裁决记录后再定海外默认。
 3. 热词通道打通：配置层新增供应商中立的热词列表（代码术语/人名/路径），分别映射 Deepgram keyterm、阿里热词、火山热词表；本地 SenseVoice/Zipformer 的热词能力以 P0 实测为准，不承诺未验证能力。
 4. 会话计费防护：所有在线后端按「一次听写一条连接、空闲即断」实现，禁止常驻热连接；若未来接按会话计费的供应商（如 AssemblyAI）必须先过评审。
 5. Gemini Live 按 D5 定案降为实验项：保留代码，默认供应商列表中隐藏。
@@ -132,7 +132,7 @@
 | 流式 partial | Zipformer 双语 int8（现有） | 以现有安装器目录为准 | 中/英 |
 | 下架 | Whisper Medium f16（1.53 GB） | — | 被 turbo q5_0 以 1/3 体积支配 |
 | 在线国内 | 阿里 Paraformer（现有）+ 火山 Seed-ASR 2.0（P2 新增） | — | 中/粤/方言/英 |
-| 在线海外 | Deepgram Nova-3（现有）+ Soniox（P2 试点） | — | 英为主、中英混说 |
+| 在线海外 | Deepgram Nova-3（现有）+ Soniox（P2，与火山并行接入） | — | 英为主、中英混说 |
 
 ## 7. 验证与推送门禁（仓库既有规则，后续 Agent 必须执行）
 
@@ -143,14 +143,14 @@
 
 ## 8. 用户决策（已定案，2026-10-08）
 
-2026-10-08 用户确认 D1–D10 全部按推荐值定案。后续 Agent 按定案执行；如需变更任一项，必须由用户重新明确，不得自行推翻后宣称已定。
+2026-10-08 用户确认 D1–D10 全部按推荐值定案，同日修订 D3、D4 两项（以本表定案列为准）。后续 Agent 按定案执行；如需变更任一项，必须由用户重新明确，不得自行推翻后宣称已定。
 
 | 编号 | 决策 | 定案 | 影响阶段 |
 | --- | --- | --- | --- |
 | D1 | 默认下载策略 | **组合 A**：SenseVoiceSmall int8（229 MB）+ Whisper Small q8_0（264 MB）= 493 MB 为默认组合；单模型场景用 Whisper Small q8_0 | P1 |
 | D2 | SenseVoice 权重许可证 | **接受** FunASR Model License v1.1，分发方式限定为：应用不打包权重，仅按需从官方源下载，并在设置页标注许可证 | P1 |
-| D3 | Whisper 存量 f16 迁移 | **保留可用**：新目录只提供 q8/q5，老 f16 文件保留可用但不再推荐，用户手动重下，不做强制替换/删除 | P1 |
-| D4 | 在线新增顺序 | **先火山 Seed-ASR**（国内优先），Soniox 随后试点 | P2 |
+| D3 | Whisper 存量 f16 迁移 | **升级一键替换 q8**（用户 2026-10-08 修订，覆盖原推荐定案）：升级后检测到旧 f16 时提示一键替换，下载对应 q8 并校验通过后删除旧 f16；失败/取消/校验不通过则保留旧文件，替换完成前旧版仍可用 | P1 |
+| D4 | 在线新增顺序 | **火山 Seed-ASR 与 Soniox 并行接入**（用户 2026-10-08 修订，覆盖原推荐定案） | P2 |
 | D5 | Gemini Live 去留 | **降为实验项**：保留代码，默认供应商列表中隐藏 | P2 |
 | D6 | LLM 清理默认档 | **默认关**，用户手动开启（关/轻/全三档保留） | P3 |
 | D7 | 移动端启动时机与形态 | **PC 的 P1/P2 完成后再立项**，移动端形态届时另行设计 | P4 |
