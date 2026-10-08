@@ -91,6 +91,22 @@ controls:
   selector: '[data-testid="workspace-context-close"]'
   kind: interactive
   optional: true
+- id: workspace-dialog-drag-handle
+  selector: '[data-testid="workspace-dialog-drag-handle"]'
+  kind: interactive
+  optional: true
+- id: workspace-dialog-resize-handle
+  selector: '[data-testid="workspace-dialog-resize-handle"]'
+  kind: interactive
+  optional: true
+- id: workspace-dialog-close
+  selector: '[data-testid="workspace-dialog-close"]'
+  kind: interactive
+  optional: true
+- id: workspace-dialog-backdrop
+  selector: '[data-testid="workspace-dialog-backdrop"]'
+  kind: display
+  optional: true
 - id: workspace-preview-load
   selector: '[data-testid="workspace-preview-load"]'
   kind: interactive

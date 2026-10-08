@@ -2,7 +2,7 @@ import { useT } from "../../lib/i18n";
 import { PanelsTopLeft, PanelRight, X } from "lucide-react";
 import { WorkspacePreview } from "./WorkspacePreview";
 import { TabBar, type TabBarProps } from "../tabbar/TabBar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAppStore } from "../../stores/appStore";
@@ -141,7 +141,10 @@ export function WorkspaceDialogs({ onCommand, onConnectSession }: { onCommand: (
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+  const interaction = useRef<{ mode: "drag" | "resize"; startX: number; startY: number; left: number; top: number; width: number; height: number } | null>(null);
+  const [dialogFrame, setDialogFrame] = useState<{ left?: number; top?: number; width: number; height?: number }>({ width: 560 });
   const open = state.createDialogOpen || state.commandCenterOpen;
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -157,19 +160,56 @@ export function WorkspaceDialogs({ onCommand, onConnectSession }: { onCommand: (
     if (open) { previousFocus.current = document.activeElement as HTMLElement; input.current?.focus(); }
     else previousFocus.current?.focus();
   }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    setDialogFrame({ width: Math.min(560, Math.max(360, window.innerWidth - 24)) });
+  }, [open, state.createDialogOpen]);
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      const current = interaction.current;
+      if (!current) return;
+      if (current.mode === "drag") {
+        const left = Math.max(12, Math.min(window.innerWidth - 180, current.left + event.clientX - current.startX));
+        const top = Math.max(12, Math.min(window.innerHeight - 80, current.top + event.clientY - current.startY));
+        setDialogFrame((frame) => ({ ...frame, left, top }));
+      } else {
+        const width = Math.max(360, Math.min(window.innerWidth - 24, current.width + event.clientX - current.startX));
+        const height = Math.max(180, Math.min(window.innerHeight - 24, current.height + event.clientY - current.startY));
+        setDialogFrame((frame) => ({ ...frame, width, height }));
+      }
+    };
+    const onUp = () => { interaction.current = null; document.body.style.cursor = ""; };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
+  }, []);
   if (!open) return null;
   const close = () => { useWorkspaceStore.setState({ createDialogOpen: false, commandCenterOpen: false }); setError(""); };
   const match = (text: string) => text.toLowerCase().includes(query.toLowerCase());
-  return <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] bg-black/40" onClick={close} onKeyDown={(e) => { if (e.key === "Escape") close(); }}>
-    <div role="dialog" aria-modal="true" aria-label={state.createDialogOpen ? t("workspace.newWorkspace") : t("workspace.commandCenter")} data-testid={state.createDialogOpen ? "workspace-create-dialog" : "command-center"} className="w-[560px] max-w-[calc(100vw-24px)] max-h-[75vh] overflow-auto rounded-lg p-4 shadow-xl bg-[var(--taomni-bg)]" onClick={(e) => e.stopPropagation()} onKeyDown={(event) => {
+  const beginInteraction = (mode: "drag" | "resize", event: ReactPointerEvent) => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const rect = dialog.getBoundingClientRect();
+    interaction.current = { mode, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    setDialogFrame({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+    document.body.style.cursor = mode === "drag" ? "grabbing" : "nwse-resize";
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  return <div data-testid="workspace-dialog-backdrop" className="fixed inset-0 z-[100] bg-black/40" onClick={close} onKeyDown={(e) => { if (e.key === "Escape") close(); }}>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={state.createDialogOpen ? t("workspace.newWorkspace") : t("workspace.commandCenter")} data-testid={state.createDialogOpen ? "workspace-create-dialog" : "command-center"} className="absolute max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-auto rounded-lg p-4 shadow-xl bg-[var(--taomni-bg)]" style={{ width: dialogFrame.width, height: dialogFrame.height, left: dialogFrame.left ?? "50%", top: dialogFrame.top ?? "12vh", transform: dialogFrame.left === undefined ? "translateX(-50%)" : undefined }} onClick={(e) => e.stopPropagation()} onKeyDown={(event) => {
       if (event.key !== "Tab") return;
       const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')];
       const first = controls[0]; const last = controls.at(-1);
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}>
+      <div data-testid="workspace-dialog-drag-handle" className="flex items-center gap-2 mb-3 select-none cursor-grab" onPointerDown={(event) => beginInteraction("drag", event)}>
+        <h2 className="font-semibold flex-1">{state.createDialogOpen ? t("workspace.newWorkspace") : t("workspace.commandCenter")}</h2>
+        <button type="button" data-testid="workspace-dialog-close" aria-label={t("common.close")} className="rounded p-1 hover:bg-[var(--taomni-hover)]" onClick={close}><X className="w-4 h-4" /></button>
+      </div>
       {state.createDialogOpen ? <form onSubmit={(e) => { e.preventDefault(); setBusy(true); void state.create(name).then(() => { setName(""); close(); }).catch((e) => setError(String(e))).finally(() => setBusy(false)); }}>
-        <h2 className="font-semibold mb-3">{t("workspace.newWorkspace")}</h2><input ref={input} data-testid="workspace-name-input" aria-label={t("workspace.name")} className="taomni-input w-full" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("workspace.name")} />
+        <input ref={input} data-testid="workspace-name-input" aria-label={t("workspace.name")} className="taomni-input w-full" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("workspace.name")} />
         {error && <p role="alert">{error}</p>}<div className="flex gap-2 mt-3"><button data-testid="workspace-create-submit" disabled={busy || !name.trim()} className={button}>{t("workspace.create")}</button><button type="button" className={button} onClick={() => { close(); onCommand("new-session"); }}>{t("workspace.newSessionInstead")}</button><button type="button" className={button} onClick={close}>Cancel</button></div>
       </form> : <>
         <input ref={input} data-testid="command-center-search" aria-label="Search commands, workspaces and sessions" className="taomni-input w-full mb-3" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("workspace.commandsPlaceholder")} />
@@ -177,8 +217,8 @@ export function WorkspaceDialogs({ onCommand, onConnectSession }: { onCommand: (
         {sessions.filter((s) => match(s.name)).map((s) => <button key={s.id} className={`${button} block w-full text-left`} onClick={() => { close(); onConnectSession(s); }}>Session · {s.name}</button>)}
         {views.filter(match).map((view) => <button key={view} className={`${button} block w-full text-left capitalize`} onClick={() => { close(); openWorkspaceView(view); }}>Surface · {view}</button>)}
         {(["servers", "tools", "mfa", "lan-chat", "settings", "new-session"] as AppCommand[]).filter(match).map((command) => <button key={command} className={`${button} block w-full text-left`} onClick={() => { close(); onCommand(command); }}>Global · {command}</button>)}
-        <button className={button} onClick={close}>Close</button>
       </>}
+      <div data-testid="workspace-dialog-resize-handle" role="separator" aria-orientation="horizontal" aria-label="Resize dialog" className="absolute right-1 bottom-1 h-3 w-3 cursor-nwse-resize" onPointerDown={(event) => beginInteraction("resize", event)} />
     </div>
   </div>;
 }

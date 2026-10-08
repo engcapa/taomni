@@ -1,0 +1,148 @@
+id: TC-WS-015
+title: Workspace shell controls, dialog drag/resize/close and scoped context pane
+description: Browser coverage for the Workspace-first shell's high frequency controls. It checks that the new-workspace and command dialogs stay usable at desktop width, expose stable drag/resize/close affordances, and preserve the workspace canvas when the context pane is toggled.
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- shell-layout
+- dialog
+- splitter
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-navigator"]'
+- click: '[data-testid="workspace-create"]'
+- wait_for: '[data-testid="workspace-create-dialog"]'
+- assert_visible: '[data-testid="workspace-dialog-drag-handle"]'
+- assert_visible: '[data-testid="workspace-dialog-resize-handle"]'
+- assert_visible: '[data-testid="workspace-dialog-close"]'
+- assert_visible: '[data-testid="workspace-name-input"]'
+- eval_readonly:
+    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create-dialog"]')?.getBoundingClientRect().width) > 359
+    expect_truthy: true
+- drag_to:
+    from: '[data-testid="workspace-dialog-resize-handle"]'
+    to: '[data-testid="workspace-create-dialog"]'
+- eval_readonly:
+    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create-dialog"]')?.getBoundingClientRect().width) > 359
+    expect_truthy: true
+- drag_to:
+    from: '[data-testid="workspace-dialog-drag-handle"]'
+    to: '[data-testid="workspace-create-dialog"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create-dialog"]')?.style.left !== ""
+    expect_truthy: true
+- click: '[data-testid="workspace-dialog-close"]'
+- assert_count:
+    selector: '[data-testid="workspace-create-dialog"]'
+    equal: 0
+- click: '[data-testid="workspace-create"]'
+- wait_for: '[data-testid="workspace-create-dialog"]'
+- fill:
+    selector: '[data-testid="workspace-name-input"]'
+    value: UI Interaction Fixture
+- click: '[data-testid="workspace-create-submit"]'
+- wait_for: '[data-testid="workspace-header"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: UI Interaction Fixture
+- press:
+    key: Control+k
+- wait_for: '[data-testid="command-center"]'
+- assert_visible: '[data-testid="workspace-dialog-drag-handle"]'
+- assert_visible: '[data-testid="workspace-dialog-resize-handle"]'
+- fill:
+    selector: '[data-testid="command-center-search"]'
+    value: QA Main
+- click: '[data-testid="command-center"] button'
+- assert_count:
+    selector: '[data-testid="command-center"]'
+    equal: 0
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-context-toggle"]'
+- wait_for: '[data-testid="workspace-context-pane"]'
+- assert_visible: '[data-testid="workspace-context-close"]'
+- click: '[data-testid="workspace-context-close"]'
+- assert_count:
+    selector: '[data-testid="workspace-context-pane"]'
+    equal: 0
+- screenshot: workspace-shell-interactions.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Workspace dialog controls remain reachable and the dialog can be resized, dragged and explicitly closed.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 10
+    - 12
+    - 14
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 23
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
+    checkpoints:
+    - step: 4
+      expectation: Workspace dialog is open.
+    - step: 9
+      expectation: Dialog has a usable width.
+    - step: 11
+      expectation: Resize drag keeps the dialog above its minimum width.
+    - step: 13
+      expectation: Dragging the dialog header switches it to an explicit positioned frame.
+    - step: 15
+      expectation: Explicit close removes the dialog.
+    - step: 21
+      expectation: The created workspace is visible in the navigator.
+    - step: 23
+      expectation: Command Center is open.
+    - step: 28
+      expectation: Command Center action closes the popup after selecting a result.
+    - step: 31
+      expectation: Context pane is open.
+    - step: 32
+      expectation: Context pane close affordance is visible.
+    - step: 34
+      expectation: Context pane closes and leaves the workspace canvas usable.
+    results:
+    - 4
+    - 9
+    - 11
+    - 13
+    - 15
+    - 21
+    - 23
+    - 28
+    - 31
+    - 32
+    - 34
+  visual:
+  - check: Dialog width, input affordance, shell spacing, rail density and context pane close affordance remain legible without clipping or crowding.
+    method: manual
+    reason: Screenshot evidence needs human visual review.
+  native:
+  - check: This case is renderer-only; native window and IPC behavior remain covered by workspace native companion cases.
+    method: external
+    reason: Browser evidence does not certify native boundaries.
