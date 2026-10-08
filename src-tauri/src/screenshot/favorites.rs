@@ -90,6 +90,35 @@ fn add(root: &Path, src: &Path) -> anyhow::Result<ScreenshotFavorite> {
     Ok(favorite)
 }
 
+/// Rewrite `info.json` so the next read observes the new note atomically;
+/// missing legacy fields keep their serde defaults.
+fn write(root: &Path, item: &ScreenshotFavorite) -> anyhow::Result<()> {
+    let dir = entry_dir(root, &item.id)?;
+    let staging = dir.join(".info.json.pending");
+    std::fs::write(&staging, serde_json::to_vec(item)?)?;
+    std::fs::rename(&staging, dir.join("info.json"))?;
+    Ok(())
+}
+
+/// Store `note` on the favorite with `id` and return the updated entry.
+pub fn update_note(root: &Path, id: &str, note: &str) -> anyhow::Result<ScreenshotFavorite> {
+    let mut item = read(root, id)?;
+    item.note = note.to_string();
+    write(root, &item)?;
+    Ok(item)
+}
+
+/// Update a favorite's note from an IPC context; failures (a removed favorite,
+/// for instance) are reported to the caller, which may ignore them.
+pub fn sync_favorite_note(
+    app: &AppHandle,
+    id: &str,
+    note: &str,
+) -> anyhow::Result<ScreenshotFavorite> {
+    let _guard = STORAGE.lock().unwrap_or_else(|e| e.into_inner());
+    update_note(&root(app)?, id, note)
+}
+
 #[tauri::command]
 pub async fn screenshot_list_favorites(app: AppHandle) -> Result<Vec<ScreenshotFavorite>, String> {
     blocking("list favorites", move || {
@@ -108,17 +137,13 @@ pub async fn screenshot_add_favorite(
         let _guard = STORAGE.lock().unwrap_or_else(|e| e.into_inner());
         let root = root(&app)?;
         let mut item = add(&root, &capture::ensure_artifact_path(&path)?)?;
-        let note = super::tool_state()
+        item.note = super::tool_state()
             .pins
             .values()
             .find(|pin| pin.path == path)
             .map(|pin| pin.note.clone())
             .unwrap_or_default();
-        item.note = note;
-        std::fs::write(
-            entry_dir(&root, &item.id)?.join("info.json"),
-            serde_json::to_vec(&item)?,
-        )?;
+        write(&root, &item)?;
         Ok(item)
     })
     .await
@@ -213,5 +238,23 @@ mod tests {
         }
         assert!(add(temp.path(), &temp.path().join("missing.png")).is_err());
         assert!(list(temp.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn note_updates_persist_and_invalid_ids_are_rejected() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("favorites");
+        let src = temp.path().join("source.png");
+        image::RgbaImage::new(4, 4).save(&src).unwrap();
+        let favorite = add(&root, &src).unwrap();
+        let updated = update_note(&root, &favorite.id, "login page").unwrap();
+        assert_eq!(updated.note, "login page");
+        assert_eq!(list(&root).unwrap()[0].note, "login page");
+        // A fresh read from disk (not just the returned clone) keeps the note.
+        assert_eq!(read(&root, &favorite.id).unwrap().note, "login page");
+        for id in ["../escape", "not-an-id"] {
+            assert!(update_note(&root, id, "x").is_err());
+        }
+        assert_eq!(read(&root, &favorite.id).unwrap().note, "login page");
     }
 }

@@ -26,6 +26,10 @@ on:
         description: 'Linux native profiles (CSV): ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland'
         type: string
         default: ubuntu-24.04-xvfb
+      native_release:
+        description: Use release QA builds for selected native cases (reuse full-run caches)
+        type: boolean
+        default: false
       case_ids:
         description: Exact case IDs (selected, or additions to impacted)
         type: string
@@ -47,6 +51,7 @@ on:
       platforms: {type: string, default: 'linux,windows,macos'}
       modes: {type: string, default: 'browser,native'}
       linux_profiles: {type: string, default: 'ubuntu-24.04-xvfb'}
+      native_release: {type: boolean, default: false}
       case_ids: {type: string, default: ''}
       features: {type: string, default: ''}
       tags: {type: string, default: ''}
@@ -120,7 +125,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -136,6 +141,7 @@ jobs:
           QA_PLATFORMS: ${{ inputs.platforms }}
           QA_MODES: ${{ inputs.modes }}
           QA_LINUX_PROFILES: ${{ inputs.linux_profiles }}
+          QA_NATIVE_RELEASE: ${{ inputs.native_release }}
           QA_CASE_IDS: ${{ inputs.case_ids }}
           QA_FEATURES: ${{ inputs.features }}
           QA_TAGS: ${{ inputs.tags }}
@@ -154,7 +160,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       # The QA app inherits tauri-driver's startup environment. Fixture setup
       # happens later, so enable reference-client diagnostics before the driver.
@@ -200,18 +206,6 @@ jobs:
           # rust-cache ignores `key` when `shared-key` is also supplied.
           cache-targets: false
           cache-on-failure: true
-      - name: Native QA workspace cache
-        if: matrix.mode == 'native'
-        uses: actions/cache@v4
-        with:
-          path: src-tauri/target/qa-ui-auto
-          # A new revision saves its workspace crates instead of hitting an
-          # immutable dependency cache. Separate debug/release workloads so
-          # a quick debug run cannot prevent saving the RDP release build.
-          key: qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-${{ needs.plan.outputs.head }}
-          restore-keys: |
-            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
-            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
       - name: Windows build tools and WebView2 driver
         if: runner.os == 'Windows' && matrix.mode == 'native'
         shell: pwsh
@@ -231,7 +225,7 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
           $driver >> $env:GITHUB_PATH
-          if ('${{ contains(matrix.capabilities, 'rdp') }}' -eq 'true') {
+          if ('${{ contains(matrix.capabilities, 'mstsc') }}' -eq 'true') {
             $dumpZip = Join-Path $env:RUNNER_TEMP 'qa-procdump.zip'
             $dumpTools = Join-Path $env:RUNNER_TEMP 'qa-procdump'
             Invoke-WebRequest 'https://download.sysinternals.com/files/Procdump.zip' -OutFile $dumpZip
@@ -255,37 +249,30 @@ jobs:
           choco install tesseract --yes --no-progress
           if ($LASTEXITCODE -ne 0) { throw 'Tesseract installation failed' }
           'C:\Program Files\Tesseract-OCR' >> $env:GITHUB_PATH
-      # RDP audio cases (rdp_audio_required): hosted Windows/macOS runners have
-      # no audio output. This installs VB-CABLE (Windows, devcon with its
-      # publisher certificate trusted) or Background Music (macOS); the fixture
-      # only verifies the device. Linux uses PipeWire packages above.
-      - name: Virtual audio output
-        if: runner.os != 'Linux' && contains(matrix.capabilities, 'audio')
+      # Hosted audio cases need a loopback device. BlackHole has no controller
+      # app or microphone consent sheet to cover capture fixtures on macOS.
+      - name: Windows virtual audio output
+        if: runner.os == 'Windows' && contains(matrix.capabilities, 'audio')
         uses: LABSN/sound-ci-helpers@d08c889a7bba7d9b1b059f8f76dac4672ea3a9cf # v1.0.4
-      - name: Keep macOS virtual audio without its desktop controller
+      - name: macOS virtual audio output
         if: runner.os == 'macOS' && contains(matrix.capabilities, 'audio')
         run: |
-          # The package installer opens the controller, whose microphone
-          # consent dialog otherwise covers screenshot fixtures and steals
-          # OS input. The HAL loopback driver works independently of this UI.
-          bgm_executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' '/Applications/Background Music.app/Contents/Info.plist')
-          /usr/bin/pkill -TERM -x "$bgm_executable" || [[ $? -eq 1 ]]
-          for attempt in {1..25}; do
-            /usr/bin/pgrep -x "$bgm_executable" >/dev/null || break
-            sleep 0.2
-          done
-          if /usr/bin/pgrep -x "$bgm_executable" >/dev/null; then
-            echo 'Background Music desktop controller did not exit' >&2
-            exit 1
-          fi
-          python - <<'PY'
+          brew install --cask blackhole-2ch
+          sudo launchctl kickstart -kp system/com.apple.audio.coreaudiod
+          python - <<'PYTHON'
+          import time
           from qa_ui_auto.fixtures.rdp_audio_required import _CoreAudio
-          audio = _CoreAudio()
-          outputs = [audio.name(device) for device in audio.devices() if audio.has_output(device)]
-          if not any('Background Music' in name for name in outputs):
-              raise SystemExit('Background Music HAL output unavailable after controller exit')
-          print('HAL outputs after controller exit:', outputs)
-          PY
+          deadline = time.monotonic() + 30
+          while True:
+              audio = _CoreAudio()
+              outputs = [audio.name(device) for device in audio.devices() if audio.has_output(device)]
+              if any('BlackHole' in name for name in outputs):
+                  print('HAL outputs:', outputs)
+                  break
+              if time.monotonic() >= deadline:
+                  raise SystemExit('BlackHole HAL output unavailable')
+              time.sleep(0.5)
+          PYTHON
       - name: macOS build dependencies
         if: runner.os == 'macOS' && matrix.mode == 'native'
         run: |
@@ -324,20 +311,52 @@ jobs:
           QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
         run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
       - name: Windows mstsc startup diagnostic
-        if: runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        if: runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'mstsc')
         run: >-
           python -m qa_ui_auto.rdp_helpers.mstsc
           --preflight 'qa-ui-auto-report/${{ matrix.id }}/mstsc-startup'
       - name: Retain the mstsc startup diagnostic before compiling
-        if: always() && runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        if: always() && runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'mstsc')
         uses: actions/upload-artifact@v4
         with:
           name: qa-windows-mstsc-startup-${{ needs.plan.outputs.artifact_key }}
           path: qa-ui-auto-report/${{ matrix.id }}/mstsc-startup/
           if-no-files-found: error
           retention-days: 14
+      - name: Native QA build input identity
+        id: native-cache-key
+        if: matrix.mode == 'native'
+        env:
+          QA_RELEASE: ${{ contains(matrix.capabilities, 'release') }}
+        run: |
+          python - <<'PYTHON'
+          import hashlib, json, os
+          from native_build import build_inputs
+          inputs = build_inputs(release=os.environ["QA_RELEASE"] == "true")
+          key = hashlib.sha256(json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"key={key}\n")
+          PYTHON
+      - name: Native QA workspace cache
+        if: matrix.mode == 'native'
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target/qa-ui-auto
+          # Test/runner-only revisions share the same verified app build.
+          # New source, recipe, toolchain or build environment gets a new key.
+          # Restore prefixes retain useful crates from older build inputs.
+          key: qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-inputs-${{ steps.native-cache-key.outputs.key }}
+          restore-keys: |
+            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
+            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
       - name: RDP unit contracts on the native platform
-        if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        # The IronRDP unit contracts are platform-independent. Run the
+        # expensive release test matrix once on the Linux representative;
+        # Windows/macOS still execute their real release native RDP cases and
+        # startup diagnostics below. This removes a 30–50 minute duplicate
+        # Rust test build from each non-Linux native job without changing any
+        # release app build or product evidence.
+        if: matrix.rdp_unit_contracts
         env:
           CARGO_TARGET_DIR: target/qa-ui-auto
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'

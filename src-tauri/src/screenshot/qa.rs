@@ -247,6 +247,18 @@ async fn open_fixture(
         tokio::time::sleep(Duration::from_millis(300)).await;
     }
     let display = capture::resolve_display(app, None)?;
+    // Keep the fixture above the X11 main surface, but use the same hidden
+    // window ledger as capture. Closing the real tool must restore the app;
+    // fixture cleanup must not manufacture a passing lifecycle assertion.
+    if cfg!(target_os = "linux")
+        && std::env::var_os("DISPLAY").is_some()
+        && std::env::var_os("WAYLAND_DISPLAY").is_none()
+    {
+        super::hide_app_windows(app);
+        super::await_hidden_windows(app)
+            .await
+            .map_err(anyhow::Error::msg)?;
+    }
     let s = display.scale_factor.max(0.5);
     let url = WebviewUrl::App(format!("index.html#screenshot-qa-{route}").into());
     let window = super::window_builder(app, QA_WINDOW_LABEL, url)
@@ -259,6 +271,13 @@ async fn open_fixture(
         .focused(true)
         .build()
         .context("open QA fixture window")?;
+    // X11/LXQt and Xtigervnc can map a newly created WebView below the main
+    // surface even when the builder requests focus/topmost. Re-assert both
+    // after mapping so the OS capture region contains this fixture rather
+    // than the stale window underneath it.
+    let _ = window.show();
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_focus();
     let ready = run_js(
         &window,
         "const ready = () => { const root = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return !!root && (!root.querySelector('canvas') || root.dataset.sourceReady === 'true'); }; for (let i = 0; i < 100 && !ready(); i++) await new Promise((r) => setTimeout(r, 100)); return ready();",
@@ -270,7 +289,7 @@ async fn open_fixture(
     }
     let _ = window.set_focus();
     // Let the window manager map and raise it.
-    tokio::time::sleep(Duration::from_millis(700)).await;
+    tokio::time::sleep(Duration::from_millis(1200)).await;
     if route == "anim" {
         // A previous scroll scenario leaves the OS cursor over the fixture.
         // CoreGraphics snapshots include it even when a different WebView has
@@ -298,6 +317,12 @@ async fn open_fixture(
 fn close_fixture(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(QA_WINDOW_LABEL) {
         let _ = window.destroy();
+    }
+    if cfg!(target_os = "linux")
+        && std::env::var_os("DISPLAY").is_some()
+        && std::env::var_os("WAYLAND_DISPLAY").is_none()
+    {
+        super::restore_app_windows(app);
     }
 }
 

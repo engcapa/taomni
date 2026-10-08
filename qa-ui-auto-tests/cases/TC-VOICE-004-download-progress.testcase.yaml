@@ -1,0 +1,58 @@
+id: TC-VOICE-004
+title: Pinned links, restored model progress, cancel and resume in a responsive modal
+covers: [F-AI-2.3]
+tags: [ai, voice, download, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 100
+steps:
+- open: '${cfg.app.base_url}/?voiceFixture=1&voiceDownloadSlow=1'
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="asr-download-url-whisper-base"]'
+- assert_attribute: {selector: '[data-testid="asr-download-url-whisper-base"]', name: href, equals: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.bin?download=true'}
+- click: '[data-testid="asr-copy-url-whisper-base"]'
+- assert_text: {selector: '[data-testid="asr-copy-url-whisper-base"]', contains: Copied}
+- assert_element_geometry: {selector: '[data-testid="voice-settings-dialog"]', min_width: 850, min_height: 400, viewport_margin: 8}
+- screenshot: model-download-layout.png
+- click: '[data-testid="asr-download-whisper-base"]'
+- wait_for: '[data-testid="asr-installation-progress"]'
+- assert_text: {selector: '[data-testid="asr-installation-progress"]', contains: '14.8 /', timeout_sec: 5}
+- click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="ptt-button"]'
+- assert_text: {selector: '[data-testid="asr-installation-progress"]', contains: Downloading}
+- assert_attribute: {selector: '[data-testid="asr-download-whisper-base"]', name: disabled, equals: ''}
+- screenshot: restored-download-progress.png
+- click: '[data-testid="asr-cancel-download"]'
+- assert_text: {selector: '[data-testid="asr-installation-progress"]', contains: 'Download cancelled'}
+- assert_text: {selector: '[data-testid="asr-download-whisper-base"]', contains: Resume download}
+- click: '[data-testid="asr-download-whisper-base"]'
+- assert_text: {selector: '[data-testid="asr-installation-progress"]', contains: 'Downloaded and verified', timeout_sec: 20}
+- assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: Downloaded}
+- set_viewport: {width: 620, height: 760}
+- assert_element_geometry: {selector: '[data-testid="voice-settings-dialog"]', min_width: 550, min_height: 400, viewport_margin: 8}
+- screenshot: model-download-narrow.png
+- assert_element_geometry: {selector: '[data-testid="voice-settings-close"]', min_width: 28, min_height: 26, icon_size: 16, tolerance: 2, viewport_margin: 8}
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Official links are copyable, background progress survives reopening, active downloads cannot be duplicated, and cancelled downloads can be resumed.
+    actions: [3, 6, 10, 13, 14, 18, 21, 24]
+    checkpoints:
+    - {step: 5, expectation: Link matches the pinned official artifact.}
+    - {step: 7, expectation: Copy reports success.}
+    - {step: 8, expectation: Wide modal fits the viewport.}
+    - {step: 15, expectation: Reopened modal restores the active download.}
+    - {step: 16, expectation: Duplicate download is disabled.}
+    - {step: 19, expectation: Cancellation is shown.}
+    - {step: 20, expectation: Partial data can be resumed.}
+    - {step: 22, expectation: Resume completes and verifies.}
+    - {step: 25, expectation: Narrow viewport modal remains inside the screen.}
+    - {step: 27, expectation: Close icon remains visible and clickable in the narrow modal.}
+    results: [5, 7, 8, 15, 16, 19, 20, 22, 25, 27]
+  visual:
+  - {check: "Model cards, progress and narrow layout", method: manual, reason: Inspect the three retained screenshots.}
+  native:
+  - {check: "Range requests, cancellation and hash publication", method: external, reason: Rust local-server tests exercise real file transfer; browser uses explicit delayed fixture.}
+  - {check: System browser and clipboard, method: manual, reason: UI tests check exact IPC URL and existing shared helpers; Win11 OS opening and clipboard need a real desktop check.}

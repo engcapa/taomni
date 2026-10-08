@@ -180,7 +180,18 @@ class Desktop:
             (config / "lxqt").mkdir(parents=True)
             (config / "lxqt/session.conf").write_text("[General]\nwindow_manager=openbox\n", encoding="utf-8")
             (config / "autostart").mkdir()
-            (config / "autostart/fcitx5.desktop").write_text("[Desktop Entry]\nHidden=true\n", encoding="utf-8")
+            # Build time can exceed the distro idle timeout before any case
+            # sends native input. Prevent screen savers/lockers from starting
+            # in this disposable session; never unlock an existing desktop.
+            disabled = {"fcitx5.desktop", "xscreensaver.desktop", "lxqt-powermanagement.desktop"}
+            for directory in os.environ.get("XDG_CONFIG_DIRS", "/etc/xdg").split(":"):
+                for entry in (Path(directory) / "autostart").glob("*.desktop"):
+                    content = entry.read_text(encoding="utf-8", errors="replace").lower()
+                    if any(name in content for name in ("xscreensaver", "light-locker", "xss-lock", "lxqt-powermanagement")):
+                        disabled.add(entry.name)
+            for name in sorted(disabled):
+                (config / "autostart" / name).write_text("[Desktop Entry]\nHidden=true\n", encoding="utf-8")
+            facts["disabled_autostart"] = sorted(disabled)
             self.start(["lxqt-session"], env={**os.environ, "XDG_CONFIG_HOME": str(config),
                                             "XDG_CURRENT_DESKTOP": "LXQt"})
         else:
@@ -192,12 +203,18 @@ class Desktop:
             time.sleep(0.25)
         else:
             raise RuntimeError("window manager did not register EWMH")
-        facts.update(display=os.environ["DISPLAY"], wm=wm.strip(), input_transport="X11/WebDriver")
         if "display" in self.capabilities and profile.compositor == "xcompmgr":
             compositor = self.start(["xcompmgr", "-n"])
             time.sleep(0.25)
             if compositor.poll() is not None:
                 raise RuntimeError("desktop compositor exited during startup")
+        # X11's own idle blanking is independent of the desktop's screen saver.
+        subprocess.run(["xset", "s", "off"], check=True, timeout=10)
+        subprocess.run(["xset", "s", "noblank"], check=True, timeout=10)
+        # Virtual X servers may not expose DPMS; retain the probe result.
+        dpms = subprocess.run(["xset", "-dpms"], capture_output=True, text=True, timeout=10)
+        facts.update(display=os.environ["DISPLAY"], wm=wm.strip(), input_transport="X11/WebDriver",
+                     idle_blanking=False, dpms_disabled=dpms.returncode == 0)
         subprocess.run([sys.executable, "-c", "import tkinter as t; w=t.Tk(); w.update(); w.destroy()"], check=True)
         if "ime" in self.capabilities:
             self._ime(facts)
@@ -207,6 +224,15 @@ class Desktop:
         config = self.root / "ime-config"
         directory = config / "fcitx5"
         directory.mkdir(parents=True, exist_ok=True)
+        # The disposable desktop provides IME through native_ime_keys, which
+        # explicitly selects/activates the engine and restores it afterwards.
+        # App shortcuts and modifier drags must not toggle it accidentally.
+        (directory / "config").write_text(
+            "[Hotkey]\nEnumerateWithTriggerKeys=False\n"
+            "[Hotkey/TriggerKeys]\n[Hotkey/AltTriggerKeys]\n"
+            "[Hotkey/ActivateKeys]\n[Hotkey/DeactivateKeys]\n"
+            "[Hotkey/EnumerateForwardKeys]\n[Hotkey/EnumerateBackwardKeys]\n",
+            encoding="utf-8")
         (directory / "profile").write_text(
             "[Groups/0]\nName=Default\nDefault Layout=us\nDefaultIM=wbpy\n"
             "[Groups/0/Items/0]\nName=keyboard-us\nLayout=\n"
@@ -242,6 +268,10 @@ class Desktop:
             return engine if engine == "wbpy" else False
 
         engine = self._wait(gtk, engine_ready, "fcitx5 wbpy engine")
+        # The readiness probe activated wbpy. Leave the ordinary typing path
+        # on the US keyboard before destroying its input context.
+        subprocess.run(["fcitx5-remote", "-s", "keyboard-us"], env=env, check=True, timeout=5)
+        subprocess.run(["fcitx5-remote", "-c"], env=env, check=True, timeout=5)
         gtk.terminate()
         gtk.wait(timeout=10)
         self.processes.remove(gtk)

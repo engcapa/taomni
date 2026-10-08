@@ -34,6 +34,7 @@ import {
   normalizeChatSendShortcut,
 } from "../../lib/chat/sendShortcut";
 import { useAiStore } from "../../stores/aiStore";
+import { DictationButton } from "../voice/DictationButton";
 import { useT } from "../../lib/i18n";
 
 interface ComposerProps {
@@ -90,6 +91,7 @@ export function Composer({
   const sendShortcutLabel = sendShortcut === "enter"
     ? t("chat.shortcutEnter")
     : t("chat.shortcutCtrlEnter");
+  const [voiceEpoch, setVoiceEpoch] = useState(0);
   const initialDraft = draftKey ? useChatStore.getState().composerDrafts[draftKey] : undefined;
   const [text, setText] = useState(() => initialDraft?.text ?? "");
   const [selectedAttachments, setSelectedAttachments] = useState<ChatAttachment[]>(
@@ -264,6 +266,7 @@ export function Composer({
     // Clear optimistically so the box is ready for the next message, then put
     // the text back if the send was refused — the alternative (awaiting first)
     // leaves the sent text sitting in the box for the whole round trip.
+    setVoiceEpoch((value) => value + 1);
     setText("");
     setSelectedAttachments([]);
     setAttachmentError(null);
@@ -441,8 +444,11 @@ export function Composer({
             <Paperclip className="w-3.5 h-3.5" />
           </button>
         )}
+        <DictationButton targetRef={textareaRef} onText={setText} contextKey={`${draftKey}:${voiceEpoch}`} disabled={draftDisabled} testId="chat-voice-button" />
         <textarea
           ref={textareaRef}
+          data-testid="chat-composer-textarea"
+          id="chat-composer-textarea"
           className="taomni-input flex-1 text-[12px] resize-none py-1.5"
           placeholder={placeholder ?? t("chat.inputPlaceholder", { shortcut: sendShortcutLabel })}
           value={text}

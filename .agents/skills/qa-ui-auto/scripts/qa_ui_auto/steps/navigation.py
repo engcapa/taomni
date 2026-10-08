@@ -29,19 +29,39 @@ def step_open(ctx: StepContext, args: Any) -> None:
         url = str(args)
     if ctx.dry_run:
         return
-    # Windows Chromium can briefly exhaust the loopback socket buffer while a
-    # worker is closing one context and another worker opens the next case.
-    # The page is still usable after the transient net::ERR_NO_BUFFER_SPACE;
-    # retry the navigation within the case deadline instead of recording a
-    # false product failure.
-    for attempt in range(3):
-        try:
-            ctx.page.goto(url, wait_until="domcontentloaded")
-            return
-        except Exception as exc:  # noqa: BLE001
-            if "ERR_NO_BUFFER_SPACE" not in str(exc) or attempt == 2:
-                raise
-            ctx.page.wait_for_timeout(250 * (attempt + 1))
+    # Retry only startup network failures, before any testcase interaction.
+    # Dynamic imports can fail after DOMContentLoaded with a successful HTTP
+    # navigation, so observe script failures until the app root mounts too.
+    transient = ("ERR_NO_BUFFER_SPACE", "ERR_NETWORK_CHANGED")
+    failures: list[str] = []
+
+    def request_failed(request):
+        if request.resource_type in {"document", "script"}:
+            error = request.failure or ""
+            if any(code in error for code in transient):
+                failures.append(error)
+
+    ctx.page.on("requestfailed", request_failed)
+    try:
+        for attempt in range(3):
+            failures.clear()
+            try:
+                ctx.page.goto(url, wait_until="domcontentloaded")
+                ctx.page.wait_for_selector("#root > *", state="attached", timeout=30_000)
+                if not failures:
+                    return
+                raise StepError("startup network failure: " + ", ".join(sorted(set(failures))))
+            except Exception as exc:  # noqa: BLE001
+                if not failures and not any(code in str(exc) for code in transient):
+                    raise
+                if attempt == 2:
+                    raise
+                # Retain recovered infrastructure faults in the case artifact.
+                with (ctx.case_dir / "startup-network-retries.log").open("a", encoding="utf-8") as log:
+                    log.write(f"attempt {attempt + 1}: {exc}\n")
+                ctx.page.wait_for_timeout(250 * (attempt + 1))
+    finally:
+        ctx.page.remove_listener("requestfailed", request_failed)
 
 
 @verb("goto")

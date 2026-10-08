@@ -94,6 +94,23 @@
 ## ai/voice (F-AI-2.3)
 
 - `[data-testid="ptt-button"]` — interactive [optional] — F-AI-2.3.ptt-button
+- `[data-testid="chat-voice-button"]` — interactive — F-AI-2.3.chat-voice-button
+- `[data-testid="chat-voice-button-cancel"]` — interactive — F-AI-2.3.chat-voice-cancel
+- `[data-testid="voice-settings-close"]` — interactive — F-AI-2.3.voice-settings-close
+- `[data-testid="voice-settings-dialog"]` — display — F-AI-2.3.voice-settings-dialog
+- `[data-testid="asr-installation-progress"]` — display — F-AI-2.3.asr-installation-progress
+- `[data-testid="asr-cancel-download"]` — interactive — F-AI-2.3.asr-cancel-download
+- `[data-testid="asr-download-url-whisper-base"]` — interactive — F-AI-2.3.asr-download-url-base
+- `[data-testid="asr-copy-url-whisper-base"]` — interactive — F-AI-2.3.asr-copy-url-base
+- `[data-testid="asr-open-url-whisper-base"]` — interactive — F-AI-2.3.asr-open-url-base
+- `[data-testid="asr-download-proxy-mode"]` — interactive — F-AI-2.3.asr-download-proxy-mode
+- `[data-testid="asr-download-proxy-save"]` — interactive — F-AI-2.3.asr-download-proxy-save
+- `[data-testid="asr-check-models"]` — interactive — F-AI-2.3.asr-check-models
+- `[data-testid="asr-language"]` — interactive — F-AI-2.3.asr-language
+- `[data-testid="asr-download-whisper-base"]` — interactive — F-AI-2.3.asr-download-base
+- `[data-testid="asr-download-whisper-small"]` — interactive — F-AI-2.3.asr-download-small
+- `[data-testid="asr-select-whisper-base"]` — interactive — F-AI-2.3.asr-select-base
+- `[data-testid="asr-select-whisper-small"]` — interactive — F-AI-2.3.asr-select-small
 
 ## application/update (F-Update-1)
 
@@ -1851,6 +1868,9 @@
 - `[data-testid="screenshot-pin-collapse"]` — interactive — F27.1.screenshot-pin-collapse
 - `[data-testid="screenshot-pin-expand"]` — interactive — F27.1.screenshot-pin-expand
 - `[data-testid="screenshot-pin-menu-toggle"]` — interactive — F27.1.screenshot-pin-menu-toggle
+- `[data-testid="screenshot-pin-tab-pin"]` — interactive — F27.1.screenshot-pin-tab-pin
+- `[data-testid="screenshot-pin-tab-all"]` — interactive — F27.1.screenshot-pin-tab-all
+- `[data-testid="screenshot-pin-list"]` — display — F27.1.screenshot-pin-list
 - `[data-testid="screenshot-pin-close"]` — interactive — F27.1.screenshot-pin-close
 - `[data-testid="screenshot-pin-zoom-out"]` — interactive — F27.1.screenshot-pin-zoom-out
 - `[data-testid="screenshot-pin-zoom-in"]` — interactive — F27.1.screenshot-pin-zoom-in
@@ -1873,6 +1893,7 @@
 - `[data-testid="screenshot-favorites-empty"]` — display — F27.1.screenshot-favorites-empty
 - `[data-testid="screenshot-favorite-item"]` — display — F27.1.screenshot-favorite-item
 - `[data-testid="screenshot-favorite-thumbnail"]` — display — F27.1.screenshot-favorite-thumbnail
+- `[data-testid="screenshot-favorite-note"]` — display — F27.1.screenshot-favorite-note
 - `[data-testid="screenshot-favorites-error"]` — display — F27.1.screenshot-favorites-error
 - `[data-testid="capture-menu"]` — display [optional] — F27.1.capture-menu
 - `[data-testid="capture-toolbar"]` — display [optional] — F27.1.capture-toolbar
@@ -1887,6 +1908,7 @@
 - `[data-testid="screenshot-fill"]` — interactive [optional] — F27.1.screenshot-fill
 - `[data-testid="screenshot-more"]` — interactive [optional] — F27.1.screenshot-more
 - `[data-testid="screenshot-pin-note"]` — display [optional] — F27.1.screenshot-pin-note
+- `[data-testid="screenshot-pin-thumb-note"]` — display [optional] — F27.1.screenshot-pin-thumb-note
 - `[data-testid="screenshot-pin-note-input"]` — interactive [optional] — F27.1.screenshot-pin-note-input
 - `[data-testid="screenshot-pin-note-save"]` — interactive [optional] — F27.1.screenshot-pin-note-save
 - `[data-testid="screenshot-pins-collapse"]` — interactive [optional] — F27.1.screenshot-pins-collapse

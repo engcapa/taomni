@@ -56,6 +56,7 @@ steps:
 - wait_for: '[data-testid="screenshot-pin-expand"]'
 - click: '[data-testid="screenshot-pin-expand"]'
 - click: '[data-testid="screenshot-pin-menu-toggle"]'
+- click: '[data-testid="screenshot-pin-tab-all"]'
 - click: '[data-testid="screenshot-pins-tile"]'
 - click: '[data-testid="screenshot-pin-close"]'
 - wait_for: '[data-testid="system-screenshot"]'

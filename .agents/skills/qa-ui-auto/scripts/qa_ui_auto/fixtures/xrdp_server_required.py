@@ -112,9 +112,16 @@ def setup(ctx: Any) -> None:
         _sudo("chown", user, str(state_dir))
         helper = root / "rdp_target.py"
         shutil.copy2(Path(__file__).resolve().parents[1] / "rdp_helpers" / "rdp_target.py", helper)
-        target = [sys.executable, str(helper), "--mode", "flip", "--pattern", "--geometry", "480x320+40+80", "--state", str(state_dir / "flip-state.json")]
+        # python3-tk is installed for the distro interpreter, not setup-python's
+        # separately bundled Tcl/Tk. Keep the desktop fixture on that pair.
+        target = ["/usr/bin/python3", str(helper), "--mode", "flip", "--pattern", "--geometry", "480x320+40+80", "--state", str(state_dir / "flip-state.json")]
         xsession = ("#!/bin/sh\n"
-                    "unset DBUS_SESSION_BUS_ADDRESS SESSION_MANAGER\n"
+                    "unset DBUS_SESSION_BUS_ADDRESS SESSION_MANAGER XAUTHORITY\n"
+                    f"export XDG_CONFIG_HOME=/home/{user}/.config\n"
+                    f"export XDG_CACHE_HOME=/home/{user}/.cache\n"
+                    f"export XDG_DATA_HOME=/home/{user}/.local/share\n"
+                    "unset GTK_IM_MODULE QT_IM_MODULE XMODIFIERS\n"
+                    "mkdir -p \"$XDG_CONFIG_HOME\" \"$XDG_CACHE_HOME\" \"$XDG_DATA_HOME\"\n"
                     "openbox-session &\n"
                     + shlex.join(target) + " >" + shlex.quote(str(state_dir / "target.log")) + " 2>&1 &\n"
                     "wait\n")
@@ -182,6 +189,8 @@ def _collect_diagnostics(ctx: Any) -> None:
         if user := _STATE.get("user"):
             files.extend([("xsession.log", f"/home/{user}/.xsession-errors"),
                           ("xorg.log", f"/home/{user}/.xorgxrdp.10.log")])
+        if directory := _STATE.get("directory"):
+            files.append(("target.log", str(Path(directory.name) / "session/target.log")))
         for name, path in files:
             result = _sudo("tail", "-c", "100000", path, check=False)
             detail = result.stdout + result.stderr

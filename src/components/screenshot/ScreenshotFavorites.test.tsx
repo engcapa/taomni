@@ -17,6 +17,21 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe("ScreenshotFavorites", () => {
+  it("shows the stored note on each item with a full tooltip and hides the block without one", async () => {
+    api.list.mockResolvedValue([
+      { id: "with-note", width: 800, height: 600, createdAt: 2, note: "登录页对照" },
+      { id: "no-note", width: 400, height: 300, createdAt: 1, note: "" },
+    ]);
+    render(<ScreenshotFavorites onClose={vi.fn()} />);
+    const items = await screen.findAllByTestId("screenshot-favorite-item");
+    expect(items).toHaveLength(2);
+    const note = screen.getByTestId("screenshot-favorite-note");
+    expect(note).toHaveTextContent("登录页对照");
+    expect(note).toHaveAttribute("title", "登录页对照");
+    // Empty notes render no placeholder block at all.
+    expect(screen.getAllByTestId("screenshot-favorite-note")).toHaveLength(1);
+  });
+
   it("reopens a saved original and removes only after confirmation, with thumbnail cleanup", async () => {
     const view = render(<ScreenshotFavorites onClose={vi.fn()} />);
     await screen.findByTestId("screenshot-favorite-thumbnail");

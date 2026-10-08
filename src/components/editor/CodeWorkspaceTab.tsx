@@ -1973,6 +1973,8 @@ export function CodeWorkspaceTab({
   const rearrangeRequestTokenRef = useRef(0);
   const cleanupRequestTokenRef = useRef(0);
   const workspaceEditQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingWorkspaceEditsRef = useRef(0);
+  const pendingWorkspaceHistoryClaimRef = useRef(false);
   const providerCommandSemanticGuardRef = useRef<{
     generation: number;
     revision: number;
@@ -2436,15 +2438,9 @@ export function CodeWorkspaceTab({
   });
   /** Latest caret per group for callbacks that must not change identity per caret move. */
   const cursorPositionsRef = useRef(cursorPositions);
-  // Keyboard actions (Ctrl+F8, Ctrl+Shift+F8…) read the caret right after
-  // the keys that moved it, while the state itself commits in a transition.
-  // The editor callback writes this ref synchronously; a render only
-  // replaces it when the committed state actually changed.
-  const committedCursorPositionsRef = useRef(cursorPositions);
-  if (committedCursorPositionsRef.current !== cursorPositions) {
-    committedCursorPositionsRef.current = cursorPositions;
-    cursorPositionsRef.current = cursorPositions;
-  }
+  // The selection callback owns this ref synchronously. Never copy deferred
+  // React state back into it: an older transition can commit between a caret
+  // move and Ctrl+F8/Ctrl+Shift+F8, putting the action on the previous line.
   const [viewportRanges, setViewportRangesNow] = useState<Record<EditorGroupId, LspRange | null>>({
     primary: null,
     secondary: null,
@@ -7208,7 +7204,27 @@ export function CodeWorkspaceTab({
       setStatusMessage(`Cannot read external change for ${file.subtitle}: ${errorMessage(error)}`);
       return;
     }
-    const latest = openFilesRef.current[file.key] ?? file;
+    const latest = openFilesRef.current[file.key];
+    if (!latest || latest.saving) return;
+    if (disk.hash === latest.hash) {
+      // The bytes are still our accepted disk snapshot. A delayed save echo
+      // or chmod notification must not replace the selected encoding with
+      // the decoder's canonical alias (ISO-8859-1 reads as windows-1252),
+      // nor clear a newer edit or a failed-save state.
+      setOpenFiles((current) => ({
+        ...current,
+        [file.key]: { ...(current[file.key] ?? latest), mtime: disk.mtime, size: disk.size },
+      }));
+      return;
+    }
+    // A delayed watcher echo of our last save can arrive after the user
+    // chooses a new encoding/EOL without editing the logical text. Keep that
+    // unsaved policy while refreshing the disk guard.
+    const preservePolicy = latest.dirty && (
+      latest.eol !== disk.eol
+      || latest.encoding !== disk.encoding
+      || latest.bom !== disk.bom
+    );
     if (disk.text !== latest.text && disk.text !== latest.savedText) invalidateSemantics();
     if (disk.text === latest.text) {
       // Another process wrote exactly the buffer we already have. Accept the
@@ -7218,13 +7234,11 @@ export function CodeWorkspaceTab({
         [file.key]: {
           ...(current[file.key] ?? latest),
           savedText: disk.text,
-          eol: disk.eol,
-          encoding: disk.encoding,
-          bom: disk.bom,
+          ...(preservePolicy ? {} : { eol: disk.eol, encoding: disk.encoding, bom: disk.bom }),
           hash: disk.hash,
           mtime: disk.mtime,
           size: disk.size,
-          dirty: false,
+          dirty: preservePolicy,
           error: null,
         },
       }));
@@ -7237,9 +7251,7 @@ export function CodeWorkspaceTab({
         ...current,
         [file.key]: {
           ...(current[file.key] ?? latest),
-          eol: disk.eol,
-          encoding: disk.encoding,
-          bom: disk.bom,
+          ...(preservePolicy ? {} : { eol: disk.eol, encoding: disk.encoding, bom: disk.bom }),
           hash: disk.hash,
           mtime: disk.mtime,
           size: disk.size,
@@ -10910,7 +10922,10 @@ export function CodeWorkspaceTab({
     edit: LspWorkspaceEdit,
     options: WorkspaceEditApplyOptions = {},
   ) => {
-    const pending = workspaceEditQueueRef.current.then(() => applyLspWorkspaceEditNow(edit, options));
+    pendingWorkspaceEditsRef.current += 1;
+    const pending = workspaceEditQueueRef.current
+      .then(() => applyLspWorkspaceEditNow(edit, options))
+      .finally(() => { pendingWorkspaceEditsRef.current -= 1; });
     workspaceEditQueueRef.current = pending.then(() => undefined, () => undefined);
     return pending;
   }, [applyLspWorkspaceEditNow]);
@@ -11396,6 +11411,21 @@ export function CodeWorkspaceTab({
   // journal blocks the stroke entirely so a document undo can never interleave
   // with a running multi-file restore.
   const claimWorkspaceHistory = useCallback((action: "undo" | "redo"): boolean | undefined => {
+    if (pendingWorkspaceHistoryClaimRef.current) return false;
+    if (pendingWorkspaceEditsRef.current > 0) {
+      // Writes become visible before post-state verification registers their
+      // history. Keep this stroke with the multi-file transaction; falling
+      // through here would undo only the open document and strand disk edits.
+      const sequence = workspaceEditHistorySequenceRef.current;
+      pendingWorkspaceHistoryClaimRef.current = true;
+      const pendingClaim = workspaceEditQueueRef.current.then(async () => {
+        if (action === "undo" && workspaceEditHistorySequenceRef.current > sequence) {
+          await undoWorkspaceEdit();
+        }
+      }).finally(() => { pendingWorkspaceHistoryClaimRef.current = false; });
+      workspaceEditQueueRef.current = pendingClaim.then(() => undefined, () => undefined);
+      return true;
+    }
     const state = workspaceEditHistory.state();
     if (state.busy) return false;
     if (action === "undo" ? !state.canUndo : !state.canRedo) return undefined;
@@ -18022,6 +18052,20 @@ export function CodeWorkspaceTab({
     return null;
   }, [promptInlineName]);
 
+  // "The workspace changed" alone cannot separate a genuine concurrent edit
+  // from a watcher echo of the provider's own project metadata
+  // (.project/.classpath/.settings) arriving during a rename. Name it.
+  const describeSemanticInvalidation = useCallback((
+    snapshot: ReturnType<typeof semanticIndex.current>,
+    tokenRevision: number,
+  ): string => [
+    snapshot.staleReasons.length > 0 ? `reasons=${snapshot.staleReasons.join(",")}` : null,
+    snapshot.invalidatedPaths.length > 0
+      ? `paths=${snapshot.invalidatedPaths.slice(0, 3).join(",")}`
+      : null,
+    `revision=${snapshot.revision}/${tokenRevision}`,
+  ].filter(Boolean).join(" "), []);
+
   const renameSymbolAt = useCallback(async (
     file: OpenFileState,
     position: LspPosition,
@@ -18126,7 +18170,8 @@ export function CodeWorkspaceTab({
       // change and must not cancel a rename the user already confirmed.
       if (beforeRename.revision !== buildToken.revision) {
         semanticIndex.abandonBuild(buildToken);
-        const message = "Rename was cancelled because the workspace changed while the dialog was open";
+        const message = "Rename was cancelled because the workspace changed while the dialog was open "
+          + `(${describeSemanticInvalidation(beforeRename, buildToken.revision)})`;
         setStatusMessage(message);
         return { status: "stale", message };
       }
@@ -18143,7 +18188,28 @@ export function CodeWorkspaceTab({
       }
       updateLspStatusForFile(live, renamed.status);
       if (!isCurrent()) return staleResult();
-      const operationCount = workspaceEditOperations(renamed.edit).length;
+      let operationCount = workspaceEditOperations(renamed.edit).length;
+      // JDT LS can answer the first rename request with an empty edit while
+      // its cross-file index is finishing a watcher update.  The document
+      // revision is still unchanged, so a short same-token retry is safe and
+      // avoids exposing a transient "Rename produced no edits" result to the
+      // user.  A real edit or a second empty response follows the normal
+      // result path below.
+      if (operationCount === 0 && isCurrent() && semanticIndex.current().revision === buildToken.revision) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (isCurrent() && semanticIndex.current().revision === buildToken.revision) {
+          try {
+            renamed = await lspRename(descriptor, position, nextName);
+            updateLspStatusForFile(live, renamed.status);
+            operationCount = workspaceEditOperations(renamed.edit).length;
+          } catch (err) {
+            const message = errorMessage(err);
+            semanticIndex.failBuild(buildToken, message);
+            setStatusMessage(message);
+            return { status: "failed", message, retryable: true };
+          }
+        }
+      }
       if (operationCount === 0) {
         semanticIndex.finishQuery(buildToken, { kind: "rename", resultCount: 0 });
         const message = "Rename produced no edits";
@@ -18158,9 +18224,14 @@ export function CodeWorkspaceTab({
       });
       if (
         !completion.accepted
-        || !workspaceSemanticIndexBuildIsCurrent(completion.snapshot, buildToken)
+        // Provider progress and an already-consumed invalidation can leave
+        // staleReasons populated without changing the pinned workspace
+        // revision. The rename response is still valid in that case; reject
+        // only a real revision change after the provider answered.
+        || !workspaceSemanticIndexTokenRevisionCurrent(completion.snapshot, buildToken)
       ) {
-        const message = "Rename result became stale because the workspace changed; run Rename again";
+        const message = "Rename result became stale because the workspace changed; run Rename again "
+          + `(${describeSemanticInvalidation(completion.snapshot, buildToken.revision)})`;
         setStatusMessage(message);
         return { status: "stale", message };
       }

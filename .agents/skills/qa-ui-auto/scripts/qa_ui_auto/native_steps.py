@@ -41,6 +41,7 @@ import stat
 import subprocess
 import sys
 from .deadline import budget_time as time, remaining_timeout
+from .evidence import text_tail
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable
@@ -186,6 +187,9 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
         raise StepError(f"press: expected string or {{key, macos_key?, selector?}}, got {args!r}")
     if selector:
         ctx.session.focus(selector)
+    # X input focus alone is insufficient: WebKit's automation browsing
+    # context also needs activation after reloads and auxiliary windows.
+    ctx.session.activate_linux_window()
     return ctx.session.press_combo(key)
 
 
@@ -303,6 +307,7 @@ def _eval_readonly(ctx: NativeStepContext, args: Any) -> str:
 
 
 def _hover(ctx: NativeStepContext, args: Any) -> str:
+    ctx.session.activate_linux_window()
     selector, _ = _selector_args(args)
     element = ctx.session.find(selector, interactive=True)
     # Use the WebDriver element origin instead of converting the element's
@@ -1507,6 +1512,7 @@ def _do_type(ctx: NativeStepContext, args: Any) -> str:
 def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
     selector, text, submit, verify = _terminal_input_args(args)
     attempts = verify["attempts"] if verify else 1
+    observed = ""
     for attempt in range(attempts):
         if attempt:
             # Recover a truncated shell line or a probe now reading stdin.
@@ -1516,12 +1522,13 @@ def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
         _dispatch_terminal_input(ctx, selector, text, submit)
         if verify is None:
             break
-        if _terminal_output_matches(ctx, verify):
+        observed, matched = _terminal_output_matches(ctx, verify)
+        if matched:
             break
     else:
         raise StepError(
-            f"terminal_input: {verify['selector']} did not match {verify['regex']!r} "
-            f"after {attempts} attempt(s)"
+            f"terminal_input: sent {text!r}; {verify['selector']} did not match "
+            f"{verify['regex']!r} after {attempts} attempt(s); observed tail: {text_tail(observed)}"
         )
     return f"sent {len(text)} chars to xterm input" + (" and submitted" if submit else "")
 
@@ -1569,11 +1576,20 @@ def _terminal_verify_args(verify: Any) -> dict[str, Any]:
 def _dispatch_terminal_input(ctx: NativeStepContext, selector: str, text: str, submit: bool) -> None:
     ctx.session.focus(selector)
     ctx.session.press_combo("Shift")
+    # A focus() call and the synthetic modifier cycle are asynchronous in
+    # WebKitGTK/WebView2. Let xterm commit the focused helper textarea before
+    # dispatching its InputEvent; otherwise the first byte is intermittently
+    # dropped on Windows ConPTY (for example `printf` becomes `rintf`).
+    time.sleep(0.08)
+    # WebView2/ConPTY occasionally drops the first byte of a synthetic input
+    # event immediately after a modifier cycle. A leading shell space is
+    # harmless for command probes and makes the first delivered byte expendable.
+    payload_text = f" {text}" if platform.system() == "Windows" else text
     result = ctx.session.execute(
         f"const element = document.querySelector({json.dumps(selector)});"
         "if (!element) return {found:false,focused:false};"
         "element.focus();"
-        f"const data = {json.dumps(text)};"
+        f"const data = {json.dumps(payload_text)};"
         "element.dispatchEvent(new InputEvent('input',{"
         "data,inputType:'insertText',bubbles:true,composed:false}));"
         "return {found:true,focused:document.activeElement===element};"
@@ -1586,22 +1602,23 @@ def _dispatch_terminal_input(ctx: NativeStepContext, selector: str, text: str, s
         ctx.session.press_combo("Enter")
 
 
-def _terminal_output_matches(ctx: NativeStepContext, verify: dict[str, Any]) -> bool:
+def _terminal_output_matches(ctx: NativeStepContext, verify: dict[str, Any]) -> tuple[str, bool]:
     """Poll the pty buffer until the probe's own output shows up.
 
     Windows OpenSSH/ConPTY intermittently drops part of a terminal write (a
     missing leading byte, a truncated burst). An optional verify block lets the
     probe be re-sent instead of failing the case on that transport hiccup; the
-    case's own assertion still decides what the run proves.
+    case's own assertion still decides what the run proves. Returns the last
+    buffer text so a failed case can name what actually arrived.
     """
     pattern = re.compile(verify["regex"])
     deadline = time.monotonic() + verify["timeout_sec"]
     while True:
-        text = ctx.session.text(verify["selector"])
-        if pattern.search(text or ""):
-            return True
+        text = ctx.session.text(verify["selector"]) or ""
+        if pattern.search(text):
+            return text, True
         if time.monotonic() >= deadline:
-            return False
+            return text, False
         time.sleep(0.25)
 
 
@@ -1644,12 +1661,16 @@ def _do_assert_pattern(ctx: NativeStepContext, args: Any) -> str:
     pattern = re.compile(args["regex"])
     timeout = min(float(args.get("timeout_sec", 10)), remaining_timeout(float(args.get("timeout_sec", 10))))
     expires = time.monotonic() + timeout
+    observed = ""
     while time.monotonic() < expires:
-        text = ctx.session.text(args["selector"])
-        if pattern.search(text):
+        observed = ctx.session.text(args["selector"])
+        if pattern.search(observed):
             return f"pattern matched: {args['selector']}"
         time.sleep(0.25)
-    raise StepError(f"assert_pattern failed: {args['selector']} did not match {args['regex']!r}")
+    raise StepError(
+        f"assert_pattern failed: {args['selector']} did not match {args['regex']!r}; "
+        f"observed tail: {text_tail(observed)}"
+    )
 
 
 @_verb("assert_text_equals")
@@ -2005,6 +2026,7 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
     window_id = None
     window_identity = None
     if transport == "webdriver":
+        ctx.session.activate_linux_window()
         ctx.session.press_combos(keys)
     elif transport == "x11":
         if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
@@ -2639,6 +2661,7 @@ def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     )
     time.sleep(2.0)  # document teardown; execute/sync is unavailable during it
     ctx.session.find("[data-testid='control-bar']", timeout=60)
+    ctx.session.activate_linux_window()
     # The reload dropped the console hook along with the old document.
     ctx.session.install_console_hook()
     return "reloaded; app shell visible"

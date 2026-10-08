@@ -515,7 +515,22 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     except Exception:
                         session.deadline = Deadline(5)
                         capture_started = time.monotonic()
+                        process = harness.driver.proc
+                        exit_before_capture = process.poll() if process is not None else None
                         failure_artifacts = _capture_native_failure(session, case_dir)
+                        # Observe before teardown sends any signal. In macOS's
+                        # in-process bridge this distinguishes an app crash or
+                        # kill from a live app with a failed WebDriver request.
+                        with suppress(Exception):
+                            if process is not None:
+                                process_path = case_dir / "native-process.json"
+                                process_path.write_text(json.dumps({
+                                    "pid": process.pid, "platform": platform.system(),
+                                    "macos_lldb": harness.driver.macos_lldb,
+                                    "exit_code_at_failure": exit_before_capture,
+                                    "exit_code_after_capture": process.poll(),
+                                }, indent=2) + "\n", encoding="utf-8")
+                                failure_artifacts["process"] = str(process_path)
                         r["timings"]["failure_capture_sec"] = time.monotonic() - capture_started
                         raise
                     finally:

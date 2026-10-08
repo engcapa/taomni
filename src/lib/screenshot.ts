@@ -84,7 +84,14 @@ export interface PinInit {
   note?: string;
 }
 
-export interface ScreenshotFavorite { id: string; width: number; height: number; createdAt: number; }
+export interface ScreenshotFavorite {
+  id: string;
+  width: number;
+  height: number;
+  createdAt: number;
+  /** Caption carried from the pin; empty string when none was written. */
+  note?: string;
+}
 
 export async function listScreenshotFavorites(): Promise<ScreenshotFavorite[]> {
   return invoke<ScreenshotFavorite[]>("screenshot_list_favorites");

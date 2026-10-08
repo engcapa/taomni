@@ -2,6 +2,8 @@ import json
 import os
 from pathlib import Path
 import stat
+import socket
+import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11,7 +13,7 @@ from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
 from qa_ui_auto.deadline import Deadline
-from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, selector_strategy
+from tauri_webdriver import NativeHarness, NativeSession, TauriDriverProcess, WebDriverError, selector_strategy
 
 
 class NativeSessionTransportTest(TestCase):
@@ -107,6 +109,34 @@ class NativeSessionTransportTest(TestCase):
         ])
         session.execute.assert_called_with("return document.hasFocus();")
         session.install_console_hook.assert_called_once_with()
+
+    def test_x11_activation_requires_os_and_webview_focus(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock(side_effect=["qa-window", None])
+        session.execute = Mock(side_effect=[False, False, True])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+             patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+             patch("qa_ui_auto.native_steps._activate_x11_application") as activate, \
+             patch("tauri_webdriver.time.sleep"):
+            session.activate_linux_window()
+        activate.assert_called_once_with(session.application)
+        session.request.assert_called_with("POST", "/session/session-1/window", {"handle": "qa-window"})
+        self.assertEqual(session.focus_warning, "")
+
+    def test_x11_activation_failure_is_reported_instead_of_failing_the_session(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock()
+        session.execute = Mock(return_value=False)
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+             patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+             patch("qa_ui_auto.native_steps._activate_x11_application",
+                   side_effect=native_steps.StepError("native X11: no window belongs to taomni")), \
+             patch("tauri_webdriver.time.sleep"):
+            session.activate_linux_window()
+        self.assertIn("no window belongs to taomni", session.focus_warning)
+        session.request.assert_not_called()
 
     def test_wayland_unfocused_document_fails_before_starting_app_steps(self):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
@@ -237,15 +267,17 @@ class NativeSessionTransportTest(TestCase):
         with self.assertRaisesRegex(Exception, "invalid element list"):
             session.count(".tab")
 
-    def test_scoped_press_focuses_without_activation(self):
+    def test_scoped_press_activates_webview_without_clicking_target(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
         session.find = Mock(return_value="row-1")
         session.request = Mock(return_value=True)
         session.press_combo = Mock(return_value="pressed")
+        session.activate_linux_window = Mock()
         ctx = Mock(session=session)
         native_steps._press(ctx, {"selector": "#folder", "key": "ArrowRight"})
         session.press_combo.assert_called_once_with("ArrowRight")
+        session.activate_linux_window.assert_called_once_with()
         session.request.assert_called_once()
         self.assertTrue(session.request.call_args.args[1].endswith("/execute/sync"))
         self.assertEqual(session.request.call_args.args[2]["args"], [{"element-6066-11e4-a52e-4f735466cecf": "row-1"}])
@@ -300,7 +332,7 @@ class NativeSessionTransportTest(TestCase):
                 session.execute = Mock(side_effect=[
                     WebDriverError("Failed to read the 'localStorage' property"), False, True])
                 session.install_console_hook = Mock()
-
+                session.activate_linux_window = Mock()
                 with patch("tauri_webdriver.platform.system", return_value=system), \
                      patch.dict(os.environ, {"NEWMOB_DATA_DIR": "/qa/run/native-appdata"}):
                     session.start()
@@ -1176,3 +1208,73 @@ class NativeClipboardOwnerTest(TestCase):
                 )
             with self.assertRaises(native_steps.StepError):
                 native_steps.VERBS["assert_system_clipboard"](ctx, {})
+
+
+class MacosDebuggerProcessTest(TestCase):
+    def test_opt_in_debugger_keeps_the_isolated_application_and_captures_all_threads(self):
+        with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"), \
+                patch("tauri_webdriver._tcp_ok", side_effect=[False, True]), \
+                patch("tauri_webdriver.subprocess.Popen") as launch:
+            app = Path(root) / "qa-app"
+            app.touch()
+            launch.return_value.poll.return_value = None
+            driver = TauriDriverProcess({"app": {"native_binary": str(app), "macos_lldb": True}}, Path(root))
+            driver.start()
+            command = launch.call_args.args[0]
+            self.assertEqual(command[0], "lldb")
+            self.assertEqual(command[-2:], ["--", str(app.resolve())])
+            self.assertIn("thread backtrace all", command)
+            self.assertTrue(launch.call_args.kwargs["start_new_session"])
+            self.assertEqual(launch.call_args.kwargs["env"]["TAOMNI_QA_WEBDRIVER_PORT"], "4444")
+
+    def test_debugger_cleanup_reaps_only_owned_descendants_before_the_debugger(self):
+        with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"), \
+                patch("tauri_webdriver.subprocess.check_output", return_value="4321 1\n5000 4321\n5001 5000\n6000 1\n6001 6000\n"), \
+                patch("tauri_webdriver.os.kill") as kill:
+            driver = TauriDriverProcess({"app": {"macos_lldb": True}}, Path(root))
+            process = Mock(pid=4321)
+            process.poll.return_value = None
+            driver.proc = process
+            driver.stop()
+            self.assertEqual([call.args[0] for call in kill.call_args_list], [5001, 5000])
+            process.terminate.assert_called_once_with()
+            process.wait.assert_called_once_with(timeout=5)
+            self.assertIsNone(driver.proc)
+
+    def test_unresponsive_live_debugger_uses_owned_tree_cleanup_before_restart(self):
+        with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"), \
+                patch("tauri_webdriver._tcp_ok", return_value=False):
+            driver = TauriDriverProcess({"app": {"macos_lldb": True}}, Path(root))
+            driver.proc = Mock()
+            driver.proc.poll.return_value = None
+            driver.stop = Mock()
+            driver.start = Mock()
+            driver.ensure_running()
+            driver.stop.assert_called_once_with()
+            driver.start.assert_called_once_with()
+
+    @skipUnless(os.name == "posix", "requires a POSIX debugger process tree")
+    def test_cleanup_releases_a_real_inferior_port_in_a_separate_process_group(self):
+        child_code = ("import socket,time; s=socket.socket(); s.bind(('127.0.0.1',0)); "
+                      "s.listen(); print(s.getsockname()[1],flush=True); time.sleep(30)")
+        parent_code = ("import subprocess,sys; "
+                       f"p=subprocess.Popen([sys.executable,'-c',{child_code!r}], "
+                       "stdout=subprocess.PIPE,text=True,start_new_session=True); "
+                       "print(p.stdout.readline().strip(),flush=True); p.wait()")
+        process = subprocess.Popen([sys.executable, "-c", parent_code], stdout=subprocess.PIPE,
+                                   text=True, start_new_session=True)
+        try:
+            port = int(process.stdout.readline())
+            with socket.create_connection(("127.0.0.1", port), timeout=2):
+                pass
+            with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Darwin"):
+                driver = TauriDriverProcess({"app": {"macos_lldb": True}}, Path(root))
+                driver.proc = process
+                driver.stop()
+            with self.assertRaises(OSError):
+                socket.create_connection(("127.0.0.1", port), timeout=2)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+            process.stdout.close()

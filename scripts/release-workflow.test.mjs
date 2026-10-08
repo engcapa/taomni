@@ -8,6 +8,14 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const workflow = readFileSync(fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)), "utf8").replaceAll("\r\n", "\n");
+test("macOS native tests and bundles share a deployment target supporting Whisper filesystem APIs", () => {
+  const config = JSON.parse(readFileSync(fileURLToPath(new URL("../src-tauri/tauri.conf.json", import.meta.url)), "utf8"));
+  const macosJob = workflow.split("  build-macos:\n")[1].split("    steps:\n")[0];
+  const target = macosJob.match(/MACOSX_DEPLOYMENT_TARGET: "([\d.]+)"/)?.[1];
+  assert.equal(target, config.bundle.macOS.minimumSystemVersion);
+  const [major, minor = 0] = target.split(".").map(Number);
+  assert(major > 10 || (major === 10 && minor >= 15), "Whisper requires macOS 10.15 or newer");
+});
 test("artifact-only selection controls builders and cannot enter the publishing job", () => {
   assert(workflow.includes("    if: needs.plan.outputs.build_desktop == 'true'"));
   const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];

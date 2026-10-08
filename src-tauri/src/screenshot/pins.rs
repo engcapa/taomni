@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
-use super::{PIN_LABEL_PREFIX, tool_state};
+use super::{PIN_LABEL_PREFIX, blocking, tool_state};
 
 /// Pin windows listen for this to apply a batch action to themselves.
 pub const PIN_ACTION_EVENT: &str = "screenshot://pin-action";
@@ -237,16 +237,50 @@ pub async fn screenshot_set_pin_note(
         return Err("not a pin window".into());
     }
     let note = normalize_note(&note);
-    {
+    let favorite_id = {
         let mut state = tool_state();
         let pin = state
             .pins
             .get_mut(&label)
             .ok_or("no pinned screenshot for this window")?;
         pin.note = note.clone();
+        pin.favorite_id.clone()
+    };
+    // Keep the persistent favorite's caption in step so reopening it shows the
+    // same description the pin shows now.
+    if let Some(favorite_id) = favorite_id {
+        let app_for_favorite = app.clone();
+        let favorite_note = note.clone();
+        let _ = blocking("sync favorite note", move || {
+            super::favorites::sync_favorite_note(&app_for_favorite, &favorite_id, &favorite_note)
+        })
+        .await;
     }
     let _ = app.emit(PINS_CHANGED_EVENT, ());
     Ok(note)
+}
+
+/// GDK monitor/work-area queries can issue Xlib requests. Always snapshot them
+/// on the UI thread, including calls made by asynchronous commands and QA.
+pub(super) async fn pin_monitor(
+    app: &AppHandle,
+    window: WebviewWindow,
+) -> Result<tauri::Monitor, String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let monitor = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .or_else(|| window.primary_monitor().ok().flatten())
+            .ok_or_else(|| "no monitor for pin arrangement".to_string());
+        let _ = tx.send(monitor);
+    })
+    .map_err(|e| e.to_string())?;
+    tokio::time::timeout(std::time::Duration::from_secs(5), rx)
+        .await
+        .map_err(|_| "monitor query timed out".to_string())?
+        .map_err(|e| e.to_string())?
 }
 
 /// Move and size every open pin according to `mode` on the monitor showing
@@ -268,12 +302,7 @@ pub async fn screenshot_arrange_pins(
     let anchor_window = anchor
         .and_then(|label| app.get_webview_window(&label))
         .unwrap_or_else(|| pins[0].1.clone());
-    let monitor = anchor_window
-        .current_monitor()
-        .ok()
-        .flatten()
-        .or_else(|| anchor_window.primary_monitor().ok().flatten())
-        .ok_or("no monitor for pin arrangement")?;
+    let monitor = pin_monitor(&app, anchor_window).await?;
     let work = monitor.work_area();
     let area = Rect {
         x: work.position.x as f64,

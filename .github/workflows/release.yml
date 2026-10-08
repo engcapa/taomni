@@ -315,6 +315,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # macOS – single arm64 runner, cross-compiles both architectures
+  # tauri.conf.json sets minimumSystemVersion to 10.15 for Whisper's C++17
+  # std::filesystem. Tauri forwards it as MACOSX_DEPLOYMENT_TARGET to both builds.
   # ---------------------------------------------------------------------------
   build-macos:
     needs: plan
@@ -322,6 +324,10 @@ jobs:
     # Pin the major runner image instead of following the moving `macos-latest`
     # label. GitHub's macos-15 standard image is arm64 (Apple Silicon).
     runs-on: macos-15
+    env:
+      # Direct cargo tests run before Tauri exports minimumSystemVersion.
+      # Keep native C/C++ dependencies on the same floor as the app bundle.
+      MACOSX_DEPLOYMENT_TARGET: "10.15"
 
     steps:
       - name: Checkout

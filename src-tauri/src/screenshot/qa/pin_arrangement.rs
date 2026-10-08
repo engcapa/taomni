@@ -43,6 +43,7 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         "opened",
         json!({"labels":windows.iter().map(|w| w.label()).collect::<Vec<_>>()}),
     );
+    trace.mark("note-begin", json!({"label": windows[0].label()}));
     let note = run_js(&windows[0], r#"
         const q=id=>document.querySelector('[data-testid="'+id+'"]');
         const wait=()=>new Promise(r=>setTimeout(r,50));
@@ -66,6 +67,9 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         note == "QA original A",
         "pin note was not saved through the UI: {note}"
     );
+    // Two pin windows exist from here on. Mark each remaining step so a native
+    // page crash names the phase instead of only "opened".
+    trace.mark("noted", json!({"note": note}));
     let pins = super::super::pins::screenshot_list_pins(app.clone())
         .await
         .map_err(anyhow::Error::msg)?;
@@ -76,9 +80,17 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
     // Drive the same menu entry users use; this invokes native arrangement.
     run_js(&windows[0], r#"
         const q=id=>document.querySelector('[data-testid="'+id+'"]');
-        if(!q('screenshot-pins-tile')) { q('screenshot-pin-menu-toggle').click(); await new Promise(r=>setTimeout(r,100)); }
+        const wait=()=>new Promise(r=>setTimeout(r,50));
+        q('screenshot-pin-menu-toggle').click();
+        for(let i=0;i<100&&!q('screenshot-pin-tab-all');i++) await wait();
+        q('screenshot-pin-tab-all').click();
+        for(let i=0;i<100&&!q('screenshot-pins-tile');i++) await wait();
         q('screenshot-pins-tile').click(); return true;
-    "#, Duration::from_secs(5)).await?;
+    "#, Duration::from_secs(12)).await?;
+    trace.mark(
+        "tile-requested",
+        json!({"wayland": super::super::pins::native_wayland()}),
+    );
     let wayland = super::super::pins::native_wayland();
     let geometry = if wayland {
         let board = wait_window(app, "screenshot-pin-board", Duration::from_secs(10)).await?;
@@ -135,9 +147,9 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         }
         json!({"board":content,"size":size,"pinsRestored":true})
     } else {
-        let monitor = windows[0]
-            .current_monitor()?
-            .context("pin monitor missing")?;
+        let monitor = super::super::pins::pin_monitor(app, windows[0].clone())
+            .await
+            .map_err(anyhow::Error::msg)?;
         let work = monitor.work_area();
         let area = [
             work.position.x,
@@ -189,10 +201,12 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
     // Closing one pin must remove only its own file and leave the other usable.
     for (index, window) in windows.iter().enumerate() {
         window.eval("document.querySelector('[data-testid=\"screenshot-pin-close\"]').click()")?;
+        trace.mark("closing", json!({"index": index, "label": window.label()}));
         anyhow::ensure!(
             wait_closed(app, window.label(), Duration::from_secs(5)).await,
             "pin did not close"
         );
+        trace.mark("closed", json!({"index": index, "label": window.label()}));
         anyhow::ensure!(
             !originals[index].0.exists(),
             "closed pin file was not removed"

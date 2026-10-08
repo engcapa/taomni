@@ -61,6 +61,9 @@ pub async fn save_ai_config(
         )
     };
     let mut ai_ctx = state.ai_ctx.write().await;
+    if config.fully_disabled || ai_ctx.config.asr != config.asr {
+        crate::voice::commands::cancel_all();
+    }
     ai_ctx.reload_with_router(config, llm);
     Ok(())
 }

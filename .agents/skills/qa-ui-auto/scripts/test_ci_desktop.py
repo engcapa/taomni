@@ -217,7 +217,9 @@ class DesktopTests(unittest.TestCase):
                 self.assertEqual(observed_owner, '(uint32 42,)')
                 self.assertIn(gtk, desktop.processes)
                 self.assertEqual(kwargs['env'], environments[0])
-                self.assertEqual(command, ['fcitx5-remote', '-s', 'wbpy'])
+                self.assertIn(command, [
+                    ['fcitx5-remote', '-s', 'wbpy'],
+                    ['fcitx5-remote', '-s', 'keyboard-us'], ['fcitx5-remote', '-c']])
                 return subprocess.CompletedProcess(command, 0, '')
 
             start.side_effect = launch
@@ -229,7 +231,12 @@ class DesktopTests(unittest.TestCase):
             self.assertEqual(facts['ime']['pid'], 42)
             self.assertEqual(environments[0], environments[1])
             self.assertEqual(owner.call_count, 4)
-            self.assertEqual(remote.call_count, 2)
+            self.assertEqual(remote.call_count, 4)
+            self.assertEqual([call.args[0] for call in remote.call_args_list[-2:]],
+                             [['fcitx5-remote', '-s', 'keyboard-us'], ['fcitx5-remote', '-c']])
+            config = (desktop.root / 'ime-config/fcitx5/config').read_text()
+            self.assertIn('[Hotkey/AltTriggerKeys]\n', config)
+            self.assertIn('[Hotkey/TriggerKeys]\n', config)
             self.assertEqual(desktop.processes, [fcitx])
             gtk.terminate.assert_called_once()
 
@@ -486,4 +493,8 @@ class DesktopTests(unittest.TestCase):
             with Desktop(Path(d), ['display'], 'ubuntu-22.04-x11') as desktop:
                 self.assertEqual(desktop.facts['compositor'], 'xcompmgr')
                 self.assertEqual(desktop.facts['desktop'], 'LXQt/Openbox')
+                config = Path(desktop.temporary.name) / 'config'
+                for name in ('xscreensaver.desktop', 'lxqt-powermanagement.desktop'):
+                    self.assertIn('Hidden=true', (config / 'autostart' / name).read_text())
+                self.assertFalse(desktop.facts['idle_blanking'])
             self.assertEqual([call.args[0] for call in start.call_args_list], [['lxqt-session'], ['xcompmgr', '-n']])

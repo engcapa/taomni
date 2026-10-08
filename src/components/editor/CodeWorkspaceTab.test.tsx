@@ -4570,6 +4570,40 @@ describe("CodeWorkspaceTab", () => {
     );
   });
 
+  it("preserves unsaved EOL and BOM choices when a save watcher echo arrives", async () => {
+    runtimeState.tauri = true;
+    const instance = "instance-watcher-policy";
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-watcher-policy",
+      workspaceInstanceId: instance, name: "Watcher policy",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [], initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "first\nsecond", {
+      hash: "watcher-original", encoding: "UTF-8", bom: false,
+    }));
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    const key = "root:app:src/main.ts";
+    const current = () => selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instance).openFiles[key];
+    await waitFor(() => expect(current()?.text).toBe("first\nsecond"));
+    await waitFor(() => expect(useCodeWorkspaceStatusStore.getState().actions?.cycleEol).toBeDefined());
+    act(() => {
+      useCodeWorkspaceStatusStore.getState().actions?.cycleEol?.();
+      useCodeWorkspaceStatusStore.getState().actions?.toggleBom?.();
+    });
+    await waitFor(() => expect(current()).toMatchObject({ eol: "CRLF", bom: true, dirty: true }));
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "first\nsecond", {
+      hash: "watcher-refreshed", encoding: "UTF-8", bom: false,
+    }));
+    await act(async () => {
+      await emit("lsp://external-file-change", { workspaceId: instance, path: "/repo/app/src/main.ts", type: 2 });
+    });
+    await waitFor(() => expect(current()?.hash).toBe("watcher-refreshed"));
+    expect(current()).toMatchObject({ eol: "CRLF", bom: true, dirty: true, text: "first\nsecond" });
+  });
+
   it("queues an external dirty-buffer conflict and applies a merge against the latest disk hash", async () => {
     runtimeState.tauri = true;
     const workspace: CodeWorkspaceTabInfo = {
@@ -7548,6 +7582,7 @@ describe("CodeWorkspaceTab", () => {
   });
 
   it("opens the encoding chooser from workspace status and saves through the encoded writer", async () => {
+    runtimeState.tauri = true;
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-encoding-save",
@@ -7601,6 +7636,25 @@ describe("CodeWorkspaceTab", () => {
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-encoding-save")
         .openFiles["root:app:src/main.txt"]?.encoding,
     ).toBe("ISO-8859-1");
+
+    // The watcher reads the same saved bytes using the decoder's canonical
+    // label. It must not overwrite the user's chosen encoding after save.
+    workspaceMocks.workspaceReadFileWithEncoding.mockResolvedValue(file("src/main.txt", "café", {
+      encoding: "windows-1252", bom: false, hash: "hash-latin1", mtime: 12345,
+    }));
+    await act(async () => {
+      await emit("lsp://external-file-change", {
+        workspaceId: "instance-encoding-save", path: "/repo/app/src/main.txt", type: 2,
+      });
+    });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-encoding-save")
+        .openFiles["root:app:src/main.txt"]?.mtime,
+    ).toBe(12345));
+    expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-encoding-save")
+        .openFiles["root:app:src/main.txt"],
+    ).toMatchObject({ encoding: "ISO-8859-1", dirty: false });
   });
 
   it("opens a queued encoding chooser after an in-flight save settles", async () => {
@@ -13142,6 +13196,45 @@ end_of_record
       expect(getRefactorRecoveryJournalV2("rec-conflict-1")?.status).toBe("recovery-required");
     });
 
+    it("queues editor undo until the cross-file post-state and journal are committed", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("pending-history", "src/a.ts");
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/a.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+      let releasePostRead!: () => void;
+      const postRead = new Promise<void>((resolve) => { releasePostRead = resolve; });
+      let waiting = false;
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (path === "src/b.ts" && disk[path] === "hello BETA") {
+          waiting = true;
+          await postRead;
+        }
+        return file(path, disk[path]!);
+      });
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: [
+          { uri: "file:///repo/app/src/a.ts", path: "/repo/app/src/a.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }] },
+          { uri: "file:///repo/app/src/b.ts", path: "/repo/app/src/b.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 10 } }, newText: "BETA" }] },
+        ],
+      });
+      try {
+        await waitFor(() => expect(waiting).toBe(true));
+        const pane = screen.getByTestId("code-workspace-editor-pane");
+        fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
+        // The document ledger must not restore only the open buffer while
+        // the multi-file journal is still being verified.
+        expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspace.workspaceInstanceId!)
+          .openFiles["root:app:src/a.ts"]?.text).toBe("hello ALPHA");
+      } finally {
+        await act(async () => { releasePostRead(); });
+      }
+      await waitFor(() => expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]));
+      expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspace.workspaceInstanceId!)
+        .openFiles["root:app:src/a.ts"]?.text).toBe(PRE["src/a.ts"]);
+    });
+
     it("commits recovery journal and supports single undo on verified success", async () => {
       const { disk, workspace, onCommandsChange } = setupWorkspace("planless-success", "src/c.ts");
       vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
@@ -14739,6 +14832,45 @@ end_of_record
       expect(fixture.text()).toContain("int sum = extracted(values);");
       expect(fixture.text()).toContain("private static int extracted(int[] values) {");
       expect(fixture.disk[HELPER_PATH]).toContain("// extract-cross-file");
+    });
+
+    it("a stale rename names the invalidation that cancelled it", async () => {
+      // "the workspace changed" alone cannot separate a real concurrent edit
+      // from a watcher echo, so the status must carry reason, path and revisions.
+      // The watcher listener is registered at mount, so the Tauri runtime must be
+      // on before the workspace renders for an external change to arrive.
+      runtimeState.tauri = true;
+      const fixture = setupExtract("instance-rename-stale-detail");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+
+      // Change an unrelated file on disk while the naming prompt is open: a real
+      // content change, so the confirmed rename must be refused with detail.
+      // The watcher event only reaches the tab in the Tauri runtime.
+      await act(async () => {
+        await emit("lsp://external-file-change", {
+          workspaceId: "instance-rename-stale-detail",
+          path: "/repo/app/src/main/java/demo/Unrelated.java",
+          type: 2,
+        });
+        await new Promise((resolve) => { window.setTimeout(resolve, 200); });
+      });
+      fireEvent.change(input, { target: { value: "sumOf" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => {
+        const message = useAppStore.getState().statusMessage ?? "";
+        expect(message).toContain("workspace changed");
+      });
+      const message = useAppStore.getState().statusMessage!;
+      expect(message).toMatch(/reasons=[a-z-]+/);
+      expect(message).toContain("Unrelated.java");
+      expect(message).toMatch(/revision=\d+\/\d+/);
+      expect(fixture.text()).not.toContain("sumOf");
+      runtimeState.tauri = false;
     });
 
     it("a view switch while the rename preview is open never renames the abandoned file", async () => {

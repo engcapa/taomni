@@ -37,7 +37,7 @@ def _distance(x, y, polygon):
     return min(distances)
 
 
-def compare_mask(actual, source, crop, polygon):
+def compare_mask(actual, source, crop, polygon, *, watermarked=False):
     """Fixed lossless thresholds plus exact nonboundary RGBA alpha values."""
     from PIL import Image
     x, y, w, h = (crop[k] for k in ("x", "y", "width", "height"))
@@ -46,7 +46,7 @@ def compare_mask(actual, source, crop, polygon):
     original = source.crop((x, y, x + w, y + h))
     expected = Image.new("RGBA", (w, h))
     diff = Image.new("RGBA", (w, h), (0, 0, 0, 255))
-    opaque = transparent = alpha_errors = total = bad = 0
+    opaque = transparent = alpha_errors = total = bad = changed = 0
     tiles = {}
     for py in range(h):
         for px in range(w):
@@ -63,6 +63,7 @@ def compare_mask(actual, source, crop, polygon):
                 alpha_errors += int(a[3] != b[3])
             error = sum(abs(a[c] - b[c]) for c in range(3)) if interior and not boundary else 0
             total += error
+            changed += int(error > 3)
             bad += int(error > 36)
             key = (px // 24, py // 24)
             tile_sum, count = tiles.get(key, (0, 0))
@@ -72,8 +73,14 @@ def compare_mask(actual, source, crop, polygon):
     mean = total / (w * h * 3)
     bad_fraction = bad / (w * h)
     worst_tile = max((s / n for s, n in tiles.values()), default=255)
+    # A scattered watermark intentionally changes interior RGB. In that
+    # separate mode require visible marks, retained original background, and
+    # the same exact alpha mask. Never weaken the pristine-image oracle.
+    rgb_ok = (20 <= changed <= opaque * .25 if watermarked
+              else mean <= 2 and bad_fraction <= .01 and worst_tile <= 5)
     metrics = {"passed": actual.size == (w, h) and opaque > 100 and transparent > 100
-               and alpha_errors == 0 and mean <= 2 and bad_fraction <= .01 and worst_tile <= 5,
+               and alpha_errors == 0 and rgb_ok,
+               "watermarked": watermarked, "changedInteriorPixels": changed,
                "expectedSize": [w, h], "actualSize": list(actual.size),
                "opaquePixels": opaque, "transparentPixels": transparent, "alphaMismatches": alpha_errors,
                "meanRgbError": mean, "badPixelFraction": bad_fraction, "worstTileRgbError": worst_tile,
@@ -109,8 +116,10 @@ def step_screenshot_reference(ctx: StepContext, args):
 
 @verb("assert_screenshot_mask")
 def step_assert_screenshot_mask(ctx: StepContext, args):
-    if not isinstance(args, dict) or set(args) != {"selector", "crop", "polygon"}:
-        raise StepError("assert_screenshot_mask requires selector, crop and polygon")
+    if (not isinstance(args, dict) or not {"selector", "crop", "polygon"} <= set(args)
+            or set(args) - {"selector", "crop", "polygon", "watermarked"}
+            or not isinstance(args.get("watermarked", False), bool)):
+        raise StepError("assert_screenshot_mask requires selector, crop, polygon and optional watermarked boolean")
     crop, polygon = args["crop"], args["polygon"]
     if not isinstance(crop, dict) or set(crop) != {"x", "y", "width", "height"} or any(
             isinstance(v, bool) or not isinstance(v, int) or v < (1 if k in {"width", "height"} else 0)
@@ -129,7 +138,8 @@ def step_assert_screenshot_mask(ctx: StepContext, args):
         raise StepError("screenshot_reference must retain the original before export")
     with Image.open(Path(path)) as source:
         actual = _image(ctx, args["selector"])
-        metrics, expected, diff = compare_mask(actual, source.convert("RGBA"), crop, polygon)
+        metrics, expected, diff = compare_mask(actual, source.convert("RGBA"), crop, polygon,
+                                               watermarked=args.get("watermarked", False))
     prefix = f"screenshot-mask-{ctx.step_index}"
     actual.save(ctx.case_dir / f"{prefix}-actual.png")
     expected.save(ctx.case_dir / f"{prefix}-expected.png")

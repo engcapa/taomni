@@ -522,6 +522,7 @@
           "additionalProperties": false,
           "required": ["selector", "crop", "polygon"],
           "properties": {
+            "watermarked": {"type": "boolean"},
             "selector": {"$ref": "#/$defs/selector"},
             "crop": {
               "type": "object",

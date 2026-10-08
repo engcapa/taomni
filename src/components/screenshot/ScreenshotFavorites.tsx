@@ -72,6 +72,7 @@ export function ScreenshotFavorites({ onClose }: { onClose: () => void }) {
         {loading ? <p role="status" className="text-[12px]">{t("screenshot.favoritesLoading")}</p> : items.length === 0 ? <p data-testid="screenshot-favorites-empty" className="py-8 text-center text-[13px] text-[var(--taomni-text-muted)]">{t("screenshot.favoritesEmpty")}</p> : <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {items.map((item) => <div key={item.id} data-testid="screenshot-favorite-item" className="rounded-lg p-2 border border-[var(--taomni-divider)]">
             <FavoriteThumbnail item={item} />
+            {item.note ? <p data-testid="screenshot-favorite-note" title={item.note} className="mt-2 text-[12px] leading-4 line-clamp-2 break-words">{item.note}</p> : null}
             <p className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">{new Date(item.createdAt).toLocaleString()}</p>
             <div className="flex items-center gap-1 mt-2 text-[12px]">
               <span className="flex-1 tabular-nums">{item.width} × {item.height}</span>

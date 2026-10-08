@@ -19,6 +19,8 @@ modes:
 fixtures:
 - reset_db
 timeout_sec: 180
+# Consecutive modifier clicks may produce dblclick on GTK; they must remain
+# selection gestures and must not connect a session (steps 46, 48, 50).
 steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'

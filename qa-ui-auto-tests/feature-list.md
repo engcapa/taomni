@@ -3766,28 +3766,82 @@ controls:
 - `Enable AI command rewrite (Ctrl+K)` 开关 + 自定义快捷键输入框
 - 选择 `+ai` 时按需下载 FIM 模型（约 400 MB）；本地 PowerShell 终端忽略此功能避免与 PSReadLine 冲突
 
-### 14.3 PTT 语音录制按钮 ✅
+### 14.3 本地 Whisper 语音输入 ✅
 
 <!-- feature
 id: F-AI-2.3
 status: done
 area: ai/voice
-components: [PttButton, AsrPanel, TitleBarTrayControls]
+components: [PttButton, DictationButton, VoiceSettingsDialog, AsrPanel, TitleBarTrayControls]
 files:
   - src/components/window/PttButton.tsx
+  - src/components/voice/
   - src/components/settings/AsrPanel.tsx
   - src-tauri/src/voice/
+  - src-tauri/src/asr/
 controls:
   - id: ptt-button
     selector: '[data-testid="ptt-button"]'
     kind: interactive
-    optional: true       # hidden when AI master switch is on (fully_disabled)
+    optional: true
+  - id: chat-voice-button
+    selector: '[data-testid="chat-voice-button"]'
+    kind: interactive
+  - id: chat-voice-cancel
+    selector: '[data-testid="chat-voice-button-cancel"]'
+    kind: interactive
+  - id: voice-settings-close
+    selector: '[data-testid="voice-settings-close"]'
+    kind: interactive
+  - id: voice-settings-dialog
+    selector: '[data-testid="voice-settings-dialog"]'
+    kind: display
+  - id: asr-installation-progress
+    selector: '[data-testid="asr-installation-progress"]'
+    kind: display
+  - id: asr-cancel-download
+    selector: '[data-testid="asr-cancel-download"]'
+    kind: interactive
+  - id: asr-download-url-base
+    selector: '[data-testid="asr-download-url-whisper-base"]'
+    kind: interactive
+  - id: asr-copy-url-base
+    selector: '[data-testid="asr-copy-url-whisper-base"]'
+    kind: interactive
+  - id: asr-open-url-base
+    selector: '[data-testid="asr-open-url-whisper-base"]'
+    kind: interactive
+  - id: asr-download-proxy-mode
+    selector: '[data-testid="asr-download-proxy-mode"]'
+    kind: interactive
+  - id: asr-download-proxy-save
+    selector: '[data-testid="asr-download-proxy-save"]'
+    kind: interactive
+  - id: asr-check-models
+    selector: '[data-testid="asr-check-models"]'
+    kind: interactive
+  - id: asr-language
+    selector: '[data-testid="asr-language"]'
+    kind: interactive
+  - id: asr-download-base
+    selector: '[data-testid="asr-download-whisper-base"]'
+    kind: interactive
+  - id: asr-download-small
+    selector: '[data-testid="asr-download-whisper-small"]'
+    kind: interactive
+  - id: asr-select-base
+    selector: '[data-testid="asr-select-whisper-base"]'
+    kind: interactive
+  - id: asr-select-small
+    selector: '[data-testid="asr-select-whisper-small"]'
+    kind: interactive
 -->
 
-- 标题栏托盘内的麦克风按钮：按下开始录音、释放停止 + 转写
-- 探测 `voice_capture_supported` 失败时按钮置灰并显示 `MicOff` 图标（`data-state="unsupported"`）
-- 转写结果通过 `chatStore.attachToComposer(text)` 暂存到当前可聊天 tab 的 Chat 输入框，便于检视后再发送
-- AI 全局禁用 (`fully_disabled`) 时整个按钮被卸载
+- 单击开始，再次单击停止识别；Esc、取消、切换上下文或窗口失焦会取消。最长 120 秒。
+- 模型设置提供完整下载地址、复制与浏览器打开；后端进度支持关闭重开恢复，取消保留断点，再次下载按 Range 续传。宽窄窗口自适应，标题栏入口卸载不关闭设置。
+- 默认 Whisper Base，多语言 Small/Medium 可选；首次显式下载或离线导入，校验 SHA-256。多语言权重支持中文；模型版本目录按哈希隔离，支持显式检查完整性与更新。
+- 标题栏和 Chat、LAN 聊天、终端 AI 改写说明共用听写组件，只填入可编辑文本，不自动发送或执行。
+- AI 全局禁用时隐藏入口。浏览器语音 fixture 仅验证交互；原生采集与跨平台权限需真机检查。
 
 ### 14.4 AI Chat Drawer ✅
 
@@ -4854,7 +4908,7 @@ controls:
 - 剪贴板按方向分级（off/text/rich/all，默认 all）：文本、CF_HTML、CF_DIB/CF_DIBV5 图片、文件（FileGroupDescriptorW + FileContents，暂存目录 + 上限 MB）；两方向都 off 时不提供 CLIPRDR 通道
 - CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
 - Windows：NAT-01/PERF-01 三端运行，Windows 上经 `platform_choice` 在系统远程桌面提示中选 Taomni；系统远程桌面分支由 TC-RDPS-NAT-06 覆盖，TermService 基线由 TC-RDPS-PERF-02 测量
-- 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 Background Music 虚拟设备
+- 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 BlackHole 虚拟设备
 
 ---
 
@@ -11002,6 +11056,15 @@ controls:
   - id: screenshot-pin-menu-toggle
     selector: '[data-testid="screenshot-pin-menu-toggle"]'
     kind: interactive
+  - id: screenshot-pin-tab-pin
+    selector: '[data-testid="screenshot-pin-tab-pin"]'
+    kind: interactive
+  - id: screenshot-pin-tab-all
+    selector: '[data-testid="screenshot-pin-tab-all"]'
+    kind: interactive
+  - id: screenshot-pin-list
+    selector: '[data-testid="screenshot-pin-list"]'
+    kind: display
   - id: screenshot-pin-close
     selector: '[data-testid="screenshot-pin-close"]'
     kind: interactive
@@ -11068,6 +11131,9 @@ controls:
   - id: screenshot-favorite-thumbnail
     selector: '[data-testid="screenshot-favorite-thumbnail"]'
     kind: display
+  - id: screenshot-favorite-note
+    selector: '[data-testid="screenshot-favorite-note"]'
+    kind: display
   - id: screenshot-favorites-error
     selector: '[data-testid="screenshot-favorites-error"]'
     kind: display
@@ -11123,6 +11189,10 @@ controls:
     selector: '[data-testid="screenshot-pin-note"]'
     kind: display
     optional: true
+  - id: screenshot-pin-thumb-note
+    selector: '[data-testid="screenshot-pin-thumb-note"]'
+    kind: display
+    optional: true
   - id: screenshot-pin-note-input
     selector: '[data-testid="screenshot-pin-note-input"]'
     kind: interactive
@@ -11149,7 +11219,7 @@ controls:
 - 区域选择与全屏选择默认处于 select 模式，显式点击矩形等工具后才开始绘制；选区可通过八方向 handles 与 move 区域调整，recrop 保留标注，选区外重新选择和滚动截图完成则清空旧标注。12 个工具包含矩形、椭圆、箭头、直线、画笔、荧光笔、文字、气泡、马赛克、模糊、编号和橡皮；实际拖拽创建形状，文字可选择默认/衬线/等宽或系统字体与 8–144px 字号，Enter 换行、点击外部/失焦或 Ctrl/Cmd+Enter 提交、Escape 取消，擦除是可撤销的变更，redo 仅在 undo 后可用。
 - “选择/移动标注”按最上层命中选择已有形状，支持拖动、四角缩放、颜色/线宽修改、Delete/Backspace 或按钮删除，以及双击修改文字；操作参与撤销/重做。标注选中边框仅显示在编辑器中，不进入导出画面。
 - 自由手绘选区：hint/toolbar 可在矩形与自由选区间切换，松手自动闭合，凹形/交叉轮廓按 even-odd 规则命中和导出；退化直线/微小轮廓不进入标注。八方向 handles 与 move 按包围盒变换轮廓并保留标注历史；轮廓外（包括包围盒内空白）按下重新选择。切回矩形保留包围盒/标注，重新进入自由选区清空旧形状。画笔仍是独立标注工具。
-- 输出支持复制、PNG 保存（取消保留选区）、贴图；自由选区在自然尺寸 PNG 中保留内部原画/标注并将外部变为透明，最终遮罩在水印之后应用。Pin 保留原有无边框/置顶/原生拖动和三种关闭入口，以棋盘背景显示透明 PNG，不扩展为跨重启图库。OCR 显示/复制识别结果，auto-redact 将返回框作为一次可撤销标注，水印支持文字/透明度/颜色的 apply/clear。滚动截图完成直接进入等比结果预览，支持适应窗口（不放大）、100% 原图滚动查看、复制/保存/贴图与直接标记，无需再次选区或切换编辑页；GIF/MP4 录制入口配独立状态条、停止预览、保存/完成和 GIF 首帧复制（剪贴板不承载动画）；自由选区禁用滚动/录制并提示切换矩形。
+- 输出支持复制、PNG 保存（取消保留选区）、贴图；自由选区在自然尺寸 PNG 中保留内部原画/标注并将外部变为透明，最终遮罩在水印之后应用。Pin 保留原有无边框/置顶/原生拖动和三种关闭入口，以棋盘背景显示透明 PNG，不扩展为跨重启图库。设置菜单分"本贴图"与"全部贴图"两个页签：前者为缩放、透明度、说明与编辑/帮助，后者为排列、批量操作与定位列表，右键始终落在"本贴图"。贴图说明在说明条与收起缩略图上截断显示、悬停 tooltip 展示全文；保存说明会同步到已关联的本机收藏，收藏列表以两行截断展示并悬停显示全文，重开收藏恢复原说明。OCR 显示/复制识别结果，auto-redact 将返回框作为一次可撤销标注，水印支持文字/透明度/颜色的 apply/clear。滚动截图完成直接进入等比结果预览，支持适应窗口（不放大）、100% 原图滚动查看、复制/保存/贴图与直接标记，无需再次选区或切换编辑页；GIF/MP4 录制入口配独立状态条、停止预览、保存/完成和 GIF 首帧复制（剪贴板不承载动画）；自由选区禁用滚动/录制并提示切换矩形。
 - 滚动截图开始前说明自动滚动与结束方式，进行中显示帧数、“完成”和“取消”；完成保留已捕获长图，取消保留原始选区和标注。滚动及录制期间使用选区外的原生红色边框和控制窗口，避免依赖平台的内容保护来排除控制画面；全屏等没有安全控制位置时隐藏控制窗口，截图快捷键结束采集后再显示预览。没有安全位置且快捷键未注册时拒绝启动并提示调整范围或启用快捷键。
 - Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回 400×1800 的可读长图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
 - Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界。N2/N9 捕获完整长页并将产物逐像素/24×24 区块与真实 renderer canvas 保留的原画比对，覆盖文字、图案、分隔线及缺失/重复/错位/拉伸，不只检查高度或单列颜色。N5–N8 对 GIF/MP4 每一解码帧核对原画 frame id、每轮随机 nonce、区域像素及有序时间线，黑帧/错区域/静态或无关多帧均不得通过；保存原始 PNG、产物、逐帧指标/时间线和原图/实际/差异接触图。

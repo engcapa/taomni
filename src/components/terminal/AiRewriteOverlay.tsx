@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Loader2, Wand2 } from "lucide-react";
 import { VAULT_LOCKED_EVENT, isVaultLockedError } from "../../lib/ipc";
+import { DictationButton } from "../voice/DictationButton";
 import { useT } from "../../lib/i18n";
 
 interface AiRewriteOverlayProps {
@@ -87,6 +88,7 @@ export function AiRewriteOverlay({ currentCommand, onAccept, onDismiss }: AiRewr
 
       {/* Instruction input */}
       <div className="flex gap-2 mb-2">
+        <DictationButton targetRef={inputRef} onText={setInstruction} contextKey={currentCommand} disabled={loading} testId="rewrite-voice-button" />
         <input
           ref={inputRef}
           type="text"

@@ -126,6 +126,10 @@ def main():
                 config["app"]["tooling_java_home"] = os.environ["JAVA_HOME"]
                 if "java25" in entry["capabilities"]:
                     config["app"]["tooling_java25_home"] = os.environ["JAVA25_HOME"]
+            if entry["mode"] == "native" and platform.system() == "Darwin" and os.environ.get("TAOMNI_QA_MACOS_LLDB") == "1":
+                # Opt-in crash capture is part of the recorded run config.
+                config["app"]["macos_lldb"] = True
+                config["webdriver"] = {"startup_timeout": 60}
             release = entry["mode"] == "native" and "release" in entry["capabilities"]
             if release:
                 from native_build import qa_binary as release_binary

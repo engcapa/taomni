@@ -126,7 +126,7 @@ zlib-rs = { version = "0.6", default-features = false, features = ["std"] }
 # archives to the workspace. Keep formats narrow: SDK/source JARs use deflate.
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
 tungstenite = "0.29"
-tokio-tungstenite = "0.29"
+tokio-tungstenite = { version = "0.29", features = ["rustls-tls-native-roots"] }
 imap = "2.4.1"
 # BODYSTRUCTURE / section types; same version `imap` already uses.
 imap-proto = "=0.10.2"
@@ -186,6 +186,8 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 keyring = "4"
 keyring-core = "1"
 cpal = { version = "0.17", optional = true }
+whisper-rs = { version = "0.16", optional = true }
+sherpa-onnx = { version = "1.13.8", optional = true }
 # LanChat native A/V stack (lanchat/media, behind the `native-av` feature): Opus
 # audio (audiopus → vendored libopus via cc, no nasm) and software H.264
 # (openh264 → Cisco's BSD encoder/decoder built from source; needs nasm for its
@@ -273,7 +275,9 @@ tauri-utils = { path = "vendor/tauri-utils" }
 winscard = { path = "vendor/winscard" }
 
 [features]
-default = ["hbase-kerberos", "rdp-server-audio"]
+default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper", "asr-sherpa"]
+asr-whisper = ["dep:whisper-rs"]
+asr-sherpa = ["dep:sherpa-onnx"]
 # RDP server sound: WASAPI loopback / virtual-microphone playback through cpal
 # (macOS loopback uses ScreenCaptureKit; Linux uses PipeWire directly). Also
 # lets the QA-only rdp-probe play and record host audio devices.
@@ -285,7 +289,6 @@ screen-capture = ["dep:xcap"]
 # Linux desktop bundles that need native voice/video. See
 # claudedocs/lanchat-linux-native-av-transport.md.
 native-av = ["dep:cpal", "dep:audiopus", "dep:nokhwa"]
-asr-sherpa-onnx = []
 vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]
 hbase-kerberos = ["dep:cross-krb5"]

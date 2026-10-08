@@ -14,8 +14,10 @@ import os
 import platform
 import re
 import shutil
+import signal
 import socket
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -276,6 +278,7 @@ class TauriDriverProcess:
         self.native_port = int(webdriver.get("native_port", 4445))
         self._restart_required = False
         self.startup_timeout = float(webdriver.get("startup_timeout", 20))
+        self.macos_lldb = platform.system() == "Darwin" and cfg.get("app", {}).get("macos_lldb") is True
 
     def start(self) -> None:
         if self.host not in ("127.0.0.1", "localhost"):
@@ -298,9 +301,15 @@ class TauriDriverProcess:
             env = dict(os.environ)
             env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
             env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
+            command = [str(self.application.resolve())]
+            if self.macos_lldb:
+                command = ["lldb", "--batch", "-o", "settings set target.disable-aslr false",
+                           "-o", "run", "-k", "thread backtrace all", "-k", "process kill",
+                           "--", *command]
             with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
                 self.proc = subprocess.Popen(
-                    [str(self.application.resolve())],
+                    command,
+                    start_new_session=self.macos_lldb,
                     cwd=ROOT,
                     env=env,
                     stdout=stdout,
@@ -353,12 +362,7 @@ class TauriDriverProcess:
             return
 
         if self.proc is not None and self.proc.poll() is None:
-            self.proc.terminate()
-            try:
-                self.proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
-                self.proc.wait(timeout=5)
+            self.stop()
 
         deadline = time.time() + self.startup_timeout
         while _tcp_ok(self.host, self.port) and time.time() < deadline:
@@ -390,7 +394,22 @@ class TauriDriverProcess:
             self.proc.wait(timeout=5)
             self.proc = None
             return
-        self.proc.terminate()
+        if self.macos_lldb and self.proc.poll() is None:
+            # debugserver can give the inferior its own process group, and
+            # LLDB intercepts SIGTERM. Snapshot only this launcher's descendants
+            # while ownership is intact, then reap leaf-first with SIGKILL.
+            # Killing only LLDB leaves a stopped app holding the bridge port.
+            table = subprocess.check_output(["ps", "-axo", "pid=,ppid="], text=True, timeout=5)
+            parents = {int(pid): int(parent) for pid, parent in
+                       (line.split() for line in table.splitlines() if len(line.split()) == 2)}
+            owned = [self.proc.pid]
+            for parent in owned:
+                owned.extend(pid for pid, ppid in parents.items() if ppid == parent and pid not in owned)
+            for pid in reversed(owned[1:]):
+                with suppress(ProcessLookupError):
+                    os.kill(pid, signal.SIGKILL)
+        if self.proc.poll() is None:
+            self.proc.terminate()
         try:
             self.proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
@@ -400,6 +419,10 @@ class TauriDriverProcess:
 
 
 class NativeSession:
+    #: Non-empty when Linux desktop focus could not be recovered. Focus is a
+    #: case assertion, so this is reported and never fails the whole session.
+    focus_warning = ""
+
     def __init__(self, driver_url: str, application: Path, on_close: Any | None = None):
         self.driver_url = driver_url.rstrip("/")
         self.application = application
@@ -492,9 +515,38 @@ class NativeSession:
         # race that navigation; transient evaluation failures are retryable,
         # but the case deadline remains authoritative.
         self.wait_for_app_ready()
-        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND") == "wayland":
-            self.activate_wayland_window()
+        self.activate_linux_window()
         self.install_console_hook()
+
+    def activate_linux_window(self) -> None:
+        """Give the fresh/reloaded QA document real desktop focus.
+
+        X11 focus recovery is best effort: an unfocused window is a case
+        assertion, never a reason to abandon every remaining native case.
+        """
+        self.focus_warning = ""
+        if platform.system() != "Linux":
+            return
+        if os.environ.get("GDK_BACKEND") == "wayland":
+            self.activate_wayland_window()
+            return
+        if self.execute("return document.hasFocus();") is not True:
+            try:
+                from qa_ui_auto.native_steps import _activate_x11_application
+                _activate_x11_application(self.application)
+            except Exception as error:  # noqa: BLE001 - reported, never fatal
+                self.focus_warning = f"X11 activation unavailable: {error}"
+                print(f"[native] {self.focus_warning}", file=sys.stderr, flush=True)
+                return
+            handle = self.request("GET", self.endpoint("/window"))
+            self.request("POST", self.endpoint("/window"), {"handle": handle})
+            end = time.monotonic() + 5
+            while self.execute("return document.hasFocus();") is not True:
+                if time.monotonic() >= end:
+                    self.focus_warning = "X11 QA document did not receive native focus"
+                    print(f"[native] {self.focus_warning}", file=sys.stderr, flush=True)
+                    return
+                time.sleep(0.1)
 
     def activate_wayland_window(self, timeout: float = 5.0) -> None:
         # Headless Wayland can create a visible WebView whose page is not
@@ -1313,7 +1365,10 @@ class NativeHarness:
                             "profile": identity.get("profile")}, indent=2) + "\n",
                 encoding="utf-8",
             )
-            self.driver.start()
+            # A diagnostic debugger starts after the first fixture reset;
+            # no throwaway preflight inferior is needed before create_session.
+            if not self.driver.macos_lldb:
+                self.driver.start()
         except BaseException:
             self.__exit__(None, None, None)
             raise

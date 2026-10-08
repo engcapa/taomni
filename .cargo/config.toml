@@ -1,0 +1,10 @@
+# Do not inherit build-host-only instructions (e.g. AVX512).
+# x86 voice uses a checked AVX2/FMA/F16C baseline; ARM uses its normal NEON backend.
+[env]
+GGML_NATIVE = "OFF"
+GGML_SSE42 = "ON"
+GGML_AVX = "ON"
+GGML_AVX2 = "ON"
+GGML_BMI2 = "OFF"
+GGML_FMA = "ON"
+GGML_F16C = "ON"

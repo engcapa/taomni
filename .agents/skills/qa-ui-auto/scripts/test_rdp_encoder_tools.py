@@ -333,6 +333,29 @@ class EncoderToolsTest(unittest.TestCase):
 
 
 class TermServiceFixtureTest(unittest.TestCase):
+    def test_only_owned_reference_probes_release_the_warmed_connection(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(steps.platform, 'system', return_value='Windows'), \
+             patch.dict(os.environ, {'QA_RDP_BASELINE_PORT': '3389'}), \
+             patch.object(baseline, '_CREATED', ['qa-rdp-base2']), \
+             patch.object(steps.subprocess, 'Popen'), \
+             patch.object(steps, '_finish_probe', return_value='measured') as finish, \
+             patch.object(baseline, 'disconnect_owned_session', return_value=[7]) as disconnect:
+            artifact = Path(directory) / 'throughput.json'
+            ctx = SimpleNamespace(case_dir=Path(directory))
+            with patch.object(steps, '_probe_command', return_value=(['probe'], artifact)):
+                for user, port, expected_calls in [('runneradmin', 3389, 0), ('qa-rdp-base2', 3390, 0), ('qa-rdp-base2', 3389, 1)]:
+                    result = steps._do_rdp_probe(ctx, {'scenario': 'throughput', 'args': {'user': user, 'port': port}})
+                    self.assertEqual(result, 'measured')
+                    self.assertEqual(disconnect.call_count, expected_calls)
+                disconnect.assert_called_once_with('qa-rdp-base2')
+                self.assertEqual(json.loads(artifact.with_name('throughput-disconnect.json').read_text())['sessions'], [7])
+                artifact.with_name('throughput-disconnect.json').unlink()
+                finish.side_effect = StepError('measurement failed')
+                with self.assertRaisesRegex(StepError, 'measurement failed'):
+                    steps._do_rdp_probe(ctx, {'scenario': 'throughput', 'args': {'user': 'qa-rdp-base2', 'port': 3389}})
+                self.assertFalse(artifact.with_name('throughput-disconnect.json').exists())
+
     def test_partial_host_setup_registers_accounts_before_reporting_failure(self):
         from qa_ui_auto.fixtures import FixtureSkip
         with tempfile.TemporaryDirectory() as directory, \
@@ -362,7 +385,7 @@ class TermServiceFixtureTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "^setup failed$"):
                 baseline.setup(SimpleNamespace())
             self.assertIn("TermService setup cleanup failed: cleanup failed", evidence.getvalue())
-            context.__exit__.assert_called_once()
+            self.assertEqual(context.__exit__.call_count, 2)
             self.assertIsNone(baseline._SESSION_POLICY)
 
     def test_session_ids_match_only_the_owned_user_with_active_or_disconnected_rows(self):
@@ -372,6 +395,34 @@ class TermServiceFixtureTest(unittest.TestCase):
                 " QA-RDP-BASE1 7 Disc 2 10/2/2026 9:00 AM\n"
                 " qa-rdp-base2 8 Disc 1 10/2/2026 9:00 AM\n")
         self.assertEqual(baseline.session_ids(rows, "qa-rdp-base1"), [3, 7])
+
+    def test_disconnect_waits_for_owned_warm_session_without_touching_runner(self):
+        import ctypes
+        api = MagicMock()
+        api.wtsapi32.WTSDisconnectSession.return_value = True
+        rows = ">runneradmin console 1 Active none\n qa-rdp-base2 rdp-tcp#2 7 Active none\n"
+        with patch.object(baseline.platform, 'system', return_value='Windows'), \
+             patch.dict(os.environ, {'GITHUB_ACTIONS': 'true'}), \
+             patch.object(baseline, '_CREATED', ['qa-rdp-base2']), \
+             patch.object(baseline.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, rows)), \
+             patch.object(baseline, '_session_connection_state', side_effect=[0, 0, 4]), \
+             patch.object(ctypes, 'windll', api, create=True), patch('time.sleep'):
+            self.assertEqual(baseline.disconnect_owned_session('qa-rdp-base2'), [7])
+        api.wtsapi32.WTSDisconnectSession.assert_called_once_with(None, 7, False)
+
+    def test_disconnect_refuses_unowned_account_and_accepts_already_disconnected(self):
+        import ctypes
+        api = MagicMock()
+        with patch.object(baseline.platform, 'system', return_value='Windows'), \
+             patch.dict(os.environ, {'GITHUB_ACTIONS': 'true'}), \
+             patch.object(baseline, '_CREATED', ['qa-rdp-base2']), \
+             patch.object(baseline.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, 'qa-rdp-base2 7 Disc none')), \
+             patch.object(baseline, '_session_connection_state', return_value=4), \
+             patch.object(ctypes, 'windll', api, create=True):
+            with self.assertRaisesRegex(RuntimeError, 'owned hosted'):
+                baseline.disconnect_owned_session('runneradmin')
+            self.assertEqual(baseline.disconnect_owned_session('qa-rdp-base2'), [7])
+        api.wtsapi32.WTSDisconnectSession.assert_not_called()
 
     def test_logoff_rejects_workstations_inherited_accounts_and_unowned_users(self):
         for hosted, owned, user in [("false", True, "qa-rdp-base1"),
@@ -412,7 +463,7 @@ class TermServiceFixtureTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "setup failed"):
                 baseline.setup(SimpleNamespace())
             cleanup.assert_called_once()
-            context.__exit__.assert_called_once()
+            self.assertEqual(context.__exit__.call_count, 2)
             self.assertIsNone(baseline._SESSION_POLICY)
         context = MagicMock()
         with patch.object(baseline, "_SESSION_POLICY", context), \

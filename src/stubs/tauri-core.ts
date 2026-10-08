@@ -1,3 +1,4 @@
+import { voiceStub } from "./voiceStub";
 import {
   installStubMailQaControl,
   stubMailAppend,
@@ -1751,6 +1752,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     const vault = loadStubVault();
     return await stubMfaInvoke(cmd, args, vault.state === "unlocked", vault.masterPassword) as T;
   }
+  if (cmd.startsWith("voice_")) return await voiceStub(cmd, args) as T;
   switch (cmd) {
     case "structural_search_capabilities":
       return parity009Capabilities() as T;

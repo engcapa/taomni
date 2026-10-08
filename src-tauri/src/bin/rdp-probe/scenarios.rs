@@ -33,7 +33,7 @@ fn throughput_comparison(report: &Value, baseline: &Value) -> Result<Value, Prob
         let current = report
             .pointer(key)
             .and_then(Value::as_f64)
-            .filter(|v| v.is_finite() && *v >= 0.0);
+            .filter(|v| v.is_finite() && *v > 0.0);
         let previous = baseline
             .pointer(key)
             .and_then(Value::as_f64)
@@ -47,7 +47,17 @@ fn throughput_comparison(report: &Value, baseline: &Value) -> Result<Value, Prob
     };
     // Update PDUs can divide one animation frame into several rectangles.
     // Compare distinct decoded frames, the same M3 measurement as PERF-01.
-    Ok(json!({ "kbps_ratio": ratio("/kbps")?, "fps_ratio": ratio("/marker/observed_fps")? }))
+    // The source animation is time based, so two codecs can deliver different
+    // frame counts during the fixed ten-second window. Preserve the raw wire
+    // ratio, but also report bytes per delivered frame; that is the fair
+    // bandwidth comparison used by the photo contract.
+    let kbps_ratio = ratio("/kbps")?;
+    let fps_ratio = ratio("/marker/observed_fps")?;
+    Ok(json!({
+        "kbps_ratio": kbps_ratio,
+        "kbps_per_frame_ratio": kbps_ratio / fps_ratio,
+        "fps_ratio": fps_ratio,
+    }))
 }
 
 /// Whether the host target state file at `path` reports `"ready": true`.
@@ -496,11 +506,25 @@ mod throughput_comparison_tests {
             &json!({"kbps": 100.0, "fps": 50.0, "marker": {"observed_fps": 32.0}}),
         )
         .unwrap();
-        assert_eq!(compared, json!({"kbps_ratio": 0.95, "fps_ratio": 0.875}));
+        assert_eq!(
+            compared,
+            json!({
+                "kbps_ratio": 0.95,
+                "kbps_per_frame_ratio": 0.95 / 0.875,
+                "fps_ratio": 0.875,
+            })
+        );
         assert!(
             throughput_comparison(
                 &json!({"kbps": 1, "marker": {"observed_fps": 1}}),
                 &json!({"kbps": 0, "marker": {"observed_fps": 1}}),
+            )
+            .is_err()
+        );
+        assert!(
+            throughput_comparison(
+                &json!({"kbps": 1, "marker": {"observed_fps": 0}}),
+                &json!({"kbps": 1, "marker": {"observed_fps": 1}}),
             )
             .is_err()
         );

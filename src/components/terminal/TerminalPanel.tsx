@@ -3102,10 +3102,11 @@ export function TerminalPanel({
         let integrationInstalling = false;
         let startupCommandSent = false;
         let startupCommandOutputObserved = false;
+        let startupCommandSentAt = 0;
         let startupCommandPromptSnapshot: string | null = null;
         const snapshotPromptBuffer = (liveTerm: Terminal) => {
           const buffer = liveTerm.buffer.active;
-          return `${buffer.baseY + buffer.cursorY}:${buffer.cursorX}\n${getLastBufferLines(liveTerm, 5)}`;
+          return `${buffer.baseY + buffer.cursorY}:${buffer.cursorX}\n${getLastBufferLines(liveTerm, 5, buffer.baseY + buffer.cursorY + 1)}`;
         };
         const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
         const installCwdIntegration = (): boolean => {
@@ -3121,6 +3122,7 @@ export function TerminalPanel({
           if (pendingStartupCommand && !startupCommandSent) {
             if (!terminalAtIdlePrompt(liveTerm)) return false;
             startupCommandSent = true;
+            startupCommandSentAt = Date.now();
             startupCommandPromptSnapshot = snapshotPromptBuffer(liveTerm);
             writeTerminal(targetSid, encodeBase64(`${pendingStartupCommand}\r`)).catch((err) => {
               appendEvent("error", `Failed to send SSH startup command: ${String(err)}`);
@@ -3128,10 +3130,17 @@ export function TerminalPanel({
             return false;
           }
           if (pendingStartupCommand && !startupCommandOutputObserved) {
+            // xterm updates its buffer as soon as the command is echoed. That
+            // echo is not proof that the command completed; sending the cwd
+            // hook at that point races the shell and can swallow the startup
+            // command on slow SSH/ConPTY sessions. Give the shell a turn, then
+            // require an idle prompt and a changed buffer before continuing.
+            if (Date.now() - startupCommandSentAt < 500) return false;
             if (snapshotPromptBuffer(liveTerm) === startupCommandPromptSnapshot) return false;
+            if (!terminalAtIdlePrompt(liveTerm)) return false;
             startupCommandOutputObserved = true;
-            automationInputSettlingRef.current = false;
-            syncAutomationState();
+            // Keep input held until the following cwd probe also completes.
+            // Publishing readiness here exposes a gap between the two writes.
           }
           if (!terminalAtIdlePrompt(liveTerm)) return false;
           if (!integrationCommand) {
@@ -3141,7 +3150,12 @@ export function TerminalPanel({
             return true;
           }
           integrationInstalling = true;
-          const isMingwShell = /\bMINGW(?:32|64)\b/.test(getLastBufferLines(liveTerm, 3));
+          // xterm allocates blank rows below a short prompt. Inspect the rows
+          // ending at the cursor, not the bottom of the viewport.
+          const promptBuffer = liveTerm.buffer.active;
+          const isMingwShell = /\bMINGW(?:32|64)\b/.test(
+            getLastBufferLines(liveTerm, 3, promptBuffer.baseY + promptBuffer.cursorY + 1),
+          );
           // Git Bash can take long enough to echo a prompt hook that the user
           // types into the hidden setup line. A one-shot OSC 7 probe still
           // captures the requested cwd without modifying its prompt.
@@ -3160,6 +3174,7 @@ export function TerminalPanel({
           // non-POSIX shell — which never emits the OSC 7 — isn't blacked out
           // for too long before output resumes.
           automationInputSettlingRef.current = true;
+          syncAutomationState();
           // SSH/local shell integration emits a private completion marker after
           // the one-shot setup. Matching that marker avoids mistaking a prompt's
           // ordinary OSC 7 report for completion while the setup line is still
@@ -4423,9 +4438,9 @@ function getBufferText(term: Terminal): string {
   return lines.join("\n");
 }
 
-function getLastBufferLines(term: Terminal, lineCount: number): string {
+function getLastBufferLines(term: Terminal, lineCount: number, end = term.buffer.active.length): string {
   const buffer = term.buffer.active;
-  const total = buffer.length;
+  const total = Math.min(buffer.length, end);
   const start = Math.max(0, total - lineCount);
   const lines: string[] = [];
   for (let i = start; i < total; i++) {

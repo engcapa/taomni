@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { VoiceSettingsDialog } from "./components/voice/VoiceSettingsDialog";
 import { MainLayout } from "./layouts/MainLayout";
 import {
   SftpDetachedWindow,
@@ -241,7 +242,7 @@ function App() {
     <AppDialogProvider>
       {hostsRdpApprovals ? <RdpServerApprovalBridge /> : null}
       <VaultGateProvider>
-        <StartupVaultUnlockGate>{content}</StartupVaultUnlockGate>
+        <StartupVaultUnlockGate>{content}<VoiceSettingsDialog /></StartupVaultUnlockGate>
       </VaultGateProvider>
     </AppDialogProvider>
   );

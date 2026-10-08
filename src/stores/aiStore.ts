@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  type AppProxyConfig,
   vaultStatus,
   VAULT_LOCKED_EVENT,
   VAULT_LOCKED_ERROR,
@@ -13,9 +14,16 @@ export const ACP_PROVIDER_PREFIX = "acp:";
 export interface AsrProviderConfig {
   engine: string;
   model: string;
+  endpoint?: string;
+  api_key?: string;
+  proxy_mode?: "app" | "custom" | "none" | string;
+  proxy_url?: string;
 }
 
 export interface AsrConfig {
+  download_proxy?: { mode: "app" | "custom" | "none"; custom: AppProxyConfig };
+  language?: string;
+  mode?: "local" | "online" | string;
   active: string;
   providers: Record<string, AsrProviderConfig>;
   warm_on_startup: boolean;
@@ -356,13 +364,19 @@ interface AiStore {
 
 const DEFAULT_CONFIG: AiConfig = {
   asr: {
-    active: "sherpa-zipformer-zh-en",
+    download_proxy: { mode: "app", custom: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" } },
+    active: "whisper-base",
+    mode: "local",
     providers: {
-      "sherpa-zipformer-zh-en": { engine: "sherpa-onnx", model: "streaming-zipformer-bilingual-zh-en-small" },
-      "whisper-base": { engine: "whisper-rs", model: "ggml-base-q5_1" },
-    },
-    warm_on_startup: true,
-    vad: "silero",
+      ...Object.fromEntries(["base", "small", "medium"].map((size) => [`whisper-${size}`, { engine: "whisper-rs", model: `ggml-${size}.bin` }])),
+      "sherpa-zipformer-zh-en": { engine: "sherpa-onnx", model: "streaming-zipformer-bilingual-zh-en-2023-02-20", endpoint: "", api_key: "", proxy_mode: "app" },
+      aliyun: { engine: "aliyun-dashscope", model: "paraformer-realtime-v2", endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/inference/", api_key: "", proxy_mode: "app" },
+      deepgram: { engine: "deepgram", model: "nova-3", endpoint: "wss://api.deepgram.com/v1/listen", api_key: "", proxy_mode: "app" },
+      gemini: { engine: "gemini", model: "gemini-3.5-transcribe-live", endpoint: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent", api_key: "", proxy_mode: "app" },
+    } as Record<string, AsrProviderConfig>,
+    warm_on_startup: false,
+    vad: "none",
+    language: "auto",
   },
   llm: {
     active: "deepseek",
@@ -613,6 +627,10 @@ function isPlaintextVaultableKey(provider: LlmProviderConfig, key: string): bool
   );
 }
 
+function isPlaintextAsrKey(key: string): boolean {
+  return key.length > 0 && !key.startsWith("vault:");
+}
+
 function normalizeAiConfig(config: AiConfig): AiConfig {
   const providers = config.llm.providers.agnes
     ? config.llm.providers
@@ -625,6 +643,13 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
   );
   return {
     ...config,
+    asr: {
+      ...DEFAULT_CONFIG.asr,
+      download_proxy: config.asr?.download_proxy ?? DEFAULT_CONFIG.asr.download_proxy,
+      mode: config.asr?.mode === "online" ? "online" : "local",
+      active: ["whisper-base", "whisper-small", "whisper-medium", "sherpa-zipformer-zh-en", "aliyun", "deepgram", "gemini"].includes(config.asr?.active) ? config.asr.active : "whisper-base",
+      language: ["auto", "zh", "en", "ja", "ko", "fr", "de", "es"].includes(config.asr?.language ?? "") ? config.asr.language : "auto",
+    },
     llm: {
       ...config.llm,
       providers: Object.fromEntries(
@@ -766,6 +791,22 @@ export const useAiStore = create<AiStore>((set, get) => ({
         ...config,
         llm: { ...config.llm, providers },
       };
+
+      const asrProviders: Record<string, AsrProviderConfig> = {};
+      for (const [id, provider] of Object.entries(config.asr.providers ?? {})) {
+        const key = provider.api_key ?? "";
+        if (!isPlaintextAsrKey(key)) {
+          asrProviders[id] = provider;
+          continue;
+        }
+        const ref = await invoke<string>("save_ai_api_key", {
+          kind: `asr_api_key:${id}`,
+          label: `ASR Provider: ${id}`,
+          plaintext: key,
+        });
+        asrProviders[id] = { ...provider, api_key: ref };
+      }
+      safeConfig.asr = { ...config.asr, providers: asrProviders };
 
       await invoke("save_ai_config", { config: safeConfig });
       set({ config: safeConfig, saving: false });
