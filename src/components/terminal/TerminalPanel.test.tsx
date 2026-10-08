@@ -897,6 +897,21 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("does not steal focus from a path input opened while activation is settling", async () => {
+    const { rerender } = render(<TerminalPanel visible={false} />);
+    const input = document.createElement("input");
+    document.body.append(input);
+    try {
+      rerender(<TerminalPanel visible />);
+      input.focus();
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+      expect(document.activeElement).toBe(input);
+      expect(terminalMocks.focus).not.toHaveBeenCalled();
+    } finally {
+      input.remove();
+    }
+  });
+
   it("pastes clipboard text with Shift+Insert", async () => {
     const readText = vi.fn(async () => "pasted text");
     vi.stubGlobal("navigator", {

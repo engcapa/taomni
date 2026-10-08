@@ -531,6 +531,17 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                                     "exit_code_after_capture": process.poll(),
                                 }, indent=2) + "\n", encoding="utf-8")
                                 failure_artifacts["process"] = str(process_path)
+                                if platform.system() == "Darwin" and not harness.driver.macos_lldb and process.poll() is None:
+                                    # A stuck WKWebView cannot return DOM or screenshots.
+                                    # Sample only this harness-owned QA process before teardown.
+                                    import subprocess
+                                    sample_path = case_dir / "native-process-sample.txt"
+                                    sampled = subprocess.run(
+                                        ["/usr/bin/sample", str(process.pid), "2", "-file", str(sample_path.resolve())],
+                                        capture_output=True, text=True, errors="replace", timeout=10,
+                                    )
+                                    if sampled.returncode == 0 and sample_path.is_file():
+                                        failure_artifacts["process_sample"] = str(sample_path)
                         r["timings"]["failure_capture_sec"] = time.monotonic() - capture_started
                         raise
                     finally:

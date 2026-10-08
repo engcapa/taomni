@@ -3621,11 +3621,16 @@ export function TerminalPanel({
   useEffect(() => {
     if (!visible) return;
 
+    const focusAtActivation = document.activeElement;
     let frame = 0;
     const timer = window.setTimeout(() => {
       frame = window.requestAnimationFrame(() => {
         fitVisibleTerminal();
-        if (activeForShortcuts && !searchOpen) {
+        const currentFocus = document.activeElement;
+        const focusMovedOutside = currentFocus !== focusAtActivation
+          && currentFocus !== document.body && !containerRef.current?.contains(currentFocus);
+        if (activeForShortcuts && !searchOpen && !focusMovedOutside
+          && !isEditableTarget(currentFocus, currentFocus)) {
           focusTerminal();
         }
       });
