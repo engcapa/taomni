@@ -899,7 +899,10 @@ export function MainLayout() {
   const executeControlToolRef = useRef<ControlToolExecutor | null>(null);
   const seenControlToolCallsRef = useRef<Set<string>>(new Set());
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
-  const lastSidebarSizeRef = useRef(22);
+  // Seed the shell restore target from the same persisted layout used by the
+  // panel group. Without this, the visibility sync effect would immediately
+  // resize a restored navigator back to the 22% default after reload.
+  const lastSidebarSizeRef = useRef(loadResizableLayout("main-layout", ["sidebar", "content"])?.sidebar ?? 22);
   const [showSessionEditor, setShowSessionEditor] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionConfig | undefined>();
   const [newSessionGroupPath, setNewSessionGroupPath] = useState<string | null>(null);

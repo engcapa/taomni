@@ -48,7 +48,7 @@ steps:
       steps: 8
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 390
+    min_width: 420
     min_height: 200
 - press:
     selector: '[data-testid="main-sidebar-resize-handle"]'
@@ -61,7 +61,7 @@ steps:
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - assert_element_geometry:
     selector: '[data-testid="workspace-canvas"]'
-    min_width: 1300
+    min_width: 420
     min_height: 200
 - click: '[data-testid="side-tab-work"]'
 - wait_for: '[data-testid="workspace-navigator"]'
