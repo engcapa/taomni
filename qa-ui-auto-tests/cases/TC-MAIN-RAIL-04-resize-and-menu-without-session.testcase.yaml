@@ -3,7 +3,8 @@ title: Main sidebar owns resizing and the names menu in every tab and panel stat
 description: Renderer regression for Welcome with no open sessions, expanded and collapsed panels, Code Workspace
   and a local terminal. The full-height main rail edge resizes independently of embedded tab tools. Background,
   Settings and permanent buttons expose the names preference; tool buttons retain their own context menu. Width
-  and names remain shared across tab switches and survive reload.
+  and names remain shared across tab switches and survive reload. Runtime switches retain the current navigator
+  choice; explicitly hide it before exercising the merged rail.
 covers:
 - F1.2
 - F1.9
@@ -156,6 +157,10 @@ steps:
     expect_truthy: true
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - assert_count:
     selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'
     equal: 1
@@ -201,6 +206,10 @@ steps:
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-tools"]'
 - click: '[data-testid="context-menu-item-code-workspace"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - click: '[data-testid="side-tab-sessions"]:visible'
 - wait_for: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
@@ -299,13 +308,16 @@ verification:
     - 60
     - 65
     - 68
+    - 70
     - 71
-    - 73
-    - 74
-    - 76
+    - 72
+    - 75
     - 77
-    - 82
-    - 84
+    - 78
+    - 80
+    - 81
+    - 86
+    - 88
     checkpoints:
     - step: 51
       expectation: The collapsed workspace has one main sidebar resize edge.
@@ -319,17 +331,17 @@ verification:
       expectation: Project names toggle also hides permanent button names.
     - step: 67
       expectation: Welcome restores the same 68 CSS pixel rail.
-    - step: 70
+    - step: 74
       expectation: An active local terminal still has one main sidebar resize edge.
-    - step: 72
+    - step: 76
       expectation: A terminal-state pointer drag grows the rail to 80 CSS pixels.
-    - step: 75
+    - step: 79
       expectation: The permanent button names menu works in the terminal state.
-    - step: 83
+    - step: 87
       expectation: Welcome keeps the 80 CSS pixel width.
-    - step: 92
+    - step: 96
       expectation: Reloaded Welcome renders the stored 80 CSS pixel width.
-    - step: 93
+    - step: 97
       expectation: Names remain enabled after reload.
     results:
     - 51
@@ -338,30 +350,33 @@ verification:
     - 56
     - 58
     - 67
-    - 70
-    - 72
-    - 75
-    - 83
-    - 92
-    - 93
+    - 74
+    - 76
+    - 79
+    - 87
+    - 96
+    - 97
   - id: R4
     requirement: 展开主侧栏后 Code Workspace 独立工具栏仍可用原有边缘及方向键调整宽度，共享设置同步至主侧栏。
     actions:
-    - 95
     - 99
-    - 101
     - 103
-    checkpoints:
-    - step: 102
-      expectation: Expanding the sidebar returns the left tool rail to the workspace.
-    - step: 104
-      expectation: The standalone edge persists a width of 76 after ArrowLeft.
-    - step: 105
-      expectation: The main sidebar shares the resulting 76 CSS pixel width.
-    results:
-    - 102
     - 104
     - 105
+    - 106
+    - 109
+    - 111
+    checkpoints:
+    - step: 110
+      expectation: Expanding the sidebar returns the left tool rail to the workspace.
+    - step: 112
+      expectation: The standalone edge persists a width of 76 after ArrowLeft.
+    - step: 113
+      expectation: The main sidebar shares the resulting 76 CSS pixel width.
+    results:
+    - 110
+    - 112
+    - 113
   visual:
   - check: 欢迎页的整高边缘以及调整后的名称布局。
     method: automated
