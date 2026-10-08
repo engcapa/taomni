@@ -1495,6 +1495,10 @@
   ↳ `[data-testid="workspace-surface-mail"]` — alias
 - `[data-testid="workspace-context-toggle"]` — interactive — F-Workspace-1.workspace-context-toggle
 - `[data-testid="workspace-context-close"]` — interactive [optional] — F-Workspace-1.workspace-context-close
+- `[data-testid="workspace-dialog-drag-handle"]` — interactive [optional] — F-Workspace-1.workspace-dialog-drag-handle
+- `[data-testid="workspace-dialog-resize-handle"]` — interactive [optional] — F-Workspace-1.workspace-dialog-resize-handle
+- `[data-testid="workspace-dialog-close"]` — interactive [optional] — F-Workspace-1.workspace-dialog-close
+- `[data-testid="workspace-dialog-backdrop"]` — display [optional] — F-Workspace-1.workspace-dialog-backdrop
 - `[data-testid="workspace-preview-load"]` — interactive [optional] — F-Workspace-1.workspace-preview-load
 - `[data-testid="workspace-home"]` — interactive — F-Workspace-1.workspace-home
 - `[data-testid="global-search"]` — interactive — F-Workspace-1.global-search
