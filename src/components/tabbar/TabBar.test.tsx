@@ -126,6 +126,30 @@ describe("TabBar overflow navigation", () => {
     });
   });
 
+  it("moves visible surfaces past interleaved hidden workspace tabs", () => {
+    useAppStore.setState({ tabs: [makeTab(1), makeTab(2), makeTab(3)], activeTabId: "tab-3" });
+    render(<TabBar surfaceIds={["tab-1", "tab-3"]} onStartLocalTerminal={vi.fn()} onConnectSession={vi.fn()} onOpenSessionEditor={vi.fn()} />);
+    fireEvent.contextMenu(screen.getAllByTestId("tab-item")[1]);
+    fireEvent.click(screen.getByTestId("context-menu-item-move-left"));
+    expect(screen.getAllByTestId("tab-title").map((node) => node.textContent)).toEqual(["Terminal 3", "Terminal 1"]);
+    expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(["tab-3", "tab-1", "tab-2"]);
+    fireEvent.contextMenu(screen.getAllByTestId("tab-item")[0]);
+    fireEvent.click(screen.getByTestId("context-menu-item-move-right"));
+    expect(screen.getAllByTestId("tab-title").map((node) => node.textContent)).toEqual(["Terminal 1", "Terminal 3"]);
+  });
+
+  it("keeps another workspace alive when closing other or all scoped surfaces", () => {
+    useAppStore.setState({ tabs: [makeTab(1), makeTab(2), makeTab(3)], activeTabId: "tab-3" });
+    render(<TabBar surfaceIds={["tab-1", "tab-3"]} onStartLocalTerminal={vi.fn()} onConnectSession={vi.fn()} onOpenSessionEditor={vi.fn()} />);
+    fireEvent.contextMenu(screen.getAllByTestId("tab-item")[0]);
+    fireEvent.click(screen.getByTestId("context-menu-item-close-others"));
+    expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(["tab-1", "tab-2"]);
+    expect(useAppStore.getState().activeTabId).toBe("tab-1");
+    fireEvent.contextMenu(screen.getByTestId("tab-item"));
+    fireEvent.click(screen.getByTestId("context-menu-item-close-all"));
+    expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(["tab-2"]);
+  });
+
   it("shows scroll buttons when the tab list overflows and scrolls by page steps", async () => {
     renderTabBar();
     const scrollArea = screen.getByTestId("tab-scroll-area");

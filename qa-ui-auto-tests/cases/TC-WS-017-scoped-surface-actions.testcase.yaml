@@ -1,0 +1,308 @@
+id: TC-WS-017
+title: Surface context actions reorder and close only the current Workspace
+covers:
+- F-Workspace-1
+- F1.5
+tags:
+- workspace-first
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- dblclick: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: Main A
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Enter
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- dblclick: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: Remote retained
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Enter
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- dblclick: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: Main B
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Enter
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- dblclick: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: Main C
+- press:
+    selector: '[data-testid="tab-title-input"]'
+    key: Enter
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 3
+- right_click: '[data-testid="tab-item"][data-tab-title="Main B"]'
+- click: '[data-testid="context-menu-item-move-left"]'
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=0'
+    name: data-tab-title
+    equals: Main B
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=1'
+    name: data-tab-title
+    equals: Main A
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=2'
+    name: data-tab-title
+    equals: Main C
+- right_click: '[data-testid="tab-item"][data-tab-title="Main B"]'
+- click: '[data-testid="context-menu-item-move-right"]'
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=0'
+    name: data-tab-title
+    equals: Main A
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=1'
+    name: data-tab-title
+    equals: Main B
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=2'
+    name: data-tab-title
+    equals: Main C
+- right_click: '[data-testid="tab-item"][data-tab-title="Main C"]'
+- click: '[data-testid="context-menu-item-move-to-first"]'
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=0'
+    name: data-tab-title
+    equals: Main C
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=1'
+    name: data-tab-title
+    equals: Main A
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=2'
+    name: data-tab-title
+    equals: Main B
+- right_click: '[data-testid="tab-item"][data-tab-title="Main C"]'
+- click: '[data-testid="context-menu-item-move-to-last"]'
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=0'
+    name: data-tab-title
+    equals: Main A
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=1'
+    name: data-tab-title
+    equals: Main B
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=2'
+    name: data-tab-title
+    equals: Main C
+- right_click: '[data-testid="tab-item"][data-tab-title="Main A"]'
+- click: '[data-testid="context-menu-item-close-others"]'
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-tab-title="Main A"]'
+    name: data-active
+    equals: 'true'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=0'
+    name: data-tab-title
+    equals: Main A
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=0'
+    name: data-tab-title
+    equals: Remote retained
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- right_click: '[data-testid="tab-item"][data-tab-title="Main A"]'
+- click: '[data-testid="context-menu-item-close-all"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-surface-overview"]'
+    name: aria-selected
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: QA Main
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 0
+- click: '[data-testid="workspace-row-qa-workspace-remote"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=0'
+    name: data-tab-title
+    equals: Remote retained
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: QA Remote
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- screenshot: workspace-surface-actions-scoped.png
+verification:
+  review: reviewed
+  requirements:
+  - id: scope-actions
+    requirement: Interleaved Workspace surfaces move relative to their visible siblings; Close others and Close
+      all preserve another Workspace runtime and title.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    - 28
+    - 32
+    - 33
+    - 37
+    - 38
+    - 42
+    - 43
+    - 47
+    - 48
+    - 52
+    - 55
+    - 56
+    - 57
+    - 61
+    checkpoints:
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 3}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
+        "equals": "Main B"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=1", "name": "data-tab-title",
+        "equals": "Main A"}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "name": "data-tab-title",
+        "equals": "Main C"}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
+        "equals": "Main A"}}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=1", "name": "data-tab-title",
+        "equals": "Main B"}}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "name": "data-tab-title",
+        "equals": "Main C"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
+        "equals": "Main C"}}'
+    - step: 40
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=1", "name": "data-tab-title",
+        "equals": "Main A"}}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "name": "data-tab-title",
+        "equals": "Main B"}}'
+    - step: 44
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
+        "equals": "Main A"}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=1", "name": "data-tab-title",
+        "equals": "Main B"}}'
+    - step: 46
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "name": "data-tab-title",
+        "equals": "Main C"}}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-title=\"Main A\"]", "name":
+        "data-active", "equals": "true"}}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 1}}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
+        "equals": "Main A"}}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 1}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
+        "equals": "Remote retained"}}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-surface-overview\"]", "name": "aria-selected",
+        "equals": "true"}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "QA Main"}}'
+    - step: 60
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 0}}'
+    - step: 62
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 1}}'
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
+        "equals": "Remote retained"}}'
+    - step: 64
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "QA Remote"}}'
+    - step: 65
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    results:
+    - 26
+    - 29
+    - 30
+    - 31
+    - 34
+    - 35
+    - 36
+    - 39
+    - 40
+    - 41
+    - 44
+    - 45
+    - 46
+    - 49
+    - 50
+    - 51
+    - 53
+    - 54
+    - 58
+    - 59
+    - 60
+    - 62
+    - 63
+    - 64
+    - 65
+  visual:
+  - check: Surface menus remain readable and use the existing labels and Lucide icons.
+    method: manual
+    reason: Review the retained screenshot.
+  native:
+  - check: Native PTY survival is covered by TC-WS-NATIVE-002/004.
+    method: external
+    reason: This case verifies renderer action targets, not OS processes.

@@ -18,10 +18,10 @@ steps:
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - click: '[data-testid="new-local-terminal"]'
-- wait_for: '[data-testid="tab-item"] >> nth=2'
+- wait_for: '[data-testid="tab-item"][data-tab-type="terminal"] >> nth=1'
 - assert_count:
-    selector: '[data-testid="tab-item"]'
-    min: 2
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    equal: 2
 - middle_click: '[data-testid="tab-item"][data-tab-type="terminal"]'
 - wait: 1
 - assert_text:
@@ -47,9 +47,10 @@ verification:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 7
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"] >> nth=2"}'
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"] >> nth=1"}'
     - step: 8
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "equal":
+        2}}'
     - step: 11
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "1 terminals"}}'
     - step: 12
@@ -65,7 +66,8 @@ verification:
     - 3
     checkpoints:
     - step: 12
-      expectation: The original final visible result remains reachable after the navigation migration.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "equal":
+        1}}'
     results:
     - 12
   visual:

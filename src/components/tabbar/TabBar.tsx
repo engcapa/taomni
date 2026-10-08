@@ -27,6 +27,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { tabToSurfaceDescriptor } from "../../lib/workspaceScope";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import {
   startCustomDrag,
@@ -99,11 +101,10 @@ export function TabBar({
     tabs,
     activeTabId,
     setActiveTab,
-    removeTab,
-    removeTabs,
+    removeTab: removeTabFromStore,
+    removeTabs: removeTabsFromStore,
     duplicateTab,
     moveTab,
-    moveTabToIndex,
     updateTabTitle,
     tabFilter,
     setTabFilter,
@@ -300,10 +301,36 @@ export function TabBar({
 
   // Tabs actually rendered in the strip. The focus filter (issue #121) hides
   // non-matching tabs here without closing them; the `…` menu still lists all.
-  const visibleTabs = useMemo(
-    () => filterVisibleTabs(surfaceIds ? tabs.filter((tab) => surfaceIds.includes(tab.id)) : tabs, sessions, tabFilter),
-    [tabs, sessions, tabFilter, surfaceIds],
+  const scopedTabs = useMemo(
+    () => surfaceIds ? tabs.filter((tab) => surfaceIds.includes(tab.id)) : tabs,
+    [tabs, surfaceIds],
   );
+  const visibleTabs = useMemo(
+    () => filterVisibleTabs(scopedTabs, sessions, tabFilter),
+    [scopedTabs, sessions, tabFilter],
+  );
+
+  const closeSurfaces = (ids: string[], single = false) => {
+    const active = scopedTabs.find((tab) => tab.id === activeTabId);
+    const survivors = scopedTabs.filter((tab) => !ids.includes(tab.id));
+    if (single) removeTabFromStore(ids[0]);
+    else removeTabsFromStore(ids);
+    if (!surfaceIds || !active || !ids.includes(active.id)) return;
+    if (survivors.length) {
+      setActiveTab(survivors[0].id);
+      return;
+    }
+    const surface = tabToSurfaceDescriptor(active);
+    const workspaceId = "workspaceId" in surface ? surface.workspaceId
+      : surface.scope === "global" && surface.kind === "mail-unified" ? surface.contextWorkspaceId : undefined;
+    const workspace = useWorkspaceStore.getState();
+    if (workspaceId && workspace.workspaces.some((item) => item.id === workspaceId)) {
+      workspace.selectWorkspace(workspaceId);
+      useWorkspaceStore.getState().selectView("overview");
+    }
+  };
+  const removeTab = (id: string) => closeSurfaces([id], true);
+  const removeTabs = (ids: string[]) => closeSurfaces(ids);
 
   useEffect(() => {
     if (editingTabId && !tabs.some((t) => t.id === editingTabId)) {
@@ -432,13 +459,16 @@ export function TabBar({
   );
 
   const handleTabContext = (e: React.MouseEvent, tab: Tab) => {
-    const idx = tabs.findIndex((t) => t.id === tab.id);
-    const isFirst = idx === 0;
-    const isLast = idx === tabs.length - 1;
+    const idx = visibleTabs.findIndex((candidate) => candidate.id === tab.id);
+    const isFirst = idx <= 0;
+    const isLast = idx === visibleTabs.length - 1;
+    const moveRelative = (target: Tab | undefined, position: "before" | "after") => {
+      if (target) moveTab(tab.id, target.id, position);
+    };
     ctx.show(e, [
       { label: t("tabs.close"), icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
-      { label: t("tabs.closeOthersShort"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
-      { label: t("tabs.closeAll"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.closable).map((t) => t.id)) },
+      { label: t("tabs.closeOthersShort"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(scopedTabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
+      { label: t("tabs.closeAll"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(scopedTabs.filter((t) => t.closable).map((t) => t.id)) },
       { label: "", separator: true, onClick: () => {} },
       { label: t("tabs.rename"), icon: <Pencil className="w-3 h-3" />, onClick: () => startRename(tab), disabled: !tab.closable },
       { label: t("tabs.duplicate"), icon: <Copy className="w-3 h-3" />, onClick: () => {
@@ -451,10 +481,10 @@ export function TabBar({
         onClick: () => copyTabSessionInfo(tab),
       },
       { label: "", separator: true, onClick: () => {} },
-      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
-      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: isFirst },
-      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx + 1), disabled: isLast },
-      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, tabs.length - 1), disabled: isLast },
+      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveRelative(visibleTabs[0], "before"), disabled: isFirst },
+      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveRelative(visibleTabs[idx - 1], "before"), disabled: isFirst },
+      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveRelative(visibleTabs[idx + 1], "after"), disabled: isLast },
+      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveRelative(visibleTabs.at(-1), "after"), disabled: isLast },
     ]);
   };
 

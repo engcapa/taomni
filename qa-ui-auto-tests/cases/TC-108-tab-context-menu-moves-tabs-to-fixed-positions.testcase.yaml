@@ -24,7 +24,7 @@ steps:
 - click: '[data-testid="session-recents"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
-- dblclick: '[data-testid="tab-title"] >> nth=1'
+- dblclick: '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-title"]'
 - wait_for: '[data-testid="tab-title-input"]'
 - fill:
     selector: '[data-testid="tab-title-input"]'
@@ -38,8 +38,8 @@ steps:
 - click: '[data-testid="new-local-terminal"]'
 - wait: 0.3
 - assert_count:
-    selector: '[data-testid="tab-item"]'
-    min: 4
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    equal: 3
 - right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
 - wait_for: '[data-testid="context-menu"]'
 - assert_menu_items:
@@ -50,7 +50,7 @@ steps:
 - click: '[data-testid="context-menu-item-move-to-last"]'
 - wait: 0.5
 - assert_attribute:
-    selector: '[data-testid="tab-item"] >> nth=3'
+    selector: '[data-testid="tab-item"] >> nth=2'
     name: data-tab-title
     equals: Terminal 1
 - right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
@@ -58,7 +58,7 @@ steps:
 - click: '[data-testid="context-menu-item-move-left"]'
 - wait: 0.5
 - assert_attribute:
-    selector: '[data-testid="tab-item"] >> nth=2'
+    selector: '[data-testid="tab-item"] >> nth=1'
     name: data-tab-title
     equals: Terminal 1
 - right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
@@ -107,18 +107,19 @@ verification:
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"tab-title-input\"]"}'
     - step: 15
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 4}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "equal":
+        3}}'
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 18
       expectation: '{"assert_menu_items": ["Move to first", "Move left", "Move right", "Move to last"]}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=3", "name": "data-tab-title",
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "name": "data-tab-title",
         "equals": "Terminal 1"}}'
     - step: 23
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "name": "data-tab-title",
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=1", "name": "data-tab-title",
         "equals": "Terminal 1"}}'
     - step: 28
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
@@ -139,7 +140,8 @@ verification:
     - 3
     checkpoints:
     - step: 36
-      expectation: The original final visible result remains reachable after the navigation migration.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=1", "name": "data-tab-title",
+        "equals": "Terminal 1"}}'
     results:
     - 36
   visual:
