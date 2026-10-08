@@ -915,7 +915,9 @@ pub async fn screenshot_qa_scroll(app: AppHandle) -> Result<String, String> {
     park_pointer(input_point((display.x + 16, display.y + 16), source.scale))
         .await
         .map_err(|e| e.to_string())?;
-    let control = std::sync::Arc::new(super::scroll::ScrollControl::new(super::scroll::ScrollMode::Auto));
+    let control = std::sync::Arc::new(super::scroll::ScrollControl::new(
+        super::scroll::ScrollMode::Auto,
+    ));
     let worker_control = control.clone();
     let worker_display = display.clone();
     let worker = app.clone();
