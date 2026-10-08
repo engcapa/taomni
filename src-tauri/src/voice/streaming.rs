@@ -407,11 +407,25 @@ fn ws_request(
     url: &str,
     headers: &[(&str, &str)],
 ) -> Result<tungstenite::http::Request<()>, String> {
-    let mut builder = tungstenite::http::Request::builder().uri(url);
-    for (name, value) in headers {
-        builder = builder.header(*name, *value);
+    use tungstenite::client::IntoClientRequest;
+    let endpoint = Url::parse(url).map_err(|_| "ASR_WS_REQUEST: invalid endpoint")?;
+    if !matches!(endpoint.scheme(), "ws" | "wss") || endpoint.host_str().is_none() {
+        return Err("ASR_WS_REQUEST: endpoint must use ws:// or wss:// with a host".into());
     }
-    builder.body(()).map_err(|e| format!("ASR_WS_REQUEST: {e}"))
+    // A manually built HTTP request does not acquire the required WebSocket
+    // upgrade headers in client_async_tls. Let tungstenite generate a fresh
+    // Sec-WebSocket-Key, Host, Connection, Upgrade and version for each session.
+    let mut request = url
+        .into_client_request()
+        .map_err(|_| "ASR_WS_REQUEST: invalid WebSocket endpoint")?;
+    for (name, value) in headers {
+        let name = tungstenite::http::HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| "ASR_WS_REQUEST: invalid header name")?;
+        let value = tungstenite::http::HeaderValue::from_str(value)
+            .map_err(|_| "ASR_WS_REQUEST: invalid header value")?;
+        request.headers_mut().insert(name, value);
+    }
+    Ok(request)
 }
 
 async fn run_deepgram(
@@ -542,4 +556,132 @@ async fn run_aliyun(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+    use tokio::net::TcpListener;
+
+    async fn handshake_through(route: &str) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let route = route.to_owned();
+        let proxy = (!route.is_empty()).then(|| ResolvedProxy {
+            host: "127.0.0.1".into(),
+            port,
+            kind: route.clone(),
+            username: String::new(),
+            password: String::new(),
+        });
+        // A deliberately unresolvable destination proves the selected proxy
+        // handles origin DNS. The fixture terminates the tunnel as a WS server.
+        let endpoint = if proxy.is_some() {
+            "ws://asr-fixture.invalid:8080/listen?language=zh".to_owned()
+        } else {
+            format!("ws://127.0.0.1:{port}/listen?language=zh")
+        };
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            match route.as_str() {
+                "http" => {
+                    let mut header = Vec::new();
+                    while !header.ends_with(b"\r\n\r\n") {
+                        assert!(header.len() < 4096);
+                        header.push(stream.read_u8().await.unwrap());
+                    }
+                    assert!(
+                        String::from_utf8(header)
+                            .unwrap()
+                            .starts_with("CONNECT asr-fixture.invalid:8080 HTTP/1.1\r\n")
+                    );
+                    stream
+                        .write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                        .await
+                        .unwrap();
+                }
+                "socks5" => {
+                    let mut greeting = [0; 3];
+                    stream.read_exact(&mut greeting).await.unwrap();
+                    assert_eq!(greeting, [5, 1, 0]);
+                    stream.write_all(&[5, 0]).await.unwrap();
+                    let mut header = [0; 5];
+                    stream.read_exact(&mut header).await.unwrap();
+                    assert_eq!(&header[..4], &[5, 1, 0, 3]);
+                    let mut domain = vec![0; header[4] as usize];
+                    stream.read_exact(&mut domain).await.unwrap();
+                    assert_eq!(domain, b"asr-fixture.invalid");
+                    assert_eq!(stream.read_u16().await.unwrap(), 8080);
+                    stream
+                        .write_all(&[5, 0, 0, 1, 127, 0, 0, 1, 0, 0])
+                        .await
+                        .unwrap();
+                }
+                "" => {}
+                _ => panic!("unknown fixture route"),
+            }
+            let mut ws = tokio_tungstenite::accept_hdr_async(
+                stream,
+                |request: &tungstenite::handshake::server::Request, response| {
+                    assert_eq!(request.uri().path(), "/listen");
+                    assert_eq!(request.uri().query(), Some("language=zh"));
+                    assert_eq!(request.headers()["Authorization"], "Token fixture-key");
+                    Ok(response)
+                },
+            )
+            .await
+            .unwrap();
+            let audio = ws.next().await.unwrap().unwrap();
+            assert_eq!(audio.into_data().as_ref(), &[0u8, 1, 2, 3]);
+            ws.send(tungstenite::Message::Text("fixture transcript".into()))
+                .await
+                .unwrap();
+        });
+        let exchange = async {
+            let request = ws_request(&endpoint, &[("Authorization", "Token fixture-key")]).unwrap();
+            let (mut client, response) = connect_ws(request, proxy.as_ref()).await.unwrap();
+            assert_eq!(response.status(), 101);
+            client
+                .send(tungstenite::Message::Binary(vec![0, 1, 2, 3].into()))
+                .await
+                .unwrap();
+            assert_eq!(
+                client.next().await.unwrap().unwrap().into_text().unwrap(),
+                "fixture transcript"
+            );
+            server.await.unwrap();
+        };
+        tokio::time::timeout(Duration::from_secs(5), exchange)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn online_handshake_direct() {
+        handshake_through("").await;
+    }
+
+    #[tokio::test]
+    async fn online_handshake_http_proxy() {
+        handshake_through("http").await;
+    }
+
+    #[tokio::test]
+    async fn online_handshake_socks5_proxy() {
+        handshake_through("socks5").await;
+    }
+
+    #[test]
+    fn request_rejects_invalid_endpoint_and_header_without_exposing_credentials() {
+        assert!(ws_request("https://asr.example.test/listen", &[]).is_err());
+        assert!(ws_request("ws:///", &[]).is_err());
+        let error = ws_request(
+            "wss://asr.example.test/listen",
+            &[("Authorization", "secret\r\ninjected")],
+        )
+        .unwrap_err();
+        assert!(error.starts_with("ASR_WS_REQUEST:"));
+        assert!(!error.contains("secret"));
+    }
 }

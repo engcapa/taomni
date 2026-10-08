@@ -59,3 +59,32 @@ Rust probe was built and explicitly run against installed Base and Small f16
 weights on the i7-6700K. Results and limitations are in
 [asr-bench-results-2026-10-08.md](asr-bench-results-2026-10-08.md).
 This does not complete P0 or authorize bypassing its P1 selection gate.
+
+## Stage 3 — restore existing online WebSocket handshakes
+
+The shared online connector manually constructed an HTTP request without the
+WebSocket upgrade headers. A real loopback server reproduced the same missing
+`Sec-WebSocket-Key` failure for direct TCP, HTTP CONNECT and SOCKS5 routes.
+Use tungstenite's `IntoClientRequest` to generate protocol-required headers and
+fresh handshake keys, then add provider authentication. Reject invalid/non-WS
+endpoints and malformed headers without including credential text in errors.
+
+All four new regressions failed before the fix. Afterward the native `voice::`
+suite passed 8 tests, including actual WebSocket upgrades, PCM-byte delivery and
+transcript receipt through all three transport routes. Proxy tests target an
+unresolvable origin name and assert proxy-side DNS/CONNECT semantics. These are
+native socket fixtures, not cloud-provider or live TLS acceptance.
+
+The user workflow and IPC contract are unchanged; retained TC-VOICE-005 protects
+provider settings, while the native socket tests cover the changed boundary that
+browser stubs cannot exercise. No new browser control/case is appropriate for the
+HTTP upgrade header correction. No new provider protocol, billing behavior or
+network fallback was introduced. Live credentials, cloud finalization and desktop
+microphone behavior remain outside this evidence.
+
+Final formatting check: changed Rust files pass focused rustfmt checks. The
+workspace-wide `cargo fmt -- --check` still reports pre-existing formatting in
+unrelated modules (for example `bin/sockscap-helper/capture.rs`); no broad formatting
+churn was included. Global QA/CI failures above remain outstanding integration
+work. The completed increments are committed locally; P0/P1/P2/P3/P4/P5 as a whole
+are not marked complete.
