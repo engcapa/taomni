@@ -100,7 +100,7 @@ pub async fn run_local(
                 .unwrap_or_default();
             (result, recognizer.is_endpoint(&stream))
         });
-        if text != last && !text.trim().is_empty() {
+        if !text.trim().is_empty() && (text != last || endpoint) {
             last = text.clone();
             emit(
                 &app,
