@@ -902,7 +902,9 @@ export function MainLayout() {
   // Seed the shell restore target from the same persisted layout used by the
   // panel group. Without this, the visibility sync effect would immediately
   // resize a restored navigator back to the 22% default after reload.
-  const lastSidebarSizeRef = useRef(loadResizableLayout("main-layout", ["sidebar", "content"])?.sidebar ?? 22);
+  const lastSidebarSizeRef = useRef(Math.min(40, Math.max(15,
+    loadResizableLayout("main-layout", ["sidebar", "content"])?.sidebar || 22,
+  )));
   const [showSessionEditor, setShowSessionEditor] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionConfig | undefined>();
   const [newSessionGroupPath, setNewSessionGroupPath] = useState<string | null>(null);
@@ -4318,7 +4320,11 @@ export function MainLayout() {
           orientation="horizontal"
           id="main-layout"
           defaultLayout={loadResizableLayout("main-layout", ["sidebar", "content"])}
-          onLayoutChanged={saveResizableLayout("main-layout")}
+          onLayoutChanged={(layout) => {
+            // Visibility is persisted separately. Keep the last expanded width
+            // so reopening after a collapsed restart restores the user's size.
+            if (layout.sidebar > 2) saveResizableLayout("main-layout")(layout);
+          }}
           className="workspace-main-layout flex-1 min-w-0"
           // Size the resize hit target to match the 6px visible divider.
           // Sizing the hit target to the divider width keeps it from bleeding onto content/terminal.

@@ -1517,6 +1517,8 @@
 - `[data-testid="global-new"]` — interactive — F-Workspace-1.global-new
 - `[data-testid="command-center"]` — display [optional] — F-Workspace-1.command-center
 - `[data-testid="command-center-search"]` — interactive [optional] — F-Workspace-1.command-center-search
+- `[data-testid^="workspace-command-result-"]` — interactive [optional] — F-Workspace-1.workspace-command-result
+  ↳ `[data-testid="workspace-command-result-qa-workspace-remote"]` — alias
 - `[data-testid="session-tool-picker"]` — display [optional] — F-Workspace-1.session-tool-picker
 - `[data-testid="workspace-tool-picker"]` — display [optional] — F-Workspace-1.workspace-tool-picker
 - `[data-testid="workspace-canvas"]` — display — F-Workspace-1.workspace-canvas

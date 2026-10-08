@@ -138,6 +138,12 @@ controls:
   selector: '[data-testid="command-center-search"]'
   kind: interactive
   optional: true
+- id: workspace-command-result
+  selector: '[data-testid^="workspace-command-result-"]'
+  kind: interactive
+  optional: true
+  aliases:
+  - '[data-testid="workspace-command-result-qa-workspace-remote"]'
 - id: session-tool-picker
   selector: '[data-testid="session-tool-picker"]'
   kind: display

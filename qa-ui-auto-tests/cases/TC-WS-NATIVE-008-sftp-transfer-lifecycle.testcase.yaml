@@ -39,19 +39,21 @@ steps:
     selector: '[data-testid="sftp-browser"][data-sftp-attached="true"]'
     timeout_sec: 30
 - click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: input[data-testid="sftp-remote-path"]
 - fill:
-    selector: '[data-testid="sftp-remote-path"]'
+    selector: input[data-testid="sftp-remote-path"]
     value: ${cfg.sftp.remote_test_dir}
 - press:
-    selector: '[data-testid="sftp-remote-path"]'
+    selector: input[data-testid="sftp-remote-path"]
     key: Enter
 - wait_for: '[data-testid="sftp-remote-pane"]'
 - click: '[data-testid="sftp-local-path-edit"]'
+- wait_for: input[data-testid="sftp-local-path"]
 - fill:
-    selector: '[data-testid="sftp-local-path"]'
+    selector: input[data-testid="sftp-local-path"]
     value: ${fixture.workspace_catalog_root}
 - press:
-    selector: '[data-testid="sftp-local-path"]'
+    selector: input[data-testid="sftp-local-path"]
     key: Enter
 - click: '[data-testid="sftp-local-pane"] tr[title$="qa-workspace-transfer.txt"]'
 - click: '[data-testid="sftp-local-upload-selected"]'
@@ -65,11 +67,12 @@ steps:
     timeout_sec: 60
 - assert_visible: '[data-testid="sftp-remote-pane"] tr[title$="qa-workspace-transfer.txt"]'
 - click: '[data-testid="sftp-local-path-edit"]'
+- wait_for: input[data-testid="sftp-local-path"]
 - fill:
-    selector: '[data-testid="sftp-local-path"]'
+    selector: input[data-testid="sftp-local-path"]
     value: ${fixture.workspace_catalog_download}
 - press:
-    selector: '[data-testid="sftp-local-path"]'
+    selector: input[data-testid="sftp-local-path"]
     key: Enter
 - click: '[data-testid="sftp-remote-pane"] tr[title$="qa-workspace-transfer.txt"]'
 - click: '[data-testid="sftp-remote-download-selected"]'
@@ -104,49 +107,52 @@ verification:
     - 12
     - 14
     - 16
-    - 17
     - 18
-    - 20
+    - 19
     - 21
-    - 22
     - 23
     - 24
     - 25
     - 26
     - 27
     - 28
-    - 31
-    - 32
+    - 29
+    - 30
     - 33
-    - 34
     - 35
     - 36
     - 37
     - 38
     - 39
-    - 42
-    - 43
-    - 44
-    checkpoints:
-    - step: 13
-      expectation: The upload result, downloaded bytes, unique SFTP host or remote cleanup is observable after switching.
-    - step: 29
-      expectation: The upload result, downloaded bytes, unique SFTP host or remote cleanup is observable after switching.
-    - step: 30
-      expectation: The upload result, downloaded bytes, unique SFTP host or remote cleanup is observable after switching.
-    - step: 40
-      expectation: The upload result, downloaded bytes, unique SFTP host or remote cleanup is observable after switching.
-    - step: 41
-      expectation: The upload result, downloaded bytes, unique SFTP host or remote cleanup is observable after switching.
-    - step: 45
-      expectation: The upload result, downloaded bytes, unique SFTP host or remote cleanup is observable after switching.
-    results:
-    - 13
-    - 29
-    - 30
     - 40
     - 41
+    - 42
     - 45
+    - 46
+    - 47
+    checkpoints:
+    - step: 13
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
+        "regex": "(?m)^QA_SHARED_BEFORE\\s*$", "timeout_sec": 30}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-transfer-queue\"]", "contains": "done", "timeout_sec":
+        60}}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] tr[title$=\"qa-workspace-transfer.txt\"]"}'
+    - step: 43
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_catalog_download}/qa-workspace-transfer.txt",
+        "equals": "${fixture.workspace_transfer_sha256}", "timeout_sec": 60}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-browser\"]", "equal": 1}}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-remote-pane\"] tr[title$=\"qa-workspace-transfer.txt\"]"}'
+    results:
+    - 13
+    - 31
+    - 32
+    - 43
+    - 44
+    - 48
   visual:
   - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
     method: manual

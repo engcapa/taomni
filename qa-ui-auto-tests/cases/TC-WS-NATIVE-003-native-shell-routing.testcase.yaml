@@ -38,7 +38,7 @@ steps:
 - fill:
     selector: '[data-testid="command-center-search"]'
     value: QA Remote
-- click: '[data-testid="command-center"] button'
+- click: '[data-testid="workspace-command-result-qa-workspace-remote"]'
 - assert_text:
     selector: '[data-testid="workspace-header"]'
     contains: QA Remote
@@ -64,13 +64,13 @@ verification:
     - 21
     checkpoints:
     - step: 6
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="control-bar"] [data-testid="tab-bar"]'', ''equal'':
+      expectation: '{"assert_count": {"selector": "[data-testid=\"control-bar\"] [data-testid=\"tab-bar\"]", "equal":
         0}}'
     - step: 12
-      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]'', ''min_width'':
-        180, ''min_height'': 100}}'
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-canvas\"]", "min_width":
+        180, "min_height": 100}}'
     - step: 19
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'', ''contains'': ''QA Remote''}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "QA Remote"}}'
     - step: 22
       expectation: Returning to QA Main reopens the existing Files renderer without a blank canvas.
     results:
@@ -92,4 +92,3 @@ native_platforms:
 - Windows
 - macOS
 - Linux
-

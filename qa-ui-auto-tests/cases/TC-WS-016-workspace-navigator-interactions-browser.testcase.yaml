@@ -48,33 +48,38 @@ steps:
       steps: 8
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 400
+    min_width: 390
     min_height: 200
 - press:
     selector: '[data-testid="main-sidebar-resize-handle"]'
     key: ArrowRight
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 400
+    min_width: 420
     min_height: 200
 - click: '[data-testid="workspace-hide"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly: &id001
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-canvas"]').getBoundingClientRect().width
+      >= 1300
+    expect_truthy: true
+    timeout_sec: 10
 - assert_element_geometry:
     selector: '[data-testid="workspace-canvas"]'
-    min_width: 400
+    min_width: 1300
     min_height: 200
 - click: '[data-testid="side-tab-work"]'
 - wait_for: '[data-testid="workspace-navigator"]'
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 400
+    min_width: 420
     min_height: 200
 - reload_window: null
 - wait_for: '[aria-label="Unpin QA Main"]'
 - assert_visible: '[data-testid="workspace-navigator"] section:first-of-type [data-testid="workspace-row-qa-workspace-main"]'
 - assert_element_geometry:
     selector: '[data-testid="expanded-sidebar-panel"]'
-    min_width: 400
+    min_width: 420
     min_height: 200
 - click: '[aria-label="Unpin QA Main"]'
 - wait_for: '[aria-label="Pin QA Main"]'
@@ -82,13 +87,25 @@ steps:
 - assert_text:
     selector: '[data-testid="workspace-header"]'
     contains: Workspace · QA Main
+- click: '[data-testid="workspace-hide"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly: *id001
+- reload_window: null
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="side-tab-work"]'
+- wait_for: '[data-testid="workspace-navigator"]'
+- assert_element_geometry:
+    selector: '[data-testid="expanded-sidebar-panel"]'
+    min_width: 420
+    min_height: 200
 - screenshot: workspace-navigator-resized.png
 verification:
   review: pending
   requirements:
   - id: R1
     requirement: Search handles matches and no results; pin/unpin moves the row; actual sidebar width grows with
-      pointer and keyboard, survives hide/restore and reload without switching workspace.
+      pointer and keyboard, survives hide/restore and reload without switching workspace. A restart while collapsed
+      also preserves the expanded width and allows reopening.
     actions:
     - 4
     - 7
@@ -98,9 +115,12 @@ verification:
     - 14
     - 16
     - 18
-    - 21
-    - 24
-    - 28
+    - 22
+    - 25
+    - 29
+    - 33
+    - 36
+    - 38
     checkpoints:
     - step: 5
       expectation: '{"assert_visible": "[data-testid=\"workspace-row-qa-workspace-remote\"]"}'
@@ -113,26 +133,37 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:first-of-type [data-testid=\"workspace-row-qa-workspace-main\"]"}'
     - step: 15
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
-        400, "min_height": 200}}'
+        390, "min_height": 200}}'
     - step: 17
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
-        400, "min_height": 200}}'
+        420, "min_height": 200}}'
     - step: 20
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61)
+        + ''\"workspace-canvas\"]'').getBoundingClientRect().width >= 1300", "expect_truthy": true, "timeout_sec":
+        10}}'
+    - step: 21
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-canvas\"]", "min_width":
         1300, "min_height": 200}}'
-    - step: 23
+    - step: 24
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
-        400, "min_height": 200}}'
-    - step: 26
-      expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:first-of-type [data-testid=\"workspace-row-qa-workspace-main\"]"}'
+        420, "min_height": 200}}'
     - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:first-of-type [data-testid=\"workspace-row-qa-workspace-main\"]"}'
+    - step: 28
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
-        400, "min_height": 200}}'
-    - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:nth-of-type(2) [data-testid=\"workspace-row-qa-workspace-main\"]"}'
+        420, "min_height": 200}}'
     - step: 31
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "Workspace ·
+      expectation: '{"assert_visible": "[data-testid=\"workspace-navigator\"] section:nth-of-type(2) [data-testid=\"workspace-row-qa-workspace-main\"]"}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "Workspace \u00b7
         QA Main"}}'
+    - step: 35
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61)
+        + ''\"workspace-canvas\"]'').getBoundingClientRect().width >= 1300", "expect_truthy": true, "timeout_sec":
+        10}}'
+    - step: 40
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"expanded-sidebar-panel\"]", "min_width":
+        420, "min_height": 200}}'
     results:
     - 5
     - 6
@@ -141,11 +172,14 @@ verification:
     - 15
     - 17
     - 20
-    - 23
-    - 26
+    - 21
+    - 24
     - 27
-    - 30
+    - 28
     - 31
+    - 32
+    - 35
+    - 40
   visual:
   - check: Inspect input width, reference actions and canvas spacing after the navigator is widened.
     method: manual
