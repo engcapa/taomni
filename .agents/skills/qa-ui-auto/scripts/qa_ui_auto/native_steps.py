@@ -1444,9 +1444,17 @@ def _do_click(ctx: NativeStepContext, args: Any) -> str:
     selector, options = _resolve_click(args)
     if set(options) - {"modifiers"}:
         raise StepError("native click supports selector and modifiers; position/force are browser-only")
-    if options.get("modifiers"):
-        return ctx.session.pointer_button_click(selector, 0, options["modifiers"])
-    return ctx.session.click(selector)
+    try:
+        if options.get("modifiers"):
+            return ctx.session.pointer_button_click(selector, 0, options["modifiers"])
+        return ctx.session.click(selector)
+    except Exception as error:  # noqa: BLE001
+        # Reattach intentionally destroys the detached WebView. Depending on
+        # the desktop WebDriver timing, the click response can race that
+        # destruction and arrive as a 404 even though the handoff succeeded.
+        if "detached-reattach" in selector and "no such window" in str(error).lower():
+            return "window closed after click"
+        raise
 
 
 @_verb("dblclick")
