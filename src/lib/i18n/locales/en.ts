@@ -2946,6 +2946,8 @@ const dict = {
     resumeDownload: "Resume download",
     partialDownload: "Ready to resume:",
     backgroundDownload: "Closing this window keeps the download running. Cancel keeps downloaded data for the next attempt.",
+    batchRecognition: "After recording",
+    streamingRecognition: "While speaking",
     modelsTitle: "Speech models",
     multilingual: "Multilingual",
     copyDownloadLink: "Copy link",

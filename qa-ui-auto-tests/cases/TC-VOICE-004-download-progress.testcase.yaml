@@ -1,10 +1,10 @@
 id: TC-VOICE-004
-title: Pinned links, restored model progress, cancel and resume in a responsive modal
+title: Whisper and Zipformer share model cards, progress, cancellation and resume
 covers: [F-AI-2.3]
 tags: [ai, voice, download, p1]
 modes: [browser]
 fixtures: [reset_db]
-timeout_sec: 100
+timeout_sec: 160
 steps:
 - open: '${cfg.app.base_url}/?voiceFixture=1&voiceDownloadSlow=1'
 - wait_for: '[data-testid="ptt-button"]'
@@ -33,6 +33,31 @@ steps:
 - assert_element_geometry: {selector: '[data-testid="voice-settings-dialog"]', min_width: 550, min_height: 400, viewport_margin: 8}
 - screenshot: model-download-narrow.png
 - assert_element_geometry: {selector: '[data-testid="voice-settings-close"]', min_width: 28, min_height: 26, icon_size: 16, tolerance: 2, viewport_margin: 8}
+- set_viewport: {width: 1280, height: 900}
+- select_option: {selector: '[data-testid="asr-realtime-provider"]', value: whisper-small}
+- assert_attribute: {selector: '[data-testid="asr-download-url-sherpa-zipformer-zh-en"]', name: href, equals: 'https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tree/98590b7ed6443e77b714204da2757d75e1a642f4'}
+- click: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]'
+- assert_text: {selector: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]', contains: Copied}
+- click: '[data-testid="asr-download-sherpa-zipformer-zh-en"]'
+- assert_text: {selector: '[data-testid="asr-sherpa-installation-progress"]', contains: '19.9 /', timeout_sec: 5}
+- click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="ptt-button"]'
+- assert_text: {selector: '[data-testid="asr-sherpa-installation-progress"]', contains: Downloading}
+- assert_attribute: {selector: '[data-testid="asr-download-whisper-base"]', name: disabled, equals: ''}
+- screenshot: zipformer-restored-download.png
+- click: '[data-testid="asr-cancel-sherpa-download"]'
+- assert_text: {selector: '[data-testid="asr-sherpa-installation-progress"]', contains: 'Download cancelled'}
+- assert_text: {selector: '[data-testid="asr-download-sherpa-zipformer-zh-en"]', contains: Resume download}
+- click: '[data-testid="asr-download-sherpa-zipformer-zh-en"]'
+- assert_text: {selector: '[data-testid="asr-sherpa-installation-progress"]', contains: 'Downloaded and verified', timeout_sec: 20}
+- click: '[data-testid="asr-select-sherpa-zipformer-zh-en"]'
+- assert_localstorage: {key: taomni.ai.config.v1, contains: '"active":"sherpa-zipformer-zh-en"'}
+- set_viewport: {width: 620, height: 760}
+- assert_element_geometry: {selector: '[data-testid="voice-settings-dialog"]', min_width: 550, min_height: 400, viewport_margin: 8}
+- screenshot: zipformer-model-narrow.png
+- click: '[data-testid="asr-download-url-sherpa-zipformer-zh-en"]'
+- click: '[data-testid="asr-open-url-sherpa-zipformer-zh-en"]'
+- assert_visible: '[data-testid="asr-model-sherpa-zipformer-zh-en"]'
 verification:
   review: reviewed
   requirements:
@@ -51,6 +76,21 @@ verification:
     - {step: 25, expectation: Narrow viewport modal remains inside the screen.}
     - {step: 27, expectation: Close icon remains visible and clickable in the narrow modal.}
     results: [5, 7, 8, 15, 16, 19, 20, 22, 25, 27]
+  - id: R2
+    requirement: Zipformer is available alongside Whisper with matching download controls; progress restores after reopening and cancellation retains resumable bytes.
+    actions: [29, 31, 33, 35, 36, 40, 43, 45, 47, 50, 51]
+    checkpoints:
+    - {step: 30, expectation: Zipformer exposes its official model bundle page.}
+    - {step: 32, expectation: Copy uses the same feedback as Whisper.}
+    - {step: 37, expectation: Reopening restores the Zipformer running job.}
+    - {step: 38, expectation: Other downloads remain disabled during the running job.}
+    - {step: 41, expectation: Cancellation retains progress.}
+    - {step: 42, expectation: The common download action offers resume.}
+    - {step: 44, expectation: Resume reaches verified completion.}
+    - {step: 46, expectation: The shared use-model action selects Zipformer.}
+    - {step: 48, expectation: All model cards remain inside the narrow dialog.}
+    - {step: 52, expectation: Link and open actions retain the settings page; exact IPC target is covered by the mounted test.}
+    results: [30, 32, 37, 38, 41, 42, 44, 46, 48, 52]
   visual:
   - {check: "Model cards, progress and narrow layout", method: manual, reason: Inspect the three retained screenshots.}
   native:

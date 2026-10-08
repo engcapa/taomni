@@ -2923,6 +2923,8 @@ export const zhCN: DeepPartial<typeof en> = {
     resumeDownload: "继续下载",
     partialDownload: "可续传：",
     backgroundDownload: "关闭窗口后下载会继续。取消会保留已下载数据，下次下载时自动续传。",
+    batchRecognition: "录完识别",
+    streamingRecognition: "边说边识别",
     modelsTitle: "语音模型",
     multilingual: "多语言",
     copyDownloadLink: "复制地址",
