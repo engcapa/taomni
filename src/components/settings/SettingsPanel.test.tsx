@@ -24,6 +24,12 @@ vi.mock("../../lib/ipc", () => ({
   ...ipcMocks,
 }));
 
+// Settings search mounts the ASR section, including its progress subscription.
+// jsdom has no Tauri event bridge; the dedicated AsrPanel suite exercises events.
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+}));
+
 const CODE_VIEW_STORAGE_KEY = "taomni.codeViewProfile.v1";
 const APP_THEME_STORAGE_KEY = "taomni.appTheme.v1";
 const TERMINAL_DEFAULT_STORAGE_KEY = "taomni.terminalDefaultProfile.v1";

@@ -38,7 +38,7 @@ steps:
 - fill:
     selector: '[data-testid="command-center-search"]'
     value: QA Remote
-- click: '[data-testid="command-center"] > button:first-of-type'
+- click: '[data-testid="command-center"] button'
 - assert_text:
     selector: '[data-testid="workspace-header"]'
     contains: QA Remote
@@ -92,3 +92,4 @@ native_platforms:
 - Windows
 - macOS
 - Linux
+
