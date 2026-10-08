@@ -31,6 +31,10 @@ impl AsrManager {
         }
     }
 
+    pub(crate) fn language(&self) -> &str {
+        &self.language
+    }
+
     pub fn configured(model_id: &str, language: &str) -> Self {
         Self {
             model_id: model_id.into(),

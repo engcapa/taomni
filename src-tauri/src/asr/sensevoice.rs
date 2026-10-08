@@ -11,6 +11,22 @@ pub struct SenseVoice {
     recognizer: Arc<Mutex<Option<sherpa_onnx::OfflineRecognizer>>>,
 }
 impl SenseVoice {
+    /// Keep a single warm language configuration across short streaming sessions.
+    /// Existing sessions retain their own Arc when the language changes.
+    pub fn cached(language: &str) -> Self {
+        static CACHE: std::sync::OnceLock<Mutex<Option<(String, SenseVoice)>>> =
+            std::sync::OnceLock::new();
+        let mut cache = CACHE.get_or_init(|| Mutex::new(None)).lock().unwrap();
+        if let Some((previous, recognizer)) = cache.as_ref() {
+            if previous == language {
+                return recognizer.clone();
+            }
+        }
+        let recognizer = Self::default();
+        *cache = Some((language.to_owned(), recognizer.clone()));
+        recognizer
+    }
+
     pub async fn prepare(&self, language: &str) -> Result<(), String> {
         if !["auto", "zh", "yue", "en", "ja", "ko"].contains(&language) {
             return Err("ASR_LANGUAGE: SenseVoice supports zh/yue/en/ja/ko; select Whisper for this language".into());

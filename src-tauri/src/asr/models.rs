@@ -39,8 +39,8 @@ impl InstallationTracker {
             revision: current.as_ref().map_or(1, |p| p.revision + 1),
             job_id: job_id.into(),
             model_id: model.id.into(),
-            bytes: bytes.min(model.bytes),
-            total: model.bytes,
+            bytes: bytes.min(bundle_bytes(model)),
+            total: bundle_bytes(model),
             phase,
             error,
         };
@@ -68,18 +68,29 @@ pub fn voice_cancel_model_installation(job_id: String) {
 pub fn voice_cancel_sherpa_model_installation(job_id: String) {
     voice_cancel_model_installation(job_id);
 }
+fn bundle_bytes(model: &catalog::Model) -> u64 {
+    model.bytes
+        + if model.id == "sensevoice-small" {
+            catalog::SENSE_TOKENS.bytes
+        } else {
+            0
+        }
+}
+
 struct InstallationReporter<'a> {
     app: &'a tauri::AppHandle,
     model: &'static catalog::Model,
     job_id: String,
     bytes: u64,
+    offset: u64,
     finished: bool,
 }
 impl InstallationReporter<'_> {
     fn report(&mut self, phase: &'static str, bytes: u64, error: Option<String>) {
         self.bytes = bytes;
         self.finished = matches!(phase, "complete" | "failed" | "cancelled");
-        let progress = INSTALLATION.update(self.model, &self.job_id, phase, bytes, error);
+        let progress =
+            INSTALLATION.update(self.model, &self.job_id, phase, bytes + self.offset, error);
         let _ = self.app.emit("voice-model-progress", progress);
     }
 }
@@ -249,7 +260,7 @@ pub struct SherpaModelStatus {
     pub installed: bool,
 }
 
-pub(crate) fn sherpa_model_dir() -> std::path::PathBuf {
+fn sherpa_storage_dir() -> std::path::PathBuf {
     if let Ok(path) = std::env::var("TAOMNI_SHERPA_MODEL_DIR") {
         return std::path::PathBuf::from(path);
     }
@@ -258,13 +269,42 @@ pub(crate) fn sherpa_model_dir() -> std::path::PathBuf {
         .join("taomni/models/sherpa-zipformer-zh-en")
 }
 
+/// Publish a complete revision by its marker, keeping legacy weights usable
+/// while individual files in the new revision are downloaded and verified.
+pub(crate) fn sherpa_model_dir() -> std::path::PathBuf {
+    active_sherpa_dir(sherpa_storage_dir(), SHERPA_UPSTREAM_REVISION)
+}
+
+fn active_sherpa_dir(root: std::path::PathBuf, revision: &str) -> std::path::PathBuf {
+    let candidate = root.join(revision);
+    if std::fs::read_to_string(candidate.join(SHERPA_REVISION_FILE))
+        .is_ok_and(|value| value == revision)
+    {
+        candidate
+    } else if let Ok(previous) = std::fs::read_to_string(root.join(".active")) {
+        if previous.len() == 40 && previous.chars().all(|c| c.is_ascii_hexdigit()) {
+            let previous_dir = root.join(&previous);
+            if std::fs::read_to_string(previous_dir.join(SHERPA_REVISION_FILE))
+                .is_ok_and(|value| value == previous)
+            {
+                return previous_dir;
+            }
+        }
+        root
+    } else {
+        root
+    }
+}
+
 fn sherpa_file_status() -> SherpaModelStatus {
     let dir = sherpa_model_dir();
     let files = SHERPA_FILES
         .iter()
         .map(|(filename, bytes, sha256)| {
             let path = dir.join(filename);
-            let part = dir.join(format!("{filename}.part"));
+            let part = sherpa_storage_dir()
+                .join(SHERPA_UPSTREAM_REVISION)
+                .join(format!("{filename}.part"));
             let downloaded = std::fs::metadata(&part)
                 .map(|m| m.len())
                 .unwrap_or(0)
@@ -372,7 +412,7 @@ pub async fn voice_install_sherpa_model(
     let job_id = uuid::Uuid::new_v4().to_string();
     let cancel = CancellationToken::new();
     *CANCELLATION.lock().unwrap() = Some((job_id.clone(), cancel.clone()));
-    let dir = sherpa_model_dir();
+    let dir = sherpa_storage_dir().join(SHERPA_UPSTREAM_REVISION);
     let result = async {
         tokio::fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
         let settings = state.ai_ctx.read().await.config.asr.download_proxy.clone();
@@ -388,6 +428,18 @@ pub async fn voice_install_sherpa_model(
                 continue;
             }
             let part = dir.join(format!("{filename}.part"));
+            if !part.exists() {
+                let legacy = sherpa_storage_dir().join(filename);
+                let legacy_part = sherpa_storage_dir().join(format!("{filename}.part"));
+                if std::fs::metadata(&legacy).is_ok_and(|m| m.len() == *bytes)
+                    && crate::models::downloader::sha256_file(&legacy).is_ok_and(|hash| hash == *sha256) {
+                    tokio::fs::copy(&legacy, &part).await.map_err(|e| e.to_string())?;
+                } else if std::fs::metadata(&legacy_part).is_ok_and(|m| m.len() <= *bytes) {
+                    // Copy, never move, so a cancelled migration leaves the old
+                    // installer state intact. Final hash still validates the prefix.
+                    tokio::fs::copy(&legacy_part, &part).await.map_err(|e| e.to_string())?;
+                }
+            }
             let url = format!("{SHERPA_UPSTREAM_REPOSITORY}/resolve/{SHERPA_UPSTREAM_REVISION}/{filename}?download=true");
             sherpa_progress(&app, &job_id, "connecting", completed, Some((*filename).into()), None);
             download_to_part(&client, &url, *bytes, &part, &cancel, |phase, bytes_done| {
@@ -402,9 +454,13 @@ pub async fn voice_install_sherpa_model(
             tokio::fs::rename(&part, &target).await.map_err(|e| e.to_string())?;
             completed += *bytes;
         }
-        tokio::fs::write(dir.join(SHERPA_REVISION_FILE), SHERPA_UPSTREAM_REVISION)
-            .await
-            .map_err(|e| e.to_string())?;
+        if cancel.is_cancelled() { return Err("CANCELLED".into()); }
+        let marker = dir.join(".revision.part");
+        tokio::fs::write(&marker, SHERPA_UPSTREAM_REVISION).await.map_err(|e| e.to_string())?;
+        tokio::fs::rename(marker, dir.join(SHERPA_REVISION_FILE)).await.map_err(|e| e.to_string())?;
+        let active_part = sherpa_storage_dir().join(".active.part");
+        tokio::fs::write(&active_part, SHERPA_UPSTREAM_REVISION).await.map_err(|e| e.to_string())?;
+        tokio::fs::rename(active_part, sherpa_storage_dir().join(".active")).await.map_err(|e| e.to_string())?;
         Ok::<(), String>(())
     }.await;
     CANCELLATION.lock().unwrap().take();
@@ -432,10 +488,20 @@ pub async fn voice_install_sherpa_model(
     }
     result
 }
-fn retire_replaced_model(root: &std::path::Path, old: &catalog::Model, new: &catalog::Model) -> Result<(), String> {
+fn retire_replaced_model(
+    root: &std::path::Path,
+    old: &catalog::Model,
+    new: &catalog::Model,
+) -> Result<(), String> {
     catalog::verify(new, &catalog::version_path(root, new))?;
-    for old_path in [catalog::version_path(root, old), root.join(old.id).join(old.filename)] {
-        if old_path.is_file() { std::fs::remove_file(old_path).map_err(|e| format!("Replacement ready; old model removal failed: {e}"))?; }
+    for old_path in [
+        catalog::version_path(root, old),
+        root.join(old.id).join(old.filename),
+    ] {
+        if old_path.is_file() {
+            std::fs::remove_file(old_path)
+                .map_err(|e| format!("Replacement ready; old model removal failed: {e}"))?;
+        }
     }
     Ok(())
 }
@@ -483,7 +549,11 @@ fn inventory(m: &catalog::Model, root: &std::path::Path, verify: bool) -> ModelS
         });
     let legacy = root.join(m.id).join(m.filename).is_file();
     ModelStatus {
-        model: m.clone(),
+        model: {
+            let mut display = m.clone();
+            display.bytes = bundle_bytes(m);
+            display
+        },
         replacement: catalog::replacement(m.id),
         download_url: catalog::download_url(m),
         resumable_bytes: std::fs::metadata(target.with_extension("bin.part"))
@@ -565,6 +635,7 @@ pub async fn voice_install_model(
         model: m,
         job_id,
         bytes: 0,
+        offset: 0,
         finished: false,
     };
     reporter.report(
@@ -599,7 +670,7 @@ pub async fn voice_install_model(
                         token_model.bytes,
                         &token_part,
                         &cancel,
-                        |phase, _| reporter.report(phase, 0, None),
+                        |phase, bytes| reporter.report(phase, bytes, None),
                     )
                     .await?;
                 }
@@ -610,6 +681,7 @@ pub async fn voice_install_model(
                     Some(&cancel),
                 )?;
             }
+            reporter.offset = token_model.bytes;
         }
         if let Some(source) = source_path {
             if tokio::fs::metadata(&source)
@@ -860,13 +932,41 @@ fn publish_verified_cancellable(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn incomplete_bundle_keeps_previous_revision_and_rejects_unsafe_marker() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let old = "a".repeat(40);
+        let new = "b".repeat(40);
+        std::fs::create_dir(root.join(&old)).unwrap();
+        std::fs::create_dir(root.join(&new)).unwrap();
+        std::fs::write(root.join(&old).join(super::SHERPA_REVISION_FILE), &old).unwrap();
+        std::fs::write(root.join(".active"), &old).unwrap();
+        std::fs::write(root.join(&new).join("encoder.part"), b"partial").unwrap();
+        assert_eq!(super::active_sherpa_dir(root.into(), &new), root.join(&old));
+        std::fs::write(root.join(&new).join(super::SHERPA_REVISION_FILE), &new).unwrap();
+        assert_eq!(super::active_sherpa_dir(root.into(), &new), root.join(&new));
+        std::fs::remove_file(root.join(&new).join(super::SHERPA_REVISION_FILE)).unwrap();
+        std::fs::write(root.join(".active"), "../escape").unwrap();
+        assert_eq!(super::active_sherpa_dir(root.into(), &new), root);
+    }
+
     use super::*;
     #[test]
     fn replacement_keeps_working_weights_until_new_hash_is_verified() {
         let root = tempfile::tempdir().unwrap();
-        let old = catalog::Model { id: "old", filename: "old.bin", bytes: 3, sha256: "old" };
-        let new = catalog::Model { id: "new", filename: "new.bin", bytes: 3,
-            sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" };
+        let old = catalog::Model {
+            id: "old",
+            filename: "old.bin",
+            bytes: 3,
+            sha256: "old",
+        };
+        let new = catalog::Model {
+            id: "new",
+            filename: "new.bin",
+            bytes: 3,
+            sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        };
         let old_path = catalog::version_path(root.path(), &old);
         let new_path = catalog::version_path(root.path(), &new);
         std::fs::create_dir_all(old_path.parent().unwrap()).unwrap();
