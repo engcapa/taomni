@@ -43,13 +43,15 @@ test = false
 bench = false
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.7.1", features = [] }
 prost-build = "0.14"
 cc = "1"
 
 [dependencies]
 # Plain native windows keep capture range borders lightweight and out of the crop.
-tauri = { version = "2", features = ["protocol-asset", "unstable", "macos-private-api"] }
+# Tauri 2.12 uses Tao 0.37: older Windows keyboard/IME handling can deadlock
+# on reentrant focus messages during an RDP session switch (tao#1194/#1349).
+tauri = { version = "2.12.0", features = ["protocol-asset", "unstable", "macos-private-api"] }
 tauri-plugin-log = "2"
 # In-app auto-update: pull signed bundles from GitHub Releases (see
 # claudedocs/auto-update-plan.md). `process` provides relaunch() after install.
@@ -250,8 +252,7 @@ mp4 = "0.14"
 zune-jpeg = "0.5"
 zune-core = "0.5"
 tauri-plugin-dialog = "2.7.3"
-# Screenshot hotkey. Pinned to 2.3.2: 2.4.0 requires tauri ^2.12 and would
-# force a workspace-wide tauri 2.11 -> 2.12 upgrade.
+# Keep the existing screenshot hotkey plugin while updating the window runtime.
 tauri-plugin-global-shortcut = "=2.3.2"
 sqlparser = "0.62.0"
 scopeguard = "1.2"
