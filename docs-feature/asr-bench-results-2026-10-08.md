@@ -123,7 +123,7 @@ No numeric quality gate has been reverse-engineered from the results.
 ## Additional model and non-speech smoke checks
 
 The same frozen P1 probe also decoded one Mandarin and one English recording
-through Base q8 and Turbo q5. These two-recording rows establish format/runtime
+through Base q8, Medium q8 and Turbo q5. These two-recording rows establish format/runtime
 compatibility only; they are not full-corpus model rankings. All use this same
 i7-6700K, four CPU threads, and the pinned catalog hashes.
 
@@ -133,6 +133,8 @@ i7-6700K, four CPU threads, and the pinned catalog hashes.
 | whisper-base-q8 | en | 10.56 | 0.0123 | 7438.0 |
 | whisper-turbo-q5 | zh | 10.38 | 0.0000 | 63132.4 |
 | whisper-turbo-q5 | en | 10.56 | 0.0123 | 62634.5 |
+| Medium q8_0 | zh | 10.38 | 0.3043 | 22026.6 |
+| Medium q8_0 | en | 10.56 | 0.0123 | 22811.3 |
 
 The committed three-second silence and deterministic low-amplitude white-noise
 controls are test signals (CC0), not substitutes for human speech. Raw outputs
@@ -146,3 +148,9 @@ SenseVoice returned `그.` and Small q8 returned `ស្្្្្្`; both a
 flagged `unexpected_text: true`. Noise robustness has **not** passed. Do not
 replace these observations with a hand-tuned string filter. Real microphone
 noise, VAD calibration and human speech preservation remain required.
+
+Medium q8 migration weights also passed both language smoke decodes after a
+resumed download validated the exact catalog SHA-256. All new q8/q5 tiers now
+have real format/runtime smoke evidence; only Small q8 has the complete
+160-recording run. These later smoke runs reuse the frozen P1 executable; source
+hashes captured at invocation identify the workspace, not a newly rebuilt binary.
