@@ -1,6 +1,10 @@
 id: TC-WS-015
 title: Workspace shell controls, dialog drag/resize/close and scoped context pane
-description: Browser coverage for the Workspace-first shell's high frequency controls. It checks that the new-workspace and command dialogs stay usable at desktop width, expose stable drag/resize/close affordances, and preserve the workspace canvas when the context pane is toggled.
+description: 'Browser coverage for the Workspace-first shell''s high frequency controls. It checks that the new-workspace
+
+  and command dialogs stay usable at desktop width, expose stable drag/resize/close affordances, and preserve the
+
+  workspace canvas when the context pane is toggled.'
 covers:
 - F-Workspace-1
 tags:
@@ -18,132 +22,261 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- set_viewport:
+    width: 1440
+    height: 900
 - wait_for: '[data-testid="workspace-navigator"]'
 - click: '[data-testid="workspace-create"]'
 - wait_for: '[data-testid="workspace-create-dialog"]'
-- assert_visible: '[data-testid="workspace-dialog-drag-handle"]'
-- assert_visible: '[data-testid="workspace-dialog-resize-handle"]'
-- assert_visible: '[data-testid="workspace-dialog-close"]'
-- assert_visible: '[data-testid="workspace-name-input"]'
 - eval_readonly:
-    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create-dialog"]')?.getBoundingClientRect().width) > 359
+    expression: 'document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"workspace-create-dialog"]'').getBoundingClientRect().width
+
+      > 559 && document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"workspace-create-dialog"]'').getBoundingClientRect().width
+
+      < 561'
     expect_truthy: true
+- assert_attribute:
+    selector: '[data-testid="workspace-create-submit"]'
+    name: disabled
+    equals: ''
 - drag_to:
     from: '[data-testid="workspace-dialog-resize-handle"]'
-    to: '[data-testid="workspace-create-dialog"]'
+    by:
+      dx: 100
+      dy: 80
+      steps: 8
 - eval_readonly:
-    expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create-dialog"]')?.getBoundingClientRect().width) > 359
+    expression: 'document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"workspace-create-dialog"]'').getBoundingClientRect().width
+
+      > 658 && document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"workspace-create-dialog"]'').getBoundingClientRect().width
+
+      < 662'
     expect_truthy: true
 - drag_to:
     from: '[data-testid="workspace-dialog-drag-handle"]'
-    to: '[data-testid="workspace-create-dialog"]'
+    by:
+      dx: 80
+      dy: 60
+      steps: 8
 - eval_readonly:
-    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create-dialog"]')?.style.left !== ""
+    expression: 'document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"workspace-create-dialog"]'').getBoundingClientRect().left
+
+      > 518 && document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"workspace-create-dialog"]'').getBoundingClientRect().top
+
+      > 166'
     expect_truthy: true
-- click: '[data-testid="workspace-dialog-close"]'
-- assert_count:
+- screenshot: workspace-dialog-dragged.png
+- press:
+    selector: '[data-testid="workspace-dialog-resize-handle"]'
+    key: ArrowRight
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create-dialog"]').getBoundingClientRect().width
+      > 668 && document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create-dialog"]').getBoundingClientRect().width
+      < 672
+    expect_truthy: true
+- press:
+    selector: '[data-testid="workspace-dialog-resize-handle"]'
+    key: Tab
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "workspace-dialog-close"
+    expect_truthy: true
+- press:
+    selector: '[data-testid="workspace-dialog-close"]'
+    key: Shift+Tab
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "workspace-dialog-resize-handle"
+    expect_truthy: true
+- drag_to:
+    from: '[data-testid="workspace-dialog-drag-handle"]'
+    by:
+      dx: 1200
+      dy: 800
+      steps: 8
+- assert_element_geometry:
     selector: '[data-testid="workspace-create-dialog"]'
-    equal: 0
+    min_width: 360
+    min_height: 180
+    viewport_margin: 10
+- set_viewport:
+    width: 400
+    height: 700
+- assert_element_geometry:
+    selector: '[data-testid="workspace-create-dialog"]'
+    min_width: 300
+    min_height: 180
+    viewport_margin: 10
+- assert_element_geometry:
+    selector: '[data-testid="workspace-name-input"]'
+    min_width: 240
+    min_height: 20
+    viewport_margin: 10
+- screenshot: workspace-dialog-narrow.png
+- click: '[data-testid="workspace-dialog-close"]'
+- assert_not_visible: '[data-testid="workspace-create-dialog"]'
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-create"]')
+    expect_truthy: true
+- set_viewport:
+    width: 1440
+    height: 900
 - click: '[data-testid="workspace-create"]'
 - wait_for: '[data-testid="workspace-create-dialog"]'
 - fill:
     selector: '[data-testid="workspace-name-input"]'
     value: UI Interaction Fixture
 - click: '[data-testid="workspace-create-submit"]'
-- wait_for: '[data-testid="workspace-header"]'
+- assert_not_visible: '[data-testid="workspace-create-dialog"]'
 - assert_text:
     selector: '[data-testid="workspace-header"]'
     contains: UI Interaction Fixture
-- press:
-    key: Control+k
+- click: '[data-testid="global-search"]'
 - wait_for: '[data-testid="command-center"]'
-- assert_visible: '[data-testid="workspace-dialog-drag-handle"]'
-- assert_visible: '[data-testid="workspace-dialog-resize-handle"]'
 - fill:
     selector: '[data-testid="command-center-search"]'
     value: QA Main
-- click: '[data-testid="command-center"] button'
-- assert_count:
-    selector: '[data-testid="command-center"]'
-    equal: 0
-- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="command-center"] button:has-text("Workspace · QA Main")'
+- assert_not_visible: '[data-testid="command-center"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: Workspace · QA Main
 - click: '[data-testid="workspace-context-toggle"]'
 - wait_for: '[data-testid="workspace-context-pane"]'
-- assert_visible: '[data-testid="workspace-context-close"]'
 - click: '[data-testid="workspace-context-close"]'
-- wait_for: '[data-testid="workspace-context-toggle"][aria-expanded="false"]'
-- assert_count:
-    selector: '[data-testid="workspace-context-pane"]'
-    equal: 0
+- assert_not_visible: '[data-testid="workspace-context-pane"]'
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-context-toggle"]')
+    expect_truthy: true
 - screenshot: workspace-shell-interactions.png
+- click: '[data-testid="global-search"]'
+- wait_for: '[data-testid="command-center"]'
+- press: Escape
+- assert_not_visible: '[data-testid="command-center"]'
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('[data-testid' + String.fromCharCode(61) + '"global-search"]')
+    expect_truthy: true
 verification:
   review: pending
   requirements:
   - id: R1
-    requirement: Workspace dialog controls remain reachable and the dialog can be resized, dragged and explicitly closed.
+    requirement: 'Dialog movement and resizing change actual geometry, stay inside a narrow viewport, route selected
+
+      commands and restore focus after closing.'
     actions:
-    - 3
+    - 2
     - 4
-    - 5
-    - 6
-    - 7
     - 8
     - 10
-    - 12
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 25
+    - 28
+    - 29
+    - 31
+    - 32
+    - 35
+    - 37
+    - 38
+    - 41
+    - 43
+    - 47
+    - 49
+    checkpoints:
+    - step: 6
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61)
+        + ''\"workspace-create-dialog\"]'').getBoundingClientRect().width\n> 559 && document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"workspace-create-dialog\"]'').getBoundingClientRect().width\n< 561", "expect_truthy":
+        true}}'
+    - step: 7
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-create-submit\"]", "name": "disabled",
+        "equals": ""}}'
+    - step: 9
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61)
+        + ''\"workspace-create-dialog\"]'').getBoundingClientRect().width\n> 658 && document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"workspace-create-dialog\"]'').getBoundingClientRect().width\n< 662", "expect_truthy":
+        true}}'
+    - step: 11
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61)
+        + ''\"workspace-create-dialog\"]'').getBoundingClientRect().left\n> 518 && document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"workspace-create-dialog\"]'').getBoundingClientRect().top\n> 166", "expect_truthy":
+        true}}'
+    - step: 14
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61)
+        + ''\"workspace-create-dialog\"]'').getBoundingClientRect().width > 668 && document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"workspace-create-dialog\"]'').getBoundingClientRect().width < 672", "expect_truthy":
+        true}}'
+    - step: 16
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
+        \"workspace-dialog-close\"", "expect_truthy": true}}'
+    - step: 18
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
+        \"workspace-dialog-resize-handle\"", "expect_truthy": true}}'
+    - step: 20
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-create-dialog\"]", "min_width":
+        360, "min_height": 180, "viewport_margin": 10}}'
+    - step: 22
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-create-dialog\"]", "min_width":
+        300, "min_height": 180, "viewport_margin": 10}}'
+    - step: 23
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-name-input\"]", "min_width":
+        240, "min_height": 20, "viewport_margin": 10}}'
+    - step: 26
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-create-dialog\"]"}'
+    - step: 27
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"workspace-create\"]'')", "expect_truthy": true}}'
+    - step: 33
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-create-dialog\"]"}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "UI Interaction
+        Fixture"}}'
+    - step: 39
+      expectation: '{"assert_not_visible": "[data-testid=\"command-center\"]"}'
+    - step: 40
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "Workspace ·
+        QA Main"}}'
+    - step: 44
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-context-pane\"]"}'
+    - step: 45
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"workspace-context-toggle\"]'')", "expect_truthy": true}}'
+    - step: 50
+      expectation: '{"assert_not_visible": "[data-testid=\"command-center\"]"}'
+    - step: 51
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"global-search\"]'')", "expect_truthy": true}}'
+    results:
+    - 6
+    - 7
+    - 9
+    - 11
     - 14
     - 16
-    - 17
     - 18
-    - 19
     - 20
     - 22
     - 23
     - 26
     - 27
-    - 29
-    - 30
-    - 31
     - 33
-    checkpoints:
-    - step: 4
-      expectation: Workspace dialog is open.
-    - step: 9
-      expectation: Dialog has a usable width.
-    - step: 11
-      expectation: Resize drag keeps the dialog above its minimum width.
-    - step: 13
-      expectation: Dragging the dialog header switches it to an explicit positioned frame.
-    - step: 15
-      expectation: Explicit close removes the dialog.
-    - step: 21
-      expectation: The created workspace is visible in the navigator.
-    - step: 23
-      expectation: Command Center is open.
-    - step: 28
-      expectation: Command Center action closes the popup after selecting a result.
-    - step: 31
-      expectation: Context pane is open.
-    - step: 32
-      expectation: Context pane close affordance is visible.
-    - step: 35
-      expectation: Context pane closes and leaves the workspace canvas usable.
-    results:
-    - 4
-    - 9
-    - 11
-    - 13
-    - 15
-    - 21
-    - 23
-    - 28
-    - 31
-    - 32
-    - 35
+    - 34
+    - 39
+    - 40
+    - 44
+    - 45
+    - 50
+    - 51
   visual:
-  - check: Dialog width, input affordance, shell spacing, rail density and context pane close affordance remain legible without clipping or crowding.
+  - check: 'Dialog width, input affordance, shell spacing, rail density and context pane close affordance remain
+
+      legible without clipping or crowding.'
     method: manual
     reason: Screenshot evidence needs human visual review.
   native:
-  - check: This case is renderer-only; native window and IPC behavior remain covered by workspace native companion cases.
+  - check: 'This case is renderer-only; native window and IPC behavior remain covered by workspace native companion
+
+      cases.'
     method: external
     reason: Browser evidence does not certify native boundaries.

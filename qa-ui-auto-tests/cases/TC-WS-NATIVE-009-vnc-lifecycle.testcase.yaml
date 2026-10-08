@@ -33,6 +33,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: QA VNC resource
 - click: '[data-testid="session-save"]'
+- assert_not_visible: '[data-testid="session-editor"]'
 - click: '[data-testid="side-tab-work"]'
 - click: '[data-testid="workspace-row-qa-workspace-main"]'
 - select_option:
@@ -51,7 +52,10 @@ steps:
 - fill:
     selector: '[data-testid="vnc-auth-password"]'
     value: ${env.QA_VNC_PASSWORD}
+- click: '[data-testid="vnc-auth-remember"]'
 - click: '[data-testid="vnc-auth-ok"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-workspace-test-password
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
     timeout_sec: 20
@@ -111,6 +115,7 @@ verification:
   - id: R1
     requirement: Keep the existing VNC connection reachable across scope changes.
     actions:
+    - 2
     - 3
     - 4
     - 6
@@ -119,40 +124,70 @@ verification:
     - 9
     - 11
     - 12
-    - 13
     - 14
     - 15
     - 16
+    - 17
+    - 19
+    - 20
+    - 22
+    - 23
     - 24
-    - 25
     - 26
-    - 27
-    - 28
+    - 29
+    - 30
     - 31
+    - 32
     - 33
-    - 34
-    - 35
+    - 36
     - 38
+    - 39
     - 40
-    - 41
+    - 43
+    - 45
+    - 46
     checkpoints:
-    - step: 23
+    - step: 13
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    - step: 27
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]", "timeout_sec":
         20}}'
-    - step: 30
+    - step: 28
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\": \"auth\",
+        \"ok\": true, \"security\": \"VNCAuth\""}}'
+    - step: 34
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]", "timeout_sec":
         30}}'
-    - step: 43
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"900\"][height=\"600\"]", "timeout_sec":
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"vnc-canvas\"]", "equal": 1}}'
+    - step: 37
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\": \"pointer\""}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]", "timeout_sec":
         30}}'
     - step: 44
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"900\"][height=\"600\"]", "timeout_sec":
+        30}}'
+    - step: 47
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"900\"][height=\"600\"]", "timeout_sec":
+        30}}'
+    - step: 48
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-header\"]", "contains": "Workspace ·
         QA Main"}}'
+    - step: 49
+      expectation: '{"assert_count": {"selector": "[data-testid=\"vnc-canvas\"]", "equal": 1}}'
     results:
-    - 23
-    - 30
-    - 43
+    - 13
+    - 27
+    - 28
+    - 34
+    - 35
+    - 37
+    - 42
     - 44
+    - 47
+    - 48
+    - 49
   native:
   - check: Tauri VNC relay and detached OS window lifecycle.
     method: automated

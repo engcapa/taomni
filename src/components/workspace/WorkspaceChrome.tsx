@@ -1,5 +1,5 @@
 import { useT } from "../../lib/i18n";
-import { PanelsTopLeft, PanelRight, X } from "lucide-react";
+import { PanelsTopLeft, PanelRight, MoveDiagonal2, X } from "lucide-react";
 import { WorkspacePreview } from "./WorkspacePreview";
 import { TabBar, type TabBarProps } from "../tabbar/TabBar";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -143,7 +143,7 @@ export function WorkspaceDialogs({ onCommand, onConnectSession }: { onCommand: (
   const input = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
-  const interaction = useRef<{ mode: "drag" | "resize"; startX: number; startY: number; left: number; top: number; width: number; height: number } | null>(null);
+  const interaction = useRef<{ mode: "drag" | "resize"; pointerId: number; target: HTMLElement; cursor: string; startX: number; startY: number; left: number; top: number; width: number; height: number } | null>(null);
   const [dialogFrame, setDialogFrame] = useState<{ left?: number; top?: number; width: number; height?: number }>({ width: 560 });
   const open = state.createDialogOpen || state.commandCenterOpen;
   useEffect(() => {
@@ -165,52 +165,81 @@ export function WorkspaceDialogs({ onCommand, onConnectSession }: { onCommand: (
     setDialogFrame({ width: Math.min(560, Math.max(360, window.innerWidth - 24)) });
   }, [open, state.createDialogOpen]);
   useEffect(() => {
+    if (!open) return;
+    const constrain = (left: number, top: number, width: number, height: number) => {
+      width = Math.min(width, window.innerWidth - 24);
+      height = Math.min(height, window.innerHeight - 24);
+      return { width, height, left: Math.max(12, Math.min(window.innerWidth - width - 12, left)), top: Math.max(12, Math.min(window.innerHeight - height - 12, top)) };
+    };
     const onMove = (event: PointerEvent) => {
       const current = interaction.current;
-      if (!current) return;
+      if (!current || current.pointerId !== event.pointerId) return;
       if (current.mode === "drag") {
-        const left = Math.max(12, Math.min(window.innerWidth - 180, current.left + event.clientX - current.startX));
-        const top = Math.max(12, Math.min(window.innerHeight - 80, current.top + event.clientY - current.startY));
-        setDialogFrame((frame) => ({ ...frame, left, top }));
+        setDialogFrame(constrain(current.left + event.clientX - current.startX, current.top + event.clientY - current.startY, current.width, current.height));
       } else {
-        const width = Math.max(360, Math.min(window.innerWidth - 24, current.width + event.clientX - current.startX));
-        const height = Math.max(180, Math.min(window.innerHeight - 24, current.height + event.clientY - current.startY));
-        setDialogFrame((frame) => ({ ...frame, width, height }));
+        const width = Math.min(window.innerWidth - current.left - 12, Math.max(360, current.width + event.clientX - current.startX));
+        const height = Math.min(window.innerHeight - current.top - 12, Math.max(180, current.height + event.clientY - current.startY));
+        setDialogFrame(constrain(current.left, current.top, width, height));
       }
     };
-    const onUp = () => { interaction.current = null; document.body.style.cursor = ""; };
+    const onUp = () => {
+      const current = interaction.current;
+      if (!current) return;
+      interaction.current = null;
+      if (current.target.hasPointerCapture(current.pointerId)) current.target.releasePointerCapture(current.pointerId);
+      document.body.style.cursor = current.cursor;
+    };
+    const onResize = () => {
+      onUp();
+      const rect = dialogRef.current?.getBoundingClientRect();
+      if (rect) setDialogFrame(constrain(rect.left, rect.top, rect.width, rect.height));
+    };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-    return () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); };
-  }, []);
+    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("blur", onUp);
+    window.addEventListener("resize", onResize);
+    return () => {
+      onUp();
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("blur", onUp);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [open]);
   if (!open) return null;
   const close = () => { useWorkspaceStore.setState({ createDialogOpen: false, commandCenterOpen: false }); setError(""); };
   const match = (text: string) => text.toLowerCase().includes(query.toLowerCase());
   const beginInteraction = (mode: "drag" | "resize", event: ReactPointerEvent) => {
     const dialog = dialogRef.current;
-    if (!dialog) return;
+    if (!dialog || event.button !== 0 || interaction.current) return;
+    if (mode === "drag" && event.target instanceof Element && event.target.closest("button,input,select,a")) return;
     const rect = dialog.getBoundingClientRect();
-    interaction.current = { mode, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture(event.pointerId);
+    interaction.current = { mode, pointerId: event.pointerId, target, cursor: document.body.style.cursor, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, width: rect.width, height: rect.height };
     setDialogFrame({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
     document.body.style.cursor = mode === "drag" ? "grabbing" : "nwse-resize";
     event.preventDefault();
     event.stopPropagation();
   };
   return <div data-testid="workspace-dialog-backdrop" className="fixed inset-0 z-[100] bg-black/40" onClick={close} onKeyDown={(e) => { if (e.key === "Escape") close(); }}>
-    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={state.createDialogOpen ? t("workspace.newWorkspace") : t("workspace.commandCenter")} data-testid={state.createDialogOpen ? "workspace-create-dialog" : "command-center"} className="absolute max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-auto rounded-lg p-4 shadow-xl bg-[var(--taomni-bg)]" style={{ width: dialogFrame.width, height: dialogFrame.height, left: dialogFrame.left ?? "50%", top: dialogFrame.top ?? "12vh", transform: dialogFrame.left === undefined ? "translateX(-50%)" : undefined }} onClick={(e) => e.stopPropagation()} onKeyDown={(event) => {
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={state.createDialogOpen ? t("workspace.newWorkspace") : t("workspace.commandCenter")} data-testid={state.createDialogOpen ? "workspace-create-dialog" : "command-center"} className="absolute max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] flex flex-col overflow-hidden rounded-lg p-4 shadow-xl bg-[var(--taomni-bg)]" style={{ width: dialogFrame.width, height: dialogFrame.height, maxHeight: dialogFrame.top === undefined ? "calc(88vh - 12px)" : undefined, left: dialogFrame.left ?? "50%", top: dialogFrame.top ?? "12vh", transform: dialogFrame.left === undefined ? "translateX(-50%)" : undefined }} onClick={(e) => e.stopPropagation()} onKeyDown={(event) => {
       if (event.key !== "Tab") return;
       const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')];
       const first = controls[0]; const last = controls.at(-1);
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}>
-      <div data-testid="workspace-dialog-drag-handle" className="flex items-center gap-2 mb-3 select-none cursor-grab" onPointerDown={(event) => beginInteraction("drag", event)}>
+      <div data-testid="workspace-dialog-drag-handle" className="flex items-center gap-2 mb-3 shrink-0 select-none touch-none cursor-grab" onPointerDown={(event) => beginInteraction("drag", event)}>
         <h2 className="font-semibold flex-1">{state.createDialogOpen ? t("workspace.newWorkspace") : t("workspace.commandCenter")}</h2>
         <button type="button" data-testid="workspace-dialog-close" aria-label={t("common.close")} className="rounded p-1 hover:bg-[var(--taomni-hover)]" onClick={close}><X className="w-4 h-4" /></button>
       </div>
+      <div className="min-h-0 overflow-auto">
       {state.createDialogOpen ? <form onSubmit={(e) => { e.preventDefault(); setBusy(true); void state.create(name).then(() => { setName(""); close(); }).catch((e) => setError(String(e))).finally(() => setBusy(false)); }}>
         <input ref={input} data-testid="workspace-name-input" aria-label={t("workspace.name")} className="taomni-input w-full" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("workspace.name")} />
-        {error && <p role="alert">{error}</p>}<div className="flex gap-2 mt-3"><button data-testid="workspace-create-submit" disabled={busy || !name.trim()} className={button}>{t("workspace.create")}</button><button type="button" className={button} onClick={() => { close(); onCommand("new-session"); }}>{t("workspace.newSessionInstead")}</button><button type="button" className={button} onClick={close}>Cancel</button></div>
+        {error && <p role="alert">{error}</p>}<div className="flex flex-wrap gap-2 mt-3"><button data-testid="workspace-create-submit" disabled={busy || !name.trim()} className={button}>{t("workspace.create")}</button><button type="button" className={button} onClick={() => { close(); onCommand("new-session"); }}>{t("workspace.newSessionInstead")}</button><button type="button" className={button} onClick={close}>Cancel</button></div>
       </form> : <>
         <input ref={input} data-testid="command-center-search" aria-label="Search commands, workspaces and sessions" className="taomni-input w-full mb-3" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("workspace.commandsPlaceholder")} />
         {state.workspaces.filter((w) => match(w.name)).map((w) => <button key={w.id} className={`${button} block w-full text-left`} onClick={() => { state.selectWorkspace(w.id); close(); }}>Workspace · {w.name}</button>)}
@@ -218,7 +247,17 @@ export function WorkspaceDialogs({ onCommand, onConnectSession }: { onCommand: (
         {views.filter(match).map((view) => <button key={view} className={`${button} block w-full text-left capitalize`} onClick={() => { close(); openWorkspaceView(view); }}>Surface · {view}</button>)}
         {(["servers", "tools", "mfa", "lan-chat", "settings", "new-session"] as AppCommand[]).filter(match).map((command) => <button key={command} className={`${button} block w-full text-left`} onClick={() => { close(); onCommand(command); }}>Global · {command}</button>)}
       </>}
-      <div data-testid="workspace-dialog-resize-handle" role="separator" aria-orientation="horizontal" aria-label="Resize dialog" className="absolute right-1 bottom-1 h-3 w-3 cursor-nwse-resize" onPointerDown={(event) => beginInteraction("resize", event)} />
+      </div>
+      <button type="button" data-testid="workspace-dialog-resize-handle" aria-label="Resize dialog" title="Resize dialog (arrow keys)" className="absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] touch-none cursor-nwse-resize" onPointerDown={(event) => beginInteraction("resize", event)} onKeyDown={(event) => {
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        const rect = dialogRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const delta = event.shiftKey ? 40 : 10;
+        const width = Math.min(window.innerWidth - rect.left - 12, Math.max(360, rect.width + (event.key === "ArrowRight" ? delta : event.key === "ArrowLeft" ? -delta : 0)));
+        const height = Math.min(window.innerHeight - rect.top - 12, Math.max(180, rect.height + (event.key === "ArrowDown" ? delta : event.key === "ArrowUp" ? -delta : 0)));
+        setDialogFrame({ left: rect.left, top: rect.top, width, height });
+      }}><MoveDiagonal2 className="h-3 w-3" /></button>
     </div>
   </div>;
 }
