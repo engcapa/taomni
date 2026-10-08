@@ -144,8 +144,8 @@ verification:
   review: reviewed
   requirements:
   - id: capture
-    requirement: Selected physical region dispatches correctly; confirmation can be cancelled before start; prior marks are
-      cleared.
+    requirement: Selected physical region dispatches correctly; confirmation can be cancelled before start; prior
+      marks are cleared.
     actions:
     - 1
     - 2
@@ -163,115 +163,115 @@ verification:
       expectation: Instructions visible
     - step: 13
       expectation: Cancel closes instructions
-    - step: 16
-      expectation: Result preview opens
     - step: 17
-      expectation: No selection frame
+      expectation: Result preview opens
     - step: 18
-      expectation: Annotation toolbar immediately available
+      expectation: No selection frame
     - step: 19
-      expectation: No busy state
+      expectation: Annotation toolbar immediately available
     - step: 20
-      expectation: Result is visible
+      expectation: No busy state
     - step: 21
+      expectation: Result is visible
+    - step: 22
       expectation: Old marks cleared
-    - step: 23
-      expectation: Crop IPC is exact
     - step: 24
+      expectation: Crop IPC is exact
+    - step: 25
       expectation: Tall result metadata is stored
     results:
     - 8
     - 11
     - 13
-    - 16
     - 17
     - 18
     - 19
     - 20
     - 21
-    - 23
+    - 22
     - 24
+    - 25
   - id: preview
     requirement: Fit and original-size views preserve proportions and stay readable.
     actions:
-    - 26
-    - 30
+    - 27
+    - 31
     checkpoints:
-    - step: 22
+    - step: 23
       expectation: Native dimensions shown
-    - step: 25
+    - step: 26
       expectation: Uniform aspect ratio
-    - step: 27
-      expectation: 100% image with scrollable viewport
     - step: 28
       expectation: 100% image with scrollable viewport
     - step: 29
       expectation: 100% image with scrollable viewport
-    - step: 31
-      expectation: Fit stays inside viewport without upscaling
+    - step: 30
+      expectation: 100% image with scrollable viewport
     - step: 32
       expectation: Fit stays inside viewport without upscaling
+    - step: 33
+      expectation: Fit stays inside viewport without upscaling
     results:
-    - 22
-    - 25
-    - 27
+    - 23
+    - 26
     - 28
     - 29
-    - 31
+    - 30
     - 32
+    - 33
   - id: output
     requirement: Continue annotation directly and copy full natural dimensions.
     actions:
-    - 38
+    - 39
     checkpoints:
-    - step: 34
-      expectation: Toolbar opens
     - step: 35
-      expectation: Undo cleared
+      expectation: Toolbar opens
     - step: 36
-      expectation: Redo cleared
+      expectation: Undo cleared
     - step: 37
+      expectation: Redo cleared
+    - step: 38
       expectation: Annotation image keeps aspect ratio
-    - step: 39
-      expectation: Copy closes tool
     - step: 40
+      expectation: Copy closes tool
+    - step: 41
       expectation: Export remains 400x1800
     results:
-    - 34
     - 35
     - 36
     - 37
-    - 39
+    - 38
     - 40
+    - 41
   - id: preview-actions
     requirement: Preview Save uses the chosen filename; Pin opens the captured image; Close exits directly.
     actions:
-    - 41
-    - 47
+    - 43
     - 49
-    - 50
-    - 53
-    - 59
+    - 51
+    - 52
+    - 56
     - 62
-    - 64
-    - 70
+    - 65
+    - 68
+    - 74
     checkpoints:
-    - step: 52
+    - step: 54
       expectation: Save dispatched to long-capture.png
-    - step: 60
-      expectation: Pinned image appears
-    - step: 61
-      expectation: Pin IPC dispatched
     - step: 63
+      expectation: Pinned image appears
+    - step: 64
+      expectation: Pin IPC dispatched
+    - step: 66
       expectation: Pin closes
-    - step: 71
+    - step: 75
       expectation: Result closes without another selection
     results:
-    - 52
-    - 60
-    - 61
+    - 54
     - 63
-    - 71
+    - 64
+    - 66
+    - 75
   visual:
   - check: Text, menu and result layout
     method: automated
@@ -279,5 +279,5 @@ verification:
   native:
   - check: Packaged WebView, OS capture and clipboard
     method: external
-    reason: Native SHOT-N3 and N12 exercise real capture/clipboard and three packaged WebViews. Browser stubs do not establish
-      OS behavior.
+    reason: Native SHOT-N3 and N12 exercise real capture/clipboard and three packaged WebViews. Browser stubs do
+      not establish OS behavior.
