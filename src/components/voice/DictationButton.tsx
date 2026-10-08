@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Mic, Square, Loader2, X } from "lucide-react";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
@@ -30,18 +31,44 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
   const session = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mounted = useRef(true);
+  const streamingMode = active === "sherpa-zipformer-zh-en" || ["aliyun", "deepgram", "gemini"].includes(active);
+  const streamBase = useRef("");
+  const streamSuffix = useRef("");
+  const streamCommitted = useRef("");
+  const streamInterim = useRef("");
+  const applyStreamText = useCallback((text: string, finalText: boolean) => {
+    if (finalText) {
+      streamCommitted.current += text;
+      streamInterim.current = "";
+    } else {
+      streamInterim.current = text;
+    }
+    const value = streamBase.current + streamCommitted.current + streamInterim.current + streamSuffix.current;
+    if (targetRef?.current) onText?.(value); else if (finalText) onTranscript?.(text);
+  }, [onText, onTranscript, targetRef]);
   const cancel = useCallback(() => {
     const id = session.current;
     session.current = null;
     finishing.current = false;
     clearTimeout(timer.current);
-    if (id) void invoke("voice_stop_capture", { sessionId: id }).catch(() => undefined);
+    if (id) void invoke(streamingMode ? "voice_stop_stream" : "voice_stop_capture", { sessionId: id }).catch(() => undefined);
     if (mounted.current) setPhase("idle");
-  }, []);
+  }, [streamingMode]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; cancel(); };
   }, [cancel]);
+  useEffect(() => {
+    if (!streamingMode) return;
+    let disposed = false;
+    const unlisten = listen<{ session_id: string; text: string; final_text: boolean }>("voice-transcript", ({ payload }) => {
+      if (!disposed && payload.session_id === session.current) applyStreamText(payload.text, payload.final_text);
+    });
+    const unlistenError = listen<{ session_id: string; error: string }>("voice-transcript-error", ({ payload }) => {
+      if (!disposed && payload.session_id === session.current) setError(payload.error);
+    });
+    return () => { disposed = true; void unlisten.then((fn) => fn()); void unlistenError.then((fn) => fn()); };
+  }, [applyStreamText, streamingMode]);
   useEffect(() => { cancel(); }, [contextKey, active, language, fullyDisabled, disabled, cancel]);
   useEffect(() => {
     const hide = () => { if (document.hidden) cancel(); };
@@ -62,6 +89,14 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
     if (session.current !== id || finishing.current) return;
     finishing.current = true;
     clearTimeout(timer.current);
+    if (streamingMode) {
+      await invoke("voice_stop_stream", { sessionId: id }).catch((e) => setError(String(e)));
+      // Let the provider flush the last PCM window and emit its final result.
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      session.current = null;
+      if (mounted.current) setPhase("idle");
+      return;
+    }
     setPhase("transcribing");
     try {
       const result = await invoke<{ transcript: string }>("voice_stop_and_transcribe", { sessionId: id });
@@ -92,20 +127,30 @@ export function DictationButton({ targetRef, onText, onTranscript, contextKey, d
     session.current = id;
     finishing.current = false;
     setError("");
+    if (streamingMode) {
+      const target = targetRef?.current;
+      const start = target?.selectionStart ?? target?.value.length ?? 0;
+      streamBase.current = target?.value.slice(0, start) ?? "";
+      streamSuffix.current = target?.value.slice(target?.selectionEnd ?? start) ?? "";
+      streamCommitted.current = "";
+      streamInterim.current = "";
+    }
     setPhase("preparing");
     try {
       if (!await invoke<boolean>("voice_capture_supported")) throw new Error(t("voice.unsupported"));
-      const models = await invoke<{ id: string; installed: boolean }[]>("voice_models");
-      if (session.current !== id) return;
-      if (!models.find((m) => m.id === active)?.installed) {
-        session.current = null;
-        setPhase("idle");
-        setSetup(true);
-        return;
+      if (!streamingMode) {
+        const models = await invoke<{ id: string; installed: boolean }[]>("voice_models");
+        if (session.current !== id) return;
+        if (!models.find((m) => m.id === active)?.installed) {
+          session.current = null;
+          setPhase("idle");
+          setSetup(true);
+          return;
+        }
       }
-      await invoke("voice_start_capture", { sessionId: id });
+      await invoke(streamingMode ? "voice_start_stream" : "voice_start_capture", { sessionId: id });
       if (session.current !== id) {
-        void invoke("voice_stop_capture", { sessionId: id }).catch(() => undefined);
+        void invoke(streamingMode ? "voice_stop_stream" : "voice_stop_capture", { sessionId: id }).catch(() => undefined);
         return;
       }
       setPhase("recording");

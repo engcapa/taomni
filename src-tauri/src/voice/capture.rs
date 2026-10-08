@@ -7,11 +7,16 @@ pub const MAX_SECONDS: usize = 120;
 pub struct Capture {
     pub stop: mpsc::Sender<()>,
     pub result: tokio::sync::oneshot::Receiver<Result<Vec<f32>, String>>,
+    /// Source-rate chunks emitted approximately every 100 ms. The batch
+    /// result remains available for the legacy Whisper path; realtime engines
+    /// consume this channel while recording is still active.
+    pub chunks: Arc<Mutex<Option<tokio::sync::mpsc::Receiver<Vec<f32>>>>>,
 }
 pub async fn start() -> Result<Capture, String> {
     let (stop, rx) = mpsc::channel();
     let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
     let (result_tx, result) = tokio::sync::oneshot::channel();
+    let (chunk_tx, chunk_rx) = tokio::sync::mpsc::channel(32);
     std::thread::Builder::new()
         .name("voice-capture".into())
         .spawn(move || {
@@ -23,9 +28,40 @@ pub async fn start() -> Result<Capture, String> {
                     if ready_tx.send(Ok(())).is_err() {
                         return;
                     }
-                    let _ = rx.recv_timeout(Duration::from_secs(MAX_SECONDS as u64));
+                    let deadline =
+                        std::time::Instant::now() + Duration::from_secs(MAX_SECONDS as u64);
+                    let mut cursor = 0usize;
+                    let mut realtime_resampler = StreamingResampler::new(sr);
+                    loop {
+                        match rx.recv_timeout(Duration::from_millis(100)) {
+                            Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                            Err(mpsc::RecvTimeoutError::Timeout) => {
+                                let snapshot = buffer.lock().unwrap();
+                                if snapshot.len() > cursor {
+                                    let chunk = realtime_resampler.push(&snapshot[cursor..]);
+                                    cursor = snapshot.len();
+                                    if !chunk.is_empty() && chunk_tx.blocking_send(chunk).is_err() {
+                                        break;
+                                    }
+                                }
+                                if std::time::Instant::now() >= deadline {
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     drop(stream);
                     let pcm = std::mem::take(&mut *buffer.lock().unwrap());
+                    if pcm.len() > cursor {
+                        let chunk = realtime_resampler.push(&pcm[cursor..]);
+                        if !chunk.is_empty() {
+                            let _ = chunk_tx.blocking_send(chunk);
+                        }
+                    }
+                    let tail = realtime_resampler.finish(pcm.len());
+                    if !tail.is_empty() {
+                        let _ = chunk_tx.blocking_send(tail);
+                    }
                     let result = if let Some(e) = error.lock().unwrap().take() {
                         Err(e)
                     } else {
@@ -40,7 +76,11 @@ pub async fn start() -> Result<Capture, String> {
         })
         .map_err(|e| e.to_string())?;
     ready_rx.await.map_err(|e| e.to_string())??;
-    Ok(Capture { stop, result })
+    Ok(Capture {
+        stop,
+        result,
+        chunks: Arc::new(Mutex::new(Some(chunk_rx))),
+    })
 }
 fn open(
     pcm: Arc<Mutex<Vec<f32>>>,
@@ -132,6 +172,71 @@ pub fn resample(input: &[f32], sr: u32) -> Result<Vec<f32>, String> {
     }
     Ok(output)
 }
+
+struct StreamingResampler {
+    sr: u32,
+    input: Vec<f32>,
+    next_output: usize,
+    ratio: f64,
+    cutoff: f64,
+    radius: i64,
+}
+impl StreamingResampler {
+    fn new(sr: u32) -> Self {
+        let ratio = sr as f64 / 16_000.0;
+        let cutoff = (1.0 / ratio).min(1.0) * 0.9;
+        let radius = (32.0 / cutoff).ceil() as i64;
+        Self {
+            sr,
+            input: Vec::new(),
+            next_output: 0,
+            ratio,
+            cutoff,
+            radius,
+        }
+    }
+    fn sample(&self, n: usize) -> f32 {
+        if self.sr == 16_000 {
+            return self.input.get(n).copied().unwrap_or_default();
+        }
+        let t = n as f64 * self.ratio;
+        let center = t.floor() as i64;
+        let mut sum = 0.0;
+        let mut weight = 0.0;
+        for i in center - self.radius..=center + self.radius {
+            if i < 0 || i >= self.input.len() as i64 {
+                continue;
+            }
+            let d = t - i as f64;
+            let x = std::f64::consts::PI * d * self.cutoff;
+            let sinc = if x.abs() < 1e-9 { 1.0 } else { x.sin() / x };
+            let window = 0.5 + 0.5 * (std::f64::consts::PI * d / self.radius as f64).cos();
+            let w = sinc * window;
+            sum += self.input[i as usize] as f64 * w;
+            weight += w;
+        }
+        (sum / weight.max(1e-9)) as f32
+    }
+    fn push(&mut self, chunk: &[f32]) -> Vec<f32> {
+        self.input.extend_from_slice(chunk);
+        let mut output = Vec::new();
+        while self.next_output as f64 * self.ratio + (self.radius as f64) < self.input.len() as f64
+        {
+            output.push(self.sample(self.next_output));
+            self.next_output += 1;
+        }
+        output
+    }
+    fn finish(&mut self, input_len: usize) -> Vec<f32> {
+        let count = (input_len as f64 / self.ratio).round() as usize;
+        let mut output = Vec::new();
+        while self.next_output < count {
+            output.push(self.sample(self.next_output));
+            self.next_output += 1;
+        }
+        output
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,5 +257,16 @@ mod tests {
         let out = resample(&high, 48000).unwrap();
         let rms = (out[100..15900].iter().map(|v| v * v).sum::<f32>() / 15800.0).sqrt();
         assert!(rms < 0.01, "Aliased energy: {rms}");
+    }
+    #[test]
+    fn streaming_resampler_matches_batch_length() {
+        let input: Vec<f32> = (0..48_000).map(|i| (i as f32 * 0.01).sin()).collect();
+        let mut streaming = StreamingResampler::new(48_000);
+        let mut output = Vec::new();
+        for chunk in input.chunks(1_600) {
+            output.extend(streaming.push(chunk));
+        }
+        output.extend(streaming.finish(input.len()));
+        assert_eq!(output.len(), 16_000);
     }
 }

@@ -2,3 +2,4 @@
 #[cfg(feature = "voice-capture")]
 pub mod capture;
 pub mod commands;
+pub mod streaming;

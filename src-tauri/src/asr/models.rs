@@ -64,6 +64,10 @@ pub fn voice_cancel_model_installation(job_id: String) {
         }
     }
 }
+#[tauri::command]
+pub fn voice_cancel_sherpa_model_installation(job_id: String) {
+    voice_cancel_model_installation(job_id);
+}
 struct InstallationReporter<'a> {
     app: &'a tauri::AppHandle,
     model: &'static catalog::Model,
@@ -190,6 +194,213 @@ pub struct ModelStatus {
     installed_version: Option<String>,
     update_available: bool,
     integrity: &'static str,
+}
+
+pub const SHERPA_UPSTREAM_REVISION: &str = "98590b7ed6443e77b714204da2757d75e1a642f4";
+const SHERPA_MODEL_ID: &str = "sherpa-zipformer-zh-en";
+const SHERPA_FILES: &[(&str, u64, &str)] = &[
+    (
+        "encoder-epoch-99-avg-1.int8.onnx",
+        43_687_936,
+        "d9d00f6d64d01e6ae1a1de8381cb4114be5ce04283f4830abadd130aac528ecf",
+    ),
+    (
+        "decoder-epoch-99-avg-1.onnx",
+        13_876_452,
+        "2e3b5ec371f8899ee6acd829fd753ba45772df57a91bdf37cde3136354e7db7d",
+    ),
+    (
+        "joiner-epoch-99-avg-1.int8.onnx",
+        3_228_404,
+        "1ed689c5ed19dbaa725d9d191bb4822b5f4855a39e1ffd28cbc1f340d25b2ee0",
+    ),
+    (
+        "tokens.txt",
+        56_317,
+        "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3",
+    ),
+];
+
+#[derive(Clone, Serialize)]
+pub struct SherpaFileStatus {
+    pub filename: &'static str,
+    pub bytes: u64,
+    pub downloaded: u64,
+    pub installed: bool,
+    pub sha256: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+pub struct SherpaModelStatus {
+    pub model_id: &'static str,
+    pub revision: &'static str,
+    pub files: Vec<SherpaFileStatus>,
+    pub total_bytes: u64,
+    pub downloaded_bytes: u64,
+    pub installed: bool,
+}
+
+pub(crate) fn sherpa_model_dir() -> std::path::PathBuf {
+    if let Ok(path) = std::env::var("TAOMNI_SHERPA_MODEL_DIR") {
+        return std::path::PathBuf::from(path);
+    }
+    crate::resolved_cache_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("taomni/models/sherpa-zipformer-zh-en")
+}
+
+fn sherpa_file_status() -> SherpaModelStatus {
+    let dir = sherpa_model_dir();
+    let files = SHERPA_FILES
+        .iter()
+        .map(|(filename, bytes, sha256)| {
+            let path = dir.join(filename);
+            let part = dir.join(format!("{filename}.part"));
+            let downloaded = std::fs::metadata(&part)
+                .map(|m| m.len())
+                .unwrap_or(0)
+                .min(*bytes);
+            let installed = std::fs::metadata(&path)
+                .map(|m| m.len() == *bytes)
+                .unwrap_or(false)
+                && crate::models::downloader::sha256_file(&path)
+                    .map(|hash| hash == *sha256)
+                    .unwrap_or(false);
+            SherpaFileStatus {
+                filename,
+                bytes: *bytes,
+                downloaded,
+                installed,
+                sha256,
+            }
+        })
+        .collect::<Vec<_>>();
+    SherpaModelStatus {
+        model_id: SHERPA_MODEL_ID,
+        revision: SHERPA_UPSTREAM_REVISION,
+        total_bytes: files.iter().map(|f| f.bytes).sum(),
+        downloaded_bytes: files
+            .iter()
+            .map(|f| if f.installed { f.bytes } else { f.downloaded })
+            .sum(),
+        installed: files.iter().all(|f| f.installed),
+        files,
+    }
+}
+
+#[tauri::command]
+pub fn voice_sherpa_model_status() -> SherpaModelStatus {
+    sherpa_file_status()
+}
+
+#[derive(Clone, Serialize)]
+pub struct SherpaInstallationProgress {
+    pub revision: u64,
+    pub job_id: String,
+    pub model_id: &'static str,
+    pub bytes: u64,
+    pub total: u64,
+    pub phase: &'static str,
+    pub file: Option<String>,
+    pub error: Option<String>,
+}
+static SHERPA_PROGRESS: std::sync::Mutex<Option<SherpaInstallationProgress>> =
+    std::sync::Mutex::new(None);
+fn sherpa_progress(
+    app: &tauri::AppHandle,
+    job_id: &str,
+    phase: &'static str,
+    bytes: u64,
+    file: Option<String>,
+    error: Option<String>,
+) {
+    let mut guard = SHERPA_PROGRESS.lock().unwrap();
+    let progress = SherpaInstallationProgress {
+        revision: guard.as_ref().map_or(1, |p| p.revision + 1),
+        job_id: job_id.into(),
+        model_id: SHERPA_MODEL_ID,
+        bytes,
+        total: SHERPA_FILES.iter().map(|(_, n, _)| *n).sum(),
+        phase,
+        file,
+        error,
+    };
+    *guard = Some(progress.clone());
+    let _ = app.emit("voice-sherpa-model-progress", progress);
+}
+
+#[tauri::command]
+pub fn voice_sherpa_model_installation() -> Option<SherpaInstallationProgress> {
+    SHERPA_PROGRESS.lock().unwrap().clone()
+}
+
+#[tauri::command]
+pub async fn voice_install_sherpa_model(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let _lock = INSTALL
+        .try_lock()
+        .map_err(|_| "A model installation is already running")?;
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let cancel = CancellationToken::new();
+    *CANCELLATION.lock().unwrap() = Some((job_id.clone(), cancel.clone()));
+    let dir = sherpa_model_dir();
+    let result = async {
+        tokio::fs::create_dir_all(&dir).await.map_err(|e| e.to_string())?;
+        let settings = state.ai_ctx.read().await.config.asr.download_proxy.clone();
+        let proxy = resolve_download_proxy(&state, &settings)?;
+        let client = download_client(proxy.as_ref())?;
+        let mut completed = 0u64;
+        for (filename, bytes, sha256) in SHERPA_FILES {
+            if cancel.is_cancelled() { return Err("CANCELLED".into()); }
+            let target = dir.join(filename);
+            if std::fs::metadata(&target).map(|m| m.len() == *bytes).unwrap_or(false)
+                && crate::models::downloader::sha256_file(&target).is_ok_and(|hash| hash == *sha256) {
+                completed += *bytes;
+                continue;
+            }
+            let part = dir.join(format!("{filename}.part"));
+            let url = format!("https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-zh-en-2023-02-20/resolve/{SHERPA_UPSTREAM_REVISION}/{filename}?download=true");
+            sherpa_progress(&app, &job_id, "connecting", completed, Some((*filename).into()), None);
+            download_to_part(&client, &url, *bytes, &part, &cancel, |phase, bytes_done| {
+                sherpa_progress(&app, &job_id, phase, completed + bytes_done, Some((*filename).into()), None);
+            }).await?;
+            sherpa_progress(&app, &job_id, "verifying", completed + *bytes, Some((*filename).into()), None);
+            let actual = crate::models::downloader::sha256_file(&part)?;
+            if actual != *sha256 {
+                let _ = tokio::fs::remove_file(&part).await;
+                return Err(format!("MODEL_CORRUPT: SHA-256 mismatch for {filename}"));
+            }
+            tokio::fs::rename(&part, &target).await.map_err(|e| e.to_string())?;
+            completed += *bytes;
+        }
+        Ok::<(), String>(())
+    }.await;
+    CANCELLATION.lock().unwrap().take();
+    match &result {
+        Ok(()) => sherpa_progress(
+            &app,
+            &job_id,
+            "complete",
+            SHERPA_FILES.iter().map(|(_, n, _)| *n).sum(),
+            None,
+            None,
+        ),
+        Err(error) => sherpa_progress(
+            &app,
+            &job_id,
+            if error == "CANCELLED" {
+                "cancelled"
+            } else {
+                "failed"
+            },
+            sherpa_file_status().downloaded_bytes,
+            None,
+            (error != "CANCELLED").then(|| error.clone()),
+        ),
+    }
+    result
 }
 fn inventory(m: &catalog::Model, root: &std::path::Path, verify: bool) -> ModelStatus {
     let target = catalog::version_path(root, m);
