@@ -197,6 +197,9 @@ pub struct ModelStatus {
 }
 
 pub const SHERPA_UPSTREAM_REVISION: &str = "98590b7ed6443e77b714204da2757d75e1a642f4";
+const SHERPA_UPSTREAM_REPOSITORY: &str =
+    "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20";
+const SHERPA_REVISION_FILE: &str = ".revision";
 const SHERPA_MODEL_ID: &str = "sherpa-zipformer-zh-en";
 const SHERPA_FILES: &[(&str, u64, &str)] = &[
     (
@@ -234,6 +237,11 @@ pub struct SherpaFileStatus {
 pub struct SherpaModelStatus {
     pub model_id: &'static str,
     pub revision: &'static str,
+    pub download_url: String,
+    pub available_version: String,
+    pub installed_version: Option<String>,
+    pub update_available: bool,
+    pub integrity: &'static str,
     pub files: Vec<SherpaFileStatus>,
     pub total_bytes: u64,
     pub downloaded_bytes: u64,
@@ -275,9 +283,27 @@ fn sherpa_file_status() -> SherpaModelStatus {
             }
         })
         .collect::<Vec<_>>();
+    let installed = files.iter().all(|file| file.installed);
+    let any_target = files.iter().any(|file| dir.join(file.filename).is_file());
+    let installed_version = std::fs::read_to_string(dir.join(SHERPA_REVISION_FILE))
+        .ok()
+        .map(|version| version.trim().chars().take(12).collect::<String>())
+        .filter(|version| !version.is_empty())
+        .or_else(|| installed.then(|| SHERPA_UPSTREAM_REVISION[..12].into()));
     SherpaModelStatus {
         model_id: SHERPA_MODEL_ID,
         revision: SHERPA_UPSTREAM_REVISION,
+        download_url: format!("{SHERPA_UPSTREAM_REPOSITORY}/tree/{SHERPA_UPSTREAM_REVISION}"),
+        available_version: SHERPA_UPSTREAM_REVISION[..12].into(),
+        update_available: !installed && any_target,
+        integrity: if installed {
+            "verified"
+        } else if any_target {
+            "corrupt"
+        } else {
+            "missing"
+        },
+        installed_version,
         total_bytes: files.iter().map(|f| f.bytes).sum(),
         downloaded_bytes: files
             .iter()
@@ -361,7 +387,7 @@ pub async fn voice_install_sherpa_model(
                 continue;
             }
             let part = dir.join(format!("{filename}.part"));
-            let url = format!("https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/{SHERPA_UPSTREAM_REVISION}/{filename}?download=true");
+            let url = format!("{SHERPA_UPSTREAM_REPOSITORY}/resolve/{SHERPA_UPSTREAM_REVISION}/{filename}?download=true");
             sherpa_progress(&app, &job_id, "connecting", completed, Some((*filename).into()), None);
             download_to_part(&client, &url, *bytes, &part, &cancel, |phase, bytes_done| {
                 sherpa_progress(&app, &job_id, phase, completed + bytes_done, Some((*filename).into()), None);
@@ -375,6 +401,9 @@ pub async fn voice_install_sherpa_model(
             tokio::fs::rename(&part, &target).await.map_err(|e| e.to_string())?;
             completed += *bytes;
         }
+        tokio::fs::write(dir.join(SHERPA_REVISION_FILE), SHERPA_UPSTREAM_REVISION)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok::<(), String>(())
     }.await;
     CANCELLATION.lock().unwrap().take();

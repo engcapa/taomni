@@ -19,7 +19,7 @@ interface Installation {
   phase: "connecting" | "downloading" | "importing" | "verifying" | "complete" | "failed" | "cancelled";
   error?: string | null;
 }
-interface SherpaStatus { model_id: string; revision: string; files: { filename: string; bytes: number; downloaded: number; installed: boolean }[]; total_bytes: number; downloaded_bytes: number; installed: boolean }
+interface SherpaStatus { model_id: string; revision: string; download_url?: string; available_version?: string; installed_version?: string | null; update_available?: boolean; integrity?: "missing" | "verified" | "corrupt"; files: { filename: string; bytes: number; downloaded: number; installed: boolean }[]; total_bytes: number; downloaded_bytes: number; installed: boolean }
 interface SherpaProgress { revision: number; job_id: string; model_id: string; bytes: number; total: number; phase: "connecting" | "downloading" | "verifying" | "complete" | "failed" | "cancelled"; file?: string | null; error?: string | null }
 const isRunning = (job: Installation | null) => !!job && !["complete", "failed", "cancelled"].includes(job.phase);
 const megabytes = (bytes: number) => (bytes / 1e6).toFixed(1);
@@ -99,7 +99,15 @@ export function AsrPanel() {
   };
   const checkModels = async () => {
     setBusy("check"); setError(""); setChecked(false);
-    try { setModels(await invoke<Model[]>("voice_check_models")); setChecked(true); }
+    try {
+      const [whisperModels, sherpaStatus] = await Promise.all([
+        invoke<Model[]>("voice_check_models"),
+        invoke<SherpaStatus>("voice_sherpa_model_status"),
+      ]);
+      setModels(whisperModels);
+      setSherpa(sherpaStatus);
+      setChecked(true);
+    }
     catch (e) { setError(String(e)); }
     finally { setBusy(""); }
   };
@@ -120,6 +128,11 @@ export function AsrPanel() {
   const copyLink = async (m: Model) => {
     if (!m.download_url) return;
     try { await writeText(m.download_url); setCopied(m.id); }
+    catch (e) { setError(String(e)); }
+  };
+  const copySherpaLink = async () => {
+    if (!sherpa?.download_url) return;
+    try { await writeText(sherpa.download_url); setCopied(sherpa.model_id); }
     catch (e) { setError(String(e)); }
   };
   const phaseLabel = (phase: Installation["phase"]) => ({
@@ -146,7 +159,7 @@ export function AsrPanel() {
         </select>
       </div>
       <p className="text-[var(--taomni-text-muted)] leading-relaxed">{t("voice.localModelHelp")}</p>
-      {config?.asr.active === "sherpa-zipformer-zh-en" && <div className="space-y-2"><p className="text-[var(--taomni-text-muted)] leading-relaxed">{t("voice.zipformerDownloadHelp")}</p><div className="flex items-center gap-2"><span>{sherpa?.installed ? "Zipformer installed" : `Zipformer ${megabytes(sherpa?.downloaded_bytes ?? 0)} / ${megabytes(sherpa?.total_bytes ?? 0)} MB`}</span><button type="button" className="taomni-btn px-2 py-1" disabled={blocked || (!!sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase))} onClick={() => void installSherpa()}>{sherpa?.installed ? "Reinstall Zipformer" : "Install Zipformer"}</button>{sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase) && <button type="button" className="taomni-btn px-2 py-1" onClick={() => void invoke("voice_cancel_sherpa_model_installation", { jobId: sherpaProgress.job_id })}>Cancel</button>}</div>{sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase) && <progress className="block h-2 w-full accent-[var(--taomni-accent)]" max={100} value={Math.floor((sherpaProgress.bytes * 100) / Math.max(1, sherpaProgress.total))} />}{sherpaProgress?.error && <p className="text-red-400 break-words">{sherpaProgress.error}</p>}</div>}
+      {config?.asr.active === "sherpa-zipformer-zh-en" && <div className="space-y-2"><p className="text-[var(--taomni-text-muted)] leading-relaxed">{t("voice.zipformerDownloadHelp")}</p><div className="flex items-center gap-2"><span>{sherpa?.installed ? `Zipformer ${t("voice.installed")}` : `Zipformer ${megabytes(sherpa?.downloaded_bytes ?? 0)} / ${megabytes(sherpa?.total_bytes ?? 0)} MB`}</span><button type="button" className="taomni-btn px-2 py-1" disabled={blocked || (!!sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase))} onClick={() => void installSherpa()}>{sherpa?.update_available ? t("voice.updateModel") : sherpa?.installed ? t("voice.reinstall") : t("voice.download")}</button>{sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase) && <button type="button" className="taomni-btn px-2 py-1" onClick={() => void invoke("voice_cancel_sherpa_model_installation", { jobId: sherpaProgress.job_id })}>{t("voice.cancelDownload")}</button>}</div><p>{sherpa?.update_available ? t("voice.updateAvailable") : sherpa?.integrity === "corrupt" ? t("voice.corrupt") : sherpa?.integrity === "verified" ? t("voice.verified") : t("voice.notInstalled")}</p>{sherpa?.available_version && <p className="text-[10px] text-[var(--taomni-text-muted)]">{t("voice.version")} {sherpa.available_version}{sherpa.installed_version && sherpa.installed_version !== sherpa.available_version ? ` ← ${sherpa.installed_version}` : ""}</p>}{sherpaProgress && !["complete", "failed", "cancelled"].includes(sherpaProgress.phase) && <progress className="block h-2 w-full accent-[var(--taomni-accent)]" max={100} value={Math.floor((sherpaProgress.bytes * 100) / Math.max(1, sherpaProgress.total))} />}{sherpaProgress?.error && <p className="text-red-400 break-words">{sherpaProgress.error}</p>}{sherpa?.download_url && <div className="border-t border-[var(--taomni-divider)] pt-2 space-y-2"><a className="block break-all text-[10px] leading-relaxed text-[var(--taomni-text-muted)] hover:underline" href={sherpa.download_url} title={t("voice.openDownloadLink")} data-testid="asr-download-url-sherpa-zipformer-zh-en" onClick={(e) => { e.preventDefault(); void openExternalUrl(sherpa.download_url!).catch((e) => setError(String(e))); }}>{sherpa.download_url}</a><div className="flex flex-wrap gap-3"><button type="button" className="inline-flex items-center gap-1 hover:underline" data-testid="asr-copy-url-sherpa-zipformer-zh-en" onClick={() => void copySherpaLink()}><Copy className="h-3 w-3" />{copied === sherpa.model_id ? t("voice.linkCopied") : t("voice.copyDownloadLink")}</button><button type="button" className="inline-flex items-center gap-1 hover:underline" data-testid="asr-open-url-sherpa-zipformer-zh-en" onClick={() => void openExternalUrl(sherpa.download_url!).catch((e) => setError(String(e)))}><ExternalLink className="h-3 w-3" />{t("voice.openDownloadLink")}</button></div></div>}</div>}
       {config?.asr.mode === "online" && config.asr.providers[config.asr.active] && (() => {
         const id = config.asr.active;
         const provider = providerDraft[id] ?? config.asr.providers[id];

@@ -120,6 +120,23 @@ it("copies and opens the exact pinned download address", async () => {
   await waitFor(() => expect(ipc).toHaveBeenCalledWith("open_external_url", { url: downloadUrl }));
   expect(ipc.mock.calls.some(([c]) => c === "voice_install_model")).toBe(false);
 });
+it("shows and copies the backend-provided Zipformer repository address", async () => {
+  const current = useAiStore.getState().config!;
+  useAiStore.setState({ config: { ...current, asr: { ...current.asr, active: "sherpa-zipformer-zh-en", mode: "local" } } });
+  const downloadUrl = "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tree/98590b7ed6443e77b714204da2757d75e1a642f4";
+  ipc.mockImplementation(async (c) => c === "voice_models" ? [] : c === "voice_capture_supported" ? true : c === "voice_sherpa_model_status" ? {
+    model_id: "sherpa-zipformer-zh-en", revision: "98590b7ed6443e77b714204da2757d75e1a642f4", download_url: downloadUrl,
+    available_version: "98590b7ed644", installed_version: null, update_available: false, integrity: "missing",
+    files: [], total_bytes: 199056205, downloaded_bytes: 0, installed: false,
+  } : null);
+  render(<AsrPanel />);
+  expect(await screen.findByTestId("asr-download-url-sherpa-zipformer-zh-en")).toHaveAttribute("href", downloadUrl);
+  fireEvent.click(screen.getByTestId("asr-copy-url-sherpa-zipformer-zh-en"));
+  expect(await screen.findByText("Copied")).toBeVisible();
+  expect(ipc).toHaveBeenCalledWith("clipboard_write_text", { text: downloadUrl });
+  fireEvent.click(screen.getByTestId("asr-open-url-sherpa-zipformer-zh-en"));
+  await waitFor(() => expect(ipc).toHaveBeenCalledWith("open_external_url", { url: downloadUrl }));
+});
 it("restores backend progress on reopening, cancels the same job and resumes its partial file", async () => {
   let job = { revision: 1, job_id: "job-1", model_id: "whisper-base", bytes: 30_000_000, total: 100_000_000, phase: "downloading" };
   ipc.mockImplementation(async (c) => {
