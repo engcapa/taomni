@@ -443,6 +443,14 @@ controls:
     selector: '[data-testid="context-menu-item-move-to-first"]'
     kind: interactive
     optional: true       # only visible in a tab context menu
+  - id: tab-menu-close-others
+    selector: '[data-testid="context-menu-item-close-others"]'
+    kind: interactive
+    optional: true
+  - id: tab-menu-close-all
+    selector: '[data-testid="context-menu-item-close-all"]'
+    kind: interactive
+    optional: true
   - id: tab-menu-move-left
     selector: '[data-testid="context-menu-item-move-left"]'
     kind: interactive

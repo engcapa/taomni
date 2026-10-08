@@ -1398,6 +1398,8 @@
 - `[data-testid="open-tabs-menu"]` — display [optional] — F1.5.open-tabs-menu
 - `[data-testid="open-tabs-detach-active"]` — interactive [optional] — F1.5.open-tabs-detach-active
 - `[data-testid="context-menu-item-move-to-first"]` — interactive [optional] — F1.5.tab-menu-move-first
+- `[data-testid="context-menu-item-close-others"]` — interactive [optional] — F1.5.tab-menu-close-others
+- `[data-testid="context-menu-item-close-all"]` — interactive [optional] — F1.5.tab-menu-close-all
 - `[data-testid="context-menu-item-move-left"]` — interactive [optional] — F1.5.tab-menu-move-left
 - `[data-testid="context-menu-item-move-right"]` — interactive [optional] — F1.5.tab-menu-move-right
 - `[data-testid="context-menu-item-move-to-last"]` — interactive [optional] — F1.5.tab-menu-move-last
