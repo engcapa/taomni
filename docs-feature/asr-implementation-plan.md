@@ -9,6 +9,8 @@
   - `asr-research-03-pc-cpu-latency-and-model-size.md`：PC 纯 CPU 延迟深析 + 8 语种模型大小推荐
 - 既有文档关系：`asr-model-catalog.md`（模型目录/更新协议）、`asr-refactor-report.md`（重构评估）、`voice-input-delivery.md`（本地语音交付与验证）继续有效；本方案与之冲突时，以用户对第 8 节的决策为准，并回写受影响文档。
 
+实施进度与实际门禁结果见 [asr-implementation-progress.md](asr-implementation-progress.md)；本机初始基准见 [asr-bench-results-2026-10-08.md](asr-bench-results-2026-10-08.md)，P0 尚未完成。
+
 ## 1. 目标与非目标
 
 ### 目标

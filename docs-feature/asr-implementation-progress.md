@@ -44,3 +44,18 @@ modern CPU comparison, candidate q8/SenseVoice and online A/B measurements remai
 outstanding. Do not use one-sentence smoke measurements to select defaults or
 claim latency/accuracy targets. P1 engine decisions remain behind the plan's P0
 gate; P4 remains deferred until PC P1/P2 completion as required by D7.
+
+## Stage 2 — P0 benchmark infrastructure and old-CPU smoke
+
+Added a local manifest validator, fixed CER/WER normalization, weighted JSON
+aggregates, per-sample failure receipts, input/model/source/binary hashes and an
+explicit P0 corpus gate. The native opt-in adapter invokes production AsrManager;
+no runtime dependency or automatic network request is added to the application.
+Private fixture and local adapter paths are ignored by Git.
+
+Seven Python regressions pass, including wrong hashes/durations, duplicate audio,
+nonfinite metrics, missing corpus coverage and failed adapter cleanup. The ignored
+Rust probe was built and explicitly run against installed Base and Small f16
+weights on the i7-6700K. Results and limitations are in
+[asr-bench-results-2026-10-08.md](asr-bench-results-2026-10-08.md).
+This does not complete P0 or authorize bypassing its P1 selection gate.

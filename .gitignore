@@ -125,3 +125,7 @@ output
 
 # turbo-agent
 .turbo-agent
+
+# Private ASR corpora and local adapter settings (public fixtures stay explicit)
+/qa-ui-auto-tests/fixtures/voice/private/
+/scripts/asr-bench/*.local.json
