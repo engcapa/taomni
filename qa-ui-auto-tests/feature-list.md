@@ -55,6 +55,16 @@ controls:
   aliases:
   - '[data-testid="workspace-row-qa-workspace-main"]'
   - '[data-testid="workspace-row-qa-workspace-remote"]'
+- id: workspace-pin
+  selector: '[data-testid="workspace-navigator"] button[aria-label^="Pin "]'
+  kind: interactive
+  aliases:
+  - '[aria-label="Pin QA Main"]'
+- id: workspace-unpin
+  selector: '[data-testid="workspace-navigator"] button[aria-label^="Unpin "]'
+  kind: interactive
+  aliases:
+  - '[aria-label="Unpin QA Main"]'
 - id: workspace-references
   selector: '[data-testid="workspace-references"]'
   kind: display
@@ -2969,6 +2979,12 @@ controls:
     selector: '[data-testid="vnc-unencrypted-continue"]'
     kind: interactive
     optional: true          # per-attempt unencrypted-connection warning (VNC-SESS-003, DEC-VNC-19)
+  - id: vnc-auth-remember
+    selector: '[data-testid="vnc-auth-remember"]'
+    kind: interactive
+  - id: vnc-unencrypted-dont-warn
+    selector: '[data-testid="vnc-unencrypted-dont-warn"]'
+    kind: interactive
   - id: vnc-auth-password
     selector: '[data-testid="vnc-auth-password"]'
     kind: interactive

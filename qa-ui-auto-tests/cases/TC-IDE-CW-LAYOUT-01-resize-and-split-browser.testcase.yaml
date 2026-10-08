@@ -30,9 +30,9 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="workspace-navigator"]'
-- click: '[data-testid="side-tab-tools"]'
-- wait_for: '[data-testid="sidebar-tools-panel"]'
-- click: '[data-testid="sidebar-tool-code-workspace"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-code-workspace"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_visible: '[data-testid="code-workspace-tree-pane"]'
 - assert_visible: '[data-testid="code-workspace-project-resize-handle"]'
@@ -118,6 +118,7 @@ verification:
     actions:
     - 1
     - 3
+    - 4
     - 5
     - 9
     - 11
@@ -141,8 +142,8 @@ verification:
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 2
+      expectation: The Workspace navigator is visible before opening the retained editor from the Tools menu.
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 7

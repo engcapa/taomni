@@ -1487,6 +1487,10 @@
 - `[data-testid^="workspace-row-"]` — interactive — F-Workspace-1.workspace-row
   ↳ `[data-testid="workspace-row-qa-workspace-main"]` — alias
   ↳ `[data-testid="workspace-row-qa-workspace-remote"]` — alias
+- `[data-testid="workspace-navigator"] button[aria-label^="Pin "]` — interactive — F-Workspace-1.workspace-pin
+  ↳ `[aria-label="Pin QA Main"]` — alias
+- `[data-testid="workspace-navigator"] button[aria-label^="Unpin "]` — interactive — F-Workspace-1.workspace-unpin
+  ↳ `[aria-label="Unpin QA Main"]` — alias
 - `[data-testid="workspace-references"]` — display — F-Workspace-1.workspace-references
 - `[data-testid="workspace-open-reference"]` — interactive — F-Workspace-1.workspace-open-reference
 - `[data-testid="workspace-add-session"]` — interactive — F-Workspace-1.workspace-add-session
@@ -2798,6 +2802,8 @@
 - `[data-testid="vnc-session-info"]` — display [optional] — F9.6.session-info
 - `[data-testid="vnc-reconnect"]` — interactive [optional] — F9.6.reconnect
 - `[data-testid="vnc-unencrypted-continue"]` — interactive [optional] — F9.6.unencrypted-continue
+- `[data-testid="vnc-auth-remember"]` — interactive — F9.6.vnc-auth-remember
+- `[data-testid="vnc-unencrypted-dont-warn"]` — interactive — F9.6.vnc-unencrypted-dont-warn
 - `[data-testid="vnc-auth-password"]` — interactive [optional] — F9.6.vnc-auth-password
 - `[data-testid="vnc-auth-username"]` — interactive [optional] — F9.6.vnc-auth-username
 - `[data-testid="vnc-auth-error"]` — display [optional] — F9.6.vnc-auth-error
