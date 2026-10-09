@@ -25,7 +25,7 @@ steps:
 - fill:
     selector: '[data-testid="workspace-rename-input"]'
     value: Workspace with a deliberately long project name for layout review
-- click: '[data-testid="workspace-canvas"] button:has-text("Cancel")'
+- click: '[data-testid="workspace-canvas"] form button[type="button"]'
 - assert_not_visible: '[data-testid="workspace-rename-input"]'
 - assert_text:
     selector: '[data-testid="workspace-header"]'
@@ -34,7 +34,7 @@ steps:
 - fill:
     selector: '[data-testid="workspace-rename-input"]'
     value: Workspace with a deliberately long project name for layout review
-- click: '[data-testid="workspace-canvas"] button:has-text("Save")'
+- click: '[data-testid="workspace-canvas"] form button:not([type])'
 - assert_text:
     selector: '[data-testid="workspace-header"]'
     contains: Workspace with a deliberately long project name
@@ -59,12 +59,12 @@ steps:
     min_height: 20
     viewport_margin: 0
 - assert_element_geometry:
-    selector: '[data-testid="workspace-canvas"] button:has-text("Save")'
+    selector: '[data-testid="workspace-canvas"] form button:not([type])'
     min_width: 24
     min_height: 20
     viewport_margin: 0
 - assert_element_geometry:
-    selector: '[data-testid="workspace-canvas"] button:has-text("Cancel")'
+    selector: '[data-testid="workspace-canvas"] form button[type="button"]'
     min_width: 24
     min_height: 20
     viewport_margin: 0
@@ -74,7 +74,7 @@ steps:
       + String.fromCharCode(61) + '"workspace-canvas"]').clientWidth + 1
     expect_truthy: true
 - screenshot: workspace-narrow-rename.png
-- click: '[data-testid="workspace-canvas"] button:has-text("Cancel")'
+- click: '[data-testid="workspace-canvas"] form button[type="button"]'
 - click: '[data-testid="workspace-context-toggle"]'
 - wait_for: '[data-testid="workspace-context-pane"]'
 - assert_element_geometry:
@@ -105,7 +105,7 @@ steps:
 - click: '[data-testid="workspace-hide"]'
 - assert_text:
     selector: '[data-testid="workspace-canvas"] h1'
-    contains: Overview
+    contains: overview
 - click: '[data-testid="workspace-delete"]'
 - assert_visible: '[role="alertdialog"][aria-label="Delete workspace"]'
 - assert_element_geometry:
@@ -184,11 +184,11 @@ verification:
         ''min_width'': 160, ''min_height'': 20, ''viewport_margin'': 0}}'
     - step: 20
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]
-        button:has-text("Save")'', ''min_width'': 24, ''min_height'': 20, ''viewport_margin'':
+        form button:not([type])'', ''min_width'': 24, ''min_height'': 20, ''viewport_margin'':
         0}}'
     - step: 21
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]
-        button:has-text("Cancel")'', ''min_width'': 24, ''min_height'': 20, ''viewport_margin'':
+        button[type="button"]'', ''min_width'': 24, ''min_height'': 20, ''viewport_margin'':
         0}}'
     - step: 22
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\''
@@ -214,7 +214,7 @@ verification:
         ''name'': ''aria-selected'', ''equals'': ''true''}}'
     - step: 38
       expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-canvas"]
-        h1'', ''contains'': ''Overview''}}'
+        h1'', ''contains'': ''overview''}}'
     - step: 40
       expectation: '{''assert_visible'': ''[role="alertdialog"][aria-label="Delete
         workspace"]''}'

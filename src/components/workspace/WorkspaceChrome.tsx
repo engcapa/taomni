@@ -30,7 +30,6 @@ export function openWorkspaceView(view: WorkspaceView) {
   }
   if (view === "tao") { void useChatStore.getState().openTabChat(`workspace:${workspace.id}`); return; }
   if (!["files", "changes", "mail"].includes(view)) return;
-  if ((view === "files" || view === "changes") && !workspace.roots.length && !workspace.looseFiles.length) return;
   const app = useAppStore.getState();
   const existing = app.tabs.find((tab) => {
     const surface = tabToSurfaceDescriptor(tab);
@@ -38,6 +37,7 @@ export function openWorkspaceView(view: WorkspaceView) {
       || (view === "mail" && surface.scope === "global" && surface.kind === "mail-unified" && surface.contextWorkspaceId === workspace.id);
   });
   if (existing) { app.setActiveTab(existing.id); return; }
+  if ((view === "files" || view === "changes") && !workspace.roots.length && !workspace.looseFiles.length) return;
   const id = crypto.randomUUID();
   const root = workspace.roots[0]?.path ?? "";
   if (view === "files") app.addTab({ id, type: "code-workspace", title: workspace.name, closable: true,
@@ -102,7 +102,7 @@ export function WorkspaceCanvas({ onConnectSession }: { onConnectSession: (sessi
             <button data-testid="workspace-add-folder" className={button} onClick={() => void addWorkspaceRoot(workspace).catch((e) => useWorkspaceStore.setState({ error: String(e) }))}>{t("workspace.addFolder")}</button>
             <button data-testid="workspace-delete" className={button} onClick={() => setConfirmDelete(true)}>{t("workspace.delete")}</button>
           </div>
-          {rename !== null && <form className="flex gap-2 my-3" onSubmit={(e) => { e.preventDefault(); void state.patch(workspace.id, { name: rename.trim() }).then(() => setRename(null)).catch(() => {}); }}><input aria-label={t("workspace.name")} data-testid="workspace-rename-input" className="taomni-input" value={rename} onChange={(e) => setRename(e.target.value)} /><button disabled={!rename.trim()} className={button}>Save</button><button type="button" className={button} onClick={() => setRename(null)}>Cancel</button></form>}
+          {rename !== null && <form className="flex flex-wrap gap-2 my-3" onSubmit={(e) => { e.preventDefault(); void state.patch(workspace.id, { name: rename.trim() }).then(() => setRename(null)).catch(() => {}); }}><input aria-label={t("workspace.name")} data-testid="workspace-rename-input" className="taomni-input flex-1 min-w-[160px]" value={rename} onChange={(e) => setRename(e.target.value)} /><button disabled={!rename.trim()} className={button}>Save</button><button type="button" className={button} onClick={() => setRename(null)}>Cancel</button></form>}
           {confirmDelete && <div role="alertdialog" aria-label="Delete workspace" className="p-3 border rounded my-3"><p>Delete this workspace and its references? Saved sessions will remain.</p><button data-testid="workspace-delete-confirm" className={button} onClick={() => void state.remove(workspace.id).then(() => setConfirmDelete(false)).catch((e) => useWorkspaceStore.setState({ error: String(e) }))}>Delete</button><button className={button} onClick={() => setConfirmDelete(false)}>Cancel</button></div>}
           <section className="py-4"><h2 className="font-semibold">Folders</h2>{workspace.roots.map((root) => <div className="flex gap-2 items-center py-2" key={root.id}><button className={`${button} truncate`} onClick={() => openWorkspaceView("files")}>{root.path}</button><button className={button} onClick={() => void state.patch(workspace.id, { roots: workspace.roots.filter((r) => r.id !== root.id) }).catch(() => {})}>{t("workspace.removeFolder")}</button></div>)}</section>
         </>}

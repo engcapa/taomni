@@ -204,6 +204,21 @@ describe("§8.26 / ED-MULTIVIEW-002: WorkspaceDocumentTransactionOwner", () => {
     unsubscribe();
   });
 
+  it("retains undo while an open file has no mounted view, then releases on close", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.retainOpenFiles(["a.ts"]);
+    owner.acquireView("a.ts", "primary", "before");
+    owner.dispatchTransaction("a.ts", "primary", [{ from: 6, to: 6, insert: "X" }], "user-input");
+    expect(owner.releaseView("a.ts", "primary")).toBe(false);
+    expect(owner.acquireView("a.ts", "primary", "beforeX")).toBe("beforeX");
+    expect(owner.undo("a.ts", "primary")?.origin).toBe("undo");
+    expect(owner.getDocument("a.ts")).toBe("before");
+    owner.releaseView("a.ts", "primary");
+    owner.retainOpenFiles([]);
+    expect(owner.getDocument("a.ts")).toBeNull();
+    expect(owner.getHistoryState("a.ts").canRedo).toBe(false);
+  });
+
   it("restores a completion caret only in the view that accepted it", () => {
     const owner = new WorkspaceDocumentTransactionOwner();
     const before = "StringUtiSuffix;";

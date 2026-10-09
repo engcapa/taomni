@@ -1,0 +1,222 @@
+id: TC-WS-019
+title: Dedicated Workspace Changes opens nested repository files in the original Files surface
+covers:
+- F-Workspace-1
+- F26.2
+- F25.5
+tags:
+- workspace-first
+- git
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="workspace-navigator"]'
+- click: '[data-testid="workspace-navigator"] button:has-text("Import parity008")'
+- wait_for: '[data-testid="workspace-header"]'
+- click: '[data-testid="workspace-surface-changes"]'
+- wait_for: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- assert_count:
+    selector: '[data-testid="workspace-flat-repo-header"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="workspace-git-manager"] textarea'
+    value: draft retained without Files
+- click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-diff-open-in-editor"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-b WORKTREE
+    - shared line
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: X
+- assert_visible: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+- click: '[data-testid="workspace-surface-changes"]'
+- click: '[data-testid="workspace-change-row"][data-repo-root$="repo-a"][data-path="same.txt"]'
+- click: '[data-testid="git-diff-open-in-editor"]'
+- wait_for: '[data-editor-tab-key][data-active="true"][data-editor-tab-key$="repo-a/same.txt"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - ''
+- click: '[data-testid="workspace-surface-changes"]'
+- click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-diff-open-in-editor"]'
+- wait_for: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-b WORKTREE
+    - shared line
+    - X
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- press:
+    key: Mod+z
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-editor-tab-key][data-active="true"]:not([data-dirty])'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-b WORKTREE
+    - shared line
+    - ''
+- click: '[data-testid="tab-item"][data-tab-type="code-workspace"] [data-testid="tab-close"]'
+- click: '[data-testid="workspace-surface-changes"]'
+- wait_for: '[data-testid="workspace-git-manager"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 0
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-git-manager"] textarea').value
+      === 'draft retained without Files'
+    expect_truthy: true
+- assert_attribute:
+    selector: '[data-testid="workspace-change-row"][data-active="true"]'
+    name: data-repo-root
+    equals: ${fixture.parity008_root}/repo-b
+- parity008_trace:
+    writes: 0
+    pending: 0
+    last_pair_repo: ${fixture.parity008_root}/repo-b
+- screenshot: workspace-git-after-closing-files.png
+- click: '[data-testid="workspace-surface-overview"]'
+- click: '[data-testid="workspace-canvas"] button:has-text("Remove folder")'
+- click: '[data-testid="workspace-surface-changes"]'
+- wait_for: '[data-testid="workspace-git-surface"] [role="status"]'
+- assert_text:
+    selector: '[data-testid="workspace-git-surface"]'
+    contains: No Git repository in this workspace
+- assert_count:
+    selector: '[data-testid="workspace-change-row"]'
+    equal: 0
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Changes discovers both nested repos without Files; Git opens repo-specific paths in one editor
+      and preserves dirty buffers and undo; closing Files retains Git draft and selection with zero writes.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 9
+    - 10
+    - 11
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 20
+    - 23
+    - 24
+    - 25
+    - 29
+    - 32
+    - 33
+    - 40
+    - 41
+    - 42
+    checkpoints:
+    - step: 2
+      expectation: '{''wait_for'': ''[data-testid="workspace-navigator"]''}'
+    - step: 4
+      expectation: '{''wait_for'': ''[data-testid="workspace-header"]''}'
+    - step: 6
+      expectation: '{''wait_for'': ''[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]''}'
+    - step: 7
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="workspace-flat-repo-header"]'', ''equal'':
+        2}}'
+    - step: 8
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-tab"]'', ''equal'': 0}}'
+    - step: 12
+      expectation: '{''wait_for'': ''[data-testid="code-workspace-editor"] .cm-content''}'
+    - step: 13
+      expectation: '{''assert_items'': {''selector'': ''[data-testid="code-workspace-editor"] .cm-line'', ''equals'':
+        [''repo-b WORKTREE'', ''shared line'', '''']}}'
+    - step: 17
+      expectation: '{''assert_visible'': ''[data-editor-tab-key][data-active="true"][data-dirty="true"]''}'
+    - step: 21
+      expectation: '{''wait_for'': ''[data-editor-tab-key][data-active="true"][data-editor-tab-key$="repo-a/same.txt"]''}'
+    - step: 22
+      expectation: '{''assert_items'': {''selector'': ''[data-testid="code-workspace-editor"] .cm-line'', ''equals'':
+        [''repo-a WORKTREE'', ''shared line'', '''']}}'
+    - step: 26
+      expectation: '{''wait_for'': ''[data-editor-tab-key][data-active="true"][data-dirty="true"]''}'
+    - step: 27
+      expectation: '{''assert_items'': {''selector'': ''[data-testid="code-workspace-editor"] .cm-line'', ''equals'':
+        [''repo-b WORKTREE'', ''shared line'', ''X'']}}'
+    - step: 28
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-tab"]'', ''equal'': 1}}'
+    - step: 30
+      expectation: '{''wait_for'': ''[data-editor-tab-key][data-active="true"]:not([data-dirty])''}'
+    - step: 31
+      expectation: '{''assert_items'': {''selector'': ''[data-testid="code-workspace-editor"] .cm-line'', ''equals'':
+        [''repo-b WORKTREE'', ''shared line'', '''']}}'
+    - step: 34
+      expectation: '{''wait_for'': ''[data-testid="workspace-git-manager"]''}'
+    - step: 35
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-tab"]'', ''equal'': 0}}'
+    - step: 36
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"workspace-git-manager"]
+        textarea\'').value === \''draft retained without Files\'''', ''expect_truthy'': True}}'
+    - step: 37
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="workspace-change-row"][data-active="true"]'',
+        ''name'': ''data-repo-root'', ''equals'': ''${fixture.parity008_root}/repo-b''}}'
+    - step: 38
+      expectation: '{''parity008_trace'': {''writes'': 0, ''pending'': 0, ''last_pair_repo'': ''${fixture.parity008_root}/repo-b''}}'
+    - step: 43
+      expectation: '{''wait_for'': ''[data-testid="workspace-git-surface"] [role="status"]''}'
+    - step: 44
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-git-surface"]'', ''contains'': ''No
+        Git repository in this workspace''}}'
+    - step: 45
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="workspace-change-row"]'', ''equal'': 0}}'
+    results:
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 12
+    - 13
+    - 17
+    - 21
+    - 22
+    - 26
+    - 27
+    - 28
+    - 30
+    - 31
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 43
+    - 44
+    - 45
+  visual:
+  - check: Dedicated Git page remains full size after closing Files.
+    method: manual
+    reason: Screenshot review supplements routing assertions.
+  native:
+  - check: Real repository zero writes and dirty editor return.
+    method: external
+    reason: TC-IDE-PARITY-018-02 and TC-IDE-PARITY-008-03 retain real IPC/hash assertions.

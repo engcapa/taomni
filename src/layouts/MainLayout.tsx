@@ -45,6 +45,8 @@ import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
 import { TerminalPanel, type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
 import { GitPanel } from "../components/git/GitPanel";
 import { WorkspaceGitManager } from "../components/git/WorkspaceGitManager";
+import { WorkspaceGitSurface } from "../components/git/WorkspaceGitSurface";
+import { openWorkspaceFileFromGit } from "../lib/workspaceGitNavigation";
 import { CodeWorkspaceTab, type CodeWorkspaceGitManagerPayload } from "../components/editor/CodeWorkspaceTab";
 import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
 import { resolveShellShortcutRoute } from "../components/editor/workspace/shellShortcutRouter";
@@ -2297,7 +2299,9 @@ export function MainLayout() {
       : workspaceRoots[0].repoRoot;
     const name = payload.workspaceName.trim() || "Code Workspace";
     const existing = tabsRef.current.find((tab) => {
-      if (tab.type !== "git" || !tab.git?.workspaceRoots?.length) return false;
+      if (tab.type !== "git" || !tab.git) return false;
+      if (payload.workspaceId && tab.git.sourceWorkspaceId === payload.workspaceId) return true;
+      if (!tab.git.workspaceRoots?.length) return false;
       if (payload.workspaceInstanceId) {
         return tab.git.sourceWorkspaceInstanceId === payload.workspaceInstanceId;
       }
@@ -2335,6 +2339,9 @@ export function MainLayout() {
   }, [addTab, setActiveTab, updateGitTabInfo]);
 
   const syncWorkspaceGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
+    // Canonical Workspace discovery is owned by its Git surface, even when
+    // Files is hidden/closed or its own detection is still pending.
+    if (useWorkspaceStore.getState().workspaces.some((workspace) => workspace.id === payload.workspaceId)) return;
     const sourceWorkspaceInstanceId = payload.workspaceInstanceId;
     if (!sourceWorkspaceInstanceId) return;
     const workspaceRoots = normalizeGitWorkspaceRoots(payload.roots);
@@ -2381,11 +2388,12 @@ export function MainLayout() {
     );
     for (const tab of tabs) {
       if (tab.type !== "git" || !tab.git?.sourceWorkspaceInstanceId) continue;
+      if (workspaceNavigation.workspaces.some((workspace) => workspace.id === tab.git?.sourceWorkspaceId)) continue;
       if (!tab.git.workspaceRoots?.length) continue;
       if (openWorkspaceInstanceIds.has(tab.git.sourceWorkspaceInstanceId)) continue;
       removeTab(tab.id);
     }
-  }, [removeTab, tabs]);
+  }, [removeTab, tabs, workspaceNavigation.workspaces]);
 
   const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
     const roots = workspace.roots ?? [];
@@ -4341,7 +4349,7 @@ export function MainLayout() {
             // The panel's default scroll container can pan the fixed rail when
             // a focused/selected session is scrolled into view. Its children
             // own their scrolling; this frame must keep the rail in place.
-            style={{ overflow: "clip" }}
+            style={{ overflow: "clip", ...(sidebarCollapsed ? { display: "none" } : {}) }}
             onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
               const percentage = size.asPercentage;
               if (percentage > 2) {
@@ -4378,7 +4386,7 @@ export function MainLayout() {
           />
 
           <Panel id="content">
-            <div className="h-full flex min-w-0">
+            <div className="h-full w-full flex min-w-0">
               {chatDrawerInline && chatDrawerPosition === "left" && <ChatDrawer />}
               <div className="h-full flex flex-col min-w-0 flex-1">
               <WorkspaceChrome onStartLocalTerminal={(shell) => openLocalTab(shell?.name ?? tr("tabs.localTerminal"), undefined, undefined, shell, undefined, workspaceNavigation.section === "work" ? workspaceNavigation.activeWorkspaceId ?? undefined : undefined)} onConnectSession={handleConnectSession} onOpenSessionEditor={() => handleNewSession()} onDuplicateTab={handleDuplicateTab} />
@@ -4817,25 +4825,37 @@ export function MainLayout() {
                   if (!tab.git) return null;
                   const isActive = !workspaceCanvasVisible && activeTabId === tab.id;
                   const workspaceRoots = tab.git.workspaceRoots ?? [];
+                  const owner = workspaceNavigation.workspaces.find((workspace) => workspace.id === tab.git?.sourceWorkspaceId);
+                  const openFromGit = (repoRoot: string, path?: string | null) => {
+                    if (!owner || !openWorkspaceFileFromGit(owner.id, repoRoot, path)) openCodeWorkspaceTab(repoRoot, path);
+                  };
                   return (
                     <div
                       key={tab.id}
                       className="absolute inset-0"
                       style={{ display: isActive ? "block" : "none" }}
+                      onKeyDown={(event) => {
+                        if (!owner || event.key !== "Escape" || !event.shiftKey || event.defaultPrevented) return;
+                        if (event.target instanceof Element && event.target.closest('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+                        event.preventDefault();
+                        openWorkspaceFileFromGit(owner.id, tab.git!.repoRoot);
+                      }}
                     >
-                      {workspaceRoots.length > 0 ? (
+                      {owner ? (
+                        <WorkspaceGitSurface workspace={owner} activeRepoRoot={tab.git.activeRepoRoot ?? tab.git.repoRoot} visible={isActive} onOpenWorkspace={openFromGit} />
+                      ) : workspaceRoots.length > 0 ? (
                         <WorkspaceGitManager
                           workspaceName={tab.git.workspaceName}
                           roots={workspaceRoots}
                           activeRepoRoot={tab.git.activeRepoRoot ?? tab.git.repoRoot}
                           visible={isActive}
-                          onOpenWorkspace={openCodeWorkspaceTab}
+                          onOpenWorkspace={openFromGit}
                         />
                       ) : (
                         <GitPanel
                           repoRoot={tab.git.repoRoot}
                           visible={isActive}
-                          onOpenWorkspace={openCodeWorkspaceTab}
+                          onOpenWorkspace={openFromGit}
                         />
                       )}
                     </div>

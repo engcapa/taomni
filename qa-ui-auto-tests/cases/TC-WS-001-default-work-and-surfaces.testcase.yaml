@@ -36,7 +36,7 @@ steps:
     selector: '[data-testid="workspace-header"]'
     contains: QA Main
 - click: '[data-testid="workspace-surface-changes"]'
-- wait_for: '[data-testid="git-panel"]'
+- wait_for: '[data-testid="workspace-git-surface"]'
 - click: '[data-testid="workspace-surface-overview"]'
 - assert_count:
     selector: '[data-testid="workspace-navigator"] [data-testid^="workspace-reference-"]'

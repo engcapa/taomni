@@ -21,6 +21,8 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-recents"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
@@ -100,9 +102,7 @@ steps:
     writes: 0
     pending: 0
     last_pair_repo: ${fixture.parity008_root}/repo-b
-- click: '[data-testid="app-main-menu"]'
-- hover: '[data-testid="context-menu-item-tools"]'
-- click: '[data-testid="context-menu-item-code-workspace"]'
+- click: '[data-testid="workspace-surface-files"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -121,62 +121,62 @@ verification:
   - id: ED-PARITY-008-V1
     requirement: 两仓库 Changes 分组/分支/路径正确；repo-a→repo-b 切换后标题、HEAD oid、工作区标签、1/3→3/3 与 diff 文本全部来自当前仓库，无 Git 写请求。
     actions:
-    - 3
-    - 4
-    - 13
-    - 18
-    - 27
-    - 30
+    - 5
+    - 6
+    - 15
+    - 20
+    - 29
+    - 32
     checkpoints:
-    - step: 16
+    - step: 18
       expectation: '{assert_items: {attribute: aria-label, equals: [repo-a same.txt Staged, repo-a untracked.txt
         Untracked, repo-b same.txt Modified], selector: ''[data-testid="workspace-change-row"]''}}'
-    - step: 17
+    - step: 19
       expectation: '{assert_items: {equals: [repo-amain2/2, repo-bmain1/1], selector: ''[data-testid="workspace-flat-repo-header"]''}}'
-    - step: 20
-      expectation: '{assert_text_equals: {equals: repo-a / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
-    - step: 21
-      expectation: '{assert_text_equals: {equals: 1/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
     - step: 22
-      expectation: '{assert_text_equals: {equals: HEAD 8748e377 · same.txt, selector: ''[data-testid="workspace-diff-old-label"]''}}'
+      expectation: '{assert_text_equals: {equals: repo-a / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
     - step: 23
-      expectation: '{assert_text_equals: {equals: Working tree · same.txt, selector: ''[data-testid="workspace-diff-new-label"]''}}'
+      expectation: '{assert_text_equals: {equals: 1/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
     - step: 24
+      expectation: '{assert_text_equals: {equals: HEAD 8748e377 · same.txt, selector: ''[data-testid="workspace-diff-old-label"]''}}'
+    - step: 25
+      expectation: '{assert_text_equals: {equals: Working tree · same.txt, selector: ''[data-testid="workspace-diff-new-label"]''}}'
+    - step: 26
       expectation: '{assert_pattern: {regex: ''(?s)repo-a HEAD.*shared line.*repo-a WORKTREE.*shared line'', selector:
         ''[data-testid="git-diff-viewer"]''}}'
-    - step: 29
+    - step: 31
       expectation: '{assert_text_equals: {equals: 2/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
-    - step: 32
-      expectation: '{assert_text_equals: {equals: repo-b / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
-    - step: 33
-      expectation: '{assert_text_equals: {equals: 3/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
     - step: 34
-      expectation: '{assert_text_equals: {equals: HEAD 909b2b27 · same.txt, selector: ''[data-testid="workspace-diff-old-label"]''}}'
+      expectation: '{assert_text_equals: {equals: repo-b / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
     - step: 35
-      expectation: '{assert_pattern: {regex: ''(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'', selector: ''[data-testid="git-diff-viewer"]''}}'
+      expectation: '{assert_text_equals: {equals: 3/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
     - step: 36
+      expectation: '{assert_text_equals: {equals: HEAD 909b2b27 · same.txt, selector: ''[data-testid="workspace-diff-old-label"]''}}'
+    - step: 37
+      expectation: '{assert_pattern: {regex: ''(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'', selector: ''[data-testid="git-diff-viewer"]''}}'
+    - step: 38
       expectation: '{assert_disabled: ''[data-testid="workspace-diff-next-file"]''}'
-    - step: 39
+    - step: 41
       expectation: '{parity008_trace: {last_pair_repo: ''${fixture.parity008_root}/repo-b'', pending: 0, writes:
         0}}'
     results:
-    - 35
-    - 36
-    - 39
+    - 37
+    - 38
+    - 41
   - id: ED-PARITY-008-V2
     requirement: 打开 Git diff 并切换仓库后回到编辑器，dirty 文本与选区保持。
     actions:
-    - 6
-    - 7
     - 8
     - 9
-    - 13
-    - 40
+    - 10
+    - 11
+    - 15
+    - 42
     checkpoints:
-    - step: 10
+    - step: 12
       expectation: '{assert_items: {equals: [repo-a WORKTREE, shared line, edit-kept], selector: ''[data-testid="code-workspace-editor"]
         .cm-line''}}'
-    - step: 11
+    - step: 13
       expectation: '{wait_for: ''[data-editor-tab-key][data-active="true"][data-dirty="true"]''}'
     - step: 43
       expectation: '{assert_visible: ''[data-editor-tab-key][data-active="true"][data-dirty="true"]''}'

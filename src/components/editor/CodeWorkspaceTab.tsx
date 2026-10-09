@@ -361,6 +361,7 @@ import {
   type EditorSelectionRange,
 } from "./workspace/CodeMirrorHost";
 import { WorkspaceDocumentTransactionOwner } from "./workspace/workspaceDocumentTransactionOwner";
+import { useWorkspaceFolders } from "./workspace/useWorkspaceFolders";
 import { SurroundWithDialog } from "./workspace/SurroundWithDialog";
 import { GenerateCodeDialog } from "./workspace/GenerateCodeDialog";
 import {
@@ -466,7 +467,6 @@ import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
 import { GoToLineDialog } from "./workspace/GoToLineDialog";
 import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
 import { javaSyntaxOutline } from "./workspace/javaSyntaxOutline";
-import { WorkspaceGitManager } from "../git/WorkspaceGitManager";
 import { CodeInsightNotice, caretAnchor, type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
 import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
 import {
@@ -719,7 +719,6 @@ import {
 } from "./workspace/replaceInFilesModel";
 import type {
   CodeWorkspaceFileRef,
-  CodeWorkspaceLooseFileInfo,
   CodeWorkspaceRootInfo,
   CodeWorkspaceTabInfo,
 } from "../../types";
@@ -1168,7 +1167,6 @@ import {
   gitPathForWorkspacePath,
   gitRootsForWorkspaceRoot,
   initialFileRef,
-  initialLooseFiles,
   initialRoots,
   isExternalHref,
   isLspFeatureReady,
@@ -2050,6 +2048,11 @@ export function CodeWorkspaceTab({
   );
   const toolWindowLayoutRef = useRef(toolWindowLayout);
   toolWindowLayoutRef.current = toolWindowLayout;
+  useEffect(() => {
+    // Older layouts may restore the retired embedded Git dock. Its capability
+    // now lives in Changes; do not leave an empty dock occupying editor space.
+    toolWindowLayoutRef.current.hide("git");
+  }, [workspaceInstanceId]);
   const toolWindowNodes = useToolWindowNodes();
   const leftToolAreaOpen = toolWindowLayout.sideOpen("left");
   const rightToolAreaOpen = toolWindowLayout.sideOpen("right");
@@ -2388,7 +2391,7 @@ export function CodeWorkspaceTab({
   const [tabPolicyReceipt, setTabPolicyReceipt] = useState<TabPolicyLifecycleReceiptView | null>(null);
   const [columnSelectionMode, setColumnSelectionMode] = useState(false);
   const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
-  const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
+  const { roots, setRoots, looseFiles, setLooseFiles } = useWorkspaceFolders(workspace);
   const projectFactsRoot = roots[0]?.path ?? "";
   const projectFacts = useProjectFacts(projectFactsRoot, {
     autoFetch: visible,
@@ -2402,7 +2405,6 @@ export function CodeWorkspaceTab({
       projectDescriptorDiscovery.refresh(),
     ]);
   }, [projectDescriptorDiscovery.refresh, projectFacts.refresh]);
-  const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
   const {
     directories,
     compactChains,
@@ -2711,6 +2713,9 @@ export function CodeWorkspaceTab({
     },
   }));
   const initialOpenedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    documentTransactionOwnerRef.current.retainOpenFiles(Object.keys(openFiles));
+  }, [openFiles]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
   const editorPaneRef = useRef<HTMLElement | null>(null);
@@ -2719,8 +2724,6 @@ export function CodeWorkspaceTab({
   const codeInsightNoticeSeqRef = useRef(0);
   /** ED-PARITY-014 DEC-014-04: File Structure shows a syntax-only outline. */
   const [structureSyntaxOnly, setStructureSyntaxOnly] = useState(false);
-  /** ED-PARITY-018: the Git tool window mounts on first open, then stays. */
-  const [gitToolWindowMounted, setGitToolWindowMounted] = useState(false);
   const showCodeInsightNotice = useCallback((message: string, action: "configure" | null = null) => {
     codeInsightNoticeSeqRef.current += 1;
     setCodeInsightNotice({
@@ -4155,6 +4158,15 @@ export function CodeWorkspaceTab({
     initialOpenedKeyRef.current = key;
     void openFile(ref);
   }, [looseFiles, openFile, roots, workspace, workspaceInstanceId]);
+
+  const handledOpenFileRequest = useRef<string | null>(null);
+  useEffect(() => {
+    const request = workspace.openFileRequest;
+    if (!request || handledOpenFileRequest.current === request.id) return;
+    handledOpenFileRequest.current = request.id;
+    if (request.file) void openFile(request.file, { preview: false }).then(handleReturnToEditor);
+    else handleReturnToEditor();
+  }, [workspace.openFileRequest, openFile, handleReturnToEditor]);
 
   const persistWorkspaceLayoutNow = useCallback((targetInstanceId = workspaceInstanceId) => {
     if (!targetInstanceId) return;
@@ -11438,6 +11450,9 @@ export function CodeWorkspaceTab({
     let unlisten: UnlistenFn | null = null;
     let disposed = false;
     void listen<LspWorkspaceApplyEditRequest>("lsp://workspace-apply-edit", (event) => {
+      // Registration resolves asynchronously. A StrictMode cleanup or changed
+      // callback can dispose this subscription before unlisten is available.
+      if (disposed) return;
       const request = event.payload;
       if (request.workspaceId !== workspaceInstanceId) return;
       void (async () => {
@@ -12886,6 +12901,10 @@ export function CodeWorkspaceTab({
    */
   const handleActivateToolWindow = useCallback((requestedId: string) => {
     const toolId = requestedId === "outline" ? "structure" : requestedId;
+    if (toolId === "git") {
+      openGitManager();
+      return;
+    }
     const layout = toolWindowLayoutRef.current;
     const pane = toolId === "project"
       ? treePaneRef.current
@@ -12902,7 +12921,7 @@ export function CodeWorkspaceTab({
     } else {
       focusToolWindowSoon(toolId);
     }
-  }, [focusToolWindowSoon, handleReturnToEditor]);
+  }, [focusToolWindowSoon, handleReturnToEditor, openGitManager]);
 
   const handleRestoreToolWindowLayout = useCallback(() => {
     // IDEA Window | Restore Default Layout: default anchors, Project only.
@@ -16677,9 +16696,6 @@ export function CodeWorkspaceTab({
   const [toolbarMoreOpen, setToolbarMoreOpen] = useState(false);
   /** ED-PARITY-012 DEC-012-06: pending Go to Line:Column dialog. */
   const [goToLineRequest, setGoToLineRequest] = useState<GoToLineRequest | null>(null);
-  useEffect(() => {
-    if (bottomDockOpen && bottomDockTab === "git") setGitToolWindowMounted(true);
-  }, [bottomDockOpen, bottomDockTab]);
   // The ⋮ menu closes on any outside press or Esc without swallowing that
   // press, so the next toolbar/editor click still reaches its target.
   useEffect(() => {
@@ -16744,7 +16760,7 @@ export function CodeWorkspaceTab({
       id: "commit",
       label: "Commit",
       icon: <GitCommitHorizontal className="h-3.5 w-3.5" />,
-      active: bottomDockOpen && bottomDockTab === "git",
+      active: false,
       shortcut: railShortcut("workspace.commitToolWindow"),
       disabled: gitRoots.length === 0,
       disabledReason: "No Git repository in this workspace",
@@ -22158,29 +22174,6 @@ export function CodeWorkspaceTab({
           }}
           onRefreshCoverage={() => void scanWorkspaceCoverage()}
         />
-      ),
-    },
-    {
-      // ED-PARITY-018 DEC-018-01: the workspace Git tool window hosts the
-      // same Git manager as the Git tab, scoped to this workspace's repos.
-      id: "git",
-      label: "Git",
-      icon: <GitBranch className="h-3.5 w-3.5" />,
-      // Mounted on first open and kept, so the commit message and
-      // selection survive hiding the tool window.
-      content: gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
-        <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
-          <WorkspaceGitManager
-            workspaceName={title}
-            roots={gitRoots}
-            activeRepoRoot={activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null}
-            visible={bottomDockOpen && bottomDockTab === "git"}
-          />
-        </div>
-      ) : (
-        <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-[11px] text-[var(--taomni-code-muted)]">
-          {gitRootsLoading ? "Detecting Git repositories…" : "No Git repository in this workspace"}
-        </div>
       ),
     },
     {

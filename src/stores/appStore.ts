@@ -1,4 +1,4 @@
-import { useWorkspaceStore } from "./workspaceStore";
+import { activateWorkspaceRuntimeSurface, useWorkspaceStore } from "./workspaceStore";
 import { tabToSurfaceDescriptor } from "../lib/workspaceScope";
 import { create } from "zustand";
 import type {
@@ -956,7 +956,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       tab = { ...tab, surface: tabToSurfaceDescriptor(tab) };
       const descriptor = tab.surface!;
-      useWorkspaceStore.setState({ canvas: "runtime", ...("workspaceId" in descriptor && descriptor.workspaceId ? { activeWorkspaceId: descriptor.workspaceId } : {}) });
+      activateWorkspaceRuntimeSurface(descriptor);
       const nextTabs = [...s.tabs, tab];
       const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
@@ -1204,7 +1204,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const tab = s.tabs.find((item) => item.id === id);
       const descriptor = tab && tabToSurfaceDescriptor(tab);
-      useWorkspaceStore.setState({ canvas: "runtime", ...(descriptor && "workspaceId" in descriptor && descriptor.workspaceId ? { activeWorkspaceId: descriptor.workspaceId } : {}) });
+      activateWorkspaceRuntimeSurface(descriptor);
       const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
         s.recentWorkspaceIdByWorkspaceInstance,

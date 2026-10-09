@@ -13359,6 +13359,9 @@ end_of_record
       expect(disk["src/a.java"]).toBe("hello replaced_lower");
 
       // Undo restores both distinct files accurately
+      // The final disk acknowledgement precedes transaction registration and
+      // preview dismissal. Wait for the completed UI action before undoing it.
+      await waitFor(() => expect(screen.queryByTestId("refactoring-preview-dialog")).not.toBeInTheDocument());
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });

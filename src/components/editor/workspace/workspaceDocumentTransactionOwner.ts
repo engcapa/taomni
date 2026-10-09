@@ -200,6 +200,7 @@ function isHistoryReplay(origin: DocumentTransactionOrigin): boolean {
 export class WorkspaceDocumentTransactionOwner {
   private listenersByFile = new Map<string, Set<DocumentTransactionListener>>();
   private documentsByFile = new Map<string, DocumentRecord>();
+  private retainedFiles = new Set<string>();
 
   constructor(private readonly observer: WorkspaceDocumentOwnerObserver = {}) {}
 
@@ -238,7 +239,19 @@ export class WorkspaceDocumentTransactionOwner {
     return canonical;
   }
 
-  /** Release a view lease and clear document state when no views remain. */
+  /** Open tabs own history even when their editor view is temporarily absent. */
+  retainOpenFiles(fileKeys: Iterable<string>): void {
+    const next = new Set(fileKeys);
+    for (const key of this.retainedFiles) {
+      if (!next.has(key) && this.documentsByFile.get(key)?.views.size === 0) {
+        this.documentsByFile.delete(key);
+        this.listenersByFile.delete(key);
+      }
+    }
+    this.retainedFiles = next;
+  }
+
+  /** Release the view; closed files release history when their last view leaves. */
   releaseView(fileKey: string, viewId: string): boolean {
     const record = this.documentsByFile.get(fileKey);
     if (!record || !record.views.delete(viewId)) return false;
@@ -252,7 +265,7 @@ export class WorkspaceDocumentTransactionOwner {
       activeViewCount: record.views.size,
       delta: -1,
     });
-    if (record.views.size > 0) return false;
+    if (record.views.size > 0 || this.retainedFiles.has(fileKey)) return false;
     this.documentsByFile.delete(fileKey);
     this.listenersByFile.delete(fileKey);
     return true;
@@ -510,6 +523,7 @@ export class WorkspaceDocumentTransactionOwner {
 
   clear(fileKey?: string): void {
     if (fileKey) {
+      this.retainedFiles.delete(fileKey);
       const record = this.documentsByFile.get(fileKey);
       if (record) {
         for (const viewId of record.views) {
@@ -524,6 +538,7 @@ export class WorkspaceDocumentTransactionOwner {
       this.listenersByFile.delete(fileKey);
       this.documentsByFile.delete(fileKey);
     } else {
+      this.retainedFiles.clear();
       for (const [currentFileKey, record] of this.documentsByFile) {
         for (const viewId of record.views) {
           this.notifyLeaseChanged({

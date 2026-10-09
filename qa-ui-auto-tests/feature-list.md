@@ -7398,10 +7398,6 @@ controls:
   - id: debug-tab
     selector: '[data-testid="code-workspace-bottom-tab-debug"]'
     kind: interactive
-  - id: bottom-tab-git               # ED-PARITY-018 Git tool window tab
-    selector: '[data-testid="code-workspace-bottom-tab-git"]'
-    kind: interactive
-    optional: true
   - id: bottom-tab-overflow
     selector: '[data-testid="code-workspace-bottom-tab-overflow"]'
     kind: interactive
@@ -8524,6 +8520,10 @@ controls:
     kind: display
     optional: true       # unsaved buffer marker (ED-PARITY-008/009 retained-state checks)
     aliases: ['[data-editor-tab-key][data-active="true"][data-dirty="true"]']
+  - id: editor-active-tab
+    selector: '[data-editor-tab-key][data-active="true"]'
+    kind: display
+    optional: true
   - id: editor-split-layout
     selector: '[data-testid="code-workspace-editor-split"]'
     kind: display
@@ -9218,14 +9218,6 @@ controls:
     optional: true
   - id: recent-files-path
     selector: '[data-testid="code-workspace-recent-files-path"]'
-    kind: display
-    optional: true
-  - id: git-tool-window              # ED-PARITY-018 workspace Git tool window (Alt+9 / Commit rail)
-    selector: '[data-testid="code-workspace-git-tool-window"]'
-    kind: display
-    optional: true
-  - id: git-tool-window-empty
-    selector: '[data-testid="code-workspace-git-tool-window-empty"]'
     kind: display
     optional: true
   - id: code-insight-notice          # ED-PARITY-020 caret popup for empty/unavailable code insight
@@ -10195,6 +10187,12 @@ controls:
   - id: workspace-git-manager
     selector: '[data-testid="workspace-git-manager"]'
     kind: display
+  - id: workspace-git-surface
+    selector: '[data-testid="workspace-git-surface"]'
+    kind: display
+  - id: git-diff-open-in-editor
+    selector: '[data-testid="git-diff-open-in-editor"]'
+    kind: interactive
   - id: workspace-change-row
     selector: '[data-testid="workspace-change-row"]'
     kind: interactive

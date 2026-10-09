@@ -13,12 +13,22 @@ vi.mock("../lib/workspacePersistence", () => ({
   },
   deleteWorkspace: async (workspace: Workspace) => { backend.records = backend.records.filter((w) => w.id !== workspace.id); },
 }));
-import { useWorkspaceStore } from "./workspaceStore";
+import { activateWorkspaceRuntimeSurface, useWorkspaceStore } from "./workspaceStore";
 beforeEach(() => {
   backend.records = []; backend.conflict = false;
   useWorkspaceStore.setState({ workspaces: [], activeWorkspaceId: null, hydrated: false, error: null, section: "work", canvas: "workspace" });
 });
 describe("workspace catalog", () => {
+  it("activates and persists the owning Surface when a Git action opens a runtime tab", async () => {
+    const store = useWorkspaceStore.getState();
+    const owner = await store.create("Git owner");
+    await store.create("Another workspace");
+    activateWorkspaceRuntimeSurface({ scope: "workspace", kind: "changes", workspaceId: owner.id, surfaceId: "git" });
+    expect(useWorkspaceStore.getState()).toMatchObject({ activeWorkspaceId: owner.id, canvas: "runtime" });
+    expect(useWorkspaceStore.getState().workspaces.find((w) => w.id === owner.id)?.navigation.activeSurface).toBe("changes");
+    await store.patch(owner.id, { description: "queue flushed" });
+    expect(backend.records.find((w) => w.id === owner.id)?.navigation.activeSurface).toBe("changes");
+  });
   it("does not flash an older surface while rapid selections and pane changes persist", async () => {
     const store = useWorkspaceStore.getState();
     const workspace = await store.create("Rapid navigation");

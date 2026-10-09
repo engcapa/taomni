@@ -410,6 +410,8 @@ export interface CodeWorkspaceTabInfo {
   roots?: CodeWorkspaceRootInfo[];
   looseFiles?: CodeWorkspaceLooseFileInfo[];
   initialFile?: CodeWorkspaceFileRef | null;
+  /** An explicit Git/navigation request; a new id also reopens the same path. */
+  openFileRequest?: { id: string; file: CodeWorkspaceFileRef | null };
 }
 
 export interface RecentWorkspace {

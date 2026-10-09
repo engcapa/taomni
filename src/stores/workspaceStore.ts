@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import * as persistence from "../lib/workspacePersistence";
 import type { RecentWorkspace } from "../types";
-import type { Workspace, WorkspaceMembership, WorkspaceView } from "../types/workspace";
+import type { SurfaceDescriptor, Workspace, WorkspaceMembership, WorkspaceView } from "../types/workspace";
 
 export type NavigationSection = "work" | "sessions" | "tools" | "alerts";
 interface WorkspaceState {
@@ -122,6 +122,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
   },
 }));
+
+/** Toolbar/Actions and tab clicks must select the same remembered Surface. */
+export function activateWorkspaceRuntimeSurface(surface?: SurfaceDescriptor) {
+  const state = useWorkspaceStore.getState();
+  const workspaceId = surface && "workspaceId" in surface ? surface.workspaceId : undefined;
+  if (workspaceId) useWorkspaceStore.setState({ activeWorkspaceId: workspaceId });
+  if (surface?.scope === "workspace") {
+    const workspace = state.workspaces.find((candidate) => candidate.id === surface.workspaceId);
+    if (workspace && workspace.navigation.activeSurface !== surface.kind) state.selectView(surface.kind);
+  }
+  useWorkspaceStore.setState({ canvas: "runtime" });
+}
 
 /** Install once per shell; only reload after canonical Sessions have hydrated. */
 export async function subscribeWorkspaceChanges() {
