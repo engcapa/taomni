@@ -99,7 +99,9 @@ class Desktop:
         binary = qa_binary(release="release" in self.capabilities)
         desktop_file.write_text(
             "[Desktop Entry]\nType=Application\nName=Taomni QA\n"
-            f'Exec="{binary}"\nStartupWMClass=Taomni QA\n', encoding="utf-8")
+            # Anonymous GTK applications use the executable's program name
+            # as their Wayland app_id. Match that real surface to this entry.
+            f'Exec="{binary}"\nStartupWMClass={binary.name}\n', encoding="utf-8")
         os.environ["XDG_DATA_DIRS"] = str(data) + ":" + os.environ.get(
             "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
         facts["portal_application"] = {"identifier": QA_APP_ID,

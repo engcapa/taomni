@@ -422,6 +422,7 @@ class DesktopTests(unittest.TestCase):
                     entry = data / 'applications/com.taomni.app.qa.desktop'
                     self.assertIn('Name=Taomni QA', entry.read_text())
                     self.assertIn('Exec="', entry.read_text())
+                    self.assertIn('StartupWMClass=taomni\n', entry.read_text())
                     self.assertEqual(accessibility_enabled, [True])
                     self.assertIn('pipewire', started)
                     self.assertIn('--unsafe-mode', command)

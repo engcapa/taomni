@@ -16,10 +16,12 @@ WINDOW_STATE = """(() => ({
     overview_actor_visible: Main.layoutManager.overviewGroup.visible,
     modal_count: Main.modalCount,
     stage_focus: global.stage.get_key_focus()?.get_accessible()?.get_name() ?? null,
+    focused_application: imports.gi.Shell.WindowTracker.get_default().focus_app?.get_id() ?? null,
     starting_up: Main.layoutManager._startingUp,
     windows: global.get_window_actors().map(actor => {
         const window = actor.meta_window;
         return {pid: window.get_pid(), title: window.get_title(),
+                wm_class: window.get_wm_class(),
                 normal: window.get_window_type() === imports.gi.Meta.WindowType.NORMAL,
                 focused: window.has_focus(), minimized: window.minimized,
                 visible: actor.visible && !window.minimized, above: window.is_above(),

@@ -3220,6 +3220,10 @@ def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
     observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "pid": proc.pid,
                    "geometry": {"x": x, "y": y, "width": width, "height": height}, "platform": platform.system()}
     (ctx.case_dir / "native-image-window.json").write_text(json.dumps(observation, indent=1), encoding="utf-8")
+    if wayland.active():
+        # Mapping the external QR window may take focus. The next user action
+        # belongs to Taomni; preserve the fixture's real keep-above surface.
+        ctx.session.activate_wayland_window()
     return f"image window mapped at {x},{y} {width}x{height}"
 
 
