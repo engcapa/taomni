@@ -15,6 +15,12 @@
 @import "tailwindcss" source("./");
 @source "../index.html";
 
+/* Panel's style prop targets its inner content. Hide its outer frame too: the
+   narrow overlay has its own width/background even when its children are hidden. */
+.workspace-main-layout[data-navigator-collapsed="true"] > #sidebar {
+  display: none !important;
+}
+
 /* Narrow windows use an overlay navigator; the active canvas keeps its width. */
 @media (max-width: 760px) {
   .workspace-main-layout { position: relative; }

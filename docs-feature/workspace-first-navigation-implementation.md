@@ -39,7 +39,7 @@ Windows 使用 `qa-ui-auto-tests/local/run-platforms.py`，沿用 `.github/workf
 
 Windows native 使用隔离的 `com.taomni.app.qa`、独立 data/config/cache 与临时项目。构建和执行使用同一套 portable MSVC / Node 22 / pnpm 10 环境。Linux/macOS browser/native 通过 GitHub workflow 执行。Browser 三端结果不替代对应 WebView 的原生结果。
 
-## 验证进度（持续更新）
+## 历史验证与失败诊断（下表为当时状态，最终结果见文末）
 
 | 批次 | 结果 / 限制 |
 |---|---|
@@ -80,5 +80,11 @@ Windows native 使用隔离的 `com.taomni.app.qa`、独立 data/config/cache �
 
 - 提交 `1e1df5b4` 的三端 browser 整批均为 154/154 passed、0 failed、0 skipped。Windows：`windows-git-integrated-browser-v2/windows-browser/run-20261009-172039-028419400/summary.json`，`identity_stable=true`；Linux/macOS：[GitHub 37908867081](https://github.com/engcapa/taomni/actions/runs/37908867081)，真实 `ci-summary.json` 的 `passed=true`、`report_ok=true`、`gaps=[]`。包括 WS-001…019、布局/交互、IDE Git 与原有共享入口回归。
 - [GitHub native 37908873415](https://github.com/engcapa/taomni/actions/runs/37908873415)：macOS 16/16 passed，Linux 15/16 passed。IDE-PARITY-008-03/018-02 两端均通过；Linux WS-NATIVE-005 输入地址失败，保留原始失败截图、DOM 与 focus event 序列于 `gh-run-37908873415-selected/`。
-- Linux 005 的地址输入沿用会在 breadcrumb DIV 和 input 之间变化的 selector。失败记录显示第二次点击落到列表状态栏，随后 select-all 选中了页面；用例改用明确的地址编辑按钮，等待真实 input 后输入，与已通过的 008 地址编辑流程一致。保留 SSH 输出、SFTP 与 canonical session 断言，受影响用例三端重跑中。
-- Windows native `windows-git-integrated-native-v2` 已成功构建，但未执行用例：tauri-driver 无法绑定 4464；系统 `netsh` 证明 4401–4500 在 TCP 排除范围内。仅调整忽略目录内的本地配置至实测可绑定的 19464/19465，不改系统保留策略；`windows-git-integrated-native-v3` 复用同一验证过的 QA build，继续 16 条真实 native 用例。
+- Linux 005 的地址输入沿用会在 breadcrumb DIV 和 input 之间变化的 selector。失败记录显示第二次点击落到列表状态栏，随后 select-all 选中了页面；用例改用明确的地址编辑按钮，等待真实 input 后输入，与已通过的 008 地址编辑流程一致。保留 SSH 输出、SFTP 与 canonical session 断言。Windows `sftp-address-browser-recovery` 1/1；[GitHub 37916902411](https://github.com/engcapa/taomni/actions/runs/37916902411) Linux/macOS browser/native 各 1/1，`passed=true`、`gaps=[]`。
+- Windows native `windows-git-integrated-native-v2` 已成功构建，但未执行用例：tauri-driver 无法绑定 4464；系统 `netsh` 证明 4401–4500 在 TCP 排除范围内。仅调整忽略目录内的本地配置至实测可绑定的 19464/19465，不改系统保留策略；`windows-git-integrated-native-v3/windows-native/run-20261009-181751-228052400` 复用同一验证过的 QA build，16/16 passed、0 failed、0 skipped，`identity_stable=true`。
+
+## 窄屏视觉复核发现与修复
+
+- 逐图复核 `windows-git-integrated-browser-v2` 的 WS-018 发现：400px 窗口下收起导航后，320px 的空白背景盖住画布。原来的 input 几何断言与点击仍通过，因为遮挡层设置了 `pointer-events:none`；不能把这些断言等同于视觉可用。
+- 新的 WS-008/018 断言检查收起时外层 sidebar 面板实际宽度为 0。`narrow-overlay-baseline` 的 WS-018 在第 17 步按预期失败，保留截图/DOM/trace。
+- 根因是 react-resizable-panels 的 `Panel.style` 作用于内层，外层仍受窄屏 overlay CSS 影响。主 PanelGroup 显式标注 navigator 状态，CSS 在收起时隐藏外层面板；不改变原主题、图标和恢复布局契约。修复后 Windows `narrow-overlay-fixed/windows-browser/run-20261009-183513-123594600` 六项 6/6 passed、identity stable；WS-008/015/016/018、IDE-PARITY-027-01、MAIN-RAIL-01。已逐图确认 400px rename/context 恢复可见，输入约 196px，保存/取消/关闭按钮在视口内。布局/导航 mounted tests 64/64，`workspace-final-typecheck.log` exit 0。三端最终增量验证继续进行。

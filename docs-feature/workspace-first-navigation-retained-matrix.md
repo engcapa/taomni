@@ -1,6 +1,6 @@
 # Workspace-first retained case migration
 
-Navigation-only migration; execution status remains pending until the matching run is reviewed.
+Navigation entry migration; the current results below come from reviewed execution summaries. Browser passes do not establish native behavior.
 
 ## Navigator and editor rail reconciliation (2026-10-08)
 
@@ -34,41 +34,49 @@ all cases passed. Inspect `passed`, case totals and failure details on every run
 
 | Case | Old → new entry | Retained results | Modes | Evidence |
 |---|---|---|---|---|
-| TC-013 | Initial Work → Sessions | All existing business assertions retained | browser | Pending rerun |
-| TC-036 | Initial Work → Sessions | All existing business assertions retained | browser | Pending rerun |
-| TC-037 | Initial Work → Sessions | All existing business assertions retained | browser | Pending rerun |
-| TC-038 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-041 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-042 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-053 | Initial Work → Sessions | All existing business assertions retained | browser | Pending rerun |
-| TC-054 | Initial Work → Sessions | All existing business assertions retained | browser | Pending rerun |
-| TC-055 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-061 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-062 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore; Welcome tab → More → Welcome | All existing business assertions retained | browser | Pending rerun |
-| TC-102 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-103 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-108 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-110 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser, native | Pending rerun |
-| TC-MAIL-AUTOCONF-01 | Initial Work → Sessions | All existing business assertions retained | browser, native | Pending rerun |
-| TC-MFA-001 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-002 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-003 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-004 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-005 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-006 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-007 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-008 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-009 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-010 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-011 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-012 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Pending rerun |
-| TC-MFA-101 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Pending rerun |
-| TC-MFA-102 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Pending rerun |
-| TC-MFA-103 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Pending rerun |
-| TC-MFA-104 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Pending rerun |
-| TC-MFA-105 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Pending rerun |
-| TC-MFA-106 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Pending rerun |
-| TC-MFA-107 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Pending rerun |
-| TC-MFA-108 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Pending rerun |
-| TC-SESSION-TREE-01 | Initial Work → Sessions; Reload → explicit destination | All existing business assertions retained | browser, native | Pending rerun |
-| TC-SESSION-TREE-02 | Initial Work → Sessions; Reload → explicit destination | All existing business assertions retained | browser, native | Pending rerun |
+| TC-013 | Initial Work → Sessions | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-036 | Initial Work → Sessions | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-037 | Initial Work → Sessions | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-038 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-041 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-042 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-053 | Initial Work → Sessions | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-054 | Initial Work → Sessions | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-055 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-061 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-062 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore; Welcome tab → More → Welcome | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-102 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-103 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-108 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-110 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser, native | Browser W/L/M: passed (B154); native: not selected (N-scope below) |
+| TC-MAIL-AUTOCONF-01 | Initial Work → Sessions | All existing business assertions retained | browser, native | Browser W/L/M: passed (B154); native: not selected (N-scope below) |
+| TC-MFA-001 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-002 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-003 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-004 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-005 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-006 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-007 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-008 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-009 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-010 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-011 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-012 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | browser | Browser W/L/M: passed (B154) |
+| TC-MFA-101 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Native: not selected (N-scope below) |
+| TC-MFA-102 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Native: not selected (N-scope below) |
+| TC-MFA-103 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Native: not selected (N-scope below) |
+| TC-MFA-104 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Native: not selected (N-scope below) |
+| TC-MFA-105 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Native: not selected (N-scope below) |
+| TC-MFA-106 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Native: not selected (N-scope below) |
+| TC-MFA-107 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Native: not selected (N-scope below) |
+| TC-MFA-108 | Initial Work → Sessions; Welcome default → Sessions → Recent sessions and restore | All existing business assertions retained | native | Native: not selected (N-scope below) |
+| TC-SESSION-TREE-01 | Initial Work → Sessions; Reload → explicit destination | All existing business assertions retained | browser, native | Browser W/L/M: passed (B154); native: not selected (N-scope below) |
+| TC-SESSION-TREE-02 | Initial Work → Sessions; Reload → explicit destination | All existing business assertions retained | browser, native | Browser W/L/M: passed (B154); native: not selected (N-scope below) |
+
+## Current evidence and native boundary (2026-10-09)
+
+B154: source `1e1df5b4`, Windows `qa-ui-auto-report/workspace-first/windows-git-integrated-browser-v2/windows-browser/run-20261009-172039-028419400/summary.json` (154/154, identity stable), Linux/macOS GitHub run [37908867081](https://github.com/engcapa/taomni/actions/runs/37908867081) (154/154 each; actual CI summary passed, no gaps). Later fixes and their focused reruns are recorded in [implementation](workspace-first-navigation-implementation.md).
+
+N-scope: Workspace native 001–011, IDEA 008-03/018-02/027-02/027-03 and MAIN-RAIL-01. Windows `windows-git-integrated-native-v3` and GitHub macOS `37908873415` each pass 16/16; Linux passes 15/16, with shared-SFTP 005 recovery in progress. The selected scenarios establish SQLite restart, real PTY, shared SSH/SFTP and SHA-256 roundtrip, VNC, MySQL, Mail IDLE, detached-window return and Git disk/index/ref preservation.
+
+MFA 101–108, SessionTree native duplicates and other historical native business suites in this table were not selected: their changes only enter Sessions explicitly, while the business implementation and assertions remain intact. MFA 001–012 and the corresponding renderer flows ran in B154; dedicated Workspace native cases cover the changed runtime ownership. These rows are not native passes, and do not claim OS-global hotkey, every provider or RDP host coverage. RDP requires its own real server fixture and is outside this run's named resource selection.

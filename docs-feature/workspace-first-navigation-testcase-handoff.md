@@ -172,3 +172,17 @@ For each selected retained case, record old selector → new selector, preserved
 - Generate/validate `references/testid-catalog.md` only after controls are actually implemented. Planning IDs and selectors remain marked proposed.
 - New YAML must use only schema-supported verbs; `verification.review` stays `pending` until P2 reviews semantics; every unexecuted case is `unrun`.
 - Run after implementation, not during this design-only handoff: `python -m qa_ui_auto audit --gate`, exact `ci plan`, focused browser IDs with `--require-pass`, one stable native build, then sequential native IDs. Browser results never certify native.
+
+## 8. 实施后实际映射（2026-10-09）
+
+第 2–7 节保留为设计基线；实际 fixture `workspace_membership` 已注册并按 browser/native 分别建立隔离数据。当前执行入口为 `qa-ui-auto-tests/local/run-platforms.py`（Windows）及 `.github/workflows/qa-ui-auto-platforms.yml`（Linux/macOS），使用相同 selection/service-readiness/receipt 契约。
+
+| 设计验收 | 已实现用例 | 对应边界 |
+|---|---|---|
+| AC-01/02/03/04/08/11 | WS-001/002/003/006/012、NATIVE-001/003/004/005 | canonical Session、membership、空与过期引用、SQLite 重启、真实共享 SSH、独立窗口返回 |
+| AC-05/07 | WS-001/005/009/011/014/019、NATIVE-002/004/005/007/008/009/010/011、IDE-PARITY-008/018 | Surface 保持挂载、Preview、Git、多仓库、PTY、SFTP 文件哈希、VNC、DB、Mail IDLE |
+| AC-06/09/12/13 | WS-004/007/008/015/016/017/018、NATIVE-003、IDE-PARITY-027、MAIN-RAIL | 全局工具、命令、拖动/缩放、焦点、收起重载、长名称、窄屏及 scope 菜单 |
+| AC-10 | WS-005/010/013、NATIVE-006 | Workspace/Session Tao 草稿、消息与重启隔离 |
+| AC-14 | WS-PROTOTYPE-001、上述产品 browser cases | 原型/产品资源、真实按钮操作与 renderer 错误检查 |
+
+完整 ID 为 `TC-WS-*` / `TC-WS-NATIVE-*`。共有 19 条 Workspace browser、1 条原型和 11 条 Workspace native；005/011 同时覆盖 browser。UI-only 增量按用户要求三端 browser，不新增冗余 native。保留入口清单及未选 native 边界见 [retained matrix](workspace-first-navigation-retained-matrix.md)；最终计数、失败修复过程和报告路径见 [实施与验证记录](workspace-first-navigation-implementation.md)。

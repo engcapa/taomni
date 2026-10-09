@@ -4327,6 +4327,7 @@ export function MainLayout() {
         <PanelGroup
           orientation="horizontal"
           id="main-layout"
+          data-navigator-collapsed={sidebarCollapsed ? "true" : "false"}
           defaultLayout={loadResizableLayout("main-layout", ["sidebar", "content"])}
           onLayoutChanged={(layout) => {
             // Visibility is persisted separately. Keep the last expanded width

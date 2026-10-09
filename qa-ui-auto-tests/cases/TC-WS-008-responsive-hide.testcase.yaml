@@ -22,6 +22,10 @@ steps:
     height: 900
 - click: '[data-testid="workspace-hide"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly:
+    expression: document.getElementById('sidebar').getBoundingClientRect().width === 0
+    expect_truthy: true
+    timeout_sec: 5
 - assert_element_geometry:
     selector: '[data-testid="workspace-canvas"]'
     min_width: 180
@@ -37,6 +41,10 @@ steps:
     height: 800
 - click: '[data-testid="workspace-hide"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly:
+    expression: document.getElementById('sidebar').getBoundingClientRect().width === 0
+    expect_truthy: true
+    timeout_sec: 5
 - assert_element_geometry:
     selector: '[data-testid="workspace-canvas"]'
     min_width: 180
@@ -52,6 +60,10 @@ steps:
     height: 700
 - click: '[data-testid="workspace-hide"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly:
+    expression: document.getElementById('sidebar').getBoundingClientRect().width === 0
+    expect_truthy: true
+    timeout_sec: 5
 - assert_element_geometry:
     selector: '[data-testid="workspace-canvas"]'
     min_width: 180
@@ -72,42 +84,54 @@ verification:
     - 4
     - 5
     - 6
-    - 10
-    - 13
+    - 11
     - 14
-    - 18
-    - 21
-    - 22
-    - 26
+    - 15
+    - 20
+    - 23
+    - 24
+    - 29
     checkpoints:
     - step: 8
-      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]'', ''min_width'':
-        180, ''min_height'': 100}}'
+      expectation: Collapsed navigator outer panel has no painted width, so it cannot cover the canvas even with
+        pointer-events disabled.
     - step: 9
-      expectation: '{''eval_readonly'': {''expression'': ''document.documentElement.scrollWidth <= document.documentElement.clientWidth'',
-        ''expect_truthy'': True}}'
-    - step: 16
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]'', ''min_width'':
         180, ''min_height'': 100}}'
+    - step: 10
+      expectation: '{''eval_readonly'': {''expression'': ''document.documentElement.scrollWidth <= document.documentElement.clientWidth'',
+        ''expect_truthy'': True}}'
     - step: 17
-      expectation: '{''eval_readonly'': {''expression'': ''document.documentElement.scrollWidth <= document.documentElement.clientWidth'',
-        ''expect_truthy'': True}}'
-    - step: 24
+      expectation: Collapsed navigator outer panel has no painted width, so it cannot cover the canvas even with
+        pointer-events disabled.
+    - step: 18
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]'', ''min_width'':
         180, ''min_height'': 100}}'
-    - step: 25
+    - step: 19
       expectation: '{''eval_readonly'': {''expression'': ''document.documentElement.scrollWidth <= document.documentElement.clientWidth'',
         ''expect_truthy'': True}}'
-    - step: 29
+    - step: 26
+      expectation: Collapsed navigator outer panel has no painted width, so it cannot cover the canvas even with
+        pointer-events disabled.
+    - step: 27
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]'', ''min_width'':
+        180, ''min_height'': 100}}'
+    - step: 28
+      expectation: '{''eval_readonly'': {''expression'': ''document.documentElement.scrollWidth <= document.documentElement.clientWidth'',
+        ''expect_truthy'': True}}'
+    - step: 32
       expectation: The navigator can be restored at 400px width.
     results:
     - 8
     - 9
-    - 16
+    - 10
     - 17
-    - 24
-    - 25
-    - 29
+    - 18
+    - 19
+    - 26
+    - 27
+    - 28
+    - 32
   visual:
   - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
     method: manual
