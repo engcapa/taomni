@@ -176,6 +176,8 @@ def main() -> None:
                         value = clipboard_serial[0]
                     elif name == "xwayland_display":
                         value = evaluate("imports.gi.GLib.getenv('DISPLAY')")
+                    elif name == "xwayland_authority":
+                        value = evaluate("imports.gi.GLib.getenv('XAUTHORITY')")
                     elif name in {"geometry", "place"}:
                         value = window_command(request, diagnostics)
                     elif name == "pointer":

@@ -132,6 +132,10 @@ class Desktop:
             from qa_ui_auto.wayland import command as wayland_command
             display = self._wait(input_owner, lambda: wayland_command("xwayland_display"), "owned XWayland workload display")
             os.environ["DISPLAY"] = display
+            authority = self._wait(input_owner, lambda: wayland_command("xwayland_authority"), "owned XWayland authentication")
+            if not Path(authority).is_file():
+                raise RuntimeError("owned XWayland authentication file is missing")
+            os.environ["XAUTHORITY"] = authority
             facts["fixture_xwayland_display"] = display
         (self.root / "wayland-info.txt").write_text(protocols, encoding="utf-8")
         for interface in ("wl_compositor", "xdg_wm_base", "wl_output"):
