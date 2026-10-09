@@ -9,7 +9,7 @@ from qa_ui_auto.steps import StepError
 from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.testcase import load_case
 from qa_ui_auto.verification import native_support
-from qa_ui_auto.window_drag import run_window_drag, validate_movement
+from qa_ui_auto.window_drag import run_wayland_window_drag, run_window_drag, validate_movement
 
 
 class WindowDragTest(TestCase):
@@ -69,3 +69,29 @@ class WindowDragTest(TestCase):
         for args in ({"y_fraction": float("nan"), "dx": 1, "dy": 1}, {"dx": 0, "dy": 0}):
             with self.subTest(args=args), self.assertRaises(StepError):
                 run_window_drag(ctx, args, "0x42", "qa-app")
+
+    def test_wayland_drag_activates_owned_app_and_requires_actual_movement(self):
+        for moved in (True, False):
+            with self.subTest(moved=moved), TemporaryDirectory() as tmp:
+                ctx = SimpleNamespace(case_dir=Path(tmp), session=Mock())
+                ctx.session.application = Path("qa-app")
+                ctx.session.execute.side_effect = [None,
+                    {"x": 30, "y": 0, "width": 48, "height": 31,
+                     "viewportWidth": 1000, "viewportHeight": 680}, []]
+                original = {"x": 320, "y": 138, "width": 1280, "height": 837}
+                before = {"x": 120, "y": 120, "width": 1000, "height": 680}
+                after = {**before, "x": 144, "y": 138} if moved else before
+                desktop = Mock(side_effect=[{"frame": original}, True,
+                    {"frame": before}, {"start": [174, 131]}, {"frame": after}, True])
+                with patch("qa_ui_auto.wayland.command", desktop), patch("qa_ui_auto.window_drag.time.sleep"):
+                    args = {"selector": "#grip", "dx": 24, "dy": 18, "y_fraction": 0.35}
+                    if moved:
+                        run_wayland_window_drag(ctx, args)
+                    else:
+                        with self.assertRaises(StepError):
+                            run_wayland_window_drag(ctx, args)
+                desktop.assert_any_call("drag", application="qa-app", start=[174, 131], end=[198, 149])
+                desktop.assert_any_call("place", application="qa-app", rect=original)
+                receipt = json.loads((Path(tmp) / "native-window-drags.jsonl").read_text())
+                self.assertEqual(receipt["passed"], moved)
+                self.assertEqual(receipt["after"], after)

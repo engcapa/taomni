@@ -17,6 +17,16 @@ from tauri_webdriver import NativeHarness, NativeSession, TauriDriverProcess, We
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_wayland_auxiliary_backend_is_private_to_the_application_driver(self):
+        with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
+                patch("tauri_webdriver._tcp_ok", side_effect=[False, False, True, True]), \
+                patch("tauri_webdriver.subprocess.Popen") as launch:
+            launch.return_value.poll.return_value = None
+            TauriDriverProcess({"app": {"native_binary": str(Path(root) / "qa-app")}}, Path(root)).start()
+            self.assertEqual(launch.call_args.kwargs["env"]["GDK_BACKEND"], "wayland,x11")
+            self.assertEqual(os.environ["GDK_BACKEND"], "wayland")
+
     def test_modified_click_holds_keys_through_pointer_up_and_releases_them_on_failure(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
@@ -139,15 +149,16 @@ class NativeSessionTransportTest(TestCase):
         session.execute = Mock(return_value=False)
         with self.assertRaisesRegex(WebDriverError, "window did not receive focus"):
             session.activate_wayland_window(timeout=0)
-        self.assertEqual(session.execute.call_count, 2)
+        self.assertEqual(session.execute.call_count, 1)
         session.execute.assert_called_with("return document.hasFocus();")
 
-    def test_wayland_start_requests_owned_desktop_activation_when_document_is_unfocused(self):
+    def test_wayland_activation_verifies_desktop_even_when_document_is_focused(self):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"
         session.request = Mock(side_effect=["window-qa", None])
-        session.execute = Mock(side_effect=[False, True])
+        session.execute = Mock(return_value=True)
         with patch.dict(os.environ, {"QA_WAYLAND_INPUT_SOCKET": "/qa/private/input.sock"}), \
+                patch("tauri_webdriver.socket.AF_UNIX", 1, create=True), \
                 patch("tauri_webdriver.socket.socket") as factory:
             connection = factory.return_value.__enter__.return_value
             connection.recv.return_value = b'{"ok":true}\n'
@@ -891,7 +902,7 @@ class NativeClickVerbTest(TestCase):
 
             self.assertEqual(
                 result,
-                'injected X11 pointer click into [data-testid="file-encoding-bom"]',
+                'injected native WebKitGTK pointer click into [data-testid="file-encoding-bom"]',
             )
             activate.assert_called_once_with(session.application)
             session.pointer_click.assert_called_once_with('[data-testid="file-encoding-bom"]')

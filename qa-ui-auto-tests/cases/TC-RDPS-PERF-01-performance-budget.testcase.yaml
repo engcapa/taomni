@@ -1,5 +1,5 @@
 id: TC-RDPS-PERF-01-performance-budget
-title: RDP server performance - connect time, input-to-frame latency and animation throughput
+title: RDP server performance - native portal input queue, connect time, latency and throughput
 description: 'V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Measures the
 
   Taomni RDP server with rdp-probe over loopback on the runner desktop:
@@ -37,6 +37,7 @@ description: 'V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Meas
   and zero independent decompression errors. Absolute M1-M4 budgets remain fixed.
 
   Probe sample_events and target flip_samples retain the same-host input/draw/receive timestamps for native latency diagnosis.
+  Wayland drains pending PipeWire buffers before copying the newest frame; all 40 input samples and the absolute budgets remain required.
 
   '
 covers:

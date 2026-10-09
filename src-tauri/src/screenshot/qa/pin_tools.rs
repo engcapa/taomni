@@ -1,6 +1,15 @@
 use super::*;
 
 async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Result<Value> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        wayland::keys(vec![vec![0xffe3, 'l' as u32]]).await?;
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        wayland::keys(vec![vec![0xffe3, 'a' as u32]]).await?;
+        wayland::type_text(destination.to_string_lossy().into_owned()).await?;
+        wayland::keys(vec![vec![0xff0d]]).await?;
+        return Ok(json!({"input":"OS keyboard via owned Mutter desktop"}));
+    }
     tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
         use enigo::{Direction, Key, Keyboard};
         let mut input = enigo::Enigo::new(&enigo::Settings::default())
@@ -149,11 +158,11 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     // accepting a CSS opacity value inside an opaque native window.
     pin.hide().map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(350)).await;
-    let background = capture::capture_display(&app, &display).map_err(|e| e.to_string())?;
+    let background = read_desktop(&app, &display).await.map_err(|e| e.to_string())?;
     pin.show().map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(400)).await;
-    let composited = capture::capture_display(&app, &display).map_err(|e| e.to_string())?;
-    let position = pin.inner_position().map_err(|e| e.to_string())?;
+    let composited = read_desktop(&app, &display).await.map_err(|e| e.to_string())?;
+    let position = observed_inner_rect(&pin).await.map_err(|e| e.to_string())?.0;
     let sample = (
         (position.x - display.x + (100.0 * scale) as i32) as u32,
         (position.y - display.y + (100.0 * scale) as i32) as u32,
@@ -199,7 +208,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     let save_dialog_ready = match readiness {
         Ok(state) => state,
         Err(error) => {
-            if let Ok(desktop) = capture::capture_display(&app, &display) {
+            if let Ok(desktop) = read_desktop(&app, &display).await {
                 keep_image(&desktop, "pin-save-dialog-not-ready.png");
             }
             return Err(format!("{error:#}"));
@@ -214,13 +223,13 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         "save-dialog-open",
         json!({"destination":destination,"readiness":save_dialog_ready}),
     );
-    if let Ok(desktop) = capture::capture_display(&app, &display) {
+    if let Ok(desktop) = read_desktop(&app, &display).await {
         keep_image(&desktop, "pin-save-dialog-open.png");
     }
     let save_dialog_input = match choose_save_destination(destination.clone()).await {
         Ok(state) => state,
         Err(error) => {
-            if let Ok(desktop) = capture::capture_display(&app, &display) {
+            if let Ok(desktop) = read_desktop(&app, &display).await {
                 keep_image(&desktop, "pin-save-dialog-input-failed.png");
             }
             return Err(format!("{error:#}"));
@@ -240,7 +249,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         json!({"originalSaved":saved_identical,"destination":destination}),
     );
     if !saved_identical {
-        if let Ok(desktop) = capture::capture_display(&app, &display) {
+        if let Ok(desktop) = read_desktop(&app, &display).await {
             keep_image(&desktop, "pin-save-dialog-failed.png");
         }
         return Ok(report(

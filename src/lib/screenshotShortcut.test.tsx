@@ -218,7 +218,7 @@ describe("useScreenshotAppShortcut", () => {
     mocks.invoke.mockResolvedValue({ ...fallback, registered: true });
     const { unmount } = await mountShortcut();
     expect(mocks.listen).toHaveBeenCalledWith(SCREENSHOT_OPEN_FAILED_EVENT, expect.any(Function));
-    const handler = mocks.listen.mock.calls[0][1];
+    const handler = mocks.listen.mock.calls.find(([event]) => event === SCREENSHOT_OPEN_FAILED_EVENT)![1];
     await act(async () => {
       handler({ payload: "Enable Taomni in macOS Screen Recording settings" });
     });
@@ -228,16 +228,28 @@ describe("useScreenshotAppShortcut", () => {
     }));
     expect(openCalls()).toHaveLength(0);
     unmount();
-    expect(mocks.unlisten).toHaveBeenCalledOnce();
+    expect(mocks.unlisten).toHaveBeenCalledTimes(2);
   });
 
   it("releases an error listener that resolves after unmount", async () => {
     mocks.native = true;
-    let resolveListen!: (stop: () => void) => void;
-    mocks.listen.mockImplementation(() => new Promise<() => void>((resolve) => { resolveListen = resolve; }));
+    const resolveListeners: ((stop: () => void) => void)[] = [];
+    mocks.listen.mockImplementation(() => new Promise<() => void>((resolve) => { resolveListeners.push(resolve); }));
     const { unmount } = await mountShortcut();
     unmount();
-    await act(async () => { resolveListen(mocks.unlisten); });
-    expect(mocks.unlisten).toHaveBeenCalledOnce();
+    await act(async () => { resolveListeners.forEach((resolve) => resolve(mocks.unlisten)); });
+    expect(mocks.unlisten).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops app-local handling when the desktop grants a pending global shortcut", async () => {
+    mocks.native = true;
+    await mountShortcut();
+    const handler = mocks.listen.mock.calls.find(([event]) => event === "screenshot://shortcut-status")![1];
+    await act(async () => { handler({ payload: { ...fallback, registered: true } }); });
+    fireEvent.keyDown(document.body, chord);
+    expect(openCalls()).toHaveLength(0);
+    await act(async () => { handler({ payload: { ...fallback, registered: false } }); });
+    fireEvent.keyDown(document.body, chord);
+    expect(openCalls()).toHaveLength(1);
   });
 });

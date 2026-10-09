@@ -1,10 +1,12 @@
 id: TC-MFA-106
 title: Scan screen hides Taomni, captures the desktop and imports the visible QR code
 description: >-
-  V-24 (AC-06). Packaged app on Linux (Xvfb + Openbox) and Windows. A separate
+  V-24 (AC-06). Packaged app on Linux (X11 and GNOME Wayland) and Windows. A separate
   topmost window shows the RFC 4226 QR (`native_show_image_window`). Scan
   screen hides Taomni, captures every display through the Rust capture path,
-  restores the window and opens the review step; QA Bank imports with
+  restores the window and opens the review step; Wayland obtains real portal
+  permission while Taomni is visible, then captures again after hiding it.
+  Only the hidden-window capture is decoded. QA Bank imports with
   755 224. With the QR window closed a second scan reports that no QR code is
   on screen and the dialog stays usable. macOS needs Screen Recording
   permission and is covered manually (V-26).
@@ -71,6 +73,9 @@ verification:
     method: manual
     reason: Window visibility during capture is not observable through WebDriver.
   native:
-  - check: macOS Screen Recording permission (V-26) and Linux Wayland portals (V-27) are manual.
+  - check: macOS Screen Recording permission (V-26) is manual.
     method: manual
-    reason: Hosted runners cannot grant those permissions.
+    reason: This Linux/Windows case does not grant macOS Screen Recording permission.
+  - check: GNOME Wayland uses the real Screenshot portal and a visible external QR window (V-27).
+    method: automated
+    reason: The owned CI desktop accepts the actual portal dialog through AT-SPI and retains its consent trace.

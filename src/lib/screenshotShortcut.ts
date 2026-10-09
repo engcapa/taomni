@@ -101,6 +101,16 @@ export function useScreenshotAppShortcut(): void {
 
   useEffect(() => {
     void refresh();
+    if (!isTauriRuntime()) return;
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    void getCurrentWindow().listen<ShortcutStatus>("screenshot://shortcut-status", ({ payload }) => {
+      useScreenshotShortcutStore.setState({ status: payload, loaded: true });
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else { stop = unlisten; void refresh(); }
+    }).catch((error) => console.error("[screenshot] shortcut status listener failed", error));
+    return () => { disposed = true; stop?.(); };
   }, [refresh]);
 
   useEffect(() => {

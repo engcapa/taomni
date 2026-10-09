@@ -30,6 +30,10 @@ on:
         description: Use release QA builds for selected native cases (reuse full-run caches)
         type: boolean
         default: false
+      run_rdp_unit_contracts:
+        description: Run RDP Rust unit contracts (disable only when reusing matching prior unit evidence)
+        type: boolean
+        default: true
       case_ids:
         description: Exact case IDs (selected, or additions to impacted)
         type: string
@@ -52,6 +56,7 @@ on:
       modes: {type: string, default: 'browser,native'}
       linux_profiles: {type: string, default: 'ubuntu-24.04-xvfb'}
       native_release: {type: boolean, default: false}
+      run_rdp_unit_contracts: {type: boolean, default: true}
       case_ids: {type: string, default: ''}
       features: {type: string, default: ''}
       tags: {type: string, default: ''}
@@ -133,6 +138,8 @@ jobs:
         run: node --test scripts/compose-updater-manifest.test.mjs
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
+      - name: Wayland automation contracts
+        run: python -m unittest test_wayland_tools
       - name: Plan exact cases and dependencies
         id: plan
         env:
@@ -349,6 +356,14 @@ jobs:
           restore-keys: |
             qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
             qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
+      - name: Verify owned Wayland desktop before expensive native checks
+        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_profile == 'ubuntu-26.04-wayland'
+        env:
+          QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
+        run: >-
+          dbus-run-session -- python .agents/skills/qa-ui-auto/scripts/ci_desktop_preflight.py
+          --profile ubuntu-26.04-wayland --capabilities "$QA_CAPABILITIES"
+          --report 'qa-ui-auto-report/${{ matrix.id }}/desktop-preflight'
       - name: RDP unit contracts on the native platform
         # The IronRDP unit contracts are platform-independent. Run the
         # expensive release test matrix once on the Linux representative;
@@ -356,7 +371,7 @@ jobs:
         # startup diagnostics below. This removes a 30–50 minute duplicate
         # Rust test build from each non-Linux native job without changing any
         # release app build or product evidence.
-        if: matrix.rdp_unit_contracts
+        if: matrix.rdp_unit_contracts && (github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts)
         env:
           CARGO_TARGET_DIR: target/qa-ui-auto
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'
@@ -416,6 +431,24 @@ jobs:
           name: qa-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
           path: |
             qa-ui-auto-report/${{ matrix.id }}/
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Retain compact native diagnostics
+        uses: actions/upload-artifact@v4
+        if: always() && matrix.mode == 'native'
+        with:
+          # Keep this outside the aggregate's qa-* pattern: these are copies
+          # for diagnosis, not a second set of execution receipts.
+          name: diagnostics-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
+          path: |
+            qa-ui-auto-report/${{ matrix.id }}/**/*.json
+            qa-ui-auto-report/${{ matrix.id }}/**/*.jsonl
+            qa-ui-auto-report/${{ matrix.id }}/**/*.log
+            qa-ui-auto-report/${{ matrix.id }}/**/*.html
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**

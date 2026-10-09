@@ -55,7 +55,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
-from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
+from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_desktop_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
 from . import project_tree
 from . import parity005_completion
 from . import parity006_replace
@@ -102,6 +102,7 @@ REGISTRY: dict[str, Fixture] = {
     "jdtls_required": Fixture("jdtls_required", jdtls_required.setup),
     "java_test_bundle": Fixture("java_test_bundle", java_test_bundle.setup),
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),
+    "linux_desktop_required": Fixture("linux_desktop_required", linux_desktop_required.setup),
     "workspace_root": Fixture("workspace_root", workspace_root.setup, workspace_root.teardown),
     "java_sample_projects": Fixture("java_sample_projects", java_sample_projects.setup),
     "java25_projects": Fixture("java25_projects", java25_projects.setup),

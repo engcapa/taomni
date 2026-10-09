@@ -386,16 +386,29 @@ class DesktopTests(unittest.TestCase):
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '26.04'}), \
              patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
              patch.object(Desktop, 'start') as start, \
-             patch.object(Desktop, '_wait', side_effect=[None, None, None, WAYLAND_PROTOCOLS]) as wait, \
+             patch.object(Desktop, '_wait', side_effect=[None, None, None, WAYLAND_PROTOCOLS, ':42', d + '/xauth', True]) as wait, \
              patch('ci_desktop.subprocess.run') as run, \
              patch('ci_desktop.subprocess.check_output', side_effect=[
                  'GdkWaylandDisplay\n1\n', portal, 'GNOME Shell 50']):
             activation_env = {}
+            (Path(d) / 'xauth').touch()
             started = []
+            accessibility_enabled = []
 
             def activate(command, **kwargs):
-                self.assertEqual(command[0], 'dbus-update-activation-environment')
-                activation_env.update({key: os.environ[key] for key in command[1:]})
+                if command[0] == 'dbus-update-activation-environment':
+                    activation_env.update({key: os.environ[key] for key in command[1:]})
+                else:
+                    self.assertEqual(command, [
+                        'gdbus', 'call', '--session', '--dest', 'org.a11y.Bus',
+                        '--object-path', '/org/a11y/bus', '--method',
+                        'org.freedesktop.DBus.Properties.Set', 'org.a11y.Status',
+                        'IsEnabled', '<true>',
+                    ])
+                    self.assertEqual(activation_env['GTK_A11Y'], 'atspi')
+                    self.assertEqual(activation_env['NO_AT_BRIDGE'], '0')
+                    accessibility_enabled.append(True)
+                return Mock(returncode=0)
 
             def launch(command, **kwargs):
                 if command[0] == 'gnome-shell':
@@ -404,27 +417,40 @@ class DesktopTests(unittest.TestCase):
                     self.assertEqual(activation_env['XDG_CURRENT_DESKTOP'], 'ubuntu:GNOME')
                     self.assertEqual(activation_env['GDK_BACKEND'], 'wayland')
                     self.assertEqual(activation_env['XDG_RUNTIME_DIR'], os.environ['XDG_RUNTIME_DIR'])
+                    data = Path(activation_env['XDG_RUNTIME_DIR']).parent / 'data'
+                    self.assertTrue(activation_env['XDG_DATA_DIRS'].startswith(str(data) + ':'))
+                    entry = data / 'applications/com.taomni.app.qa.desktop'
+                    self.assertIn('Name=Taomni QA', entry.read_text())
+                    self.assertIn('Exec="', entry.read_text())
+                    self.assertIn('StartupWMClass=taomni\n', entry.read_text())
+                    self.assertEqual(accessibility_enabled, [True])
                     self.assertIn('pipewire', started)
                     self.assertIn('--unsafe-mode', command)
+                    self.assertIn('--mode=user', command)
                 started.append(command[0])
                 return Mock()
 
             run.side_effect = activate
             start.side_effect = launch
             with Desktop(Path(d), ['display'], 'ubuntu-26.04-wayland') as desktop:
-                self.assertNotIn('DISPLAY', os.environ)
+                self.assertEqual(os.environ['DISPLAY'], ':42')
+                self.assertEqual(os.environ['XAUTHORITY'], d + '/xauth')
                 self.assertEqual(os.environ['GDK_BACKEND'], 'wayland')
                 self.assertEqual(desktop.facts['gdk_display'], 'GdkWaylandDisplay')
                 self.assertEqual(desktop.facts['session_type'], 'wayland')
+                self.assertEqual(desktop.facts['shell_session_mode'], 'user')
                 self.assertEqual(desktop.facts['input_devices'], ['keyboard', 'pointer'])
                 self.assertEqual(desktop.facts['portal_interfaces'], ['Screenshot', 'ScreenCast', 'RemoteDesktop'])
                 self.assertTrue(desktop.facts['ready'])
                 self.assertEqual([call.args[2] for call in wait.call_args_list], [
                     'PipeWire', 'GNOME Wayland compositor', 'Mutter RemoteDesktop service',
                     'Wayland keyboard and pointer',
+                    'owned XWayland workload display', 'owned XWayland authentication',
+                    'GNOME portal accessibility automation',
                 ])
                 self.assertFalse(any('openbox' in call.args[0] for call in start.call_args_list))
             self.assertEqual(os.environ['DISPLAY'], ':99')
+            self.assertFalse(Path(desktop.facts['portal_application']['desktop_file']).exists())
 
     def test_wayland_protocol_globals_with_an_empty_seat_are_not_input_ready(self):
         self.assertFalse(wayland_has_input(WAYLAND_PROTOCOLS.replace('pointer keyboard', '')))
@@ -468,6 +494,8 @@ class DesktopTests(unittest.TestCase):
         def launch(command, **kwargs):
             if command[0] == '/usr/bin/python3':
                 self.assertEqual(len(owner_checks), 2)
+                if '--ready' in command:
+                    Path(command[command.index('--ready') + 1]).write_text('{}')
             calls.append(command)
             process = Mock()
             process.poll.return_value = None
@@ -477,8 +505,10 @@ class DesktopTests(unittest.TestCase):
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '26.04'}), \
              patch.dict(os.environ, {'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
              patch.object(Desktop, 'start', side_effect=launch), patch('ci_desktop.Path.is_socket', return_value=True), \
+             patch('qa_ui_auto.wayland.command', side_effect=lambda name: ':42' if name == 'xwayland_display' else d + '/xauth'), \
              patch('ci_desktop.subprocess.run'), patch('ci_desktop.time.sleep'), \
              patch('ci_desktop.subprocess.check_output', side_effect=probe):
+            (Path(d) / 'xauth').touch()
             with Desktop(Path(d), ['display'], 'ubuntu-26.04-wayland') as desktop:
                 self.assertTrue(desktop.facts['ready'])
             self.assertTrue(any(command[0] == '/usr/bin/python3' for command in calls))

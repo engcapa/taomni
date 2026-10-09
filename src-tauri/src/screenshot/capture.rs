@@ -638,13 +638,31 @@ impl FrameSource {
         #[cfg(target_os = "linux")]
         if crate::servers::rdp::capture::wayland::is_wayland_session() {
             use crate::servers::rdp::capture::PortalInput;
+            if !matches!(&self.backend, Backend::Persistent(c) if c.supports_portal_input()) {
+                // A manual session deliberately starts without pointer access.
+                // Request it only when the user switches to Auto, retaining the
+                // working capture source until the replacement is approved.
+                let log = crate::servers::engine::LogEmitter::new(
+                    self.app.clone(),
+                    crate::servers::ServerType::Rdp,
+                );
+                let native_id = native_display_id(&self.display);
+                let replacement = crate::servers::rdp::capture::create_capturer_for_display(
+                    &log,
+                    native_id.as_deref(),
+                    true,
+                )?;
+                anyhow::ensure!(
+                    replacement.supports_portal_input(),
+                    "Wayland pointer permission was not granted. Allow remote control to use automatic scrolling, or continue manually."
+                );
+                self.backend = Backend::Persistent(replacement);
+                self.last = None;
+                self.captured_at = None;
+            }
             let Backend::Persistent(capturer) = &mut self.backend else {
                 anyhow::bail!("Wayland portal capture unavailable");
             };
-            anyhow::ensure!(
-                capturer.supports_portal_input(),
-                "Wayland pointer permission was not granted. Restart automatic capture and allow remote control, or use manual scrolling."
-            );
             capturer.inject_portal_input(PortalInput::MotionAbsolute {
                 x: px as f64,
                 y: py as f64,

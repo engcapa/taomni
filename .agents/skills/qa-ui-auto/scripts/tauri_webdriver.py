@@ -314,8 +314,14 @@ class TauriDriverProcess:
             cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
             if self.native_driver:
                 cmd += ["--native-driver", str(self.native_driver)]
+            env = dict(os.environ)
+            if platform.system() == "Linux" and env.get("GDK_BACKEND") == "wayland":
+                # The app's floating capture windows use a separate XWayland
+                # connection. Keep the parent/DBus activation environment at
+                # canonical 'wayland': GNOME portal rejects backend lists.
+                env["GDK_BACKEND"] = "wayland,x11"
             with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
-                self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=stdout, stderr=stderr, text=True)
+                self.proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=stdout, stderr=stderr, text=True)
         deadline = time.time() + self.startup_timeout
         while time.time() < deadline:
             if self.proc.poll() is not None:
@@ -524,7 +530,7 @@ class NativeSession:
         self.focus_warning = ""
         if platform.system() != "Linux":
             return
-        if os.environ.get("GDK_BACKEND") == "wayland":
+        if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
             self.activate_wayland_window()
             return
         if self.execute("return document.hasFocus();") is not True:
@@ -550,24 +556,25 @@ class NativeSession:
         # focused. DOM focus() still changes activeElement, but :focus and
         # :focus-within correctly remain false. Activate the toplevel through
         # the owned desktop's window manager, then focus its WebDriver context.
-        if self.execute("return document.hasFocus();") is not True:
-            input_socket = os.environ.get("QA_WAYLAND_INPUT_SOCKET")
-            if input_socket:
-                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-                    connection.settimeout(10)
-                    connection.connect(input_socket)
-                    connection.sendall(json.dumps({"command": "activate", "application":
-                                                   str(self.application.resolve())}).encode() + b"\n")
-                    response = b""
-                    while not response.endswith(b"\n") and len(response) < 4096:
-                        chunk = connection.recv(4096)
-                        if not chunk:
-                            break
-                        response += chunk
-                result = json.loads(response)
-                if result.get("ok") is not True:
-                    raise WebDriverError("Wayland desktop did not activate the QA app window: "
-                                         + str(result.get("error", "missing acknowledgement")))
+        # DOM focus can stay true while a Shell actor intercepts the pointer.
+        # Always verify compositor activation when an owned broker is available.
+        input_socket = os.environ.get("QA_WAYLAND_INPUT_SOCKET")
+        if input_socket:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                connection.settimeout(10)
+                connection.connect(input_socket)
+                connection.sendall(json.dumps({"command": "activate", "application":
+                                               str(self.application.resolve())}).encode() + b"\n")
+                response = b""
+                while not response.endswith(b"\n") and len(response) < 4096:
+                    chunk = connection.recv(4096)
+                    if not chunk:
+                        break
+                    response += chunk
+            result = json.loads(response)
+            if result.get("ok") is not True:
+                raise WebDriverError("Wayland desktop did not activate the QA app window: "
+                                     + str(result.get("error", "missing acknowledgement")))
         handle = self.request("GET", self.endpoint("/window"))
         if not isinstance(handle, str) or not handle:
             raise WebDriverError("Wayland driver did not return a window handle")
@@ -956,7 +963,7 @@ class NativeSession:
         # (path breadcrumbs, rename fields) disappear before /value arrives.
         # Select and replace through keyboard input while retaining focus.
         self.request("POST", self.element_path(element, "/click"), {})
-        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND") == "wayland":
+        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
             self._select_wayland_fill_input(selector)
         else:
             self.press_combo("Mod+a")
@@ -1024,7 +1031,7 @@ class NativeSession:
             previous = host_clipboard.get_text()
         try:
             self.request("POST", self.element_path(element, "/click"), {})
-            if os.environ.get("GDK_BACKEND") == "wayland":
+            if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
                 self._select_wayland_fill_input(selector)
             else:
                 self.press_combo("Mod+a")

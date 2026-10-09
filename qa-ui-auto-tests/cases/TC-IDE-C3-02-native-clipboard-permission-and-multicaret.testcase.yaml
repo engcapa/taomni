@@ -1,5 +1,5 @@
 id: TC-IDE-C3-02
-title: Packaged clipboard OS grant, real X11 denial, multi-caret distribution, and recovery
+title: Packaged clipboard OS grant, real desktop conversion denial, multi-caret distribution, and recovery
 description: 'ED-CLIP-004 A4 packaged Linux/WebKitGTK slice. It enters a real host workspace
 
   through persisted recents and drives the production copy/paste owners against
@@ -48,7 +48,7 @@ tags:
 modes:
 - native
 fixtures:
-- linux_x11_required
+- linux_desktop_required
 - reset_db
 - workspace_root
 timeout_sec: 420

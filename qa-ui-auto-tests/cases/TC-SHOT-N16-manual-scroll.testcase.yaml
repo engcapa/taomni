@@ -45,4 +45,4 @@ verification:
   native:
   - check: OS input, clipboard, windows and persistent files
     method: automated
-    reason: Native fixed scenarios verify the real OS and independent output pixels.
+    reason: Native fixed scenarios verify the real OS and independent output pixels. Wayland starts with capture-only consent and requests pointer access only when switching to Auto; Manual pauses and subsequent capture remain valid. Its second full-display capture retains visible Cancel controls outside the captured pixels, verified through Mutter geometry.

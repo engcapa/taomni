@@ -25,7 +25,7 @@ modes:
 native_platforms:
 - Linux
 fixtures:
-- linux_x11_required
+- linux_desktop_required
 - reset_db
 - workspace_root
 timeout_sec: 300

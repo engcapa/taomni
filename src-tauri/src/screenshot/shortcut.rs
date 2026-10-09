@@ -52,6 +52,9 @@ struct Current {
 
 static CURRENT: Mutex<Option<Current>> = Mutex::new(None);
 
+#[cfg(target_os = "linux")]
+mod portal;
+
 fn settings_path(app: &AppHandle) -> Option<PathBuf> {
     crate::resolved_app_data_dir(app)
         .ok()
@@ -151,7 +154,15 @@ fn status_of(current: &Current) -> ShortcutStatus {
 /// Apply `accelerator` (empty = disabled): unregister the old chord and
 /// register the new one. On a registration failure the old chord is
 /// restored and the error returned.
-fn apply(app: &AppHandle, accelerator: String) -> Result<ShortcutStatus, String> {
+async fn apply(app: &AppHandle, accelerator: String) -> Result<ShortcutStatus, String> {
+    #[cfg(target_os = "linux")]
+    if super::pins::native_wayland() {
+        return portal::apply(app, accelerator).await;
+    }
+    apply_native(app, accelerator)
+}
+
+fn apply_native(app: &AppHandle, accelerator: String) -> Result<ShortcutStatus, String> {
     let new_shortcut = if accelerator.is_empty() {
         None
     } else {
@@ -194,11 +205,44 @@ fn apply(app: &AppHandle, accelerator: String) -> Result<ShortcutStatus, String>
     }
 }
 
+/// Identify the shared portal connection before GTK/Tauri can issue a request.
+#[cfg(target_os = "linux")]
+pub(crate) fn prepare_portal_identity(identifier: &str) {
+    if crate::servers::rdp::capture::wayland::is_wayland_session() {
+        // GTK/Tauri initialization can query portal settings before setup.
+        // The first request fixes ashpd's connection identity on portal 1.20.
+        if let Err(error) = tauri::async_runtime::block_on(portal::ensure_identity(identifier)) {
+            eprintln!("Wayland portal application identity: {error}");
+        }
+    }
+}
+
 /// Startup registration from the persisted setting. Failures are recorded
 /// in the status instead of aborting startup.
 pub fn init(app: &AppHandle) {
     let accelerator = effective(&load(app));
-    if let Err(e) = apply(app, accelerator.clone()) {
+    #[cfg(target_os = "linux")]
+    if super::pins::native_wayland() {
+        *CURRENT.lock().unwrap_or_else(|p| p.into_inner()) = Some(Current {
+            accelerator: accelerator.clone(),
+            registered: None,
+            error: Some("Waiting for the desktop shortcut permission".into()),
+        });
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            record_startup_result(&app, accelerator.clone(), apply(&app, accelerator).await);
+        });
+        return;
+    }
+    record_startup_result(app, accelerator.clone(), apply_native(app, accelerator));
+}
+
+fn record_startup_result(
+    app: &AppHandle,
+    accelerator: String,
+    result: Result<ShortcutStatus, String>,
+) {
+    if let Err(e) = result {
         log::warn!("screenshot shortcut: {e}");
         *CURRENT.lock().unwrap_or_else(|p| p.into_inner()) = Some(Current {
             accelerator,
@@ -206,6 +250,7 @@ pub fn init(app: &AppHandle) {
             error: Some(e),
         });
     }
+    let _ = app.emit("screenshot://shortcut-status", current_status());
 }
 
 pub(super) fn current_status() -> ShortcutStatus {
@@ -238,8 +283,9 @@ pub async fn screenshot_shortcut_set(
     let settings = Settings {
         global_shortcut: accelerator.as_ref().map(|s| s.trim().to_string()),
     };
-    let status = apply(&app, effective(&settings))?;
+    let status = apply(&app, effective(&settings)).await?;
     save(&app, &settings)?;
+    let _ = app.emit("screenshot://shortcut-status", status.clone());
     Ok(status)
 }
 

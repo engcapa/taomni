@@ -34,6 +34,23 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     )
     .await
     .map_err(|e| e.to_string())?;
+    // Wayland's first frame follows the real portal consent. The pause checks
+    // start after that frame arrives, rather than timing the consent dialog.
+    let first_frame_deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        let ready = super::super::tool_state()
+            .scroll
+            .as_ref()
+            .is_some_and(|c| c.frames.load(Ordering::SeqCst) >= 1);
+        if ready {
+            break;
+        }
+        if Instant::now() >= first_frame_deadline {
+            return Err("manual capture did not produce its first approved frame".into());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    trace.mark("first-frame-ready", json!(true));
     tokio::time::sleep(Duration::from_millis(1800)).await;
     let paused = super::super::tool_state()
         .scroll
@@ -48,7 +65,9 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     trace.mark("initial-pause", json!(paused));
     run_js(&bar, "document.querySelector('[data-testid=\"screenshot-scroll-switch-mode\"]').click(); return true;", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
     let mut switched_auto = false;
-    for _ in 0..100 {
+    // Switching on Wayland includes a new user-facing portal consent request.
+    // Wait for that handshake as well as the first actual scrolled frame.
+    for _ in 0..350 {
         switched_auto = super::super::tool_state().scroll.as_ref().is_some_and(|c| {
             c.mode() == super::super::scroll::ScrollMode::Auto
                 && c.frames.load(Ordering::SeqCst) >= 2
@@ -59,7 +78,13 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     if !switched_auto {
-        return Err("switching from manual to automatic did not scroll the page".into());
+        return Err(format!(
+            "switching from manual to automatic did not scroll the page: {:?}",
+            super::super::tool_state()
+                .scroll
+                .as_ref()
+                .map(|c| c.status())
+        ));
     }
     run_js(&bar, "const button=document.querySelector('[data-testid=\"screenshot-scroll-switch-mode\"]'); for(let i=0;i<50 && button.disabled;i++) await new Promise(r=>setTimeout(r,100)); button.click(); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     let mut switched_manual = false;
@@ -85,22 +110,40 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         source.scale,
     );
     let mut positions = Vec::new();
-    let mut input = tokio::task::spawn_blocking(|| enigo::Enigo::new(&enigo::Settings::default()))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    let wayland_input = wayland::active();
+    #[cfg(not(target_os = "linux"))]
+    let wayland_input = false;
+    let mut input = if wayland_input {
+        None
+    } else {
+        Some(
+            tokio::task::spawn_blocking(|| enigo::Enigo::new(&enigo::Settings::default()))
+                .await
+                .map_err(|e| e.to_string())?
+                .map_err(|e| e.to_string())?,
+        )
+    };
     for _ in 0..70 {
-        input = tokio::task::spawn_blocking(move || -> anyhow::Result<enigo::Enigo> {
-            use enigo::Mouse;
-            move_os_pointer(&mut input, center)?;
-            input
-                .scroll(1, enigo::Axis::Vertical)
-                .map_err(|e| anyhow::anyhow!("wheel: {e}"))?;
-            Ok(input)
-        })
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+        if wayland_input {
+            os_wheel(center, 1).await.map_err(|e| e.to_string())?;
+        } else {
+            let mut session = input
+                .take()
+                .context("manual wheel input session")
+                .map_err(|e| e.to_string())?;
+            input = Some(
+                tokio::task::spawn_blocking(move || -> anyhow::Result<enigo::Enigo> {
+                    use enigo::Mouse;
+                    move_os_pointer(&mut session, center)?;
+                    session.scroll(1, enigo::Axis::Vertical)?;
+                    Ok(session)
+                })
+                .await
+                .map_err(|e| e.to_string())?
+                .map_err(|e| e.to_string())?,
+            );
+        }
         tokio::time::sleep(Duration::from_millis(220)).await;
         let position = run_js(&fixture, "const el = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return {top:el.scrollTop, end:el.scrollHeight-el.clientHeight};", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
         let bottom = position["top"].as_f64().unwrap_or(0.0)
@@ -144,7 +187,15 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     trace.mark("finished-overlay-closed", json!(true));
     // A second public capture exercises explicit cancellation, retaining the
     // selected original instead of installing a partial result.
-    let original = begin_scroll_ui(&app, &display, region, false, false).await?;
+    // Wayland has no session-wide Escape/right-click stop hook. Exercise a
+    // full-display selection too: its visible controls must remain outside the
+    // planned capture pixels so the user can still finish or cancel.
+    let cancel_region = if wayland_input {
+        (0, 0, display.width, display.height)
+    } else {
+        region
+    };
+    let original = begin_scroll_ui(&app, &display, cancel_region, false, false).await?;
     trace.mark("cancel-selection-ready", json!(true));
     run_js(&original, "document.querySelector('[data-testid=\"screenshot-scroll-mode-manual\"]').click(); await new Promise(r=>setTimeout(r,100)); document.querySelector('[data-testid=\"screenshot-scroll-start\"]').click(); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     let cancel_bar = wait_window(
@@ -154,6 +205,37 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     )
     .await
     .map_err(|e| e.to_string())?;
+    if wayland_input {
+        let plan = super::super::screenshot_scroll_plan(
+            app.clone(),
+            Some(display.id.clone()),
+            cancel_region.0,
+            cancel_region.1,
+            cancel_region.2,
+            cancel_region.3,
+        )
+        .await?;
+        let (position, size) = observed_inner_rect(&cancel_bar)
+            .await
+            .map_err(|e| e.to_string())?;
+        let captured = super::super::surfaces::region_rect(
+            &display,
+            (plan.x, plan.y, plan.width, plan.height),
+        );
+        let controls = super::super::surfaces::Rect {
+            x: position.x,
+            y: position.y,
+            w: size.width as i32,
+            h: size.height as i32,
+        };
+        if !cancel_bar.is_visible().map_err(|e| e.to_string())? || captured.intersects(controls) {
+            return Err(
+                "Wayland full-display scroll controls are hidden or inside the captured pixels"
+                    .into(),
+            );
+        }
+        trace.mark("full-display-controls", json!({"plan":plan,"controls":{"x":controls.x,"y":controls.y,"width":controls.w,"height":controls.h}}));
+    }
     run_js(&cancel_bar, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]');i++) await new Promise(r=>setTimeout(r,100)); if(!document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]')) throw new Error('manual Cancel control missing'); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
     trace.mark("cancel-controls-ready", json!(true));
     tokio::time::sleep(Duration::from_millis(600)).await;

@@ -15,6 +15,10 @@ description: |
   longer accepts connections. Control approval is disabled here; the
   approval gate itself is covered by a dedicated case.
 
+  The owned Wayland desktop parks its initial OS pointer away from GNOME's
+  hot corner before any target or measurement, while the actual RDP clicks
+  and independent host flip counter remain required.
+
   On Windows the runner's system Remote Desktop is running, so Start first
   offers it; platform_choice answers "Use Taomni anyway" there and asserts the
   prompt never appears on Linux/macOS. TC-RDPS-NAT-06 covers the rest of the

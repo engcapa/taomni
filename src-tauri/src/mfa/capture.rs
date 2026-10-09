@@ -111,9 +111,7 @@ fn ensure_screen_permission() -> Result<(), String> {
 /// xdg-desktop-portal Screenshot request, which shows the desktop's own prompt.
 #[cfg(target_os = "linux")]
 fn capture_all_monitors() -> Result<Vec<LumaFrame>, String> {
-    let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some()
-        || std::env::var("XDG_SESSION_TYPE").is_ok_and(|kind| kind.eq_ignore_ascii_case("wayland"));
-    if wayland {
+    if linux::native_wayland() {
         linux::capture_portal()
     } else {
         linux::capture_x11()
@@ -153,6 +151,18 @@ pub fn capture_screens_hiding<R: tauri::Runtime>(
 ) -> Result<Vec<u8>, String> {
     ensure_screen_permission()?;
     let was_visible = window.is_visible().unwrap_or(true);
+    #[cfg(target_os = "linux")]
+    if was_visible && linux::native_wayland() {
+        // GNOME permits the Screenshot access dialog only for the focused
+        // application. Obtain the real grant before hiding this window; the
+        // permission capture is discarded, never sent to the QR decoder.
+        // The subsequent request captures the desktop with Taomni hidden.
+        window.set_focus().map_err(|e| {
+            format!("{ERR_CAPTURE_FAILED}: focus before screenshot permission: {e}")
+        })?;
+        std::thread::sleep(HIDE_SETTLE);
+        drop(linux::capture_portal()?);
+    }
     if was_visible {
         let _ = window.hide();
         std::thread::sleep(HIDE_SETTLE);
@@ -174,6 +184,12 @@ pub(crate) mod linux {
     use x11rb::connection::Connection as _;
     use x11rb::protocol::randr::ConnectionExt as _;
     use x11rb::protocol::xproto::{ConnectionExt as _, ImageFormat, ImageOrder};
+
+    pub(super) fn native_wayland() -> bool {
+        std::env::var_os("WAYLAND_DISPLAY").is_some()
+            || std::env::var("XDG_SESSION_TYPE")
+                .is_ok_and(|kind| kind.eq_ignore_ascii_case("wayland"))
+    }
 
     /// Luma of a 32-bpp ZPixmap (BGRX for LSB-first servers, XRGB otherwise).
     pub(crate) fn zpixmap_to_luma(

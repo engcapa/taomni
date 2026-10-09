@@ -1,7 +1,7 @@
 id: TC-MAIN-RAIL-03
 title: The title-bar grip moves the actual Linux native window
 description: >-
-  Real X11 pointer input into the packaged WebKitGTK app and independent window
+  Real X11 or Mutter Wayland pointer input into the packaged WebKitGTK app and independent window
   geometry readback prove that the title-bar grip moves rather than resizes
   the window. Raw displacement and geometry restoration are retained for all
   three positions; Sessions/Tools remain operable after moving the window.
@@ -9,7 +9,7 @@ covers: [F1.2, F1.3, F6.2, F-Sockscap-1]
 tags: [main, sidebar, window, p1]
 modes: [native]
 native_platforms: [Linux]
-fixtures: [reset_db, linux_x11_required]
+fixtures: [reset_db, linux_desktop_required]
 timeout_sec: 120
 steps:
   - open: ${cfg.app.base_url}

@@ -39,7 +39,8 @@ class Desktop:
         self.temporary = None
 
     def start(self, command, *, env=None):
-        log = (self.root / (Path(command[0]).name + ".log")).open("w", encoding="utf-8")
+        name = Path(command[1]).name if len(command) > 1 and command[1].endswith(".py") else Path(command[0]).name
+        log = (self.root / (name + ".log")).open("w", encoding="utf-8")
         self.logs.append(log)
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env,
                                    start_new_session=sys.platform != "win32")
@@ -87,23 +88,48 @@ class Desktop:
     def _wayland(self, facts):
         runtime = Path(self.temporary.name) / "runtime"
         runtime.mkdir(mode=0o700)
+        # The QA build runs as a bare executable rather than an installed
+        # bundle. Registry requires real GDesktopAppInfo for its compiled ID.
+        # Make that packaging identity visible to this session's portal only.
+        from native_build import QA_APP_ID, qa_binary
+        data = Path(self.temporary.name) / "data"
+        applications = data / "applications"
+        applications.mkdir(parents=True)
+        desktop_file = applications / (QA_APP_ID + ".desktop")
+        binary = qa_binary(release="release" in self.capabilities)
+        desktop_file.write_text(
+            "[Desktop Entry]\nType=Application\nName=Taomni QA\n"
+            # Anonymous GTK applications use the executable's program name
+            # as their Wayland app_id. Match that real surface to this entry.
+            f'Exec="{binary}"\nStartupWMClass={binary.name}\n', encoding="utf-8")
+        os.environ["XDG_DATA_DIRS"] = str(data) + ":" + os.environ.get(
+            "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
+        facts["portal_application"] = {"identifier": QA_APP_ID,
+                                       "desktop_file": str(desktop_file), "binary": str(binary)}
         os.environ.pop("DISPLAY", None)
         os.environ.pop("XAUTHORITY", None)
         os.environ.update(XDG_RUNTIME_DIR=str(runtime), WAYLAND_DISPLAY="wayland-qa",
                           XDG_SESSION_TYPE="wayland", XDG_CURRENT_DESKTOP="ubuntu:GNOME",
                           GDK_BACKEND="wayland", LIBGL_ALWAYS_SOFTWARE="1",
-                          WEBKIT_DISABLE_DMABUF_RENDERER="1")
+                          WEBKIT_DISABLE_DMABUF_RENDERER="1", GTK_A11Y="atspi", NO_AT_BRIDGE="0")
         # Shell startup can activate portals itself. Publish the new session
         # environment first, otherwise DBus selects the GTK/X11 fallback and
         # those services keep the old runtime directory for the whole run.
         subprocess.run(["dbus-update-activation-environment", "XDG_RUNTIME_DIR", "WAYLAND_DISPLAY",
                         "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "GDK_BACKEND",
-                        "LIBGL_ALWAYS_SOFTWARE", "WEBKIT_DISABLE_DMABUF_RENDERER"], check=True, timeout=20)
+                        "LIBGL_ALWAYS_SOFTWARE", "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_A11Y",
+                        "NO_AT_BRIDGE", "XDG_DATA_DIRS"], check=True, timeout=20)
+        subprocess.run(["gdbus", "call", "--session", "--dest", "org.a11y.Bus",
+                        "--object-path", "/org/a11y/bus", "--method",
+                        "org.freedesktop.DBus.Properties.Set", "org.a11y.Status", "IsEnabled",
+                        "<true>"], check=True, timeout=20)
         pipewire = self.start(["pipewire"])
         self._wait(pipewire, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire")
         self.start(["wireplumber"])
+        # Use GNOME's standard session without Ubuntu's forced desktop-icons
+        # extension and background indexing; this compositor belongs to QA.
         shell = self.start(["gnome-shell", "--wayland", "--headless", "--virtual-monitor=1920x1080",
-                            "--wayland-display=wayland-qa", "--mode=ubuntu", "--unsafe-mode"])
+                            "--wayland-display=wayland-qa", "--mode=user", "--unsafe-mode"])
         # Eval is limited to this disposable compositor on the job's private
         # session bus. It lets the helper inspect and activate OS windows.
         self._wait(shell, lambda: (runtime / "wayland-qa").is_socket(), "GNOME Wayland compositor")
@@ -137,6 +163,17 @@ class Desktop:
             "print(d.get_n_monitors()); w.destroy()"], text=True, timeout=20).splitlines()
         if not probe or probe[0] != "GdkWaylandDisplay" or int(probe[1]) < 1:
             raise RuntimeError(f"GTK did not use a Wayland display: {probe}")
+        # Floating capture surfaces and Tk workloads use this compositor's
+        # own XWayland connection. The main GTK backend was verified above;
+        # make it available to screenshot-only selections too.
+        from qa_ui_auto.wayland import command as wayland_command
+        display = self._wait(input_owner, lambda: wayland_command("xwayland_display"), "owned XWayland workload display")
+        os.environ["DISPLAY"] = display
+        authority = self._wait(input_owner, lambda: wayland_command("xwayland_authority"), "owned XWayland authentication")
+        if not Path(authority).is_file():
+            raise RuntimeError("owned XWayland authentication file is missing")
+        os.environ["XAUTHORITY"] = authority
+        facts["fixture_xwayland_display"] = display
         portal = subprocess.check_output(["gdbus", "introspect", "--session", "--dest",
                    "org.freedesktop.portal.Desktop", "--object-path", "/org/freedesktop/portal/desktop"],
                    text=True, timeout=60)
@@ -144,13 +181,26 @@ class Desktop:
         for interface in ("Screenshot", "ScreenCast", "RemoteDesktop"):
             if f"org.freedesktop.portal.{interface}" not in portal:
                 raise RuntimeError(f"GNOME desktop portal lacks {interface}")
+        consent_ready = self.root / "portal-automation-ready.json"
+        consent = self.start(["/usr/bin/python3", str(Path(__file__).with_name("ci_wayland_portal.py")),
+                              "--ready", str(consent_ready),
+                              "--log", str(self.root / "portal-consent.jsonl")])
+        self._wait(consent, consent_ready.is_file, "GNOME portal accessibility automation")
+        if "ime" in self.capabilities:
+            self._ime(facts)
+        if "audio" in self.capabilities:
+            os.environ["PULSE_SERVER"] = f"unix:{runtime}/pulse/native"
+            pulse = self.start(["pipewire-pulse"])
+            self._wait(pulse, lambda: subprocess.run(["pactl", "info"], capture_output=True,
+                                                    timeout=5).returncode == 0, "PipeWire Pulse server")
         facts.update(gdk_display=probe[0], monitors=int(probe[1]),
                      wayland_display=os.environ["WAYLAND_DISPLAY"], input_transport="Wayland/WebDriver",
                      input_devices=["keyboard", "pointer"], input_provider="Mutter RemoteDesktop",
-                     renderer="software", screen=[1920, 1080],
+                     renderer="software", screen=[1920, 1080], shell_session_mode="user",
                      gnome_version=subprocess.check_output(["gnome-shell", "--version"], text=True).strip(),
                      portal_interfaces=["Screenshot", "ScreenCast", "RemoteDesktop"],
-                     note="GNOME virtual monitor; portal user consent and physical GPU/input are unverified")
+                     portal_consent="AT-SPI on owned GNOME portal and Shell screenshot access dialogs",
+                     note="GNOME virtual monitor; physical GPU/input remain unverified")
 
     def _linux(self, facts):
         profile = LINUX_PROFILES[self.linux_profile]
@@ -262,6 +312,11 @@ class Desktop:
         def engine_ready():
             if fcitx.poll() is not None:
                 raise RuntimeError("QA fcitx5 exited during engine startup")
+            if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
+                # GTK present() cannot grant OS focus on Wayland. Select the
+                # probe in the owned compositor before checking its IM context.
+                from qa_ui_auto.wayland import command
+                command("focus_pid", pid=gtk.pid)
             subprocess.run(["fcitx5-remote", "-s", "wbpy"], env=env,
                            capture_output=True, timeout=5)
             engine = current_fcitx_engine(env=env)

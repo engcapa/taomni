@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import yaml
 
@@ -13,6 +13,20 @@ from qa_ui_auto.behavior_contract import validate_contract
 
 
 class UpdaterFixtureUnitTests(unittest.TestCase):
+    def test_about_waits_for_current_document_menu_then_activates_appkit_once(self):
+        from types import SimpleNamespace
+        from qa_ui_auto import updater_steps
+        with tempfile.TemporaryDirectory() as directory:
+            session = Mock()
+            session.execute.side_effect = [False, False, True]
+            session.request.return_value = {'transport': 'AppKit NSMenu', 'activated': 'about'}
+            ctx = SimpleNamespace(session=session, case_dir=Path(directory))
+            with patch.object(updater_steps.time, 'sleep'):
+                updater_steps.native_about(ctx, None)
+            self.assertEqual(session.execute.call_count, 3)
+            session.request.assert_called_once()
+            self.assertEqual(len(ctx.case_dir.joinpath('native-about-activation.jsonl').read_text().splitlines()), 1)
+
     def test_cached_asset_is_reused_only_with_exact_hash(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

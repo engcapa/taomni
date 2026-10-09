@@ -143,6 +143,9 @@ async fn exit_app(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    #[cfg(target_os = "linux")]
+    screenshot::shortcut::prepare_portal_identity(&context.config().identifier);
     tauri::Builder::default()
         // Auto-update: unconditional (unlike the debug-only log plugin below).
         // `process` provides relaunch() so the user can restart into the new
@@ -1224,7 +1227,7 @@ pub fn run() {
             backup::backup_get_default_dir,
             exit_app,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while running tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::ExitRequested { code, ref api, .. } = event {

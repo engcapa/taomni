@@ -71,6 +71,7 @@
           "jdtls_required",
           "java_test_bundle",
           "linux_x11_required",
+          "linux_desktop_required",
           "workspace_root",
           "java_sample_projects",
           "java25_projects",
@@ -1877,10 +1878,10 @@
         "transport": {
           "enum": [
             "x11",
+            "wayland",
             "webdriver"
           ],
-          "default": "x11",
-          "description": "Native key transport. WebDriver uses packaged-webview W3C key actions; x11 uses XTest."
+          "description": "Native key transport. Omitted selects the effective Linux desktop. WebDriver uses packaged-webview W3C key actions; x11 uses XTest; wayland uses the owned Mutter RemoteDesktop session."
         }
       }
     },

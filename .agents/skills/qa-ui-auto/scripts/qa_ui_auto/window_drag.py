@@ -81,3 +81,60 @@ def run_window_drag(ctx, args: dict, window_id: str, identity: str) -> str:
         with (ctx.case_dir / "native-window-drags.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(observation, ensure_ascii=False) + "\n")
     return f"native window moved by ({dx}, {dy}) from y={fraction}"
+
+
+def run_wayland_window_drag(ctx, args: dict) -> str:
+    from .wayland import command as desktop_command
+
+    fraction = args.get("y_fraction", 0.5)
+    dx, dy = args["dx"], args["dy"]
+    if not isinstance(fraction, (int, float)) or not math.isfinite(fraction) or not 0.05 <= fraction <= 0.95:
+        raise StepError("native_window_drag: y_fraction must be within 0.05..0.95")
+    if any(type(value) is not int or abs(value) > 100 for value in (dx, dy)) or (dx == 0 and dy == 0):
+        raise StepError("native_window_drag: dx/dy must specify movement within -100..100")
+    application = str(ctx.session.application)
+    ctx.session.activate_wayland_window()
+    original = desktop_command("geometry", application=application)["frame"]
+    observation = {"transport": "Mutter RemoteDesktop pointer -> GNOME window manager",
+                   "application": application, "selector": args["selector"], "requested": {"dx": dx, "dy": dy}}
+    try:
+        desktop_command("place", application=application, rect={"x": 120, "y": 120, "width": 1000, "height": 680})
+        time.sleep(0.3)
+        before = desktop_command("geometry", application=application)["frame"]
+        ctx.session.activate_wayland_window()
+        ctx.session.execute("window.__QA_WINDOW_DRAG_EVENTS__=[];"
+            "window.__QA_WINDOW_DRAG_LISTENER__=(e)=>{const r={type:e.type,trusted:e.isTrusted,"
+            "x:e.clientX,y:e.clientY,testid:e.target?.closest?.('[data-testid]')?.dataset.testid};"
+            "setTimeout(()=>window.__QA_WINDOW_DRAG_EVENTS__.push({...r,prevented:e.defaultPrevented}));};"
+            "for(const type of ['pointerdown','mousedown','mouseup'])"
+            "window.addEventListener(type,window.__QA_WINDOW_DRAG_LISTENER__,true);")
+        geometry = ctx.session.execute(
+            f"const el=document.querySelector({json.dumps(args['selector'])});"
+            "if(!el)return null; const r=el.getBoundingClientRect();"
+            "return {x:r.x,y:r.y,width:r.width,height:r.height,viewportWidth:innerWidth,viewportHeight:innerHeight};")
+        if not geometry or geometry["width"] <= 0 or geometry["height"] <= 0:
+            raise StepError("native_window_drag: drag target has no visible area")
+        x = before["x"] + round((geometry["x"] + geometry["width"] / 2) * before["width"] / geometry["viewportWidth"])
+        y = before["y"] + round((geometry["y"] + geometry["height"] * fraction) * before["height"] / geometry["viewportHeight"])
+        observation.update(before=before, geometry=geometry, pointer={"x": x, "y": y})
+        observation["observedPointer"] = desktop_command("drag", application=application,
+            start=[x, y], end=[x + dx, y + dy])
+        time.sleep(0.2)
+        after = desktop_command("geometry", application=application)["frame"]
+        observation["after"] = after
+        validate_movement(before, after, dx, dy)
+        observation["passed"] = True
+    except Exception as error:
+        observation.update(passed=False, error=str(error))
+        raise
+    finally:
+        with suppress(Exception):
+            observation["events"] = ctx.session.execute(
+                "for(const type of ['pointerdown','mousedown','mouseup'])"
+                "window.removeEventListener(type,window.__QA_WINDOW_DRAG_LISTENER__,true);"
+                "return window.__QA_WINDOW_DRAG_EVENTS__ ?? [];")
+        with suppress(Exception):
+            desktop_command("place", application=application, rect=original)
+        with (ctx.case_dir / "native-window-drags.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(observation, ensure_ascii=False) + "\n")
+    return f"Wayland native window moved by ({dx}, {dy}) from y={fraction}"

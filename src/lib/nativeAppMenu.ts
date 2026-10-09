@@ -239,46 +239,44 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
   };
 }
 
-// Tauri menu option shapes — typed loosely here so this module stays
-// importable in jsdom tests without pulling the @tauri-apps/api/menu runtime.
-type TauriMenuItemOptions =
-  | { item: PredefinedKind; text?: string }
-  | { id: string; text: string; enabled?: boolean; accelerator?: string; action?: (id: string) => void }
-  | { id: string; text: string; checked: boolean; action?: (id: string) => void }
-  | { id: string; text: string; enabled?: boolean; items: TauriMenuItemOptions[] };
+type NativeMenuApi = typeof import("@tauri-apps/api/menu");
+type NativeMenuItem = Awaited<ReturnType<NativeMenuApi["MenuItem"]["new"]>>
+  | Awaited<ReturnType<NativeMenuApi["CheckMenuItem"]["new"]>>
+  | Awaited<ReturnType<NativeMenuApi["PredefinedMenuItem"]["new"]>>
+  | Awaited<ReturnType<NativeMenuApi["Submenu"]["new"]>>;
+type NativeMenuResource = NativeMenuItem | Awaited<ReturnType<NativeMenuApi["Menu"]["new"]>>;
 
-function nodeToOptions(
-  node: MenuNodeSpec,
-  dispatch: (action: MenuActionId) => void,
-): TauriMenuItemOptions {
-  switch (node.type) {
-    case "separator":
-      return { item: "Separator" };
-    case "predefined":
-      return node.label ? { item: node.item, text: node.label } : { item: node.item };
-    case "item":
-      return {
-        id: node.id,
-        text: node.label,
-        enabled: node.enabled ?? true,
-        ...(node.accelerator ? { accelerator: node.accelerator } : {}),
-        action: () => dispatch(node.action),
-      };
-    case "check":
-      return {
-        id: node.id,
-        text: node.label,
-        checked: node.checked,
-        action: () => dispatch(node.action),
-      };
-    case "submenu":
-      return {
-        id: node.id,
-        text: node.label,
-        enabled: node.enabled ?? true,
-        items: node.items.map((child) => nodeToOptions(child, dispatch)),
-      };
+let installationRevision = 0;
+let installedRevision = 0;
+let installedResources: NativeMenuResource[] = [];
+let installationQueue = Promise.resolve();
+
+export function appMenuInstallationReady(): boolean {
+  return installedRevision > 0 && installedRevision === installationRevision;
+}
+
+// Observe installation in this document. A WebView reload can temporarily
+// leave AppKit showing the previous document's menu and dead JS callbacks.
+if (__TAOMNI_QA_UPDATER__) {
+  (globalThis as typeof globalThis & {
+    __TAOMNI_QA_APP_MENU__?: { ready: () => boolean };
+  }).__TAOMNI_QA_APP_MENU__ = { ready: appMenuInstallationReady };
+}
+
+async function closeResources(resources: NativeMenuResource[]): Promise<void> {
+  const results = await Promise.allSettled(resources.reverse().map((resource) => resource.close()));
+  for (const result of results) {
+    if (result.status === "rejected") console.error("Failed to release native menu resource", result.reason);
   }
+}
+
+async function finishCreations<T>(creations: Promise<T>[]): Promise<T[]> {
+  // Let every sibling finish before cleanup so a failed IPC call cannot
+  // leave a late-created menu resource outside the cleanup ledger.
+  const results = await Promise.allSettled(creations);
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure?.status === "rejected") throw failure.reason;
+  return results.map((result) => (result as PromiseFulfilledResult<T>).value);
 }
 
 /**
@@ -291,14 +289,66 @@ export async function installAppMenu(
   spec: AppMenuSpec,
   dispatch: (action: MenuActionId) => void,
 ): Promise<void> {
-  const { Menu } = await import("@tauri-apps/api/menu");
-  const items = spec.submenus.map((submenu) => ({
-    id: submenu.id,
-    text: submenu.label,
-    items: submenu.items.map((node) => nodeToOptions(node, dispatch)),
-  }));
-  // The option-object form lets Tauri build the whole tree (submenus +
-  // predefined + check items) in one round-trip.
-  const menu = await Menu.new({ items: items as never });
-  await menu.setAsAppMenu();
+  const revision = ++installationRevision;
+  const api = await import("@tauri-apps/api/menu");
+  // Tauri 2.12 drops the temporary wrappers built from nested option objects,
+  // which unregisters their JS action channels. Explicit resource handles
+  // keep every item alive until its menu is replaced.
+  const prefix = `app-menu-${crypto.randomUUID()}`;
+  const resources: NativeMenuResource[] = [];
+  const own = <T extends NativeMenuResource>(resource: T): T => {
+    resources.push(resource);
+    return resource;
+  };
+  const materialize = async (node: MenuNodeSpec): Promise<NativeMenuItem> => {
+    switch (node.type) {
+      case "separator":
+        return own(await api.PredefinedMenuItem.new({ item: "Separator" }));
+      case "predefined":
+        return own(await api.PredefinedMenuItem.new({ item: node.item, text: node.label }));
+      case "item":
+        return own(await api.MenuItem.new({
+          id: `${prefix}-${node.id}`, text: node.label, enabled: node.enabled ?? true,
+          accelerator: node.accelerator, action: () => dispatch(node.action),
+        }));
+      case "check":
+        return own(await api.CheckMenuItem.new({
+          id: `${prefix}-${node.id}`, text: node.label, checked: node.checked,
+          action: () => dispatch(node.action),
+        }));
+      case "submenu": {
+        const items = await finishCreations(node.items.map(materialize));
+        return own(await api.Submenu.new({
+          id: `${prefix}-${node.id}`, text: node.label, enabled: node.enabled ?? true, items,
+        }));
+      }
+    }
+  };
+  try {
+    const items = await finishCreations(spec.submenus.map(async (submenu) => {
+      const children = await finishCreations(submenu.items.map(materialize));
+      return own(await api.Submenu.new({ id: `${prefix}-${submenu.id}`, text: submenu.label, items: children }));
+    }));
+    const menu = own(await api.Menu.new({ items }));
+    const install = installationQueue.then(async () => {
+      if (revision !== installationRevision) {
+        await closeResources(resources);
+        return;
+      }
+      const replaced = await menu.setAsAppMenu();
+      const previous = installedResources;
+      installedResources = resources;
+      // IDs are unique to this installation, so old resources cannot remove
+      // the new menu's channels when their native wrappers are released.
+      await closeResources(previous);
+      // setAsAppMenu also returns a new handle to the previous root menu.
+      if (replaced) await closeResources([replaced]);
+      installedRevision = revision;
+    });
+    installationQueue = install.catch(() => {});
+    await install;
+  } catch (error) {
+    await closeResources(resources);
+    throw error;
+  }
 }
