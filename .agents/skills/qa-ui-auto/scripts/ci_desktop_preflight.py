@@ -25,6 +25,12 @@ def main():
                 str(args.report.resolve()), "true" if "rdp" in desktop.capabilities else "false"],
                 cwd=probe.parent, text=True, timeout=180)
             desktop.facts["portal_requests"] = json.loads(result)
+            app_info = subprocess.check_output(["/usr/bin/python3", "-c",
+                "import gi; from gi.repository import Gio; "
+                "app=Gio.DesktopAppInfo.new('com.taomni.app.qa.desktop'); "
+                "assert app is not None, 'QA portal application metadata missing'; "
+                "print(app.get_id())"], text=True, timeout=20).strip()
+            desktop.facts["portal_application"]["observed_id"] = app_info
         print(json.dumps(desktop.facts, indent=2), flush=True)
 
 

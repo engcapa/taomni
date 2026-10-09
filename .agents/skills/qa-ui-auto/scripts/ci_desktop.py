@@ -88,6 +88,22 @@ class Desktop:
     def _wayland(self, facts):
         runtime = Path(self.temporary.name) / "runtime"
         runtime.mkdir(mode=0o700)
+        # The QA build runs as a bare executable rather than an installed
+        # bundle. Registry requires real GDesktopAppInfo for its compiled ID.
+        # Make that packaging identity visible to this session's portal only.
+        from native_build import QA_APP_ID, qa_binary
+        data = Path(self.temporary.name) / "data"
+        applications = data / "applications"
+        applications.mkdir(parents=True)
+        desktop_file = applications / (QA_APP_ID + ".desktop")
+        binary = qa_binary(release="release" in self.capabilities)
+        desktop_file.write_text(
+            "[Desktop Entry]\nType=Application\nName=Taomni QA\n"
+            f'Exec="{binary}"\nStartupWMClass=Taomni QA\n', encoding="utf-8")
+        os.environ["XDG_DATA_DIRS"] = str(data) + ":" + os.environ.get(
+            "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
+        facts["portal_application"] = {"identifier": QA_APP_ID,
+                                       "desktop_file": str(desktop_file), "binary": str(binary)}
         os.environ.pop("DISPLAY", None)
         os.environ.pop("XAUTHORITY", None)
         os.environ.update(XDG_RUNTIME_DIR=str(runtime), WAYLAND_DISPLAY="wayland-qa",
@@ -100,7 +116,7 @@ class Desktop:
         subprocess.run(["dbus-update-activation-environment", "XDG_RUNTIME_DIR", "WAYLAND_DISPLAY",
                         "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "GDK_BACKEND",
                         "LIBGL_ALWAYS_SOFTWARE", "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_A11Y",
-                        "NO_AT_BRIDGE"], check=True, timeout=20)
+                        "NO_AT_BRIDGE", "XDG_DATA_DIRS"], check=True, timeout=20)
         subprocess.run(["gdbus", "call", "--session", "--dest", "org.a11y.Bus",
                         "--object-path", "/org/a11y/bus", "--method",
                         "org.freedesktop.DBus.Properties.Set", "org.a11y.Status", "IsEnabled",

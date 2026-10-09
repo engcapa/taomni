@@ -21,6 +21,10 @@ def native_about(ctx, args):
     last = None
     while time.time() < deadline:
         try:
+            if ctx.session.execute("return window.__TAOMNI_QA_APP_MENU__?.ready() === true;") is not True:
+                last = "the current document's native menu installation is pending"
+                time.sleep(0.2)
+                continue
             result = ctx.session.request("POST", ctx.session.endpoint("/qa/native-about"), {})
             with (ctx.case_dir / "native-about-activation.jsonl").open("a", encoding="utf-8") as trace:
                 trace.write(json.dumps(result) + "\n")

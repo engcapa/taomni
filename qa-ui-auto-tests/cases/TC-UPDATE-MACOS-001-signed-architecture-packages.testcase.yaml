@@ -59,7 +59,7 @@ verification:
       requirement: An ARM target with the overwritten Intel bytes is rejected by real minisign verification, preserving the installed app.
       actions: [3, 5, 8]
       checkpoints:
-        - {step: 4, expectation: The installed AppKit About item retains its native callback and opens the product dialog.}
+        - {step: 4, expectation: The current document's installed AppKit About item retains its native callback and opens the product dialog.}
         - {step: 10, expectation: Signature validation error is visible instead of the restart gate.}
         - {step: 11, expectation: Independent host SHA256 still matches the original disposable app.}
       results: [4, 10, 11]

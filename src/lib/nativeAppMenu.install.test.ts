@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { installAppMenu, type AppMenuSpec } from "./nativeAppMenu";
+import { appMenuInstallationReady, installAppMenu, type AppMenuSpec } from "./nativeAppMenu";
 
 const native = vi.hoisted(() => ({
   channels: new Map<string, () => void>(),
@@ -60,6 +60,7 @@ describe("native menu action lifetime", () => {
   it("keeps About and check-item callbacks callable after installation", async () => {
     const dispatch = vi.fn();
     await installAppMenu(spec, dispatch);
+    expect(appMenuInstallationReady()).toBe(true);
     click(0);
     click(1);
     expect(dispatch.mock.calls).toEqual([["help"], ["toggle-quick-connect"]]);
@@ -83,8 +84,18 @@ describe("native menu action lifetime", () => {
     const current = native.current;
     native.failInstall = true;
     await expect(installAppMenu(spec, vi.fn())).rejects.toThrow("AppKit install failed");
+    expect(appMenuInstallationReady()).toBe(false);
     expect(native.current).toBe(current);
     click(0);
     expect(dispatch).toHaveBeenCalledWith("help");
+  });
+
+  it("marks a current-document replacement pending before asynchronous IPC finishes", async () => {
+    await installAppMenu(spec, vi.fn());
+    expect(appMenuInstallationReady()).toBe(true);
+    const pending = installAppMenu(spec, vi.fn());
+    expect(appMenuInstallationReady()).toBe(false);
+    await pending;
+    expect(appMenuInstallationReady()).toBe(true);
   });
 });

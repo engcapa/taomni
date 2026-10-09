@@ -2013,10 +2013,7 @@ pub async fn screenshot_qa_full_recorder(app: AppHandle) -> Result<String, Strin
         .map_err(|e| e.to_string())?
         .join("screenshot-settings.json");
     let original = std::fs::read(&settings_path).ok();
-    if !super::pins::native_wayland() {
-        super::shortcut::screenshot_shortcut_set(app.clone(), Some("Control+Shift+F10".into()))
-            .await?;
-    }
+    super::shortcut::screenshot_shortcut_set(app.clone(), Some("Control+Shift+F10".into())).await?;
     let result = full_recorder(&app).await;
     let _ = super::shortcut::screenshot_shortcut_set(app.clone(), Some(String::new())).await;
     if let Some(bytes) = original {

@@ -247,8 +247,21 @@ type NativeMenuItem = Awaited<ReturnType<NativeMenuApi["MenuItem"]["new"]>>
 type NativeMenuResource = NativeMenuItem | Awaited<ReturnType<NativeMenuApi["Menu"]["new"]>>;
 
 let installationRevision = 0;
+let installedRevision = 0;
 let installedResources: NativeMenuResource[] = [];
 let installationQueue = Promise.resolve();
+
+export function appMenuInstallationReady(): boolean {
+  return installedRevision > 0 && installedRevision === installationRevision;
+}
+
+// Observe installation in this document. A WebView reload can temporarily
+// leave AppKit showing the previous document's menu and dead JS callbacks.
+if (__TAOMNI_QA_UPDATER__) {
+  (globalThis as typeof globalThis & {
+    __TAOMNI_QA_APP_MENU__?: { ready: () => boolean };
+  }).__TAOMNI_QA_APP_MENU__ = { ready: appMenuInstallationReady };
+}
 
 async function closeResources(resources: NativeMenuResource[]): Promise<void> {
   const results = await Promise.allSettled(resources.reverse().map((resource) => resource.close()));
@@ -330,6 +343,7 @@ export async function installAppMenu(
       await closeResources(previous);
       // setAsAppMenu also returns a new handle to the previous root menu.
       if (replaced) await closeResources([replaced]);
+      installedRevision = revision;
     });
     installationQueue = install.catch(() => {});
     await install;

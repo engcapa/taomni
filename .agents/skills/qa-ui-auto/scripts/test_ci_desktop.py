@@ -417,6 +417,11 @@ class DesktopTests(unittest.TestCase):
                     self.assertEqual(activation_env['XDG_CURRENT_DESKTOP'], 'ubuntu:GNOME')
                     self.assertEqual(activation_env['GDK_BACKEND'], 'wayland')
                     self.assertEqual(activation_env['XDG_RUNTIME_DIR'], os.environ['XDG_RUNTIME_DIR'])
+                    data = Path(activation_env['XDG_RUNTIME_DIR']).parent / 'data'
+                    self.assertTrue(activation_env['XDG_DATA_DIRS'].startswith(str(data) + ':'))
+                    entry = data / 'applications/com.taomni.app.qa.desktop'
+                    self.assertIn('Name=Taomni QA', entry.read_text())
+                    self.assertIn('Exec="', entry.read_text())
                     self.assertEqual(accessibility_enabled, [True])
                     self.assertIn('pipewire', started)
                     self.assertIn('--unsafe-mode', command)
@@ -444,6 +449,7 @@ class DesktopTests(unittest.TestCase):
                 ])
                 self.assertFalse(any('openbox' in call.args[0] for call in start.call_args_list))
             self.assertEqual(os.environ['DISPLAY'], ':99')
+            self.assertFalse(Path(desktop.facts['portal_application']['desktop_file']).exists())
 
     def test_wayland_protocol_globals_with_an_empty_seat_are_not_input_ready(self):
         self.assertFalse(wayland_has_input(WAYLAND_PROTOCOLS.replace('pointer keyboard', '')))
