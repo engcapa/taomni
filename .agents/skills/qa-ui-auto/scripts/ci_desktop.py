@@ -284,6 +284,11 @@ class Desktop:
         def engine_ready():
             if fcitx.poll() is not None:
                 raise RuntimeError("QA fcitx5 exited during engine startup")
+            if os.environ.get("GDK_BACKEND") == "wayland":
+                # GTK present() cannot grant OS focus on Wayland. Select the
+                # probe in the owned compositor before checking its IM context.
+                from qa_ui_auto.wayland import command
+                command("focus_pid", pid=gtk.pid)
             subprocess.run(["fcitx5-remote", "-s", "wbpy"], env=env,
                            capture_output=True, timeout=5)
             engine = current_fcitx_engine(env=env)

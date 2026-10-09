@@ -59,10 +59,10 @@ def main():
         return False
 
     def ready():
-        command("focus_pid", pid=os.getpid())
+        observed = command("focus_pid", pid=os.getpid())
         if args.mode == "image":
-            width, height = window.get_size()
-            print("WINDOW-READY", 0, 0, width, height, flush=True)
+            rect = observed["frame"]
+            print("WINDOW-READY", rect["x"], rect["y"], rect["width"], rect["height"], flush=True)
         else:
             command("keys", chords=[[0xFFE1]])
             GLib.timeout_add(200, publish)

@@ -16,7 +16,10 @@ WINDOW_STATE = """(() => ({
         const window = actor.meta_window;
         return {pid: window.get_pid(), title: window.get_title(),
                 focused: window.has_focus(), minimized: window.minimized,
-                frame: window.get_frame_rect(), client: window.get_buffer_rect()};
+                frame: (() => { const r = window.get_frame_rect();
+                    return {x: r.x, y: r.y, width: r.width, height: r.height}; })(),
+                client: (() => { const r = window.get_buffer_rect();
+                    return {x: r.x, y: r.y, width: r.width, height: r.height}; })()};
     })
 }))()"""
 
@@ -48,6 +51,11 @@ def activate_window(evaluate, application: Path, runtime: Path, diagnostics: dic
     diagnostics["before"] = before
     pid = owned_window_pid(before["windows"], application, runtime)
     diagnostics["pid"] = pid
+    focus_window(evaluate, pid, diagnostics)
+
+
+def focus_window(evaluate, pid: int, diagnostics: dict) -> dict:
+    """Activate and observe the mapped toplevel, including Overview dismissal."""
     evaluate(f"(() => {{ Main.overview.hide(); const window = global.get_window_actors()"
              f".map(actor => actor.meta_window).find(window => window.get_pid() === {pid}); "
              "if (!window) throw new Error('QA window disappeared'); "
@@ -56,9 +64,10 @@ def activate_window(evaluate, application: Path, runtime: Path, diagnostics: dic
     while True:
         after = evaluate(WINDOW_STATE)
         diagnostics["after"] = after
-        if not after["overview"] and any(window["pid"] == pid and window["focused"]
-                                          for window in after["windows"]):
-            return
+        focused = next((window for window in after["windows"]
+                        if window["pid"] == pid and window["focused"]), None)
+        if not after["overview"] and focused:
+            return focused
         if time.monotonic() >= end:
             raise RuntimeError("GNOME did not focus the QA application window")
         time.sleep(0.05)
@@ -160,9 +169,7 @@ def main() -> None:
                         environment = (Path("/proc") / str(pid) / "environ").read_bytes().split(b"\0")
                         if b"XDG_RUNTIME_DIR=" + str(args.socket.parent).encode() not in environment:
                             raise RuntimeError("refusing a window outside the owned compositor")
-                        evaluate(f"(() => {{ Main.overview.hide(); const w = global.get_window_actors()"
-                                 f".map(a => a.meta_window).find(w => w.get_pid() === {pid}); "
-                                 "if (!w) throw new Error('fixture window missing'); Main.activateWindow(w); return true; })()")
+                        value = focus_window(evaluate, pid, diagnostics)
                     elif name == "keys":
                         inject_keys(request["chords"])
                     elif name == "clipboard_serial":

@@ -5,11 +5,24 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ci_wayland_portal import owned_portal
+from ci_wayland_input import focus_window
 from qa_ui_auto import host_clipboard, wayland
 from qa_ui_auto.native_steps import _read_wayland_clipboard
 
 
 class WaylandToolsTests(unittest.TestCase):
+    def test_fixture_readiness_waits_for_os_focus_and_reports_real_geometry(self):
+        rect = {"x": 120, "y": 80, "width": 600, "height": 400}
+        window = {"pid": 42, "focused": True, "frame": rect}
+        evaluate = Mock(side_effect=[True,
+            {"overview": True, "windows": [window]},
+            {"overview": False, "windows": [window]}])
+        diagnostics = {}
+        with patch("ci_wayland_input.time.sleep"):
+            self.assertEqual(focus_window(evaluate, 42, diagnostics)["frame"], rect)
+        self.assertEqual(evaluate.call_count, 3)
+        self.assertFalse(diagnostics["after"]["overview"])
+
     def test_portal_automation_rejects_other_runtime_and_non_portal_processes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
