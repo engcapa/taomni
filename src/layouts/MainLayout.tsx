@@ -788,15 +788,25 @@ export function MainLayout() {
     if (["files", "changes", "mail"].includes(selectedWorkspace.navigation.activeSurface)) openWorkspaceView(selectedWorkspace.navigation.activeSurface);
   }, [workspaceCanvasVisible, selectedWorkspace?.id, selectedWorkspace?.navigation.activeSurface]);
   const restoredWorkspaceLayout = useRef<string | null>(null);
+  const restoringNavigatorCollapsed = useRef<boolean | null>(null);
   useEffect(() => {
-    if (workspaceNavigation.canvas !== "workspace" || !selectedWorkspace || restoredWorkspaceLayout.current === selectedWorkspace.id) return;
-    restoredWorkspaceLayout.current = selectedWorkspace.id;
-    setSidebarCollapsed(selectedWorkspace.navigation.navigatorCollapsed);
-  }, [workspaceNavigation.canvas, selectedWorkspace?.id, setSidebarCollapsed]);
-  useEffect(() => {
-    if (workspaceNavigation.canvas !== "workspace" || !selectedWorkspace || restoredWorkspaceLayout.current !== selectedWorkspace.id || selectedWorkspace.navigation.navigatorCollapsed === sidebarCollapsed) return;
+    if (workspaceNavigation.canvas !== "workspace" || !selectedWorkspace) return;
+    if (restoredWorkspaceLayout.current !== selectedWorkspace.id) {
+      restoredWorkspaceLayout.current = selectedWorkspace.id;
+      restoringNavigatorCollapsed.current = selectedWorkspace.navigation.navigatorCollapsed;
+      setSidebarCollapsed(selectedWorkspace.navigation.navigatorCollapsed);
+      // Restoration must finish before persisting a user change. A separate
+      // effect here would write this render's previous shell state back over
+      // the workspace preference during hydration or workspace switching.
+      return;
+    }
+    if (restoringNavigatorCollapsed.current !== null) {
+      if (sidebarCollapsed !== restoringNavigatorCollapsed.current) return;
+      restoringNavigatorCollapsed.current = null;
+    }
+    if (selectedWorkspace.navigation.navigatorCollapsed === sidebarCollapsed) return;
     void useWorkspaceStore.getState().patch(selectedWorkspace.id, { navigation: { navigatorCollapsed: sidebarCollapsed } }).catch(() => {});
-  }, [workspaceNavigation.canvas, sidebarCollapsed]);
+  }, [workspaceNavigation.canvas, selectedWorkspace?.id, sidebarCollapsed, setSidebarCollapsed]);
   const migratingWorkspaceTabs = useRef(new Set<string>());
   useEffect(() => {
     if (!workspaceNavigation.hydrated) return;

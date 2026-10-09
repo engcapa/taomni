@@ -23,7 +23,7 @@
 
 /* Narrow windows use an overlay navigator; the active canvas keeps its width. */
 @media (max-width: 760px) {
-  .taomni-control-bar .taomni-window-drag-handle { width: 24px; }
+  .taomni-control-bar .taomni-window-drag-handle { width: 16px; }
   .taomni-control-bar .taomni-theme-cycle {
     flex-shrink: 0;
     width: 26px;

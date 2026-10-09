@@ -990,6 +990,26 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
   });
 
+  it("restores a workspace navigator before persisting subsequent user changes", async () => {
+    const patch = vi.spyOn(useWorkspaceStore.getState(), "patch").mockResolvedValue();
+    const workspace = {
+      id: "restore-layout", name: "Restore layout", description: "", roots: [], looseFiles: [],
+      pinned: false, order: 0, revision: 1, createdAt: 1, updatedAt: 1, lastOpenedAt: 1,
+      navigation: { activeSurface: "overview" as const, navigatorCollapsed: true, rightPaneOpen: false },
+      memberships: [],
+    };
+    useWorkspaceStore.setState({ workspaces: [workspace], activeWorkspaceId: workspace.id, canvas: "workspace" });
+    try {
+      render(<MainLayout />);
+      await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+      expect(patch).not.toHaveBeenCalled();
+      act(() => useAppStore.getState().setSidebarCollapsed(false));
+      await waitFor(() => expect(patch).toHaveBeenCalledWith(workspace.id, { navigation: { navigatorCollapsed: false } }));
+    } finally {
+      patch.mockRestore();
+    }
+  });
+
   it("collapses the main sidebar to a fixed rail without leaving the panel gap", () => {
     useAppStore.setState({
       sidebarCollapsed: true,
