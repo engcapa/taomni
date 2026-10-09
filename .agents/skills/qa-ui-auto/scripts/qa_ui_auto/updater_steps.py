@@ -22,6 +22,8 @@ def native_about(ctx, args):
     while time.time() < deadline:
         try:
             result = ctx.session.request("POST", ctx.session.endpoint("/qa/native-about"), {})
+            with (ctx.case_dir / "native-about-activation.jsonl").open("a", encoding="utf-8") as trace:
+                trace.write(json.dumps(result) + "\n")
             return json.dumps(result)
         except Exception as error:
             last = error

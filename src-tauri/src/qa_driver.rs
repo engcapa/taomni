@@ -794,10 +794,16 @@ async fn native_about<R: Runtime>(
     #[cfg(target_os = "macos")]
     {
         let app = state.app.clone();
+        let window = state.window.clone();
         let (tx, rx) = oneshot::channel();
         if let Err(err) = state.app.run_on_main_thread(move || {
             let result = (|| -> Result<(), String> {
-                use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
+                use objc2::{
+                    class, msg_send,
+                    rc::Retained,
+                    runtime::{AnyObject, Sel},
+                    sel,
+                };
                 use objc2_foundation::NSString;
                 use tauri::menu::MenuItemKind;
                 let menu = app.menu().ok_or("application menu is not installed yet")?;
@@ -819,7 +825,11 @@ async fn native_about<R: Runtime>(
                         for index in 0..count {
                             let item: Retained<AnyObject> = msg_send![menu, itemAtIndex: index];
                             let text: Retained<NSString> = msg_send![&*item, title];
-                            if text.to_string() == title {
+                            let action: Option<Sel> = msg_send![&*item, action];
+                            // Tauri's predefined About panel can have the same
+                            // title. It does not dispatch the custom JS action
+                            // that opens the product's update-enabled dialog.
+                            if text.to_string() == title && action == Some(sel!(customAction:)) {
                                 let enabled: bool = msg_send![&*item, isEnabled];
                                 if !enabled {
                                     return false;
@@ -840,6 +850,9 @@ async fn native_about<R: Runtime>(
                 unsafe {
                     let application: Retained<AnyObject> =
                         msg_send![class!(NSApplication), sharedApplication];
+                    let _: () = msg_send![&*application, activateIgnoringOtherApps: true];
+                    window.show().map_err(|e| e.to_string())?;
+                    window.set_focus().map_err(|e| e.to_string())?;
                     let menu: Option<Retained<AnyObject>> = msg_send![&*application, mainMenu];
                     if !menu.is_some_and(|menu| activate(&menu, &title)) {
                         return Err("installed AppKit About item was not found".into());

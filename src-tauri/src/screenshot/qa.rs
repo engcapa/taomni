@@ -1574,6 +1574,11 @@ pub async fn screenshot_qa_scroll_permission_error(app: AppHandle) -> Result<Str
             r#"
               const q = (id) => document.querySelector('[data-testid="' + id + '"]');
               const before = q('screenshot-selection').getBoundingClientRect().toJSON();
+              q('screenshot-scroll-mode-auto').click();
+              await new Promise(r => setTimeout(r, 100));
+              if (!q('screenshot-scroll-mode-auto').checked) throw new Error('automatic scroll mode was not selected');
+              for (let i = 0; i < 50 && q('screenshot-scroll-start').disabled; i++) await new Promise(r => setTimeout(r, 100));
+              if (q('screenshot-scroll-start').disabled) throw new Error('scroll region planning did not finish');
               q('screenshot-scroll-start').click();
               for (let i = 0; i < 100 && !q('screenshot-scroll-error'); i++) await new Promise(r => setTimeout(r, 100));
               await new Promise(r => setTimeout(r, 3500));
