@@ -211,6 +211,12 @@ pub fn init(app: &AppHandle) {
     let accelerator = effective(&load(app));
     #[cfg(target_os = "linux")]
     if super::pins::native_wayland() {
+        // The portal caches a host connection's identity at its first request,
+        // including capture requests with an empty app ID. Identify it before
+        // renderer IPC can start any capture, even when shortcuts are disabled.
+        if let Err(error) = tauri::async_runtime::block_on(portal::ensure_identity(app)) {
+            log::warn!("Wayland portal application identity: {error}");
+        }
         *CURRENT.lock().unwrap_or_else(|p| p.into_inner()) = Some(Current {
             accelerator: accelerator.clone(),
             registered: None,

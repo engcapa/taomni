@@ -37,6 +37,7 @@ description: 'V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Meas
   and zero independent decompression errors. Absolute M1-M4 budgets remain fixed.
 
   Probe sample_events and target flip_samples retain the same-host input/draw/receive timestamps for native latency diagnosis.
+  Wayland drains pending PipeWire buffers before copying the newest frame; all 40 input samples and the absolute budgets remain required.
 
   '
 covers:

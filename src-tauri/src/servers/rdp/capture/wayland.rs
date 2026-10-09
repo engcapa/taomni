@@ -10,7 +10,7 @@ use std::io::Cursor;
 use std::os::fd::OwnedFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, bail};
 use ashpd::desktop::remote_desktop::{Axis as PortalAxis, DeviceType, KeyState, RemoteDesktop};
@@ -62,6 +62,7 @@ struct RawFrame {
     width: u32,
     height: u32,
     bgra: Vec<u8>,
+    captured_at: Instant,
 }
 
 struct FrameMailbox {
@@ -432,7 +433,9 @@ fn raw_to_frame(raw: RawFrame) -> anyhow::Result<Frame> {
             raw.bgra.len()
         );
     }
-    Ok(Frame::bgra(raw.bgra, 0, 0, width, height, stride))
+    let mut frame = Frame::bgra(raw.bgra, 0, 0, width, height, stride);
+    frame.captured_at = raw.captured_at;
+    Ok(frame)
 }
 
 #[derive(Default)]
@@ -500,6 +503,17 @@ fn run_pipewire(
             if let Ok((MediaType::Video, MediaSubtype::Raw)) = format_utils::parse_format(param) {
                 if let Err(error) = state.format.parse(param) {
                     tracing::warn!(?error, "could not parse Wayland PipeWire video format");
+                } else {
+                    log::info!(
+                        "Wayland PipeWire format: {:?}, {}x{}, rate={}/{}, max={}/{}",
+                        state.format.format(),
+                        state.format.size().width,
+                        state.format.size().height,
+                        state.format.framerate().num,
+                        state.format.framerate().denom,
+                        state.format.max_framerate().num,
+                        state.format.max_framerate().denom,
+                    );
                 }
             }
         })
@@ -507,6 +521,12 @@ fn run_pipewire(
             let Some(mut buffer) = stream.dequeue_buffer() else {
                 return;
             };
+            // The callback can run after several producer frames were queued.
+            // Drain to the newest buffer before copying pixels; a latest-frame
+            // mailbox downstream cannot remove latency already in PipeWire.
+            while let Some(newer) = stream.dequeue_buffer() {
+                buffer = newer;
+            }
             let Some(data) = buffer.datas_mut().first_mut() else {
                 return;
             };
@@ -621,6 +641,7 @@ fn copy_pipewire_bgra(
     height: u32,
     format: VideoFormat,
 ) -> anyhow::Result<RawFrame> {
+    let captured_at = Instant::now();
     if width == 0 || height == 0 || width > MAX_DIMENSION || height > MAX_DIMENSION {
         bail!("invalid PipeWire dimensions {width}x{height}");
     }
@@ -666,14 +687,23 @@ fn copy_pipewire_bgra(
             output_row
         };
         let row = &source[source_row * source_stride..source_row * source_stride + row_bytes];
-        for pixel in row.chunks_exact(bytes_per_pixel) {
-            if matches!(
-                format,
-                VideoFormat::BGRx | VideoFormat::BGRA | VideoFormat::BGR
-            ) {
-                bgra.extend_from_slice(&[pixel[0], pixel[1], pixel[2], 0xff]);
-            } else {
-                bgra.extend_from_slice(&[pixel[2], pixel[1], pixel[0], 0xff]);
+        if bytes_per_pixel == 4 {
+            let start = bgra.len();
+            bgra.extend_from_slice(row);
+            let swap = matches!(format, VideoFormat::RGBx | VideoFormat::RGBA);
+            for pixel in bgra[start..].chunks_exact_mut(4) {
+                if swap {
+                    pixel.swap(0, 2);
+                }
+                pixel[3] = 0xff;
+            }
+        } else {
+            for pixel in row.chunks_exact(3) {
+                if format == VideoFormat::BGR {
+                    bgra.extend_from_slice(&[pixel[0], pixel[1], pixel[2], 0xff]);
+                } else {
+                    bgra.extend_from_slice(&[pixel[2], pixel[1], pixel[0], 0xff]);
+                }
             }
         }
     }
@@ -681,6 +711,7 @@ fn copy_pipewire_bgra(
         width,
         height,
         bgra,
+        captured_at,
     })
 }
 
@@ -725,6 +756,37 @@ mod tests {
     fn pipewire_rejects_truncated_or_oversized_frames() {
         assert!(copy_pipewire_bgra(&[0; 4], 0, 4, 8, 2, 1, VideoFormat::BGRx).is_err());
         assert!(copy_pipewire_bgra(&[], 0, 0, 0, MAX_DIMENSION + 1, 1, VideoFormat::BGRx).is_err());
+    }
+
+    #[test]
+    fn pipewire_conversion_keeps_opaque_bgra_for_every_supported_format() {
+        for format in [
+            VideoFormat::BGRx,
+            VideoFormat::BGRA,
+            VideoFormat::RGBx,
+            VideoFormat::RGBA,
+            VideoFormat::BGR,
+            VideoFormat::RGB,
+        ] {
+            let bgr = matches!(
+                format,
+                VideoFormat::BGRx | VideoFormat::BGRA | VideoFormat::BGR
+            );
+            let mut bytes = if bgr {
+                vec![30, 20, 10]
+            } else {
+                vec![10, 20, 30]
+            };
+            if !matches!(format, VideoFormat::BGR | VideoFormat::RGB) {
+                bytes.push(0);
+            }
+            let raw = copy_pipewire_bgra(&bytes, 0, bytes.len(), bytes.len() as i32, 1, 1, format)
+                .unwrap();
+            let captured_at = raw.captured_at;
+            let frame = raw_to_frame(raw).unwrap();
+            assert_eq!(frame.data.as_ref(), &[30, 20, 10, 255]);
+            assert_eq!(frame.captured_at, captured_at);
+        }
     }
 
     #[test]

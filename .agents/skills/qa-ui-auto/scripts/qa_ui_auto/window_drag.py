@@ -117,7 +117,8 @@ def run_wayland_window_drag(ctx, args: dict) -> str:
         x = before["x"] + round((geometry["x"] + geometry["width"] / 2) * before["width"] / geometry["viewportWidth"])
         y = before["y"] + round((geometry["y"] + geometry["height"] * fraction) * before["height"] / geometry["viewportHeight"])
         observation.update(before=before, geometry=geometry, pointer={"x": x, "y": y})
-        observation["observedPointer"] = desktop_command("drag", start=[x, y], end=[x + dx, y + dy])
+        observation["observedPointer"] = desktop_command("drag", application=application,
+            start=[x, y], end=[x + dx, y + dy])
         time.sleep(0.2)
         after = desktop_command("geometry", application=application)["frame"]
         observation["after"] = after

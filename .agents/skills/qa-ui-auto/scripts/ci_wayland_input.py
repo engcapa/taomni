@@ -152,6 +152,7 @@ def main() -> None:
             const path = [];
             while (actor && path.length < 16) {
                 path.push({name: actor.get_name(), type: actor.constructor.name,
+                    visible: actor.visible, mapped: actor.mapped,
                     pid: actor.meta_window?.get_pid() ?? null,
                     title: actor.meta_window?.get_title() ?? null});
                 actor = actor.get_parent();
@@ -267,6 +268,11 @@ def main() -> None:
                     elif name == "drag":
                         start, end = request["start"], request["end"]
                         diagnostics["pointer_start"] = pointer(*start)
+                        # Wait for Mutter's pointer enter/pick after queued
+                        # motion, just as the multi-segment path injector does.
+                        time.sleep(0.15)
+                        diagnostics["after_pointer"] = evaluate(WINDOW_STATE)
+                        activate_window(evaluate, Path(request["application"]), args.socket.parent, diagnostics)
                         diagnostics["target_start"] = pointer_target()
                         call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, True)))
                         try:
