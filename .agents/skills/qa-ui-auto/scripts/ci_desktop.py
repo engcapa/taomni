@@ -102,7 +102,7 @@ class Desktop:
                         "LIBGL_ALWAYS_SOFTWARE", "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_A11Y",
                         "NO_AT_BRIDGE"], check=True, timeout=20)
         subprocess.run(["gdbus", "call", "--session", "--dest", "org.a11y.Bus",
-                        "--object-path", "/org/a11y/status", "--method",
+                        "--object-path", "/org/a11y/bus", "--method",
                         "org.freedesktop.DBus.Properties.Set", "org.a11y.Status", "IsEnabled",
                         "<true>"], check=True, timeout=20)
         pipewire = self.start(["pipewire"])

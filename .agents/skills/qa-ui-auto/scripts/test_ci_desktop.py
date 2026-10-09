@@ -400,7 +400,7 @@ class DesktopTests(unittest.TestCase):
                 else:
                     self.assertEqual(command, [
                         'gdbus', 'call', '--session', '--dest', 'org.a11y.Bus',
-                        '--object-path', '/org/a11y/status', '--method',
+                        '--object-path', '/org/a11y/bus', '--method',
                         'org.freedesktop.DBus.Properties.Set', 'org.a11y.Status',
                         'IsEnabled', '<true>',
                     ])
