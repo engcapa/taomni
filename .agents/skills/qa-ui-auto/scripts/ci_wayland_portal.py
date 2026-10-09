@@ -44,14 +44,20 @@ def consent_kind(executable: str, records: list[dict]) -> str | None:
     return None
 
 
-def descendants(node, depth=0):
-    if depth > 15:
+def descendants(node, depth=0, max_depth=15):
+    if depth > max_depth:
         return
     yield node
     for index in range(min(node.get_child_count(), 200)):
         child = node.get_child_at_index(index)
         if child is not None:
-            yield from descendants(child, depth + 1)
+            yield from descendants(child, depth + 1, max_depth)
+
+
+def interactive_state(state, types):
+    # GTK4's AT-SPI backend maps GTK_ACCESSIBLE_STATE_DISABLED to SENSITIVE;
+    # it does not set ENABLED at all (unlike GTK3 and GNOME Shell).
+    return state.contains(types.ENABLED) or state.contains(types.SENSITIVE)
 
 
 def activate_accessible(node, record, coordinates, click):
@@ -108,10 +114,13 @@ def main():
                                    if owned_process(pid, runtime, name)), None)
                 if executable is None:
                     continue
-                nodes = list(descendants(app))
+                # GTK4/libadwaita stacks add structural accessible layers;
+                # the monitor toggle can be deeper than a Shell dialog.
+                nodes = list(descendants(app, max_depth=30 if executable == "xdg-desktop-portal-gnome" else 15))
                 records = [{"name": n.get_name(), "role": n.get_role_name(),
                             "showing": n.get_state_set().contains(Atspi.StateType.SHOWING),
-                            "enabled": n.get_state_set().contains(Atspi.StateType.ENABLED)} for n in nodes]
+                            "enabled": interactive_state(n.get_state_set(), Atspi.StateType),
+                            "checked": n.get_state_set().contains(Atspi.StateType.CHECKED)} for n in nodes]
                 kind = consent_kind(executable, records)
                 actions = []
                 # With one monitor GNOME selects it automatically. Handle the
