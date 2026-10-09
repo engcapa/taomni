@@ -427,9 +427,8 @@ pub async fn screenshot_stop_scroll_capture(cancel: bool) -> Result<(), String> 
     Ok(())
 }
 
-/// Keep the requested pixels. If controls do not fit outside the crop, hide
-/// them and finish with the session's Escape/right-click input. The screenshot
-/// start shortcut's registration status must never change the selected area.
+/// Keep controls outside captured pixels. Platforms with session-owned stop
+/// input can hide them; Wayland reserves a strip so finishing remains possible.
 fn scroll_layout(
     app: &AppHandle,
     display: &DisplayInfo,
@@ -444,6 +443,24 @@ fn scroll_layout(
     let near_full = (rect.w as i64 * 10 >= display.width as i64 * 9)
         && (rect.h as i64 * 10 >= display.height as i64 * 9);
     if near_full {
+        #[cfg(target_os = "linux")]
+        if crate::servers::rdp::capture::wayland::is_wayland_session() {
+            let (capture, controls) =
+                surfaces::inside_control_strip(display, rect, scroll::MIN_REGION_HEIGHT as i32)
+                    .ok_or_else(|| {
+                        "Select a taller region to leave room for scroll capture controls."
+                            .to_string()
+                    })?;
+            return Ok((
+                (
+                    (capture.x - display.x) as u32,
+                    (capture.y - display.y) as u32,
+                    capture.w as u32,
+                    capture.h as u32,
+                ),
+                Some(controls),
+            ));
+        }
         return Ok((requested, None));
     }
     Ok((requested, surfaces::control_position(&displays, rect)))

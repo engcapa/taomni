@@ -108,8 +108,10 @@ class Desktop:
         pipewire = self.start(["pipewire"])
         self._wait(pipewire, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire")
         self.start(["wireplumber"])
+        # Use GNOME's standard session without Ubuntu's forced desktop-icons
+        # extension and background indexing; this compositor belongs to QA.
         shell = self.start(["gnome-shell", "--wayland", "--headless", "--virtual-monitor=1920x1080",
-                            "--wayland-display=wayland-qa", "--mode=ubuntu", "--unsafe-mode"])
+                            "--wayland-display=wayland-qa", "--mode=user", "--unsafe-mode"])
         # Eval is limited to this disposable compositor on the job's private
         # session bus. It lets the helper inspect and activate OS windows.
         self._wait(shell, lambda: (runtime / "wayland-qa").is_socket(), "GNOME Wayland compositor")
@@ -176,7 +178,7 @@ class Desktop:
         facts.update(gdk_display=probe[0], monitors=int(probe[1]),
                      wayland_display=os.environ["WAYLAND_DISPLAY"], input_transport="Wayland/WebDriver",
                      input_devices=["keyboard", "pointer"], input_provider="Mutter RemoteDesktop",
-                     renderer="software", screen=[1920, 1080],
+                     renderer="software", screen=[1920, 1080], shell_session_mode="user",
                      gnome_version=subprocess.check_output(["gnome-shell", "--version"], text=True).strip(),
                      portal_interfaces=["Screenshot", "ScreenCast", "RemoteDesktop"],
                      portal_consent="AT-SPI on owned GNOME portal and Shell screenshot access dialogs",

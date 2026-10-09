@@ -10,7 +10,10 @@ import time
 
 
 WINDOW_STATE = """(() => ({
-    overview: Main.overview.visible,
+    overview: Main.overview.visible || Main.overview.animationInProgress || Main.layoutManager.overviewGroup.visible,
+    overview_visible: Main.overview.visible,
+    overview_animating: Main.overview.animationInProgress,
+    overview_actor_visible: Main.layoutManager.overviewGroup.visible,
     modal_count: Main.modalCount,
     stage_focus: global.stage.get_key_focus()?.get_accessible()?.get_name() ?? null,
     starting_up: Main.layoutManager._startingUp,
@@ -76,6 +79,12 @@ def focus_window(evaluate, pid: int, diagnostics: dict) -> dict:
                         if window["pid"] == pid and window["focused"]), None)
         if not after["overview"] and focused:
             return focused
+        if (after.get("overview_actor_visible") and not after.get("overview_visible")
+                and not after.get("overview_animating")):
+            # Shell can leave a reactive Overview actor after logical dismissal.
+            # Complete its normal layout transition in this private desktop;
+            # subsequent pointer input still has to move the app itself.
+            evaluate("(() => { Main.layoutManager.hideOverview(); return true; })()")
         if time.monotonic() >= end:
             raise RuntimeError("GNOME did not focus the QA application window")
         time.sleep(0.05)

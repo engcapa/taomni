@@ -7,7 +7,7 @@ use ashpd::desktop::{
     global_shortcuts::{GlobalShortcuts, NewShortcut},
 };
 use futures::StreamExt;
-use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::{Mutex as AsyncMutex, OnceCell};
 
 struct Registration {
     session: Session<'static, GlobalShortcuts<'static>>,
@@ -15,6 +15,7 @@ struct Registration {
 }
 
 static REGISTRATION: AsyncMutex<Option<Registration>> = AsyncMutex::const_new(None);
+static HOST_IDENTITY: OnceCell<()> = OnceCell::const_new();
 
 /// XDG shortcut triggers use XKB key names and uppercase modifier names.
 fn trigger(shortcut: Shortcut) -> String {
@@ -37,6 +38,22 @@ fn trigger(shortcut: Shortcut) -> String {
 }
 
 async fn register(app: &AppHandle, shortcut: Shortcut) -> Result<Registration, String> {
+    // Host processes have no sandbox metadata from which the portal can infer
+    // an app ID. Register on ashpd's shared bus connection before opening the
+    // shortcut session. This identifies the app; BindShortcuts still requests
+    // the user's permission for each new binding.
+    HOST_IDENTITY
+        .get_or_try_init(|| async {
+            let app_id = app
+                .config()
+                .identifier
+                .parse::<ashpd::AppID>()
+                .map_err(|e| format!("shortcut application ID: {e}"))?;
+            ashpd::register_host_app(app_id)
+                .await
+                .map_err(|e| format!("register shortcut application: {e}"))
+        })
+        .await?;
     let portal = GlobalShortcuts::new()
         .await
         .map_err(|e| format!("GlobalShortcuts portal: {e}"))?;

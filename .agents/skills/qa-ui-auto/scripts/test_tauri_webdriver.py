@@ -149,14 +149,14 @@ class NativeSessionTransportTest(TestCase):
         session.execute = Mock(return_value=False)
         with self.assertRaisesRegex(WebDriverError, "window did not receive focus"):
             session.activate_wayland_window(timeout=0)
-        self.assertEqual(session.execute.call_count, 2)
+        self.assertEqual(session.execute.call_count, 1)
         session.execute.assert_called_with("return document.hasFocus();")
 
-    def test_wayland_start_requests_owned_desktop_activation_when_document_is_unfocused(self):
+    def test_wayland_activation_verifies_desktop_even_when_document_is_focused(self):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"
         session.request = Mock(side_effect=["window-qa", None])
-        session.execute = Mock(side_effect=[False, True])
+        session.execute = Mock(return_value=True)
         with patch.dict(os.environ, {"QA_WAYLAND_INPUT_SOCKET": "/qa/private/input.sock"}), \
                 patch("tauri_webdriver.socket.AF_UNIX", 1, create=True), \
                 patch("tauri_webdriver.socket.socket") as factory:

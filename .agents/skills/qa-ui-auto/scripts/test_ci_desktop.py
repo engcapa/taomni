@@ -420,6 +420,7 @@ class DesktopTests(unittest.TestCase):
                     self.assertEqual(accessibility_enabled, [True])
                     self.assertIn('pipewire', started)
                     self.assertIn('--unsafe-mode', command)
+                    self.assertIn('--mode=user', command)
                 started.append(command[0])
                 return Mock()
 
@@ -431,6 +432,7 @@ class DesktopTests(unittest.TestCase):
                 self.assertEqual(os.environ['GDK_BACKEND'], 'wayland')
                 self.assertEqual(desktop.facts['gdk_display'], 'GdkWaylandDisplay')
                 self.assertEqual(desktop.facts['session_type'], 'wayland')
+                self.assertEqual(desktop.facts['shell_session_mode'], 'user')
                 self.assertEqual(desktop.facts['input_devices'], ['keyboard', 'pointer'])
                 self.assertEqual(desktop.facts['portal_interfaces'], ['Screenshot', 'ScreenCast', 'RemoteDesktop'])
                 self.assertTrue(desktop.facts['ready'])

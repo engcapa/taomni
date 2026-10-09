@@ -127,6 +127,18 @@ class WaylandToolsTests(unittest.TestCase):
         self.assertEqual(evaluate.call_count, 3)
         self.assertFalse(diagnostics["after"]["overview"])
 
+    def test_focus_dismisses_an_overview_actor_that_still_intercepts_input(self):
+        window = {"pid": 42, "focused": True}
+        evaluate = Mock(side_effect=[True,
+            {"overview": True, "overview_visible": False, "overview_animating": False,
+             "overview_actor_visible": True, "windows": [window]},
+            True, {"overview": False, "windows": [window]}])
+        diagnostics = {}
+        with patch("ci_wayland_input.time.sleep"):
+            self.assertEqual(focus_window(evaluate, 42, diagnostics), window)
+        self.assertIn("hideOverview()", evaluate.call_args_list[2].args[0])
+        self.assertFalse(diagnostics["after"]["overview"])
+
     def test_portal_automation_rejects_other_runtime_and_non_portal_processes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

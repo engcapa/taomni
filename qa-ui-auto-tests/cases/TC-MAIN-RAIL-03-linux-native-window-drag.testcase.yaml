@@ -1,7 +1,7 @@
 id: TC-MAIN-RAIL-03
 title: The title-bar grip moves the actual Linux native window
 description: >-
-  Real X11 pointer input into the packaged WebKitGTK app and independent window
+  Real X11 or Mutter Wayland pointer input into the packaged WebKitGTK app and independent window
   geometry readback prove that the title-bar grip moves rather than resizes
   the window. Raw displacement and geometry restoration are retained for all
   three positions; Sessions/Tools remain operable after moving the window.
