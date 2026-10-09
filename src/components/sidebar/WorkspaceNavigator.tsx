@@ -18,7 +18,20 @@ export function WorkspaceNavigator({ onConnectSession }: { onConnectSession?: (s
   return <div data-testid="workspace-navigator" className="flex flex-col min-h-0 flex-1 text-xs">
     <div className="flex items-center p-2 gap-2"><strong className="flex-1">{t("workspace.workspaces")}</strong>
       <button data-testid="workspace-create" className={buttonClass} onClick={() => useWorkspaceStore.setState({ createDialogOpen: true })}>{t("workspace.new")}</button>
-      <button data-testid="workspace-hide" className={buttonClass} onClick={() => useAppStore.getState().setSidebarCollapsed(true)}>{t("workspace.hide")}</button>
+      <button data-testid="workspace-hide" className={buttonClass} onClick={() => {
+        useAppStore.getState().setSidebarCollapsed(true);
+        if (active) {
+          // Apply the durable Workspace preference optimistically with the
+          // shell change so an in-flight panel layout callback cannot restore
+          // the navigator from the previous persisted value.
+          useWorkspaceStore.setState((state) => ({
+            workspaces: state.workspaces.map((workspace) => workspace.id === active.id
+              ? { ...workspace, navigation: { ...workspace.navigation, navigatorCollapsed: true } }
+              : workspace),
+          }));
+          void state.patch(active.id, { navigation: { navigatorCollapsed: true } }).catch(() => {});
+        }
+      }}>{t("workspace.hide")}</button>
     </div>
     <input data-testid="workspace-search" aria-label={t("workspace.searchWorkspaces")} className="taomni-input m-2 min-w-0" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("workspace.searchWorkspaces")} />
     {state.error && <div role="alert" className="p-2">{state.error}<button onClick={() => void state.load()}>{t("workspace.retry")}</button></div>}
