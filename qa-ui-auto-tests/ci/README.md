@@ -39,6 +39,13 @@ Workspace cache keys use the same source, recipe, toolchain and environment
 fingerprint as the QA build verifier. Test/runner-only commits therefore reuse
 one cache entry instead of saving duplicate binaries under each commit SHA.
 
+`run_rdp_unit_contracts` defaults to `true`. For a focused native reproduction,
+`-f run_rdp_unit_contracts=false` can reuse a recorded successful unit-contract
+run when the RDP Rust sources, dependency lockfile, toolchain and release
+configuration match. Record that prior run in the investigation; this option
+does not omit any selected native case. RDP source changes need fresh unit
+contracts. Scheduled runs always run them.
+
 GitHub only registers `workflow_dispatch` on the default branch. Publishing the
 new file on a feature branch alone is insufficient. Branch validation can use a
 temporary branch-specific caller; do not merge that temporary push trigger.

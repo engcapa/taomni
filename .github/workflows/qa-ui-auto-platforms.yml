@@ -30,6 +30,10 @@ on:
         description: Use release QA builds for selected native cases (reuse full-run caches)
         type: boolean
         default: false
+      run_rdp_unit_contracts:
+        description: Run RDP Rust unit contracts (disable only when reusing matching prior unit evidence)
+        type: boolean
+        default: true
       case_ids:
         description: Exact case IDs (selected, or additions to impacted)
         type: string
@@ -52,6 +56,7 @@ on:
       modes: {type: string, default: 'browser,native'}
       linux_profiles: {type: string, default: 'ubuntu-24.04-xvfb'}
       native_release: {type: boolean, default: false}
+      run_rdp_unit_contracts: {type: boolean, default: true}
       case_ids: {type: string, default: ''}
       features: {type: string, default: ''}
       tags: {type: string, default: ''}
@@ -366,7 +371,7 @@ jobs:
         # startup diagnostics below. This removes a 30–50 minute duplicate
         # Rust test build from each non-Linux native job without changing any
         # release app build or product evidence.
-        if: matrix.rdp_unit_contracts
+        if: matrix.rdp_unit_contracts && (github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts)
         env:
           CARGO_TARGET_DIR: target/qa-ui-auto
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'
