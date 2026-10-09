@@ -65,6 +65,15 @@ Windows native 使用隔离的 `com.taomni.app.qa`、独立 data/config/cache �
 
 该节保留初次检查记录；后续窄屏遮挡与主题按钮修正、最终结果见文末。
 
+## 2026-10-10 main 合并与最终响应式/恢复验证
+
+- 已合并 `origin/main` 至 `8902897e`，合并提交 `a96b4cf8`；保留截图预览缩放、滚动拼接侧边检测、Windows 运行库打包和 macOS runtime path 修复。
+- WS-018 恢复并加强标题栏几何断言：可见主题按钮限定为 `.taomni-control-bar .taomni-theme-cycle`，保留 12px Lucide 图标、26x24px 按钮、主题 light/dark/system 持久化和动作区无水平溢出检查。400px 的 Home/Search/New 留白及拖动柄进一步收紧，未改变字体、颜色或图标风格。
+- 修复 Workspace navigator 恢复竞态：hydration 不会把旧 shell 状态写回 Workspace；Panel 的陈旧展开回报不会重开收起导航；Hide 乐观更新当前 Workspace 的 `navigatorCollapsed` 后异步持久化。`MainLayout` + `WorkspaceNavigator` 相关 mounted 单测最终 55/55，Windows WS-016/018 2/2。
+- 当前提交 `693327ec` 的三端 browser 最终摘要：[GitHub 38003406768](https://github.com/engcapa/taomni/actions/runs/38003406768)，Linux/macOS 各 9/9，`passed=true`、`report_ok=true`、`gaps=[]`；Windows `workspace-restore-final-browser/windows-browser/run-20261010-071707-441733800/summary.json` 9/9、identity stable。
+- 当前提交的 Linux native [GitHub 38003412042](https://github.com/engcapa/taomni/actions/runs/38003412042) Linux 16/16；macOS 同批次曾有 TC-WS-NATIVE-004 输入分片失败，单独重跑 [38005017117](https://github.com/engcapa/taomni/actions/runs/38005017117) 1/1，真实 `ci-summary` passed。Windows native 16 条批次中 TC-WS-NATIVE-006 首两次因 WebView2 `chrome not reachable` 只在 setup 失败，未执行断言；清理残留 driver/process 后隔离重跑 `workspace-native-006-recovery-v2/windows-native/run-20261010-073443-394926100/summary.json` 1/1，identity stable。
+- 单元验证：此前完整 Node22/pnpm10 批次 `all-units-git-integrated` 为 523 files / 5296 tests passed；合并后完整批次在高并发环境出现 6 个既有 CodeWorkspace mounted test 的 15s timeout（5291 passed / 6 failed），未修改这些断言。随后 `CodeWorkspaceTab.test.tsx` 单文件 251/251、`MainLayout.test.tsx` + `WorkspaceNavigator.test.tsx` 55/55、工具单测 66/66、Rust 单线程 1645 passed / 0 failed / 19 ignored、typecheck exit 0、audit gate exit 0；超时失败记录保留。
+
 ## 2026-10-09 main 合并与 Git 整合增量
 
 - main 已合并至 `5bb68ec4`（合并提交 `57cde15f`）；之后 fetch 确认无新提交。
