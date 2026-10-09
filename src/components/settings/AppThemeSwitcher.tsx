@@ -62,7 +62,7 @@ export function AppThemeIconButton() {
   return (
     <button
       type="button"
-      className="h-6 px-2 inline-flex items-center gap-1.5 rounded border text-[11px] hover:bg-[var(--taomni-control-hover)]"
+      className="taomni-theme-cycle h-6 px-2 inline-flex items-center gap-1.5 rounded border text-[11px] hover:bg-[var(--taomni-control-hover)]"
       style={{
         borderColor: "var(--taomni-input-border)",
         background: "var(--taomni-input-bg)",

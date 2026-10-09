@@ -63,7 +63,7 @@ Windows native 使用隔离的 `com.taomni.app.qa`、独立 data/config/cache �
 
 已检查 1440px 与 400px 截图：新弹窗沿用原字体、颜色变量与 Lucide 图标；窄弹窗的输入、关闭及 resize handle 保留在视口内。导航展开在窄窗口占据主要区域，收起后完整画布可用。WS-015/016 用真实 pointer/keyboard 操作证明拖动、调整尺寸、焦点和恢复结果。
 
-最终布局复核及证据汇总仍在进行；本记录不声明全部验证已经完成。
+该节保留初次检查记录；后续窄屏遮挡与主题按钮修正、最终结果见文末。
 
 ## 2026-10-09 main 合并与 Git 整合增量
 
@@ -88,3 +88,10 @@ Windows native 使用隔离的 `com.taomni.app.qa`、独立 data/config/cache �
 - 逐图复核 `windows-git-integrated-browser-v2` 的 WS-018 发现：400px 窗口下收起导航后，320px 的空白背景盖住画布。原来的 input 几何断言与点击仍通过，因为遮挡层设置了 `pointer-events:none`；不能把这些断言等同于视觉可用。
 - 新的 WS-008/018 断言检查收起时外层 sidebar 面板实际宽度为 0。`narrow-overlay-baseline` 的 WS-018 在第 17 步按预期失败，保留截图/DOM/trace。
 - 根因是 react-resizable-panels 的 `Panel.style` 作用于内层，外层仍受窄屏 overlay CSS 影响。主 PanelGroup 显式标注 navigator 状态，CSS 在收起时隐藏外层面板；不改变原主题、图标和恢复布局契约。修复后 Windows `narrow-overlay-fixed/windows-browser/run-20261009-183513-123594600` 六项 6/6 passed、identity stable；WS-008/015/016/018、IDE-PARITY-027-01、MAIN-RAIL-01。已逐图确认 400px rename/context 恢复可见，输入约 196px，保存/取消/关闭按钮在视口内。布局/导航 mounted tests 64/64，`workspace-final-typecheck.log` exit 0。三端最终增量验证继续进行。
+
+## 最终 native 整合结果（`d3e22aed`）
+
+- Linux/macOS：[37918956195](https://github.com/engcapa/taomni/actions/runs/37918956195)，各 16/16 passed、0 failed、0 skipped；真实汇总 `passed=true`、`report_ok=true`、`gaps=[]`。
+- Windows：`windows-final-native` 首批 10/16 passed，其余 6 条在 fixture setup 因同一个 WebView2 `chrome_debug.log` 文件锁失败，尚未运行产品断言。日志锁随后释放；保留失败批次，使用新隔离目录、同一已验证二进制执行 `windows-final-native-recovery/windows-native/run-20261009-190008-661435300`，16/16 passed、0 skipped、identity stable。未修改测试断言或个人环境来隐藏失败。
+- 最终布局 browser 增量：[37918961298](https://github.com/engcapa/taomni/actions/runs/37918961298) Linux/macOS 各 6/6，与 Windows `narrow-overlay-fixed` 的 6/6 对应。已下载并查看三端 400px rename/context 与 dialog 截图。
+- macOS 400px 顶部主题文案挤压图标：最后新增纯样式修正，窄窗口保留原 Lucide 图标、tooltip 与主题循环，隐藏按钮内文案，缩小 Home/Search/New 水平间距。WS-018 增加原图标尺寸及实际 light/dark/system 点击持久化检查；该 UI-only 增量按用户要求只做三端 browser，native 证据版本保持上述明确边界。

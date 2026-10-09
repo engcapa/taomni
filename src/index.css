@@ -23,6 +23,20 @@
 
 /* Narrow windows use an overlay navigator; the active canvas keeps its width. */
 @media (max-width: 760px) {
+  .taomni-control-bar .taomni-window-drag-handle { width: 24px; }
+  .taomni-control-bar .taomni-theme-cycle {
+    flex-shrink: 0;
+    width: 26px;
+    height: 24px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+  }
+  .taomni-control-bar .taomni-theme-cycle > span { display: none; }
+  .taomni-control-bar .taomni-theme-cycle > svg { flex-shrink: 0; }
+  .taomni-control-bar [data-testid="workspace-home"],
+  .taomni-control-bar [data-testid="global-search"],
+  .taomni-control-bar [data-testid="global-new"] { padding-inline: 4px; flex-shrink: 0; }
   .workspace-main-layout { position: relative; }
   .workspace-main-layout > #sidebar {
     position: absolute !important;

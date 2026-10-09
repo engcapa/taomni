@@ -24,4 +24,15 @@ WorkspaceChrome 创建 Workspace Changes 描述符；独立 WorkspaceGitSurface 
 3. 新增 `TC-WS-019` browser：从 Workspace Changes 首次打开多仓库；选 repo-b 同名文件，Open in Editor 复用 Files；dirty 后再切换、关闭 Files 并返回 Changes，草稿仍在；覆盖不存在仓库与重试状态由定向 mounted tests 支撑。对应 A1/A2/A3。
 4. 保留并执行 `TC-IDE-PARITY-008-01/02/03`：多仓库 diff 身份、迟到结果、编辑器选区、真实磁盘取消零写入。原测试返回入口如变更仅调整 selector，保留效果断言。
 
-Windows 本机与 Linux/macOS GitHub workflow 使用隔离 fixture。UI 布局细项由 browser 三端验证；完整本地 unit、一次组合 typecheck、稳定源码后的 native 构建归本次 Workspace 集成任务承担。当前所有新增契约均待实现/待验证；证据回填于 Workspace implementation 文档，不能借历史 PASS 认定本次完成。
+Windows 本机与 Linux/macOS GitHub workflow 使用隔离 fixture。UI 布局细项由 browser 三端验证；完整本地 unit、一次组合 typecheck、稳定源码后的 native 构建归本次 Workspace 集成任务承担。以下是本次实现的当前证据，不借历史 PASS 认定完成。
+
+## 实施结果（2026-10-09）
+
+专属 `WorkspaceGitSurface` 已接入 canonical Workspace 多根目录探测与 stale/error/retry 保护；原 `WorkspaceGitManager`/`GitPanel` 完整复用。Git Actions、Alt+9/Alt+0、Commit rail 与 Changes 汇入同一页；Files 关闭后草稿保留。`workspaceGitNavigation` 将同名和嵌套仓库文件映射回原 Files；document owner 保持仍打开文档的 Undo。
+
+- A1/A2：WS-019、IDE-PARITY-018-01、WorkspaceGitSurface/useWorkspaceFolders 定向单测；首次 Git 探测、关闭 Files 后草稿、目录移除、取消迟到结果及失败重试。
+- A3：WS-019、IDE-PARITY-008-01/02、018-01/02；真实快捷键、dirty buffer、Undo、Shift+Esc、原 root 文件身份与零写入。
+- A4：三端 browser 整批各 154/154；三端 native 在 `d3e22aed` 各 16/16，包括真实两仓库 Git008-03/018-02。既有主题和 Lucide 控件保留，管理器从编辑器底部移入专属页；不宣称与 IDEA 像素等同。
+- 完整 frontend 523 files / 5296 tests 通过，Rust 1644 passed / 19 ignored，组合 typecheck exit 0。后续布局 64 项 mounted tests 通过。
+
+详细失败恢复、平台报告、截图与后续 UI-only 样式增量见 [Workspace 实施与验证记录](../workspace-first-navigation-implementation.md)；结构化验收证据由本卡任务板保存。
