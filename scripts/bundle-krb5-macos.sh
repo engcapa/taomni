@@ -40,14 +40,19 @@ DYLIBS=(
 
 is_known() { local b="$1" k; for k in "${DYLIBS[@]}"; do [ "$b" = "$k" ] && return 0; done; return 1; }
 
-# Rewrite any absolute load path whose basename is one of our dylibs to @rpath.
+# Homebrew bottles unpacked without brew relocation retain install names such
+# as @@HOMEBREW_PREFIX@@/opt/krb5/lib/.... Those are NOT absolute paths. Match
+# the known dependency basenames so both bottle placeholders and installed
+# Homebrew paths are rewritten before Tauri signs the app/updater archive.
 retarget_to_rpath() {
-  local file="$1" dep base
+  local file="$1" dep base dependencies
+  dependencies="$(otool -L "$file")"
   while IFS= read -r dep; do
-    case "$dep" in
-      /*) base="$(basename "$dep")"; if is_known "$base"; then install_name_tool -change "$dep" "@rpath/$base" "$file"; fi ;;
-    esac
-  done < <(otool -L "$file" | tail -n +2 | awk '{print $1}')
+    base="${dep##*/}"
+    if is_known "$base" && [ "$dep" != "@rpath/$base" ]; then
+      install_name_tool -change "$dep" "@rpath/$base" "$file"
+    fi
+  done < <(printf '%s\n' "$dependencies" | tail -n +2 | awk '{print $1}')
   return 0
 }
 

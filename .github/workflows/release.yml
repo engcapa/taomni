@@ -299,6 +299,17 @@ jobs:
         with:
           args: ${{ matrix.args }} --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
+      - name: Verify Windows installer runtimes
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          TAOMNI_REQUIRE_NSIS_TESTS: '1'
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          node --test scripts/windows-runtime-bundle.test.mjs
+          pwsh -File scripts/verify-windows-release-bundle.ps1
+
       - name: Collect workflow artifacts
         shell: bash
         env:
@@ -402,7 +413,7 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::recovery -- --test-threads=1
 
       - name: Release signing unit contracts
-        run: node --test scripts/configure-release-signing.test.mjs scripts/verify-macos-release-bundle.test.mjs
+        run: node --test scripts/configure-release-signing.test.mjs scripts/verify-macos-release-bundle.test.mjs scripts/macos-runtime-paths.test.mjs
 
       # Reuse one .p12 and pin its fingerprint for both architectures and every
       # upgrade. Import it into a temporary keychain before Tauri signs/bundles;
