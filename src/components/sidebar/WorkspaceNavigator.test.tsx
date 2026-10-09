@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceNavigator } from "./WorkspaceNavigator";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useSessionStore } from "../../stores/sessionStore";
-import { useAppStore } from "../../stores/appStore";
+import { recentWorkspaceIdFromParts, useAppStore } from "../../stores/appStore";
 import type { Workspace } from "../../types/workspace";
 import type { SessionConfig } from "../../lib/ipc";
 
@@ -27,6 +27,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Workspace navigator workflows", () => {
+  it("does not offer to import the current Files surface as another workspace", () => {
+    const roots = [{ id: "root-a", name: "project", path: "/project", kind: "folder" as const }];
+    useWorkspaceStore.setState({ workspaces: [{ ...workspace("A"), roots }] });
+    useAppStore.setState({ recentWorkspaces: [
+      { id: recentWorkspaceIdFromParts(roots), name: "A", roots, looseFiles: [], lastOpenedAt: 1, isGitRepo: false },
+      { id: "legacy-unimported", name: "Legacy", roots: [], looseFiles: [], lastOpenedAt: 1, isGitRepo: false },
+    ] });
+    render(<WorkspaceNavigator />);
+    expect(screen.queryByRole("button", { name: "Import A" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Import Legacy" })).toBeEnabled();
+  });
+
   it("opens a canonical reference with explicit Workspace context", () => {
     const connect = vi.fn();
     render(<WorkspaceNavigator onConnectSession={connect} />);

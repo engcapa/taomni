@@ -1,0 +1,268 @@
+id: TC-WS-018
+title: Workspace long names and compact layouts keep rename, context and cancel actions
+  usable
+covers:
+- F-Workspace-1
+tags:
+- workspace-first
+- shell-layout
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- workspace_membership
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- set_viewport:
+    width: 1440
+    height: 900
+- wait_for: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-row-qa-workspace-main"]'
+- click: '[data-testid="workspace-rename"]'
+- fill:
+    selector: '[data-testid="workspace-rename-input"]'
+    value: Workspace with a deliberately long project name for layout review
+- click: '[data-testid="workspace-canvas"] button:has-text("Cancel")'
+- assert_not_visible: '[data-testid="workspace-rename-input"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: QA Main
+- click: '[data-testid="workspace-rename"]'
+- fill:
+    selector: '[data-testid="workspace-rename-input"]'
+    value: Workspace with a deliberately long project name for layout review
+- click: '[data-testid="workspace-canvas"] button:has-text("Save")'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: Workspace with a deliberately long project name
+- click: '[data-testid="workspace-hide"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) +
+      '"workspace-canvas"]').getBoundingClientRect().width >= 1300
+    expect_truthy: true
+    timeout_sec: 10
+- set_viewport:
+    width: 400
+    height: 700
+- assert_element_geometry:
+    selector: '[data-testid="workspace-context-toggle"]'
+    min_width: 20
+    min_height: 20
+    viewport_margin: 0
+- click: '[data-testid="workspace-rename"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-rename-input"]'
+    min_width: 160
+    min_height: 20
+    viewport_margin: 0
+- assert_element_geometry:
+    selector: '[data-testid="workspace-canvas"] button:has-text("Save")'
+    min_width: 24
+    min_height: 20
+    viewport_margin: 0
+- assert_element_geometry:
+    selector: '[data-testid="workspace-canvas"] button:has-text("Cancel")'
+    min_width: 24
+    min_height: 20
+    viewport_margin: 0
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) +
+      '"workspace-canvas"]').scrollWidth <= document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"workspace-canvas"]').clientWidth + 1
+    expect_truthy: true
+- screenshot: workspace-narrow-rename.png
+- click: '[data-testid="workspace-canvas"] button:has-text("Cancel")'
+- click: '[data-testid="workspace-context-toggle"]'
+- wait_for: '[data-testid="workspace-context-pane"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-context-close"]'
+    min_width: 20
+    min_height: 20
+    viewport_margin: 0
+- assert_element_geometry:
+    selector: '[data-testid="workspace-context-pane"] [data-testid="workspace-add-session"]'
+    min_width: 180
+    min_height: 20
+    viewport_margin: 0
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) +
+      '"workspace-context-pane"]').scrollWidth <= document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"workspace-context-pane"]').clientWidth + 1
+    expect_truthy: true
+- screenshot: workspace-narrow-context.png
+- click: '[data-testid="workspace-context-close"]'
+- assert_not_visible: '[data-testid="workspace-context-pane"]'
+- click: '[data-testid="workspace-surface-terminal"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-surface-terminal"]'
+    name: aria-selected
+    equals: 'true'
+- click: '[data-testid="workspace-hide"]'
+- click: '[data-testid="workspace-surface-overview"]'
+- click: '[data-testid="workspace-hide"]'
+- assert_text:
+    selector: '[data-testid="workspace-canvas"] h1'
+    contains: Overview
+- click: '[data-testid="workspace-delete"]'
+- assert_visible: '[role="alertdialog"][aria-label="Delete workspace"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-delete-confirm"]'
+    min_width: 24
+    min_height: 20
+    viewport_margin: 0
+- click: '[role="alertdialog"] button:has-text("Cancel")'
+- assert_not_visible: '[role="alertdialog"][aria-label="Delete workspace"]'
+- assert_text:
+    selector: '[data-testid="workspace-header"]'
+    contains: Workspace with a deliberately long project name
+- set_viewport:
+    width: 1024
+    height: 768
+- click: '[data-testid="side-tab-work"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-search"]'
+    min_width: 120
+    min_height: 20
+    viewport_margin: 0
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) +
+      '"workspace-navigator"]').scrollWidth <= document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"workspace-navigator"]').clientWidth + 1
+    expect_truthy: true
+- screenshot: workspace-compact-overview.png
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: At 400px and 1024px, long workspace names leave controls reachable;
+      rename/save/cancel, context close, Surface selection and deletion cancellation
+      preserve the workspace.
+    actions:
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 10
+    - 11
+    - 12
+    - 14
+    - 16
+    - 18
+    - 24
+    - 25
+    - 31
+    - 33
+    - 35
+    - 36
+    - 37
+    - 39
+    - 42
+    - 45
+    - 46
+    checkpoints:
+    - step: 8
+      expectation: '{''assert_not_visible'': ''[data-testid="workspace-rename-input"]''}'
+    - step: 9
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'',
+        ''contains'': ''QA Main''}}'
+    - step: 13
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'',
+        ''contains'': ''Workspace with a deliberately long project name''}}'
+    - step: 15
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\''
+        + String.fromCharCode(61) + \''"workspace-canvas"]\'').getBoundingClientRect().width
+        >= 1300'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
+    - step: 17
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-context-toggle"]'',
+        ''min_width'': 20, ''min_height'': 20, ''viewport_margin'': 0}}'
+    - step: 19
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-rename-input"]'',
+        ''min_width'': 160, ''min_height'': 20, ''viewport_margin'': 0}}'
+    - step: 20
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]
+        button:has-text("Save")'', ''min_width'': 24, ''min_height'': 20, ''viewport_margin'':
+        0}}'
+    - step: 21
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"]
+        button:has-text("Cancel")'', ''min_width'': 24, ''min_height'': 20, ''viewport_margin'':
+        0}}'
+    - step: 22
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\''
+        + String.fromCharCode(61) + \''"workspace-canvas"]\'').scrollWidth <= document.querySelector(\''[data-testid\''
+        + String.fromCharCode(61) + \''"workspace-canvas"]\'').clientWidth + 1'',
+        ''expect_truthy'': True}}'
+    - step: 27
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-context-close"]'',
+        ''min_width'': 20, ''min_height'': 20, ''viewport_margin'': 0}}'
+    - step: 28
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-context-pane"]
+        [data-testid="workspace-add-session"]'', ''min_width'': 180, ''min_height'':
+        20, ''viewport_margin'': 0}}'
+    - step: 29
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\''
+        + String.fromCharCode(61) + \''"workspace-context-pane"]\'').scrollWidth <=
+        document.querySelector(\''[data-testid\'' + String.fromCharCode(61) + \''"workspace-context-pane"]\'').clientWidth
+        + 1'', ''expect_truthy'': True}}'
+    - step: 32
+      expectation: '{''assert_not_visible'': ''[data-testid="workspace-context-pane"]''}'
+    - step: 34
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="workspace-surface-terminal"]'',
+        ''name'': ''aria-selected'', ''equals'': ''true''}}'
+    - step: 38
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-canvas"]
+        h1'', ''contains'': ''Overview''}}'
+    - step: 40
+      expectation: '{''assert_visible'': ''[role="alertdialog"][aria-label="Delete
+        workspace"]''}'
+    - step: 41
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-delete-confirm"]'',
+        ''min_width'': 24, ''min_height'': 20, ''viewport_margin'': 0}}'
+    - step: 43
+      expectation: '{''assert_not_visible'': ''[role="alertdialog"][aria-label="Delete
+        workspace"]''}'
+    - step: 44
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'',
+        ''contains'': ''Workspace with a deliberately long project name''}}'
+    - step: 47
+      expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-search"]'',
+        ''min_width'': 120, ''min_height'': 20, ''viewport_margin'': 0}}'
+    - step: 48
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\''
+        + String.fromCharCode(61) + \''"workspace-navigator"]\'').scrollWidth <= document.querySelector(\''[data-testid\''
+        + String.fromCharCode(61) + \''"workspace-navigator"]\'').clientWidth + 1'',
+        ''expect_truthy'': True}}'
+    results:
+    - 8
+    - 9
+    - 13
+    - 15
+    - 17
+    - 19
+    - 20
+    - 21
+    - 22
+    - 27
+    - 28
+    - 29
+    - 32
+    - 34
+    - 38
+    - 40
+    - 41
+    - 43
+    - 44
+    - 47
+    - 48
+  visual:
+  - check: Inspect input widths, action wrapping, icon continuity and readable compact
+      layout.
+    method: manual
+    reason: Geometry alone does not establish visual balance.
+  native:
+  - check: Renderer layout and controls only.
+    method: external
+    reason: Native persistence and runtime boundaries use TC-WS-NATIVE companions.

@@ -4351,6 +4351,11 @@ export function MainLayout() {
               // tab group's collapsed sidebar (ED-PARITY-027); the store's state
               // wins and the sync effect resizes the panel to it.
               if (!prevSize) return;
+              // A viewport resize can make the panel library report the last
+              // expanded percentage while the navigator is intentionally
+              // collapsed. Do not let that measurement reopen the navigator;
+              // only a user/state transition from the collapsed state should.
+              if (sidebarCollapsed && percentage > 2) return;
               setSidebarCollapsed(percentage <= 2);
             }}
           >

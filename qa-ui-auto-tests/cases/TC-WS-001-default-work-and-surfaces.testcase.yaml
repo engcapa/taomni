@@ -42,6 +42,7 @@ steps:
     selector: '[data-testid="workspace-navigator"] [data-testid^="workspace-reference-"]'
     equal: 2
 - screenshot: workspace-overview.png
+- assert_not_visible: '[data-testid="workspace-navigator"] button:has-text("Import QA Main")'
 verification:
   review: pending
   requirements:
@@ -68,12 +69,15 @@ verification:
       expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'', ''contains'': ''QA Main''}}'
     - step: 18
       expectation: Returning to Overview retains exactly two canonical session references.
+    - step: 20
+      expectation: Opening Files must not offer the same canonical workspace for legacy import.
     results:
     - 5
     - 6
     - 12
     - 14
     - 18
+    - 20
   visual:
   - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
     method: manual

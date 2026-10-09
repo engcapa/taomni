@@ -3,7 +3,7 @@ import { Pin, PinOff } from "lucide-react";
 import { useState } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useSessionStore } from "../../stores/sessionStore";
-import { useAppStore } from "../../stores/appStore";
+import { recentWorkspaceIdFromParts, useAppStore } from "../../stores/appStore";
 import { selectFolderPath, type SessionConfig } from "../../lib/ipc";
 import type { Workspace } from "../../types/workspace";
 
@@ -32,7 +32,8 @@ export function WorkspaceNavigator({ onConnectSession }: { onConnectSession?: (s
           </div>)}
       </section>)}
       {!state.workspaces.length && <p className="p-2 text-[var(--taomni-text-muted)]">{t("workspace.empty")}</p>}
-      {recents.filter((r) => !state.workspaces.some((w) => w.legacyRecentId === r.id)).map((r) => <button key={r.id} className={`${buttonClass} block w-full truncate`} onClick={() => void state.create(r.name, r).catch((error) => useWorkspaceStore.setState({ error: String(error) }))}>Import {r.name}</button>)}
+      {recents.filter((r) => !state.workspaces.some((w) => w.legacyRecentId === r.id
+        || recentWorkspaceIdFromParts(w.roots, w.looseFiles) === r.id)).map((r) => <button key={r.id} className={`${buttonClass} block w-full truncate`} onClick={() => void state.create(r.name, r).catch((error) => useWorkspaceStore.setState({ error: String(error) }))}>Import {r.name}</button>)}
       {active && <WorkspaceReferences workspace={active} sessions={sessions} onConnectSession={onConnectSession} />}
     </div>
   </div>;
