@@ -4,13 +4,20 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from ci_wayland_portal import owned_portal, owned_process, consent_kind, activate_accessible, interactive_state
+from ci_wayland_portal import owned_portal, owned_process, consent_kind, activate_accessible, interactive_state, selected_state
 from ci_wayland_input import focus_window, move_pointer, owned_window_pid
 from qa_ui_auto import host_clipboard, wayland
 from qa_ui_auto.native_steps import _read_wayland_clipboard
 
 
 class WaylandToolsTests(unittest.TestCase):
+    def test_selected_monitor_toggle_is_not_deselected_when_gtk_uses_pressed(self):
+        types = Mock(CHECKED='checked', PRESSED='pressed', SELECTED='selected')
+        for present, expected in (({'pressed'}, True), ({'checked'}, True), ({'selected'}, True), (set(), False)):
+            state = Mock()
+            state.contains.side_effect = present.__contains__
+            self.assertEqual(selected_state(state, types), expected)
+
     def test_gtk4_sensitive_controls_and_gtk3_enabled_controls_are_interactive(self):
         types = Mock(ENABLED='enabled', SENSITIVE='sensitive')
         for present, expected in (({'sensitive'}, True), ({'enabled'}, True), (set(), False)):

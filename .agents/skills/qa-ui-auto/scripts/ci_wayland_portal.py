@@ -60,6 +60,11 @@ def interactive_state(state, types):
     return state.contains(types.ENABLED) or state.contains(types.SENSITIVE)
 
 
+def selected_state(state, types):
+    # GtkToggleButton uses PRESSED; GtkSwitch/CheckButton use CHECKED.
+    return any(state.contains(value) for value in (types.CHECKED, types.PRESSED, types.SELECTED))
+
+
 def activate_accessible(node, record, coordinates, click):
     """Use the accessible action, or actual pointer input at its screen bounds.
 
@@ -120,7 +125,8 @@ def main():
                 records = [{"name": n.get_name(), "role": n.get_role_name(),
                             "showing": n.get_state_set().contains(Atspi.StateType.SHOWING),
                             "enabled": interactive_state(n.get_state_set(), Atspi.StateType),
-                            "checked": n.get_state_set().contains(Atspi.StateType.CHECKED)} for n in nodes]
+                            "checked": selected_state(n.get_state_set(), Atspi.StateType),
+                            "action_count": n.get_action_iface().get_n_actions() if n.get_action_iface() else 0} for n in nodes]
                 kind = consent_kind(executable, records)
                 actions = []
                 # With one monitor GNOME selects it automatically. Handle the
@@ -130,10 +136,17 @@ def main():
                         continue
                     state = node.get_state_set()
                     if (kind == "portal" and record["role"] in {"toggle button", "check box", "switch"}
-                            and not state.contains(Atspi.StateType.CHECKED)
+                            and not selected_state(state, Atspi.StateType)
                             and "remember" not in record["name"].lower()):
+                        # AdwSwitchRow and its child GtkSwitch share a label.
+                        # The row has no action; use the child's actual toggle.
+                        if record["action_count"] == 0:
+                            continue
                         result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
                         actions.append({"name": record["name"], "action": "select", **result})
+                        # Refresh the live states before toggling another
+                        # control or activating Share; snapshots may be stale.
+                        break
                     labels = {"Allow"} if kind == "screenshot-access" else {"Share", "Allow"}
                     if record["name"].replace("_", "") in labels and record["role"] in {"push button", "button"}:
                         result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
