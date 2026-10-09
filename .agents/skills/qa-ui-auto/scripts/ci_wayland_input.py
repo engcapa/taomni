@@ -209,7 +209,9 @@ def main() -> None:
                         value = pointer(request["x"], request["y"])
                     elif name == "pointer_position":
                         value = evaluate("global.get_pointer().slice(0, 2)")
-                    elif name == "button":
+                    elif name in {"button", "click"}:
+                        if name == "click":
+                            diagnostics["pointer"] = pointer(request["x"], request["y"])
                         button = {"left": 272, "right": 273, "middle": 274}[request["button"]]
                         call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (button, True)))
                         time.sleep(0.05)

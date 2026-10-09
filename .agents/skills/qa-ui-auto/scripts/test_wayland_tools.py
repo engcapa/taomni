@@ -4,13 +4,33 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from ci_wayland_portal import owned_portal, owned_process, consent_kind
+from ci_wayland_portal import owned_portal, owned_process, consent_kind, activate_accessible
 from ci_wayland_input import focus_window, move_pointer, owned_window_pid
 from qa_ui_auto import host_clipboard, wayland
 from qa_ui_auto.native_steps import _read_wayland_clipboard
 
 
 class WaylandToolsTests(unittest.TestCase):
+    def test_owned_consent_component_uses_real_pointer_when_action_cannot_activate(self):
+        node = Mock()
+        node.get_action_iface.return_value.get_n_actions.return_value = 1
+        node.get_action_iface.return_value.do_action.return_value = False
+        rect = Mock(x=800, y=500, width=120, height=40)
+        node.get_component_iface.return_value.get_extents.return_value = rect
+        click = Mock()
+        result = activate_accessible(node, {}, 'screen', click)
+        click.assert_called_once_with(860, 520)
+        self.assertEqual(result['pointer'], [860, 520])
+        self.assertEqual(result['transport'], 'Mutter OS pointer at AT-SPI bounds')
+        node.get_action_iface.return_value.do_action.return_value = True
+        click.reset_mock()
+        self.assertEqual(activate_accessible(node, {}, 'screen', click)['transport'], 'AT-SPI action')
+        click.assert_not_called()
+        node.get_action_iface.return_value.do_action.return_value = False
+        rect.width = 0
+        self.assertEqual(activate_accessible(node, {}, 'screen', click)['transport'], 'unavailable')
+        click.assert_not_called()
+
     def test_named_window_retains_executable_runtime_and_uniqueness_checks(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

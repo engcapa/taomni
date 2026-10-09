@@ -54,10 +54,35 @@ def descendants(node, depth=0):
             yield from descendants(child, depth + 1)
 
 
+def activate_accessible(node, record, coordinates, click):
+    """Use the accessible action, or actual pointer input at its screen bounds.
+
+    GNOME Shell's St.Button exposes a component but its AT-SPI action does
+    not activate AccessDialog. Callers already constrain process ownership,
+    dialog title, showing/enabled state and the exact allowed button label.
+    """
+    action = node.get_action_iface()
+    count = action.get_n_actions() if action else 0
+    if count and action.do_action(0):
+        return {"transport": "AT-SPI action", "action_count": count}
+    component = node.get_component_iface()
+    if not component:
+        return {"transport": "unavailable", "action_count": count}
+    rect = component.get_extents(coordinates)
+    if rect.width <= 0 or rect.height <= 0 or rect.x < 0 or rect.y < 0:
+        return {"transport": "unavailable", "action_count": count,
+                "bounds": [rect.x, rect.y, rect.width, rect.height]}
+    x, y = rect.x + rect.width // 2, rect.y + rect.height // 2
+    click(x, y)
+    return {"transport": "Mutter OS pointer at AT-SPI bounds", "action_count": count,
+            "bounds": [rect.x, rect.y, rect.width, rect.height], "pointer": [x, y]}
+
+
 def main():
     import gi
     gi.require_version("Atspi", "2.0")
     from gi.repository import Atspi
+    from qa_ui_auto.wayland import command
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--log", type=Path, required=True)
@@ -68,6 +93,9 @@ def main():
     Atspi.set_timeout(1000, 1000)
     args.ready.write_text(json.dumps({"transport": "AT-SPI", "runtime": runtime}))
     previous = {}
+    def click(x, y):
+        command("click", x=x, y=y, button="left")
+
     while True:
         try:
             desktop = Atspi.get_desktop(0)
@@ -95,14 +123,12 @@ def main():
                     if (kind == "portal" and record["role"] in {"toggle button", "check box", "switch"}
                             and not state.contains(Atspi.StateType.CHECKED)
                             and "remember" not in record["name"].lower()):
-                        action = node.get_action_iface()
-                        if action and action.get_n_actions() and action.do_action(0):
-                            actions.append({"name": record["name"], "action": "select"})
+                        result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
+                        actions.append({"name": record["name"], "action": "select", **result})
                     labels = {"Allow"} if kind == "screenshot-access" else {"Share", "Allow"}
                     if record["name"].replace("_", "") in labels and record["role"] in {"push button", "button"}:
-                        action = node.get_action_iface()
-                        if action and action.get_n_actions() and action.do_action(0):
-                            actions.append({"name": record["name"], "action": "consent"})
+                        result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
+                        actions.append({"name": record["name"], "action": "consent", **result})
                 observation = {"pid": pid, "executable": executable, "kind": kind,
                                "tree": records, "actions": actions}
                 signature = json.dumps(observation, sort_keys=True)
