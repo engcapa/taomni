@@ -314,8 +314,14 @@ class TauriDriverProcess:
             cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
             if self.native_driver:
                 cmd += ["--native-driver", str(self.native_driver)]
+            env = dict(os.environ)
+            if platform.system() == "Linux" and env.get("GDK_BACKEND") == "wayland":
+                # The app's floating capture windows use a separate XWayland
+                # connection. Keep the parent/DBus activation environment at
+                # canonical 'wayland': GNOME portal rejects backend lists.
+                env["GDK_BACKEND"] = "wayland,x11"
             with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
-                self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=stdout, stderr=stderr, text=True)
+                self.proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=stdout, stderr=stderr, text=True)
         deadline = time.time() + self.startup_timeout
         while time.time() < deadline:
             if self.proc.poll() is not None:

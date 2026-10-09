@@ -17,6 +17,16 @@ from tauri_webdriver import NativeHarness, NativeSession, TauriDriverProcess, We
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_wayland_auxiliary_backend_is_private_to_the_application_driver(self):
+        with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
+                patch("tauri_webdriver._tcp_ok", side_effect=[False, False, True, True]), \
+                patch("tauri_webdriver.subprocess.Popen") as launch:
+            launch.return_value.poll.return_value = None
+            TauriDriverProcess({"app": {"native_binary": str(Path(root) / "qa-app")}}, Path(root)).start()
+            self.assertEqual(launch.call_args.kwargs["env"]["GDK_BACKEND"], "wayland,x11")
+            self.assertEqual(os.environ["GDK_BACKEND"], "wayland")
+
     def test_modified_click_holds_keys_through_pointer_up_and_releases_them_on_failure(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"

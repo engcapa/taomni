@@ -414,7 +414,7 @@ class DesktopTests(unittest.TestCase):
                     # Shell may activate the portal before the explicit probe:
                     # that process must inherit the Wayland/PipeWire session.
                     self.assertEqual(activation_env['XDG_CURRENT_DESKTOP'], 'ubuntu:GNOME')
-                    self.assertEqual(activation_env['GDK_BACKEND'], 'wayland,x11')
+                    self.assertEqual(activation_env['GDK_BACKEND'], 'wayland')
                     self.assertEqual(activation_env['XDG_RUNTIME_DIR'], os.environ['XDG_RUNTIME_DIR'])
                     self.assertEqual(accessibility_enabled, [True])
                     self.assertIn('pipewire', started)
@@ -426,7 +426,7 @@ class DesktopTests(unittest.TestCase):
             start.side_effect = launch
             with Desktop(Path(d), ['display'], 'ubuntu-26.04-wayland') as desktop:
                 self.assertNotIn('DISPLAY', os.environ)
-                self.assertEqual(os.environ['GDK_BACKEND'], 'wayland,x11')
+                self.assertEqual(os.environ['GDK_BACKEND'], 'wayland')
                 self.assertEqual(desktop.facts['gdk_display'], 'GdkWaylandDisplay')
                 self.assertEqual(desktop.facts['session_type'], 'wayland')
                 self.assertEqual(desktop.facts['input_devices'], ['keyboard', 'pointer'])
