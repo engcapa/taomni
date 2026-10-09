@@ -48,10 +48,37 @@ def descendants(node, depth=0, max_depth=15):
     if depth > max_depth:
         return
     yield node
-    for index in range(min(node.get_child_count(), 200)):
-        child = node.get_child_at_index(index)
-        if child is not None:
-            yield from descendants(child, depth + 1, max_depth)
+    try:
+        count = min(node.get_child_count(), 200)
+    except Exception:
+        return  # The dialog may close between two accessibility reads.
+    for index in range(count):
+        try:
+            child = node.get_child_at_index(index)
+            if child is not None:
+                yield from descendants(child, depth + 1, max_depth)
+        except Exception:
+            continue  # A vanished sibling must not hide the live Share button.
+
+
+def accessible_record(node, types):
+    state = node.get_state_set()
+    action = node.get_action_iface()
+    return {"name": node.get_name(), "role": node.get_role_name(),
+            "showing": state.contains(types.SHOWING),
+            "enabled": interactive_state(state, types),
+            "checked": selected_state(state, types),
+            "action_count": action.get_n_actions() if action else 0}
+
+
+def observe_nodes(app, types, max_depth):
+    pairs = []
+    for node in descendants(app, max_depth=max_depth):
+        try:
+            pairs.append((node, accessible_record(node, types)))
+        except Exception:
+            continue
+    return pairs
 
 
 def interactive_state(state, types):
@@ -110,6 +137,7 @@ def main():
     while True:
         try:
             desktop = Atspi.get_desktop(0)
+            applications = []
             for index in range(desktop.get_child_count()):
                 app = desktop.get_child_at_index(index)
                 if app is None:
@@ -119,19 +147,24 @@ def main():
                                    if owned_process(pid, runtime, name)), None)
                 if executable is None:
                     continue
+                applications.append((executable, pid, app))
+            # The Shell tree contains all mapped application surfaces. Read
+            # actual portal consent first, and inspect Shell only while it has
+            # a modal actor (Screenshot AccessDialog is not a MetaWindow).
+            applications.sort(key=lambda item: item[0] != "xdg-desktop-portal-gnome")
+            for executable, pid, app in applications:
+                if executable == "gnome-shell" and not command("shell_modal"):
+                    continue
                 # GTK4/libadwaita stacks add structural accessible layers;
                 # the monitor toggle can be deeper than a Shell dialog.
-                nodes = list(descendants(app, max_depth=30 if executable == "xdg-desktop-portal-gnome" else 15))
-                records = [{"name": n.get_name(), "role": n.get_role_name(),
-                            "showing": n.get_state_set().contains(Atspi.StateType.SHOWING),
-                            "enabled": interactive_state(n.get_state_set(), Atspi.StateType),
-                            "checked": selected_state(n.get_state_set(), Atspi.StateType),
-                            "action_count": n.get_action_iface().get_n_actions() if n.get_action_iface() else 0} for n in nodes]
+                pairs = observe_nodes(app, Atspi.StateType,
+                                      30 if executable == "xdg-desktop-portal-gnome" else 15)
+                records = [record for _, record in pairs]
                 kind = consent_kind(executable, records)
                 actions = []
                 # With one monitor GNOME selects it automatically. Handle the
                 # unselected preview too, using its accessible toggle action.
-                for node, record in zip(nodes, records):
+                for node, record in pairs:
                     if kind is None or not record["showing"] or not record["enabled"]:
                         continue
                     state = node.get_state_set()

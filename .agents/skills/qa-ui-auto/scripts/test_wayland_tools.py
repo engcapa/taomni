@@ -4,13 +4,24 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from ci_wayland_portal import owned_portal, owned_process, consent_kind, activate_accessible, interactive_state, selected_state
+from ci_wayland_portal import owned_portal, owned_process, consent_kind, activate_accessible, interactive_state, selected_state, descendants, observe_nodes
 from ci_wayland_input import focus_window, move_pointer, owned_window_pid
 from qa_ui_auto import host_clipboard, wayland
 from qa_ui_auto.native_steps import _read_wayland_clipboard
 
 
 class WaylandToolsTests(unittest.TestCase):
+    def test_vanished_accessibility_siblings_do_not_hide_live_consent(self):
+        app, stale, share = Mock(), Mock(), Mock()
+        app.get_child_count.return_value = 3
+        app.get_child_at_index.side_effect = [RuntimeError("object vanished"), stale, share]
+        stale.get_child_count.side_effect = RuntimeError("object vanished")
+        share.get_child_count.return_value = 0
+        self.assertEqual(list(descendants(app)), [app, stale, share])
+        with patch("ci_wayland_portal.descendants", return_value=iter([stale, share])), \
+             patch("ci_wayland_portal.accessible_record", side_effect=[RuntimeError("object vanished"), {"name": "Share"}]):
+            self.assertEqual(observe_nodes(app, Mock(), 30), [(share, {"name": "Share"})])
+
     def test_selected_monitor_toggle_is_not_deselected_when_gtk_uses_pressed(self):
         types = Mock(CHECKED='checked', PRESSED='pressed', SELECTED='selected')
         for present, expected in (({'pressed'}, True), ({'checked'}, True), ({'selected'}, True), (set(), False)):

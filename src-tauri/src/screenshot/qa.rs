@@ -977,7 +977,7 @@ pub async fn screenshot_qa_scroll(app: AppHandle) -> Result<String, String> {
         if control.mode() == super::scroll::ScrollMode::Manual || Instant::now() >= deadline {
             interrupted = true;
             trace.mark("automatic-interrupted", control.status());
-            if let Ok(last) = capture::capture_display(&app, &display) {
+            if let Ok(last) = read_desktop(&app, &display).await {
                 keep_image(&last, "scroll-auto-interrupted-desktop.png");
             }
             control.request_stop(false);
@@ -1357,6 +1357,16 @@ fn read_clipboard_image(app: &AppHandle) -> anyhow::Result<RgbaImage> {
         data.bytes.into_owned(),
     )
     .context("clipboard image size mismatch")
+}
+
+/// Portal capture owns a synchronous runtime and must run outside Tokio's
+/// asynchronous workers, including diagnostic snapshots on failure paths.
+async fn read_desktop(app: &AppHandle, display: &DisplayInfo) -> anyhow::Result<RgbaImage> {
+    let app = app.clone();
+    let display = display.clone();
+    tokio::task::spawn_blocking(move || capture::capture_display(&app, &display))
+        .await
+        .context("desktop observation worker")?
 }
 
 #[cfg(any(target_os = "linux", test))]

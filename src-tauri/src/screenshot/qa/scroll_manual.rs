@@ -34,6 +34,23 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     )
     .await
     .map_err(|e| e.to_string())?;
+    // Wayland's first frame follows the real portal consent. The pause checks
+    // start after that frame arrives, rather than timing the consent dialog.
+    let first_frame_deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        let ready = super::super::tool_state()
+            .scroll
+            .as_ref()
+            .is_some_and(|c| c.frames.load(Ordering::SeqCst) >= 1);
+        if ready {
+            break;
+        }
+        if Instant::now() >= first_frame_deadline {
+            return Err("manual capture did not produce its first approved frame".into());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    trace.mark("first-frame-ready", json!(true));
     tokio::time::sleep(Duration::from_millis(1800)).await;
     let paused = super::super::tool_state()
         .scroll

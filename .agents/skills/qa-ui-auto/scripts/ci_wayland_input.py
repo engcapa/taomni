@@ -19,6 +19,9 @@ WINDOW_STATE = """(() => ({
         return {pid: window.get_pid(), title: window.get_title(),
                 focused: window.has_focus(), minimized: window.minimized,
                 visible: actor.visible && !window.minimized, above: window.is_above(),
+                actor: (() => { const [x, y] = actor.get_transformed_position();
+                    const [width, height] = actor.get_transformed_size();
+                    return {x, y, width, height}; })(),
                 frame: (() => { const r = window.get_frame_rect();
                     return {x: r.x, y: r.y, width: r.width, height: r.height}; })(),
                 client: (() => { const r = window.get_buffer_rect();
@@ -133,6 +136,20 @@ def main() -> None:
         return move_pointer(evaluate, lambda dx, dy: call(
             session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (dx, dy))), x, y)
 
+    def pointer_target():
+        return evaluate("""(() => {
+            const [x, y] = global.get_pointer();
+            let actor = global.stage.get_actor_at_pos(imports.gi.Clutter.PickMode.REACTIVE, x, y);
+            const path = [];
+            while (actor && path.length < 16) {
+                path.push({name: actor.get_name(), type: actor.constructor.name,
+                    pid: actor.meta_window?.get_pid() ?? null,
+                    title: actor.meta_window?.get_title() ?? null});
+                actor = actor.get_parent();
+            }
+            return path;
+        })()""")
+
     def window_command(request, diagnostics):
         state = evaluate(WINDOW_STATE)
         title = request.get("title")
@@ -209,6 +226,8 @@ def main() -> None:
                         value = pointer(request["x"], request["y"])
                     elif name == "pointer_position":
                         value = evaluate("global.get_pointer().slice(0, 2)")
+                    elif name == "shell_modal":
+                        value = evaluate("Main.modalCount > 0")
                     elif name in {"button", "click"}:
                         if name == "click":
                             diagnostics["pointer"] = pointer(request["x"], request["y"])
@@ -239,6 +258,7 @@ def main() -> None:
                     elif name == "drag":
                         start, end = request["start"], request["end"]
                         diagnostics["pointer_start"] = pointer(*start)
+                        diagnostics["target_start"] = pointer_target()
                         call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, True)))
                         try:
                             time.sleep(0.2)
@@ -248,7 +268,8 @@ def main() -> None:
                         finally:
                             call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, False)))
                         diagnostics["pointer_end"] = evaluate("global.get_pointer().slice(0, 2)")
-                        value = {"start": diagnostics["pointer_start"], "end": diagnostics["pointer_end"]}
+                        value = {"start": diagnostics["pointer_start"], "end": diagnostics["pointer_end"],
+                                 "target": diagnostics["target_start"]}
                     else:
                         raise ValueError("unknown Wayland input command")
                     diagnostics["command"] = name
