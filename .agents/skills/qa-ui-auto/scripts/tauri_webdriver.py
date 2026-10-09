@@ -503,7 +503,10 @@ class NativeSession:
             if not data_root:
                 raise WebDriverError("Windows WebView2 session requires the QA data directory")
             payload["capabilities"]["alwaysMatch"]["tauri:options"]["webviewOptions"] = {
-                "userDataFolder": str(Path(data_root) / QA_APP_ID / "webview")
+                "userDataFolder": str(Path(data_root) / QA_APP_ID / "webview"),
+                # Canvas originals use sRGB. Host monitor ICC profiles must
+                # not recolor the QA renderer before native pixel comparison.
+                "additionalBrowserArguments": ["--force-color-profile=srgb"],
             }
         value = self.request("POST", "/session", payload)
         sid = value.get("sessionId") if isinstance(value, dict) else None

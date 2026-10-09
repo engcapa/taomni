@@ -32,6 +32,8 @@ mod proxy;
 mod qa_driver;
 mod rdp;
 mod screenshot;
+#[cfg(windows)]
+pub use screenshot::scroll_input::run_helper as run_screenshot_scroll_input;
 mod sdk;
 mod serial;
 mod servers;
@@ -1073,6 +1075,8 @@ pub fn run() {
             voice::commands::voice_capture_supported,
             voice::commands::voice_start_capture,
             voice::commands::voice_start_stream,
+            voice::cleanup::voice_cleanup_text,
+            voice::cleanup::voice_cancel_cleanup,
             voice::commands::voice_stop_capture,
             voice::commands::voice_stop_stream,
             voice::commands::voice_stop_and_transcribe,
@@ -1164,6 +1168,7 @@ pub fn run() {
             screenshot::qa::pin_tools::screenshot_qa_pin_tools,
             screenshot::qa::pin_arrangement::screenshot_qa_pin_arrangement,
             screenshot::qa::scroll_manual::screenshot_qa_scroll_manual,
+            screenshot::qa::scroll_exit::screenshot_qa_scroll_exit,
             screenshot::qa::colors::screenshot_qa_colors,
             screenshot::qa::screenshot_qa_freehand,
             screenshot::qa::screenshot_qa_hotkey,

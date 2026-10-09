@@ -102,6 +102,7 @@ export function Composer({
   const [composerHeight, setComposerHeight] = useState(readComposerHeight);
   const rootRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [voiceOriginal, setVoiceOriginal] = useState<{ original: string; cleaned: string; before: string } | null>(null);
   const pending = useChatStore((s) => s.pendingComposerText);
   const consumePending = useChatStore((s) => s.consumePendingComposerText);
   const setComposerDraft = useChatStore((s) => s.setComposerDraft);
@@ -120,8 +121,16 @@ export function Composer({
   // Pick up text staged by the SelectionToolbar's "Send to AI".
   useEffect(() => {
     if (pending && pending.length > 0) {
-      setText((cur) => (cur ? `${cur}\n\n${pending}` : pending));
-      consumePending();
+      // Consume atomically: StrictMode may replay this effect on mount.
+      const original = useChatStore.getState().pendingComposerOriginal;
+      const staged = consumePending();
+      if (!staged) return;
+      if (original) setVoiceOriginal((previous) => original === staged && previous?.cleaned !== text ? previous : ({
+        original: previous?.cleaned === text ? `${previous.original}\n\n${original}` : original,
+        cleaned: text ? `${text}\n\n${staged}` : staged,
+        before: previous?.cleaned === text ? previous.before : text,
+      }));
+      setText((cur) => (cur ? `${cur}\n\n${staged}` : staged));
       setTimeout(() => textareaRef.current?.focus(), 0);
     }
   }, [pending, consumePending]);
@@ -444,7 +453,11 @@ export function Composer({
             <Paperclip className="w-3.5 h-3.5" />
           </button>
         )}
-        <DictationButton targetRef={textareaRef} onText={setText} contextKey={`${draftKey}:${voiceEpoch}`} disabled={draftDisabled} testId="chat-voice-button" />
+                  {voiceOriginal && <details className="text-xs" data-testid="composer-voice-original"><summary>Original transcript</summary><p className="select-text whitespace-pre-wrap">{voiceOriginal.original}</p><button type="button" className="underline" disabled={text !== voiceOriginal.cleaned} onClick={() => {
+            setText(voiceOriginal.before ? `${voiceOriginal.before}\n\n${voiceOriginal.original}` : voiceOriginal.original);
+            setVoiceOriginal(null);
+          }}>Undo cleanup</button></details>}
+<DictationButton targetRef={textareaRef} onText={setText} contextKey={`${draftKey}:${voiceEpoch}`} disabled={draftDisabled} testId="chat-voice-button" />
         <textarea
           ref={textareaRef}
           data-testid="chat-composer-textarea"

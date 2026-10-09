@@ -119,6 +119,33 @@
 - `[data-testid="asr-download-whisper-small"]` — interactive — F-AI-2.3.asr-download-small
 - `[data-testid="asr-select-whisper-base"]` — interactive — F-AI-2.3.asr-select-base
 - `[data-testid="asr-select-whisper-small"]` — interactive — F-AI-2.3.asr-select-small
+- `[data-testid="asr-settings"]` — display — F-AI-2.3.asr-settings
+- `[data-testid="asr-download-proxy"]` — display — F-AI-2.3.asr-download-proxy
+- `[data-testid="asr-download-proxy"] input[placeholder="Port"]` — interactive — F-AI-2.3.asr-proxy-port
+- `[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]` — interactive — F-AI-2.3.asr-proxy-host
+- `[data-testid="asr-realtime-settings"] label:has-text("Model") input` — interactive — F-AI-2.3.asr-provider-model
+- `[data-testid="asr-realtime-settings"] input[type="password"]` — interactive — F-AI-2.3.asr-provider-key
+- `[data-testid="asr-realtime-settings"] label:has-text("Proxy") select` — interactive — F-AI-2.3.asr-provider-proxy
+- `[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input` — interactive — F-AI-2.3.asr-provider-proxy-url
+- `[data-testid="asr-realtime-settings"] button:has-text("Save provider")` — interactive — F-AI-2.3.asr-provider-save
+- `[data-testid="chat-composer-textarea"]` — display — F-AI-2.3.voice-composer-draft
+- `[data-testid="composer-voice-original"]` — display — F-AI-2.3.voice-composer-original
+- `[data-testid="composer-voice-original"] summary` — interactive — F-AI-2.3.voice-composer-original-open
+- `[data-testid="composer-voice-original"] button` — interactive — F-AI-2.3.voice-composer-original-undo
+- `[data-testid="asr-download-recommended"]` — interactive — F-AI-2.3.asr-download-recommended
+- `[data-testid="asr-replace-whisper-small"]` — interactive — F-AI-2.3.asr-replace-whisper-small
+- `[data-testid="asr-hotwords"]` — interactive — F-AI-2.3.asr-hotwords
+- `[data-testid="asr-hotwords-save"]` — interactive — F-AI-2.3.asr-hotwords-save
+- `[data-testid="asr-experimental"]` — interactive — F-AI-2.3.asr-experimental
+- `[data-testid="asr-cleanup"]` — interactive — F-AI-2.3.asr-cleanup
+- `[data-testid="asr-provider-endpoint"]` — interactive — F-AI-2.3.asr-provider-endpoint
+- `[data-testid="asr-model-sensevoice-small"]` — display — F-AI-2.3.asr-model-sensevoice-small
+- `[data-testid="asr-model-sherpa-zipformer-zh-en"]` — display — F-AI-2.3.asr-model-sherpa-zipformer-zh-en
+- `[data-testid="asr-model-whisper-base"]` — display — F-AI-2.3.asr-model-whisper-base
+- `[data-testid="asr-model-whisper-small"]` — display — F-AI-2.3.asr-model-whisper-small
+- `[data-testid="asr-model-whisper-small-q8"]` — display — F-AI-2.3.asr-model-whisper-small-q8
+- `[data-testid="ptt-button-interim"]` — display — F-AI-2.3.ptt-button-interim
+- `[data-testid="asr-realtime-provider"] option[value="gemini"]` — display — F-AI-2.3.asr-gemini-option
 
 ## application/update (F-Update-1)
 

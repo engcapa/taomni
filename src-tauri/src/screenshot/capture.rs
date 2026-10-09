@@ -532,6 +532,8 @@ pub struct FrameSource {
     last: Option<RgbaImage>,
     captured_at: Option<Instant>,
     region: Option<(u32, u32, u32, u32)>,
+    #[cfg(target_os = "windows")]
+    poll_without_wait: bool,
     #[cfg(target_os = "linux")]
     desktop_origin: (i32, i32),
 }
@@ -591,19 +593,44 @@ impl FrameSource {
             last: None,
             captured_at: None,
             region: None,
+            #[cfg(target_os = "windows")]
+            poll_without_wait: false,
             #[cfg(target_os = "linux")]
             desktop_origin,
         }
     }
 
     /// Wayland capture and input must share the same approved portal session.
-    pub fn for_scroll(app: &AppHandle, display: DisplayInfo, automatic: bool) -> Self {
+    pub fn for_scroll(
+        app: &AppHandle,
+        display: DisplayInfo,
+        automatic: bool,
+        region: (u32, u32, u32, u32),
+    ) -> Self {
+        // Reopening WGC for every sample can capture session/compositor
+        // transitions around window edges. Retain one stream; grab() returns
+        // the last frame without blocking when the desktop is unchanged.
+        #[cfg(target_os = "windows")]
+        {
+            let _ = automatic;
+            let mut source = Self::open(app, display);
+            source.region = Some(region);
+            source.poll_without_wait = true;
+            return source;
+        }
         #[cfg(target_os = "linux")]
         if crate::servers::rdp::capture::wayland::is_wayland_session() {
-            return Self::open_with_input(app, display, automatic);
+            let mut source = Self::open_with_input(app, display, automatic);
+            source.region = Some(region);
+            return source;
         }
-        let _ = automatic;
-        Self::one_shot(app, display)
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = automatic;
+            let mut source = Self::one_shot(app, display);
+            source.region = Some(region);
+            source
+        }
     }
 
     /// Returns false for platforms that use their native input injector.
@@ -708,8 +735,8 @@ impl FrameSource {
         }
     }
 
-    /// One-shot source (Windows/macOS stills and scroll frames: WGC and SCK
-    /// only deliver frames on change, so a static screen would stall).
+    /// One-shot source for stills and macOS scrolling. Windows scrolling uses
+    /// a persistent stream and retains the last frame when the screen is idle.
     pub fn one_shot(app: &AppHandle, display: DisplayInfo) -> Self {
         #[cfg(target_os = "linux")]
         {
@@ -724,6 +751,8 @@ impl FrameSource {
                 last: None,
                 captured_at: None,
                 region: None,
+                #[cfg(target_os = "windows")]
+                poll_without_wait: false,
             }
         }
     }
@@ -732,7 +761,16 @@ impl FrameSource {
     /// `None` when the screen is unchanged since the previous call.
     pub fn poll(&mut self) -> anyhow::Result<Option<&RgbaImage>> {
         let image = match &mut self.backend {
-            Backend::Persistent(capturer) => match capturer.poll_frame()? {
+            Backend::Persistent(capturer) => match {
+                #[cfg(target_os = "windows")]
+                if self.poll_without_wait {
+                    capturer.poll_frame_now()
+                } else {
+                    capturer.poll_frame()
+                }
+                #[cfg(not(target_os = "windows"))]
+                capturer.poll_frame()
+            }? {
                 Some(frame) => {
                     self.captured_at = Some(frame.captured_at);
                     Some(self.decode_frame(&frame)?)

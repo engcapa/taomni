@@ -339,6 +339,7 @@ interface ChatStore {
   /// Text the Composer should pick up next render (e.g. `@selection ...`).
   /// Cleared by the Composer once consumed.
   pendingComposerText: string;
+  pendingComposerOriginal?: string;
   /// Unsent composer drafts keyed by thread/tab scope. Kept in memory so
   /// switching app tabs does not discard a half-written prompt.
   composerDrafts: Record<string, ChatComposerDraft>;
@@ -1241,7 +1242,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   consumePendingComposerText: () => {
     const text = get().pendingComposerText;
-    if (text) set({ pendingComposerText: "" });
+    if (text) set({ pendingComposerText: "", pendingComposerOriginal: undefined });
     return text;
   },
 

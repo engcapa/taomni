@@ -24,6 +24,8 @@ pub mod qa;
 mod qa_oracle;
 pub mod record;
 pub mod scroll;
+pub(crate) mod scroll_input;
+mod session;
 pub mod shortcut;
 pub mod surfaces;
 
@@ -121,6 +123,7 @@ pub struct RecordingFile {
 
 #[derive(Default)]
 struct ToolState {
+    session_lease: Option<Arc<session::SessionLease>>,
     overlay: Option<OverlayInit>,
     /// Labels of app windows hidden for the capture session.
     hidden: Vec<String>,
@@ -156,6 +159,15 @@ fn tool_state() -> std::sync::MutexGuard<'static, ToolState> {
         .get_or_init(|| Mutex::new(ToolState::default()))
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn capture_lease() -> Result<Arc<session::SessionLease>, String> {
+    if let Some(lease) = &tool_state().session_lease {
+        return Ok(lease.clone());
+    }
+    session::SessionLease::acquire()?
+        .map(Arc::new)
+        .ok_or_else(|| "another Taomni instance is already capturing the screen".into())
 }
 
 fn internal_error(e: anyhow::Error) -> String {
@@ -290,6 +302,9 @@ pub async fn screenshot_scroll_capture(
     height: u32,
     mode: Option<scroll::ScrollMode>,
 ) -> Result<ScrollCaptureResult, String> {
+    // Retain ownership until the worker and stop listener have both left, even
+    // if closing the overlay clears ToolState while cancellation is pending.
+    let _capture_lease = capture_lease()?;
     // Fail while the selection UI can still show the instructions, before
     // hiding it or creating topmost controls. Never prompt from the worker.
     let mode = mode.unwrap_or_default();
@@ -308,6 +323,19 @@ pub async fn screenshot_scroll_capture(
         }
         state.scroll = Some(control.clone());
     }
+    // Establish an independent exit before hiding the overlay. Wayland keeps
+    // its visible input strip because the compositor owns global input.
+    let stop_input = if pins::native_wayland() {
+        None
+    } else {
+        match scroll_input::StopInput::start(&app, control.clone()) {
+            Ok(input) => Some(input),
+            Err(error) => {
+                tool_state().scroll = None;
+                return Err(error);
+            }
+        }
+    };
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     let overlay = app.get_webview_window(OVERLAY_LABEL);
     if let Some(window) = &overlay {
@@ -332,6 +360,7 @@ pub async fn screenshot_scroll_capture(
         scroll::scroll_capture_controlled(&worker, &display, region, u32::MAX, &worker_control)
     })
     .await;
+    drop(stop_input);
     if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
         return Err("scroll capture cancelled".into());
     }
@@ -396,11 +425,9 @@ pub async fn screenshot_stop_scroll_capture(cancel: bool) -> Result<(), String> 
     Ok(())
 }
 
-/// Region and control placement for a scroll capture. When the selection
-/// leaves no room for the controls outside it (full screen or nearly so), a
-/// strip at the bottom of the selection holds them and the captured region
-/// shrinks to the content above it: the controls stay visible and usable
-/// without ever appearing in the stitched image.
+/// Keep the requested pixels. If controls do not fit outside the crop, hide
+/// them and finish with the session's Escape/right-click input. The screenshot
+/// start shortcut's registration status must never change the selected area.
 fn scroll_layout(
     app: &AppHandle,
     display: &DisplayInfo,
@@ -430,27 +457,15 @@ fn scroll_layout(
     }
     let mut displays = capture::list_displays(app).map_err(internal_error)?;
     displays.sort_by_key(|d| d.id != display.id);
-    if let Some(position) = surfaces::control_position(&displays, rect) {
-        return Ok((requested, Some(position)));
-    }
-    if shortcut::current_status().registered {
+    // A full-display or near-full-display selection has no useful place for
+    // an auxiliary prompt. Keep every selected pixel and use the session-owned
+    // Esc/right-click stop input even when another monitor has spare space.
+    let near_full = (rect.w as i64 * 10 >= display.width as i64 * 9)
+        && (rect.h as i64 * 10 >= display.height as i64 * 9);
+    if near_full {
         return Ok((requested, None));
     }
-    // Keep at least a few overlap bands of content for stitching.
-    let min_height = scroll::MIN_REGION_HEIGHT as i32;
-    match surfaces::inside_control_strip(display, rect, min_height) {
-        Some((captured, controls)) => Ok((
-            (
-                (captured.x - display.x) as u32,
-                (captured.y - display.y) as u32,
-                captured.w as u32,
-                captured.h as u32,
-            ),
-            Some(controls),
-        )),
-        None if shortcut::current_status().registered => Ok((requested, None)),
-        None => Err("The selection is too short to keep the scroll controls outside it. Select a taller region, or enable the system screenshot hotkey to finish a hidden-controls capture.".into()),
-    }
+    Ok((requested, surfaces::control_position(&displays, rect)))
 }
 
 fn capture_control_position(
@@ -760,8 +775,8 @@ async fn open_overlay_with_window(
     }
     let recording = {
         let state = tool_state();
-        if let Some(control) = &state.scroll {
-            control.request_stop(false);
+        if state.scroll.is_some() {
+            // Start is not Stop. Another instance can own this global chord.
             return Ok(());
         }
         state.recording.clone()
@@ -791,6 +806,18 @@ async fn open_overlay_with_window(
     if OPENING.swap(true, Ordering::SeqCst) {
         return Ok(());
     }
+    let lease = session::SessionLease::acquire();
+    match lease {
+        Ok(Some(lease)) => tool_state().session_lease = Some(Arc::new(lease)),
+        Ok(None) => {
+            OPENING.store(false, Ordering::SeqCst);
+            return Ok(());
+        }
+        Err(error) => {
+            OPENING.store(false, Ordering::SeqCst);
+            return Err(error);
+        }
+    }
     let result = open_overlay_inner(app, display_id, current_window).await;
     OPENING.store(false, Ordering::SeqCst);
     if result.is_err() {
@@ -801,6 +828,7 @@ async fn open_overlay_with_window(
         }
         restore_app_windows(app);
         capture::purge_tracked();
+        tool_state().session_lease = None;
     }
     result
 }
@@ -991,6 +1019,7 @@ pub(crate) fn close_session(app: &AppHandle) {
     }
     restore_app_windows(app);
     capture::purge_tracked();
+    tool_state().session_lease = None;
 }
 
 // ---------------------------------------------------------------------------
@@ -1253,6 +1282,7 @@ pub async fn screenshot_start_recording(
     if tool_state().recorder_open {
         return Err("finish the current recording session first".into());
     }
+    let capture_lease = capture_lease()?;
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     let had_overlay = tool_state().overlay.is_some();
     let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
@@ -1316,6 +1346,7 @@ pub async fn screenshot_start_recording(
     {
         let mut state = tool_state();
         state.recording = Some(recording_id.clone());
+        state.session_lease = Some(capture_lease);
         state.recorder_open = true;
         state.overlay = None;
         let r = capture::clamp_region(

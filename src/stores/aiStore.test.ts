@@ -159,4 +159,55 @@ describe("ACP media provider capabilities", () => {
       "stdio",
     ]);
   });
+
+  it("preserves saved ASR credentials, model and proxy while filling missing providers", async () => {
+    const config = makeConfig([]);
+    config.asr = {
+      ...config.asr,
+      active: "deepgram",
+      mode: "local", // Older configurations may carry a stale mode.
+      language: "zh",
+      providers: {
+        deepgram: {
+          engine: "deepgram", model: "nova-3-custom", api_key: "vault:asr-key",
+          endpoint: "wss://speech.example.test/listen", proxy_mode: "custom",
+          proxy_url: "socks5://127.0.0.1:1080",
+        },
+      },
+    };
+    invokeMock.mockResolvedValue(config);
+    await useAiStore.getState().loadConfig();
+    const loaded = useAiStore.getState().config!;
+    expect(loaded.asr.providers.deepgram).toEqual(config.asr.providers.deepgram);
+    expect(loaded.asr.providers.aliyun.model).toBe("paraformer-realtime-v2");
+    expect(loaded.asr.mode).toBe("online");
+    expect(loaded.asr.language).toBe("zh");
+
+    await useAiStore.getState().saveConfig(loaded);
+    const persisted = invokeMock.mock.calls.find(([command]) => command === "save_ai_config")![1].config;
+    expect(persisted.asr.providers.deepgram).toEqual(config.asr.providers.deepgram);
+    expect(invokeMock.mock.calls.some(([command]) => command === "save_ai_api_key")).toBe(false);
+  });
+
+  it("encrypts a newly entered ASR key before saving and rejects vault failures", async () => {
+    const config = makeConfig([]);
+    config.asr.active = "aliyun";
+    config.asr.providers = { aliyun: { engine: "aliyun-dashscope", model: "custom", api_key: "test-only-secret" } };
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "save_ai_api_key") return "vault:new-asr-key";
+    });
+    await useAiStore.getState().saveConfig(config);
+    expect(invokeMock).toHaveBeenCalledWith("save_ai_api_key", {
+      kind: "asr_api_key:aliyun", label: "ASR Provider: aliyun", plaintext: "test-only-secret",
+    });
+    const saved = invokeMock.mock.calls.find(([command]) => command === "save_ai_config")![1].config;
+    expect(saved.asr.providers.aliyun.api_key).toBe("vault:new-asr-key");
+    expect(JSON.stringify(saved)).not.toContain("test-only-secret");
+
+    invokeMock.mockReset();
+    invokeMock.mockRejectedValue(new Error("vault locked"));
+    await expect(useAiStore.getState().saveConfig(config)).rejects.toThrow("vault locked");
+    expect(invokeMock.mock.calls.some(([command]) => command === "save_ai_config")).toBe(false);
+    expect(useAiStore.getState().saving).toBe(false);
+  });
 });

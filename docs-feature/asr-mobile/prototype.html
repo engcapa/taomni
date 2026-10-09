@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Taomni 移动听写交互原型</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef1f5;color:#172335;font:16px system-ui}main{max-width:440px;margin:24px auto;padding:24px;background:#fff;border-radius:22px;box-shadow:0 8px 36px #17233514}h1{font-size:23px}label{display:block;margin:16px 0 6px}select,textarea,button{font:inherit;border:1px solid #b7c1cd;border-radius:9px;padding:10px}select,textarea{width:100%}textarea{height:180px;resize:vertical}button{cursor:pointer;background:#edf2f8}button.primary{background:#145cbb;color:white;border:0}button:disabled{opacity:.45;cursor:default}.actions{display:flex;gap:10px;margin:20px 0}.status{min-height:54px;padding:12px;background:#f1f5fa;border-radius:8px}small{color:#536273}details{margin-top:18px}#raw{white-space:pre-wrap}output{display:block;margin-top:8px}
+</style>
+<main><small>交互原型 · 使用模拟结果，不访问麦克风或网络</small><h1>语音草稿</h1>
+<label for="route">识别通道</label><select id="route"><option>阿里 Paraformer</option><option>火山 Seed-ASR</option><option>Deepgram</option><option>Soniox</option><option>本地 CPU（v2）</option></select>
+<label for="cleanup">文本清理</label><select id="cleanup"><option value="off">关闭 · 保留原文</option><option value="light">轻度 · 标点与口头禅</option><option value="full">完整 · 整理断句</option></select>
+<label for="draft">可编辑草稿</label><textarea id="draft" placeholder="结果只填入草稿，不会自动发送"></textarea>
+<div class="status" role="status" id="status">准备就绪</div><div class="actions"><button class="primary" id="record">开始听写</button><button id="cancel" disabled>取消</button><button id="fail">模拟断网</button></div>
+<small>每次最多 120 秒；离开页面或锁屏结束会话。切换通道会取消当前录音。</small>
+<details id="original" hidden><summary>查看原文</summary><p id="raw"></p><button id="undo">撤销清理</button></details><output id="notice"></output></main>
+<script>
+const $=id=>document.getElementById(id);let generation=0,phase='idle',timer,receipt;
+function setPhase(next,message){phase=next;$('status').textContent=message;$('record').textContent=next==='recording'?'停止并定稿':next==='finishing'?'正在定稿…':'开始听写';$('record').disabled=next==='finishing';$('cancel').disabled=next==='idle';}
+function cancel(message='已取消，草稿保留'){generation++;clearTimeout(timer);setPhase('idle',message)}
+$('record').onclick=()=>{
+ if(phase==='idle'){const id=++generation;$('notice').textContent='';setPhase('recording','正在录音 · 临时文字不会写入草稿');timer=setTimeout(()=>{if(id===generation)finish(id)},120000)}
+ else finish(generation);
+};
+async function finish(id){clearTimeout(timer);setPhase('finishing','等待供应商确认最后一句…');await new Promise(r=>setTimeout(r,900));if(id!==generation)return;
+ const raw='嗯，请检查 src/main.rs，端口是 8080。';const text=$('cleanup').value==='off'?raw:'请检查 src/main.rs，端口是 8080。';const before=$('draft').value;const after=before+text;$('draft').value=after;receipt={before,after,raw};$('raw').textContent=raw;$('original').hidden=false;setPhase('idle','已定稿，请检查并编辑草稿');}
+$('cancel').onclick=()=>cancel();$('route').onchange=()=>cancel('通道已切换');$('fail').onclick=()=>cancel('网络已断开，已有草稿保留，可重新开始');
+$('undo').onclick=()=>{if($('draft').value===receipt.after){$('draft').value=receipt.before+receipt.raw;$('notice').textContent='已恢复原文'}else $('notice').textContent='草稿已修改；原文仍可查看和复制。'};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)cancel('离开页面，会话已结束')});window.addEventListener('pagehide',()=>cancel());
+</script></html>

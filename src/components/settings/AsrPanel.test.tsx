@@ -238,3 +238,30 @@ it("ignores an older snapshot and keeps full transfer distinct from verification
   expect(screen.getByTestId("asr-download-whisper-base")).toBeDisabled();
   expect(screen.getByTestId("asr-cancel-download")).toBeDisabled();
 });
+
+
+it("requires an explicit verified q8 replacement action for installed f16", async () => {
+  ipc.mockImplementation(async (command: string) => {
+    if (command === "voice_models") return [
+      { id: "whisper-small", filename: "ggml-small.bin", bytes: 487601967, installed: true, license: "MIT", replacement: "whisper-small-q8" },
+      { id: "whisper-small-q8", filename: "ggml-small-q8_0.bin", bytes: 264464607, installed: false, license: "MIT" },
+    ];
+    if (command === "voice_capture_supported") return true;
+    return null;
+  });
+  render(<AsrPanel />);
+  const replace = await screen.findByTestId("asr-replace-whisper-small");
+  await waitFor(() => expect(replace).toBeEnabled());
+  expect(ipc.mock.calls.some(([c]) => c === "voice_install_model")).toBe(false);
+  fireEvent.click(replace);
+  await waitFor(() => expect(ipc).toHaveBeenCalledWith("voice_install_model", { modelId: "whisper-small-q8", sourcePath: null, replaceModelId: "whisper-small" }));
+});
+
+it("discloses online audio upload when a cloud provider is selected", async () => {
+  const config = useAiStore.getState().config!;
+  useAiStore.setState({ config: { ...config, asr: { ...config.asr, active: "soniox", mode: "online" } } });
+  ipc.mockImplementation(async (command) => command === "voice_models" ? [] : command === "voice_capture_supported" ? true : null);
+  render(<AsrPanel />);
+  expect(await screen.findByText(/Audio is sent to the selected online provider/)).toBeVisible();
+  expect(screen.queryByText(/Audio is not uploaded/)).not.toBeInTheDocument();
+});

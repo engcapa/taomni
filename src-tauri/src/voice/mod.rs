@@ -3,3 +3,6 @@
 pub mod capture;
 pub mod commands;
 pub mod streaming;
+
+pub mod vocabulary;
+pub mod cleanup;

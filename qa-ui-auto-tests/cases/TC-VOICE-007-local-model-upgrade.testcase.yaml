@@ -1,0 +1,85 @@
+id: TC-VOICE-007
+title: Recommended local models, Cantonese routing preference and explicit f16 replacement
+covers:
+- F-AI-2.3
+tags:
+- ai
+- voice
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 75
+steps:
+- open: ${cfg.app.base_url}/?voiceFixture=1
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="asr-settings"]'
+- assert_text:
+    selector: '[data-testid="asr-model-sensevoice-small"]'
+    contains: FunASR Model License
+- click: '[data-testid="asr-download-recommended"]'
+- assert_text:
+    selector: '[data-testid="asr-model-whisper-small-q8"]'
+    contains: Downloaded
+- assert_text:
+    selector: '[data-testid="asr-model-sensevoice-small"]'
+    contains: Downloaded
+- select_option:
+    selector: '[data-testid="asr-language"]'
+    value: yue
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"language_prior":"yue"'
+- click: '[data-testid="asr-download-whisper-small"]'
+- click: '[data-testid="asr-select-whisper-small"]'
+- click: '[data-testid="asr-replace-whisper-small"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"active":"whisper-small-q8"'
+- assert_text:
+    selector: '[data-testid="asr-model-whisper-small"]'
+    contains: Not downloaded
+- screenshot: local-model-upgrade.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Recommended downloads expose license and preserve Cantonese preference;
+      f16 replacement is explicit.
+    actions:
+    - 6
+    - 9
+    - 11
+    - 12
+    - 13
+    checkpoints:
+    - step: 5
+      expectation: SenseVoice license is visible.
+    - step: 7
+      expectation: Small q8 is installed.
+    - step: 8
+      expectation: SenseVoice is installed.
+    - step: 10
+      expectation: Cantonese remains the automatic route prior.
+    - step: 14
+      expectation: Explicit replacement activates q8.
+    - step: 15
+      expectation: Old model is removed only after replacement.
+    results:
+    - 5
+    - 7
+    - 8
+    - 10
+    - 14
+    - 15
+  visual:
+  - check: Model license, size and upgrade action remain readable
+    method: manual
+    reason: Inspect local-model-upgrade.png.
+  native:
+  - check: Checksum-gated retirement and real local model decode
+    method: external
+    reason: Rust tests and native benchmark receipts provide the disk/decoder evidence;
+      browser stubs do not.

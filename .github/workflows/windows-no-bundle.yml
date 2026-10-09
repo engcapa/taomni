@@ -1,0 +1,162 @@
+name: Windows No-Bundle Binary
+
+# Manual-only build of the standalone Windows executable (no installer /
+# bundle), for hand testing. Builds the production identifier in release
+# profile via `pnpm tauri build --no-bundle` and uploads taomni.exe as a
+# workflow artifact.
+#
+# Two variants are built in parallel because current main (sherpa-onnx
+# landed 2026-10-08 in the ASR work) mixes CRT flavours on Windows:
+# sherpa-onnx's prebuilt onnxruntime is MT (static CRT) while whisper-rs
+# builds MD (dynamic CRT), which fails the release link with
+# LNK2038/LNK1169 when both are linked with the default configuration.
+#   - full:      default features, RUSTFLAGS=+crt-static so the Rust and
+#                C/C++ objects align on MT with sherpa's prebuilt libs.
+#   - nosherpa:  default features minus asr-sherpa (whisper + online ASR
+#                stay), the CRT-consistent configuration that the
+#                v0.4.34 release build proved. Fallback if `full` still
+#                fails to link.
+# The SocksCap helper is intentionally not pre-staged here: staging it
+# runs a bare `cargo build` of the whole package (including the cdylib
+# link that fails above) before the app build even starts. WinDivert is
+# still fetched into resources so the bundled resource files are present.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-no-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-no-bundle:
+    name: Windows no-bundle (${{ matrix.variant }})
+    runs-on: windows-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: full
+            rustflags: "-C target-feature=+crt-static"
+            build_args: ""
+          - variant: nosherpa
+            rustflags: ""
+            build_args: "-- --no-default-features --features hbase-kerberos,rdp-server-audio,voice-capture,asr-whisper"
+    env:
+      RUSTFLAGS: ${{ matrix.rustflags }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: windows-no-bundle-${{ matrix.variant }}
+
+      - name: Ensure Strawberry Perl (OpenSSL build)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+
+      - name: Fetch WinDivert redistributable (Windows)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dest = "src-tauri/resources/sockscap/windows"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          if (Test-Path (Join-Path $dest "WinDivert.dll")) {
+            Write-Host "WinDivert already present in $dest, skipping download."
+            exit 0
+          }
+          $version = "2.2.2"
+          $zip = Join-Path $env:RUNNER_TEMP "WinDivert-$version-A.zip"
+          $extract = Join-Path $env:RUNNER_TEMP "WinDivert-extract"
+          $urls = @(
+            "https://reqrypt.org/download/WinDivert-$version-A.zip",
+            "https://github.com/basil00/WinDivert/releases/download/v$version/WinDivert-$version-A.zip"
+          )
+          $ok = $false
+          foreach ($url in $urls) {
+            for ($i = 1; $i -le 3; $i++) {
+              try {
+                Write-Host "Downloading $url (attempt $i)..."
+                Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+                $ok = $true; break
+              } catch {
+                Write-Warning "Download failed: $($_.Exception.Message)"
+                Start-Sleep -Seconds 5
+              }
+            }
+            if ($ok) { break }
+          }
+          if (-not $ok) { throw "Unable to download WinDivert $version from any mirror." }
+          if (Test-Path $extract) { Remove-Item -Recurse -Force $extract }
+          Expand-Archive -Path $zip -DestinationPath $extract -Force
+          $x64 = Join-Path $extract "WinDivert-$version-A\x64"
+          Copy-Item -Force (Join-Path $x64 "WinDivert.dll") $dest
+          Copy-Item -Force (Join-Path $x64 "WinDivert64.sys") $dest
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build standalone binary (no bundle, release)
+        shell: bash
+        run: pnpm tauri build --no-bundle ${{ matrix.build_args }}
+
+      - name: Collect standalone binary
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'src-tauri/target/release/taomni.exe'
+          if (-not (Test-Path $exe)) { throw "Binary not found at $exe" }
+          New-Item -ItemType Directory -Force -Path 'no-bundle' | Out-Null
+          Copy-Item $exe 'no-bundle/taomni.exe'
+          # Resources (WinDivert etc.) sit next to the exe in the release
+          # dir; include them when present so features that need them work
+          # from the same folder. The SocksCap helper exe is not part of
+          # this hand-test build.
+          $res = 'src-tauri/target/release/resources'
+          if (Test-Path $res) { Copy-Item -Recurse $res 'no-bundle/resources' }
+          Get-FileHash 'no-bundle/taomni.exe' -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash)  taomni.exe" } |
+            Set-Content 'no-bundle/SHA256.txt' -Encoding ascii
+          Get-ChildItem -Recurse 'no-bundle' | Select-Object FullName, Length
+
+      - name: Upload standalone binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: taomni-windows-no-bundle-${{ matrix.variant }}-${{ github.sha }}
+          path: no-bundle/
+          if-no-files-found: error
+          retention-days: 14

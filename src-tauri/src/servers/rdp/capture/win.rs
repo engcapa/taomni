@@ -242,32 +242,11 @@ impl Capturer for WindowsCapturer {
     }
 
     fn poll_frame(&mut self) -> anyhow::Result<Option<Frame>> {
-        self.maybe_refresh_topology()?;
-        if let Some(frame) = self.pending.take() {
-            return Ok(Some(frame));
-        }
+        self.poll_with_wait(FRAME_WAIT)
+    }
 
-        if matches!(self.backend, Backend::Gdi) {
-            self.restart_recorder();
-        }
-        match &self.backend {
-            Backend::Recorder(_) => match self.next_recorder_frame(FRAME_WAIT) {
-                Ok(frame) => Ok(frame),
-                Err(error) => {
-                    self.fallback_to_gdi(&error);
-                    Ok(self.pending.take())
-                }
-            },
-            Backend::Gdi => {
-                // GDI is a compatibility path only. Keep its cadence bounded
-                // and let the display layer's hash suppress unchanged pixels.
-                std::thread::sleep(FRAME_WAIT);
-                let frame = capture_gdi(&self.monitor)?;
-                self.width = frame.width;
-                self.height = frame.height;
-                Ok(Some(frame))
-            }
-        }
+    fn poll_frame_now(&mut self) -> anyhow::Result<Option<Frame>> {
+        self.poll_with_wait(Duration::ZERO)
     }
 
     fn is_self_paced(&self) -> bool {
@@ -277,6 +256,38 @@ impl Capturer for WindowsCapturer {
     fn needs_frame_deduplication(&self) -> bool {
         matches!(self.backend, Backend::Gdi)
     }
+}
+
+impl WindowsCapturer {
+    fn poll_with_wait(&mut self, wait: Duration) -> anyhow::Result<Option<Frame>> {
+        self.maybe_refresh_topology()?;
+        if let Some(frame) = self.pending.take() {
+            return Ok(Some(frame));
+        }
+
+        if matches!(self.backend, Backend::Gdi) {
+            self.restart_recorder();
+        }
+        match &self.backend {
+            Backend::Recorder(_) => match self.next_recorder_frame(wait) {
+                Ok(frame) => Ok(frame),
+                Err(error) => {
+                    self.fallback_to_gdi(&error);
+                    Ok(self.pending.take())
+                }
+            },
+            Backend::Gdi => {
+                // GDI is a compatibility path only. Keep its cadence bounded
+                // and let the display layer's hash suppress unchanged pixels.
+                std::thread::sleep(wait);
+                let frame = capture_gdi(&self.monitor)?;
+                self.width = frame.width;
+                self.height = frame.height;
+                Ok(Some(frame))
+            }
+        }
+    }
+
 }
 
 impl Drop for WindowsCapturer {

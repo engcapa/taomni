@@ -10,10 +10,10 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
-rust-version = "1.77.2"
+edition = "2024"
+rust-version = "1.90"
 name = "tauri-utils"
-version = "2.9.3"
+version = "2.10.1"
 authors = ["Tauri Programme within The Commons Conservancy"]
 build = false
 exclude = [
@@ -81,7 +81,7 @@ optional = true
 version = "1"
 
 [dependencies.brotli]
-version = "8"
+version = "9"
 features = ["std"]
 optional = true
 default-features = false
@@ -91,15 +91,11 @@ version = "0.19"
 optional = true
 
 [dependencies.ctor]
-version = "0.8"
-features = [
-    "std",
-    "proc_macro",
-]
+version = "1.0"
 default-features = false
 
 [dependencies.dom_query]
-version = "0.27"
+version = "0.28"
 optional = true
 default-features = false
 
@@ -122,10 +118,10 @@ optional = true
 version = "1"
 
 [dependencies.infer]
-version = "0.19"
+version = "0.22"
 
 [dependencies.json-patch]
-version = "3.0"
+version = "4.0"
 
 [dependencies.json5]
 version = "0.4"
@@ -161,7 +157,7 @@ optional = true
 version = "1"
 
 [dependencies.schemars]
-version = "0.8.21"
+version = "0.8.22"
 features = [
     "url",
     "uuid1",
@@ -192,7 +188,7 @@ optional = true
 version = "2"
 
 [dependencies.toml]
-version = "1.1.2"
+version = ">=0.9, <=1"
 features = ["parse"]
 
 [dependencies.url]
@@ -200,7 +196,7 @@ version = "2"
 features = ["serde"]
 
 [dependencies.urlpattern]
-version = "0.3"
+version = "0.6"
 
 [dependencies.uuid]
 version = "1"
@@ -215,12 +211,18 @@ version = "0.3"
 features = ["std"]
 
 [dev-dependencies.serial_test]
-version = "3"
+version = "3.5"
 
 [dev-dependencies.tempfile]
 version = "3.15.0"
 
 [target.'cfg(target_os = "macos")'.dependencies.swift-rs]
-version = "1"
+version = "1.0.8"
 features = ["build"]
 optional = true
+
+[lints.clippy]
+assigning_clones = "warn"
+collapsible_if = "allow"
+or_fun_call = "warn"
+redundant_clone = "warn"

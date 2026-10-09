@@ -1,0 +1,136 @@
+id: TC-VOICE-005
+title: ASR provider credentials and custom proxy survive save and reload
+description: Exercises the production settings/store with browser persistence and
+  a vault stub; no provider connection or native encryption claim.
+covers:
+- F-AI-2.3
+tags:
+- ai
+- voice
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 75
+steps:
+- open: ${cfg.app.base_url}/?voiceFixture=1
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="asr-settings"]'
+- select_option:
+    selector: '[data-testid="asr-realtime-provider"]'
+    value: deepgram
+- fill:
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Model") input'
+    value: nova-3-persistence-fixture
+- fill:
+    selector: '[data-testid="asr-realtime-settings"] input[type="password"]'
+    value: non-secret-browser-fixture
+- select_option:
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy") select'
+    value: custom
+- fill:
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input'
+    value: socks5://127.0.0.1:1080
+- click: '[data-testid="asr-realtime-settings"] button:has-text("Save provider")'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: vault:stub-asr_api_key:deepgram
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: nova-3-persistence-fixture
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: socks5://127.0.0.1:1080
+- reload: {}
+- wait_for: '[data-testid="ptt-button"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: '[data-testid="asr-settings"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"active":"deepgram"'
+- assert_attribute:
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Model") input'
+    name: value
+    equals: nova-3-persistence-fixture
+- assert_attribute:
+    selector: '[data-testid="asr-realtime-settings"] input[type="password"]'
+    name: placeholder
+    equals: Stored in credential vault
+- assert_attribute:
+    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input'
+    name: value
+    equals: socks5://127.0.0.1:1080
+- select_option:
+    selector: '[data-testid="asr-language"]'
+    value: zh
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: vault:stub-asr_api_key:deepgram
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: nova-3-persistence-fixture
+- screenshot: provider-persistence.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Saving a configured provider keeps the selected model and feature
+      proxy and replaces the test API key with a vault reference.
+    actions:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    checkpoints:
+    - step: 11
+      expectation: The persisted credential is a vault reference.
+    - step: 12
+      expectation: The custom model persists.
+    - step: 13
+      expectation: The custom proxy persists.
+    results:
+    - 11
+    - 12
+    - 13
+  - id: R2
+    requirement: Reloading settings and saving another preference retains the provider
+      settings.
+    actions:
+    - 14
+    - 16
+    - 17
+    - 23
+    checkpoints:
+    - step: 19
+      expectation: The selected online provider survives reload.
+    - step: 20
+      expectation: The model field retains the saved value.
+    - step: 21
+      expectation: The key stays in the vault.
+    - step: 22
+      expectation: The proxy input retains its saved value.
+    - step: 24
+      expectation: Saving language retains the vault reference.
+    - step: 25
+      expectation: Saving language retains the custom model.
+    results:
+    - 19
+    - 20
+    - 21
+    - 22
+    - 24
+    - 25
+  visual:
+  - check: Provider settings remain readable after reload
+    method: manual
+    reason: Inspect retained provider-persistence.png; no visual redesign.
+  native:
+  - check: Native vault encryption and provider connection
+    method: external
+    reason: Browser fixture only proves renderer persistence; unchanged native vault
+      and networking require separate evidence.

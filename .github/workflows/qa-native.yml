@@ -63,6 +63,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pip install pyyaml jsonschema
       - run: cargo install tauri-driver --locked
+      - name: Windows input reentrancy regression
+        if: runner.os == 'Windows'
+        run: python scripts/windows-input-reentrancy/run.py --report-dir qa-ui-auto-report/windows-input-reentrancy
       - name: Build isolated QA app
         run: python .agents/skills/qa-ui-auto/scripts/native_build.py
       - name: Run Linux native smoke

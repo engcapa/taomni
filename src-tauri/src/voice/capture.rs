@@ -12,7 +12,7 @@ pub struct Capture {
     /// consume this channel while recording is still active.
     pub chunks: Arc<Mutex<Option<tokio::sync::mpsc::Receiver<Vec<f32>>>>>,
 }
-pub async fn start() -> Result<Capture, String> {
+pub async fn start(streaming: bool) -> Result<Capture, String> {
     let (stop, rx) = mpsc::channel();
     let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
     let (result_tx, result) = tokio::sync::oneshot::channel();
@@ -37,7 +37,7 @@ pub async fn start() -> Result<Capture, String> {
                             Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
                             Err(mpsc::RecvTimeoutError::Timeout) => {
                                 let snapshot = buffer.lock().unwrap();
-                                if snapshot.len() > cursor {
+                                if streaming && snapshot.len() > cursor {
                                     let chunk = realtime_resampler.push(&snapshot[cursor..]);
                                     cursor = snapshot.len();
                                     if !chunk.is_empty() && chunk_tx.blocking_send(chunk).is_err() {
@@ -52,14 +52,14 @@ pub async fn start() -> Result<Capture, String> {
                     }
                     drop(stream);
                     let pcm = std::mem::take(&mut *buffer.lock().unwrap());
-                    if pcm.len() > cursor {
+                    if streaming && pcm.len() > cursor {
                         let chunk = realtime_resampler.push(&pcm[cursor..]);
                         if !chunk.is_empty() {
                             let _ = chunk_tx.blocking_send(chunk);
                         }
                     }
                     let tail = realtime_resampler.finish(pcm.len());
-                    if !tail.is_empty() {
+                    if streaming && !tail.is_empty() {
                         let _ = chunk_tx.blocking_send(tail);
                     }
                     let result = if let Some(e) = error.lock().unwrap().take() {

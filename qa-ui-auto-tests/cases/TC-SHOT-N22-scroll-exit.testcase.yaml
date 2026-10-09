@@ -1,0 +1,33 @@
+id: TC-SHOT-N22
+title: Windows whole-window and full-screen scrolling preserves pixels and has independent stop input
+covers: [F27.1]
+tags: [screenshot, regression, windows, native, p1]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: scroll-exit
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: scroll-exit
+    requirement: Exact current-window selection and full-screen selections preserve their dimensions without a registered screenshot hotkey. Automatic and manual capture keep original body pixels, and the native bottom scrollbar button and thumb occur once. Moving outside pauses automatic input. Escape and right-click finish without losing the preview; Start does not act as Stop.
+    actions: [1, 3]
+    checkpoints:
+    - step: 3
+      expectation: Real window geometry, native wheel/Escape/right-button input and original pixel comparison pass for all three scenarios; the whole-window output contains exactly one native bottom scrollbar button and the same vertical thumb/arrow pixel count as the captured reference.
+    - step: 4
+      expectation: The main window is restored after capture cleanup.
+    results: [3, 4]
+  visual:
+  - check: Full selection and surviving result preview
+    method: automated
+    reason: Native selection/output geometry and preview visibility are asserted, with retained PNG evidence.
+  native:
+  - check: Native scrolling, pointer escape, full-screen selection and stop input
+    method: automated
+    reason: The scenario drives public capture controls, sends OS input and compares captured pixels with the retained canvas source.

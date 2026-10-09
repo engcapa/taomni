@@ -16,6 +16,8 @@ struct Session {
     id: String,
     cancel: Arc<AtomicBool>,
     finishing: AtomicBool,
+    stop_task: tokio_util::sync::CancellationToken,
+    completed: tokio::sync::watch::Sender<Option<Result<(), String>>>,
     streaming: AtomicBool,
     engine: Arc<AsrManager>,
     #[cfg(feature = "voice-capture")]
@@ -49,6 +51,7 @@ fn remove(id: &str) {
 pub fn cancel_all() {
     if let Some(s) = current().lock().unwrap().take() {
         s.cancel.store(true, Ordering::Relaxed);
+        s.stop_task.cancel();
         #[cfg(feature = "voice-capture")]
         if let Some(c) = s.capture.lock().unwrap().take() {
             let _ = c.stop.send(());
@@ -85,6 +88,8 @@ async fn voice_start_capture_inner(
     let session = Arc::new(Session {
         id: session_id.to_string(),
         finishing: AtomicBool::new(false),
+        stop_task: tokio_util::sync::CancellationToken::new(),
+        completed: tokio::sync::watch::channel(None).0,
         streaming: AtomicBool::new(false),
         cancel: Arc::new(AtomicBool::new(false)),
         engine,
@@ -119,7 +124,7 @@ async fn voice_start_capture_inner(
         }
         #[cfg(feature = "voice-capture")]
         {
-            let capture = super::capture::start().await?;
+            let capture = super::capture::start(!prepare_engine).await?;
             let mut guard = session.capture.lock().unwrap();
             if session.cancel.load(Ordering::Relaxed) {
                 let _ = capture.stop.send(());
@@ -156,56 +161,91 @@ pub async fn voice_start_stream(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
+    // Resolve one configuration snapshot before acquiring the microphone.
+    let (active, language, provider_config, full_local_mode, disabled, hotwords) = {
+        let ai = state.ai_ctx.read().await;
+        let asr = &ai.config.asr;
+        (
+            asr.active.clone(),
+            asr.routed_language().to_owned(),
+            asr.providers.get(&asr.active).cloned(),
+            ai.config.full_local_mode,
+            ai.config.fully_disabled,
+            asr.hotwords.clone(),
+        )
+    };
+    if disabled {
+        return Err("AI is fully disabled".into());
+    }
+    let online =
+        ["aliyun", "volcengine", "soniox", "deepgram", "gemini"].contains(&active.as_str());
+    if full_local_mode && online {
+        return Err(
+            "FULL_LOCAL_MODE: online ASR is disabled while full local mode is enabled".into(),
+        );
+    }
+    let (proxy, key) = if online {
+        let config = provider_config
+            .as_ref()
+            .ok_or("ASR_PROVIDER_MISSING: configure the selected realtime provider")?;
+        let proxy = match config.proxy_mode.as_str() {
+            "app" => {
+                crate::proxy::resolve_default(&state).map_err(|e| format!("ASR_PROXY: {e}"))?
+            }
+            "custom" => {
+                if let Some(custom) = &config.custom_proxy {
+                    let mut custom = custom.clone();
+                    custom.enabled = true;
+                    crate::proxy::resolve(&state, &custom)
+                        .map_err(|e| format!("ASR_PROXY: {e}"))?
+                        .ok_or("ASR_PROXY: configure a feature proxy")
+                        .map(Some)?
+                } else {
+                    parse_asr_proxy_url(&config.proxy_url)?
+                }
+            }
+            "none" | "" => None,
+            _ => return Err("ASR_PROXY: unknown ASR proxy mode".into()),
+        };
+        let key = if config.api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
+            state
+                .vault
+                .resolve(&config.api_key)
+                .map_err(|_| "ASR_CREDENTIAL: unlock the credential vault")?
+                .map(|v| (*v).clone())
+                .unwrap_or_default()
+        } else {
+            config.api_key.clone()
+        };
+        if key.trim().is_empty() {
+            return Err("ASR_KEY_MISSING: configure the provider API key".into());
+        }
+        (proxy, key)
+    } else {
+        (None, String::new())
+    };
+    // Validate terms before microphone acquisition; uploads remain cancellable
+    // inside the session-owned backend task.
+    crate::voice::vocabulary::validate(&hotwords)?;
     voice_start_capture_inner(&session_id, &state, false).await?;
     let session = current()
         .lock()
         .unwrap()
         .clone()
         .filter(|s| s.id == session_id)
-        .ok_or("Recording expired")?;
-    let (active, language, full_local_mode) = {
+        .ok_or("ASR_CANCELLED: recording expired")?;
+    {
         let ai = state.ai_ctx.read().await;
-        (
-            ai.config.asr.active.clone(),
-            ai.config.asr.language.clone(),
-            ai.config.full_local_mode,
-        )
-    };
-    if full_local_mode && ["aliyun", "deepgram", "gemini"].contains(&active.as_str()) {
-        voice_stop_capture(session_id);
-        return Err(
-            "FULL_LOCAL_MODE: online ASR is disabled while full local mode is enabled".into(),
-        );
-    }
-    let provider_config = {
-        state
-            .ai_ctx
-            .read()
-            .await
-            .config
-            .asr
-            .providers
-            .get(&active)
-            .cloned()
-    };
-    let vault = state.vault.clone();
-    let (proxy, proxy_error) = provider_config
-        .as_ref()
-        .map_or((None, None), |config| match config.proxy_mode.as_str() {
-            "app" => match crate::proxy::resolve_default(&state) {
-                Ok(proxy) => (proxy, None),
-                Err(error) => (None, Some(format!("ASR_PROXY: {error}"))),
-            },
-            "custom" => match parse_asr_proxy_url(&config.proxy_url) {
-                Ok(proxy) => (proxy, None),
-                Err(error) => (None, Some(error)),
-            },
-            "none" | "" => (None, None),
-            _ => (None, Some("ASR_PROXY: unknown ASR proxy mode".into())),
-        });
-    if let Some(error) = proxy_error {
-        voice_stop_capture(session_id);
-        return Err(error);
+        if ai.config.asr.active != active
+            || ai.config.asr.routed_language() != language
+            || ai.config.asr.providers.get(&active) != provider_config.as_ref()
+            || ai.config.fully_disabled
+            || ai.config.full_local_mode != full_local_mode
+            || ai.config.asr.hotwords != hotwords
+        {
+            voice_stop_capture(session_id);
+            return Err("ASR_CONFIG_CHANGED: voice configuration changed".into());
+        }
     }
     let chunks = session
         .capture
@@ -216,51 +256,72 @@ pub async fn voice_start_stream(
         .ok_or("Recording stream is not ready")?;
     session.streaming.store(true, Ordering::SeqCst);
     tokio::spawn(async move {
-        let result = match active.as_str() {
-            "sherpa-zipformer-zh-en" => {
-                crate::voice::streaming::run_local(
-                    app.clone(),
-                    session_id.clone(),
-                    chunks,
-                    language,
-                )
-                .await
-            }
-            "aliyun" | "deepgram" | "gemini" => {
-                if let Some(config) = provider_config {
-                    let key_result = if config.api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
-                        match vault.resolve(&config.api_key) {
-                            Ok(Some(value)) => Ok((*value).clone()),
-                            Ok(None) => Ok(String::new()),
-                            Err(e) => Err(e.to_string()),
-                        }
-                    } else {
-                        Ok(config.api_key.clone())
-                    };
-                    match key_result {
-                        Ok(key) => {
-                            crate::voice::streaming::run_online(
-                                app.clone(),
-                                session_id.clone(),
-                                chunks,
-                                active,
-                                config.model,
-                                config.endpoint,
-                                key,
-                                language,
-                                proxy,
-                            )
-                            .await
-                        }
-                        Err(error) => Err(error),
-                    }
-                } else {
-                    Err("ASR_PROVIDER_MISSING: configure the selected realtime provider".into())
+        let backend = async {
+            match active.as_str() {
+                "local-auto" | "sensevoice-small" => {
+                    crate::voice::streaming::run_routed_local(
+                        crate::voice::streaming::event_sink(app.clone()),
+                        session_id.clone(),
+                        chunks,
+                        language,
+                        session.engine.clone(),
+                        session.cancel.clone(),
+                    )
+                    .await
                 }
+                "sherpa-zipformer-zh-en" => {
+                    crate::voice::streaming::run_local(
+                        crate::voice::streaming::event_sink(app.clone()),
+                        session_id.clone(),
+                        chunks,
+                        language.clone(),
+                        language,
+                    )
+                    .await
+                }
+                "aliyun" | "volcengine" | "soniox" | "deepgram" | "gemini" => {
+                    let config = provider_config.ok_or("ASR_PROVIDER_MISSING")?;
+                    crate::voice::streaming::run_online(
+                        crate::voice::streaming::event_sink(app.clone()),
+                        session_id.clone(),
+                        chunks,
+                        active,
+                        config,
+                        key,
+                        language,
+                        proxy,
+                        hotwords,
+                    )
+                    .await
+                }
+                provider => Err(format!("ASR_PROVIDER_UNAVAILABLE: {provider}")),
             }
-            provider => Err(format!("STREAMING_PROVIDER_UNAVAILABLE: {provider}")),
         };
+        let result = tokio::select! {
+            biased;
+            _ = session.stop_task.cancelled() => Err("ASR_CANCELLED".into()),
+            result = tokio::time::timeout(std::time::Duration::from_secs(130), backend) =>
+                result.unwrap_or_else(|_| Err("ASR_TIMEOUT: dictation exceeded its time limit".into())),
+        };
+        // Dropping the backend closes its socket. Also release the microphone
+        // when the provider ends or fails without a renderer stop command.
+        if let Some(capture) = session.capture.lock().unwrap().take() {
+            let _ = capture.stop.send(());
+        }
+        session.completed.send_replace(Some(result.clone()));
+        if result.is_ok()
+            && !session.finishing.load(Ordering::SeqCst)
+            && !session.stop_task.is_cancelled()
+        {
+            let _ = app.emit(
+                "voice-transcript-complete",
+                serde_json::json!({"session_id":session_id}),
+            );
+        }
         if let Err(error) = result {
+            if session.stop_task.is_cancelled() {
+                return;
+            }
             let _ = app.emit(
                 "voice-transcript-error",
                 serde_json::json!({"session_id": session_id, "error": error}),
@@ -290,8 +351,36 @@ fn parse_asr_proxy_url(value: &str) -> Result<Option<crate::proxy::ResolvedProxy
 }
 
 #[tauri::command]
-pub fn voice_stop_stream(session_id: String) {
-    voice_stop_capture(session_id);
+pub async fn voice_stop_stream(session_id: String) -> Result<(), String> {
+    let session = current()
+        .lock()
+        .unwrap()
+        .clone()
+        .filter(|s| s.id == session_id)
+        .ok_or("ASR_CANCELLED: recording expired")?;
+    session.finishing.store(true, Ordering::SeqCst);
+    let mut completed = session.completed.subscribe();
+    if let Some(capture) = session.capture.lock().unwrap().take() {
+        let _ = capture.stop.send(());
+    }
+    let result = tokio::time::timeout(std::time::Duration::from_secs(15), async {
+        loop {
+            if let Some(result) = completed.borrow().clone() {
+                return result;
+            }
+            completed
+                .changed()
+                .await
+                .map_err(|_| "ASR_SESSION_CLOSED".to_string())?;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| {
+        session.stop_task.cancel();
+        Err("ASR_FINAL_TIMEOUT: the provider did not finish within 15 seconds".into())
+    });
+    remove(&session_id);
+    result
 }
 #[tauri::command]
 pub fn voice_stop_capture(session_id: String) {
@@ -299,6 +388,7 @@ pub fn voice_stop_capture(session_id: String) {
     if guard.as_ref().is_some_and(|s| s.id == session_id) {
         let session = guard.take().unwrap();
         session.cancel.store(true, Ordering::Relaxed);
+        session.stop_task.cancel();
         #[cfg(feature = "voice-capture")]
         if let Some(capture) = session.capture.lock().unwrap().take() {
             let _ = capture.stop.send(());
@@ -381,6 +471,8 @@ mod tests {
             id: "current-input".into(),
             cancel: Arc::new(AtomicBool::new(false)),
             finishing: AtomicBool::new(false),
+            stop_task: tokio_util::sync::CancellationToken::new(),
+            completed: tokio::sync::watch::channel(None).0,
             engine: Arc::new(AsrManager::configured("whisper-base", "auto")),
             streaming: AtomicBool::new(false),
             #[cfg(feature = "voice-capture")]

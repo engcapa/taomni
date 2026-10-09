@@ -28,6 +28,7 @@ mod macos_save_dialog;
 pub mod pin_arrangement;
 pub mod pin_tools;
 pub mod scroll_manual;
+pub mod scroll_exit;
 #[cfg(target_os = "windows")]
 mod windows_save_dialog;
 
@@ -1459,7 +1460,7 @@ async fn begin_scroll_ui(
       }}
       q('screenshot-scroll-capture').click(); await sleep(100);
       if (!q('screenshot-scroll-instructions')?.textContent) throw new Error('scroll instructions missing');
-      if ({start}) q('screenshot-scroll-start').click();
+      if ({start}) {{ q('screenshot-scroll-mode-auto').click(); await sleep(100); q('screenshot-scroll-start').click(); }}
       return true;
     "#,
         x = region.0,
@@ -1894,6 +1895,26 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
 pub async fn screenshot_qa_full_recorder(app: AppHandle) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
+    // A production instance may own the default chord. Use a separate test
+    // binding in the isolated QA profile and restore its settings afterwards.
+    let settings_path = crate::resolved_app_data_dir(&app)
+        .map_err(|e| e.to_string())?.join("screenshot-settings.json");
+    let original = std::fs::read(&settings_path).ok();
+    if !super::pins::native_wayland() {
+        super::shortcut::screenshot_shortcut_set(app.clone(), Some("Control+Shift+F10".into())).await?;
+    }
+    let result = full_recorder(&app).await;
+    let _ = super::shortcut::screenshot_shortcut_set(app.clone(), Some(String::new())).await;
+    if let Some(bytes) = original {
+        let _ = std::fs::write(&settings_path, bytes);
+    } else {
+        let _ = std::fs::remove_file(&settings_path);
+    }
+    super::shortcut::init(&app);
+    result
+}
+
+async fn full_recorder(app: &AppHandle) -> Result<String, String> {
     super::close_session(&app);
     let display = capture::resolve_display(&app, None).map_err(|e| e.to_string())?;
     let started = super::screenshot_start_recording(
