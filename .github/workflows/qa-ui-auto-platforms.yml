@@ -351,6 +351,14 @@ jobs:
           restore-keys: |
             qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
             qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
+      - name: Verify owned Wayland desktop before expensive native checks
+        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_profile == 'ubuntu-26.04-wayland'
+        env:
+          QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
+        run: >-
+          dbus-run-session -- python .agents/skills/qa-ui-auto/scripts/ci_desktop_preflight.py
+          --profile ubuntu-26.04-wayland --capabilities "$QA_CAPABILITIES"
+          --report 'qa-ui-auto-report/${{ matrix.id }}/desktop-preflight'
       - name: RDP unit contracts on the native platform
         # The IronRDP unit contracts are platform-independent. Run the
         # expensive release test matrix once on the Linux representative;
