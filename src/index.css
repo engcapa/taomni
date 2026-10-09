@@ -36,7 +36,7 @@
   .taomni-control-bar .taomni-theme-cycle > svg { flex-shrink: 0; }
   .taomni-control-bar [data-testid="workspace-home"],
   .taomni-control-bar [data-testid="global-search"],
-  .taomni-control-bar [data-testid="global-new"] { padding-inline: 4px; flex-shrink: 0; }
+  .taomni-control-bar [data-testid="global-new"] { padding-inline: 3px; flex-shrink: 0; }
   .workspace-main-layout { position: relative; }
   .workspace-main-layout > #sidebar {
     position: absolute !important;
