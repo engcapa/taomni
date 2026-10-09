@@ -59,9 +59,10 @@ verification:
       requirement: An ARM target with the overwritten Intel bytes is rejected by real minisign verification, preserving the installed app.
       actions: [3, 5, 8]
       checkpoints:
+        - {step: 4, expectation: The installed AppKit About item retains its native callback and opens the product dialog.}
         - {step: 10, expectation: Signature validation error is visible instead of the restart gate.}
         - {step: 11, expectation: Independent host SHA256 still matches the original disposable app.}
-      results: [10, 11]
+      results: [4, 10, 11]
     - id: V-UPD-MAC-02
       requirement: Corrected ARM mapping downloads, verifies and installs the authentic ARM release through the architecture selector.
       actions: [13, 14, 16, 18, 20]
@@ -73,10 +74,11 @@ verification:
       requirement: The Intel choice and About version entry remain functional with the corrected release mapping.
       actions: [24, 26, 28, 30, 33]
       checkpoints:
+        - {step: 27, expectation: After reloading WKWebView the newly installed native About callback opens the product dialog.}
         - {step: 32, expectation: The Intel target is selected in the production dialog.}
         - {step: 34, expectation: The Intel installation reaches the restart confirmation gate.}
         - {step: 35, expectation: 'Host executable SHA256 matches the signed archive, lipo reports x86_64 and Info.plist reports 0.4.29.'}
-      results: [34, 35]
+      results: [27, 34, 35]
   visual:
     - check: Update architecture states and error/ready dialog remain observable.
       method: automated
