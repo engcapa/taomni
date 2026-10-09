@@ -6,6 +6,9 @@ use std::time::UNIX_EPOCH;
 use tauri::State;
 use tauri::ipc::{InvokeBody, Request, Response};
 
+#[cfg(any(all(unix, not(target_os = "macos")), test))]
+mod clipboard_text;
+
 const MAX_READ_STREAM_CHUNK: usize = 1_048_576;
 
 #[derive(serde::Serialize)]
@@ -1286,7 +1289,7 @@ mod platform {
     /// API or the caller's normal empty-clipboard handling to decide next.
     pub fn clipboard_read_text_fallback() -> Result<Option<String>, String> {
         if std::env::var_os("WAYLAND_DISPLAY").is_some() {
-            if let Ok(Some(text)) = run_clipboard_reader("wl-paste", &["--no-newline"]) {
+            if let Some(text) = run_clipboard_reader("wl-paste", &["--no-newline"])? {
                 return Ok(Some(text));
             }
         }
@@ -1593,8 +1596,7 @@ mod platform {
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(err) => Err(format!("{program}: {err}")),
             Ok(output) if output.status.success() => {
-                let text = String::from_utf8_lossy(&output.stdout).to_string();
-                Ok((!text.trim().is_empty()).then_some(text))
+                super::clipboard_text::decode_payload(program, output.stdout)
             }
             Ok(_) => Ok(None),
         }
