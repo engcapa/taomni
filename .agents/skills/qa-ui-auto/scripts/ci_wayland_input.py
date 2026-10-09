@@ -27,10 +27,12 @@ WINDOW_STATE = """(() => ({
 }))()"""
 
 
-def owned_window_pid(windows, application: Path, runtime: Path, proc: Path = Path("/proc")) -> int:
+def owned_window_pid(windows, application: Path, runtime: Path, proc: Path = Path("/proc"), *, title=None) -> int:
     """Match a mapped window to the executable in this private compositor."""
     matches = []
     for window in windows:
+        if title is not None and window["title"] != title:
+            continue
         pid = int(window["pid"])
         directory = proc / str(pid)
         try:
@@ -133,15 +135,17 @@ def main() -> None:
 
     def window_command(request, diagnostics):
         state = evaluate(WINDOW_STATE)
-        pid = owned_window_pid(state["windows"], Path(request["application"]), args.socket.parent)
-        window = next(w for w in state["windows"] if w["pid"] == pid)
+        title = request.get("title")
+        pid = owned_window_pid(state["windows"], Path(request["application"]), args.socket.parent, title=title)
+        window = next(w for w in state["windows"] if w["pid"] == pid and (title is None or w["title"] == title))
         diagnostics["window"] = window
         if request["command"] == "geometry":
             return window
         if request["command"] == "place":
             rect = request["rect"]
+            selector = f"w.get_pid() === {pid}" + (f" && w.get_title() === {json.dumps(title)}" if title is not None else "")
             evaluate(f"(() => {{ const w = global.get_window_actors().map(a => a.meta_window)"
-                     f".find(w => w.get_pid() === {pid}); w.unmaximize(3); "
+                     f".find(w => {selector}); w.unmaximize(3); "
                      f"w.move_resize_frame(true, {int(rect['x'])}, {int(rect['y'])}, "
                      f"{int(rect['width'])}, {int(rect['height'])}); return true; }})()")
             return True
@@ -186,6 +190,13 @@ def main() -> None:
                         value = focus_window(evaluate, pid, diagnostics)
                     elif name == "keys":
                         inject_keys(request["chords"])
+                    elif name == "text":
+                        for character in request["text"]:
+                            code = ord(character)
+                            keysym = code if code <= 0xff else 0x01000000 | code
+                            call(session, interface, "NotifyKeyboardKeysym", GLib.Variant("(ub)", (keysym, True)))
+                            call(session, interface, "NotifyKeyboardKeysym", GLib.Variant("(ub)", (keysym, False)))
+                            time.sleep(0.02)
                     elif name == "clipboard_serial":
                         value = clipboard_serial[0]
                     elif name == "xwayland_display":
@@ -196,6 +207,33 @@ def main() -> None:
                         value = window_command(request, diagnostics)
                     elif name == "pointer":
                         value = pointer(request["x"], request["y"])
+                    elif name == "pointer_position":
+                        value = evaluate("global.get_pointer().slice(0, 2)")
+                    elif name == "button":
+                        button = {"left": 272, "right": 273, "middle": 274}[request["button"]]
+                        call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (button, True)))
+                        time.sleep(0.05)
+                        call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (button, False)))
+                    elif name == "wheel":
+                        pointer(request["x"], request["y"])
+                        call(session, interface, "NotifyPointerAxisDiscrete",
+                             GLib.Variant("(ui)", (0, int(request["steps"]))))
+                    elif name == "path":
+                        points = request["points"]
+                        if len(points) < 2:
+                            raise ValueError("mouse path requires at least two points")
+                        pointer(*points[0])
+                        time.sleep(0.15)
+                        call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, True)))
+                        try:
+                            time.sleep(0.25)
+                            for start, end in zip(points, points[1:]):
+                                for step in range(1, 17):
+                                    pointer(*(round(a + (b - a) * step / 16) for a, b in zip(start, end)))
+                                    time.sleep(0.018)
+                                time.sleep(0.12)
+                        finally:
+                            call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, False)))
                     elif name == "drag":
                         start, end = request["start"], request["end"]
                         diagnostics["pointer_start"] = pointer(*start)

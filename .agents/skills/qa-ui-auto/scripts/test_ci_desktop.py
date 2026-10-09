@@ -392,10 +392,22 @@ class DesktopTests(unittest.TestCase):
                  'GdkWaylandDisplay\n1\n', portal, 'GNOME Shell 50']):
             activation_env = {}
             started = []
+            accessibility_enabled = []
 
             def activate(command, **kwargs):
-                self.assertEqual(command[0], 'dbus-update-activation-environment')
-                activation_env.update({key: os.environ[key] for key in command[1:]})
+                if command[0] == 'dbus-update-activation-environment':
+                    activation_env.update({key: os.environ[key] for key in command[1:]})
+                else:
+                    self.assertEqual(command, [
+                        'gdbus', 'call', '--session', '--dest', 'org.a11y.Bus',
+                        '--object-path', '/org/a11y/status', '--method',
+                        'org.freedesktop.DBus.Properties.Set', 'org.a11y.Status',
+                        'IsEnabled', '<true>',
+                    ])
+                    self.assertEqual(activation_env['GTK_A11Y'], 'atspi')
+                    self.assertEqual(activation_env['NO_AT_BRIDGE'], '0')
+                    accessibility_enabled.append(True)
+                return Mock(returncode=0)
 
             def launch(command, **kwargs):
                 if command[0] == 'gnome-shell':
@@ -404,6 +416,7 @@ class DesktopTests(unittest.TestCase):
                     self.assertEqual(activation_env['XDG_CURRENT_DESKTOP'], 'ubuntu:GNOME')
                     self.assertEqual(activation_env['GDK_BACKEND'], 'wayland')
                     self.assertEqual(activation_env['XDG_RUNTIME_DIR'], os.environ['XDG_RUNTIME_DIR'])
+                    self.assertEqual(accessibility_enabled, [True])
                     self.assertIn('pipewire', started)
                     self.assertIn('--unsafe-mode', command)
                 started.append(command[0])

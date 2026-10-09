@@ -34,8 +34,7 @@ async fn run(app: &AppHandle) -> anyhow::Result<Value> {
             tokio::time::sleep(Duration::from_millis(600)).await;
         }
         let source = read_source(&fixture).await?;
-        let inner = fixture.inner_position()?;
-        let size = fixture.inner_size()?;
+        let (inner, size) = observed_inner_rect(&fixture).await?;
         super::super::open_overlay_with_window(
             app,
             Some(display.id.clone()),
@@ -105,14 +104,7 @@ async fn run(app: &AppHandle) -> anyhow::Result<Value> {
                 ),
                 source.scale,
             );
-            tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-                use enigo::Mouse;
-                let mut input = enigo::Enigo::new(&enigo::Settings::default())?;
-                move_os_pointer(&mut input, point)?;
-                input.scroll(1, enigo::Axis::Vertical)?;
-                Ok(())
-            })
-            .await??;
+            os_wheel(point, 1).await?;
             wait_frames(app, 2).await?;
         } else if !fullscreen {
             let outside = input_point((display.x + 16, display.y + 16), source.scale);
@@ -121,7 +113,7 @@ async fn run(app: &AppHandle) -> anyhow::Result<Value> {
             let before = run_js(&fixture, "return document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]').scrollTop;", Duration::from_secs(5)).await?;
             tokio::time::sleep(Duration::from_millis(900)).await;
             let after = run_js(&fixture, "return document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]').scrollTop;", Duration::from_secs(5)).await?;
-            let pointer = app.cursor_position()?;
+            let pointer = observed_pointer(app).await?;
             anyhow::ensure!(
                 before == after && (pointer.x - (display.x + 16) as f64).abs() < 3.0,
                 "automatic capture stole the pointer or kept scrolling outside the region"
@@ -148,17 +140,7 @@ async fn run(app: &AppHandle) -> anyhow::Result<Value> {
                 .is_some_and(|s| !s.stop.load(Ordering::SeqCst)),
             "Start was reused as Stop"
         );
-        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            use enigo::{Keyboard, Mouse};
-            let mut input = enigo::Enigo::new(&enigo::Settings::default())?;
-            if right_click {
-                input.button(enigo::Button::Right, enigo::Direction::Click)?;
-            } else {
-                input.key(enigo::Key::Escape, enigo::Direction::Click)?;
-            }
-            Ok(())
-        })
-        .await??;
+        os_stop_input(right_click).await?;
         tokio::time::sleep(Duration::from_millis(300)).await;
         trace.mark("stop-input", json!({"rightClick":right_click,"status":super::super::screenshot_scroll_status().await,
             "stop":super::super::tool_state().scroll.as_ref().map(|s| s.stop.load(Ordering::SeqCst))}));

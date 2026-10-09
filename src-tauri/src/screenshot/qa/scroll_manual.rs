@@ -85,22 +85,28 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         source.scale,
     );
     let mut positions = Vec::new();
-    let mut input = tokio::task::spawn_blocking(|| enigo::Enigo::new(&enigo::Settings::default()))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    let wayland_input = wayland::active();
+    #[cfg(not(target_os = "linux"))]
+    let wayland_input = false;
+    let mut input = if wayland_input {
+        None
+    } else {
+        Some(tokio::task::spawn_blocking(|| enigo::Enigo::new(&enigo::Settings::default()))
+            .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?)
+    };
     for _ in 0..70 {
-        input = tokio::task::spawn_blocking(move || -> anyhow::Result<enigo::Enigo> {
-            use enigo::Mouse;
-            move_os_pointer(&mut input, center)?;
-            input
-                .scroll(1, enigo::Axis::Vertical)
-                .map_err(|e| anyhow::anyhow!("wheel: {e}"))?;
-            Ok(input)
-        })
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+        if wayland_input {
+            os_wheel(center, 1).await.map_err(|e| e.to_string())?;
+        } else {
+            let mut session = input.take().context("manual wheel input session").map_err(|e| e.to_string())?;
+            input = Some(tokio::task::spawn_blocking(move || -> anyhow::Result<enigo::Enigo> {
+                use enigo::Mouse;
+                move_os_pointer(&mut session, center)?;
+                session.scroll(1, enigo::Axis::Vertical)?;
+                Ok(session)
+            }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?);
+        }
         tokio::time::sleep(Duration::from_millis(220)).await;
         let position = run_js(&fixture, "const el = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return {top:el.scrollTop, end:el.scrollHeight-el.clientHeight};", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
         let bottom = position["top"].as_f64().unwrap_or(0.0)

@@ -29,6 +29,8 @@ pub mod pin_tools;
 pub mod pin_arrangement;
 pub mod scroll_manual;
 pub mod scroll_exit;
+#[cfg(target_os = "linux")]
+mod wayland;
 #[cfg(target_os = "windows")]
 mod windows_save_dialog;
 
@@ -298,8 +300,7 @@ async fn open_fixture(
         park_pointer(input_point((display.x + 16, display.y + 16), s)).await?;
         tokio::time::sleep(Duration::from_millis(350)).await;
     }
-    let pos = window.inner_position().context("fixture position")?;
-    let size = window.inner_size().context("fixture size")?;
+    let (pos, size) = observed_inner_rect(&window).await?;
     let content_width = run_js(&window, "const root = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return root.querySelector('canvas')?.getBoundingClientRect().width ?? root.clientWidth;", Duration::from_secs(5)).await?.as_f64().context("fixture content width")?;
     let margin = (6.0 * s).round() as u32;
     let rx = (pos.x - display.x).max(0) as u32 + margin;
@@ -313,6 +314,68 @@ async fn open_fixture(
         size.height.saturating_sub(margin * 2),
     );
     Ok((window, display, region))
+}
+
+async fn observed_inner_rect(window: &WebviewWindow) -> anyhow::Result<(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        return wayland::inner_rect(window).await;
+    }
+    Ok((window.inner_position()?, window.inner_size()?))
+}
+
+async fn observed_outer_rect(window: &WebviewWindow) -> anyhow::Result<(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        return wayland::rect(&wayland::window(window).await?["frame"], window.scale_factor()?.max(0.5));
+    }
+    Ok((window.outer_position()?, window.outer_size()?))
+}
+
+async fn os_wheel(point: (i32, i32), steps: i32) -> anyhow::Result<()> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        return wayland::wheel(point, steps).await;
+    }
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        use enigo::Mouse;
+        let mut input = enigo::Enigo::new(&enigo::Settings::default())?;
+        move_os_pointer(&mut input, point)?;
+        input.scroll(steps, enigo::Axis::Vertical)?;
+        Ok(())
+    }).await.context("OS wheel task")?
+}
+
+async fn os_stop_input(right_click: bool) -> anyhow::Result<()> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        if right_click {
+            wayland::command(json!({"command":"button","button":"right"})).await?;
+        } else {
+            wayland::keys(vec![vec![0xff1b]]).await?;
+        }
+        return Ok(());
+    }
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        use enigo::{Keyboard, Mouse};
+        let mut input = enigo::Enigo::new(&enigo::Settings::default())?;
+        if right_click {
+            input.button(enigo::Button::Right, enigo::Direction::Click)?;
+        } else {
+            input.key(enigo::Key::Escape, enigo::Direction::Click)?;
+        }
+        Ok(())
+    }).await.context("OS stop input task")?
+}
+
+async fn observed_pointer(app: &AppHandle) -> anyhow::Result<tauri::PhysicalPosition<f64>> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        let value = wayland::command(json!({"command":"pointer_position"})).await?;
+        return Ok(tauri::PhysicalPosition::new(value[0].as_f64().context("Mutter pointer x")?,
+            value[1].as_f64().context("Mutter pointer y")?));
+    }
+    Ok(app.cursor_position()?)
 }
 
 fn close_fixture(app: &AppHandle) {
@@ -1341,6 +1404,10 @@ async fn capture_surfaces(
         let visible = bar.is_visible()?;
         #[cfg(target_os = "linux")]
         let (control, visible, native_probe, ready) = if visible {
+            if wayland::active() {
+                let (rect, mapped, probe) = wayland::control_geometry(&bar).await?;
+                (rect, mapped, probe, true)
+            } else {
             // Tao initialises its outer-size cache from root_origin and only
             // refreshes geometry on configure events. Query the X server for
             // the actual mapped control instead of accepting that cache.
@@ -1358,6 +1425,7 @@ async fn capture_surfaces(
                 (rect, mapped, probe, true)
             } else {
                 (cached, false, probe, false)
+            }
             }
         } else {
             (cached, false, Value::Null, true)
@@ -2085,6 +2153,10 @@ fn move_os_pointer(input: &mut enigo::Enigo, (x, y): (i32, i32)) -> anyhow::Resu
 }
 
 async fn park_pointer(point: (i32, i32)) -> anyhow::Result<()> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        return wayland::pointer(point).await;
+    }
     tokio::task::spawn_blocking(move || {
         let mut input = enigo::Enigo::new(&enigo::Settings::default())
             .map_err(|e| anyhow::anyhow!("input synthesis unavailable: {e}"))?;
@@ -2095,6 +2167,10 @@ async fn park_pointer(point: (i32, i32)) -> anyhow::Result<()> {
 }
 
 async fn mouse_path(points: Vec<(i32, i32)>) -> anyhow::Result<()> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        return wayland::mouse_path(points).await;
+    }
     tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
         use enigo::{Button, Direction, Enigo, Mouse, Settings};
         let mut input = Enigo::new(&Settings::default())
@@ -2159,15 +2235,25 @@ fn x11_pin_is_above(state: &Value) -> bool {
 async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyhow::Result<Value> {
     let scale = window.scale_factor()?.max(0.5);
     // A deterministic visible starting point is setup, not the asserted move.
-    window.set_position(tauri::PhysicalPosition::new(
-        display.x + (36.0 * scale).round() as i32,
-        display.y + (48.0 * scale).round() as i32,
-    ))?;
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        let current = wayland::window(window).await?;
+        let mut rect = current["frame"].clone();
+        rect["x"] = json!(display.x as f64 / scale + 36.0);
+        rect["y"] = json!(display.y as f64 / scale + 48.0);
+        wayland::command(json!({"command":"place","application":std::env::current_exe()?,
+            "title":window.title()?,"rect":rect})).await?;
+    } else {
+        window.set_position(tauri::PhysicalPosition::new(display.x + (36.0 * scale).round() as i32,
+            display.y + (48.0 * scale).round() as i32))?;
+    }
+    #[cfg(not(target_os = "linux"))]
+    window.set_position(tauri::PhysicalPosition::new(display.x + (36.0 * scale).round() as i32,
+        display.y + (48.0 * scale).round() as i32))?;
     window.set_focus()?;
     tokio::time::sleep(Duration::from_millis(700)).await;
-    let before = window.outer_position()?;
-    let inner = window.inner_position()?;
-    let size = window.inner_size()?;
+    let before = observed_outer_rect(window).await?.0;
+    let (inner, size) = observed_inner_rect(window).await?;
     let start = (
         inner.x + size.width as i32 / 2,
         inner.y + size.height as i32 / 2,
@@ -2176,12 +2262,12 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
     let end = (start.0 + delta.0, start.1 + delta.1);
     mouse_path(vec![input_point(start, scale), input_point(end, scale)]).await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
-    let after = window.outer_position()?;
+    let after = observed_outer_rect(window).await?.0;
     let actual = (after.x - before.x, after.y - before.y);
     let moved = (actual.0 - delta.0).abs() <= 6 && (actual.1 - delta.1).abs() <= 6;
     let cached_topmost = window.is_always_on_top()?;
     #[cfg(target_os = "linux")]
-    let native_state = tokio::task::spawn_blocking(|| {
+    let native_state = if wayland::active() { wayland::window(window).await? } else { tokio::task::spawn_blocking(|| {
         std::process::Command::new("xprop")
             .args(["-name", "Pinned Screenshot", "_NET_WM_STATE"])
             .output()
@@ -2192,14 +2278,14 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
             .unwrap_or_else(|e| json!({"error":e.to_string()}))
     })
     .await
-    .context("native pin state probe")?;
+    .context("native pin state probe")? };
     #[cfg(not(target_os = "linux"))]
     let native_state = Value::Null;
     // Tao's GTK window-state cache can lose ABOVE after a move even when the
     // actual X11 window retains it (run36990397751). Require the WM's atom,
     // not the builder's requested flag or a fallback to the stale cache.
     #[cfg(target_os = "linux")]
-    let topmost = x11_pin_is_above(&native_state);
+    let topmost = if wayland::active() {native_state["above"] == true} else {x11_pin_is_above(&native_state)};
     #[cfg(not(target_os = "linux"))]
     let topmost = cached_topmost;
     Ok(
@@ -2249,7 +2335,7 @@ pub async fn screenshot_qa_freehand(app: AppHandle) -> Result<String, String> {
             .await
             .map_err(|e| format!("{e:#}"))?;
         tokio::time::sleep(Duration::from_millis(350)).await;
-        let origin = fixture.inner_position().map_err(|e| e.to_string())?;
+        let origin = observed_inner_rect(&fixture).await.map_err(|e| e.to_string())?.0;
         super::open_overlay(&app, Some(display.id.clone())).await?;
         let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
             .await
@@ -2425,6 +2511,10 @@ pub async fn screenshot_qa_pin(app: AppHandle) -> Result<String, String> {
 }
 
 async fn press_hotkey() -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        return wayland::keys(vec![vec![0xffe3, 0xffe1, 0xffc6]]).await.map_err(|e| e.to_string());
+    }
     tokio::task::spawn_blocking(|| -> anyhow::Result<()> {
         use enigo::{Direction, Enigo, Key, Keyboard, Settings};
         let mut enigo = Enigo::new(&Settings::default())

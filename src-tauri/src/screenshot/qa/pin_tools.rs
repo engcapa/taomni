@@ -1,6 +1,15 @@
 use super::*;
 
 async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Result<Value> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        wayland::keys(vec![vec![0xffe3, 'l' as u32]]).await?;
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        wayland::keys(vec![vec![0xffe3, 'a' as u32]]).await?;
+        wayland::type_text(destination.to_string_lossy().into_owned()).await?;
+        wayland::keys(vec![vec![0xff0d]]).await?;
+        return Ok(json!({"input":"OS keyboard via owned Mutter desktop"}));
+    }
     tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
         use enigo::{Direction, Key, Keyboard};
         let mut input = enigo::Enigo::new(&enigo::Settings::default())
@@ -153,7 +162,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     pin.show().map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(400)).await;
     let composited = capture::capture_display(&app, &display).map_err(|e| e.to_string())?;
-    let position = pin.inner_position().map_err(|e| e.to_string())?;
+    let position = observed_inner_rect(&pin).await.map_err(|e| e.to_string())?.0;
     let sample = (
         (position.x - display.x + (100.0 * scale) as i32) as u32,
         (position.y - display.y + (100.0 * scale) as i32) as u32,

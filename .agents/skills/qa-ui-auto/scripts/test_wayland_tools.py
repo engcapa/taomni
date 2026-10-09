@@ -5,12 +5,42 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ci_wayland_portal import owned_portal, owned_process, consent_kind
-from ci_wayland_input import focus_window, move_pointer
+from ci_wayland_input import focus_window, move_pointer, owned_window_pid
 from qa_ui_auto import host_clipboard, wayland
 from qa_ui_auto.native_steps import _read_wayland_clipboard
 
 
 class WaylandToolsTests(unittest.TestCase):
+    def test_named_window_retains_executable_runtime_and_uniqueness_checks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = root / 'taomni-qa'
+            executable.touch()
+            owned_runtime = root / 'qa-owned'
+            for pid, runtime in ((42, str(owned_runtime)), (43, str(root / 'personal'))):
+                process = root / str(pid)
+                process.mkdir()
+                (process / 'environ').write_bytes(('XDG_RUNTIME_DIR=' + runtime + '\0').encode())
+            windows = [dict(pid=42, title='Main'), dict(pid=42, title='Pinned Screenshot'),
+                       dict(pid=43, title='Other')]
+            with patch.object(Path, 'resolve', return_value=executable):
+                self.assertEqual(owned_window_pid(windows, executable, owned_runtime,
+                                                 root, title='Pinned Screenshot'), 42)
+                for title in ('Other', 'Missing'):
+                    with self.assertRaisesRegex(RuntimeError, 'found 0'):
+                        owned_window_pid(windows, executable, owned_runtime, root, title=title)
+                with self.assertRaisesRegex(RuntimeError, 'found 2'):
+                    owned_window_pid(windows, executable, owned_runtime, root)
+                with self.assertRaisesRegex(RuntimeError, 'found 2'):
+                    owned_window_pid(windows + [windows[1]], executable, owned_runtime,
+                                     root, title='Pinned Screenshot')
+            def resolve(path, **kwargs):
+                return root / 'other-app' if path.name == 'exe' else executable
+            with patch.object(Path, 'resolve', resolve):
+                with self.assertRaisesRegex(RuntimeError, 'found 0'):
+                    owned_window_pid(windows, executable, owned_runtime, root,
+                                     title='Pinned Screenshot')
+
     def test_consent_only_accepts_known_dialogs_from_their_owning_process(self):
         def records(name, showing=True):
             return [{"name": name, "showing": showing}]
