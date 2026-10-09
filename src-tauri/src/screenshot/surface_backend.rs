@@ -1,0 +1,64 @@
+//! Floating capture surfaces need absolute placement and keep-above.
+//! xdg-toplevel provides neither. Use the compositor's XWayland connection
+//! for these auxiliary GTK windows; the main window and capture portal stay
+//! on Wayland. Never change GDK's process-wide default display.
+
+use gtk::prelude::*;
+use std::cell::RefCell;
+
+thread_local! {
+    static FLOATING_DISPLAY: RefCell<Option<gtk::gdk::Display>> = const { RefCell::new(None) };
+}
+
+fn configure(window: &gtk::ApplicationWindow) -> Result<(), String> {
+    if !super::pins::native_wayland() {
+        return Ok(());
+    }
+    FLOATING_DISPLAY.with(|slot| {
+        if slot.borrow().is_none() {
+            let name = std::env::var("DISPLAY")
+                .map_err(|_| "Floating screenshot windows require XWayland (DISPLAY missing)")?;
+            let display = gtk::gdk::Display::open(&name)
+                .filter(|display| display.type_().name() == "GdkX11Display")
+                .ok_or("Cannot open XWayland for floating screenshot windows; allow both wayland and x11 in GDK_BACKEND")?;
+            *slot.borrow_mut() = Some(display);
+        }
+        let display = slot.borrow();
+        let screen = display.as_ref().unwrap().default_screen();
+        window.set_screen(&screen);
+        window.set_keep_above(true);
+        Ok(())
+    })
+}
+
+pub(super) fn webview(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let target = window.clone();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            let result = target
+                .gtk_window()
+                .map_err(|e| e.to_string())
+                .and_then(|w| configure(&w));
+            let _ = tx.send(result);
+        })
+        .map_err(|e| e.to_string())?;
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("configure floating capture window: {e}"))?
+}
+
+pub(super) fn border(window: &tauri::Window) -> Result<(), String> {
+    let target = window.clone();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            let result = target
+                .gtk_window()
+                .map_err(|e| e.to_string())
+                .and_then(|w| configure(&w));
+            let _ = tx.send(result);
+        })
+        .map_err(|e| e.to_string())?;
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("configure capture outline: {e}"))?
+}

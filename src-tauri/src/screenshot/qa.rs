@@ -25,10 +25,10 @@ use super::qa_oracle;
 pub mod colors;
 #[cfg(target_os = "macos")]
 mod macos_save_dialog;
-pub mod pin_tools;
 pub mod pin_arrangement;
-pub mod scroll_manual;
+pub mod pin_tools;
 pub mod scroll_exit;
+pub mod scroll_manual;
 #[cfg(target_os = "linux")]
 mod wayland;
 #[cfg(target_os = "windows")]
@@ -316,7 +316,9 @@ async fn open_fixture(
     Ok((window, display, region))
 }
 
-async fn observed_inner_rect(window: &WebviewWindow) -> anyhow::Result<(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)> {
+async fn observed_inner_rect(
+    window: &WebviewWindow,
+) -> anyhow::Result<(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)> {
     #[cfg(target_os = "linux")]
     if wayland::active() {
         return wayland::inner_rect(window).await;
@@ -324,10 +326,15 @@ async fn observed_inner_rect(window: &WebviewWindow) -> anyhow::Result<(tauri::P
     Ok((window.inner_position()?, window.inner_size()?))
 }
 
-async fn observed_outer_rect(window: &WebviewWindow) -> anyhow::Result<(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)> {
+async fn observed_outer_rect(
+    window: &WebviewWindow,
+) -> anyhow::Result<(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)> {
     #[cfg(target_os = "linux")]
     if wayland::active() {
-        return wayland::rect(&wayland::window(window).await?["frame"], window.scale_factor()?.max(0.5));
+        return wayland::rect(
+            &wayland::window(window).await?["frame"],
+            window.scale_factor()?.max(0.5),
+        );
     }
     Ok((window.outer_position()?, window.outer_size()?))
 }
@@ -343,7 +350,9 @@ async fn os_wheel(point: (i32, i32), steps: i32) -> anyhow::Result<()> {
         move_os_pointer(&mut input, point)?;
         input.scroll(steps, enigo::Axis::Vertical)?;
         Ok(())
-    }).await.context("OS wheel task")?
+    })
+    .await
+    .context("OS wheel task")?
 }
 
 async fn os_stop_input(right_click: bool) -> anyhow::Result<()> {
@@ -365,15 +374,19 @@ async fn os_stop_input(right_click: bool) -> anyhow::Result<()> {
             input.key(enigo::Key::Escape, enigo::Direction::Click)?;
         }
         Ok(())
-    }).await.context("OS stop input task")?
+    })
+    .await
+    .context("OS stop input task")?
 }
 
 async fn observed_pointer(app: &AppHandle) -> anyhow::Result<tauri::PhysicalPosition<f64>> {
     #[cfg(target_os = "linux")]
     if wayland::active() {
         let value = wayland::command(json!({"command":"pointer_position"})).await?;
-        return Ok(tauri::PhysicalPosition::new(value[0].as_f64().context("Mutter pointer x")?,
-            value[1].as_f64().context("Mutter pointer y")?));
+        return Ok(tauri::PhysicalPosition::new(
+            value[0].as_f64().context("Mutter pointer x")?,
+            value[1].as_f64().context("Mutter pointer y")?,
+        ));
     }
     Ok(app.cursor_position()?)
 }
@@ -755,17 +768,35 @@ pub async fn screenshot_qa_capture_fidelity(app: AppHandle) -> Result<String, St
     // production capture command briefly so the case checks the settled
     // desktop pixels without weakening the comparison oracle.
     let mut file = super::screenshot_capture_region(
-        app.clone(), Some(display.id.clone()), region.0, region.1, region.2, region.3,
-    ).await?;
-    let mut image = image::open(&file.path).map_err(|e| e.to_string())?.to_rgba8();
+        app.clone(),
+        Some(display.id.clone()),
+        region.0,
+        region.1,
+        region.2,
+        region.3,
+    )
+    .await?;
+    let mut image = image::open(&file.path)
+        .map_err(|e| e.to_string())?
+        .to_rgba8();
     let mut comparison = qa_oracle::compare(&image, &expected, false);
     for _ in 0..5 {
-        if comparison.passed { break; }
+        if comparison.passed {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(250)).await;
         file = super::screenshot_capture_region(
-            app.clone(), Some(display.id.clone()), region.0, region.1, region.2, region.3,
-        ).await?;
-        image = image::open(&file.path).map_err(|e| e.to_string())?.to_rgba8();
+            app.clone(),
+            Some(display.id.clone()),
+            region.0,
+            region.1,
+            region.2,
+            region.3,
+        )
+        .await?;
+        image = image::open(&file.path)
+            .map_err(|e| e.to_string())?
+            .to_rgba8();
         comparison = qa_oracle::compare(&image, &expected, false);
     }
     let runs = row_runs(&image, image.width() * 3 / 4);
@@ -903,7 +934,9 @@ pub async fn screenshot_qa_annotation_tools(app: AppHandle) -> Result<String, St
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
     super::open_overlay(&app, None).await?;
-    let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
     let result = run_js(&overlay, r#"
       const sleep=ms=>new Promise(r=>setTimeout(r,ms));
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
@@ -929,7 +962,9 @@ pub async fn screenshot_qa_annotation_tools(app: AppHandle) -> Result<String, St
       const afterErase=Number(q('screenshot-annotation-canvas').dataset.shapes);
       return {filledRect,beforeErase,afterErase,eraseMode:q('screenshot-eraser-mode').value,fill:filledRect};
     "#, Duration::from_secs(25)).await.map_err(|e| e.to_string())?;
-    overlay.eval("document.querySelector('[data-testid=\"screenshot-cancel\"]')?.click()").map_err(|e| e.to_string())?;
+    overlay
+        .eval("document.querySelector('[data-testid=\"screenshot-cancel\"]')?.click()")
+        .map_err(|e| e.to_string())?;
     let closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
     Ok(report(
         result["filledRect"] == json!(true)
@@ -957,7 +992,9 @@ pub async fn screenshot_qa_scroll(app: AppHandle) -> Result<String, String> {
     park_pointer(input_point((display.x + 16, display.y + 16), source.scale))
         .await
         .map_err(|e| e.to_string())?;
-    let control = std::sync::Arc::new(super::scroll::ScrollControl::new(super::scroll::ScrollMode::Auto));
+    let control = std::sync::Arc::new(super::scroll::ScrollControl::new(
+        super::scroll::ScrollMode::Auto,
+    ));
     let worker_control = control.clone();
     let worker_display = display.clone();
     let worker = app.clone();
@@ -1418,24 +1455,24 @@ async fn capture_surfaces(
                 let (rect, mapped, probe) = wayland::control_geometry(&bar).await?;
                 (rect, mapped, probe, true)
             } else {
-            // Tao initialises its outer-size cache from root_origin and only
-            // refreshes geometry on configure events. Query the X server for
-            // the actual mapped control instead of accepting that cache.
-            let output = std::process::Command::new("xwininfo")
-                .args(["-name", &bar.title()?, "-stats"])
-                .env("LC_ALL", "C")
-                .output()
-                .context("query native capture control geometry")?;
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let probe = json!({"success":output.status.success(),"stdout":stdout,
+                // Tao initialises its outer-size cache from root_origin and only
+                // refreshes geometry on configure events. Query the X server for
+                // the actual mapped control instead of accepting that cache.
+                let output = std::process::Command::new("xwininfo")
+                    .args(["-name", &bar.title()?, "-stats"])
+                    .env("LC_ALL", "C")
+                    .output()
+                    .context("query native capture control geometry")?;
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let probe = json!({"success":output.status.success(),"stdout":stdout,
                 "stderr":String::from_utf8_lossy(&output.stderr)});
-            if let Some((rect, mapped)) =
-                x11_control_geometry(&stdout).filter(|_| output.status.success())
-            {
-                (rect, mapped, probe, true)
-            } else {
-                (cached, false, probe, false)
-            }
+                if let Some((rect, mapped)) =
+                    x11_control_geometry(&stdout).filter(|_| output.status.success())
+                {
+                    (rect, mapped, probe, true)
+                } else {
+                    (cached, false, probe, false)
+                }
             }
         } else {
             (cached, false, Value::Null, true)
@@ -1460,13 +1497,29 @@ async fn capture_surfaces(
         }
         let pos = window.outer_position()?;
         let size = window.outer_size()?;
-        let rect = super::surfaces::Rect {
+        #[allow(unused_mut)]
+        let mut rect = super::surfaces::Rect {
             x: pos.x,
             y: pos.y,
             w: size.width as i32,
             h: size.height as i32,
         };
-        let visible = window.is_visible()?;
+        #[allow(unused_mut)]
+        let mut visible = window.is_visible()?;
+        #[cfg(target_os = "linux")]
+        if wayland::active() {
+            let native = wayland::command(json!({"command":"geometry",
+                "application":std::env::current_exe()?, "title":window.title()?}))
+            .await?;
+            let (pos, size) = wayland::rect(&native["client"], window.scale_factor()?.max(0.5))?;
+            rect = super::surfaces::Rect {
+                x: pos.x,
+                y: pos.y,
+                w: size.width as i32,
+                h: size.height as i32,
+            };
+            visible = native["visible"] == true;
+        }
         borders_outside &= !crop.intersects(rect) && visible;
         border_geometry
             .push(json!({"label":name,"rect":[rect.x,rect.y,rect.w,rect.h],"visible":visible}));
@@ -1957,10 +2010,12 @@ pub async fn screenshot_qa_full_recorder(app: AppHandle) -> Result<String, Strin
     // A production instance may own the default chord. Use a separate test
     // binding in the isolated QA profile and restore its settings afterwards.
     let settings_path = crate::resolved_app_data_dir(&app)
-        .map_err(|e| e.to_string())?.join("screenshot-settings.json");
+        .map_err(|e| e.to_string())?
+        .join("screenshot-settings.json");
     let original = std::fs::read(&settings_path).ok();
     if !super::pins::native_wayland() {
-        super::shortcut::screenshot_shortcut_set(app.clone(), Some("Control+Shift+F10".into())).await?;
+        super::shortcut::screenshot_shortcut_set(app.clone(), Some("Control+Shift+F10".into()))
+            .await?;
     }
     let result = full_recorder(&app).await;
     let _ = super::shortcut::screenshot_shortcut_set(app.clone(), Some(String::new())).await;
@@ -2251,15 +2306,22 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
         let mut rect = current["frame"].clone();
         rect["x"] = json!(display.x as f64 / scale + 36.0);
         rect["y"] = json!(display.y as f64 / scale + 48.0);
-        wayland::command(json!({"command":"place","application":std::env::current_exe()?,
-            "title":window.title()?,"rect":rect})).await?;
+        wayland::command(
+            json!({"command":"place","application":std::env::current_exe()?,
+            "title":window.title()?,"rect":rect}),
+        )
+        .await?;
     } else {
-        window.set_position(tauri::PhysicalPosition::new(display.x + (36.0 * scale).round() as i32,
-            display.y + (48.0 * scale).round() as i32))?;
+        window.set_position(tauri::PhysicalPosition::new(
+            display.x + (36.0 * scale).round() as i32,
+            display.y + (48.0 * scale).round() as i32,
+        ))?;
     }
     #[cfg(not(target_os = "linux"))]
-    window.set_position(tauri::PhysicalPosition::new(display.x + (36.0 * scale).round() as i32,
-        display.y + (48.0 * scale).round() as i32))?;
+    window.set_position(tauri::PhysicalPosition::new(
+        display.x + (36.0 * scale).round() as i32,
+        display.y + (48.0 * scale).round() as i32,
+    ))?;
     window.set_focus()?;
     tokio::time::sleep(Duration::from_millis(700)).await;
     let before = observed_outer_rect(window).await?.0;
@@ -2277,25 +2339,33 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
     let moved = (actual.0 - delta.0).abs() <= 6 && (actual.1 - delta.1).abs() <= 6;
     let cached_topmost = window.is_always_on_top()?;
     #[cfg(target_os = "linux")]
-    let native_state = if wayland::active() { wayland::window(window).await? } else { tokio::task::spawn_blocking(|| {
-        std::process::Command::new("xprop")
-            .args(["-name", "Pinned Screenshot", "_NET_WM_STATE"])
-            .output()
-            .map(|o| {
-                json!({"success":o.status.success(),"stdout":String::from_utf8_lossy(&o.stdout),
+    let native_state = if wayland::active() {
+        wayland::window(window).await?
+    } else {
+        tokio::task::spawn_blocking(|| {
+            std::process::Command::new("xprop")
+                .args(["-name", "Pinned Screenshot", "_NET_WM_STATE"])
+                .output()
+                .map(|o| {
+                    json!({"success":o.status.success(),"stdout":String::from_utf8_lossy(&o.stdout),
                 "stderr":String::from_utf8_lossy(&o.stderr)})
-            })
-            .unwrap_or_else(|e| json!({"error":e.to_string()}))
-    })
-    .await
-    .context("native pin state probe")? };
+                })
+                .unwrap_or_else(|e| json!({"error":e.to_string()}))
+        })
+        .await
+        .context("native pin state probe")?
+    };
     #[cfg(not(target_os = "linux"))]
     let native_state = Value::Null;
     // Tao's GTK window-state cache can lose ABOVE after a move even when the
     // actual X11 window retains it (run36990397751). Require the WM's atom,
     // not the builder's requested flag or a fallback to the stale cache.
     #[cfg(target_os = "linux")]
-    let topmost = if wayland::active() {native_state["above"] == true} else {x11_pin_is_above(&native_state)};
+    let topmost = if wayland::active() {
+        native_state["above"] == true
+    } else {
+        x11_pin_is_above(&native_state)
+    };
     #[cfg(not(target_os = "linux"))]
     let topmost = cached_topmost;
     Ok(
@@ -2345,7 +2415,10 @@ pub async fn screenshot_qa_freehand(app: AppHandle) -> Result<String, String> {
             .await
             .map_err(|e| format!("{e:#}"))?;
         tokio::time::sleep(Duration::from_millis(350)).await;
-        let origin = observed_inner_rect(&fixture).await.map_err(|e| e.to_string())?.0;
+        let origin = observed_inner_rect(&fixture)
+            .await
+            .map_err(|e| e.to_string())?
+            .0;
         super::open_overlay(&app, Some(display.id.clone())).await?;
         let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
             .await
@@ -2523,7 +2596,9 @@ pub async fn screenshot_qa_pin(app: AppHandle) -> Result<String, String> {
 async fn press_hotkey() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     if wayland::active() {
-        return wayland::keys(vec![vec![0xffe3, 0xffe1, 0xffc6]]).await.map_err(|e| e.to_string());
+        return wayland::keys(vec![vec![0xffe3, 0xffe1, 0xffc6]])
+            .await
+            .map_err(|e| e.to_string());
     }
     tokio::task::spawn_blocking(|| -> anyhow::Result<()> {
         use enigo::{Direction, Enigo, Key, Keyboard, Settings};

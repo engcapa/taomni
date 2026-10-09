@@ -92,7 +92,7 @@ class Desktop:
         os.environ.pop("XAUTHORITY", None)
         os.environ.update(XDG_RUNTIME_DIR=str(runtime), WAYLAND_DISPLAY="wayland-qa",
                           XDG_SESSION_TYPE="wayland", XDG_CURRENT_DESKTOP="ubuntu:GNOME",
-                          GDK_BACKEND="wayland", LIBGL_ALWAYS_SOFTWARE="1",
+                          GDK_BACKEND="wayland,x11", LIBGL_ALWAYS_SOFTWARE="1",
                           WEBKIT_DISABLE_DMABUF_RENDERER="1", GTK_A11Y="atspi", NO_AT_BRIDGE="0")
         # Shell startup can activate portals itself. Publish the new session
         # environment first, otherwise DBus selects the GTK/X11 fallback and
@@ -293,7 +293,7 @@ class Desktop:
         def engine_ready():
             if fcitx.poll() is not None:
                 raise RuntimeError("QA fcitx5 exited during engine startup")
-            if os.environ.get("GDK_BACKEND") == "wayland":
+            if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
                 # GTK present() cannot grant OS focus on Wayland. Select the
                 # probe in the owned compositor before checking its IM context.
                 from qa_ui_auto.wayland import command

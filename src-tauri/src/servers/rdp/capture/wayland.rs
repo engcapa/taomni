@@ -33,6 +33,11 @@ use super::{Capturer, Frame, PortalInput};
 use crate::servers::engine::LogEmitter;
 
 const FRAME_WAIT: Duration = Duration::from_millis(100);
+// The capture worker also drains portal input. Waiting a whole idle frame
+// timeout delays the very input that would make the compositor produce a
+// new frame. Bound that queue delay for interactive sessions only; this is
+// a Condvar wait, and never fabricates or duplicates a frame.
+const INPUT_POLL_WAIT: Duration = Duration::from_millis(5);
 const INITIAL_FRAME_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_DIMENSION: u32 = 16_384;
 
@@ -355,7 +360,12 @@ impl Capturer for WaylandCapturer {
         if let Some(frame) = self.retained.take() {
             return Ok(Some(frame));
         }
-        let Some(raw) = self.mailbox.take_timeout(FRAME_WAIT)? else {
+        let wait = if self.portal.input_enabled {
+            INPUT_POLL_WAIT
+        } else {
+            FRAME_WAIT
+        };
+        let Some(raw) = self.mailbox.take_timeout(wait)? else {
             if self.mailbox.is_closed() {
                 bail!("Wayland PipeWire capture stream closed");
             }

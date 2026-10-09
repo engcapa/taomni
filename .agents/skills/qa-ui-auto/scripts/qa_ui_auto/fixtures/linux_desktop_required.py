@@ -6,7 +6,7 @@ import shutil
 
 def setup(ctx):
     from . import FixtureSkip
-    if os.environ.get("GDK_BACKEND") != "wayland":
+    if os.environ.get("GDK_BACKEND", "").split(",")[0] != "wayland":
         from .linux_x11_required import setup as x11_setup
         return x11_setup(ctx)
     required = ("wl-copy", "wl-paste", "fcitx5-remote", "gdbus", "/usr/bin/python3")

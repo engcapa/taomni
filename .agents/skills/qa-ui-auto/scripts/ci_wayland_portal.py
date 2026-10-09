@@ -41,6 +41,8 @@ def consent_kind(executable: str, records: list[dict]) -> str | None:
             "Allow com.taomni.app.qa to Take Screenshots?",
             "Allow com.taomni.app.qa to Take a Screenshot?"}):
         return "screenshot-access"
+    if executable == "gnome-control-center-global-shortcuts-provider" and "Add Keyboard Shortcuts" in names:
+        return "global-shortcuts"
     return None
 
 
@@ -143,7 +145,8 @@ def main():
                 if app is None:
                     continue
                 pid = app.get_process_id()
-                executable = next((name for name in ("xdg-desktop-portal-gnome", "gnome-shell")
+                executable = next((name for name in ("xdg-desktop-portal-gnome", "gnome-shell",
+                                   "gnome-control-center-global-shortcuts-provider")
                                    if owned_process(pid, runtime, name)), None)
                 if executable is None:
                     continue
@@ -157,8 +160,7 @@ def main():
                     continue
                 # GTK4/libadwaita stacks add structural accessible layers;
                 # the monitor toggle can be deeper than a Shell dialog.
-                pairs = observe_nodes(app, Atspi.StateType,
-                                      30 if executable == "xdg-desktop-portal-gnome" else 15)
+                pairs = observe_nodes(app, Atspi.StateType, 15 if executable == "gnome-shell" else 30)
                 records = [record for _, record in pairs]
                 kind = consent_kind(executable, records)
                 actions = []
@@ -180,7 +182,7 @@ def main():
                         # Refresh the live states before toggling another
                         # control or activating Share; snapshots may be stale.
                         break
-                    labels = {"Allow"} if kind == "screenshot-access" else {"Share", "Allow"}
+                    labels = {"Allow"} if kind == "screenshot-access" else {"Add"} if kind == "global-shortcuts" else {"Share", "Allow"}
                     if record["name"].replace("_", "") in labels and record["role"] in {"push button", "button"}:
                         result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
                         actions.append({"name": record["name"], "action": "consent", **result})

@@ -11,6 +11,12 @@ from qa_ui_auto.native_steps import _read_wayland_clipboard
 
 
 class WaylandToolsTests(unittest.TestCase):
+    def test_auxiliary_x11_allowance_retains_wayland_input_transport(self):
+        with patch.dict(os.environ, {"GDK_BACKEND": "wayland,x11"}, clear=True):
+            self.assertTrue(wayland.active())
+            with self.assertRaisesRegex(RuntimeError, "owned desktop input socket"):
+                wayland.command("keys", chords=[[65]])
+
     def test_vanished_accessibility_siblings_do_not_hide_live_consent(self):
         app, stale, share = Mock(), Mock(), Mock()
         app.get_child_count.return_value = 3
@@ -95,6 +101,9 @@ class WaylandToolsTests(unittest.TestCase):
         self.assertIsNone(consent_kind("gnome-shell", records("Allow Apps to Use the Microphone?")))
         self.assertIsNone(consent_kind("other-process", records("Screenshot")))
         self.assertIsNone(consent_kind("gnome-shell", records("Allow Apps to Take Screenshots?", False)))
+        provider = "gnome-control-center-global-shortcuts-provider"
+        self.assertEqual(consent_kind(provider, records("Add Keyboard Shortcuts")), "global-shortcuts")
+        self.assertIsNone(consent_kind(provider, records("Microphone")))
 
     def test_pointer_waits_for_queued_motion_and_rejects_a_nonmoving_device(self):
         evaluate = Mock(side_effect=[[0, 0], [0, 0], [24, 18]])

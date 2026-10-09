@@ -524,7 +524,7 @@ class NativeSession:
         self.focus_warning = ""
         if platform.system() != "Linux":
             return
-        if os.environ.get("GDK_BACKEND") == "wayland":
+        if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
             self.activate_wayland_window()
             return
         if self.execute("return document.hasFocus();") is not True:
@@ -956,7 +956,7 @@ class NativeSession:
         # (path breadcrumbs, rename fields) disappear before /value arrives.
         # Select and replace through keyboard input while retaining focus.
         self.request("POST", self.element_path(element, "/click"), {})
-        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND") == "wayland":
+        if platform.system() == "Linux" and os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
             self._select_wayland_fill_input(selector)
         else:
             self.press_combo("Mod+a")
@@ -1024,7 +1024,7 @@ class NativeSession:
             previous = host_clipboard.get_text()
         try:
             self.request("POST", self.element_path(element, "/click"), {})
-            if os.environ.get("GDK_BACKEND") == "wayland":
+            if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
                 self._select_wayland_fill_input(selector)
             else:
                 self.press_combo("Mod+a")

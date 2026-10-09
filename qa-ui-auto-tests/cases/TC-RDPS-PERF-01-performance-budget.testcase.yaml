@@ -1,5 +1,5 @@
 id: TC-RDPS-PERF-01-performance-budget
-title: RDP server performance - connect time, input-to-frame latency and animation throughput
+title: RDP server performance - native portal input queue, connect time, latency and throughput
 description: 'V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Measures the
 
   Taomni RDP server with rdp-probe over loopback on the runner desktop:

@@ -1,5 +1,5 @@
 id: TC-SHOT-N4
-title: Native pin saved bytes and configurable OS hotkey lifecycle
+title: Native pin bytes and OS hotkey lifecycle including Wayland portal grant
 covers: [F27.1, F27.2]
 tags: [screenshot, native, p1]
 modes: [native]

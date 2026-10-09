@@ -1,5 +1,5 @@
 id: TC-SHOT-N7
-title: Native GIF recorder timer stop preview copy and cleanup
+title: Native GIF recorder controls outside capture, timer stop preview copy and cleanup
 covers:
 - F27.1
 tags:

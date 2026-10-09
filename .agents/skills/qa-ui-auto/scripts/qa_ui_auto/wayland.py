@@ -7,7 +7,7 @@ import socket
 
 
 def active() -> bool:
-    return os.environ.get("GDK_BACKEND") == "wayland"
+    return os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland"
 
 
 def command(name: str, **parameters):

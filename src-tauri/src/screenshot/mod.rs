@@ -27,6 +27,8 @@ pub mod scroll;
 pub(crate) mod scroll_input;
 mod session;
 pub mod shortcut;
+#[cfg(target_os = "linux")]
+mod surface_backend;
 pub mod surfaces;
 
 use std::borrow::Cow;
@@ -378,7 +380,7 @@ pub async fn screenshot_scroll_capture(
 
 #[tauri::command]
 pub async fn screenshot_scroll_surface() -> bool {
-    pins::native_wayland()
+    false
 }
 
 #[tauri::command]
@@ -434,27 +436,6 @@ fn scroll_layout(
     requested: (u32, u32, u32, u32),
 ) -> Result<((u32, u32, u32, u32), Option<surfaces::Rect>), String> {
     let rect = surfaces::region_rect(display, requested);
-    if pins::native_wayland() {
-        // Fullscreen transparent controller: only the bottom strip accepts
-        // input; all other pixels are transparent and click-through.
-        let full = surfaces::region_rect(display, (0, 0, display.width, display.height));
-        let (available, bar) =
-            surfaces::inside_control_strip(display, full, scroll::MIN_REGION_HEIGHT as i32)
-                .ok_or("display is too short for scroll capture controls")?;
-        let bottom = (rect.y + rect.h).min(available.y + available.h);
-        if bottom - rect.y < scroll::MIN_REGION_HEIGHT as i32 {
-            return Err("Move the selection above the bottom control strip".into());
-        }
-        return Ok((
-            (
-                requested.0,
-                requested.1,
-                requested.2,
-                (bottom - rect.y) as u32,
-            ),
-            Some(bar),
-        ));
-    }
     let mut displays = capture::list_displays(app).map_err(internal_error)?;
     displays.sort_by_key(|d| d.id != display.id);
     // A full-display or near-full-display selection has no useful place for
@@ -494,7 +475,6 @@ fn open_scroll_bar(
         WebviewUrl::App("index.html#screenshot-scroll".into()),
     )
     .title("Scroll capture")
-    .transparent(pins::native_wayland())
     .inner_size(surfaces::CONTROL_WIDTH, surfaces::CONTROL_HEIGHT)
     .visible(false)
     .decorations(false)
@@ -512,12 +492,7 @@ fn open_scroll_bar(
         }
     });
     #[cfg(target_os = "linux")]
-    if pins::native_wayland() {
-        window.set_fullscreen(true).map_err(|e| e.to_string())?;
-        window.show().map_err(|e| e.to_string())?;
-        surfaces::configure_wayland_scroll(&window)?;
-        return Ok(());
-    }
+    surface_backend::webview(&window)?;
     if let Some(rect) = position {
         window
             .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
@@ -1114,6 +1089,7 @@ fn open_pin_with_note(
         .resizable(true)
         .always_on_top(true)
         .skip_taskbar(true)
+        .visible(false)
         .build();
     let window = match window {
         Ok(window) => window,
@@ -1123,6 +1099,20 @@ fn open_pin_with_note(
             return Err(format!("open pin window: {e}"));
         }
     };
+    #[cfg(target_os = "linux")]
+    if let Err(error) = surface_backend::webview(&window) {
+        let _ = window.close();
+        tool_state().pins.remove(&label);
+        std::fs::remove_file(&pinned).ok();
+        return Err(error);
+    }
+    window
+        .set_position(tauri::LogicalPosition::new(
+            origin.0 + 96.0 + offset,
+            origin.1 + 96.0 + offset,
+        ))
+        .map_err(|e| e.to_string())?;
+    window.show().map_err(|e| e.to_string())?;
     let pin_label = label.clone();
     let pin_app = app.clone();
     window.on_window_event(move |event| {
@@ -1500,6 +1490,8 @@ async fn open_recorder_bar(
         })
         .build()
         .map_err(|e| format!("open recorder bar: {e}"))?;
+    #[cfg(target_os = "linux")]
+    surface_backend::webview(&window)?;
     watch_session_window(&window);
     // Bottom-center of the recorded display.
     let s = display.scale_factor.max(0.5);
