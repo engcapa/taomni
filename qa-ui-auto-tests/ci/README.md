@@ -164,9 +164,16 @@ protocols, a GTK `GdkWaylandDisplay` and Screenshot/ScreenCast/RemoteDesktop
 portal interfaces. `GDK_BACKEND=wayland` prevents a product WebView X11 fallback.
 The Wayland profile selects the same native case IDs as the default Linux
 desktop. AT-SPI operates real consent controls only in the private runtime's
-GNOME portal process and retains `desktop/portal-consent.jsonl`. The product
+GNOME portal process and its GNOME Shell screenshot access dialog, retaining
+`desktop/portal-consent.jsonl`. The product
 still opens its own approved session and receives real PipeWire frames.
 Portal interface readiness alone does not prove authorization or screen capture.
+Before compilation, desktop preflight requests an actual Screenshot PNG and,
+for RDP cases, a RemoteDesktop session granting a monitor, keyboard and pointer.
+Those responses are retained in `desktop-preflight/portal-preflight.json`.
+AT-SPI is explicitly enabled on the private session bus. A missing consent
+action fails this preflight instead of blocking the remaining WebViews behind
+a Shell modal dialog. No portal permission database is seeded.
 The Tk RDP workload uses Mutter's own XWayland display inside the GNOME
 compositor; this does not change the product's verified GTK backend.
 Headless Mutter initially exposes a `wl_seat` without input devices. A

@@ -4,13 +4,33 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from ci_wayland_portal import owned_portal
-from ci_wayland_input import focus_window
+from ci_wayland_portal import owned_portal, owned_process, consent_kind
+from ci_wayland_input import focus_window, move_pointer
 from qa_ui_auto import host_clipboard, wayland
 from qa_ui_auto.native_steps import _read_wayland_clipboard
 
 
 class WaylandToolsTests(unittest.TestCase):
+    def test_consent_only_accepts_known_dialogs_from_their_owning_process(self):
+        def records(name, showing=True):
+            return [{"name": name, "showing": showing}]
+        self.assertEqual(consent_kind("gnome-shell", records("Allow Apps to Take Screenshots?")), "screenshot-access")
+        self.assertEqual(consent_kind("xdg-desktop-portal-gnome", records("Screenshot")), "portal")
+        self.assertEqual(consent_kind("xdg-desktop-portal-gnome", records("Remote Desktop")), "portal")
+        self.assertIsNone(consent_kind("gnome-shell", records("Allow Apps to Use the Microphone?")))
+        self.assertIsNone(consent_kind("other-process", records("Screenshot")))
+        self.assertIsNone(consent_kind("gnome-shell", records("Allow Apps to Take Screenshots?", False)))
+
+    def test_pointer_waits_for_queued_motion_and_rejects_a_nonmoving_device(self):
+        evaluate = Mock(side_effect=[[0, 0], [0, 0], [24, 18]])
+        notify = Mock()
+        with patch("ci_wayland_input.time.sleep"):
+            self.assertEqual(move_pointer(evaluate, notify, 24, 18), [24, 18])
+        self.assertEqual(notify.call_count, 2)
+        with patch("ci_wayland_input.time.sleep"):
+            with self.assertRaisesRegex(RuntimeError, "did not reach"):
+                move_pointer(Mock(return_value=[0, 0]), notify, 24, 18)
+
     def test_fixture_readiness_waits_for_os_focus_and_reports_real_geometry(self):
         rect = {"x": 120, "y": 80, "width": 600, "height": 400}
         window = {"pid": 42, "focused": True, "frame": rect}
@@ -39,6 +59,9 @@ class WaylandToolsTests(unittest.TestCase):
                 self.assertFalse(owned_portal(43, "/tmp/qa-owned", root))
             with patch.object(Path, "resolve", return_value=root / "other-app"):
                 self.assertFalse(owned_portal(42, "/tmp/qa-owned", root))
+            with patch.object(Path, "resolve", return_value=root / "gnome-shell"):
+                self.assertTrue(owned_process(42, "/tmp/qa-owned", "gnome-shell", root))
+                self.assertFalse(owned_process(42, "/tmp/personal", "gnome-shell", root))
 
     def test_missing_owned_socket_fails_without_x11_fallback(self):
         with patch.dict(os.environ, {"GDK_BACKEND": "wayland"}, clear=True):

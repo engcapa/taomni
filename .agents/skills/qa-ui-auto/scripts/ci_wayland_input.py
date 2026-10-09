@@ -11,11 +11,14 @@ import time
 
 WINDOW_STATE = """(() => ({
     overview: Main.overview.visible,
+    modal_count: Main.modalCount,
+    stage_focus: global.stage.get_key_focus()?.get_accessible()?.get_name() ?? null,
     starting_up: Main.layoutManager._startingUp,
     windows: global.get_window_actors().map(actor => {
         const window = actor.meta_window;
         return {pid: window.get_pid(), title: window.get_title(),
                 focused: window.has_focus(), minimized: window.minimized,
+                visible: actor.visible && !window.minimized, above: window.is_above(),
                 frame: (() => { const r = window.get_frame_rect();
                     return {x: r.x, y: r.y, width: r.width, height: r.height}; })(),
                 client: (() => { const r = window.get_buffer_rect();
@@ -73,6 +76,18 @@ def focus_window(evaluate, pid: int, diagnostics: dict) -> dict:
         time.sleep(0.05)
 
 
+def move_pointer(evaluate, notify, x: int, y: int) -> list[int]:
+    # Mutter queues virtual motion. Observe its resulting coordinates before
+    # issuing a button event or computing the next relative displacement.
+    for _ in range(20):
+        current = evaluate("global.get_pointer().slice(0, 2)")
+        if abs(x - current[0]) <= 1 and abs(y - current[1]) <= 1:
+            return current
+        notify(float(x - current[0]), float(y - current[1]))
+        time.sleep(0.02)
+    raise RuntimeError(f"Mutter pointer did not reach {(x, y)}; observed {current}")
+
+
 def main() -> None:
     # Use the distro Python: Gio is installed with the GNOME desktop packages.
     from gi.repository import Gio, GLib
@@ -113,9 +128,8 @@ def main() -> None:
             time.sleep(0.12)
 
     def pointer(x, y):
-        current = evaluate("global.get_pointer().slice(0, 2)")
-        call(session, interface, "NotifyPointerMotionRelative",
-             GLib.Variant("(dd)", (float(x - current[0]), float(y - current[1]))))
+        return move_pointer(evaluate, lambda dx, dy: call(
+            session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (dx, dy))), x, y)
 
     def window_command(request, diagnostics):
         state = evaluate(WINDOW_STATE)
@@ -181,10 +195,10 @@ def main() -> None:
                     elif name in {"geometry", "place"}:
                         value = window_command(request, diagnostics)
                     elif name == "pointer":
-                        pointer(request["x"], request["y"])
+                        value = pointer(request["x"], request["y"])
                     elif name == "drag":
                         start, end = request["start"], request["end"]
-                        pointer(*start)
+                        diagnostics["pointer_start"] = pointer(*start)
                         call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, True)))
                         try:
                             time.sleep(0.2)
@@ -193,6 +207,8 @@ def main() -> None:
                                 time.sleep(0.04)
                         finally:
                             call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, False)))
+                        diagnostics["pointer_end"] = evaluate("global.get_pointer().slice(0, 2)")
+                        value = {"start": diagnostics["pointer_start"], "end": diagnostics["pointer_end"]}
                     else:
                         raise ValueError("unknown Wayland input command")
                     diagnostics["command"] = name

@@ -93,13 +93,18 @@ class Desktop:
         os.environ.update(XDG_RUNTIME_DIR=str(runtime), WAYLAND_DISPLAY="wayland-qa",
                           XDG_SESSION_TYPE="wayland", XDG_CURRENT_DESKTOP="ubuntu:GNOME",
                           GDK_BACKEND="wayland", LIBGL_ALWAYS_SOFTWARE="1",
-                          WEBKIT_DISABLE_DMABUF_RENDERER="1")
+                          WEBKIT_DISABLE_DMABUF_RENDERER="1", GTK_A11Y="atspi", NO_AT_BRIDGE="0")
         # Shell startup can activate portals itself. Publish the new session
         # environment first, otherwise DBus selects the GTK/X11 fallback and
         # those services keep the old runtime directory for the whole run.
         subprocess.run(["dbus-update-activation-environment", "XDG_RUNTIME_DIR", "WAYLAND_DISPLAY",
                         "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP", "GDK_BACKEND",
-                        "LIBGL_ALWAYS_SOFTWARE", "WEBKIT_DISABLE_DMABUF_RENDERER"], check=True, timeout=20)
+                        "LIBGL_ALWAYS_SOFTWARE", "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_A11Y",
+                        "NO_AT_BRIDGE"], check=True, timeout=20)
+        subprocess.run(["gdbus", "call", "--session", "--dest", "org.a11y.Bus",
+                        "--object-path", "/org/a11y/status", "--method",
+                        "org.freedesktop.DBus.Properties.Set", "org.a11y.Status", "IsEnabled",
+                        "<true>"], check=True, timeout=20)
         pipewire = self.start(["pipewire"])
         self._wait(pipewire, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire")
         self.start(["wireplumber"])
@@ -175,7 +180,7 @@ class Desktop:
                      renderer="software", screen=[1920, 1080],
                      gnome_version=subprocess.check_output(["gnome-shell", "--version"], text=True).strip(),
                      portal_interfaces=["Screenshot", "ScreenCast", "RemoteDesktop"],
-                     portal_consent="AT-SPI on the owned GNOME portal dialog",
+                     portal_consent="AT-SPI on owned GNOME portal and Shell screenshot access dialogs",
                      note="GNOME virtual monitor; physical GPU/input remain unverified")
 
     def _linux(self, facts):

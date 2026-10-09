@@ -148,6 +148,7 @@ class NativeSessionTransportTest(TestCase):
         session.request = Mock(side_effect=["window-qa", None])
         session.execute = Mock(side_effect=[False, True])
         with patch.dict(os.environ, {"QA_WAYLAND_INPUT_SOCKET": "/qa/private/input.sock"}), \
+                patch("tauri_webdriver.socket.AF_UNIX", 1, create=True), \
                 patch("tauri_webdriver.socket.socket") as factory:
             connection = factory.return_value.__enter__.return_value
             connection.recv.return_value = b'{"ok":true}\n'
@@ -891,7 +892,7 @@ class NativeClickVerbTest(TestCase):
 
             self.assertEqual(
                 result,
-                'injected X11 pointer click into [data-testid="file-encoding-bom"]',
+                'injected native WebKitGTK pointer click into [data-testid="file-encoding-bom"]',
             )
             activate.assert_called_once_with(session.application)
             session.pointer_click.assert_called_once_with('[data-testid="file-encoding-bom"]')

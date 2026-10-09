@@ -101,6 +101,13 @@ def run_wayland_window_drag(ctx, args: dict) -> str:
         desktop_command("place", application=application, rect={"x": 120, "y": 120, "width": 1000, "height": 680})
         time.sleep(0.3)
         before = desktop_command("geometry", application=application)["frame"]
+        ctx.session.activate_wayland_window()
+        ctx.session.execute("window.__QA_WINDOW_DRAG_EVENTS__=[];"
+            "window.__QA_WINDOW_DRAG_LISTENER__=(e)=>{const r={type:e.type,trusted:e.isTrusted,"
+            "x:e.clientX,y:e.clientY,testid:e.target?.closest?.('[data-testid]')?.dataset.testid};"
+            "setTimeout(()=>window.__QA_WINDOW_DRAG_EVENTS__.push({...r,prevented:e.defaultPrevented}));};"
+            "for(const type of ['pointerdown','mousedown','mouseup'])"
+            "window.addEventListener(type,window.__QA_WINDOW_DRAG_LISTENER__,true);")
         geometry = ctx.session.execute(
             f"const el=document.querySelector({json.dumps(args['selector'])});"
             "if(!el)return null; const r=el.getBoundingClientRect();"
@@ -110,7 +117,7 @@ def run_wayland_window_drag(ctx, args: dict) -> str:
         x = before["x"] + round((geometry["x"] + geometry["width"] / 2) * before["width"] / geometry["viewportWidth"])
         y = before["y"] + round((geometry["y"] + geometry["height"] * fraction) * before["height"] / geometry["viewportHeight"])
         observation.update(before=before, geometry=geometry, pointer={"x": x, "y": y})
-        desktop_command("drag", start=[x, y], end=[x + dx, y + dy])
+        observation["observedPointer"] = desktop_command("drag", start=[x, y], end=[x + dx, y + dy])
         time.sleep(0.2)
         after = desktop_command("geometry", application=application)["frame"]
         observation["after"] = after
@@ -120,6 +127,11 @@ def run_wayland_window_drag(ctx, args: dict) -> str:
         observation.update(passed=False, error=str(error))
         raise
     finally:
+        with suppress(Exception):
+            observation["events"] = ctx.session.execute(
+                "for(const type of ['pointerdown','mousedown','mouseup'])"
+                "window.removeEventListener(type,window.__QA_WINDOW_DRAG_LISTENER__,true);"
+                "return window.__QA_WINDOW_DRAG_EVENTS__ ?? [];")
         with suppress(Exception):
             desktop_command("place", application=application, rect=original)
         with (ctx.case_dir / "native-window-drags.jsonl").open("a", encoding="utf-8") as stream:
