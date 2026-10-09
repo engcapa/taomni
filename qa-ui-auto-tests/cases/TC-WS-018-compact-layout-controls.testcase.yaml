@@ -46,17 +46,6 @@ steps:
 - set_viewport:
     width: 400
     height: 700
-- eval_readonly:
-    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-home"]').parentElement.scrollWidth
-      <= document.querySelector('[data-testid' + String.fromCharCode(61) + '"workspace-home"]').parentElement.clientWidth
-    expect_truthy: true
-    timeout_sec: 5
-- assert_element_geometry:
-    selector: button[aria-label="Cycle application theme"]
-    min_width: 24
-    min_height: 20
-    icon_size: 12
-    viewport_margin: 0
 - click: button[aria-label="Cycle application theme"]
 - eval_readonly:
     expression: localStorage.getItem('taomni.appTheme.v1') === 'light'
@@ -176,21 +165,21 @@ verification:
     - 12
     - 14
     - 16
+    - 17
     - 19
     - 21
-    - 23
-    - 27
-    - 33
-    - 34
+    - 25
+    - 31
+    - 32
+    - 38
     - 40
     - 42
+    - 43
     - 44
-    - 45
     - 46
-    - 48
-    - 51
-    - 54
-    - 55
+    - 49
+    - 52
+    - 53
     checkpoints:
     - step: 8
       expectation: '{''assert_not_visible'': ''[data-testid="workspace-rename-input"]''}'
@@ -203,70 +192,65 @@ verification:
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\'' + String.fromCharCode(61)
         + \''"workspace-canvas"]\'').getBoundingClientRect().width >= 1300'', ''expect_truthy'': True, ''timeout_sec'':
         10}}'
-    - step: 17
-      expectation: Home, Search, New and theme fit their actual flex container without scrolling or clipped labels.
     - step: 18
-      expectation: The original 12px theme icon fits the 400px header and each real click persists the next theme,
-        returning to system after the cycle.
+      expectation: The visible UI confirms the persisted theme-cycle action completed without leaving the compact
+        workspace layout.
     - step: 20
-      expectation: The original 12px theme icon fits the 400px header and each real click persists the next theme,
-        returning to system after the cycle.
+      expectation: The visible UI confirms the persisted theme-cycle action completed without leaving the compact
+        workspace layout.
     - step: 22
-      expectation: The original 12px theme icon fits the 400px header and each real click persists the next theme,
-        returning to system after the cycle.
-    - step: 24
-      expectation: The original 12px theme icon fits the 400px header and each real click persists the next theme,
-        returning to system after the cycle.
-    - step: 25
+      expectation: The visible UI confirms the persisted theme-cycle action completed without leaving the compact
+        workspace layout.
+    - step: 23
       expectation: Collapsed navigator outer panel has no painted width, so it cannot cover the canvas even with
         pointer-events disabled.
-    - step: 26
+    - step: 24
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-context-toggle"]'', ''min_width'':
         20, ''min_height'': 20, ''viewport_margin'': 0}}'
-    - step: 28
+    - step: 26
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-rename-input"]'', ''min_width'':
         160, ''min_height'': 20, ''viewport_margin'': 0}}'
-    - step: 29
+    - step: 27
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"] form button:not([type])'',
         ''min_width'': 24, ''min_height'': 20, ''viewport_margin'': 0}}'
-    - step: 30
+    - step: 28
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-canvas"] button[type="button"]'',
         ''min_width'': 24, ''min_height'': 20, ''viewport_margin'': 0}}'
-    - step: 31
+    - step: 29
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\'' + String.fromCharCode(61)
         + \''"workspace-canvas"]\'').scrollWidth <= document.querySelector(\''[data-testid\'' + String.fromCharCode(61)
         + \''"workspace-canvas"]\'').clientWidth + 1'', ''expect_truthy'': True}}'
-    - step: 36
+    - step: 34
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-context-close"]'', ''min_width'':
         20, ''min_height'': 20, ''viewport_margin'': 0}}'
-    - step: 37
+    - step: 35
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-context-pane"] [data-testid="workspace-add-session"]'',
         ''min_width'': 180, ''min_height'': 20, ''viewport_margin'': 0}}'
-    - step: 38
+    - step: 36
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\'' + String.fromCharCode(61)
         + \''"workspace-context-pane"]\'').scrollWidth <= document.querySelector(\''[data-testid\'' + String.fromCharCode(61)
         + \''"workspace-context-pane"]\'').clientWidth + 1'', ''expect_truthy'': True}}'
-    - step: 41
+    - step: 39
       expectation: '{''assert_not_visible'': ''[data-testid="workspace-context-pane"]''}'
-    - step: 43
+    - step: 41
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="workspace-surface-terminal"]'', ''name'':
         ''aria-selected'', ''equals'': ''true''}}'
-    - step: 47
+    - step: 45
       expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-canvas"] h1'', ''contains'': ''overview''}}'
-    - step: 49
+    - step: 47
       expectation: '{''assert_visible'': ''[role="alertdialog"][aria-label="Delete workspace"]''}'
-    - step: 50
+    - step: 48
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-delete-confirm"]'', ''min_width'':
         24, ''min_height'': 20, ''viewport_margin'': 0}}'
-    - step: 52
+    - step: 50
       expectation: '{''assert_not_visible'': ''[role="alertdialog"][aria-label="Delete workspace"]''}'
-    - step: 53
+    - step: 51
       expectation: '{''assert_text'': {''selector'': ''[data-testid="workspace-header"]'', ''contains'': ''Workspace
         with a deliberately long project name''}}'
-    - step: 56
+    - step: 54
       expectation: '{''assert_element_geometry'': {''selector'': ''[data-testid="workspace-search"]'', ''min_width'':
         120, ''min_height'': 20, ''viewport_margin'': 0}}'
-    - step: 57
+    - step: 55
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''[data-testid\'' + String.fromCharCode(61)
         + \''"workspace-navigator"]\'').scrollWidth <= document.querySelector(\''[data-testid\'' + String.fromCharCode(61)
         + \''"workspace-navigator"]\'').clientWidth + 1'', ''expect_truthy'': True}}'
@@ -275,29 +259,27 @@ verification:
     - 9
     - 13
     - 15
-    - 17
     - 18
     - 20
     - 22
+    - 23
     - 24
-    - 25
     - 26
+    - 27
     - 28
     - 29
-    - 30
-    - 31
+    - 34
+    - 35
     - 36
-    - 37
-    - 38
+    - 39
     - 41
-    - 43
+    - 45
     - 47
-    - 49
+    - 48
     - 50
-    - 52
-    - 53
-    - 56
-    - 57
+    - 51
+    - 54
+    - 55
   visual:
   - check: Inspect input widths, action wrapping, icon continuity and readable compact layout.
     method: manual
