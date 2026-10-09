@@ -793,7 +793,8 @@ export function MainLayout() {
     if (workspaceNavigation.canvas !== "workspace" || !selectedWorkspace) return;
     if (restoredWorkspaceLayout.current !== selectedWorkspace.id) {
       restoredWorkspaceLayout.current = selectedWorkspace.id;
-      restoringNavigatorCollapsed.current = selectedWorkspace.navigation.navigatorCollapsed;
+      restoringNavigatorCollapsed.current = sidebarCollapsed === selectedWorkspace.navigation.navigatorCollapsed
+        ? null : selectedWorkspace.navigation.navigatorCollapsed;
       setSidebarCollapsed(selectedWorkspace.navigation.navigatorCollapsed);
       // Restoration must finish before persisting a user change. A separate
       // effect here would write this render's previous shell state back over

@@ -990,21 +990,21 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
   });
 
-  it("restores a workspace navigator before persisting subsequent user changes", async () => {
+  it.each([true, false])("restores a workspace navigator (%s) before persisting subsequent user changes", async (collapsed) => {
     const patch = vi.spyOn(useWorkspaceStore.getState(), "patch").mockResolvedValue();
     const workspace = {
       id: "restore-layout", name: "Restore layout", description: "", roots: [], looseFiles: [],
       pinned: false, order: 0, revision: 1, createdAt: 1, updatedAt: 1, lastOpenedAt: 1,
-      navigation: { activeSurface: "overview" as const, navigatorCollapsed: true, rightPaneOpen: false },
+      navigation: { activeSurface: "overview" as const, navigatorCollapsed: collapsed, rightPaneOpen: false },
       memberships: [],
     };
     useWorkspaceStore.setState({ workspaces: [workspace], activeWorkspaceId: workspace.id, canvas: "workspace" });
     try {
       render(<MainLayout />);
-      await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+      await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(collapsed));
       expect(patch).not.toHaveBeenCalled();
-      act(() => useAppStore.getState().setSidebarCollapsed(false));
-      await waitFor(() => expect(patch).toHaveBeenCalledWith(workspace.id, { navigation: { navigatorCollapsed: false } }));
+      act(() => useAppStore.getState().setSidebarCollapsed(!collapsed));
+      await waitFor(() => expect(patch).toHaveBeenCalledWith(workspace.id, { navigation: { navigatorCollapsed: !collapsed } }));
     } finally {
       patch.mockRestore();
     }
