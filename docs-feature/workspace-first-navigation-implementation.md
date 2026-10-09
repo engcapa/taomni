@@ -69,9 +69,16 @@ Windows native 使用隔离的 `com.taomni.app.qa`、独立 data/config/cache �
 
 - main 已合并至 `5bb68ec4`（合并提交 `57cde15f`）；之后 fetch 确认无新提交。
 - 本地 Rust `rust-units-main-oct09-v4.log`：1644 passed、0 failed、19 ignored，exit 0。采用 main 的 Windows sherpa shared 库；补齐官方 MSVC 14.44 OneCore C++ import 库，去掉旧静态 CRT 与 `/FORCE:MULTIPLE` 临时参数。
-- 完整 frontend `all-units-merged-oct09`：5286 passed / 1 failed（右键格式化），不得记为完整通过；格式化隔离通过。后续 editor 全文件验证暴露重复 workspace-edit preview；已清理的异步 listen 回调增加 disposed guard，`undo-failures-guarded` 两项通过。最终整合后完整单测 `all-units-git-integrated` 正在执行，保持原超时。
+- 完整 frontend `all-units-merged-oct09`：5286 passed / 1 failed（右键格式化），不得记为完整通过；格式化隔离通过。后续 editor 全文件验证暴露重复 workspace-edit preview；已清理的异步 listen 回调增加 disposed guard，`undo-failures-guarded` 两项通过。最终整合后完整单测 `all-units-git-integrated`：523 files、5296 tests 全部通过，exit 0，保持原超时。
 - Git 路由/状态 73 项、目录共享与 document history 20 项定向单测通过；`git-migration-typecheck-v4.log` exit 0。新增目录 hook 将 Files 内增删根目录与 canonical Workspace/Changes 同步。
 - Git 切换到另一个文件曾释放最后一个视图并丢失 Undo；document owner 现在为仍打开的文件保留历史，真正关闭后释放。WS-019 实际操作证明 dirty buffer、Undo、同名跨仓库身份与 Git 草稿保留。
 - Windows `git-workspace-stable-browser/windows-browser/run-20261009-160155-488453100` 的实际目录见报告根；该批六项 6/6 passed、0 skipped、identity_stable=true（WS-001/018/019，IDE-PARITY-008-01/02、018-01）。此前 `git-dedicated-browser-v7/windows-browser/run-20261009-143816-004314700` 同组六项通过。新增最后一个目录移除检查另行运行，不借前次 PASS。
 - GitHub `37879497854` 实际摘要 `passed=false, report_ok=true`：Linux WS-018 使用了 DOM 不支持的 selector，macOS rename input 最小宽度不够；已分别修复 CSS selector、输入最小宽度与换行。窗口收起侧栏隐藏且内容容器填满可用宽度，Windows WS-018 通过；Linux/macOS 当前源码仍待复验。
 - 已检查专属 Git 截图：保持原主题与 Lucide 图标，Changes/Log/Branches/Tags/Stash/Settings、仓库 scope、diff、提交栏完整保留，不再挤占 editor 底部。全三端 browser/native 收口继续进行。
+
+## 2026-10-09 三端整合验证与 SFTP 恢复
+
+- 提交 `1e1df5b4` 的三端 browser 整批均为 154/154 passed、0 failed、0 skipped。Windows：`windows-git-integrated-browser-v2/windows-browser/run-20261009-172039-028419400/summary.json`，`identity_stable=true`；Linux/macOS：[GitHub 37908867081](https://github.com/engcapa/taomni/actions/runs/37908867081)，真实 `ci-summary.json` 的 `passed=true`、`report_ok=true`、`gaps=[]`。包括 WS-001…019、布局/交互、IDE Git 与原有共享入口回归。
+- [GitHub native 37908873415](https://github.com/engcapa/taomni/actions/runs/37908873415)：macOS 16/16 passed，Linux 15/16 passed。IDE-PARITY-008-03/018-02 两端均通过；Linux WS-NATIVE-005 输入地址失败，保留原始失败截图、DOM 与 focus event 序列于 `gh-run-37908873415-selected/`。
+- Linux 005 的地址输入沿用会在 breadcrumb DIV 和 input 之间变化的 selector。失败记录显示第二次点击落到列表状态栏，随后 select-all 选中了页面；用例改用明确的地址编辑按钮，等待真实 input 后输入，与已通过的 008 地址编辑流程一致。保留 SSH 输出、SFTP 与 canonical session 断言，受影响用例三端重跑中。
+- Windows native `windows-git-integrated-native-v2` 已成功构建，但未执行用例：tauri-driver 无法绑定 4464；系统 `netsh` 证明 4401–4500 在 TCP 排除范围内。仅调整忽略目录内的本地配置至实测可绑定的 19464/19465，不改系统保留策略；`windows-git-integrated-native-v3` 复用同一验证过的 QA build，继续 16 条真实 native 用例。

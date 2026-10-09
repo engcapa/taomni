@@ -37,12 +37,13 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: 'input[data-testid="sftp-remote-path"]'
 - fill:
-    selector: '[data-testid="sftp-remote-path"]'
+    selector: 'input[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}
 - press:
-    selector: '[data-testid="sftp-remote-path"]'
+    selector: 'input[data-testid="sftp-remote-path"]'
     key: Enter
 - wait_for: '[data-testid="sftp-remote-pane"]'
 - click: '[data-testid="workspace-surface-overview"]'
@@ -85,36 +86,36 @@ verification:
     - 12
     - 14
     - 16
-    - 17
     - 18
-    - 20
+    - 19
     - 21
     - 22
-    - 25
-    - 27
+    - 23
+    - 26
     - 28
-    - 31
+    - 29
     - 32
+    - 33
     checkpoints:
     - step: 13
       expectation: The retained SSH output, SFTP listing or canonical reference is observable after navigation.
-    - step: 19
-      expectation: The retained SSH output, SFTP listing or canonical reference is observable after navigation.
-    - step: 29
+    - step: 20
       expectation: The retained SSH output, SFTP listing or canonical reference is observable after navigation.
     - step: 30
       expectation: The retained SSH output, SFTP listing or canonical reference is observable after navigation.
-    - step: 33
+    - step: 31
       expectation: The retained SSH output, SFTP listing or canonical reference is observable after navigation.
     - step: 34
       expectation: The retained SSH output, SFTP listing or canonical reference is observable after navigation.
+    - step: 35
+      expectation: The retained SSH output, SFTP listing or canonical reference is observable after navigation.
     results:
     - 13
-    - 19
-    - 29
+    - 20
     - 30
-    - 33
+    - 31
     - 34
+    - 35
   visual:
   - check: Compare typography, theme tokens, Lucide icon shape, spacing and clipping with the existing shell.
     method: manual
