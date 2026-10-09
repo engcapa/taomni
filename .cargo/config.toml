@@ -8,3 +8,8 @@ GGML_AVX2 = "ON"
 GGML_BMI2 = "OFF"
 GGML_FMA = "ON"
 GGML_F16C = "ON"
+# Ensure CMake-based C/C++ dependencies on Windows (e.g. whisper.cpp via whisper-rs-sys)
+# link against the static C runtime (MT / libcmt) to match sherpa-onnx-sys and Tauri's
+# static vcruntime bundle. Non-MSVC compilers safely ignore these settings.
+CMAKE_POLICY_DEFAULT_CMP0091 = "NEW"
+CMAKE_MSVC_RUNTIME_LIBRARY = "MultiThreaded"
