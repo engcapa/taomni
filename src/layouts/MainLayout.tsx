@@ -4374,7 +4374,10 @@ export function MainLayout() {
               // expanded percentage while the navigator is intentionally
               // collapsed. Do not let that measurement reopen the navigator;
               // only a user/state transition from the collapsed state should.
-              if (sidebarCollapsed && percentage > 2) return;
+              // The panel library can report its previous expanded percentage
+              // after collapse. Read the store here instead of the render
+              // closure, which may still contain `false` for this callback.
+              if (useAppStore.getState().sidebarCollapsed && percentage > 2) return;
               setSidebarCollapsed(percentage <= 2);
             }}
           >
