@@ -40,7 +40,7 @@ verification:
   - check: Native capture and window lifecycle
     method: automated
     reason: Actual desktop capture, native visibility and geometry, production stop routing, GIF decode and lifecycle. OS
-    global chord delivery is covered by the separate hotkey scenario. The isolated profile requests a real Control+Shift+F10 binding including Wayland portal consent, so a production instance can retain the default binding, and restores its settings afterwards.
+      global chord delivery is covered by the separate hotkey scenario. The isolated profile requests a real Control+Shift+F10 binding including Wayland portal consent, so a production instance can retain the default binding, and restores its settings afterwards.
 native_platforms:
 - Linux
 - Windows
