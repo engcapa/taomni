@@ -130,18 +130,6 @@ class Desktop:
             return protocols if wayland_has_input(protocols) else False
 
         protocols = self._wait(input_owner, input_ready, "Wayland keyboard and pointer")
-        # The RDP workload uses Tk. It may be an XWayland client inside this
-        # compositor while the product remains a verified GdkWaylandDisplay.
-        # Use Mutter's own XWayland server, never a separate Xvfb desktop.
-        if "rdp" in self.capabilities:
-            from qa_ui_auto.wayland import command as wayland_command
-            display = self._wait(input_owner, lambda: wayland_command("xwayland_display"), "owned XWayland workload display")
-            os.environ["DISPLAY"] = display
-            authority = self._wait(input_owner, lambda: wayland_command("xwayland_authority"), "owned XWayland authentication")
-            if not Path(authority).is_file():
-                raise RuntimeError("owned XWayland authentication file is missing")
-            os.environ["XAUTHORITY"] = authority
-            facts["fixture_xwayland_display"] = display
         (self.root / "wayland-info.txt").write_text(protocols, encoding="utf-8")
         for interface in ("wl_compositor", "xdg_wm_base", "wl_output"):
             if interface not in protocols:
@@ -155,6 +143,17 @@ class Desktop:
             "print(d.get_n_monitors()); w.destroy()"], text=True, timeout=20).splitlines()
         if not probe or probe[0] != "GdkWaylandDisplay" or int(probe[1]) < 1:
             raise RuntimeError(f"GTK did not use a Wayland display: {probe}")
+        # Floating capture surfaces and Tk workloads use this compositor's
+        # own XWayland connection. The main GTK backend was verified above;
+        # make it available to screenshot-only selections too.
+        from qa_ui_auto.wayland import command as wayland_command
+        display = self._wait(input_owner, lambda: wayland_command("xwayland_display"), "owned XWayland workload display")
+        os.environ["DISPLAY"] = display
+        authority = self._wait(input_owner, lambda: wayland_command("xwayland_authority"), "owned XWayland authentication")
+        if not Path(authority).is_file():
+            raise RuntimeError("owned XWayland authentication file is missing")
+        os.environ["XAUTHORITY"] = authority
+        facts["fixture_xwayland_display"] = display
         portal = subprocess.check_output(["gdbus", "introspect", "--session", "--dest",
                    "org.freedesktop.portal.Desktop", "--object-path", "/org/freedesktop/portal/desktop"],
                    text=True, timeout=60)
