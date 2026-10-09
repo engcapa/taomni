@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useT } from "../../lib/i18n";
@@ -25,6 +25,7 @@ export function ScrollCaptureBar() {
   const [needsOverlap, setNeedsOverlap] = useState(false);
   const [changingMode, setChangingMode] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const finishingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   useEffect(() => {
@@ -47,13 +48,23 @@ export function ScrollCaptureBar() {
     }).catch((e) => { if (!disposed) setError(formatUnknownError(e)); });
     return () => { disposed = true; unlisten?.(); };
   }, []);
-  const finish = async (cancel: boolean) => {
-    if (finishing) return;
+  const finish = useCallback(async (cancel: boolean) => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     setFinishing(true);
     setError(null);
     try { await stopScrollCapture(cancel); }
-    catch (e) { setError(formatUnknownError(e)); setFinishing(false); }
-  };
+    catch (e) { setError(formatUnknownError(e)); setFinishing(false); finishingRef.current = false; }
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.repeat) return;
+      event.preventDefault();
+      void finish(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [finish]);
   const changeMode = async () => {
     if (changingMode || finishing) return;
     setChangingMode(true);
