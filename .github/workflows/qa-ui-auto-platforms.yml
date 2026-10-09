@@ -424,6 +424,24 @@ jobs:
             !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
           if-no-files-found: warn
           retention-days: 14
+      - name: Retain compact native diagnostics
+        uses: actions/upload-artifact@v4
+        if: always() && matrix.mode == 'native'
+        with:
+          # Keep this outside the aggregate's qa-* pattern: these are copies
+          # for diagnosis, not a second set of execution receipts.
+          name: diagnostics-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
+          path: |
+            qa-ui-auto-report/${{ matrix.id }}/**/*.json
+            qa-ui-auto-report/${{ matrix.id }}/**/*.jsonl
+            qa-ui-auto-report/${{ matrix.id }}/**/*.log
+            qa-ui-auto-report/${{ matrix.id }}/**/*.html
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
+          if-no-files-found: warn
+          retention-days: 14
 
   summarize:
     name: qa-ui-auto-platforms-result
