@@ -187,7 +187,6 @@ keyring = "4"
 keyring-core = "1"
 cpal = { version = "0.17", optional = true }
 whisper-rs = { version = "0.16", optional = true }
-sherpa-onnx = { version = "1.13.8", optional = true }
 # LanChat native A/V stack (lanchat/media, behind the `native-av` feature): Opus
 # audio (audiopus → vendored libopus via cc, no nasm) and software H.264
 # (openh264 → Cisco's BSD encoder/decoder built from source; needs nasm for its
@@ -332,6 +331,14 @@ windows = { version = "0.62", features = [
   "Security_Cryptography",
   "Storage_Streams",
 ] }
+# On Windows, upstream sherpa-onnx prebuilt static libraries are compiled with /MT (MT_StaticRelease),
+# which conflicts with Rust MSVC /MD (MD_DynamicRelease) and whisper-rs-sys (LNK2038).
+# Using shared linking resolves the runtime library mismatch via the DLL import library.
+sherpa-onnx = { version = "1.13.8", default-features = false, features = ["shared"], optional = true }
+
+[target.'cfg(not(windows))'.dependencies]
+sherpa-onnx = { version = "1.13.8", optional = true }
+
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Legacy RDP server macOS capture fallback. The primary capture source below is
