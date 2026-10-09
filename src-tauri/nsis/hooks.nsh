@@ -59,3 +59,36 @@
 !macro NSIS_HOOK_PREUNINSTALL
   !insertmacro StopSocksCapRuntime
 !macroend
+
+; sherpa-onnx-sys copies these DLLs beside the compiled executable. WiX/MSI
+; collects that directory's DLLs automatically; Tauri's NSIS bundler does not.
+; Derive each source from Tauri's actual binary path so --target, --debug,
+; custom Cargo target directories and paths containing spaces all work.
+; File is deliberately fatal when a DLL is missing: never publish an installer
+; that depends on leftovers from an earlier MSI installation.
+!macro InstallSherpaDll NAME
+  !searchreplace TAOMNI_BINARY_PATH "${MAINBINARYSRCPATH}" "/" "\"
+  !searchreplace TAOMNI_DLL_PATH "${TAOMNI_BINARY_PATH}" "\${MAINBINARYNAME}.exe" "\${NAME}"
+  File "${TAOMNI_DLL_PATH}"
+  !undef TAOMNI_DLL_PATH
+  !undef TAOMNI_BINARY_PATH
+!macroend
+
+!macro NSIS_HOOK_POSTINSTALL
+  ; Tauri has already stopped the app and copied its executable/resources.
+  SetOutPath "$INSTDIR"
+  !insertmacro InstallSherpaDll "sherpa-onnx-c-api.dll"
+  !insertmacro InstallSherpaDll "sherpa-onnx-cxx-api.dll"
+  !insertmacro InstallSherpaDll "onnxruntime.dll"
+  !insertmacro InstallSherpaDll "onnxruntime_providers_shared.dll"
+!macroend
+
+!macro NSIS_HOOK_POSTUNINSTALL
+  ; The app has stopped by this point. Remove only the files we own.
+  Delete "$INSTDIR\sherpa-onnx-c-api.dll"
+  Delete "$INSTDIR\sherpa-onnx-cxx-api.dll"
+  Delete "$INSTDIR\onnxruntime.dll"
+  Delete "$INSTDIR\onnxruntime_providers_shared.dll"
+  ; Tauri's earlier non-recursive RMDir could not remove these extra files.
+  RMDir "$INSTDIR"
+!macroend

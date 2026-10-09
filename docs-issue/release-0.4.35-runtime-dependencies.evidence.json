@@ -1,0 +1,158 @@
+{
+  "release": "v0.4.35",
+  "checkedAt": "2026-10-09",
+  "assets": [
+    {
+      "asset": "Taomni-0.4.35-1.x86_64.rpm",
+      "sha256": "a2ee1fea2e7205b13ed22d23ec74ea072ad6f043f58de2fbbd200eba82d5b192",
+      "updaterSignatureVerified": true
+    },
+    {
+      "asset": "Taomni_0.4.35_aarch64.app.tar.gz",
+      "sha256": "3209d908b277eda1f59109026aafd13d5de21d9b6374cbcfbb1a09ccf78de157",
+      "updaterSignatureVerified": true
+    },
+    {
+      "asset": "Taomni_0.4.35_aarch64.dmg",
+      "sha256": "577ad308acdcd7c1fd7ab30b191a3ddee739df46338d6e70ad10bdf290fc6af8",
+      "updaterSignatureVerified": "not applicable (DMG)"
+    },
+    {
+      "asset": "Taomni_0.4.35_amd64.AppImage",
+      "sha256": "7308029bdbc339d0f7690c06086f01317702f0403bd4d157af37f7b8ac30a592",
+      "updaterSignatureVerified": true
+    },
+    {
+      "asset": "Taomni_0.4.35_amd64.deb",
+      "sha256": "828854a0c905c26b7c7dd188e93464e752f16c3aad4fd6f27a1516dd7c6d0240",
+      "updaterSignatureVerified": true
+    },
+    {
+      "asset": "Taomni_0.4.35_x64-setup.exe",
+      "sha256": "2e05fe5ac39b3da11120bcaa3e873a8f7b9e1bc1521f7ecabcb6fee64cbe509d",
+      "updaterSignatureVerified": true
+    },
+    {
+      "asset": "Taomni_0.4.35_x64.dmg",
+      "sha256": "299f97babfb6c2e573fd433d91bdc8b200a0e2549574e99032ce40963ead8ec6",
+      "updaterSignatureVerified": "not applicable (DMG)"
+    },
+    {
+      "asset": "Taomni_0.4.35_x64_en-US.msi",
+      "sha256": "e71ccc7de79cab026a8863d4d1b02e1a676f575aba053582c2958e5658f4d3b4",
+      "updaterSignatureVerified": true
+    },
+    {
+      "asset": "Taomni_0.4.35_x86_64.app.tar.gz",
+      "sha256": "f78009e795be15f23d215f78d6922fd67afafb3335b003c62ffd0a97c588189d",
+      "updaterSignatureVerified": true
+    }
+  ],
+  "mainBinaries": [
+    {
+      "asset": "Taomni-0.4.35-1.x86_64.rpm",
+      "sha256": "a77c4f9de6930922bef95d6209db5faf6f53bc4d2543daa447ef9770bd66d7e6",
+      "sherpaOnnxImports": [],
+      "unresolvedHomebrewImports": []
+    },
+    {
+      "asset": "Taomni_0.4.35_aarch64.app.tar.gz",
+      "sha256": "308b5804ad8ea3b72dbf1e58b886c62975ac3e95831f8b9985fa886ff4a7b697",
+      "sherpaOnnxImports": [],
+      "unresolvedHomebrewImports": []
+    },
+    {
+      "asset": "Taomni_0.4.35_aarch64.dmg",
+      "sha256": "308b5804ad8ea3b72dbf1e58b886c62975ac3e95831f8b9985fa886ff4a7b697",
+      "sherpaOnnxImports": [],
+      "unresolvedHomebrewImports": []
+    },
+    {
+      "asset": "Taomni_0.4.35_amd64.AppImage",
+      "sha256": "8edd7d147e8220b1668c6674182ec7ce67bc0729a701c69a76af4fe5846e01ee",
+      "sherpaOnnxImports": [],
+      "unresolvedHomebrewImports": []
+    },
+    {
+      "asset": "Taomni_0.4.35_amd64.deb",
+      "sha256": "8f9c5b6f21e8c4503113e4ab2db5937a596cc1466e7349667faa48e8bb999288",
+      "sherpaOnnxImports": [],
+      "unresolvedHomebrewImports": []
+    },
+    {
+      "asset": "Taomni_0.4.35_x64-setup.exe",
+      "sha256": "1855d10502019a13e05ae11268e1136a2465b5ac24998274e2066f08fe9bdb29",
+      "sherpaOnnxImports": [
+        "sherpa-onnx-c-api.dll"
+      ],
+      "unresolvedHomebrewImports": []
+    },
+    {
+      "asset": "Taomni_0.4.35_x64.dmg",
+      "sha256": "0ac7b7e3648bd3181401dadd768822a1f95314e5ac5fb91362133d14a4b89efb",
+      "sherpaOnnxImports": [],
+      "unresolvedHomebrewImports": [
+        "@@HOMEBREW_PREFIX@@/opt/krb5/lib/libgssapi_krb5.2.2.dylib"
+      ]
+    },
+    {
+      "asset": "Taomni_0.4.35_x86_64.app.tar.gz",
+      "sha256": "0ac7b7e3648bd3181401dadd768822a1f95314e5ac5fb91362133d14a4b89efb",
+      "sherpaOnnxImports": [],
+      "unresolvedHomebrewImports": [
+        "@@HOMEBREW_PREFIX@@/opt/krb5/lib/libgssapi_krb5.2.2.dylib"
+      ]
+    }
+  ],
+  "macosUnresolvedPaths": [
+    {
+      "asset": "Taomni_0.4.35_aarch64.app.tar.gz",
+      "paths": []
+    },
+    {
+      "asset": "Taomni_0.4.35_x86_64.app.tar.gz",
+      "paths": [
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libk5crypto.3.1.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libkrb5support.1.1.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libkrb5.3.3.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libk5crypto.3.1.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libkrb5.3.3.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libcom_err.3.0.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libkrb5.3.3.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libkrb5support.1.1.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libgssapi_krb5.2.2.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libkrb5.3.3.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libgssapi_krb5.2.2.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libk5crypto.3.1.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libgssapi_krb5.2.2.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libcom_err.3.0.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libgssapi_krb5.2.2.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libkrb5support.1.1.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/Frameworks/libcom_err.3.0.dylib",
+          "dependency": "@@HOMEBREW_CELLAR@@/krb5/1.22.2/lib/libkrb5support.1.1.dylib"
+        },
+        {
+          "binary": "Taomni.app/Contents/MacOS/taomni",
+          "dependency": "@@HOMEBREW_PREFIX@@/opt/krb5/lib/libgssapi_krb5.2.2.dylib"
+        }
+      ]
+    }
+  ]
+}

@@ -34,6 +34,7 @@ test -x "$main_executable" || {
   echo "Taomni executable is missing: $main_executable" >&2
   exit 1
 }
+bash "$repo_root/scripts/verify-macos-runtime-paths.sh" "$app"
 
 case "$signing_mode" in
   developer-id|self-signed)
@@ -110,6 +111,7 @@ if [ "$signing_mode" != adhoc ]; then
   mkdir "$verification_dir/updater"
   tar -xzf "$archive" -C "$verification_dir/updater"
   updater_app="$verification_dir/updater/Taomni.app"
+  bash "$repo_root/scripts/verify-macos-runtime-paths.sh" "$updater_app"
   verify_certificate_signature "$updater_app" "$verification_dir/updater-cert-"
   cmp "$main_executable" "$updater_app/Contents/MacOS/taomni"
   cmp "$verification_dir/app-cert-requirement" "$verification_dir/updater-cert-requirement"
