@@ -307,8 +307,15 @@ def main() -> None:
             return GLib.SOURCE_CONTINUE
 
         GLib.io_add_watch(listener.fileno(), GLib.IO_IN, command_ready)
+        # A fresh headless pointer starts in GNOME's top-left hot corner.
+        # WebDriver clicks don't move this OS pointer, so several read-only
+        # RDP connects can reopen Overview before the first measured input.
+        # Park it in the desktop interior before any app/target is launched.
+        initial_pointer = pointer(*evaluate(
+            "[Math.round(global.stage.width / 2), Math.round(global.stage.height / 2)]"))
         args.ready.write_text(json.dumps({"session": session, "devices": ["keyboard", "pointer"],
-                                         "transport": "Mutter RemoteDesktop"}), encoding="utf-8")
+                                         "transport": "Mutter RemoteDesktop",
+                                         "initial_pointer": initial_pointer}), encoding="utf-8")
         # The session is tied to this DBus connection, so a one-shot gdbus
         # command would remove the devices immediately after provisioning.
         def quit_loop():
