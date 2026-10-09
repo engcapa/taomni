@@ -1,0 +1,66 @@
+import os
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import Mock, patch
+
+from ci_wayland_portal import owned_portal
+from qa_ui_auto import host_clipboard, wayland
+from qa_ui_auto.native_steps import _read_wayland_clipboard
+
+
+class WaylandToolsTests(unittest.TestCase):
+    def test_portal_automation_rejects_other_runtime_and_non_portal_processes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / "xdg-desktop-portal-gnome"
+            binary.touch()
+            process = root / "42"
+            process.mkdir()
+            # /proc/PID/exe resolves to the actual executable. Avoid symlink
+            # privileges on the Windows test host by patching only that read.
+            (process / "environ").write_bytes(b"XDG_RUNTIME_DIR=/tmp/qa-owned\0")
+            with patch.object(Path, "resolve", return_value=binary):
+                self.assertTrue(owned_portal(42, "/tmp/qa-owned", root))
+                self.assertFalse(owned_portal(42, "/tmp/personal", root))
+                self.assertFalse(owned_portal(43, "/tmp/qa-owned", root))
+            with patch.object(Path, "resolve", return_value=root / "other-app"):
+                self.assertFalse(owned_portal(42, "/tmp/qa-owned", root))
+
+    def test_missing_owned_socket_fails_without_x11_fallback(self):
+        with patch.dict(os.environ, {"GDK_BACKEND": "wayland"}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "owned desktop input socket"):
+                wayland.command("keys", chords=[[65]])
+
+    def test_invalid_external_utf8_is_a_real_conversion_failure(self):
+        with patch("qa_ui_auto.native_steps.subprocess.run", return_value=Mock(stdout=b"\xff")) as run:
+            self.assertFalse(_read_wayland_clipboard()["ok"])
+            self.assertEqual(run.call_args.args[0][0], "wl-paste")
+        with patch("qa_ui_auto.native_steps.subprocess.run", return_value=Mock(stdout="中文\n".encode())):
+            self.assertEqual(_read_wayland_clipboard(), {"ok": True, "text": "中文\n"})
+
+    def test_wayland_clipboard_image_oracle_retains_exact_png_bytes(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.dict(os.environ, {"GDK_BACKEND": "wayland", "WAYLAND_DISPLAY": "wayland-qa"}), \
+             patch.object(host_clipboard, "SYSTEM", "Linux"), \
+             patch.object(host_clipboard, "_run", return_value=b"\x89PNG\r\n\x00\xff") as run, \
+             patch.object(host_clipboard, "_xclip_get") as x11:
+            target = Path(directory) / "image.png"
+            host_clipboard.save_image(target)
+            self.assertEqual(target.read_bytes(), b"\x89PNG\r\n\x00\xff")
+            self.assertIn("image/png", run.call_args.args[0])
+            x11.assert_not_called()
+
+    def test_clipboard_quiet_counts_ownership_notifications_even_for_identical_payloads(self):
+        with patch.dict(os.environ, {"GDK_BACKEND": "wayland", "WAYLAND_DISPLAY": "wayland-qa"}), \
+             patch.object(host_clipboard, "SYSTEM", "Linux"), \
+             patch("qa_ui_auto.wayland.command", side_effect=[12, 15]) as command, \
+             patch.object(host_clipboard.time, "sleep"), \
+             patch.object(host_clipboard, "get_text") as read:
+            self.assertEqual(host_clipboard.count_changes(1), 3)
+            read.assert_not_called()
+            self.assertEqual(command.call_count, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

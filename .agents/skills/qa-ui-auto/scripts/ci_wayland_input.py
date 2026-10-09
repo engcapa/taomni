@@ -16,7 +16,7 @@ WINDOW_STATE = """(() => ({
         const window = actor.meta_window;
         return {pid: window.get_pid(), title: window.get_title(),
                 focused: window.has_focus(), minimized: window.minimized,
-                frame: window.get_frame_rect()};
+                frame: window.get_frame_rect(), client: window.get_buffer_rect()};
     })
 }))()"""
 
@@ -88,11 +88,53 @@ def main() -> None:
             raise RuntimeError(f"owned GNOME desktop evaluation failed: {value}")
         return json.loads(value)
 
+    def inject_keys(chords):
+        for chord in chords:
+            held = []
+            try:
+                for keysym in chord:
+                    call(session, interface, "NotifyKeyboardKeysym", GLib.Variant("(ub)", (keysym, True)))
+                    held.append(keysym)
+                    time.sleep(0.04)
+                time.sleep(0.08)
+            finally:
+                for keysym in reversed(held):
+                    call(session, interface, "NotifyKeyboardKeysym", GLib.Variant("(ub)", (keysym, False)))
+                    time.sleep(0.04)
+            time.sleep(0.12)
+
+    def pointer(x, y):
+        current = evaluate("global.get_pointer().slice(0, 2)")
+        call(session, interface, "NotifyPointerMotionRelative",
+             GLib.Variant("(dd)", (float(x - current[0]), float(y - current[1]))))
+
+    def window_command(request, diagnostics):
+        state = evaluate(WINDOW_STATE)
+        pid = owned_window_pid(state["windows"], Path(request["application"]), args.socket.parent)
+        window = next(w for w in state["windows"] if w["pid"] == pid)
+        diagnostics["window"] = window
+        if request["command"] == "geometry":
+            return window
+        if request["command"] == "place":
+            rect = request["rect"]
+            evaluate(f"(() => {{ const w = global.get_window_actors().map(a => a.meta_window)"
+                     f".find(w => w.get_pid() === {pid}); w.unmaximize(3); "
+                     f"w.move_resize_frame(true, {int(rect['x'])}, {int(rect['y'])}, "
+                     f"{int(rect['width'])}, {int(rect['height'])}); return true; }})()")
+            return True
+        raise ValueError("unknown window command")
+
     session = call("/org/gnome/Mutter/RemoteDesktop", destination, "CreateSession").unpack()[0]
     loop = GLib.MainLoop()
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    clipboard_serial = [0]
     try:
         call(session, interface, "Start")
+        def clipboard_changed(*_):
+            clipboard_serial[0] += 1
+        bus.signal_subscribe(destination, interface, "SelectionOwnerChanged", session, None,
+                             Gio.DBusSignalFlags.NONE, clipboard_changed)
+        call(session, interface, "EnableClipboard", GLib.Variant("(a{sv})", ({},)))
         # Mutter creates these devices lazily. A balanced modifier stroke and
         # zero pointer movement populate wl_seat before any QA app is opened.
         call(session, interface, "NotifyKeyboardKeycode", GLib.Variant("(ub)", (29, True)))
@@ -109,14 +151,47 @@ def main() -> None:
                 diagnostics = {"time": time.time()}
                 try:
                     request = json.loads(connection.makefile("rb").readline(4096))
-                    if request.get("command") != "activate":
+                    name = request.get("command")
+                    value = None
+                    if name == "activate":
+                        activate_window(evaluate, Path(request["application"]), args.socket.parent, diagnostics)
+                    elif name == "focus_pid":
+                        pid = int(request["pid"])
+                        environment = (Path("/proc") / str(pid) / "environ").read_bytes().split(b"\0")
+                        if b"XDG_RUNTIME_DIR=" + str(args.socket.parent).encode() not in environment:
+                            raise RuntimeError("refusing a window outside the owned compositor")
+                        evaluate(f"(() => {{ Main.overview.hide(); const w = global.get_window_actors()"
+                                 f".map(a => a.meta_window).find(w => w.get_pid() === {pid}); "
+                                 "if (!w) throw new Error('fixture window missing'); Main.activateWindow(w); return true; })()")
+                    elif name == "keys":
+                        inject_keys(request["chords"])
+                    elif name == "clipboard_serial":
+                        value = clipboard_serial[0]
+                    elif name == "xwayland_display":
+                        value = evaluate("imports.gi.GLib.getenv('DISPLAY')")
+                    elif name in {"geometry", "place"}:
+                        value = window_command(request, diagnostics)
+                    elif name == "pointer":
+                        pointer(request["x"], request["y"])
+                    elif name == "drag":
+                        start, end = request["start"], request["end"]
+                        pointer(*start)
+                        call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, True)))
+                        try:
+                            time.sleep(0.2)
+                            for step in range(1, 6):
+                                pointer(*(round(a + (b - a) * step / 5) for a, b in zip(start, end)))
+                                time.sleep(0.04)
+                        finally:
+                            call(session, interface, "NotifyPointerButton", GLib.Variant("(ib)", (272, False)))
+                    else:
                         raise ValueError("unknown Wayland input command")
-                    activate_window(evaluate, Path(request["application"]), args.socket.parent, diagnostics)
+                    diagnostics["command"] = name
                 except Exception as error:
                     diagnostics["error"] = str(error)
                     connection.sendall(json.dumps({"error": str(error)}).encode() + b"\n")
                 else:
-                    connection.sendall(b'{"ok":true}\n')
+                    connection.sendall(json.dumps({"ok": True, "value": value}).encode() + b"\n")
                 finally:
                     with (args.ready.parent / "window-activation.jsonl").open("a", encoding="utf-8") as log:
                         log.write(json.dumps(diagnostics) + "\n")

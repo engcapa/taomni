@@ -154,18 +154,22 @@ viewer reconnect/input/clipboard integration needs additional focused cases.
 Wayland preparation starts GNOME/Mutter, PipeWire/WirePlumber and real GNOME
 desktop portals on the job's private DBus session. It verifies compositor
 protocols, a GTK `GdkWaylandDisplay` and Screenshot/ScreenCast/RemoteDesktop
-portal interfaces. `GDK_BACKEND=wayland` prevents an X11 fallback. Existing
-X11/XTEST/clipboard-owner and portal-consent-dependent capture/RDP cases are
-listed as profile-specific capability gaps during planning. They are not
-silently run with weaker assertions or counted as Wayland passes. Explicitly
-selecting a case unavailable in all requested combinations fails. Portal
-interface readiness alone does not prove user authorization or screen capture.
+portal interfaces. `GDK_BACKEND=wayland` prevents a product WebView X11 fallback.
+The Wayland profile selects the same native case IDs as the default Linux
+desktop. AT-SPI operates real consent controls only in the private runtime's
+GNOME portal process and retains `desktop/portal-consent.jsonl`. The product
+still opens its own approved session and receives real PipeWire frames.
+Portal interface readiness alone does not prove authorization or screen capture.
+The Tk RDP workload uses Mutter's own XWayland display inside the GNOME
+compositor; this does not change the product's verified GTK backend.
 Headless Mutter initially exposes a `wl_seat` without input devices. A
 job-owned Mutter RemoteDesktop session keeps a virtual keyboard and pointer
 attached; readiness requires both capabilities in `desktop/wayland-info.txt`.
-This enables normal WebView focus and editing on the virtual desktop and does
-not establish portal consent or physical input coverage. Text paste helpers
-use `wl-copy`/`wl-paste` on Wayland and retain `xclip` for X11.
+This session also injects native keysyms and pointer gestures; selected IME
+cases still pass through real fcitx5 and GTK. Text, HTML, image and file
+clipboard oracles use `wl-copy`/`wl-paste` on Wayland and retain `xclip` for X11.
+Clipboard quiet assertions count Mutter ownership notifications, including
+repeated writes of identical contents. Physical input remains unverified.
 Before case steps, the harness activates an unfocused app through the owned
 desktop's window manager and switches to its WebDriver window. The private
 GNOME compositor exposes Shell Eval for OS window inspection/activation. The

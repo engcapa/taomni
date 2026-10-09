@@ -50,6 +50,7 @@ from .steps import StepError
 from .native_assertions import assert_count, assert_menu_items
 from .linux_ime import current_fcitx_engine
 from . import save_race
+from . import wayland
 
 
 class NativeStepContext:
@@ -1406,7 +1407,8 @@ def _append_clipboard_observation(ctx: NativeStepContext, entry: dict[str, Any])
     observations.append({
         "platform": platform.platform(),
         "display": os.environ.get("DISPLAY"),
-        "transport": "external X11 CLIPBOARD selection (out-of-process Tk client)",
+        "transport": ("external Wayland data offer (out-of-process wl-paste client)" if wayland.active()
+                      else "external X11 CLIPBOARD selection (out-of-process Tk client)"),
         "verifiedAtUnixMs": int(time.time() * 1000),
         **entry,
     })
@@ -1928,7 +1930,7 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("native_keys: expected {selector, keys}")
     selector = args.get("selector")
     keys = args.get("keys")
-    transport = str(args.get("transport", "x11"))
+    transport = str(args.get("transport", "wayland" if wayland.active() else "x11"))
     if not isinstance(selector, str) or not selector:
         raise StepError("native_keys: selector must be a non-empty string")
     if not isinstance(keys, list) or not keys or not all(isinstance(key, str) for key in keys):
@@ -2020,6 +2022,11 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
     if transport == "webdriver":
         ctx.session.activate_linux_window()
         ctx.session.press_combos(keys)
+    elif transport == "wayland":
+        if not wayland.active():
+            raise StepError("native_keys: Wayland transport requires the owned Wayland desktop")
+        ctx.session.activate_wayland_window()
+        wayland.command("keys", chords=[_x11_keysyms_for_chord(chord) for chord in keys])
     elif transport == "x11":
         if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
             raise StepError("native_keys: X11 transport requires a Linux display")
@@ -2055,6 +2062,8 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
         "transport": (
             "W3C WebDriver key actions -> platform WebView"
             if transport == "webdriver"
+            else "Mutter RemoteDesktop keysym -> GTK/WebKitGTK"
+            if transport == "wayland"
             else "X11 XTest -> GTK/WebKitGTK"
         ),
         "result": "keys-injected; testcase DOM postcondition is authoritative",
@@ -2091,6 +2100,9 @@ def _do_native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
 
 @_verb("native_window_drag")
 def _do_native_window_drag(ctx: NativeStepContext, args: Any) -> str:
+    if wayland.active():
+        from .window_drag import run_wayland_window_drag
+        return run_wayland_window_drag(ctx, args)
     if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
         raise StepError("native_window_drag: requires a Linux X11 display")
     if not isinstance(args, dict) or not isinstance(args.get("selector"), str) or not {"dx", "dy"} <= args.keys():
@@ -2103,7 +2115,7 @@ def _do_native_window_drag(ctx: NativeStepContext, args: Any) -> str:
 @_verb("native_click")
 def _do_native_click(ctx: NativeStepContext, args: Any) -> str:
     """Click a visible control through X11 in the exact test application."""
-    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+    if platform.system() != "Linux" or not (os.environ.get("DISPLAY") or wayland.active()):
         raise StepError("native_click: requires a Linux X11 display")
     if not isinstance(args, dict) or not isinstance(args.get("selector"), str):
         raise StepError("native_click: expected {selector}")
@@ -2127,7 +2139,7 @@ def _do_native_click(ctx: NativeStepContext, args: Any) -> str:
     if geometry["width"] <= 0 or geometry["height"] <= 0:
         raise StepError(f"native_click: target has no visible area: {selector}")
 
-    window_id, window_identity = _activate_x11_application(ctx.session.application)
+    window_id, window_identity = _activate_pointer_application(ctx)
     coordinates = ctx.session.pointer_click(selector)
     time.sleep(0.5)
 
@@ -2152,13 +2164,20 @@ def _do_native_click(ctx: NativeStepContext, args: Any) -> str:
         json.dumps(artifact, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    return f"injected X11 pointer click into {selector}"
+    return f"injected native WebKitGTK pointer click into {selector}"
+
+
+def _activate_pointer_application(ctx):
+    if wayland.active():
+        ctx.session.activate_wayland_window()
+        return None, {"backend": "Wayland", "application": str(ctx.session.application)}
+    return _activate_x11_application(ctx.session.application)
 
 
 @_verb("native_pointer_drag")
 def _do_native_pointer_drag(ctx: NativeStepContext, args: Any) -> str:
     """Drag between CodeMirror line/column coordinates in the packaged app."""
-    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+    if platform.system() != "Linux" or not (os.environ.get("DISPLAY") or wayland.active()):
         raise StepError("native_pointer_drag: requires a Linux X11 display")
     if not isinstance(args, dict) or not isinstance(args.get("selector"), str):
         raise StepError(
@@ -2237,7 +2256,7 @@ def _do_native_pointer_drag(ctx: NativeStepContext, args: Any) -> str:
         if not all(isinstance(point.get(axis), (int, float)) for axis in ("x", "y")):
             raise StepError("native_pointer_drag: invalid viewport coordinates")
 
-    window_id, window_identity = _activate_x11_application(ctx.session.application)
+    window_id, window_identity = _activate_pointer_application(ctx)
     coordinates = ctx.session.pointer_drag(resolved_start, resolved_end, modifiers)
     time.sleep(0.5)
     postcondition = ctx.session.execute(
@@ -2279,7 +2298,7 @@ def _do_native_ime_keys(ctx: NativeStepContext, args: Any) -> str:
     This is native Linux IME evidence. W3C WebDriver keys and browser
     composition events deliberately do not enter this path.
     """
-    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+    if platform.system() != "Linux" or not (os.environ.get("DISPLAY") or wayland.active()):
         raise StepError("native_ime_keys: requires a Linux X11 display")
     if not isinstance(args, dict):
         raise StepError("native_ime_keys: expected {selector, expected_engine, keys}")
@@ -2302,7 +2321,7 @@ def _do_native_ime_keys(ctx: NativeStepContext, args: Any) -> str:
             f"native_ime_keys: target must already have DOM focus before native injection: {selector}"
         )
     time.sleep(0.25)
-    window_id, window_identity = _activate_x11_application(ctx.session.application)
+    window_id, window_identity = _activate_pointer_application(ctx)
     focus_script = (
         f"const el = document.querySelector({json.dumps(selector)});"
         "return document.hasFocus() && !!el && "
@@ -2336,7 +2355,10 @@ def _do_native_ime_keys(ctx: NativeStepContext, args: Any) -> str:
             time.sleep(0.25)
         if _command_output(["fcitx5-remote"]) != "2":
             raise StepError("native_ime_keys: fcitx5 did not enter active state")
-        _inject_x11_keys(keys)
+        if wayland.active():
+            wayland.command("keys", chords=[_x11_keysyms_for_chord(chord) for chord in keys])
+        else:
+            _inject_x11_keys(keys)
         time.sleep(0.5)
         artifact = {
             "platform": platform.platform(),
@@ -2345,7 +2367,8 @@ def _do_native_ime_keys(ctx: NativeStepContext, args: Any) -> str:
             "active_window": window_id,
             "window_identity": window_identity,
             "keys": keys,
-            "transport": "X11 XTest -> fcitx5 -> GTK/WebKitGTK",
+            "transport": ("Mutter RemoteDesktop -> fcitx5 -> GTK/WebKitGTK" if wayland.active()
+                          else "X11 XTest -> fcitx5 -> GTK/WebKitGTK"),
             "result": "keys-injected; testcase DOM postcondition is authoritative",
         }
         (ctx.case_dir / "native-ime-observation.json").write_text(
@@ -2376,6 +2399,8 @@ def _do_native_clipboard_owner(ctx: NativeStepContext, args: Any) -> str:
                 owner carrying the last granted payload; reads succeed again.
       release - terminate the owner and record the host-selection replacement.
     """
+    if wayland.active():
+        return _wayland_clipboard_owner(ctx, args)
     if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
         raise StepError("native_clipboard_owner: requires a Linux X11 display")
     if not isinstance(args, dict) or "action" not in args:
@@ -2528,6 +2553,56 @@ def _process_state(pid: int) -> str | None:
     return tail[0] if tail else None
 
 
+def _read_wayland_clipboard():
+    try:
+        result = subprocess.run(["wl-paste", "--no-newline", "--type", "text"],
+                                capture_output=True, timeout=5, check=True)
+        return {"ok": True, "text": result.stdout.decode("utf-8")}
+    except (OSError, subprocess.SubprocessError, UnicodeError) as error:
+        return {"ok": False, "error": str(error)}
+
+
+def _wayland_clipboard_owner(ctx, args):
+    action = args.get("action") if isinstance(args, dict) else None
+    if action not in {"grant", "deny", "suspend", "resume", "release"}:
+        raise StepError("native_clipboard_owner: expected grant/deny/suspend/resume/release")
+    if action == "release":
+        ctx._release_clipboard_owner()
+        return "external Wayland clipboard owner released"
+    if action == "suspend":
+        if ctx._clipboard_owner is None:
+            raise StepError("native_clipboard_owner: suspend needs a live owner")
+        os.kill(ctx._clipboard_owner.pid, signal.SIGSTOP)
+        ctx._clipboard_owner_suspended = True
+    elif action == "resume" and ctx._clipboard_owner_suspended:
+        os.kill(ctx._clipboard_owner.pid, signal.SIGCONT)
+        ctx._clipboard_owner_suspended = False
+    else:
+        if action == "grant":
+            if not isinstance(args.get("text"), str) or not args["text"]:
+                raise StepError("native_clipboard_owner: grant requires nonempty text")
+            ctx._clipboard_owner_text = args["text"]
+        elif not ctx._clipboard_owner or ctx._clipboard_owner_text is None:
+            raise StepError(f"native_clipboard_owner: {action} requires a granted owner")
+        ctx._release_clipboard_owner()
+        mode = "deny" if action == "deny" else "grant"
+        helper = Path(__file__).resolve().parents[1] / "ci_wayland_fixture.py"
+        proc = subprocess.Popen(["/usr/bin/python3", str(helper), mode, "--text", ctx._clipboard_owner_text],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        ctx._clipboard_owner = proc
+        ctx._clipboard_owner_mode = mode
+        if _mfa_helper_line(proc, 15).strip() != "CLIPBOARD-READY":
+            ctx._release_clipboard_owner()
+            raise StepError("native_clipboard_owner: external GTK Wayland owner did not become ready")
+    observed = _read_wayland_clipboard()
+    expected_readable = action in {"grant", "resume"}
+    if bool(observed["ok"]) != expected_readable or (expected_readable and observed["text"] != ctx._clipboard_owner_text):
+        raise StepError(f"native_clipboard_owner: {action} external conversion postcondition failed: {observed}")
+    _append_clipboard_observation(ctx, {"action": action, "transport": "GTK Wayland data offer",
+                                       "ownerPid": ctx._clipboard_owner.pid, "externalReadOk": observed["ok"]})
+    return f"external Wayland clipboard {action} verified"
+
+
 @_verb("assert_system_clipboard")
 def _do_assert_system_clipboard(ctx: NativeStepContext, args: Any) -> str:
     """Independently read the real X11 CLIPBOARD selection and assert it.
@@ -2536,7 +2611,7 @@ def _do_assert_system_clipboard(ctx: NativeStepContext, args: Any) -> str:
     the value is fetched by a separate process through a real X11 selection
     transfer, never from the app's DOM or its in-process clipboard state.
     """
-    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+    if platform.system() != "Linux" or not (os.environ.get("DISPLAY") or wayland.active()):
         raise StepError("assert_system_clipboard: requires a Linux X11 display")
     if not isinstance(args, dict):
         raise StepError("assert_system_clipboard: expected {equals|contains|readable}")
@@ -2544,7 +2619,8 @@ def _do_assert_system_clipboard(ctx: NativeStepContext, args: Any) -> str:
     if len(keys) != 1:
         raise StepError("assert_system_clipboard: pass exactly one of equals/contains/readable")
 
-    observed = _read_x11_clipboard(timeout=float(args.get("timeout_sec", 30.0)))
+    observed = (_read_wayland_clipboard() if wayland.active()
+                else _read_x11_clipboard(timeout=float(args.get("timeout_sec", 30.0))))
     ok = bool(observed.get("ok"))
     text = observed.get("text") if ok else None
 
@@ -3119,12 +3195,14 @@ def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
     args = args if isinstance(args, dict) else {"path": args}
     if args.get("action", "show") == "close":
         return "image window closed" if ctx.stop_mfa_helper("image-window") else "no image window was open"
-    if platform.system() not in {"Linux", "Windows"} or (platform.system() == "Linux" and not os.environ.get("DISPLAY")):
+    if platform.system() not in {"Linux", "Windows"} or (platform.system() == "Linux" and not (os.environ.get("DISPLAY") or wayland.active())):
         raise StepError("native_show_image_window: requires a Linux X11 display or a Windows desktop")
     target, data = png_fixture(args.get("path"), "native_show_image_window")
     ctx.stop_mfa_helper("image-window")
+    command = (["/usr/bin/python3", str(Path(__file__).resolve().parents[1] / "ci_wayland_fixture.py"), "image", "--path", str(target)]
+               if wayland.active() else [sys.executable, "-c", _MFA_IMAGE_WINDOW_SOURCE, str(target), str(int(args.get("x", 40))), str(int(args.get("y", 40)))])
     proc = subprocess.Popen(
-        [sys.executable, "-c", _MFA_IMAGE_WINDOW_SOURCE, str(target), str(int(args.get("x", 40))), str(int(args.get("y", 40)))],
+        command,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
     ctx._mfa_helpers["image-window"] = proc
@@ -3157,6 +3235,16 @@ def _do_native_clipboard_image(ctx: NativeStepContext, args: Any) -> str:
     from .mfa_support import png_fixture
 
     target, data = png_fixture(args.get("path") if isinstance(args, dict) else args, "native_clipboard_image")
+    if wayland.active():
+        from .host_clipboard import set_image, targets
+        set_image(target)
+        offered = targets()
+        if "image/png" not in offered:
+            raise StepError(f"native_clipboard_image: Wayland did not offer image/png: {offered}")
+        (ctx.case_dir / "native-clipboard-image.json").write_text(json.dumps({
+            "path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
+            "owner": "wl-copy", "targets": offered, "hostSelectionReplaced": True}), encoding="utf-8")
+        return "external Wayland clipboard owns image/png"
     if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
         raise StepError("native_clipboard_image: requires a Linux X11 display")
     xclip = shutil.which("xclip")

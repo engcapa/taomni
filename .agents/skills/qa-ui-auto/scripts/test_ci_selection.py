@@ -78,17 +78,23 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(entry['linux_wrapper'], 'dbus')
         self.assertEqual(entry['desktop']['display_server'], 'Xtigervnc')
 
-    def test_x11_cases_are_explicit_gaps_on_wayland_not_passes(self):
+    def test_native_window_case_is_selected_on_both_linux_desktops(self):
         plan = make_plan(args(scope='selected', platforms='linux', modes='native',
                               linux_profiles='ubuntu-24.04-xvfb,ubuntu-26.04-wayland',
                               case_ids='TC-MAIN-RAIL-03,TC-NATIVE-CORE-001'))
         wayland = next(e for e in plan['entries'] if e['linux_profile'] == 'ubuntu-26.04-wayland')
-        self.assertEqual(wayland['selected_ids'], ['TC-NATIVE-CORE-001'])
-        self.assertTrue(any(g['case'] == 'TC-MAIN-RAIL-03' and
-                            g['linux_profile'] == 'ubuntu-26.04-wayland' for g in plan['gaps']))
-        with self.assertRaisesRegex(ValueError, 'explicit cases unavailable'):
-            make_plan(args(scope='selected', platforms='linux', modes='native',
-                           linux_profiles='ubuntu-26.04-wayland', case_ids='TC-MAIN-RAIL-03'))
+        self.assertEqual(set(wayland['selected_ids']), {'TC-NATIVE-CORE-001', 'TC-MAIN-RAIL-03'})
+        self.assertFalse(plan['gaps'])
+
+    def test_full_wayland_native_selection_matches_x11_case_ids(self):
+        plan = make_plan(args(scope='all', platforms='linux', modes='native',
+                              linux_profiles='ubuntu-24.04-xvfb,ubuntu-26.04-wayland'))
+        x11, wayland = plan['entries']
+        self.assertEqual(x11['selected_ids'], wayland['selected_ids'])
+        # The user's external project remains unavailable on both desktops.
+        self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']], [
+            ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-24.04-xvfb'),
+            ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-26.04-wayland')])
 
     def test_restore_pulls_predecessor_before_it(self):
         cid = 'TC-auto-F-DB-1-query-tab-rename-native-restore'

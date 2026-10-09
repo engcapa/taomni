@@ -104,13 +104,17 @@ def _wayland_text() -> bool:
 
 
 def _wlcopy_text(text: str) -> None:
+    _wlcopy("text/plain;charset=utf-8", text.encode("utf-8"))
+
+
+def _wlcopy(mime: str, data: bytes) -> None:
     if not shutil.which("wl-copy"):
         raise RuntimeError("wl-copy is not installed")
     # Like xclip, wl-copy forks an owner. Do not leave that child holding
     # capture pipes open until the next clipboard writer replaces it.
     with tempfile.TemporaryFile() as err:
-        result = subprocess.run(["wl-copy", "--type", "text/plain;charset=utf-8"],
-                                input=text.encode("utf-8"), timeout=10,
+        result = subprocess.run(["wl-copy", "--type", mime],
+                                input=data, timeout=10,
                                 stdout=subprocess.DEVNULL, stderr=err)
         if result.returncode:
             err.seek(0)
@@ -120,6 +124,8 @@ def _wlcopy_text(text: str) -> None:
 
 def targets() -> list[str]:
     if SYSTEM == "Linux":
+        if _wayland_text():
+            return _run(["wl-paste", "--list-types"]).decode("utf-8").splitlines()
         return _xclip_get("TARGETS").decode("utf-8", "replace").split()
     if SYSTEM == "Darwin":
         return _jxa(_JXA_PRELUDE + "ObjC.deepUnwrap(pb.types).join('\\n')").splitlines()
@@ -166,6 +172,8 @@ def set_html(fragment: str, plain: str) -> None:
         _jxa(_JXA_PRELUDE + "var p = JSON.parse(arg); pb.clearContents;"
              "pb.setStringForType($(p.html), $.NSPasteboardTypeHTML);"
              "pb.setStringForType($(p.text), $.NSPasteboardTypeString); 'ok'", payload)
+    elif _wayland_text():
+        _wlcopy("text/html", fragment.encode("utf-8"))
     else:
         # One xclip owner can only serve one target; HTML is the target under test.
         _xclip_set("text/html", fragment.encode("utf-8"))
@@ -210,6 +218,8 @@ def get_html() -> str:
         return raw[start + len("<!--StartFragment-->"):end] if start >= 0 and end > start else raw
     if SYSTEM == "Darwin":
         return _jxa(_JXA_PRELUDE + "var s = pb.stringForType($.NSPasteboardTypeHTML); s.isNil() ? '' : s.js")
+    if _wayland_text():
+        return _run(["wl-paste", "--no-newline", "--type", "text/html"]).decode("utf-8", "replace")
     return _xclip_get("text/html").decode("utf-8", "replace")
 
 
@@ -222,6 +232,8 @@ def set_image(png: Path) -> None:
         _jxa(_JXA_PRELUDE + "var img = $.NSImage.alloc.initWithContentsOfFile($(arg));"
              "pb.clearContents; pb.writeObjects($([img])) ? 'ok' : (function(){throw new Error('writeObjects failed')})()",
              str(png))
+    elif _wayland_text():
+        _wlcopy("image/png", png.read_bytes())
     else:
         _xclip_set("image/png", png.read_bytes())
 
@@ -241,6 +253,8 @@ def save_image(out_png: Path) -> None:
              " d = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $()); }"
              "d.writeToFileAtomically($(arg), true) ? 'ok' : (function(){throw new Error('write failed')})()",
              str(out_png))
+    elif _wayland_text():
+        out_png.write_bytes(_run(["wl-paste", "--no-newline", "--type", "image/png"]))
     else:
         out_png.write_bytes(_xclip_get("image/png"))
 
@@ -305,7 +319,7 @@ winner;
         _jxa(script, json.dumps(resolved))
     else:
         uris = "".join(Path(p).as_uri() + "\r\n" for p in resolved)
-        _xclip_set("text/uri-list", uris.encode("utf-8"))
+        (_wlcopy if _wayland_text() else _xclip_set)("text/uri-list", uris.encode("utf-8"))
 
 
 def get_files() -> list[str]:
@@ -322,7 +336,8 @@ def get_files() -> list[str]:
         return [line for line in out.splitlines() if line.strip()]
     from urllib.parse import unquote, urlparse
 
-    raw = _xclip_get("text/uri-list").decode("utf-8", "replace")
+    raw = (_run(["wl-paste", "--no-newline", "--type", "text/uri-list"])
+           if _wayland_text() else _xclip_get("text/uri-list")).decode("utf-8", "replace")
     return [unquote(urlparse(line.strip()).path) for line in raw.splitlines()
             if line.strip() and not line.startswith("#")]
 
@@ -332,6 +347,8 @@ def clear() -> None:
         _ps("[System.Windows.Forms.Clipboard]::Clear()")
     elif SYSTEM == "Darwin":
         _jxa(_JXA_PRELUDE + "pb.clearContents; 'ok'")
+    elif _wayland_text():
+        _run(["wl-copy", "--clear"])
     else:
         _xclip_set("UTF8_STRING", b"")
 
@@ -400,6 +417,11 @@ def _x11_owner_changes(seconds: float) -> int:
 def count_changes(seconds: float) -> int:
     """How often the OS clipboard changes during the next ``seconds``."""
     if SYSTEM == "Linux":
+        if _wayland_text():
+            from .wayland import command
+            before = command("clipboard_serial")
+            time.sleep(seconds)
+            return command("clipboard_serial") - before
         return _x11_owner_changes(seconds)
     before = _change_counter()
     time.sleep(seconds)

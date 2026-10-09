@@ -133,6 +133,8 @@ jobs:
         run: node --test scripts/compose-updater-manifest.test.mjs
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
+      - name: Wayland automation contracts
+        run: python -m unittest test_wayland_tools
       - name: Plan exact cases and dependencies
         id: plan
         env:

@@ -386,7 +386,7 @@ class DesktopTests(unittest.TestCase):
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '26.04'}), \
              patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'test-bus'}), \
              patch.object(Desktop, 'start') as start, \
-             patch.object(Desktop, '_wait', side_effect=[None, None, None, WAYLAND_PROTOCOLS]) as wait, \
+             patch.object(Desktop, '_wait', side_effect=[None, None, None, WAYLAND_PROTOCOLS, True]) as wait, \
              patch('ci_desktop.subprocess.run') as run, \
              patch('ci_desktop.subprocess.check_output', side_effect=[
                  'GdkWaylandDisplay\n1\n', portal, 'GNOME Shell 50']):
@@ -422,6 +422,7 @@ class DesktopTests(unittest.TestCase):
                 self.assertEqual([call.args[2] for call in wait.call_args_list], [
                     'PipeWire', 'GNOME Wayland compositor', 'Mutter RemoteDesktop service',
                     'Wayland keyboard and pointer',
+                    'GNOME portal accessibility automation',
                 ])
                 self.assertFalse(any('openbox' in call.args[0] for call in start.call_args_list))
             self.assertEqual(os.environ['DISPLAY'], ':99')
@@ -468,6 +469,8 @@ class DesktopTests(unittest.TestCase):
         def launch(command, **kwargs):
             if command[0] == '/usr/bin/python3':
                 self.assertEqual(len(owner_checks), 2)
+                if '--ready' in command:
+                    Path(command[command.index('--ready') + 1]).write_text('{}')
             calls.append(command)
             process = Mock()
             process.poll.return_value = None

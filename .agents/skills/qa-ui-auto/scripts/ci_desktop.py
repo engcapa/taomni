@@ -39,7 +39,8 @@ class Desktop:
         self.temporary = None
 
     def start(self, command, *, env=None):
-        log = (self.root / (Path(command[0]).name + ".log")).open("w", encoding="utf-8")
+        name = Path(command[1]).name if len(command) > 1 and command[1].endswith(".py") else Path(command[0]).name
+        log = (self.root / (name + ".log")).open("w", encoding="utf-8")
         self.logs.append(log)
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=env,
                                    start_new_session=sys.platform != "win32")
@@ -124,6 +125,14 @@ class Desktop:
             return protocols if wayland_has_input(protocols) else False
 
         protocols = self._wait(input_owner, input_ready, "Wayland keyboard and pointer")
+        # The RDP workload uses Tk. It may be an XWayland client inside this
+        # compositor while the product remains a verified GdkWaylandDisplay.
+        # Use Mutter's own XWayland server, never a separate Xvfb desktop.
+        if "rdp" in self.capabilities:
+            from qa_ui_auto.wayland import command as wayland_command
+            display = self._wait(input_owner, lambda: wayland_command("xwayland_display"), "owned XWayland workload display")
+            os.environ["DISPLAY"] = display
+            facts["fixture_xwayland_display"] = display
         (self.root / "wayland-info.txt").write_text(protocols, encoding="utf-8")
         for interface in ("wl_compositor", "xdg_wm_base", "wl_output"):
             if interface not in protocols:
@@ -144,13 +153,26 @@ class Desktop:
         for interface in ("Screenshot", "ScreenCast", "RemoteDesktop"):
             if f"org.freedesktop.portal.{interface}" not in portal:
                 raise RuntimeError(f"GNOME desktop portal lacks {interface}")
+        consent_ready = self.root / "portal-automation-ready.json"
+        consent = self.start(["/usr/bin/python3", str(Path(__file__).with_name("ci_wayland_portal.py")),
+                              "--ready", str(consent_ready),
+                              "--log", str(self.root / "portal-consent.jsonl")])
+        self._wait(consent, consent_ready.is_file, "GNOME portal accessibility automation")
+        if "ime" in self.capabilities:
+            self._ime(facts)
+        if "audio" in self.capabilities:
+            os.environ["PULSE_SERVER"] = f"unix:{runtime}/pulse/native"
+            pulse = self.start(["pipewire-pulse"])
+            self._wait(pulse, lambda: subprocess.run(["pactl", "info"], capture_output=True,
+                                                    timeout=5).returncode == 0, "PipeWire Pulse server")
         facts.update(gdk_display=probe[0], monitors=int(probe[1]),
                      wayland_display=os.environ["WAYLAND_DISPLAY"], input_transport="Wayland/WebDriver",
                      input_devices=["keyboard", "pointer"], input_provider="Mutter RemoteDesktop",
                      renderer="software", screen=[1920, 1080],
                      gnome_version=subprocess.check_output(["gnome-shell", "--version"], text=True).strip(),
                      portal_interfaces=["Screenshot", "ScreenCast", "RemoteDesktop"],
-                     note="GNOME virtual monitor; portal user consent and physical GPU/input are unverified")
+                     portal_consent="AT-SPI on the owned GNOME portal dialog",
+                     note="GNOME virtual monitor; physical GPU/input remain unverified")
 
     def _linux(self, facts):
         profile = LINUX_PROFILES[self.linux_profile]
