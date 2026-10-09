@@ -53,11 +53,17 @@ steps:
 - press: Escape
 - wait_for: '[data-testid="system-screenshot"]'
 - assert_visible: '[data-testid="system-screenshot"]'
+- open: ${cfg.app.base_url}#screenshot-scroll
+- wait_for: '[data-testid="screenshot-scroll-controller"]'
+- press: Escape
+- wait_for: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).args.cancel === false
 verification:
   review: reviewed
   requirements:
   - id: workflow
-    requirement: Finish keeps content and Cancel discards it. A manual capture explains pauses; switching to automatic and back updates
+    requirement: Finish and Escape keep content and Cancel discards it. A manual capture explains pauses; switching to automatic and back updates
       visible instructions and dispatches the chosen mode without closing the controller.
     actions:
     - 1
@@ -70,6 +76,8 @@ verification:
     - 20
     - 23
     - 25
+    - 28
+    - 30
     checkpoints:
     - step: 3
       expectation: "assert_text_equals: {'selector': '[data-testid=\"screenshot-scroll-progress\"]', 'equals': 'Scroll capture \xB7\
@@ -93,6 +101,8 @@ verification:
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).args.mode === "manual"''}'
     - step: 27
       expectation: The main screenshot entry is usable after exit.
+    - step: 32
+      expectation: Escape dispatches Finish with cancel false.
     results:
     - 3
     - 6
@@ -103,6 +113,7 @@ verification:
     - 21
     - 22
     - 27
+    - 32
   visual:
   - check: Visible controls, state and image dimensions
     method: automated

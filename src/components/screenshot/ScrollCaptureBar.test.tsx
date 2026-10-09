@@ -17,6 +17,13 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("scroll capture controls", () => {
+  it("finishes once with Escape and retains the collected image", async () => {
+    render(<ScrollCaptureBar />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(window, { key: "Escape", repeat: true });
+    expect(api.stop).toHaveBeenCalledExactlyOnceWith(false);
+    await waitFor(() => expect(screen.getByTestId("screenshot-scroll-stop")).toBeDisabled());
+  });
   it("allows manual takeover and retains the current mode if switching fails", async () => {
     api.status.mockResolvedValue({ frames: 3, mode: "manual", needsOverlap: false });
     render(<ScrollCaptureBar />);

@@ -87,6 +87,9 @@ pub fn parse(accelerator: &str) -> Result<Shortcut, String> {
         .trim()
         .parse()
         .map_err(|e| format!("invalid shortcut '{accelerator}': {e}"))?;
+    if format!("{:?}", shortcut.key) == "Escape" && shortcut.mods.is_empty() {
+        return Err("Escape is reserved for finishing or closing a screenshot".into());
+    }
     if shortcut.mods.is_empty() {
         let key = format!("{:?}", shortcut.key);
         // A bare letter/digit would make the key untypable system-wide.
@@ -258,6 +261,7 @@ mod tests {
         assert!(parse("Control+Shift+X").is_ok());
         assert!(parse("Control+Shift").is_err());
         assert!(parse("Banana+Q").is_err());
+        assert!(parse("Escape").is_err());
     }
 
     #[test]

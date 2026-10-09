@@ -382,6 +382,13 @@ pub(crate) trait Capturer {
         self.capture().map(Some)
     }
 
+    /// Windows scrolling screenshots pace their own stability samples. Do not
+    /// add the stream's idle wait to that interval when no new frame exists.
+    #[cfg(target_os = "windows")]
+    fn poll_frame_now(&mut self) -> anyhow::Result<Option<Frame>> {
+        self.poll_frame()
+    }
+
     /// Whether this backend already caps its own frame rate at the source.
     ///
     /// A self-paced backend blocks inside [`Capturer::poll_frame`] until the

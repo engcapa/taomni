@@ -1524,7 +1524,7 @@ export function ScreenshotOverlay() {
           </fieldset>
           <p data-testid="screenshot-scroll-mode-description" className="mb-3">{t(scrollMode === "auto" ? "screenshot.scrollRunningHint" : "screenshot.scrollManualHint")}</p>
           {plannedRegion && physSel && plannedRegion.height !== physSel.height && <p data-testid="screenshot-scroll-adjusted" className="mb-3 text-amber-600">{t("screenshot.scrollAdjusted", { width: plannedRegion.width, height: plannedRegion.height })}</p>}
-          <p data-testid="screenshot-scroll-instructions" className="mb-4">{t("screenshot.scrollInstructions", { shortcut: stopShortcut || t("settings.screenshotDisabled") })}</p>
+          <p data-testid="screenshot-scroll-instructions" className="mb-4">{t("screenshot.scrollInstructions")}</p>
           <div className="flex justify-end gap-2">
             <button data-testid="screenshot-scroll-confirm-cancel" type="button" className="px-3 py-2 rounded-lg" onClick={() => setScrollConfirm(false)}>{t("screenshot.cancel")}</button>
             <button data-testid="screenshot-scroll-start" disabled={planningScroll || !plannedRegion} type="button" className="px-3 py-2 rounded-lg" style={{ background: "var(--taomni-accent)", color: "#fff" }} onClick={() => void handleScrollCapture()}>{t("screenshot.scrollStart")}</button>
