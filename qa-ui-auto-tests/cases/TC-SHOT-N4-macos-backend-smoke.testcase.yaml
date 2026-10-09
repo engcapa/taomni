@@ -25,4 +25,4 @@ verification:
   visual:
   - {check: Pin aspect ratio, method: external, reason: Inspect saved screenshot artifact; image dimensions are asserted automatically.}
   native:
-  - {check: Pin and global hotkey, method: automated, reason: "Real native windows/disk and OS key injection; Wayland registers the host app identity then requires a real GlobalShortcuts grant and Activated event. Accessibility failures remain failures."}
+  - {check: Pin and global hotkey, method: automated, reason: "Real native windows/disk and OS key injection; Wayland registers the compiled host app identity before desktop initialization, then requires a real GlobalShortcuts grant and Activated event. Accessibility failures remain failures."}

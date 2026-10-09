@@ -92,6 +92,26 @@ class WaylandToolsTests(unittest.TestCase):
                     owned_window_pid(windows, executable, owned_runtime, root,
                                      title='Pinned Screenshot')
 
+    def test_main_window_ignores_owned_tooltips_but_rejects_two_toplevels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = root / 'taomni-qa'
+            executable.touch()
+            runtime = root / 'qa-owned'
+            process = root / '42'
+            process.mkdir()
+            (process / 'environ').write_bytes(('XDG_RUNTIME_DIR=' + str(runtime) + '\0').encode())
+            main = dict(pid=42, title='Main', normal=True)
+            tooltip = dict(pid=42, title='Drag window', normal=False)
+            with patch.object(Path, 'resolve', return_value=executable):
+                self.assertEqual(owned_window_pid([tooltip, main], executable, runtime, root), 42)
+                self.assertEqual(owned_window_pid([tooltip, main], executable, runtime,
+                                                 root, title='Drag window'), 42)
+                with self.assertRaisesRegex(RuntimeError, 'found 0'):
+                    owned_window_pid([tooltip], executable, runtime, root)
+                with self.assertRaisesRegex(RuntimeError, 'found 2'):
+                    owned_window_pid([main, dict(main, title='Other')], executable, runtime, root)
+
     def test_consent_only_accepts_known_dialogs_from_their_owning_process(self):
         def records(name, showing=True):
             return [{"name": name, "showing": showing}]

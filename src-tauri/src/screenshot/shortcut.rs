@@ -205,18 +205,24 @@ fn apply_native(app: &AppHandle, accelerator: String) -> Result<ShortcutStatus, 
     }
 }
 
+/// Identify the shared portal connection before GTK/Tauri can issue a request.
+#[cfg(target_os = "linux")]
+pub(crate) fn prepare_portal_identity(identifier: &str) {
+    if crate::servers::rdp::capture::wayland::is_wayland_session() {
+        // GTK/Tauri initialization can query portal settings before setup.
+        // The first request fixes ashpd's connection identity on portal 1.20.
+        if let Err(error) = tauri::async_runtime::block_on(portal::ensure_identity(identifier)) {
+            eprintln!("Wayland portal application identity: {error}");
+        }
+    }
+}
+
 /// Startup registration from the persisted setting. Failures are recorded
 /// in the status instead of aborting startup.
 pub fn init(app: &AppHandle) {
     let accelerator = effective(&load(app));
     #[cfg(target_os = "linux")]
     if super::pins::native_wayland() {
-        // The portal caches a host connection's identity at its first request,
-        // including capture requests with an empty app ID. Identify it before
-        // renderer IPC can start any capture, even when shortcuts are disabled.
-        if let Err(error) = tauri::async_runtime::block_on(portal::ensure_identity(app)) {
-            log::warn!("Wayland portal application identity: {error}");
-        }
         *CURRENT.lock().unwrap_or_else(|p| p.into_inner()) = Some(Current {
             accelerator: accelerator.clone(),
             registered: None,

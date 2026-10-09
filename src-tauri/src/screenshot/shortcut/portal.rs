@@ -37,16 +37,14 @@ fn trigger(shortcut: Shortcut) -> String {
         .join("+")
 }
 
-pub(super) async fn ensure_identity(app: &AppHandle) -> Result<(), String> {
+pub(super) async fn ensure_identity(identifier: &str) -> Result<(), String> {
     // Host processes have no sandbox metadata from which the portal can infer
     // an app ID. Register on ashpd's shared bus connection before opening the
     // shortcut session. This identifies the app; BindShortcuts still requests
     // the user's permission for each new binding.
     HOST_IDENTITY
         .get_or_try_init(|| async {
-            let app_id = app
-                .config()
-                .identifier
+            let app_id = identifier
                 .parse::<ashpd::AppID>()
                 .map_err(|e| format!("shortcut application ID: {e}"))?;
             ashpd::register_host_app(app_id)
@@ -58,7 +56,7 @@ pub(super) async fn ensure_identity(app: &AppHandle) -> Result<(), String> {
 }
 
 async fn register(app: &AppHandle, shortcut: Shortcut) -> Result<Registration, String> {
-    ensure_identity(app).await?;
+    ensure_identity(&app.config().identifier).await?;
     let portal = GlobalShortcuts::new()
         .await
         .map_err(|e| format!("GlobalShortcuts portal: {e}"))?;

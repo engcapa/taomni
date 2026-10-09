@@ -20,6 +20,7 @@ WINDOW_STATE = """(() => ({
     windows: global.get_window_actors().map(actor => {
         const window = actor.meta_window;
         return {pid: window.get_pid(), title: window.get_title(),
+                normal: window.get_window_type() === imports.gi.Meta.WindowType.NORMAL,
                 focused: window.has_focus(), minimized: window.minimized,
                 visible: actor.visible && !window.minimized, above: window.is_above(),
                 actor: (() => { const [x, y] = actor.get_transformed_position();
@@ -38,6 +39,10 @@ def owned_window_pid(windows, application: Path, runtime: Path, proc: Path = Pat
     matches = []
     for window in windows:
         if title is not None and window["title"] != title:
+            continue
+        if title is None and not window.get("normal", True):
+            # Tooltips/popups share the app's PID while the pointer dwells on
+            # a grip. An unnamed main-window request must match its toplevel.
             continue
         pid = int(window["pid"])
         directory = proc / str(pid)
@@ -162,15 +167,18 @@ def main() -> None:
 
     def window_command(request, diagnostics):
         state = evaluate(WINDOW_STATE)
+        diagnostics["observed"] = state
         title = request.get("title")
         pid = owned_window_pid(state["windows"], Path(request["application"]), args.socket.parent, title=title)
-        window = next(w for w in state["windows"] if w["pid"] == pid and (title is None or w["title"] == title))
+        window = next(w for w in state["windows"] if w["pid"] == pid and
+                      (w.get("normal", True) if title is None else w["title"] == title))
         diagnostics["window"] = window
         if request["command"] == "geometry":
             return window
         if request["command"] == "place":
             rect = request["rect"]
-            selector = f"w.get_pid() === {pid}" + (f" && w.get_title() === {json.dumps(title)}" if title is not None else "")
+            selector = f"w.get_pid() === {pid}" + (f" && w.get_title() === {json.dumps(title)}"
+                if title is not None else " && w.get_window_type() === imports.gi.Meta.WindowType.NORMAL")
             evaluate(f"(() => {{ const w = global.get_window_actors().map(a => a.meta_window)"
                      f".find(w => {selector}); w.unmaximize(3); "
                      f"w.move_resize_frame(true, {int(rect['x'])}, {int(rect['y'])}, "
