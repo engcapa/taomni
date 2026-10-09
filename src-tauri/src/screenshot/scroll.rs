@@ -835,7 +835,7 @@ struct Stitcher {
     /// Static rows, fixed by the first frame pair that moved.
     margins: Option<(usize, usize)>,
     /// Side chrome that does not follow the verified content displacement.
-    sides: Option<(u32, u32)>,
+    sides: Option<SideEvidence>,
     side_splits: Vec<u32>,
     /// Rows accumulated so far: header + body rows (footer excluded once
     /// margins are known).
@@ -895,14 +895,12 @@ impl Stitcher {
         if overlap >= body {
             return Step::Unchanged;
         }
-        let sides = fixed_sides(&self.last, &frame, top, body - overlap, overlap);
-        if self.sides.is_none() {
-            self.side_splits = side_chrome_splits(&self.last, &frame, sides);
+        let evidence = fixed_sides(&self.last, &frame, top, body - overlap, overlap);
+        let merged = self.sides.map_or(evidence, |old| old.merge(evidence));
+        if self.sides.is_none_or(|old| old.sides() != merged.sides()) {
+            self.side_splits = side_chrome_splits(&self.last, &frame, merged.sides());
         }
-        self.sides = Some(match self.sides {
-            Some((left, right)) => (left.min(sides.0), right.min(sides.1)),
-            None => sides,
-        });
+        self.sides = Some(merged);
         if self.margins.is_none() {
             // First movement: drop the first frame's footer from the output;
             // the final footer is appended by `finish`.
@@ -934,7 +932,7 @@ impl Stitcher {
         let height = self.height();
         let mut image = RgbaImage::from_raw(self.width, height, self.rows)
             .expect("stitched rows are whole rows");
-        if let Some((left, right)) = self.sides {
+        if let Some((left, right)) = self.sides.map(SideEvidence::sides) {
             for (start, end) in [(0, left), (self.width - right, self.width)] {
                 let mut from = start;
                 for to in self
@@ -956,21 +954,55 @@ impl Stitcher {
     }
 }
 
-/// Find the content boundary from columns that actually follow the verified
-/// vertical shift. Constant sidebars, shadows and changing scrollbar thumbs
-/// must not be treated as another scrolling page. Require a close RGB match;
-/// if there is no convincing moving column near an edge, leave it untouched.
+/// Side chrome evidence from one verified frame pair, per edge (left, right):
+/// `chrome` is the extent of columns that do not follow the content shift
+/// (fixed icons, borders, scrollbar thumbs); `bound` is the first column that
+/// does follow it, beyond which the side can never extend.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct SideEvidence {
+    chrome: (u32, u32),
+    bound: (u32, u32),
+}
+
+impl SideEvidence {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            chrome: (
+                self.chrome.0.max(other.chrome.0),
+                self.chrome.1.max(other.chrome.1),
+            ),
+            bound: (
+                self.bound.0.min(other.bound.0),
+                self.bound.1.min(other.bound.1),
+            ),
+        }
+    }
+
+    fn sides(self) -> (u32, u32) {
+        (
+            self.chrome.0.min(self.bound.0),
+            self.chrome.1.min(self.bound.1),
+        )
+    }
+}
+
+/// Classify edge columns against the verified vertical shift. Constant
+/// sidebars, shadows and changing scrollbar thumbs must not be treated as
+/// another scrolling page. Plain background matches either way, so it neither
+/// bounds nor starts a side: a terminal's blank right margin must not hide a
+/// fixed icon or scrollbar beside it. Require a close RGB match.
 fn fixed_sides(
     previous: &RgbaImage,
     next: &RgbaImage,
     top: usize,
     shift: usize,
     overlap: usize,
-) -> (u32, u32) {
+) -> SideEvidence {
     let width = next.width() as usize;
     let a = previous.as_raw();
     let b = next.as_raw();
-    let moving = |x: usize| {
+    // (follows the shift, contradicts the shift)
+    let classify = |x: usize| {
         let mut aligned_bad = 0;
         let mut still_bad = 0;
         for y in top..top + overlap {
@@ -983,12 +1015,30 @@ fn fixed_sides(
                 still_bad += 1;
             }
         }
-        aligned_bad <= overlap / 100 && still_bad > aligned_bad + overlap / 50
+        let follows = aligned_bad <= overlap / 100;
+        // Even a few shifted text rows prove the column is page content.
+        (follows && still_bad >= aligned_bad + 2, !follows)
     };
     let limit = width / 3;
-    let left = (0..limit).find(|&x| moving(x)).unwrap_or(0);
-    let right = (0..limit).find(|&x| moving(width - 1 - x)).unwrap_or(0);
-    (left as u32, right as u32)
+    let edge = |column: &dyn Fn(usize) -> usize| {
+        let mut chrome = 0;
+        for k in 0..limit {
+            let (moving, fixed) = classify(column(k));
+            if moving {
+                return (chrome, k as u32);
+            }
+            if fixed {
+                chrome = k as u32 + 1;
+            }
+        }
+        (chrome, limit as u32)
+    };
+    let (left_chrome, left_bound) = edge(&|k| k);
+    let (right_chrome, right_bound) = edge(&|k| width - 1 - k);
+    SideEvidence {
+        chrome: (left_chrome, right_chrome),
+        bound: (left_bound, right_bound),
+    }
 }
 
 /// A changing scrollbar and a stationary window shadow/desktop are separate
@@ -1194,6 +1244,48 @@ mod tests {
             .filter(|&y| out.get_pixel(230, y)[0] == 100)
             .count();
         assert_eq!(thumb, 30, "scrollbar thumb must occur once");
+    }
+
+    #[test]
+    fn fixed_icons_and_scrollbar_beyond_a_wide_blank_margin_appear_once() {
+        // A terminal: text only in the left part, a blank background wider
+        // than a third of the window, then a fixed rail icon and a scrollbar.
+        let page = page(200, 1000);
+        let bg = image::Rgba([29, 31, 33, 255]);
+        let frame = |offset: u32| {
+            let mut image = RgbaImage::from_pixel(480, 300, bg);
+            image::imageops::replace(&mut image, &view(&page, offset, 300, 0, 0), 0, 0);
+            for y in 0..300 {
+                for x in 470..480 {
+                    image.put_pixel(x, y, image::Rgba([10, 10, 10, 255]));
+                }
+            }
+            for y in 100..116 {
+                for x in 450..466 {
+                    image.put_pixel(x, y, image::Rgba([223, 247, 243, 255]));
+                }
+            }
+            for y in 10 + offset / 4..40 + offset / 4 {
+                for x in 436..444 {
+                    image.put_pixel(x, y, image::Rgba([70, 72, 73, 255]));
+                }
+            }
+            image
+        };
+        let mut stitcher = Stitcher::new(frame(0));
+        for offset in [100, 200, 300, 400] {
+            assert!(matches!(stitcher.push(frame(offset)), Step::Appended));
+        }
+        let out = stitcher.finish().image;
+        assert_eq!(out.dimensions(), (480, 700));
+        assert_eq!(crop(&out, 0, 0, 200, 700), crop(&page, 0, 0, 200, 700));
+        let count = |x: u32, value: u8| {
+            (0..700)
+                .filter(|&y| out.get_pixel(x, y)[0] == value)
+                .count()
+        };
+        assert_eq!(count(458, 223), 16, "rail icon must occur once");
+        assert_eq!(count(440, 70), 30, "scrollbar thumb must occur once");
     }
 
     #[test]
