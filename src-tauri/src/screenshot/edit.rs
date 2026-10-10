@@ -2,7 +2,7 @@
 //! lifetime to the capture session. No shell command strings are evaluated.
 
 use std::path::Path;
-use tauri::{AppHandle, Manager, WebviewWindow, WebviewUrl};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow, WebviewUrl};
 use std::process::Command;
 use super::{blocking, capture};
 
@@ -68,33 +68,167 @@ pub async fn screenshot_open_editor(path: String, editor: Option<String>) -> Res
     }).await
 }
 
-/// Re-edit a pin in a document window without capturing or hiding the desktop.
-/// The pin keeps its original image; the user exports or creates a new pin.
+/// Re-edit a pin in a document window without capturing the desktop.
+/// Remember the source pin so Done can replace it or create another pin.
 #[tauri::command]
 pub async fn screenshot_edit_pin(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     if super::OPENING.swap(true, std::sync::atomic::Ordering::SeqCst) { return Err("screenshot is opening".into()); }
-    let result = (|| {
+    let mut owns_session = false;
+    let result = async {
         let pin = {
             let state = super::tool_state();
             if state.overlay.is_some() || state.recorder_open || state.scroll.is_some() { return Err("finish the current capture first".into()); }
             state.pins.get(window.label()).cloned().ok_or("not a pin window")?
         };
         let display = capture::display_at_cursor(&app).map_err(super::internal_error)?;
+        let lease = super::session::SessionLease::acquire()?.ok_or("another screenshot session is active")?;
+        owns_session = true;
+        super::tool_state().session_lease = Some(std::sync::Arc::new(lease));
         let path = capture::temp_artifact_path("edit-pin", "png").map_err(super::internal_error)?;
         std::fs::copy(&pin.path, &path).map_err(|e| e.to_string())?;
         super::tool_state().overlay = Some(super::OverlayInit {
             path: path.to_string_lossy().into_owned(), width: pin.width, height: pin.height,
             display_id: display.id.clone(), scale_factor: display.scale_factor, window_region: None, document: true,
+            source_pin: Some(window.label().to_string()),
         });
         let editor = super::window_builder(&app, super::OVERLAY_LABEL, WebviewUrl::App("index.html#screenshot-overlay".into()))
             .title("Screenshot editor").inner_size(1000.0, 760.0).visible(false).build().map_err(|e| e.to_string())?;
         super::watch_session_window(&editor);
+        configure_document_window(&editor, &display)?;
+        // Topmost pins and their options must not cover the document editor.
+        // Restore the visible windows on Done, Cancel or a native close.
+        for (label, pin_window) in app.webview_windows() {
+            if (label.starts_with(super::PIN_LABEL_PREFIX) || label.starts_with("screenshot-tools-"))
+                && pin_window.is_visible().unwrap_or(false)
+            {
+                pin_window.hide().map_err(|e| e.to_string())?;
+                super::tool_state().hidden.push(label);
+            }
+        }
         editor.show().map_err(|e| e.to_string())?;
+        settle_document_window(&editor, &display).await?;
         editor.set_focus().map_err(|e| e.to_string())
-    })();
+    }.await;
+    if result.is_err() && owns_session {
+        super::close_session(&app);
+    }
     super::OPENING.store(false, std::sync::atomic::Ordering::SeqCst);
-    if result.is_err() && app.get_webview_window(super::OVERLAY_LABEL).is_none() { super::tool_state().overlay = None; }
     result
+}
+
+/// Turn the fullscreen selection surface into an ordinary resizable document.
+pub(super) fn configure_document_window(window: &WebviewWindow, display: &capture::DisplayInfo) -> Result<(), String> {
+    let scale = display.scale_factor.max(1.0);
+    let width = (display.width as f64 / scale * 0.8).min(1100.0);
+    let height = (display.height as f64 / scale * 0.8).min(800.0);
+    // AppKit restores fullscreen/decorations with queued style masks. Set the
+    // shared resizable flag first so those masks cannot restore the old fixed
+    // selection-window style after set_resizable has already completed.
+    window.set_resizable(true).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    window.set_simple_fullscreen(false).map_err(|e| e.to_string())?;
+    window.set_fullscreen(false).map_err(|e| e.to_string())?;
+    window.unmaximize().map_err(|e| e.to_string())?;
+    window.set_always_on_top(false).map_err(|e| e.to_string())?;
+    window.set_skip_taskbar(false).map_err(|e| e.to_string())?;
+    window.set_decorations(true).map_err(|e| e.to_string())?;
+    window.set_min_size(Some(tauri::LogicalSize::new(480.0_f64.min(width), 360.0_f64.min(height)))).map_err(|e| e.to_string())?;
+    window.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
+    window.set_position(tauri::PhysicalPosition::new(
+        display.x + ((display.width as f64 - width * scale) / 2.0).round() as i32,
+        display.y + ((display.height as f64 - height * scale) / 2.0).round() as i32,
+    )).map_err(|e| e.to_string())
+}
+
+/// GTK's cached fullscreen flag changes before Mutter acknowledges the state.
+/// An unmapped selection window also retains its screen-sized default geometry.
+/// Wait for the mapped surface to leave fullscreen before restoring its normal
+/// size, otherwise Mutter can maximize it again when it is shown.
+pub(super) async fn settle_document_window(window: &WebviewWindow, display: &capture::DisplayInfo) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if super::pins::native_wayland() {
+        let scale = display.scale_factor.max(1.0);
+        let width = (display.width as f64 / scale * 0.8).min(1100.0).round() as i32;
+        let height = (display.height as f64 / scale * 0.8).min(800.0).round() as i32;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut requested = false;
+        let mut last_state = String::new();
+        loop {
+            let target = window.clone();
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            window.run_on_main_thread(move || {
+                use gtk::prelude::*;
+                let result = target.gtk_window().map_err(|e| e.to_string()).map(|gtk| {
+                    let Some(surface) = gtk.window() else { return (requested, false, "unrealized".to_string()); };
+                    let state = surface.state();
+                    let size = gtk.size();
+                    let facts = format!("mapped={}, resizable={}, state={state:?}, size={size:?}, default={:?}", gtk.is_mapped(), gtk.is_resizable(), gtk.default_size());
+                    if !gtk.is_mapped() || state.contains(gtk::gdk::WindowState::FULLSCREEN) {
+                        return (requested, false, facts);
+                    }
+                    if state.contains(gtk::gdk::WindowState::MAXIMIZED) {
+                        gtk.unmaximize();
+                        return (requested, false, facts);
+                    }
+                    // Submit once after the native state transition. Repeated
+                    // default-size/resize requests can invalidate GTK's pending
+                    // configure allocation before Mutter acknowledges it.
+                    if !requested {
+                        gtk.set_resizable(true);
+                        gtk.set_default_size(width, height);
+                        gtk.resize(width, height);
+                        return (true, false, facts);
+                    }
+                    let sized = (size.0 - width).abs() <= 2 && (size.1 - height).abs() <= 2;
+                    (requested, gtk.is_resizable() && sized, facts)
+                });
+                let _ = tx.send(result);
+            }).map_err(|e| e.to_string())?;
+            let (sent, ready, facts) = tokio::time::timeout_at(deadline, rx).await
+                .map_err(|_| format!("screenshot editor window transition timed out: {last_state}"))?
+                .map_err(|e| e.to_string())??;
+            requested = sent;
+            last_state = facts;
+            if ready { return Ok(()); }
+            if tokio::time::Instant::now() >= deadline {
+                return Err(format!("screenshot editor did not restore its normal window size: {last_state}"));
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    }
+    let _ = (window, display);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn screenshot_update_pin(app: AppHandle, window: WebviewWindow, path: String) -> Result<(), String> {
+    if window.label() != super::OVERLAY_LABEL { return Err("not a screenshot editor".into()); }
+    let label = super::tool_state().overlay.as_ref().and_then(|o| o.source_pin.clone()).ok_or("editor has no source pin")?;
+    let (dest, width, height) = blocking("update pin", move || {
+        let source = capture::ensure_artifact_path(&path)?;
+        let image = image::open(&source)?;
+        let dest = capture::untracked_artifact_path("pin", "png")?;
+        std::fs::copy(source, &dest)?;
+        Ok((dest, image.width(), image.height()))
+    }).await?;
+    let changed = {
+        let mut state = super::tool_state();
+        if let Some(pin) = state.pins.get_mut(&label) {
+            let old = std::mem::replace(&mut pin.path, dest.to_string_lossy().into_owned());
+            pin.width = width; pin.height = height;
+            // The saved favorite is a separate snapshot of the old pixels.
+            pin.favorite_id = None;
+            Some((old, pin.clone()))
+        } else { None }
+    };
+    let Some((old, pin)) = changed else {
+        let _ = std::fs::remove_file(dest);
+        return Err("source pin is closed; create a new pin instead".into());
+    };
+    let _ = std::fs::remove_file(old);
+    app.emit_to(&label, "screenshot://pin-updated", pin).map_err(|e| e.to_string())?;
+    let _ = app.emit(super::pins::PINS_CHANGED_EVENT, ());
+    Ok(())
 }
 
 #[cfg(test)]

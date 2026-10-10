@@ -1858,7 +1858,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
       const q = id => document.querySelector('[data-testid="'+id+'"]');
       const sleep = ms => new Promise(r=>setTimeout(r,ms));
       for(let i=0;i<150 && q('screenshot-overlay')?.dataset.phase!=='preview';i++) await sleep(100);
-      if (q('screenshot-overlay')?.dataset.phase !== 'preview') throw new Error('scroll result preview missing');
+      if (q('screenshot-overlay')?.dataset.phase !== 'preview') throw new Error('scroll result preview missing: '+JSON.stringify({phase:q('screenshot-overlay')?.dataset.phase,error:q('screenshot-scroll-error')?.textContent}));
       const image = q('screenshot-scroll-result-image');
       for(let i=0;i<50 && !image?.complete;i++) await sleep(100);
       const r = image.getBoundingClientRect();

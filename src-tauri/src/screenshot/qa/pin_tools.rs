@@ -1,5 +1,33 @@
 use super::*;
 
+async fn edit_done_branch(app: &AppHandle, pin: &tauri::WebviewWindow, action: &str) -> Result<(), String> {
+    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
+    let tools = wait_window(app, &super::super::pins::tools_label(pin.label()), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    run_js(&tools, "const q=()=>document.querySelector('[data-testid=\"screenshot-pin-edit\"]'); for(let i=0;i<100 && (!q() || q().disabled);i++) await new Promise(r=>setTimeout(r,50)); if(!q() || q().disabled) throw new Error('pin Edit is not ready'); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    tools.eval("document.querySelector('[data-testid=\"screenshot-pin-edit\"]').click()").map_err(|e| e.to_string())?;
+    let editor = wait_window(app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let script = r#"
+      const q=id=>document.querySelector('[data-testid="'+id+'"]');
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      for(let i=0;i<100&&!q('screenshot-scroll-result-image')?.naturalWidth;i++) await sleep(50);
+      q('screenshot-tool-rect').click(); await sleep(100);
+      q('screenshot-color-red').click(); await sleep(50);
+      const layer=q('screenshot-annotation-layer'), image=q('screenshot-scroll-result-image');
+      const r=layer.getBoundingClientRect(), sx=r.width/image.naturalWidth, sy=r.height/image.naturalHeight;
+      const fire=(el,type,x,y)=>el.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,clientX:r.left+x*sx,clientY:r.top+y*sy}));
+      fire(layer,'mousedown',150,100); await sleep(50); fire(layer,'mousemove',220,180); await sleep(50); fire(window,'mouseup',220,180); await sleep(100);
+      q('screenshot-scroll-result-copy').click(); await sleep(100);
+      if(!q('screenshot-pin-done-dialog')) throw new Error('Done choice missing');
+      return true;
+    "#;
+    run_js(&editor, &script, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    editor.eval(&format!("document.querySelector('[data-testid=\"screenshot-pin-done-{action}\"]').click()")).map_err(|e| e.to_string())?;
+    if !wait_closed(app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await {
+        return Err(format!("Done {action} did not close the editor"));
+    }
+    Ok(())
+}
+
 async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Result<Value> {
     #[cfg(target_os = "linux")]
     if wayland::active() {
@@ -141,18 +169,21 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     trace.mark("dragged", drag.clone());
     let scale = pin.scale_factor().map_err(|e| e.to_string())?;
     let before = pin.inner_size().map_err(|e| e.to_string())?;
-    let controls = run_js(&pin, r#"
+    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
+    let tools = wait_window(&app, &super::super::pins::tools_label(&label), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let mut controls = run_js(&tools, r#"
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
-      const wait=ms=>new Promise(r=>setTimeout(r,ms));
-      q('screenshot-pin-window').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,button:2})); await wait(100);
-      const help=!!q('screenshot-pin-help')?.textContent;
+      for(let i=0;i<100&&!q('screenshot-pin-opacity');i++) await new Promise(r=>setTimeout(r,50));
       const opacity=q('screenshot-pin-opacity');
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(opacity,'50');
-      opacity.dispatchEvent(new Event('input',{bubbles:true})); opacity.dispatchEvent(new Event('change',{bubbles:true})); await wait(150);
-      q('screenshot-pin-zoom-in').click(); await wait(500);
-      const result={help,opacity:Number(getComputedStyle(q('screenshot-pin-surface')).opacity),zoom:q('screenshot-pin-zoom').textContent};
-      q('screenshot-pin-menu-toggle').click(); await wait(100); return result;
+      opacity.dispatchEvent(new Event('input',{bubbles:true})); opacity.dispatchEvent(new Event('change',{bubbles:true}));
+      await new Promise(r=>setTimeout(r,150)); q('screenshot-pin-zoom-in').click();
+      await new Promise(r=>setTimeout(r,500));
+      return {help:!!q('screenshot-pin-help')?.textContent,zoom:q('screenshot-pin-zoom').textContent};
     "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    controls["opacity"] = run_js(&pin, "return Number(getComputedStyle(document.querySelector('[data-testid=\"screenshot-pin-surface\"]')).opacity);", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
+    tools.close().map_err(|e| e.to_string())?;
+    wait_closed(&app, tools.label(), Duration::from_secs(5)).await;
     let zoomed = pin.inner_size().map_err(|e| e.to_string())?;
     // Verify the compositor really reveals the desktop, rather than merely
     // accepting a CSS opacity value inside an opaque native window.
@@ -259,20 +290,25 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     }
     // The note written through the menu must follow the pin into the
     // persistent favorite so the collection and reopen show the same caption.
-    let favorite_note = run_js(&pin, r#"
+    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
+    let tools = wait_window(&app, &super::super::pins::tools_label(&label), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    run_js(&tools, r#"
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
-      q('screenshot-pin-menu-toggle').click(); await new Promise(r=>setTimeout(r,100));
+      for(let i=0;i<100&&!q('screenshot-pin-note-input');i++) await new Promise(r=>setTimeout(r,50));
       const input=q('screenshot-pin-note-input');
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'QA pin note');
       input.dispatchEvent(new Event('input',{bubbles:true}));
-      q('screenshot-pin-note-save').click(); await new Promise(r=>setTimeout(r,300));
-      q('screenshot-pin-menu-toggle').click(); await new Promise(r=>setTimeout(r,100));
-      return q('screenshot-pin-note')?.textContent ?? '';
+      input.dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,100));
+      q('screenshot-pin-note-save').click(); return true;
     "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let favorite_note = run_js(&pin, "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-note\"]')?.textContent!=='QA pin note';i++) await new Promise(r=>setTimeout(r,50)); return document.querySelector('[data-testid=\"screenshot-pin-note\"]')?.textContent;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    trace.mark("note-written", favorite_note.clone());
+    tools.close().map_err(|e| e.to_string())?;
     run_js(&pin, "document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').click(); for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed')!=='true';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
     let items = super::super::favorites::screenshot_list_favorites(app.clone()).await?;
     let favorite = items.first().ok_or("favorite write missing")?.clone();
     let favorite_note_saved = favorite.note == "QA pin note";
+    trace.mark("favorite-written", json!({"label":label,"noteSaved":favorite_note_saved}));
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-close\"]').click()")
         .map_err(|e| e.to_string())?;
     let closed = wait_closed(&app, &label, Duration::from_secs(10)).await;
@@ -297,6 +333,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     let reopened_label = reopened_label.ok_or("favorite did not reopen")?;
+    trace.mark("favorite-reopened", json!({"label":reopened_label}));
     let reopened = wait_window(&app, &reopened_label, Duration::from_secs(10))
         .await
         .map_err(|e| e.to_string())?;
@@ -324,6 +361,53 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         .iter()
         .any(|item| item.id == favorite.id);
     let independent_pin = std::path::Path::new(&payload.path).exists();
+    // Public re-edit entry, native resizing, annotation, and Done replacement.
+    reopened.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
+    let tools = wait_window(&app, &super::super::pins::tools_label(&reopened_label), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    run_js(&tools, "const q=()=>document.querySelector('[data-testid=\"screenshot-pin-edit\"]'); for(let i=0;i<100 && (!q() || q().disabled);i++) await new Promise(r=>setTimeout(r,50)); if(!q() || q().disabled) throw new Error('pin Edit is not ready'); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    // Clicking closes this options window. Do not await a script reply from it.
+    tools.eval("document.querySelector('[data-testid=\"screenshot-pin-edit\"]').click()").map_err(|e| e.to_string())?;
+    let editor = wait_window(&app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    let editor_resizable = editor.is_resizable().map_err(|e| e.to_string())? && !editor.is_fullscreen().map_err(|e| e.to_string())?;
+    editor.set_size(tauri::LogicalSize::new(700.0, 600.0)).map_err(|e| e.to_string())?;
+    let edited = run_js(&editor, r#"
+      const q=id=>document.querySelector('[data-testid="'+id+'"]');
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      for(let i=0;i<100&&!q('screenshot-scroll-result-image')?.naturalWidth;i++) await sleep(50);
+      q('screenshot-tool-rect').click(); await sleep(100);
+      q('screenshot-color-green').click(); await sleep(50);
+      const layer=q('screenshot-annotation-layer'), image=q('screenshot-scroll-result-image');
+      const r=layer.getBoundingClientRect(), sx=r.width/image.naturalWidth, sy=r.height/image.naturalHeight;
+      const fire=(el,type,x,y)=>el.dispatchEvent(new MouseEvent(type,{bubbles:true,button:0,clientX:r.left+x*sx,clientY:r.top+y*sy}));
+      fire(layer,'mousedown',40,80); await sleep(50); fire(layer,'mousemove',140,150); await sleep(50); fire(window,'mouseup',140,150); await sleep(100);
+      if(q('screenshot-annotation-canvas')?.dataset.shapes!=='1') throw new Error('pin annotation missing');
+      q('screenshot-scroll-result-copy').click(); await sleep(100);
+      if(!q('screenshot-pin-done-dialog')) throw new Error('Done replacement choice missing');
+      return true;
+    "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    editor.eval("document.querySelector('[data-testid=\"screenshot-pin-done-replace\"]').click()").map_err(|e| e.to_string())?;
+    let edit_closed = wait_closed(&app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await;
+    let updated = super::super::tool_state().pins.get(&reopened_label).cloned().ok_or("replacement created another pin")?;
+    let updated_pixels = image::open(&updated.path).map_err(|e| e.to_string())?.to_rgba8();
+    let edited_clipboard = read_clipboard_image(&app).map_err(|e| e.to_string())?;
+    let replacement_ok = editor_resizable && edited == true && edit_closed && updated.path != payload.path
+        && updated.note == payload.note && updated_pixels != source && updated_pixels == edited_clipboard
+        && super::super::tool_state().pins.len() == 1;
+    let edit_artifact = keep_image(&updated_pixels, "pin-edited-replacement.png");
+    edit_done_branch(&app, &reopened, "new").await?;
+    let new_label = super::super::tool_state().pins.keys().find(|label| *label != &reopened_label).cloned().ok_or("Done new did not create another pin")?;
+    let new_pin = super::super::tool_state().pins.get(&new_label).cloned().ok_or("new pin missing")?;
+    let new_pixels = image::open(&new_pin.path).map_err(|e| e.to_string())?.to_rgba8();
+    let new_pin_ok = super::super::tool_state().pins.len() == 2
+        && image::open(&updated.path).map_err(|e| e.to_string())?.to_rgba8() == updated_pixels
+        && new_pixels != updated_pixels && new_pixels == read_clipboard_image(&app).map_err(|e| e.to_string())?;
+    super::super::screenshot_close_pin(app.clone(), new_label.clone()).await?;
+    wait_closed(&app, &new_label, Duration::from_secs(5)).await;
+    edit_done_branch(&app, &reopened, "copy").await?;
+    let copy_only_ok = super::super::tool_state().pins.len() == 1
+        && image::open(&updated.path).map_err(|e| e.to_string())?.to_rgba8() == updated_pixels
+        && read_clipboard_image(&app).map_err(|e| e.to_string())? == new_pixels
+        && reopened.is_visible().map_err(|e| e.to_string())?;
     let ok = drag["passed"] == true
         && controls["help"] == true
         && controls["opacity"] == json!(0.5)
@@ -343,10 +427,12 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         && reopened_pixels
         && removed
         && independent_pin
+        && replacement_ok
+        && new_pin_ok && copy_only_ok
         && copy_artifact.is_some()
         && favorite_artifact.is_some();
     Ok(report(
         ok,
-        json!({"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"saveDialogReady":save_dialog_ready,"saveDialogInput":save_dialog_input,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"pinNote":favorite_note,"favoriteNoteSaved":favorite_note_saved,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
+        json!({"pinReplacement":replacement_ok,"newPin":new_pin_ok,"copyOnly":copy_only_ok,"editorResizable":editor_resizable,"pinEditArtifact":edit_artifact,"drag":drag,"controls":controls,"before":before,"zoomed":zoomed,"collapsed":small,"restored":restored,"restoredOpacity":restored_opacity,"opacityPixels":{"passed":opacity_pixels,"underlying":underlying,"expected":expected,"actual":actual,"artifact":composite_artifact},"clipboardOriginal":copy_identical,"clipboardArtifact":copy_artifact,"saveDialogReady":save_dialog_ready,"saveDialogInput":save_dialog_input,"savedOriginal":saved_identical,"savedArtifact":destination,"closed":closed,"favorite":favorite,"pinNote":favorite_note,"favoriteNoteSaved":favorite_note_saved,"reopened":reopened_info,"reopenedOriginalPixels":reopened_pixels,"favoriteArtifact":favorite_artifact,"removed":removed,"openPinSurvivesRemoval":independent_pin}),
     ))
 }

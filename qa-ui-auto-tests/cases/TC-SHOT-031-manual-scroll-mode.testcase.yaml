@@ -24,7 +24,7 @@ steps:
 - click: '[data-testid="screenshot-scroll-mode-manual"]'
 - assert_text:
     selector: '[data-testid="screenshot-scroll-mode-description"]'
-    contains: Pauses are allowed
+    contains: Scroll one notch every 0.5 seconds
 - press: Escape
 - assert_not_visible: '[data-testid="screenshot-scroll-confirm"]'
 - click: '[data-testid="screenshot-scroll-capture"]'
@@ -62,7 +62,7 @@ verification:
     - step: 7
       expectation: 'eval_readonly: {''expression'': "document.getElementsByName(''scroll-mode'')[0].checked === true"}'
     - step: 9
-      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-scroll-mode-description"]'', ''contains'': ''Pauses are allowed''}'
+      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-scroll-mode-description"]'', ''contains'': ''Scroll one notch every 0.5 seconds''}'
     - step: 11
       expectation: 'assert_not_visible: [data-testid="screenshot-scroll-confirm"]'
     - step: 16

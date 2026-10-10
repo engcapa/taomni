@@ -1,5 +1,19 @@
 use super::*;
 
+/// GTK client-side shadows belong to the Wayland buffer, not the configured
+/// document size. Observe Mutter's visible frame and retain the buffer facts
+/// separately; a fixed shadow allowance would hide actual size regressions.
+async fn document_size(window: &WebviewWindow) -> anyhow::Result<(tauri::PhysicalSize<u32>, Value)> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        let native = wayland::window(window).await?;
+        let size = wayland::rect(&native["frame"], window.scale_factor()?.max(0.5))?.1;
+        return Ok((size, json!({"transport":"Mutter frame excluding GTK shadows","native":native})));
+    }
+    let size = window.inner_size()?;
+    Ok((size, json!({"transport":"native inner size","size":size})))
+}
+
 /// Public manual mode, real user-equivalent OS wheel input, pauses, Finish
 /// and Cancel. The complete PNG is compared with the retained source page.
 #[tauri::command]
@@ -168,8 +182,49 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     let preview = run_js(&overlay, r#"
       for (let i=0;i<100 && !document.querySelector('[data-testid="screenshot-scroll-result"]');i++) await new Promise(r=>setTimeout(r,100));
       const img=document.querySelector('[data-testid="screenshot-scroll-result-image"]');
+      if (!img) throw new Error('manual scroll result missing: '+JSON.stringify({phase:document.querySelector('[data-testid="screenshot-overlay"]')?.dataset.phase,error:document.querySelector('[data-testid="screenshot-scroll-error"]')?.textContent}));
       return {preview:!!img,width:img?.naturalWidth,height:img?.naturalHeight};
     "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    // The result event can reach the renderer before the capture command has
+    // finished configuring the native document window. Observe the completed
+    // transition instead of sampling the old fullscreen selection state.
+    let mut editor_state = json!({});
+    let mut editor_resizable = false;
+    for _ in 0..100 {
+        let resizable = overlay.is_resizable().map_err(|e| e.to_string())?;
+        let fullscreen = overlay.is_fullscreen().map_err(|e| e.to_string())?;
+        let decorated = overlay.is_decorated().map_err(|e| e.to_string())?;
+        let maximized = overlay.is_maximized().map_err(|e| e.to_string())?;
+        editor_state = json!({"resizable":resizable,"fullscreen":fullscreen,"decorated":decorated,"maximized":maximized});
+        editor_resizable = resizable && !fullscreen && !maximized && decorated;
+        if editor_resizable { break; }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let expected_width = (display.width as f64 / display.scale_factor.max(1.0) * 0.8).min(1100.0);
+    let expected_height = (display.height as f64 / display.scale_factor.max(1.0) * 0.8).min(800.0);
+    let mut initial_editor_size = tauri::PhysicalSize::new(0, 0);
+    let mut initial_editor_geometry = json!({});
+    let mut initial_editor_sized = false;
+    let initial_deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < initial_deadline {
+        (initial_editor_size, initial_editor_geometry) = document_size(&overlay).await.map_err(|e| e.to_string())?;
+        initial_editor_sized = (initial_editor_size.width as f64 / source.scale - expected_width).abs() < 3.0
+            && (initial_editor_size.height as f64 / source.scale - expected_height).abs() < 3.0;
+        if initial_editor_sized { break; }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    overlay.set_size(tauri::LogicalSize::new(760.0, 620.0)).map_err(|e| e.to_string())?;
+    let mut editor_size = tauri::PhysicalSize::new(0, 0);
+    let mut editor_geometry = json!({});
+    let mut editor_resized = false;
+    let resize_deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < resize_deadline {
+        (editor_size, editor_geometry) = document_size(&overlay).await.map_err(|e| e.to_string())?;
+        editor_resized = (editor_size.width as f64 / source.scale - 760.0).abs() < 3.0
+            && (editor_size.height as f64 / source.scale - 620.0).abs() < 3.0;
+        if editor_resized { break; }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     let output = super::super::tool_state()
         .overlay
         .clone()
@@ -247,10 +302,11 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     trace.mark("cancelled", cancelled.clone());
     Ok(report(
         bottom_still_active
+            && editor_resizable && initial_editor_sized && editor_resized
             && preview["preview"] == true
             && comparison["passed"] == true
             && cancelled == true
             && artifact.is_some(),
-        json!({"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
+        json!({"editorState":editor_state,"editorResizable":editor_resizable,"initialEditorSized":initial_editor_sized,"initialEditorSize":initial_editor_size,"initialEditorGeometry":initial_editor_geometry,"editorResized":editor_resized,"editorSize":editor_size,"editorGeometry":editor_geometry,"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
     ))
 }

@@ -1783,6 +1783,16 @@
 - `[data-testid="screenshot-scroll-mode-hint"]` — display — F27.1.screenshot-scroll-mode-hint
 - `[data-testid="screenshot-pin-surface"]` — display — F27.1.screenshot-pin-surface
 - `[data-testid="screenshot-pin-toolbar"]` — display — F27.1.screenshot-pin-toolbar
+- `[data-testid="screenshot-pin-tools-window"]` — display — F27.1.screenshot-pin-tools-window
+- `[data-testid="screenshot-pin-tools-close"]` — interactive — F27.1.screenshot-pin-tools-close
+- `[data-testid="screenshot-pin-done-dialog"]` — display — F27.1.screenshot-pin-done-dialog
+- `[data-testid="screenshot-pin-done-replace"]` — interactive — F27.1.screenshot-pin-done-replace
+- `[data-testid="screenshot-pin-done-new"]` — interactive — F27.1.screenshot-pin-done-new
+- `[data-testid="screenshot-pin-done-copy"]` — interactive — F27.1.screenshot-pin-done-copy
+- `[data-testid="screenshot-pin-done-cancel"]` — interactive — F27.1.screenshot-pin-done-cancel
+- `[data-testid="screenshot-pin-edit"]` — interactive — F27.1.screenshot-pin-edit
+- `[data-testid="screenshot-display-picker"]` — display — F27.1.screenshot-display-picker
+- `[data-testid="screenshot-display-select"]` — interactive — F27.1.screenshot-display-select
 - `[data-testid="screenshot-pin-menu"]` — display — F27.1.screenshot-pin-menu
 - `[data-testid="screenshot-pin-zoom"]` — display — F27.1.screenshot-pin-zoom
 - `[data-testid="screenshot-pin-help"]` — display — F27.1.screenshot-pin-help

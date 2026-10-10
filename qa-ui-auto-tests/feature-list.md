@@ -10504,12 +10504,13 @@ Windows 滚动截图回归用例 `TC-SHOT-N22` 覆盖当前窗口完整选区、
 id: F27.1
 status: done
 area: screenshot/screen-record
-components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, RecorderBar, ScrollCaptureBar, ScreenshotMenuButton, ControlBar, screenshot.ts, screenshot (tauri)]
+components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, PinToolsWindow, RecorderBar, ScrollCaptureBar, ScreenshotMenuButton, ControlBar, screenshot.ts, screenshot (tauri)]
 files:
   - src/components/screenshot/ScreenshotOverlay.tsx
   - src/components/screenshot/AnnotationCanvas.tsx
   - src/components/screenshot/ScreenshotFavorites.tsx
   - src/components/screenshot/PinnedImage.tsx
+  - src/components/screenshot/PinToolsWindow.tsx
   - src/components/screenshot/RecorderBar.tsx
   - src/components/screenshot/ScrollCaptureBar.tsx
   - src/components/screenshot/ScrollCaptureResult.tsx
@@ -11034,6 +11035,36 @@ controls:
   - id: screenshot-pin-toolbar
     selector: '[data-testid="screenshot-pin-toolbar"]'
     kind: display
+  - id: screenshot-pin-tools-window
+    selector: '[data-testid="screenshot-pin-tools-window"]'
+    kind: display
+  - id: screenshot-pin-tools-close
+    selector: '[data-testid="screenshot-pin-tools-close"]'
+    kind: interactive
+  - id: screenshot-pin-done-dialog
+    selector: '[data-testid="screenshot-pin-done-dialog"]'
+    kind: display
+  - id: screenshot-pin-done-replace
+    selector: '[data-testid="screenshot-pin-done-replace"]'
+    kind: interactive
+  - id: screenshot-pin-done-new
+    selector: '[data-testid="screenshot-pin-done-new"]'
+    kind: interactive
+  - id: screenshot-pin-done-copy
+    selector: '[data-testid="screenshot-pin-done-copy"]'
+    kind: interactive
+  - id: screenshot-pin-done-cancel
+    selector: '[data-testid="screenshot-pin-done-cancel"]'
+    kind: interactive
+  - id: screenshot-pin-edit
+    selector: '[data-testid="screenshot-pin-edit"]'
+    kind: interactive
+  - id: screenshot-display-picker
+    selector: '[data-testid="screenshot-display-picker"]'
+    kind: display
+  - id: screenshot-display-select
+    selector: '[data-testid="screenshot-display-select"]'
+    kind: interactive
   - id: screenshot-pin-menu
     selector: '[data-testid="screenshot-pin-menu"]'
     kind: display

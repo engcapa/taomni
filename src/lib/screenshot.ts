@@ -60,6 +60,7 @@ export interface OverlayInit {
   /** Visible part of the invoking window, in display-relative physical pixels. */
   windowRegion?: PhysicalRect | null;
   document?: boolean;
+  sourcePin?: string | null;
 }
 
 export interface RecordingStarted {
@@ -123,7 +124,7 @@ export const RECORDING_ENDED_EVENT = "screenshot://recording-ended";
 export const SCROLL_PROGRESS_EVENT = "screenshot://scroll-progress";
 export const SCREENSHOT_OPEN_FAILED_EVENT = "screenshot://open-failed";
 
-export interface ScrollStatus { frames: number; mode: ScrollMode; needsOverlap: boolean; inputError?: string | null; }
+export interface ScrollStatus { frames: number; mode: ScrollMode; needsOverlap: boolean; inputError?: string | null; waitingForContent?: boolean; }
 
 export const scrollPlan = (displayId: string | undefined, region: PhysicalRect) =>
   invoke<PhysicalRect>("screenshot_scroll_plan", { displayId: displayId ?? null, ...region });
@@ -143,6 +144,7 @@ export async function setScrollMode(mode: ScrollMode): Promise<void> {
 export async function listDisplays(): Promise<ScreenshotDisplay[]> {
   return invoke<ScreenshotDisplay[]>("screenshot_list_displays");
 }
+export const switchScreenshotDisplay = (displayId: string) => invoke<OverlayInit>("screenshot_switch_display", { displayId });
 
 export async function captureFull(displayId?: string): Promise<ScreenshotFile> {
   return invoke<ScreenshotFile>("screenshot_capture_full", {
@@ -207,6 +209,17 @@ export async function updateOverlayImage(file: ScreenshotFile): Promise<void> {
     height: file.height,
   });
 }
+
+export const updateSourcePin = (path: string) => invoke<void>("screenshot_update_pin", { path });
+export const PIN_UPDATED_EVENT = "screenshot://pin-updated";
+export const PIN_TOOL_EVENT = "screenshot://pin-tool";
+export const PIN_VIEW_EVENT = "screenshot://pin-view";
+export interface PinView {
+  zoom: number; opacity: number; note: string; busy: boolean;
+  error: string | null; notice: string | null;
+}
+export const openPinTools = (view: PinView) => invoke<string>("screenshot_open_pin_tools", { view });
+export const closePinTools = () => invoke<void>("screenshot_close_pin_tools");
 
 /** End the capture session: close tool windows, reshow app windows. */
 export async function closeScreenshotOverlay(): Promise<void> {

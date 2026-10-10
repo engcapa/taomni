@@ -1,5 +1,5 @@
 //! Scrolling ("long") screenshot: capture a region, synthesize wheel scrolls
-//! at its center, capture again, and stitch frames by vertical overlap.
+//! over its scrollable content, capture again, and stitch by vertical overlap.
 //!
 //! Stitching model. Each frame of the region is split into a static header
 //! (rows identical across frames, e.g. a sticky toolbar), a scrolling body
@@ -35,8 +35,8 @@ const SETTLE_DELAY: Duration = Duration::from_millis(450);
 const STILL_LIMIT: u32 = 6;
 /// Consecutive one-notch steps without overlap before manual takeover.
 const LOST_LIMIT: u32 = 3;
-const MANUAL_POLL: Duration = Duration::from_millis(120);
-const FRAME_CONFIRM: Duration = Duration::from_millis(80);
+const MANUAL_POLL: Duration = Duration::from_millis(40);
+const FRAME_CONFIRM: Duration = Duration::from_millis(50);
 /// Columns sampled per row for matching (frames are column-averaged to this).
 const MATCH_COLUMNS: usize = 128;
 /// Mean absolute luma difference accepted as "same content".
@@ -72,6 +72,7 @@ pub struct ScrollControl {
     pub frames: AtomicU32,
     automatic: AtomicBool,
     needs_overlap: AtomicBool,
+    waiting_for_content: AtomicBool,
     input_error: std::sync::Mutex<Option<String>>,
 }
 
@@ -89,6 +90,7 @@ impl ScrollControl {
             frames: AtomicU32::new(0),
             automatic: AtomicBool::new(mode == ScrollMode::Auto),
             needs_overlap: AtomicBool::new(false),
+            waiting_for_content: AtomicBool::new(false),
             input_error: std::sync::Mutex::new(None),
         }
     }
@@ -115,6 +117,7 @@ impl ScrollControl {
             "frames": self.frames.load(Ordering::SeqCst),
             "mode": self.mode(),
             "needsOverlap": self.needs_overlap.load(Ordering::SeqCst),
+            "waitingForContent": self.waiting_for_content.load(Ordering::SeqCst),
             "inputError": self.input_error.lock().unwrap_or_else(|e| e.into_inner()).clone(),
         })
     }
@@ -201,11 +204,27 @@ pub fn scroll_capture_controlled(
     // Activate before establishing the first frame. Inactive/active window
     // chrome must not become the first pair used to identify fixed margins.
     let positioned = std::cell::Cell::new(false);
+    // Keep a user-chosen hover point. Otherwise start near the right edge,
+    // where lists usually have a gutter rather than an autoplay thumbnail.
+    let target = app
+        .cursor_position()
+        .ok()
+        .and_then(|point| {
+            let px = point.x - display.x as f64;
+            let py = point.y - display.y as f64;
+            (px >= x as f64
+                && px < (x + width) as f64
+                && py >= y as f64
+                && py < (y + height) as f64)
+                .then_some((px as u32, py as u32))
+        })
+        .unwrap_or((x + width.saturating_sub(12), y + height / 2));
     let mut inject = |notches| -> anyhow::Result<()> {
         if source
             .borrow_mut()
-            .portal_scroll(x + width / 2, y + height / 2, notches)?
+            .portal_scroll(target.0, target.1, notches)?
         {
+            positioned.set(true);
             return Ok(());
         }
         if wheel.is_none() {
@@ -213,7 +232,7 @@ pub fn scroll_capture_controlled(
         }
         let wheel = wheel.as_mut().unwrap();
         if !positioned.get() {
-            wheel.move_to(display, x + width / 2, y + height / 2)?;
+            wheel.move_to(display, target.0, target.1)?;
             positioned.set(true);
         }
         wheel.scroll(notches)
@@ -229,7 +248,14 @@ pub fn scroll_capture_controlled(
     }
 
     let stitched = capture_frames(
-        &mut || settled_frame(&mut grab_raw, &mut |d| control.settle(d), control),
+        &mut || {
+            let was_waiting = control.waiting_for_content.load(Ordering::SeqCst);
+            let frame = settled_frame(&mut grab_raw, &mut |d| control.settle(d), control)?;
+            if was_waiting != control.waiting_for_content.load(Ordering::SeqCst) {
+                control.progress(app, control.frames.load(Ordering::SeqCst));
+            }
+            Ok(frame)
+        },
         &mut |notches| {
             if !positioned.get() {
                 inject(0)?;
@@ -268,6 +294,8 @@ fn stable_frame(a: &RgbaImage, b: &RgbaImage) -> bool {
         return false;
     }
     let (w, h) = a.dimensions();
+    let mut moving_tiles = 0;
+    let mut tiles = 0;
     for y in (0..h).step_by(32) {
         for x in (0..w).step_by(32) {
             let mut changed = 0;
@@ -282,14 +310,21 @@ fn stable_frame(a: &RgbaImage, b: &RgbaImage) -> bool {
                 }
             }
             if changed * 100 > (right - x) * (bottom - y).div_ceil(2) * 4 {
-                return false;
+                // Keep strict edge checks: transient window borders must not
+                // be stitched. A localized preview inside a settled page can
+                // animate without preventing every subsequent capture.
+                if x == 0 || y == 0 || right == w || bottom == h {
+                    return false;
+                }
+                moving_tiles += 1;
             }
+            tiles += 1;
         }
     }
-    true
+    moving_tiles * 100 <= tiles * 15
 }
 
-/// Wait for two agreeing samples, including in manual mode. Return no frame
+/// Wait for two mostly agreeing samples, including in manual mode. Return no frame
 /// during motion: never stitch a transient frame just because its center fits.
 fn settled_frame(
     grab: &mut impl FnMut() -> anyhow::Result<RgbaImage>,
@@ -304,10 +339,12 @@ fn settled_frame(
         }
         let frame = grab()?;
         if stable_frame(&previous, &frame) {
+            control.waiting_for_content.store(false, Ordering::SeqCst);
             return Ok(Some(frame));
         }
         previous = frame;
     }
+    control.waiting_for_content.store(true, Ordering::SeqCst);
     Ok(None)
 }
 
@@ -348,9 +385,8 @@ fn capture_frames(
     };
     let mut stitcher = Stitcher::new(first);
     progress(stitcher.frames);
-    // Notches per step: large regions scroll faster; a step that jumps past
-    // the region is undone and retried with a single notch.
-    let mut notches: i32 = if stitcher.frame_h >= 600 { 3 } else { 1 };
+    // Keep one-notch steps so small viewports retain enough overlap.
+    let mut notches: i32 = 1;
     let mut still = 0u32;
     let mut lost = 0u32;
     let mut previous_mode = control.mode();
@@ -424,6 +460,47 @@ fn capture_frames(
                     still += 1;
                     if still >= STILL_LIMIT {
                         if stitcher.frames > 1 {
+                            // Infinite lists can remain still while fetching
+                            // the next batch. Confirm after a quiet interval,
+                            // then retry input: newly loaded items may be
+                            // below the unchanged viewport.
+                            wait(Duration::from_secs(2));
+                            if control.mode() != ScrollMode::Auto
+                                || control.stop.load(Ordering::SeqCst)
+                            {
+                                continue;
+                            }
+                            if let Err(error) = scroll(notches) {
+                                control.set_input_error(format!("{error:#}"));
+                                control.set_mode(ScrollMode::Manual);
+                                progress(stitcher.frames);
+                                continue;
+                            }
+                            wait(SETTLE_DELAY);
+                            let mut probe = None;
+                            while probe.is_none() && !control.stop.load(Ordering::SeqCst) {
+                                probe = grab()?;
+                                if probe.is_none() {
+                                    wait(MANUAL_POLL);
+                                }
+                            }
+                            if let Some(frame) = probe {
+                                match stitcher.push(frame) {
+                                    Step::Appended => {
+                                        still = 0;
+                                        lost = 0;
+                                        progress(stitcher.frames);
+                                        continue;
+                                    }
+                                    Step::Lost => {
+                                        control.needs_overlap.store(true, Ordering::SeqCst);
+                                        control.set_mode(ScrollMode::Manual);
+                                        progress(stitcher.frames);
+                                        continue;
+                                    }
+                                    Step::Unchanged => {}
+                                }
+                            }
                             break;
                         }
                         // No movement may mean input was not accepted rather
@@ -721,7 +798,9 @@ impl Signature {
     fn row_diff(&self, a: usize, other: &Signature, b: usize, columns: &[usize]) -> u32 {
         columns
             .iter()
-            .map(|&c| self.rows[a][c].abs_diff(other.rows[b][c]) as u32)
+            // Bound a local thumbnail's contribution. Most of the overlap
+            // still has to agree; widespread layout changes remain Lost.
+            .map(|&c| self.rows[a][c].abs_diff(other.rows[b][c]).min(24) as u32)
             .sum()
     }
 }
@@ -1122,6 +1201,62 @@ fn extend_side_chrome(output: &mut RgbaImage, last: &RgbaImage, x: u32, width: u
 mod tests {
     use super::*;
 
+    fn preview(frame: &mut RgbaImage, shade: u8) {
+        for y in 96..224 {
+            for x in 160..352 {
+                frame.put_pixel(x, y, image::Rgba([shade, shade, shade, 255]));
+            }
+        }
+    }
+
+    #[test]
+    fn localized_video_preview_does_not_block_a_settled_page() {
+        let original = page(640, 480);
+        let mut a = original.clone();
+        let mut b = original;
+        preview(&mut a, 20);
+        preview(&mut b, 220);
+        assert!(stable_frame(&a, &b));
+        assert!(!stable_frame(
+            &page(640, 600),
+            &view(&page(640, 1000), 120, 600, 0, 0)
+        ));
+    }
+
+    #[test]
+    fn moving_thumbnail_preserves_the_correct_overlap_and_static_pixels() {
+        let source = page(640, 1000);
+        let mut first = view(&source, 0, 480, 0, 0);
+        preview(&mut first, 20);
+        let mut next = view(&source, 120, 480, 0, 0);
+        preview(&mut next, 220);
+        let mut stitcher = Stitcher::new(first);
+        assert!(matches!(stitcher.push(next), Step::Appended));
+        let result = stitcher.finish();
+        assert_eq!(result.image.height(), 600);
+        for y in 0..600 {
+            assert_eq!(
+                result.image.get_pixel(100, y),
+                source.get_pixel(100, y),
+                "row {y}"
+            );
+        }
+    }
+
+    #[test]
+    fn widespread_content_changes_require_overlap_recovery() {
+        let source = page(640, 1000);
+        let mut next = view(&source, 120, 480, 0, 0);
+        for y in 0..480 {
+            for x in 0..640 {
+                next.put_pixel(x, y, image::Rgba([0, 0, 0, 255]));
+            }
+        }
+        let mut stitcher = Stitcher::new(view(&source, 0, 480, 0, 0));
+        assert!(matches!(stitcher.push(next), Step::Lost));
+        assert_eq!(stitcher.finish().image.height(), 480);
+    }
+
     #[test]
     fn transient_edges_are_rejected_even_when_the_scrolling_center_matches() {
         let original = page(640, 300);
@@ -1385,6 +1520,36 @@ mod tests {
         .unwrap();
         assert_eq!(wheels, [1]);
         assert_eq!(out.image, crop(&page, 0, 0, 64, 420));
+    }
+
+    #[test]
+    fn lazy_list_retries_input_after_content_arrives_below_the_viewport() {
+        use std::cell::Cell;
+        let page = page(64, 1000);
+        let control = ScrollControl::new(ScrollMode::Auto);
+        let offset = Cell::new(0);
+        let loaded = Cell::new(false);
+        let out = capture_frames(
+            &mut || Ok(Some(view(&page, offset.get(), 300, 0, 0))),
+            &mut |_| {
+                if offset.get() == 0 || loaded.get() {
+                    offset.set(offset.get() + 120);
+                }
+                Ok(())
+            },
+            &mut |duration| {
+                if duration == Duration::from_secs(2) {
+                    loaded.set(true);
+                }
+            },
+            &mut |_| {},
+            3,
+            &control,
+        )
+        .unwrap();
+        assert!(loaded.get());
+        assert_eq!(out.frames, 3);
+        assert_eq!(out.image, crop(&page, 0, 0, 64, 540));
     }
 
     #[test]

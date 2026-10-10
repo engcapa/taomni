@@ -22,6 +22,7 @@ import {
 import { useScreenshotAppShortcut } from "./lib/screenshotShortcut";
 import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
 import { PinnedImage } from "./components/screenshot/PinnedImage";
+import { PinToolsWindow } from "./components/screenshot/PinToolsWindow";
 import { PinBoard } from "./components/screenshot/PinBoard";
 import { RecorderBar } from "./components/screenshot/RecorderBar";
 import { ScrollCaptureBar } from "./components/screenshot/ScrollCaptureBar";
@@ -209,11 +210,12 @@ function App() {
     );
   }
   if (overlayHash.startsWith("#screenshot-pin-board")) return <PinBoard />;
+  if (isTauriRuntime() && overlayHash.startsWith("#screenshot-pin-tools")) return <PinToolsWindow />;
   if (
     isScreenshotPinWindow() ||
     overlayHash.startsWith("#screenshot-pin")
   ) {
-    return <AppDialogProvider><PinnedImage /></AppDialogProvider>;
+    return <AppDialogProvider><PinnedImage />{overlayHash.startsWith("#screenshot-pin-tools") && <PinToolsWindow />}</AppDialogProvider>;
   }
   if (isScreenshotQaFixtureWindow() || overlayHash.startsWith("#screenshot-qa-")) {
     return <ScreenshotQaFixture route={overlayHash.replace("#screenshot-qa-", "")} />;

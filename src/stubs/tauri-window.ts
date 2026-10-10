@@ -30,6 +30,11 @@ class MockWindow {
   }
 
   async close(): Promise<void> {
+    if (location.hash === "#screenshot-pin-tools") {
+      const { emit } = await import("./tauri-event");
+      await emit("screenshot://pin-tool", { action: "toolsClosed" });
+      location.hash = "screenshot-pin";
+    }
     return undefined;
   }
 

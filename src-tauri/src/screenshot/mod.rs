@@ -67,6 +67,7 @@ pub struct OverlayInit {
     pub scale_factor: f64,
     pub window_region: Option<PhysicalRegion>,
     pub document: bool,
+    pub source_pin: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -136,6 +137,7 @@ struct ToolState {
     recording_region: Option<PhysicalRegion>,
     scroll: Option<Arc<scroll::ScrollControl>>,
     pins: HashMap<String, PinInit>,
+    pin_tools: HashMap<String, serde_json::Value>,
 }
 
 static STATE: OnceLock<Mutex<ToolState>> = OnceLock::new();
@@ -356,6 +358,7 @@ pub async fn screenshot_scroll_capture(
         }
         return Err(error);
     }
+    let editor_display = display.clone();
     let worker = app.clone();
     let worker_control = control.clone();
     let result = blocking("scroll capture", move || {
@@ -372,7 +375,13 @@ pub async fn screenshot_scroll_capture(
         let _ = window.close();
     }
     if let Some(window) = overlay {
+        if result.is_ok() {
+            edit::configure_document_window(&window, &editor_display)?;
+        }
         let _ = window.show();
+        if result.is_ok() {
+            edit::settle_document_window(&window, &editor_display).await?;
+        }
         let _ = window.set_focus();
     }
     result
@@ -894,6 +903,7 @@ async fn open_overlay_inner(
         scale_factor: display.scale_factor,
         window_region,
         document: false,
+        source_pin: None,
     });
 
     let url = WebviewUrl::App("index.html#screenshot-overlay".into());
@@ -941,6 +951,40 @@ pub async fn screenshot_overlay_init() -> Result<OverlayInit, String> {
         .ok_or_else(|| "no pending screenshot overlay".to_string())
 }
 
+/// Switch the selection surface to another physical display without ending
+/// the screenshot session or requiring Taomni itself to move there.
+#[tauri::command]
+pub async fn screenshot_switch_display(app: AppHandle, window: WebviewWindow, display_id: String) -> Result<OverlayInit, String> {
+    let _lease = capture_lease()?;
+    {
+        let state = tool_state();
+        if window.label() != OVERLAY_LABEL || state.overlay.as_ref().is_none_or(|o| o.document)
+            || state.scroll.is_some() { return Err("not a display selection session".into()); }
+    }
+    let generation = SESSION_GENERATION.load(Ordering::SeqCst);
+    let worker = app.clone();
+    let display = blocking("display lookup", move || capture::resolve_display(&worker, Some(&display_id))).await?;
+    window.hide().map_err(|e| e.to_string())?;
+    tokio::time::sleep(HIDE_SETTLE).await;
+    let worker = app.clone();
+    let captured_display = display.clone();
+    let captured = blocking("capture display", move || {
+        capture::save_png(&capture::capture_display(&worker, &captured_display)?, "shot")
+    }).await;
+    if SESSION_GENERATION.load(Ordering::SeqCst) != generation { return Err("screenshot opening was cancelled".into()); }
+    let result = captured.map(|(path, width, height)| OverlayInit {
+        path: path.to_string_lossy().into_owned(), display_id: display.id.clone(), width, height,
+        scale_factor: display.scale_factor, window_region: None, document: false, source_pin: None,
+    });
+    if let Ok(init) = &result {
+        tool_state().overlay = Some(init.clone());
+        cover_display(&window, &display);
+    }
+    let _ = window.show();
+    let _ = window.set_focus();
+    result
+}
+
 /// The overlay replaced its background (scroll capture result).
 #[tauri::command]
 pub async fn screenshot_overlay_update(
@@ -953,6 +997,7 @@ pub async fn screenshot_overlay_update(
         overlay.path = path;
         overlay.width = width;
         overlay.height = height;
+        overlay.document = true;
     }
     Ok(())
 }
@@ -1139,6 +1184,7 @@ fn open_pin_with_note(
                 std::fs::remove_file(pin.path).ok();
             }
             let _ = pin_app.emit(pins::PINS_CHANGED_EVENT, ());
+            pins::close_pin_tools(&pin_app, &pin_label);
         }
     });
     {
@@ -1600,6 +1646,7 @@ mod tests {
                 scale_factor: 1.0,
                 window_region: None,
                 document: false,
+                source_pin: None,
             });
             state.hidden = vec!["main".into()];
         }

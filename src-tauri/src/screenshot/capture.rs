@@ -663,10 +663,14 @@ impl FrameSource {
             let Backend::Persistent(capturer) = &mut self.backend else {
                 anyhow::bail!("Wayland portal capture unavailable");
             };
-            capturer.inject_portal_input(PortalInput::MotionAbsolute {
-                x: px as f64,
-                y: py as f64,
-            })?;
+            // Establish the hover target once. Moving on every wheel event
+            // steals control of the pointer from the user on Wayland.
+            if notches == 0 {
+                capturer.inject_portal_input(PortalInput::MotionAbsolute {
+                    x: px as f64,
+                    y: py as f64,
+                })?;
+            }
             capturer.inject_portal_input(PortalInput::Scroll {
                 horizontal: false,
                 steps: notches,

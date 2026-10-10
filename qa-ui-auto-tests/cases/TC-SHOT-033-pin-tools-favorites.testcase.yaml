@@ -21,7 +21,7 @@ steps:
 - wait_for: '[data-testid="screenshot-pin-image"]'
 - click: '[data-testid="screenshot-pin-menu-toggle"]'
 - wait_for: '[data-testid="screenshot-pin-menu"]'
-- click: '[data-testid="screenshot-pin-menu-toggle"]'
+- click: '[data-testid="screenshot-pin-tools-close"]'
 - assert_not_visible: '[data-testid="screenshot-pin-menu"]'
 - right_click: '[data-testid="screenshot-pin-window"]'
 - wait_for: '[data-testid="screenshot-pin-menu"]'
@@ -32,6 +32,14 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="screenshot-pin-zoom"]'
     equals: 100%
+- press:
+    key: Mod+-
+    selector: '[data-testid="screenshot-pin-window"]'
+- wait_for: '[data-testid="screenshot-pin-opacity"][value="90"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-pin-opacity"]'
+    name: value
+    equals: '90'
 - click: '[data-testid="screenshot-pin-zoom-in"]'
 - assert_text_equals:
     selector: '[data-testid="screenshot-pin-zoom"]'
@@ -55,6 +63,7 @@ steps:
 - press:
     key: ArrowRight
     selector: '[data-testid="screenshot-pin-opacity"]'
+- click: '[data-testid="screenshot-pin-tools-close"]'
 - eval_readonly:
     expression: Number(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"screenshot-pin-surface"]')).opacity)
       === 0.5
@@ -135,7 +144,7 @@ verification:
   review: reviewed
   requirements:
   - id: workflow
-    requirement: Right-click opens help without closing. Zoom and opacity affect the view; collapse/expand preserves opacity.
+    requirement: Right-click opens help without closing. Zoom and opacity affect the view; a reset at an already confirmed 100% still follows source-pin opacity shortcuts. Collapse/expand preserves opacity.
       Copy/save keep the pin open. Favorite survives a full page reload and restores the same original dimensions; un-favorite
       removes only the persistent entry.
     actions:
@@ -148,31 +157,32 @@ verification:
     - 11
     - 14
     - 16
-    - 18
-    - 20
+    - 19
     - 21
-    - 22
     - 23
     - 24
+    - 25
     - 26
-    - 29
+    - 27
+    - 30
     - 33
-    - 35
-    - 38
-    - 40
-    - 41
+    - 37
+    - 39
+    - 42
     - 44
-    - 47
-    - 49
+    - 45
+    - 48
     - 51
-    - 52
+    - 53
+    - 55
     - 56
-    - 58
-    - 63
-    - 66
-    - 68
-    - 69
+    - 60
+    - 62
+    - 67
+    - 70
     - 72
+    - 73
+    - 76
     checkpoints:
     - step: 10
       expectation: 'assert_not_visible: [data-testid="screenshot-pin-menu"]'
@@ -181,66 +191,69 @@ verification:
         this device''}'
     - step: 15
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''100%''}'
-    - step: 17
+    - step: 18
+      expectation: Source pin opacity shortcut updates the separate options slider after resetting an already confirmed value.
+    - step: 20
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''110%''}'
-    - step: 19
+    - step: 22
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''100%''}'
-    - step: 25
-      expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
-        === 0.5''}'
-    - step: 28
-      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-window"]'', ''name'': ''data-collapsed'',
-        ''equals'': ''true''}'
-    - step: 31
+    - step: 29
       expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
         === 0.5''}'
     - step: 32
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-window"]'', ''name'': ''data-collapsed'',
+        ''equals'': ''true''}'
+    - step: 35
+      expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
+        === 0.5''}'
+    - step: 36
       expectation: 'assert_visible: [data-testid="screenshot-pin-surface"]'
-    - step: 37
+    - step: 41
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_copy_image"''}'
-    - step: 43
+    - step: 47
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_save_image"
         && window.__taomniStubScreenshotCalls.at(-1).args.dest === "pinned-original.png"''}'
-    - step: 46
+    - step: 50
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
         ''equals'': ''true''}'
-    - step: 54
+    - step: 58
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 1}'
-    - step: 61
-      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
-        ''equals'': ''true''}'
-    - step: 62
-      expectation: 'eval_readonly: {''expression'': "document.querySelector(''img'').naturalWidth === 400 && document.querySelector(''img'').naturalHeight
-        === 300"}'
     - step: 65
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''true''}'
+    - step: 66
+      expectation: 'eval_readonly: {''expression'': "document.querySelector(''img'').naturalWidth === 400 && document.querySelector(''img'').naturalHeight
+        === 300"}'
+    - step: 69
+      expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
         ''equals'': ''false''}'
-    - step: 71
+    - step: 75
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 0}'
-    - step: 73
+    - step: 77
       expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
-    - step: 74
+    - step: 78
       expectation: Main screenshot entry remains usable.
     results:
     - 10
     - 13
     - 15
-    - 17
-    - 19
-    - 25
-    - 28
-    - 31
+    - 18
+    - 20
+    - 22
+    - 29
     - 32
-    - 37
-    - 43
-    - 46
-    - 54
-    - 61
-    - 62
+    - 35
+    - 36
+    - 41
+    - 47
+    - 50
+    - 58
     - 65
-    - 71
-    - 73
-    - 74
+    - 66
+    - 69
+    - 75
+    - 77
+    - 78
   visual:
   - check: Visible controls, state and image dimensions
     method: automated
