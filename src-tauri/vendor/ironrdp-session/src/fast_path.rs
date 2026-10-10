@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use ironrdp_bulk::BulkCompressor;
@@ -55,6 +56,57 @@ impl Processor {
         self.bulk_decompressor.as_mut()
     }
 
+    /// Consume updates for the deactivated surface without rendering them.
+    /// Their compression history is shared with activation Share Data PDUs.
+    pub(crate) fn consume_reactivation_frame(&mut self, input: &[u8]) -> SessionResult<()> {
+        let mut input = ReadCursor::new(input);
+        let _ = decode_cursor::<FastPathHeader>(&mut input).map_err(SessionError::decode)?;
+        self.complete_data = CompleteData::new();
+        while !input.is_empty() {
+            let update =
+                decode_cursor::<FastPathUpdatePdu<'_>>(&mut input).map_err(SessionError::decode)?;
+            let _ = self.decompress_update(&update)?;
+        }
+        Ok(())
+    }
+
+    fn decompress_update<'a>(
+        &mut self,
+        update: &FastPathUpdatePdu<'a>,
+    ) -> SessionResult<Cow<'a, [u8]>> {
+        if let Some(flags) = update.compression_flags {
+            if flags.intersects(
+                CompressionFlags::COMPRESSED
+                    | CompressionFlags::FLUSHED
+                    | CompressionFlags::AT_FRONT,
+            ) {
+                let bulk_flags = u32::from(flags.bits())
+                    | u32::from(update.compression_type.map_or(0, |ct| ct.as_u8()));
+                if let Some(ref mut decompressor) = self.bulk_decompressor {
+                    let data = decompressor
+                        .decompress(update.data, bulk_flags)
+                        .map_err(|e| reason_err!("FastPath", "bulk decompression failed: {}", e))?
+                        .to_vec();
+                    debug!(
+                        compressed_size = update.data.len(),
+                        decompressed_size = data.len(),
+                        compression_type = ?update.compression_type,
+                        compression_ratio = format_args!("{:.2}x", decompressor.compression_ratio()),
+                        total_compressed = decompressor.total_compressed_bytes(),
+                        total_uncompressed = decompressor.total_uncompressed_bytes(),
+                        "Decompressed FastPath update"
+                    );
+                    return Ok(Cow::Owned(data));
+                }
+                return Err(reason_err!(
+                    "FastPath",
+                    "received bulk compression without a negotiated decompressor"
+                ));
+            }
+        }
+        Ok(Cow::Borrowed(update.data))
+    }
+
     pub fn update_mouse_pos(&mut self, x: u16, y: u16) {
         self.mouse_pos_update = Some((x, y));
     }
@@ -106,50 +158,11 @@ impl Processor {
             compression_flags = ?update_pdu.compression_flags,
         );
 
-        // Decompress the payload if the server sent it compressed.
-        let decompressed_data;
-        let payload = if let Some(flags) = update_pdu.compression_flags {
-            if flags.intersects(
-                CompressionFlags::COMPRESSED
-                    | CompressionFlags::FLUSHED
-                    | CompressionFlags::AT_FRONT,
-            ) {
-                let bulk_flags = u32::from(flags.bits())
-                    | u32::from(update_pdu.compression_type.map_or(0, |ct| ct.as_u8()));
-
-                if let Some(ref mut decompressor) = self.bulk_decompressor {
-                    let decompressed = decompressor
-                        .decompress(update_pdu.data, bulk_flags)
-                        .map_err(|e| reason_err!("FastPath", "bulk decompression failed: {}", e))?;
-                    // Copy decompressed data before accessing metrics (releases the mutable borrow).
-                    decompressed_data = decompressed.to_vec();
-                    debug!(
-                        compressed_size = update_pdu.data.len(),
-                        decompressed_size = decompressed_data.len(),
-                        compression_type = ?update_pdu.compression_type,
-                        compression_ratio = format_args!("{:.2}x", decompressor.compression_ratio()),
-                        total_compressed = decompressor.total_compressed_bytes(),
-                        total_uncompressed = decompressor.total_uncompressed_bytes(),
-                        "Decompressed FastPath update"
-                    );
-                    decompressed_data.as_slice()
-                } else {
-                    warn!("Received compressed FastPath data but no decompressor is configured");
-                    update_pdu.data
-                }
-            } else {
-                // Compression flags present but COMPRESSED bit not set — pass data through.
-                // Still need to inform the decompressor of FLUSHED/AT_FRONT flags even
-                // without compressed payload.
-                update_pdu.data
-            }
-        } else {
-            update_pdu.data
-        };
+        let payload = self.decompress_update(&update_pdu)?;
 
         let processed_complete_data = self
             .complete_data
-            .process_data(payload, update_pdu.fragmentation);
+            .process_data(payload.as_ref(), update_pdu.fragmentation);
 
         let update_code = update_pdu.update_code;
 

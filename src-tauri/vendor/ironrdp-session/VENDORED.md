@@ -25,3 +25,9 @@ desktop before applying tiles. A padded capture region must not cause the
 entire repaint to be discarded after resizing to a non-tile-aligned desktop.
 The regression decodes a real RLGR tile in a padded frame and checks visible
 RGBA pixels and update bounds.
+
+During reactivation, consume in-flight Fast-Path compression updates without
+painting the deactivated surface. xrdp can send compressed pointer updates
+between Demand Active and Synchronize; skipping them corrupts the shared MPPC
+history and disconnects the next resize. A captured repeated-resize stream
+reproduces the invalid Synchronize message type when these updates are skipped.
