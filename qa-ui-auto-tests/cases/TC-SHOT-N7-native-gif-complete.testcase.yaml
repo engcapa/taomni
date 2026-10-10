@@ -27,7 +27,7 @@ verification:
   requirements:
   - id: gif-recorder
     requirement: Recorder UI stops a real clip, loads GIF preview, copies first frame, preserves preview on reentry and Done
-      restores main/removes temp clip. Recording borders are visible outside the selected pixels and the control bar does
+      restores main/removes temp clip, using real compositor pointer input on Wayland. Recording borders are visible outside the selected pixels and the control bar does
       not intersect the recording; decoded original scene comparisons reject captured tool chrome.
     actions:
     - 1

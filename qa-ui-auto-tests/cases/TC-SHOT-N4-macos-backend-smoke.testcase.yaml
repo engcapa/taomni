@@ -15,7 +15,7 @@ verification:
   review: reviewed
   requirements:
   - id: pin-hotkey
-    requirement: Save exact captured bytes, load/close a real pin and remove its copy; OS shortcut opens overlay, native close restores main, disable prevents trigger and original setting is restored.
+    requirement: Save exact captured bytes, load/close a real pin and remove its copy; OS shortcut opens overlay, native close restores main while its source surface can authorize activation, disable prevents trigger and original setting is restored.
     actions: [1]
     checkpoints:
     - {step: 3, expectation: Saved bytes identical and 320x200 pin loaded then closed with copy removed.}

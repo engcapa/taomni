@@ -27,7 +27,7 @@ verification:
   requirements:
   - id: mp4-recorder
     requirement: Recorder stop loads a real MP4 in the platform WebView and playback advances, then Done restores main/removes
-      temp clip. Recording borders are visible outside the selected pixels and the control bar does not intersect the recording;
+      temp clip, using real compositor pointer input on Wayland. Recording borders are visible outside the selected pixels and the control bar does not intersect the recording;
       decoded original scene comparisons reject captured tool chrome.
     actions:
     - 1

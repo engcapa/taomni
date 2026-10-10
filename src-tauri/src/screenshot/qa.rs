@@ -2136,9 +2136,9 @@ async fn full_recorder(app: &AppHandle) -> Result<String, String> {
     let clip = super::record::inspect_clip(&output).map_err(|e| e.to_string())?;
     let artifact = keep_artifact(&output, "whole-display-recording.gif");
     let bar_visible_after_stop = bar.is_visible().unwrap_or(false);
-    bar.eval("document.querySelector('[data-testid=\"screenshot-recorder-done\"]').click()")
-        .map_err(|e| e.to_string())?;
+    finish_recorder(&bar).await?;
     let closed = wait_closed(&app, super::RECORDER_LABEL, Duration::from_secs(10)).await;
+    let restored = main_visible(&app);
     Ok(report(
         geometry["controlsOutside"] == json!(true)
             && preview == json!(true)
@@ -2146,11 +2146,22 @@ async fn full_recorder(app: &AppHandle) -> Result<String, String> {
             && clip.frames >= 1
             && clip.duration_ms >= 800
             && closed
-            && main_visible(&app)
+            && restored
             && !output.exists()
             && artifact.is_some(),
-        json!({"geometry":geometry,"preview":preview,"clip":clip,"controlsVisibleAfterStop":bar_visible_after_stop,"closed":closed,"artifact":artifact}),
+        json!({"geometry":geometry,"preview":preview,"clip":clip,"controlsVisibleAfterStop":bar_visible_after_stop,"closed":closed,"mainRestored":restored,"artifact":artifact}),
     ))
+}
+
+async fn finish_recorder(bar: &WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        return wayland::click_control(bar, "[data-testid=\"screenshot-recorder-done\"]")
+            .await
+            .map_err(|e| format!("{e:#}"));
+    }
+    bar.eval("document.querySelector('[data-testid=\"screenshot-recorder-done\"]').click()")
+        .map_err(|e| e.to_string())
 }
 
 /// Recorder bar flow: start a real recording, stop it from the bar, check
@@ -2237,8 +2248,7 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     // A new screenshot request must focus the preview rather than replace it.
     super::open_overlay(&app, None).await?;
     let preview_retained = app.get_webview_window(super::OVERLAY_LABEL).is_none();
-    bar.eval("document.querySelector('[data-testid=\"screenshot-recorder-done\"]').click()")
-        .map_err(|e| e.to_string())?;
+    finish_recorder(&bar).await?;
     let closed = wait_closed(&app, super::RECORDER_LABEL, Duration::from_secs(10)).await;
     tokio::time::sleep(Duration::from_millis(300)).await;
     let restored = main_visible(&app);

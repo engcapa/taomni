@@ -774,16 +774,24 @@ fn restore_app_windows(app: &AppHandle) {
             #[cfg(target_os = "linux")]
             if pins::native_wayland() {
                 let target = window.clone();
-                let _ = window.run_on_main_thread(move || {
+                let restore = move || {
                     use gtk::prelude::*;
                     if let Ok(gtk) = target.gtk_window() {
+                        if let Some(id) = surface_backend::activation_id() {
+                            gtk.set_startup_id(&id);
+                        }
                         // Tao skips focus while its queued minimized cache is
                         // still set. Present the mapped GTK toplevel directly.
                         gtk.deiconify();
                         gtk.show();
                         gtk.present();
                     }
-                });
+                };
+                if gtk::is_initialized_main_thread() {
+                    restore();
+                } else {
+                    let _ = window.run_on_main_thread(restore);
+                }
                 continue;
             }
             #[cfg(target_os = "linux")]
@@ -1125,6 +1133,12 @@ fn watch_session_window(window: &WebviewWindow) {
     let app = window.app_handle().clone();
     let label = window.label().to_string();
     window.on_window_event(move |event| {
+        #[cfg(target_os = "linux")]
+        if matches!(event, tauri::WindowEvent::CloseRequested { .. }) && pins::native_wayland() {
+            // GTK still has the focused source surface here. Destroyed is too
+            // late to authorize activation of a minimized Wayland toplevel.
+            restore_app_windows(&app);
+        }
         if matches!(event, tauri::WindowEvent::Destroyed) {
             let active = {
                 let state = tool_state();

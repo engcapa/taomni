@@ -184,6 +184,49 @@ pub(super) async fn pointer(point: (i32, i32)) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Click the rendered control through the owned compositor. A DOM click has
+/// no input timestamp and cannot authorize cross-backend window restoration.
+pub(super) async fn click_control(window: &WebviewWindow, selector: &str) -> anyhow::Result<()> {
+    let dom = super::run_js(
+        window,
+        &format!(
+            r#"
+        const el=document.querySelector({selector});
+        if(!el) throw new Error('native click control missing');
+        const r=el.getBoundingClientRect();
+        return {{x:r.x+r.width/2,y:r.y+r.height/2,width:r.width,height:r.height,
+            viewportWidth:innerWidth,viewportHeight:innerHeight}};
+    "#,
+            selector = serde_json::to_string(selector)?
+        ),
+        Duration::from_secs(5),
+    )
+    .await?;
+    let native = self::window(window).await?;
+    anyhow::ensure!(
+        native["visible"] == true
+            && dom["width"].as_f64().unwrap_or(0.0) > 0.0
+            && dom["height"].as_f64().unwrap_or(0.0) > 0.0,
+        "native click control is not visible"
+    );
+    let client = &native["client"];
+    let x = client["x"].as_f64().context("control client x")?
+        + dom["x"].as_f64().context("control DOM x")?
+            * client["width"].as_f64().context("control client width")?
+            / dom["viewportWidth"]
+                .as_f64()
+                .context("control viewport width")?;
+    let y = client["y"].as_f64().context("control client y")?
+        + dom["y"].as_f64().context("control DOM y")?
+            * client["height"].as_f64().context("control client height")?
+            / dom["viewportHeight"]
+                .as_f64()
+                .context("control viewport height")?;
+    command(json!({"command":"click","x":x.round() as i32,"y":y.round() as i32,"button":"left"}))
+        .await?;
+    Ok(())
+}
+
 pub(super) async fn mouse_path(points: Vec<(i32, i32)>) -> anyhow::Result<()> {
     command(json!({"command":"path","points":points})).await?;
     Ok(())
