@@ -233,6 +233,10 @@ async fn wait_closed(app: &AppHandle, label: &str, timeout: Duration) -> bool {
 fn main_visible(app: &AppHandle) -> bool {
     app.get_webview_window("main")
         .and_then(|w| {
+            #[cfg(target_os = "linux")]
+            if wayland::active() {
+                return wayland::visible(&w).ok();
+            }
             let visible = w.is_visible().ok()?;
             #[cfg(target_os = "linux")]
             let visible = visible && !w.is_minimized().ok()?;

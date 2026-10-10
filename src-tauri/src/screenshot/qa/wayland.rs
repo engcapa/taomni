@@ -14,36 +14,49 @@ pub(super) fn active() -> bool {
 }
 
 pub(super) async fn command(request: Value) -> anyhow::Result<Value> {
-    tokio::task::spawn_blocking(move || {
-        let socket = std::path::PathBuf::from(
-            std::env::var_os("QA_WAYLAND_INPUT_SOCKET")
-                .context("owned Wayland input socket missing")?,
-        );
-        let runtime = std::path::PathBuf::from(
-            std::env::var_os("XDG_RUNTIME_DIR").context("owned Wayland runtime missing")?,
-        );
-        anyhow::ensure!(
-            socket
-                .parent()
-                .context("input socket parent")?
-                .canonicalize()?
-                == runtime.canonicalize()?
-                && socket.metadata()?.file_type().is_socket(),
-            "Wayland input socket is outside the owned runtime"
-        );
-        let mut connection = UnixStream::connect(socket).context("connect owned Mutter broker")?;
-        connection.set_read_timeout(Some(Duration::from_secs(30)))?;
-        connection.set_write_timeout(Some(Duration::from_secs(5)))?;
-        connection.write_all(serde_json::to_string(&request)?.as_bytes())?;
-        connection.write_all(b"\n")?;
-        let mut response = String::new();
-        connection.take(1_048_576).read_to_string(&mut response)?;
-        let response: Value = serde_json::from_str(&response).context("Mutter response")?;
-        anyhow::ensure!(response["ok"] == true, "Mutter command failed: {response}");
-        Ok(response["value"].clone())
-    })
-    .await
-    .context("Mutter observation/input task")?
+    tokio::task::spawn_blocking(move || command_sync(request))
+        .await
+        .context("Mutter observation/input task")?
+}
+
+fn command_sync(request: Value) -> anyhow::Result<Value> {
+    let socket = std::path::PathBuf::from(
+        std::env::var_os("QA_WAYLAND_INPUT_SOCKET")
+            .context("owned Wayland input socket missing")?,
+    );
+    let runtime = std::path::PathBuf::from(
+        std::env::var_os("XDG_RUNTIME_DIR").context("owned Wayland runtime missing")?,
+    );
+    anyhow::ensure!(
+        socket
+            .parent()
+            .context("input socket parent")?
+            .canonicalize()?
+            == runtime.canonicalize()?
+            && socket.metadata()?.file_type().is_socket(),
+        "Wayland input socket is outside the owned runtime"
+    );
+    let mut connection = UnixStream::connect(socket).context("connect owned Mutter broker")?;
+    connection.set_read_timeout(Some(Duration::from_secs(30)))?;
+    connection.set_write_timeout(Some(Duration::from_secs(5)))?;
+    connection.write_all(serde_json::to_string(&request)?.as_bytes())?;
+    connection.write_all(b"\n")?;
+    let mut response = String::new();
+    connection.take(1_048_576).read_to_string(&mut response)?;
+    let response: Value = serde_json::from_str(&response).context("Mutter response")?;
+    anyhow::ensure!(response["ok"] == true, "Mutter command failed: {response}");
+    Ok(response["value"].clone())
+}
+
+/// GTK does not receive Wayland's actual minimized state. Observe the owned
+/// compositor instead; a queued minimize request is not a visibility pass.
+pub(super) fn visible(window: &WebviewWindow) -> anyhow::Result<bool> {
+    command_sync(
+        json!({"command":"geometry", "application":std::env::current_exe()?,
+        "title":window.title()?}),
+    )?["visible"]
+        .as_bool()
+        .context("Mutter window visibility")
 }
 
 pub(super) async fn window(window: &WebviewWindow) -> anyhow::Result<Value> {

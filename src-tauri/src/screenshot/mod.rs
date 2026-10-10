@@ -711,6 +711,14 @@ async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
             if let Some(window) = app.get_webview_window(label) {
                 let mapped = window.is_visible().map_err(|e| e.to_string())?;
                 #[cfg(target_os = "linux")]
+                if pins::native_wayland() {
+                    // xdg-toplevel has no minimized state acknowledgement.
+                    // GTK/Tao's ICONIFIED cache therefore cannot establish
+                    // visibility here. Drain GTK below and allow compositor
+                    // suspension/fade; native QA observes Mutter and pixels.
+                    continue;
+                }
+                #[cfg(target_os = "linux")]
                 let mapped = mapped && !window.is_minimized().map_err(|e| e.to_string())?;
                 visible |= mapped;
             }
