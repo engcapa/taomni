@@ -1253,12 +1253,12 @@ mod bulk_tests {
     #[ignore = "offline CPU timings; run with --release --ignored --nocapture"]
     fn profile_photo_encoder_costs() {
         use std::time::{Duration, Instant};
-        for cropped in [false, true] {
-            let (width, height) = if cropped {
-                (704u16, 384u16)
-            } else {
-                (640u16, 360u16)
-            };
+        for (width, height, cropped) in [
+            (64u16, 64u16, false),
+            (128, 64, false),
+            (640, 360, false),
+            (704, 384, true),
+        ] {
             let stride = if cropped {
                 1920 * 4
             } else {
@@ -1270,8 +1270,8 @@ mod bulk_tests {
                     let mut pixels =
                         vec![48; stride * (usize::from(height) - 1) + usize::from(width) * 4];
                     let (left, top) = if cropped { (32, 16) } else { (0, 0) };
-                    for y in 0..360usize {
-                        for x in 0..640usize {
+                    for y in 0..usize::from(height.min(360)) {
+                        for x in 0..usize::from(width.min(640)) {
                             seed ^= seed << 13;
                             seed ^= seed >> 17;
                             seed ^= seed << 5;
@@ -1303,7 +1303,7 @@ mod bulk_tests {
             let mut planar_time = Duration::ZERO;
             let mut estimate_time = Duration::ZERO;
             let mut sample_time = Duration::ZERO;
-            for bitmap in &frames {
+            for bitmap in frames.iter().cycle().take(512) {
                 let started = Instant::now();
                 let (length, sample) = planar.bitmap.raw_planar_sample(bitmap).unwrap().unwrap();
                 estimate_bulk_sample(length, &sample).unwrap();
@@ -1316,23 +1316,29 @@ mod bulk_tests {
                 estimate_time += started.elapsed();
             }
             eprintln!(
-                "photo cropped={cropped}: planar={:.3}ms/frame estimate={:.3}ms/frame lazy-sample={:.3}ms/frame",
-                planar_time.as_secs_f64() * 1000.0 / frames.len() as f64,
-                estimate_time.as_secs_f64() * 1000.0 / frames.len() as f64,
-                sample_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+                "photo {width}x{height} cropped={cropped}: planar={:.3}ms/frame estimate={:.3}ms/frame lazy-sample={:.3}ms/frame",
+                planar_time.as_secs_f64() * 1000.0 / 512.0,
+                estimate_time.as_secs_f64() * 1000.0 / 512.0,
+                sample_time.as_secs_f64() * 1000.0 / 512.0,
             );
-            for adaptive in [false, true] {
-                let mut rfx =
-                    RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height });
-                let mut handler = AdaptiveHandler {
-                    bitmap: BitmapHandler::for_bulk_compression(true),
-                    rfx: rfx.clone(),
-                };
-                let mut bulk = bulk::BulkEncoder::new(CompressionType::Rdp61).unwrap();
-                let mut encoded_time = Duration::ZERO;
-                let mut send_time = Duration::ZERO;
-                let mut bytes = 0;
-                for bitmap in &frames {
+            let mut rfx =
+                RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height });
+            let mut handler = AdaptiveHandler {
+                bitmap: BitmapHandler::for_bulk_compression(true),
+                rfx: rfx.clone(),
+            };
+            let mut bulk = bulk::BulkEncoder::new(CompressionType::Rdp61).unwrap();
+            let mut encoded_time = [Duration::ZERO; 2];
+            let mut send_time = [Duration::ZERO; 2];
+            let mut bytes = [0; 2];
+            let samples = 512;
+            // Warm the Rayon pool and alternate order on each matched frame.
+            // Separate baseline/candidate loops can mistake scheduler noise
+            // or first-frame startup for the adaptive selection cost.
+            for (index, bitmap) in frames.iter().cycle().take(samples + 32).enumerate() {
+                let mut payloads = [Vec::new(), Vec::new()];
+                for mode in [index % 2, (index + 1) % 2] {
+                    let adaptive = mode == 1;
                     let started = Instant::now();
                     let mut fragment = if adaptive {
                         handler.handle(bitmap).unwrap()
@@ -1340,22 +1346,33 @@ mod bulk_tests {
                         rfx.handle(bitmap).unwrap()
                     };
                     assert_eq!(fragment.code, UpdateCode::SurfaceCommands);
-                    encoded_time += started.elapsed();
+                    if index >= 32 {
+                        encoded_time[mode] += started.elapsed();
+                    }
+                    payloads[mode] = fragment.data.clone();
                     let started = Instant::now();
                     let mut output = vec![0; fragment.size_hint()];
                     while let Some(size) = fragment
                         .next(&mut output, adaptive.then_some(&mut bulk), None)
                         .unwrap()
                     {
-                        bytes += size;
+                        if index >= 32 {
+                            bytes[mode] += size;
+                        }
                     }
-                    send_time += started.elapsed();
+                    if index >= 32 {
+                        send_time[mode] += started.elapsed();
+                    }
                 }
+                assert_eq!(payloads[0], payloads[1], "matched photo payload {index}");
+            }
+            for mode in 0..2 {
                 eprintln!(
-                    "photo cropped={cropped} adaptive={adaptive}: encode={:.3}ms/frame bulk={:.3}ms/frame wire={}B/frame",
-                    encoded_time.as_secs_f64() * 1000.0 / frames.len() as f64,
-                    send_time.as_secs_f64() * 1000.0 / frames.len() as f64,
-                    bytes / frames.len()
+                    "photo {width}x{height} cropped={cropped} adaptive={}: encode={:.3}ms/frame bulk={:.3}ms/frame wire={}B/frame",
+                    mode == 1,
+                    encoded_time[mode].as_secs_f64() * 1000.0 / samples as f64,
+                    send_time[mode].as_secs_f64() * 1000.0 / samples as f64,
+                    bytes[mode] / samples
                 );
             }
         }

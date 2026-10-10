@@ -25,3 +25,18 @@ identical output for all 33 updates in the original full capture. Omitting
 activation updates reproduces five later mismatches, including the damaged
 surface header. The focused Rust test replays the retained packets through
 the product's active-stage decoder and verifies the actual framebuffer.
+
+`xrdp-repeated-resize.bin` retains the IO-channel and Fast-Path packets from
+connection 1 of run [38006071650](https://github.com/engcapa/taomni/actions/runs/38006071650)
+at `0f437abbb6f36550e01dc2f4678e9653582f226a`,
+`linux-ubuntu-22.04-vnc-native`, `TC-RDPC-REF-02-xrdp`.
+The original `rdp-server-packets.log` records three resize sequences. Static
+channel traffic and the first connection are omitted; the active-session
+capture contains no logon credentials. Record kinds 0–3 use the format above;
+kind 4 marks Fast-Path packets received during activation.
+
+The third Synchronize PDU references the MPPC history of compressed pointer
+updates sent between Demand Active and Synchronize. Discarding those packets
+reproduces the original invalid Synchronize message type every time. Consuming
+their compression updates preserves all three typed activation PDUs and the
+two completed resize repaints without painting the deactivated surface.

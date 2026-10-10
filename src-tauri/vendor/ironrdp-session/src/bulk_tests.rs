@@ -193,6 +193,56 @@ fn compressed_bitmap_without_negotiation_fails_explicitly() {
             .to_string()
             .contains("without a negotiated decompressor")
     );
+    assert!(
+        client
+            .consume_reactivation_fast_path(&fast_frame(
+                &compressed,
+                flags,
+                PduCompressionType::K64
+            ))
+            .unwrap_err()
+            .to_string()
+            .contains("without a negotiated decompressor")
+    );
+}
+
+#[test]
+fn deactivated_graphics_keep_shared_history_without_painting_for_every_codec() {
+    for (ct, bulk_ct) in [
+        (PduCompressionType::K8, CompressionType::Rdp4),
+        (PduCompressionType::K64, CompressionType::Rdp5),
+        (PduCompressionType::Rdp6, CompressionType::Rdp6),
+        (PduCompressionType::Rdp61, CompressionType::Rdp61),
+    ] {
+        let mut client = stage(Some(ct));
+        let mut sender = BulkCompressor::new(bulk_ct).unwrap();
+        let mut image = DecodedImage::new(PixelFormat::RgbA32, 32, 32);
+        let first = bitmap([255, 0, 255]);
+        let (compressed, flags) = compress(&mut sender, &first);
+        client
+            .consume_reactivation_fast_path(&fast_frame(&compressed, flags, ct))
+            .unwrap();
+        assert!(image.data().iter().all(|byte| *byte == 0));
+
+        let next = bitmap([0, 255, 255]);
+        let (compressed, flags) = compress(&mut sender, &next);
+        client
+            .process(
+                &mut image,
+                Action::X224,
+                &slow_frame(&slow_share_data(&compressed, flags, next.len(), 2)),
+            )
+            .unwrap();
+        for pixel in image.data().chunks_exact(4) {
+            assert_eq!(&pixel[..3], &[0, 255, 255], "codec {ct:?}");
+        }
+        let frame = fast_frame(&compressed, flags, ct);
+        assert!(
+            client
+                .consume_reactivation_fast_path(&frame[..frame.len() - 1])
+                .is_err()
+        );
+    }
 }
 
 #[test]
@@ -417,4 +467,94 @@ fn reactivation_normalization_preserves_non_io_packets_and_graphics_history() {
         )
         .unwrap();
     assert_eq!(&image.data()[..4], &[255, 0, 255, 255]);
+}
+
+#[test]
+fn captured_repeated_resize_preserves_compressed_synchronize() {
+    // Replay the original native failure. The negative control keeps the old
+    // skip behavior and must fail on the third Synchronize PDU, not earlier.
+    for skip in [true, false] {
+        let mut client = ActiveStageBuilder {
+            static_channels: StaticChannelSet::new(),
+            user_channel_id: 1002,
+            io_channel_id: 1003,
+            message_channel_id: None,
+            share_id: 66538,
+            compression_type: Some(PduCompressionType::K64),
+            enable_server_pointer: false,
+            pointer_software_rendering: false,
+        }
+        .build();
+        let mut image = DecodedImage::new(PixelFormat::RgbA32, 994, 750);
+        let mut records = &include_bytes!("../testdata/xrdp-repeated-resize.bin")[..];
+        let mut sync_error = None;
+        let mut sync_count = 0;
+        let mut in_flight_count = 0;
+        let mut resize_count = 0;
+        while !records.is_empty() {
+            let kind = records[0];
+            let length = u32::from_le_bytes(records[1..5].try_into().unwrap()) as usize;
+            let payload = &records[5..5 + length];
+            records = &records[5 + length..];
+            match kind {
+                0 | 1 => {
+                    let action = if kind == 1 {
+                        Action::X224
+                    } else {
+                        Action::FastPath
+                    };
+                    client.process(&mut image, action, payload).unwrap();
+                }
+                2 => {
+                    let frame = client.normalize_reactivation_frame(payload).unwrap();
+                    let ctx = ironrdp_pdu::mcs::decode_send_data_indication(&frame).unwrap();
+                    if ctx.user_data.len() > 14 && ctx.user_data[2..4] == [0x17, 0] {
+                        if ctx.user_data[14] == 31 {
+                            sync_count += 1;
+                        }
+                        if let Err(error) = ironrdp_pdu::rdp::headers::decode_io_channel(ctx) {
+                            sync_error = Some(error.to_string());
+                            break;
+                        }
+                    }
+                }
+                3 => {
+                    assert_eq!(
+                        &image.data()[(240 * image.width() as usize + 280) * 4..][..4],
+                        &[255; 4]
+                    );
+                    image = DecodedImage::new(
+                        PixelFormat::RgbA32,
+                        u16::from_le_bytes(payload[..2].try_into().unwrap()),
+                        u16::from_le_bytes(payload[2..].try_into().unwrap()),
+                    );
+                    resize_count += 1;
+                }
+                4 => {
+                    in_flight_count += 1;
+                    if !skip {
+                        let before = image.data().to_vec();
+                        client.consume_reactivation_fast_path(payload).unwrap();
+                        assert_eq!(
+                            image.data(),
+                            before,
+                            "deactivated surface must not be painted"
+                        );
+                    }
+                }
+                _ => panic!("unknown captured record type"),
+            }
+        }
+        assert_eq!(sync_count, 3);
+        assert_eq!(resize_count, 2);
+        assert_eq!(in_flight_count, 6);
+        if skip {
+            assert!(sync_error.unwrap().contains("invalid message type"));
+        } else {
+            assert!(
+                sync_error.is_none(),
+                "compressed activation must decode with shared history"
+            );
+        }
+    }
 }

@@ -356,6 +356,9 @@ jobs:
           restore-keys: |
             qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
             qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
+      - name: Wayland cold-cache application metadata contracts
+        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_profile == 'ubuntu-26.04-wayland'
+        run: python -m unittest test_ci_portal_application
       - name: Verify owned Wayland desktop before expensive native checks
         if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_profile == 'ubuntu-26.04-wayland'
         env:

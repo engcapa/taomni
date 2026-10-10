@@ -8757,6 +8757,90 @@ end_of_record
       }
     });
 
+    it.each([false, true])("keeps a post-save member completion pending until the live document sync finishes (edit while waiting: %s)", async (editWhileWaiting) => {
+      const { EditorView } = await import("@codemirror/view");
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-completion-delayed-sync-${editWhileWaiting}`,
+        workspaceInstanceId: `instance-completion-delayed-sync-${editWhileWaiting}`,
+        name: "Completion Delayed Sync",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/App.java" },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/App.java", "System.out.println();"));
+      workspaceMocks.workspaceWriteFileEncoded.mockResolvedValue(writeAck(file(
+        "src/App.java", "System.out.println();\n", { hash: "hash-delayed-sync" },
+      )));
+      const javaStatus = documentStatus({
+        path: "src/App.java", uri: "file:///repo/app/src/App.java", presetId: "jdtls",
+        languageId: "java", displayName: "Java", available: true, active: true,
+        capabilities: defaultCapabilities({ completion: true, completionTriggerCharacters: ["."] }),
+      });
+      lspMocks.lspOpenDocument.mockResolvedValue(javaStatus);
+      lspMocks.lspChangeDocument.mockResolvedValue(javaStatus);
+      lspMocks.lspCompletion.mockResolvedValue({
+        status: javaStatus, isIncomplete: false,
+        items: [{
+          label: "println", kind: 2, detail: null, documentation: null,
+          insertText: "println", insertTextFormat: 1, filterText: null, sortText: null,
+          textEdit: null, additionalTextEdits: [], raw: {},
+        }],
+      });
+      const rendered = renderWorkspace(workspace);
+      await screen.findByTitle("app / src/App.java");
+      await waitFor(() => expect(rendered.container.querySelector(".cm-content")).not.toBeNull());
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+      const view = EditorView.findFromDOM(content)!;
+      await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
+      act(() => {
+        view.focus();
+        view.dispatch({
+          changes: { from: view.state.doc.length, insert: "\n" },
+          selection: { anchor: view.state.doc.length + 1 }, userEvent: "input.type",
+        });
+      });
+      await waitFor(() => expect(screen.getByTestId("code-workspace-save-observation")).toHaveAttribute("data-dirty", "true"));
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() => expect(screen.getByTestId("code-workspace-save-observation")).toHaveAttribute("data-dirty", "false"));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
+
+      let acknowledgeSync!: () => void;
+      const pendingSync = new Promise<typeof javaStatus>((resolve) => {
+        acknowledgeSync = () => resolve(javaStatus);
+      });
+      lspMocks.lspChangeDocument.mockClear();
+      lspMocks.lspChangeDocument.mockImplementation(() => pendingSync);
+      lspMocks.lspCompletion.mockClear();
+      act(() => {
+        view.focus();
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: "System.out." },
+          selection: { anchor: 11 }, userEvent: "input.type",
+        });
+      });
+      await waitFor(() => expect(lspMocks.lspChangeDocument).toHaveBeenCalled());
+      // The provider is active, but its real document acknowledgment can be
+      // slower than the feature's 400ms best-effort wait. It must receive no
+      // query for stale text, and the final dot must not require another key.
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 650)); });
+      expect(lspMocks.lspCompletion).not.toHaveBeenCalled();
+      if (editWhileWaiting) {
+        act(() => view.dispatch({
+          changes: { from: 11, insert: "p" }, selection: { anchor: 12 }, userEvent: "input.type",
+        }));
+      }
+      await act(async () => { acknowledgeSync(); });
+      await waitFor(() => expect(lspMocks.lspCompletion).toHaveBeenCalledWith(
+        expect.anything(), { line: 0, character: editWhileWaiting ? 12 : 11 },
+        editWhileWaiting ? null : ".", expect.anything(),
+      ));
+      expect(lspMocks.lspCompletion.mock.calls.every((call) => call[1].character === (editWhileWaiting ? 12 : 11))).toBe(true);
+      await waitFor(() => expect(document.querySelector("li.cm-completion-type-method")).toHaveTextContent("println"));
+      expect(lspMocks.lspSaveDocument).not.toHaveBeenCalled();
+    });
+
     it("never notifies jdtls with didSave and completes on the fast path after saving", async () => {
       const { EditorView } = await import("@codemirror/view");
       const { startCompletion } = await import("@codemirror/autocomplete");
