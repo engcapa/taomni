@@ -769,6 +769,10 @@ async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
 
 fn restore_app_windows(app: &AppHandle) {
     let hidden = std::mem::take(&mut tool_state().hidden);
+    #[cfg(target_os = "linux")]
+    if pins::native_wayland() {
+        log::info!("capture restoration: hidden={hidden:?}, GTK_thread={}", gtk::is_initialized_main_thread());
+    }
     for label in hidden {
         if let Some(window) = app.get_webview_window(&label) {
             #[cfg(target_os = "linux")]
@@ -777,7 +781,10 @@ fn restore_app_windows(app: &AppHandle) {
                 let restore = move || {
                     use gtk::prelude::*;
                     if let Ok(gtk) = target.gtk_window() {
-                        if let Some(id) = surface_backend::activation_id() {
+                        let id = surface_backend::activation_id();
+                        log::info!("capture restoration: target={}, backend={}, startup_id={}",
+                            target.label(), gtk.display().type_().name(), id.is_some());
+                        if let Some(id) = id {
                             gtk.set_startup_id(&id);
                         }
                         // Tao skips focus while its queued minimized cache is
@@ -1135,6 +1142,7 @@ fn watch_session_window(window: &WebviewWindow) {
     window.on_window_event(move |event| {
         #[cfg(target_os = "linux")]
         if matches!(event, tauri::WindowEvent::CloseRequested { .. }) && pins::native_wayland() {
+            log::info!("capture close requested: label={label}");
             // GTK still has the focused source surface here. Destroyed is too
             // late to authorize activation of a minimized Wayland toplevel.
             restore_app_windows(&app);

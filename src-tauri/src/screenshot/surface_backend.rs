@@ -22,6 +22,7 @@ pub(super) fn activation_id() -> Option<String> {
             .into_iter()
             .filter_map(|widget| widget.downcast::<gtk::Window>().ok())
             .any(|window| window.is_active() && window.display() == *display);
+        log::info!("capture activation: floating_display={}, active={active}", display.type_().name());
         if !active {
             return None;
         }
