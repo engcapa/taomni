@@ -18,6 +18,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("separate pin options", () => {
+  it("keeps source opacity updates after resetting an already confirmed value", async () => {
+    render(<PinToolsWindow />);
+    await waitFor(() => expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Original"));
+    fireEvent.click(screen.getByTestId("screenshot-pin-reset"));
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: { zoom: 1, opacity: 0.5, note: "Original", busy: false, error: null, notice: null } }));
+    expect(screen.getByTestId("screenshot-pin-opacity")).toHaveValue("50");
+  });
+
   it("waits for the source pin before exposing editable controls", async () => {
     let initialize!: (value: unknown) => void;
     api.invoke.mockReturnValueOnce(new Promise((resolve) => { initialize = resolve; }));

@@ -64,7 +64,7 @@ export function PinToolsWindow() {
   });
   const resize = (value: number) => send("zoom", value);
   const setOpacity = (value: number) => {
-    pendingOpacity.current = value;
+    pendingOpacity.current = value === confirmedOpacity.current ? null : value;
     setView((current) => ({ ...current, opacity: value }));
     void send("opacity", value);
   };

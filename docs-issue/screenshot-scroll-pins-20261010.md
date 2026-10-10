@@ -34,3 +34,9 @@ GitHub 验证使用 `.github/workflows/qa-ui-auto-platforms.yml`、精确提交�
 本机补测发现贴图底部保存提示会拦截缩略图恢复按钮；提示改为不接收鼠标事件。补修后 17 项贴图/设置组件测试、TypeScript 检查、5 项预检/执行测试和 `TC-SHOT-033/036/037/038` 四个 browser 用例通过。Linux 桌面测试模块中的其他既有用例依赖 POSIX `/proc`、符号链接和权限位，在 Win11 运行失败；模块整体由 GitHub 的 Linux 工具校验执行。
 
 首轮 Linux native 5/7、macOS native 4/7：两端备注用例读到空值，macOS 滚动编辑窗口状态断言还未通过。独立设置窗口原先在源贴图初始化返回前就显示可编辑控件，初始化回传可能覆盖刚写入的备注；现在源信息和初始备注准备好后才显示操作控件，组件测试模拟延迟初始化。滚动结果事件则早于原生文档窗口配置结束，native 用例现在等待该转换、记录各项状态后再检查边框与缩放，不放宽像素和几何断言。第二轮 [38021741243](https://github.com/engcapa/taomni/actions/runs/38021741243) 在发现这批问题后取消，最终构建验证另行运行。
+
+第三轮 [38022181681](https://github.com/engcapa/taomni/actions/runs/38022181681)，提交 `a2aaff3a`：三端 browser 均 39/39；Windows native 8/8、Linux X11 native 7/7；macOS 与 Ubuntu 26.04 Wayland native 各 6/7。两端唯一失败是 `TC-SHOT-N16` 的窗口断言，完整拼接像素与取消恢复均通过。虽然 workflow 结论为 success，原报告共有 144/146 通过、2 项失败，不能视为截图全部验收通过。
+
+macOS 实际窗口已有边框并退出全屏，但 `resizable=false`。Tao 0.37.1 的 simple fullscreen 退出与 decorations 更新会排队恢复样式；原来的设置顺序使这些样式仍含旧的不可缩放状态，异步覆盖后续同步 resizable 设置。现在先更新 resizable，使恢复样式也携带正确状态。Wayland 实际窗口仍为 1920×1048，增加退出最大化，并将 native 尺寸检查改为等待 compositor 配置完成；保留严格目标尺寸断言，额外检查初始 80% 窗口尺寸。
+
+透明度补测发现另一个边界：reset 已经确认的 100% 时源贴图不产生状态变化，无条件等待确认会屏蔽之后的源贴图快捷键更新。相同值现在不进入 pending 状态，组件测试和 `TC-SHOT-033` 验证 reset 后源贴图透明度快捷键仍同步到设置窗口。最新 6 个前端文件 63/63 通过、TypeScript 检查及该 browser 用例通过；最终平台结果另行补充。

@@ -179,16 +179,35 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         let resizable = overlay.is_resizable().map_err(|e| e.to_string())?;
         let fullscreen = overlay.is_fullscreen().map_err(|e| e.to_string())?;
         let decorated = overlay.is_decorated().map_err(|e| e.to_string())?;
-        editor_state = json!({"resizable":resizable,"fullscreen":fullscreen,"decorated":decorated});
-        editor_resizable = resizable && !fullscreen && decorated;
+        let maximized = overlay.is_maximized().map_err(|e| e.to_string())?;
+        editor_state = json!({"resizable":resizable,"fullscreen":fullscreen,"decorated":decorated,"maximized":maximized});
+        editor_resizable = resizable && !fullscreen && !maximized && decorated;
         if editor_resizable { break; }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+    let expected_width = (display.width as f64 / display.scale_factor.max(1.0) * 0.8).min(1100.0);
+    let expected_height = (display.height as f64 / display.scale_factor.max(1.0) * 0.8).min(800.0);
+    let mut initial_editor_size = tauri::PhysicalSize::new(0, 0);
+    let mut initial_editor_sized = false;
+    let initial_deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < initial_deadline {
+        initial_editor_size = observed_inner_rect(&overlay).await.map_err(|e| e.to_string())?.1;
+        initial_editor_sized = (initial_editor_size.width as f64 / source.scale - expected_width).abs() < 3.0
+            && (initial_editor_size.height as f64 / source.scale - expected_height).abs() < 3.0;
+        if initial_editor_sized { break; }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     overlay.set_size(tauri::LogicalSize::new(760.0, 620.0)).map_err(|e| e.to_string())?;
-    tokio::time::sleep(Duration::from_millis(250)).await;
-    let editor_size = observed_inner_rect(&overlay).await.map_err(|e| e.to_string())?.1;
-    let editor_resized = (editor_size.width as f64 / source.scale - 760.0).abs() < 3.0
-        && (editor_size.height as f64 / source.scale - 620.0).abs() < 3.0;
+    let mut editor_size = tauri::PhysicalSize::new(0, 0);
+    let mut editor_resized = false;
+    let resize_deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < resize_deadline {
+        editor_size = observed_inner_rect(&overlay).await.map_err(|e| e.to_string())?.1;
+        editor_resized = (editor_size.width as f64 / source.scale - 760.0).abs() < 3.0
+            && (editor_size.height as f64 / source.scale - 620.0).abs() < 3.0;
+        if editor_resized { break; }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     let output = super::super::tool_state()
         .overlay
         .clone()
@@ -266,11 +285,11 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     trace.mark("cancelled", cancelled.clone());
     Ok(report(
         bottom_still_active
-            && editor_resizable && editor_resized
+            && editor_resizable && initial_editor_sized && editor_resized
             && preview["preview"] == true
             && comparison["passed"] == true
             && cancelled == true
             && artifact.is_some(),
-        json!({"editorState":editor_state,"editorResizable":editor_resizable,"editorResized":editor_resized,"editorSize":editor_size,"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
+        json!({"editorState":editor_state,"editorResizable":editor_resizable,"initialEditorSized":initial_editor_sized,"initialEditorSize":initial_editor_size,"editorResized":editor_resized,"editorSize":editor_size,"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
     ))
 }

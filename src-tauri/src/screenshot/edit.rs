@@ -120,13 +120,17 @@ pub(super) fn configure_document_window(window: &WebviewWindow, display: &captur
     let scale = display.scale_factor.max(1.0);
     let width = (display.width as f64 / scale * 0.8).min(1100.0);
     let height = (display.height as f64 / scale * 0.8).min(800.0);
+    // AppKit restores fullscreen/decorations with queued style masks. Set the
+    // shared resizable flag first so those masks cannot restore the old fixed
+    // selection-window style after set_resizable has already completed.
+    window.set_resizable(true).map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     window.set_simple_fullscreen(false).map_err(|e| e.to_string())?;
     window.set_fullscreen(false).map_err(|e| e.to_string())?;
+    window.unmaximize().map_err(|e| e.to_string())?;
     window.set_always_on_top(false).map_err(|e| e.to_string())?;
     window.set_skip_taskbar(false).map_err(|e| e.to_string())?;
     window.set_decorations(true).map_err(|e| e.to_string())?;
-    window.set_resizable(true).map_err(|e| e.to_string())?;
     window.set_min_size(Some(tauri::LogicalSize::new(480.0_f64.min(width), 360.0_f64.min(height)))).map_err(|e| e.to_string())?;
     window.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
     window.set_position(tauri::PhysicalPosition::new(
