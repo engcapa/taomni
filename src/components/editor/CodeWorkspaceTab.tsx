@@ -4956,12 +4956,20 @@ export function CodeWorkspaceTab({
     if (ready) return ready;
     // No active server: do not wait on every completion keystroke.
     if (!isLspFeatureReady(lspFilesRef.current[fileKey])) return null;
-    await Promise.race([
-      waitForLspDocumentSyncQueue(fileKey),
-      new Promise<void>((resolve) => {
-        window.setTimeout(resolve, LSP_FEATURE_SYNC_WAIT_MS);
-      }),
-    ]);
+    if (requireSynchronized) {
+      // A completion for the final trigger character has no later keystroke
+      // to retry it. Keep it pending until didChange settles instead of
+      // dropping it when the best-effort feature wait expires. Callers still
+      // reject changed document/session identities before delivering results.
+      await waitForLspDocumentSyncQueue(fileKey);
+    } else {
+      await Promise.race([
+        waitForLspDocumentSyncQueue(fileKey),
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, LSP_FEATURE_SYNC_WAIT_MS);
+        }),
+      ]);
+    }
     const finalReady = kick();
     if (finalReady) return finalReady;
     // Best effort: if the server is active but still catching up, still return
@@ -17333,6 +17341,7 @@ export function CodeWorkspaceTab({
       if (!live) return null;
       if (!isLspFeatureReady(lspFilesRef.current[live.key])) return null;
       if (openFilesRef.current[live.key]?.text !== live.text) return null;
+      if (!isCompletionTokenCurrent(token)) return null;
       const descriptor = lspDescriptorForFile(live);
       if (!descriptor) return null;
       try {

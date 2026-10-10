@@ -4,7 +4,8 @@ description: Real Java member completion must survive repeated saves. Navigate t
   dialog to source position 10:1 and verify the original println statement before replacing it; ArrowDown
   counts visual lines and skips the default folded import block. Select from column zero so Home does
   not accumulate indentation. Preserve the main closing brace and verify each saved statement on disk,
-  then require real LSP method rows for names. before saving and after all three save cycles.
+  then require real LSP method rows for names. before saving and after all three save cycles. Completion
+  must wait for the live document sync to finish instead of losing the final dot when didChange is slow.
 covers:
 - F25.5
 tags:
