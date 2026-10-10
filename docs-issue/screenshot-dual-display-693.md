@@ -48,7 +48,7 @@ Wayland 的「当前窗口」预选与显示器选择是不同路径：标准 Wa
 
 本机 Win11 解锁后执行 `TC-SHOT-N10/N11/N12/N16/N17/N20/N21/N22`，8/8 通过；报告为 `D:/qa-n693/runs/run-20261010-200128-961794200/summary.json`。对应 `status --gate` 接受原始报告，未满足检查和拒绝报告均为 0。QA 应用标识 `com.taomni.app.qa`；构建、执行源码身份均为 `b349911d872c2e9f75d51c56dfe4bbf9b1abb11d7ccaaa3bd7b67c7ae44d8824`，运行器身份为 `b7904df9c2bcdca2284b6477185da4da39531c7323f0c01d5f682497ea41b705`。本机只有单屏，此结果不计为双屏硬件验收。此前锁屏和长路径清理失败的记录保留，不用于通过结论。
 
-本机 QA 二进制：`D:/code/person/taomni-fix-screenshop-autoscroll-20261010/src-tauri/target/qa-ui-auto/debug/taomni.exe`，SHA-256 为 `82f70142c4bf962a1bcd9e28731ca84ecb1132f9a1c127e9a2c64588e03afe81`。目录通过共享 target 的 junction 解析到 `D:/code/person/taomni/src-tauri/target/qa-ui-auto/debug/taomni.exe`，本轮隔离记录的哈希一致。测试仅运行 QA 进程和独立存储，安装版应用未停止。用例目录 `audit --gate`、development case contract、Wayland 工具 17 项单元测试及本机构建均通过。
+本机 QA 二进制：`D:/code/person/taomni-fix-screenshop-autoscroll-20261010/src-tauri/target/qa-ui-auto/debug/taomni.exe`，SHA-256 为 `82f70142c4bf962a1bcd9e28731ca84ecb1132f9a1c127e9a2c64588e03afe81`。本轮隔离记录中的可执行路径为 `D:/code/person/taomni/src-tauri/target/qa-ui-auto/debug/taomni.exe`；实测两处文件哈希及隔离记录均一致。测试仅运行 QA 进程和独立存储，安装版应用未停止。用例目录 `audit --gate`、development case contract、Wayland 工具 17 项单元测试及本机构建均通过。
 
 ## 物理双屏验收边界
 
