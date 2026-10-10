@@ -146,6 +146,11 @@ class Desktop:
             "--object-path", "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.NameHasOwner",
             "org.gnome.Mutter.RemoteDesktop"], text=True, timeout=5).strip() == "(true,)",
             "Mutter RemoteDesktop service")
+        if "dual-display" in self.capabilities:
+            # Build the virtual seat only after its actual logical topology.
+            # A seat created against the startup layout retains stale pointer
+            # bounds when the headless output scales are subsequently changed.
+            self._configure_displays()
         os.environ["QA_WAYLAND_INPUT_SOCKET"] = str(runtime / "input.sock")
         input_owner = self.start(["/usr/bin/python3", str(Path(__file__).with_name("ci_wayland_input.py")),
                                   "--ready", str(self.root / "virtual-input-ready.json"),
@@ -157,8 +162,6 @@ class Desktop:
             return protocols if wayland_has_input(protocols) else False
 
         protocols = self._wait(input_owner, input_ready, "Wayland keyboard and pointer")
-        if "dual-display" in self.capabilities:
-            self._configure_displays()
         (self.root / "wayland-info.txt").write_text(protocols, encoding="utf-8")
         for interface in ("wl_compositor", "xdg_wm_base", "wl_output"):
             if interface not in protocols:

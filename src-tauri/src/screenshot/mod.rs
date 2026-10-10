@@ -520,12 +520,17 @@ fn open_scroll_bar(
     #[cfg(target_os = "linux")]
     surface_backend::webview(&window)?;
     if let Some(rect) = position {
-        window
-            .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
-            .map_err(|e| e.to_string())?;
-        window
-            .set_position(PhysicalPosition::new(rect.x, rect.y))
-            .map_err(|e| e.to_string())?;
+        #[cfg(target_os = "linux")]
+        surface_backend::place_webview(&window, rect)?;
+        #[cfg(not(target_os = "linux"))]
+        {
+            window
+                .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
+                .map_err(|e| e.to_string())?;
+            window
+                .set_position(PhysicalPosition::new(rect.x, rect.y))
+                .map_err(|e| e.to_string())?;
+        }
         window.show().map_err(|e| e.to_string())?;
     }
     let _ = display;
@@ -891,6 +896,12 @@ async fn open_overlay_inner(
     display_id: Option<String>,
     current_window: Option<WebviewWindow>,
 ) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if current_window.is_some() && pins::native_wayland() {
+        // GDK returns a synthetic origin on Wayland. It must never be used
+        // as a crop of the first output (or rejected only on another output).
+        return Err("Wayland does not expose the current window's screen coordinates. Use Screen region and select the window on the desired display.".into());
+    }
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     capture::request_capture_permission(app)
         .await
@@ -1628,12 +1639,23 @@ async fn open_recorder_bar(
     // Leave room above for the grown preview (240 logical px).
     let y = display.y + display.height as i32 - ph - (240.0 * s) as i32;
     let (x, y) = position.map(|r| (r.x, r.y)).unwrap_or((x, y));
-    window
-        .set_position(PhysicalPosition::new(x, y))
-        .map_err(|e| format!("position recording controls: {e}"))?;
-    window
-        .set_size(PhysicalSize::new(pw as u32, ph as u32))
-        .map_err(|e| format!("size recording controls: {e}"))?;
+    #[cfg(target_os = "linux")]
+    if position.is_some() {
+        surface_backend::place_webview(&window, surfaces::Rect { x, y, w: pw, h: ph })?;
+    } else {
+        window
+            .set_size(PhysicalSize::new(pw as u32, ph as u32))
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        window
+            .set_position(PhysicalPosition::new(x, y))
+            .map_err(|e| format!("position recording controls: {e}"))?;
+        window
+            .set_size(PhysicalSize::new(pw as u32, ph as u32))
+            .map_err(|e| format!("size recording controls: {e}"))?;
+    }
     // Finish loading and mapping the controls before the first recording
     // snapshot. Creating a hidden WebView does not finish its navigation;
     // showing it after capture starts can stall WindowServer and lose motion.

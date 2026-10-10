@@ -93,17 +93,38 @@ pub(super) fn rect(
 pub(super) async fn inner_rect(
     window: &WebviewWindow,
 ) -> anyhow::Result<(PhysicalPosition<i32>, PhysicalSize<u32>)> {
+    let native = self::window(window).await?;
     rect(
-        &self::window(window).await?["client"],
-        window.scale_factor()?.max(0.5),
+        &native["client"],
+        output_scale(window.app_handle(), &native["client"])?,
     )
+}
+
+/// XWayland's buffer scale is global, while portal pixels are output-specific.
+/// Resolve the actual compositor rectangle before comparing desktop pixels.
+pub(super) fn output_scale(app: &tauri::AppHandle, value: &Value) -> anyhow::Result<f64> {
+    let cx = value["x"].as_f64().context("native x")?
+        + value["width"].as_f64().context("native width")? / 2.0;
+    let cy = value["y"].as_f64().context("native y")?
+        + value["height"].as_f64().context("native height")? / 2.0;
+    super::super::capture::list_displays(app)?
+        .into_iter()
+        .find(|display| {
+            let (x, y, w, h) = display.logical_rect();
+            cx >= x as f64 && cy >= y as f64 && cx < (x + w) as f64 && cy < (y + h) as f64
+        })
+        .map(|display| display.scale_factor)
+        .context("native rectangle is outside actual outputs")
 }
 
 pub(super) async fn control_geometry(
     window: &WebviewWindow,
 ) -> anyhow::Result<(super::super::surfaces::Rect, bool, Value)> {
     let native = self::window(window).await?;
-    let (origin, size) = rect(&native["client"], window.scale_factor()?.max(0.5))?;
+    let (origin, size) = rect(
+        &native["client"],
+        output_scale(window.app_handle(), &native["client"])?,
+    )?;
     let selector = if window.label() == super::super::surfaces::SCROLL_LABEL {
         "screenshot-scroll-controller"
     } else {

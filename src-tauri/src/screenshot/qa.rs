@@ -302,7 +302,7 @@ async fn open_fixture(
     }
     #[cfg(target_os = "linux")]
     if wayland::active() {
-        let (x, y, _, _) = display.logical_rect();
+        let (x, y, width, height) = display.logical_rect();
         wayland::command(
             json!({"command":"place", "application":std::env::current_exe()?,
             "title":window.title()?, "rect":{"x":x+120,"y":y+120,"width":520,"height":440}}),
@@ -311,8 +311,12 @@ async fn open_fixture(
         let until = Instant::now() + Duration::from_secs(5);
         loop {
             let observed = wayland::window(&window).await?;
-            if observed["frame"]["x"] == x + 120
-                && observed["frame"]["y"] == y + 120
+            let frame = &observed["frame"];
+            let left = frame["x"].as_f64().context("fixture left")?;
+            let top = frame["y"].as_f64().context("fixture top")?;
+            if left >= x as f64 && top >= y as f64
+                && left + frame["width"].as_f64().context("fixture width")? <= (x + width) as f64
+                && top + frame["height"].as_f64().context("fixture height")? <= (y + height) as f64
                 && (window.scale_factor()? - s).abs() < 0.01
             {
                 break;
@@ -387,10 +391,8 @@ async fn observed_outer_rect(
 ) -> anyhow::Result<(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)> {
     #[cfg(target_os = "linux")]
     if wayland::active() {
-        return wayland::rect(
-            &wayland::window(window).await?["frame"],
-            window.scale_factor()?.max(0.5),
-        );
+        let native = wayland::window(window).await?;
+        return wayland::rect(&native["frame"], wayland::output_scale(window.app_handle(), &native["frame"])?);
     }
     Ok((window.outer_position()?, window.outer_size()?))
 }
@@ -1567,7 +1569,7 @@ async fn capture_surfaces(
             let native = wayland::command(json!({"command":"geometry",
                 "application":std::env::current_exe()?, "title":window.title()?}))
             .await?;
-            let (pos, size) = wayland::rect(&native["client"], window.scale_factor()?.max(0.5))?;
+            let (pos, size) = wayland::rect(&native["client"], wayland::output_scale(app, &native["client"])? )?;
             rect = super::surfaces::Rect {
                 x: pos.x,
                 y: pos.y,
@@ -1832,16 +1834,33 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         .get_webview_window("main")
         .ok_or("main window unavailable")?;
     run_js(&main, "document.querySelector('[data-testid=\"system-screenshot-delay-toggle\"]').click(); await new Promise(r => setTimeout(r,100)); document.querySelector('[data-testid=\"system-screenshot-current-window\"]').click(); return true;", Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
-    let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
-        .await
-        .map_err(|e| e.to_string())?;
-    let selected = run_js(&overlay, "for (let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase !== 'annotate';i++) await new Promise(r=>setTimeout(r,100)); return !!document.querySelector('[data-testid=\"screenshot-selection\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    let current_window_unsupported = wayland::active();
+    #[cfg(not(target_os = "linux"))]
+    let current_window_unsupported = false;
+    let (selected, current_region, window_artifact) = if current_window_unsupported {
+        let rejected = run_js(&main, r#"
+            const q=id=>document.querySelector('[data-testid="'+id+'"]');
+            for(let i=0;i<100&&!q('alert-dialog-message');i++) await new Promise(r=>setTimeout(r,50));
+            const message=q('alert-dialog-message')?.textContent || '';
+            if(!message.includes('Wayland does not expose') || !message.includes('Screen region'))
+                throw new Error('current-window failure did not explain the supported alternative: '+message);
+            q('alert-dialog-ok').click(); return true;
+        "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+        (rejected == true && app.get_webview_window(super::OVERLAY_LABEL).is_none(), None, None)
+    } else {
+        let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
+            .await
+            .map_err(|e| e.to_string())?;
+        let selected = run_js(&overlay, "for (let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase !== 'annotate';i++) await new Promise(r=>setTimeout(r,100)); return !!document.querySelector('[data-testid=\"screenshot-selection\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+        let current_region = super::screenshot_overlay_init().await?.window_region;
+        let window_artifact = keep_artifact(
+            std::path::Path::new(&super::screenshot_overlay_init().await?.path),
+            "current-window.png",
+        );
+        (selected == true, current_region, window_artifact)
+    };
     let current_visible = main_visible(&app);
-    let current_region = super::screenshot_overlay_init().await?.window_region;
-    let window_artifact = keep_artifact(
-        std::path::Path::new(&super::screenshot_overlay_init().await?.path),
-        "current-window.png",
-    );
     super::close_session(&app);
     wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(5)).await;
     super::open_overlay(&app, None).await?;
@@ -2037,8 +2056,8 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     });
     Ok(report(
         current_visible
-            && selected == json!(true)
-            && current_region.is_some()
+            && selected
+            && (current_window_unsupported || current_region.is_some())
             && default_hidden
             && completed == json!(true)
             && marked_clipboard
@@ -2050,7 +2069,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             && cancelled == json!(true)
             && cleanup
             && artifact.is_some(),
-        json!({"currentWindowVisible":current_visible,"currentWindowSelected":selected,"currentRegion":current_region,
+        json!({"currentWindowVisible":current_visible,"currentWindowSelected":selected,"currentWindowUnsupported":current_window_unsupported,"currentRegion":current_region,
             "defaultHidesWindows":default_hidden,"scrollCompleted":completed,"scrollProgress":progress,"geometry":geometry,"comparison":comparison,
             "markedClipboard":marked_clipboard,"redLinePixels":red,"greenLinePixels":green,"annotatedArtifact":annotated_artifact,
             "scrollCancelledPreservesAnnotations":cancelled,"controlsCleaned":cleanup,"artifact":artifact,
@@ -2362,8 +2381,9 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
     if wayland::active() {
         let current = wayland::window(window).await?;
         let mut rect = current["frame"].clone();
-        rect["x"] = json!(display.x as f64 / scale + 36.0);
-        rect["y"] = json!(display.y as f64 / scale + 48.0);
+        let (x, y, _, _) = display.logical_rect();
+        rect["x"] = json!(x + 36);
+        rect["y"] = json!(y + 48);
         wayland::command(
             json!({"command":"place","application":std::env::current_exe()?,
             "title":window.title()?,"rect":rect}),
@@ -2382,6 +2402,10 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
     ))?;
     window.set_focus()?;
     tokio::time::sleep(Duration::from_millis(700)).await;
+    #[cfg(target_os = "linux")]
+    let scale = if wayland::active() {
+        wayland::output_scale(window.app_handle(), &wayland::window(window).await?["client"])?
+    } else { scale };
     let before = observed_outer_rect(window).await?.0;
     let (inner, size) = observed_inner_rect(window).await?;
     let start = (

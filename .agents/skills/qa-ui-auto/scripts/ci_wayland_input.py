@@ -192,12 +192,26 @@ def main() -> None:
             selector = f"w.get_pid() === {pid}" + (f" && w.get_title() === {json.dumps(title)}"
                 if title is not None else " && w.get_window_type() === imports.gi.Meta.WindowType.NORMAL")
             evaluate(f"(() => {{ const w = global.get_window_actors().map(a => a.meta_window)"
-                     f".find(w => {selector}); w.unmaximize(3); "
+                     f".find(w => {selector}); const x={int(rect['x'])}, y={int(rect['y'])}; "
+                     f"const cx=x+{int(rect['width'])}/2, cy=y+{int(rect['height'])}/2; "
+                     "const m=Main.layoutManager.monitors.find(m=>cx>=m.x && cx<m.x+m.width && cy>=m.y && cy<m.y+m.height); "
+                     "if(!m) throw new Error('fixture target is outside actual monitors'); "
+                     "w.unmaximize(3); w.move_to_monitor(m.index); "
                      f"w.move_resize_frame(true, {int(rect['x'])}, {int(rect['y'])}, "
                      f"{int(rect['width'])}, {int(rect['height'])}); return true; }})()")
             return True
         raise ValueError("unknown window command")
 
+    if args.absolute_pointer:
+        end = time.monotonic() + 10
+        while True:
+            layout = evaluate("({width:global.stage.width,height:global.stage.height,monitors:Main.layoutManager.monitors.map(m=>({x:m.x,y:m.y,width:m.width,height:m.height}))})")
+            observed = sorted((m["x"], m["y"], m["width"], m["height"]) for m in layout["monitors"])
+            if observed == [(0, 0, 1920, 1080), (1920, 0, 1280, 720)] and (layout["width"], layout["height"]) == (3200, 1080):
+                break
+            if time.monotonic() >= end:
+                raise RuntimeError(f"logical layout did not settle before input creation: {layout}")
+            time.sleep(0.05)
     session = call("/org/gnome/Mutter/RemoteDesktop", destination, "CreateSession").unpack()[0]
     loop = GLib.MainLoop()
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -326,12 +340,21 @@ def main() -> None:
         # WebDriver clicks don't move this OS pointer, so several read-only
         # RDP connects can reopen Overview before the first measured input.
         # Park it in the desktop interior before any app/target is launched.
+        layout = evaluate("({width:global.stage.width,height:global.stage.height,monitors:Main.layoutManager.monitors.map(m=>({x:m.x,y:m.y,width:m.width,height:m.height,index:m.index}))})")
+        pointer_probes = []
+        if args.absolute_pointer:
+            if len(layout["monitors"]) != 2:
+                raise RuntimeError(f"mixed-DPI pointer needs two actual monitors: {layout}")
+            for monitor in layout["monitors"]:
+                target = [monitor["x"] + 16, monitor["y"] + 16]
+                pointer_probes.append({"target": target, "observed": pointer(*target)})
         initial_pointer = pointer(*evaluate(
             "[Math.round(global.stage.width / 2), Math.round(global.stage.height / 2)]"))
         args.ready.write_text(json.dumps({"session": session, "devices": ["keyboard", "pointer"],
                                          "transport": "Mutter RemoteDesktop",
                                          "pointer_transport": "Clutter virtual absolute motion" if args.absolute_pointer
                                              else "Mutter RemoteDesktop relative motion",
+                                         "layout": layout, "pointer_probes": pointer_probes,
                                          "initial_pointer": initial_pointer}), encoding="utf-8")
         # The session is tied to this DBus connection, so a one-shot gdbus
         # command would remove the devices immediately after provisioning.

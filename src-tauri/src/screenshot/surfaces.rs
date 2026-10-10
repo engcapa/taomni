@@ -259,12 +259,34 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
                 .map_err(|e| format!("open capture range: {e}"))?;
             #[cfg(target_os = "linux")]
             super::surface_backend::border(&window)?;
-            window
-                .set_position(PhysicalPosition::new(rect.x, rect.y))
-                .map_err(|e| e.to_string())?;
-            window
-                .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
-                .map_err(|e| e.to_string())?;
+            #[cfg(target_os = "linux")]
+            if super::pins::native_wayland() {
+                window
+                    .set_position(tauri::LogicalPosition::new(
+                        rect.x as f64 / scale,
+                        rect.y as f64 / scale,
+                    ))
+                    .map_err(|e| e.to_string())?;
+                window
+                    .set_size(tauri::LogicalSize::new(width, height))
+                    .map_err(|e| e.to_string())?;
+            } else {
+                window
+                    .set_position(PhysicalPosition::new(rect.x, rect.y))
+                    .map_err(|e| e.to_string())?;
+                window
+                    .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
+                    .map_err(|e| e.to_string())?;
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                window
+                    .set_position(PhysicalPosition::new(rect.x, rect.y))
+                    .map_err(|e| e.to_string())?;
+                window
+                    .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
+                    .map_err(|e| e.to_string())?;
+            }
             #[cfg(target_os = "linux")]
             request_gtk_border_size(&window, width, height)?;
             // GTK creates its GDK surface on show. Applying an input shape
