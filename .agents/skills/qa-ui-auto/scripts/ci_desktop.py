@@ -60,7 +60,7 @@ class Desktop:
             time.sleep(0.5)
         raise RuntimeError(f"{description} did not become ready; see desktop logs")
 
-    def _vnc(self, facts):
+    def _vnc(self, facts, *, mirror=False):
         from ci_services import free_port, rfb_probe
         import secrets
 
@@ -70,18 +70,24 @@ class Desktop:
         encoded = subprocess.check_output(["tigervncpasswd", "-f"], input=(password + "\n").encode())
         passwd.write_bytes(encoded)
         passwd.chmod(0o600)
-        # Never replace an existing X server or remove another session's lock.
-        number = next((n for n in range(100, 200)
-                       if not Path(f"/tmp/.X{n}-lock").exists() and not Path(f"/tmp/.X11-unix/X{n}").exists()), None)
-        if number is None:
-            raise RuntimeError("no unused display for the VNC desktop")
-        os.environ["DISPLAY"] = f":{number}"
+        if not mirror:
+            # Never replace an existing X server or remove another session's lock.
+            number = next((n for n in range(100, 200)
+                           if not Path(f"/tmp/.X{n}-lock").exists() and not Path(f"/tmp/.X11-unix/X{n}").exists()), None)
+            if number is None:
+                raise RuntimeError("no unused display for the VNC desktop")
+            os.environ["DISPLAY"] = f":{number}"
         port = free_port()
-        server = self.start(["Xtigervnc", os.environ["DISPLAY"], "-geometry", "1920x1080", "-depth", "24",
-                             "-localhost", "-rfbport", str(port), "-SecurityTypes", "VncAuth",
-                             "-PasswordFile", str(passwd), "-nolisten", "tcp", "-ac"])
+        command = (["x0tigervncserver", "-display", os.environ["DISPLAY"]] if mirror else
+                   ["Xtigervnc", os.environ["DISPLAY"], "-geometry", "1920x1080", "-depth", "24",
+                    "-nolisten", "tcp", "-ac"])
+        server = self.start([*command, "-localhost", "-rfbport", str(port), "-SecurityTypes", "VncAuth",
+                             "-PasswordFile", str(passwd)])
         width, height, name = self._wait(server, lambda: rfb_probe(port, password), "VNC desktop")
-        facts["vnc"] = {"server": "Xtigervnc", "host": "127.0.0.1", "port": port,
+        if mirror and (width, height) != (3840, 1080):
+            raise RuntimeError(f"VNC desktop did not serve both Xorg outputs: {width}x{height}")
+        facts["vnc"] = {"server": command[0], "display": os.environ["DISPLAY"],
+                        "host": "127.0.0.1", "port": port,
                         "authentication": "VncAuth", "size": [width, height], "name": name,
                         "purpose": "app host desktop; independent of vnc_required"}
 
@@ -337,13 +343,19 @@ EndSection
             return
         os.environ.pop("WAYLAND_DISPLAY", None)
         os.environ.update(GDK_BACKEND="x11", XDG_SESSION_TYPE="x11")
-        if profile.display_server == "Xtigervnc":
+        dual = "dual-display" in self.capabilities
+        if profile.display_server == "Xtigervnc" and not dual:
             self._vnc(facts)
-        if not os.environ.get("DISPLAY"):
-            raise RuntimeError("native desktop requires DISPLAY; launch the complete session wrapper")
-        if "dual-display" in self.capabilities:
+        if dual:
             self._xorg_dual()
             self._configure_displays()
+            facts["display_server"] = "Xorg dummy"
+            if profile.display_server == "Xtigervnc":
+                # Serve the same dual-output Xorg desktop the app uses. A
+                # separate Xtigervnc would only host an unused single output.
+                self._vnc(facts, mirror=True)
+        if not os.environ.get("DISPLAY"):
+            raise RuntimeError("native desktop requires DISPLAY; launch the complete session wrapper")
         display = subprocess.check_output(["xdpyinfo"], text=True)
         if "XTEST" not in display:
             raise RuntimeError("X11 display lacks XTEST")
