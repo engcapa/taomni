@@ -187,6 +187,11 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     let zoomed = pin.inner_size().map_err(|e| e.to_string())?;
     // Verify the compositor really reveals the desktop, rather than merely
     // accepting a CSS opacity value inside an opaque native window.
+    // Drag leaves the OS pointer in the pin centre, where its help tooltip
+    // would cover the pixel oracle. Move it outside before both snapshots.
+    park_pointer(input_point((display.x + display.width as i32 - 32,
+        display.y + display.height as i32 - 64), display.scale_factor))
+        .await.map_err(|e| e.to_string())?;
     pin.hide().map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(350)).await;
     let background = read_desktop(&app, &display).await.map_err(|e| e.to_string())?;

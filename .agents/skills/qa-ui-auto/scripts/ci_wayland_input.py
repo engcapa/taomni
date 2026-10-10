@@ -370,7 +370,7 @@ def main() -> None:
         loop.run()
     finally:
         if args.absolute_pointer:
-            evaluate("(() => { global.__taomniQaPointer = null; return true; })()")
+            evaluate("(() => { global.__taomniQaSeat = null; return true; })()")
         listener.close()
         args.socket.unlink(missing_ok=True)
         args.ready.unlink(missing_ok=True)
