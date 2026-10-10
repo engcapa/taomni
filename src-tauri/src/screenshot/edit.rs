@@ -151,34 +151,47 @@ pub(super) async fn settle_document_window(window: &WebviewWindow, display: &cap
         let width = (display.width as f64 / scale * 0.8).min(1100.0).round() as i32;
         let height = (display.height as f64 / scale * 0.8).min(800.0).round() as i32;
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut requested = false;
+        let mut last_state = String::new();
         loop {
             let target = window.clone();
             let (tx, rx) = tokio::sync::oneshot::channel();
             window.run_on_main_thread(move || {
                 use gtk::prelude::*;
                 let result = target.gtk_window().map_err(|e| e.to_string()).map(|gtk| {
-                    let Some(surface) = gtk.window() else { return false; };
-                    if !gtk.is_mapped() || surface.state().contains(gtk::gdk::WindowState::FULLSCREEN) {
-                        return false;
-                    }
-                    gtk.set_resizable(true);
-                    gtk.set_default_size(width, height);
-                    if surface.state().contains(gtk::gdk::WindowState::MAXIMIZED) {
-                        gtk.unmaximize();
-                    }
+                    let Some(surface) = gtk.window() else { return (requested, false, "unrealized".to_string()); };
+                    let state = surface.state();
                     let size = gtk.size();
+                    let facts = format!("mapped={}, resizable={}, state={state:?}, size={size:?}, default={:?}", gtk.is_mapped(), gtk.is_resizable(), gtk.default_size());
+                    if !gtk.is_mapped() || state.contains(gtk::gdk::WindowState::FULLSCREEN) {
+                        return (requested, false, facts);
+                    }
+                    if state.contains(gtk::gdk::WindowState::MAXIMIZED) {
+                        gtk.unmaximize();
+                        return (requested, false, facts);
+                    }
+                    // Submit once after the native state transition. Repeated
+                    // default-size/resize requests can invalidate GTK's pending
+                    // configure allocation before Mutter acknowledges it.
+                    if !requested {
+                        gtk.set_resizable(true);
+                        gtk.set_default_size(width, height);
+                        gtk.resize(width, height);
+                        return (true, false, facts);
+                    }
                     let sized = (size.0 - width).abs() <= 2 && (size.1 - height).abs() <= 2;
-                    if !sized { gtk.resize(width, height); }
-                    !surface.state().contains(gtk::gdk::WindowState::MAXIMIZED) && sized
+                    (requested, gtk.is_resizable() && sized, facts)
                 });
                 let _ = tx.send(result);
             }).map_err(|e| e.to_string())?;
-            let ready = tokio::time::timeout_at(deadline, rx).await
-                .map_err(|_| "screenshot editor window transition timed out".to_string())?
+            let (sent, ready, facts) = tokio::time::timeout_at(deadline, rx).await
+                .map_err(|_| format!("screenshot editor window transition timed out: {last_state}"))?
                 .map_err(|e| e.to_string())??;
+            requested = sent;
+            last_state = facts;
             if ready { return Ok(()); }
             if tokio::time::Instant::now() >= deadline {
-                return Err("screenshot editor did not restore its normal window size".into());
+                return Err(format!("screenshot editor did not restore its normal window size: {last_state}"));
             }
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }

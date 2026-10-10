@@ -182,6 +182,7 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     let preview = run_js(&overlay, r#"
       for (let i=0;i<100 && !document.querySelector('[data-testid="screenshot-scroll-result"]');i++) await new Promise(r=>setTimeout(r,100));
       const img=document.querySelector('[data-testid="screenshot-scroll-result-image"]');
+      if (!img) throw new Error('manual scroll result missing: '+JSON.stringify({phase:document.querySelector('[data-testid="screenshot-overlay"]')?.dataset.phase,error:document.querySelector('[data-testid="screenshot-scroll-error"]')?.textContent}));
       return {preview:!!img,width:img?.naturalWidth,height:img?.naturalHeight};
     "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
     // The result event can reach the renderer before the capture command has
