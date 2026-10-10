@@ -48,4 +48,6 @@ verification:
   native:
   - check: Recorder lifecycle
     method: automated
-    reason: Actual native recorder window, raw-file blob transport, encoding and clipboard.
+    reason: Actual native recorder window, raw-file blob transport, encoding and clipboard. Wayland Done must restore the
+      minimized main window even when WebKit input has not updated the GTK X11 connection's user time; the compositor must
+      receive a current startup-notification timestamp.

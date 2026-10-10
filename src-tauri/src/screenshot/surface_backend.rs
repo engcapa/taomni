@@ -3,8 +3,14 @@
 //! for these auxiliary GTK windows; the main window and capture portal stay
 //! on Wayland. Never change GDK's process-wide default display.
 
+use gtk::glib::translate::ToGlibPtr;
 use gtk::prelude::*;
 use std::cell::RefCell;
+
+#[link(name = "gdk-3")]
+unsafe extern "C" {
+    fn gdk_x11_get_server_time(window: *mut gtk::gdk::ffi::GdkWindow) -> u32;
+}
 
 thread_local! {
     static FLOATING_DISPLAY: RefCell<Option<gtk::gdk::Display>> = const { RefCell::new(None) };
@@ -15,20 +21,21 @@ thread_local! {
 /// the compositor can resolve its startup notification using the X11 timestamp.
 /// Call on the GTK thread while the focused capture window is still mapped.
 pub(super) fn activation_id() -> Option<String> {
-    let active_displays: Vec<_> = gtk::Window::list_toplevels()
+    let active_windows: Vec<_> = gtk::Window::list_toplevels()
         .into_iter()
         .filter_map(|widget| widget.downcast::<gtk::Window>().ok())
         .filter(|window| window.is_active())
-        .map(|window| window.display())
         .collect();
-    let display = FLOATING_DISPLAY
+    let source = FLOATING_DISPLAY
         .with(|slot| {
-            slot.borrow()
-                .as_ref()
-                .filter(|display| active_displays.contains(display))
+            let display = slot.borrow();
+            active_windows
+                .iter()
+                .find(|window| display.as_ref().is_some_and(|d| window.display() == *d))
                 .cloned()
         })
-        .or_else(|| active_displays.into_iter().next())?;
+        .or_else(|| active_windows.into_iter().next())?;
+    let display = source.display();
     let executable = std::env::current_exe().ok()?;
     let command = gtk::glib::shell_quote(executable);
     let info = gtk::gio::AppInfo::create_from_commandline(
@@ -37,7 +44,24 @@ pub(super) fn activation_id() -> Option<String> {
         gtk::gio::AppInfoCreateFlags::SUPPORTS_STARTUP_NOTIFICATION,
     )
     .ok()?;
-    let id = display.app_launch_context()?.startup_notify_id(&info, &[])?;
+    let context = display.app_launch_context()?;
+    if display.type_().name() == "GdkX11Display" {
+        let surface = source.window()?;
+        // WebKit's input connection need not update this GDK connection's
+        // user_time (observed as zero). Read the X server's time for this
+        // operation on the currently focused, owned control instead.
+        let events = surface.events();
+        surface.set_events(events | gtk::gdk::EventMask::PROPERTY_CHANGE_MASK);
+        // SAFETY: the live surface belongs to GdkX11Display, and PropertyNotify
+        // is selected as required by gdk_x11_get_server_time's blocking query.
+        let timestamp = unsafe { gdk_x11_get_server_time(surface.to_glib_none().0) };
+        surface.set_events(events);
+        if timestamp == 0 {
+            return None;
+        }
+        context.set_timestamp(timestamp);
+    }
+    let id = context.startup_notify_id(&info, &[])?;
     // Startup notification and xdg activation travel on different display
     // connections. Publish the X11 sequence before activating Wayland.
     display.sync();
