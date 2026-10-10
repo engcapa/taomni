@@ -175,10 +175,10 @@ AT-SPI is explicitly enabled on the private session bus. A missing consent
 action fails this preflight instead of blocking the remaining WebViews behind
 a Shell modal dialog. No portal permission database is seeded.
 On a cold native build, application desktop-entry validation records
-`deferred-until-build`: GLib requires the entry's Exec binary to exist.
-After compilation, execution requires a real `GDesktopAppInfo` matching the
-isolated QA identifier before any cases start. A malformed entry for an
-already existing binary is a failure even during preflight.
+`awaiting-build`: GLib requires the entry's Exec binary to exist. The entry is
+registered after compilation, then execution requires a real `GDesktopAppInfo`
+matching the isolated QA identifier, executable, desktop file and window class
+before any cases start. GLib parses quoted executable paths, including spaces.
 The Tk RDP workload uses Mutter's own XWayland display inside the GNOME
 compositor; this does not change the product's verified GTK backend.
 Headless Mutter initially exposes a `wl_seat` without input devices. A

@@ -1303,7 +1303,11 @@ async fn drive_ironrdp_connection(
                             }
                         }
                     } else {
-                        tracing::debug!("ignoring fast-path frame while RDP session reactivates");
+                        // In-flight pointer/graphics updates still advance the
+                        // history shared with compressed activation PDUs.
+                        active_stage
+                            .consume_reactivation_fast_path(&payload)
+                            .map_err(|e| format!("rdp reactivation fast-path: {}", e.report()))?;
                     }
                     continue;
                 }

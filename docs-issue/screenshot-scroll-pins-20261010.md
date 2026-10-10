@@ -44,3 +44,5 @@ macOS 实际窗口已有边框并退出全屏，但 `resizable=false`。Tao 0.37
 第四轮 [38023726485](https://github.com/engcapa/taomni/actions/runs/38023726485)，提交 `9da065d0`：三端 browser 均 39/39，Windows native 8/8、macOS native 7/7、Linux X11 native 7/7；Wayland native 6/7。macOS 样式顺序修复已通过真实窗口验证。Win11 对相同源码补测 N16、N17 为 2/2，原生窗口初始 1100×800，可改为 760×620，Done 三条路径、像素与系统剪贴板均通过；QA 构建身份与源码一致。
 
 Wayland 新增状态记录明确显示 `maximized=true`、1920×1048。Tao 的 fullscreen 标记在请求发出时就清除，并不代表 Mutter 已完成转换；隐藏的 GTK 窗口还保留整屏默认尺寸，显示时可能再次最大化。现在窗口显示后在 GTK 主线程读取实际 GDK surface 状态，等待退出全屏，再清除最大化并恢复默认/当前文档尺寸。等待有五秒上限，错误保持明确，严格窗口尺寸和完整拼接像素断言继续保留。
+
+按用户要求拉取并合并 `origin/main`（`4318a510`）。冲突仅涉及 Wayland CI 预检和执行脚本。采用 main 的构建后注册实现，移除本分支旧的重复校验函数，使用真实 Gio/GLib 检查桌面文件、可执行文件、窗口类及含空格的 Exec 路径；冷构建前记录 `awaiting-build`，对应 Linux 合同测试保留。截图产品代码和本分支新增用例均保留。

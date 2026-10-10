@@ -120,6 +120,12 @@ impl ActiveStage {
             .normalize_io_channel_frame(frame, self.fast_path_processor.bulk_decompressor_mut())
     }
 
+    /// Preserve bulk history for in-flight Fast-Path updates while the desktop
+    /// is deactivated. Discard surface updates instead of painting an old size.
+    pub fn consume_reactivation_fast_path(&mut self, frame: &[u8]) -> SessionResult<()> {
+        self.fast_path_processor.consume_reactivation_frame(frame)
+    }
+
     pub fn update_mouse_pos(&mut self, x: u16, y: u16) {
         self.fast_path_processor.update_mouse_pos(x, y);
     }

@@ -12,6 +12,12 @@ Encoder-adaptive patch (`docs-feature/rdp-server-parity/encoder-adaptive-design.
 - For raw planar candidates, derive the exact length and those same sample bytes
   directly from the cropped pixels; materialize all planes only if planar wins.
   Byte-layout tests cover eight pixel formats, parent strides and split bitmaps.
+- Copy each sample strip by header and scanline spans instead of resolving
+  chunk/plane/row with integer divisions for every byte. The sampled bytes,
+  MPPC estimates and codec decisions stay identical, including partial rows
+  and chunk boundaries. The offline profile includes 64x64/128x64 damage,
+  warms the encoder, alternates matched baseline/adaptive frames and checks
+  identical RemoteFX payloads before reporting timings.
 - Use raw lossless planar for noisy pixels, vectorizable channel loops with
   fixed pixel layouts, and a lightweight disposable MPPC estimator. Repeated colours and
   coherent vertical deltas retain planar RLE. Selected RemoteFX is sent without

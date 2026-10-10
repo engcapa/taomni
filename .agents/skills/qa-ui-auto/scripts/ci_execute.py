@@ -149,9 +149,6 @@ def main():
                 from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE
                 desktop = stack.enter_context(Desktop(args.report / "desktop", entry["capabilities"],
                                                        entry.get("linux_profile") or DEFAULT_LINUX_PROFILE))
-                if entry.get("desktop"):
-                    config["desktop"] = desktop.facts
-                    cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
                 outcome["stage"] = "build"
                 write_json(args.report / "ci-outcome.json", outcome)
                 build_log = stack.enter_context((args.report / "build.log").open("w", encoding="utf-8"))
@@ -163,8 +160,11 @@ def main():
                 from native_build import identity_path, qa_binary
                 binary = qa_binary(release=release)
                 (args.report / "build-identity.json").write_bytes(identity_path(binary).read_bytes())
-                desktop.verify_portal_application()
+                outcome["stage"] = "portal-application"
+                write_json(args.report / "ci-outcome.json", outcome)
+                desktop.verify_application()
                 if entry.get("desktop"):
+                    config["desktop"] = desktop.facts
                     cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
                 if platform.system() == "Windows":
                     outcome["stage"] = "native-startup"

@@ -149,38 +149,65 @@ impl BitmapEncoder {
             PixelFormat::ABgr32 | PixelFormat::XBgr32 => [3, 2, 1],
             PixelFormat::BgrA32 | PixelFormat::BgrX32 => [2, 1, 0],
         };
-        let byte_at = |position: usize| {
-            if position < update_header.len() {
-                return update_header[position];
+        let full_chunk_size = headers[0].1 + 1 + width * chunk_height * 3;
+        // Traverse a strip by header/scanline spans. Resolving the chunk,
+        // plane and bottom-up row separately for every byte required several
+        // integer divisions per sample byte, dominating small photo updates.
+        // Keep exactly the same sample bytes and MPPC selection decisions.
+        let copy_strip = |mut position: usize, output: &mut [u8]| {
+            let mut written = 0;
+            while written < output.len() {
+                let remaining = output.len() - written;
+                let count = if position < update_header.len() {
+                    let count = remaining.min(update_header.len() - position);
+                    output[written..written + count]
+                        .copy_from_slice(&update_header[position..position + count]);
+                    count
+                } else {
+                    let relative = position - update_header.len();
+                    let index = relative / full_chunk_size;
+                    let relative = relative % full_chunk_size;
+                    let (header, header_len, height) = &headers[index];
+                    if relative < *header_len {
+                        let count = remaining.min(header_len - relative);
+                        output[written..written + count]
+                            .copy_from_slice(&header[relative..relative + count]);
+                        count
+                    } else {
+                        let relative = relative - header_len;
+                        let pixels = width * height;
+                        if relative == pixels * 3 {
+                            output[written] = 0; // raw planar trailing pad
+                            1
+                        } else {
+                            let channel = channels[relative / pixels];
+                            let pixel = relative % pixels;
+                            let column = pixel % width;
+                            let count = remaining.min(width - column);
+                            let offset = (height - pixel / width - 1) * stride + column * 4;
+                            for (byte, pixel) in output[written..written + count]
+                                .iter_mut()
+                                .zip(chunks[index][offset..offset + count * 4].chunks_exact(4))
+                            {
+                                *byte = pixel[channel];
+                            }
+                            count
+                        }
+                    }
+                };
+                position += count;
+                written += count;
             }
-            let position = position - update_header.len();
-            let full_chunk_size = headers[0].1 + 1 + width * chunk_height * 3;
-            let index = position / full_chunk_size;
-            let position = position % full_chunk_size;
-            let (header, header_len, height) = &headers[index];
-            if position < *header_len {
-                return header[position];
-            }
-            let position = position - header_len;
-            let pixels = width * height;
-            if position == pixels * 3 {
-                return 0; // raw planar trailing pad
-            }
-            let channel = channels[position / pixels];
-            let pixel = position % pixels;
-            let offset = (height - pixel / width - 1) * stride + pixel % width * 4;
-            chunks[index][offset + channel]
         };
         let sample_len = length.min(super::PLANAR_ESTIMATE_SAMPLE_SIZE);
         let mut sample = vec![0; sample_len];
-        for (index, byte) in sample.iter_mut().enumerate() {
-            let position = if length <= sample_len {
-                index
-            } else {
-                let strip = sample_len / 4;
-                (index / strip) * (length - strip) / 3 + index % strip
-            };
-            *byte = byte_at(position);
+        if length <= sample_len {
+            copy_strip(0, &mut sample);
+        } else {
+            let strip_size = sample_len / 4;
+            for (index, strip) in sample.chunks_exact_mut(strip_size).enumerate() {
+                copy_strip(index * (length - strip_size) / 3, strip);
+            }
         }
         Ok(Some((length, sample)))
     }
@@ -542,8 +569,8 @@ mod tests {
             PixelFormat::BgrA32,
             PixelFormat::BgrX32,
         ] {
-            for width in [2u16, 3, 4, 17, 252, 253, 704] {
-                for height in [3u16, 131] {
+            for width in [2u16, 3, 4, 17, 64, 128, 252, 253, 704] {
+                for height in [3u16, 5, 83, 125, 126, 131] {
                     let stride = usize::from(width + 11) * 4;
                     let mut seed = 0x9e3779b9u32;
                     let data: Vec<_> = (0..stride * (usize::from(height) - 1)

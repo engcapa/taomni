@@ -25,7 +25,9 @@ def main():
                 str(args.report.resolve()), "true" if "rdp" in desktop.capabilities else "false"],
                 cwd=probe.parent, text=True, timeout=180)
             desktop.facts["portal_requests"] = json.loads(result)
-            desktop.verify_portal_application(require_binary=False)
+            # The executable may not exist yet on a cold cache. ci_execute
+            # requires real Gio application metadata after native_build and
+            # before starting cases; this preflight proves the desktop/portals.
         print(json.dumps(desktop.facts, indent=2), flush=True)
 
 
