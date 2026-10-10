@@ -9,6 +9,9 @@ import subprocess
 import time
 import sys
 
+# org.gnome.Mutter.DisplayConfig: 1 = logical, 2 = physical.
+MUTTER_LOGICAL_LAYOUT = 1
+
 
 def monitor_configuration(state):
     """Use actual advertised modes/scales, never fabricate compositor metadata."""
@@ -42,7 +45,7 @@ def configure(report):
                                  Gio.DBusCallFlags.NONE, 10000, None).unpack()
         serial, monitors = monitor_configuration(call("GetCurrentState"))
         call("ApplyMonitorsConfig", GLib.Variant("(uua(iiduba(ssa{sv}))a{sv})",
-             (serial, 1, monitors, {"layout-mode": GLib.Variant("u", 2)})))
+             (serial, 1, monitors, {"layout-mode": GLib.Variant("u", MUTTER_LOGICAL_LAYOUT)})))
         observed = call("GetCurrentState")
         report.write_text(json.dumps({"transport": "Mutter DisplayConfig", "state": observed}, indent=2))
     else:

@@ -1,5 +1,5 @@
 import unittest
-from ci_multi_display import monitor_configuration
+from ci_multi_display import MUTTER_LOGICAL_LAYOUT, monitor_configuration
 
 
 class MonitorConfigurationTests(unittest.TestCase):
@@ -9,6 +9,8 @@ class MonitorConfigurationTests(unittest.TestCase):
         return (42, [output("A", 1920, 1080, [1.0]), output("B", 2560, 1440, [1.0, 2.0])], [], {})
 
     def test_uses_advertised_outputs_and_modes_with_distinct_scales(self):
+        # The public Mutter DBus contract specifies 1=logical, 2=physical.
+        self.assertEqual(MUTTER_LOGICAL_LAYOUT, 1)
         serial, monitors = monitor_configuration(self.state())
         self.assertEqual(serial, 42)
         self.assertEqual(monitors, [(0, 0, 1.0, 0, True, [("A", "A-mode", {})]),

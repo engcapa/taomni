@@ -81,6 +81,60 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
             other["y"].as_i64().unwrap() as i32 + 16,
         ))
         .await?;
+        // Recording and Wayland scrolling crop a persistent monitor stream;
+        // renderer Copy alone cannot prove this separate backend path.
+        if super::super::hide_app_windows(app) {
+            super::super::await_hidden_windows(app)
+                .await
+                .map_err(anyhow::Error::msg)?;
+        }
+        let scale = monitors[initial]["scale"]
+            .as_f64()
+            .context("monitor scale")?;
+        let target_rect = (
+            x,
+            y,
+            logical["width"].as_i64().unwrap() as i32,
+            logical["height"].as_i64().unwrap() as i32,
+        );
+        let display = displays
+            .iter()
+            .find(|d| d.logical_rect() == target_rect)
+            .context("initial monitor")?
+            .clone();
+        let region = (
+            (128.0 * scale) as u32,
+            (128.0 * scale) as u32,
+            (384.0 * scale) as u32,
+            (256.0 * scale) as u32,
+        );
+        let worker = app.clone();
+        let streamed = tokio::task::spawn_blocking(move || {
+            capture::FrameSource::for_region(&worker, display, region).grab()
+        })
+        .await?;
+        super::super::restore_app_windows(app);
+        let streamed = streamed?;
+        let original = image::open(
+            monitors[initial]["expected"]
+                .as_str()
+                .context("monitor original")?,
+        )?
+        .to_rgba8();
+        let reference = capture::crop(&original, region.0, region.1, region.2, region.3);
+        let pixels = qa_oracle::compare(&streamed, &reference, false);
+        let region_evidence = json!({"initial":initial,"region":region,"pixels":pixels,
+            "actual":keep_image(&streamed,&format!("dual-{initial}-stream-region.png")),
+            "expected":keep_image(&reference,&format!("dual-{initial}-stream-region-expected.png"))});
+        keep_json(
+            &region_evidence,
+            &format!("dual-{initial}-stream-region.json"),
+        )?;
+        anyhow::ensure!(
+            pixels.passed,
+            "persistent monitor region mismatch: {region_evidence}"
+        );
+        attempts.push(region_evidence);
         run_js(
             &main,
             "document.querySelector('[data-testid=\"system-screenshot\"]').click(); return true;",
