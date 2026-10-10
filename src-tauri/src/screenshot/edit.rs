@@ -74,7 +74,7 @@ pub async fn screenshot_open_editor(path: String, editor: Option<String>) -> Res
 pub async fn screenshot_edit_pin(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     if super::OPENING.swap(true, std::sync::atomic::Ordering::SeqCst) { return Err("screenshot is opening".into()); }
     let mut owns_session = false;
-    let result = (|| {
+    let result = async {
         let pin = {
             let state = super::tool_state();
             if state.overlay.is_some() || state.recorder_open || state.scroll.is_some() { return Err("finish the current capture first".into()); }
@@ -106,8 +106,9 @@ pub async fn screenshot_edit_pin(app: AppHandle, window: WebviewWindow) -> Resul
             }
         }
         editor.show().map_err(|e| e.to_string())?;
+        settle_document_window(&editor, &display).await?;
         editor.set_focus().map_err(|e| e.to_string())
-    })();
+    }.await;
     if result.is_err() && owns_session {
         super::close_session(&app);
     }
@@ -137,6 +138,53 @@ pub(super) fn configure_document_window(window: &WebviewWindow, display: &captur
         display.x + ((display.width as f64 - width * scale) / 2.0).round() as i32,
         display.y + ((display.height as f64 - height * scale) / 2.0).round() as i32,
     )).map_err(|e| e.to_string())
+}
+
+/// GTK's cached fullscreen flag changes before Mutter acknowledges the state.
+/// An unmapped selection window also retains its screen-sized default geometry.
+/// Wait for the mapped surface to leave fullscreen before restoring its normal
+/// size, otherwise Mutter can maximize it again when it is shown.
+pub(super) async fn settle_document_window(window: &WebviewWindow, display: &capture::DisplayInfo) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if super::pins::native_wayland() {
+        let scale = display.scale_factor.max(1.0);
+        let width = (display.width as f64 / scale * 0.8).min(1100.0).round() as i32;
+        let height = (display.height as f64 / scale * 0.8).min(800.0).round() as i32;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let target = window.clone();
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            window.run_on_main_thread(move || {
+                use gtk::prelude::*;
+                let result = target.gtk_window().map_err(|e| e.to_string()).map(|gtk| {
+                    let Some(surface) = gtk.window() else { return false; };
+                    if !gtk.is_mapped() || surface.state().contains(gtk::gdk::WindowState::FULLSCREEN) {
+                        return false;
+                    }
+                    gtk.set_resizable(true);
+                    gtk.set_default_size(width, height);
+                    if surface.state().contains(gtk::gdk::WindowState::MAXIMIZED) {
+                        gtk.unmaximize();
+                    }
+                    let size = gtk.size();
+                    let sized = (size.0 - width).abs() <= 2 && (size.1 - height).abs() <= 2;
+                    if !sized { gtk.resize(width, height); }
+                    !surface.state().contains(gtk::gdk::WindowState::MAXIMIZED) && sized
+                });
+                let _ = tx.send(result);
+            }).map_err(|e| e.to_string())?;
+            let ready = tokio::time::timeout_at(deadline, rx).await
+                .map_err(|_| "screenshot editor window transition timed out".to_string())?
+                .map_err(|e| e.to_string())??;
+            if ready { return Ok(()); }
+            if tokio::time::Instant::now() >= deadline {
+                return Err("screenshot editor did not restore its normal window size".into());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    }
+    let _ = (window, display);
+    Ok(())
 }
 
 #[tauri::command]

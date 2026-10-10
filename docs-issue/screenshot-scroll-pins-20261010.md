@@ -40,3 +40,7 @@ GitHub 验证使用 `.github/workflows/qa-ui-auto-platforms.yml`、精确提交�
 macOS 实际窗口已有边框并退出全屏，但 `resizable=false`。Tao 0.37.1 的 simple fullscreen 退出与 decorations 更新会排队恢复样式；原来的设置顺序使这些样式仍含旧的不可缩放状态，异步覆盖后续同步 resizable 设置。现在先更新 resizable，使恢复样式也携带正确状态。Wayland 实际窗口仍为 1920×1048，增加退出最大化，并将 native 尺寸检查改为等待 compositor 配置完成；保留严格目标尺寸断言，额外检查初始 80% 窗口尺寸。
 
 透明度补测发现另一个边界：reset 已经确认的 100% 时源贴图不产生状态变化，无条件等待确认会屏蔽之后的源贴图快捷键更新。相同值现在不进入 pending 状态，组件测试和 `TC-SHOT-033` 验证 reset 后源贴图透明度快捷键仍同步到设置窗口。最新 6 个前端文件 63/63 通过、TypeScript 检查及该 browser 用例通过；最终平台结果另行补充。
+
+第四轮 [38023726485](https://github.com/engcapa/taomni/actions/runs/38023726485)，提交 `9da065d0`：三端 browser 均 39/39，Windows native 8/8、macOS native 7/7、Linux X11 native 7/7；Wayland native 6/7。macOS 样式顺序修复已通过真实窗口验证。Win11 对相同源码补测 N16、N17 为 2/2，原生窗口初始 1100×800，可改为 760×620，Done 三条路径、像素与系统剪贴板均通过；QA 构建身份与源码一致。
+
+Wayland 新增状态记录明确显示 `maximized=true`、1920×1048。Tao 的 fullscreen 标记在请求发出时就清除，并不代表 Mutter 已完成转换；隐藏的 GTK 窗口还保留整屏默认尺寸，显示时可能再次最大化。现在窗口显示后在 GTK 主线程读取实际 GDK surface 状态，等待退出全屏，再清除最大化并恢复默认/当前文档尺寸。等待有五秒上限，错误保持明确，严格窗口尺寸和完整拼接像素断言继续保留。

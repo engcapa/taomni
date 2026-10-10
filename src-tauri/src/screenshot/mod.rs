@@ -379,6 +379,9 @@ pub async fn screenshot_scroll_capture(
             edit::configure_document_window(&window, &editor_display)?;
         }
         let _ = window.show();
+        if result.is_ok() {
+            edit::settle_document_window(&window, &editor_display).await?;
+        }
         let _ = window.set_focus();
     }
     result
