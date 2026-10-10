@@ -212,6 +212,8 @@ class Desktop:
                               "--ready", str(consent_ready),
                               "--log", str(self.root / "portal-consent.jsonl")])
         self._wait(consent, consent_ready.is_file, "GNOME portal accessibility automation")
+        subprocess.run(["/usr/bin/python3", str(Path(__file__).with_name("ci_wayland_activation_probe.py")),
+                        "--output", str(self.root / "activation-probe.json")], check=True, timeout=45)
         if "ime" in self.capabilities:
             self._ime(facts)
         if "audio" in self.capabilities:
