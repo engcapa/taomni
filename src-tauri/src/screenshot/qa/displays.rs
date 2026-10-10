@@ -44,7 +44,8 @@ async fn place_main(main: &WebviewWindow, x: i32, y: i32) -> anyhow::Result<()> 
     if wayland::active() {
         wayland::command(
             json!({"command":"place", "application":std::env::current_exe()?,
-            "title":main.title()?, "rect":{"x":x+100,"y":y+100,"width":800,"height":600}}),
+            "title":main.title()?, "activate":true,
+            "rect":{"x":x+100,"y":y+100,"width":800,"height":600}}),
         )
         .await?;
     } else {
@@ -166,13 +167,14 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         );
         attempts.push(region_evidence);
         // The standalone backend probe above remaps main as part of fixture
-        // cleanup. Establish the actual invoking monitor again before the
-        // public button workflow; Wayland owns normal-window placement.
+        // cleanup. Restore and place the fixture's invoking window before the
+        // public button workflow. A script can click a minimized WebView;
+        // that cannot represent a user invoking the visible screenshot button.
         place_main(&main, x, y).await?;
         let main_before = geometry(&main).await?;
         anyhow::ensure!(
-            on_monitor(&main_before, logical),
-            "fixture did not place invoking main on the target monitor: {main_before}"
+            main_visible(app) && on_monitor(&main_before, logical),
+            "fixture did not show invoking main on the target monitor: {main_before}"
         );
         run_js(
             &main,

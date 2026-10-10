@@ -116,6 +116,31 @@ pub async fn screenshot_edit_pin(app: AppHandle, window: WebviewWindow) -> Resul
     result
 }
 
+/// Retire the hidden Wayland backing surface before changing fullscreen/DPI
+/// geometry. GTK can otherwise keep a pending configure from the old surface
+/// and WebKit can retain its old viewport allocation after remapping.
+pub(super) async fn reset_hidden_surface(window: &WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if super::pins::native_wayland() {
+        let target = window.clone();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        window.run_on_main_thread(move || {
+            use gtk::prelude::*;
+            let result = target.gtk_window().map_err(|e| e.to_string()).and_then(|gtk| {
+                if gtk.is_mapped() { return Err("screenshot surface must be hidden before resetting its geometry".into()); }
+                if gtk.is_realized() { gtk.unrealize(); }
+                Ok(())
+            });
+            let _ = tx.send(result);
+        }).map_err(|e| e.to_string())?;
+        tokio::time::timeout(std::time::Duration::from_secs(5), rx).await
+            .map_err(|_| "GTK screenshot surface reset timed out")?
+            .map_err(|e| e.to_string())??;
+    }
+    let _ = window;
+    Ok(())
+}
+
 /// Turn the fullscreen selection surface into an ordinary resizable document.
 pub(super) fn configure_document_window(window: &WebviewWindow, display: &capture::DisplayInfo) -> Result<(), String> {
     let scale = display.scale_factor.max(1.0);
