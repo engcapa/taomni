@@ -1,0 +1,34 @@
+id: TC-SHOT-N23
+title: Capture both OS outputs and copy native selections across mixed DPI
+covers: [F27.1]
+tags: [screenshot, displays, regression, native, p1]
+modes: [native]
+native_platforms: [Linux]
+fixtures: [reset_db, dual_display_required]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario:
+    scenario: displays
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: dual-capture
+    requirement: OS-enumerated dual outputs (100% and 200% on Wayland) capture their own independent GTK pixel originals. Verify persistent region frames used by recording and scrolling on both outputs. Invoke from each output, switch away and back using the public picker, then drag with actual OS input and Copy. Monitor surface geometry, viewport/DPR, PNG size and clipboard crop must match the target; the main window returns to the same invoking monitor. The compositor may reposition normal windows within that monitor; absolute main-window coordinates are not a screenshot correctness requirement.
+    actions: [1, 3]
+    checkpoints:
+    - step: 3
+      expectation: Two actual GDK outputs, correct full-monitor PNGs, explicit monitor fullscreen, both DPI selection crops and main restoration to its invoking monitor pass with retained originals and observations.
+    - step: 4
+      expectation: Copy closes the surface and restores the main application.
+    results: [3, 4]
+  native:
+  - check: Dual OS outputs, mixed DPI, portal selection, window placement and OS clipboard
+    method: automated
+    reason: An owned X11 or Mutter desktop supplies actual OS virtual outputs and independent external GTK pixel patterns. Mixed-DPI input uses a real Clutter virtual pointer and requires the observed native position; Linux minimization/restoration must retain the invoking monitor. This validates native API boundaries; physical monitor hardware remains a separate external acceptance.
+  visual:
+  - check: The selection surface covers each target output with matching viewport and DPR
+    method: automated
+    reason: Native compositor rectangles and original pixel comparisons are retained. Browser mocks cannot establish this.

@@ -20,7 +20,7 @@ fi
 install_packages \
   libwebkit2gtk-4.1-dev "$webdriver_package" libappindicator3-dev librsvg2-dev \
   patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev \
-  libdbus-1-dev libudev-dev libgbm-dev nasm python3-tk python3-gi gir1.2-gtk-3.0 \
+  libdbus-1-dev libudev-dev libgbm-dev nasm python3-tk python3-gi python3-cairo python3-gi-cairo gir1.2-gtk-3.0 \
   fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim \
   gstreamer1.0-libav gstreamer1.0-plugins-good gstreamer1.0-plugins-bad dbus-x11
 
@@ -35,6 +35,9 @@ if [[ "$profile" == *wayland ]]; then
 else
   install_packages xvfb xauth openbox xcompmgr wmctrl xdotool x11-utils \
     x11-xserver-utils libxtst6 xclip imagemagick fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons
+  if [[ ",${QA_CAPABILITIES:-}," == *,dual-display,* ]]; then
+    install_packages xserver-xorg-core xserver-xorg-video-dummy
+  fi
   if [[ "$profile" == ubuntu-22.04-* ]]; then
     install_packages lxqt-core
   fi

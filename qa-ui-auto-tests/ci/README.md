@@ -134,9 +134,18 @@ Versioned runner labels fix the Ubuntu release family, not an immutable image:
 GitHub updates runner images and apt packages. Reports retain `VERSION_ID`,
 `PRETTY_NAME`, runner image version and desktop readiness. Upgrading the latest
 Desktop target requires a new explicit profile, not silently changing an
-existing name. These are hosted virtual desktops; physical GPU, mixed DPI,
-multiple monitors and exact reproduction of a real-machine Xorg driver remain
-separate acceptance targets.
+existing name. These are hosted virtual desktops. Cases requiring `dual-display`
+provision two OS-enumerated virtual outputs: on `ubuntu-24.04-xvfb`, a job-owned
+Xorg dummy server replaces Xvfb with two 1920×1080 RandR outputs; on
+`ubuntu-26.04-wayland`, Mutter supplies 1920×1080 at 100% and 2560×1440 at 200%.
+The fixture checks actual GDK output enumeration, mapped external GTK window
+geometry and scale before application compilation. `TC-SHOT-N23` checks full
+capture, display switching, persistent region capture and native drag/clipboard
+pixels against independently generated originals. Desktop reports retain
+`multi-display-fixture.json` and those originals. Missing outputs or incorrect
+scaling fail preparation; they are not skipped. Physical GPU, actual monitor
+hardware, hotplug and reproduction of a real-machine Xorg driver remain separate
+acceptance targets.
 
 Ubuntu 22.04 QA installs a checksum-pinned PipeWire 1.0.9 development/runtime
 overlay because pipewire-rs needs headers newer than stock Jammy. That overlay

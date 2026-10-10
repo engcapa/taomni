@@ -97,14 +97,14 @@ def focus_window(evaluate, pid: int, diagnostics: dict) -> dict:
         time.sleep(0.05)
 
 
-def move_pointer(evaluate, notify, x: int, y: int) -> list[int]:
+def move_pointer(evaluate, notify, x: int, y: int, *, absolute=False) -> list[int]:
     # Mutter queues virtual motion. Observe its resulting coordinates before
     # issuing a button event or computing the next relative displacement.
     for _ in range(20):
         current = evaluate("global.get_pointer().slice(0, 2)")
         if abs(x - current[0]) <= 1 and abs(y - current[1]) <= 1:
             return current
-        notify(float(x - current[0]), float(y - current[1]))
+        notify(float(x if absolute else x - current[0]), float(y if absolute else y - current[1]))
         time.sleep(0.02)
     raise RuntimeError(f"Mutter pointer did not reach {(x, y)}; observed {current}")
 
@@ -116,6 +116,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ready", type=Path, required=True)
     parser.add_argument("--socket", type=Path, required=True)
+    parser.add_argument("--absolute-pointer", action="store_true",
+                        help="position the owned native Clutter seat in logical coordinates for mixed DPI")
     args = parser.parse_args()
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     destination = "org.gnome.Mutter.RemoteDesktop"
@@ -149,6 +151,15 @@ def main() -> None:
             time.sleep(0.12)
 
     def pointer(x, y):
+        if args.absolute_pointer:
+            # The public native-seat API positions the actual OS pointer;
+            # RemoteDesktop supplies balanced button events. Shell's panel and
+            # hot-corner barriers still apply, so preflight parks below them.
+            # Always verify global.get_pointer() before issuing a button.
+            def absolute_motion(px, py):
+                evaluate("(() => { global.__taomniQaSeat.warp_pointer("
+                         f"{int(px)}, {int(py)}); return true; }})()")
+            return move_pointer(evaluate, absolute_motion, x, y, absolute=True)
         return move_pointer(evaluate, lambda dx, dy: call(
             session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (dx, dy))), x, y)
 
@@ -182,12 +193,26 @@ def main() -> None:
             selector = f"w.get_pid() === {pid}" + (f" && w.get_title() === {json.dumps(title)}"
                 if title is not None else " && w.get_window_type() === imports.gi.Meta.WindowType.NORMAL")
             evaluate(f"(() => {{ const w = global.get_window_actors().map(a => a.meta_window)"
-                     f".find(w => {selector}); w.unmaximize(3); "
+                     f".find(w => {selector}); const x={int(rect['x'])}, y={int(rect['y'])}; "
+                     f"const cx=x+{int(rect['width'])}/2, cy=y+{int(rect['height'])}/2; "
+                     "const m=Main.layoutManager.monitors.find(m=>cx>=m.x && cx<m.x+m.width && cy>=m.y && cy<m.y+m.height); "
+                     "if(!m) throw new Error('fixture target is outside actual monitors'); "
+                     "w.unmaximize(3); w.move_to_monitor(m.index); "
                      f"w.move_resize_frame(true, {int(rect['x'])}, {int(rect['y'])}, "
                      f"{int(rect['width'])}, {int(rect['height'])}); return true; }})()")
             return True
         raise ValueError("unknown window command")
 
+    if args.absolute_pointer:
+        end = time.monotonic() + 10
+        while True:
+            layout = evaluate("({width:global.stage.width,height:global.stage.height,monitors:Main.layoutManager.monitors.map(m=>({x:m.x,y:m.y,width:m.width,height:m.height}))})")
+            observed = sorted((m["x"], m["y"], m["width"], m["height"]) for m in layout["monitors"])
+            if observed == [(0, 0, 1920, 1080), (1920, 0, 1280, 720)] and (layout["width"], layout["height"]) == (3200, 1080):
+                break
+            if time.monotonic() >= end:
+                raise RuntimeError(f"logical layout did not settle before input creation: {layout}")
+            time.sleep(0.05)
     session = call("/org/gnome/Mutter/RemoteDesktop", destination, "CreateSession").unpack()[0]
     loop = GLib.MainLoop()
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -204,6 +229,8 @@ def main() -> None:
         call(session, interface, "NotifyKeyboardKeycode", GLib.Variant("(ub)", (29, True)))
         call(session, interface, "NotifyKeyboardKeycode", GLib.Variant("(ub)", (29, False)))
         call(session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (0.0, 0.0)))
+        if args.absolute_pointer:
+            evaluate("(() => { global.__taomniQaSeat = global.stage.context.get_backend().get_default_seat(); return true; })()")
         listener.bind(str(args.socket))
         args.socket.chmod(0o600)
         listener.listen(1)
@@ -313,10 +340,24 @@ def main() -> None:
         # WebDriver clicks don't move this OS pointer, so several read-only
         # RDP connects can reopen Overview before the first measured input.
         # Park it in the desktop interior before any app/target is launched.
+        layout = evaluate("({width:global.stage.width,height:global.stage.height,panelHeight:Main.layoutManager.panelBox.height,monitors:Main.layoutManager.monitors.map(m=>({x:m.x,y:m.y,width:m.width,height:m.height,index:m.index}))})")
+        pointer_probes = []
+        if args.absolute_pointer:
+            if len(layout["monitors"]) != 2:
+                raise RuntimeError(f"mixed-DPI pointer needs two actual monitors: {layout}")
+            for monitor in layout["monitors"]:
+                # The primary panel has a right-edge barrier spanning its
+                # height. Origin+16 crosses that barrier at the DPI seam.
+                inset = max(64, int(layout["panelHeight"]) + 16)
+                target = [monitor["x"] + inset, monitor["y"] + inset]
+                pointer_probes.append({"target": target, "observed": pointer(*target)})
         initial_pointer = pointer(*evaluate(
             "[Math.round(global.stage.width / 2), Math.round(global.stage.height / 2)]"))
         args.ready.write_text(json.dumps({"session": session, "devices": ["keyboard", "pointer"],
                                          "transport": "Mutter RemoteDesktop",
+                                         "pointer_transport": "Clutter native seat warp and Mutter RemoteDesktop buttons" if args.absolute_pointer
+                                             else "Mutter RemoteDesktop relative motion",
+                                         "layout": layout, "pointer_probes": pointer_probes,
                                          "initial_pointer": initial_pointer}), encoding="utf-8")
         # The session is tied to this DBus connection, so a one-shot gdbus
         # command would remove the devices immediately after provisioning.
@@ -328,6 +369,8 @@ def main() -> None:
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signum, quit_loop)
         loop.run()
     finally:
+        if args.absolute_pointer:
+            evaluate("(() => { global.__taomniQaSeat = null; return true; })()")
         listener.close()
         args.socket.unlink(missing_ok=True)
         args.ready.unlink(missing_ok=True)

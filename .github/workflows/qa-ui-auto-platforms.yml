@@ -139,7 +139,7 @@ jobs:
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
       - name: Wayland automation contracts
-        run: python -m unittest test_wayland_tools
+        run: python -m unittest test_wayland_tools test_multi_display
       - name: Plan exact cases and dependencies
         id: plan
         env:
@@ -393,15 +393,42 @@ jobs:
             cargo test --locked --release --lib rdp::
             cargo test --locked --release --bin rdp-probe
           ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/rdp-unit.log'
+      - name: Verify owned X11 dual-output desktop before compilation
+        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb' && contains(matrix.capabilities, 'dual-display')
+        env:
+          QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
+        run: >-
+          dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24 -nolisten tcp'
+          python .agents/skills/qa-ui-auto/scripts/ci_desktop_preflight.py
+          --profile ubuntu-24.04-xvfb --capabilities "$QA_CAPABILITIES"
+          --report 'qa-ui-auto-report/${{ matrix.id }}/desktop-preflight'
+      - name: Dual-display Rust contracts
+        if: runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'dual-display')
+        env:
+          CARGO_TARGET_DIR: target/qa-ui-auto
+        run: |
+          mkdir -p 'qa-ui-auto-report/${{ matrix.id }}'
+          (
+            set -e
+            pnpm build --mode qa
+            cd src-tauri
+            # One root test invocation covers screenshot mapping and the
+            # retained X11/Wayland capture contracts without repeated links.
+            cargo test --locked --lib capture::
+            cargo test --locked --lib screenshot::surfaces::
+          ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/dual-display-unit.log'
       - name: Run selected cases (Linux Xvfb desktop)
         if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb'
         env:
           QA_ENTRY: ${{ matrix.id }}
-        run: >-
-          dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24 -nolisten tcp'
-          python .agents/skills/qa-ui-auto/scripts/ci_execute.py
-          --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
-          --report "qa-ui-auto-report/$QA_ENTRY"
+          QA_DUAL_DISPLAY: ${{ contains(matrix.capabilities, 'dual-display') }}
+        run: |
+          screen=1920x1080x24
+          if [[ "$QA_DUAL_DISPLAY" == true ]]; then screen=3840x1440x24; fi
+          dbus-run-session -- xvfb-run -a -s "-screen 0 $screen -nolisten tcp" \
+            python .agents/skills/qa-ui-auto/scripts/ci_execute.py \
+            --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY" \
+            --report "qa-ui-auto-report/$QA_ENTRY"
       - name: Run selected cases (Linux VNC or GNOME Wayland desktop)
         if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'dbus'
         env:

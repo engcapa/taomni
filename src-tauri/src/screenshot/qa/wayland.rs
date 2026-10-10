@@ -7,43 +7,56 @@ use std::time::Duration;
 
 use anyhow::Context;
 use serde_json::{Value, json};
-use tauri::{PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 pub(super) fn active() -> bool {
     super::super::pins::native_wayland()
 }
 
 pub(super) async fn command(request: Value) -> anyhow::Result<Value> {
-    tokio::task::spawn_blocking(move || {
-        let socket = std::path::PathBuf::from(
-            std::env::var_os("QA_WAYLAND_INPUT_SOCKET")
-                .context("owned Wayland input socket missing")?,
-        );
-        let runtime = std::path::PathBuf::from(
-            std::env::var_os("XDG_RUNTIME_DIR").context("owned Wayland runtime missing")?,
-        );
-        anyhow::ensure!(
-            socket
-                .parent()
-                .context("input socket parent")?
-                .canonicalize()?
-                == runtime.canonicalize()?
-                && socket.metadata()?.file_type().is_socket(),
-            "Wayland input socket is outside the owned runtime"
-        );
-        let mut connection = UnixStream::connect(socket).context("connect owned Mutter broker")?;
-        connection.set_read_timeout(Some(Duration::from_secs(30)))?;
-        connection.set_write_timeout(Some(Duration::from_secs(5)))?;
-        connection.write_all(serde_json::to_string(&request)?.as_bytes())?;
-        connection.write_all(b"\n")?;
-        let mut response = String::new();
-        connection.take(1_048_576).read_to_string(&mut response)?;
-        let response: Value = serde_json::from_str(&response).context("Mutter response")?;
-        anyhow::ensure!(response["ok"] == true, "Mutter command failed: {response}");
-        Ok(response["value"].clone())
-    })
-    .await
-    .context("Mutter observation/input task")?
+    tokio::task::spawn_blocking(move || command_sync(request))
+        .await
+        .context("Mutter observation/input task")?
+}
+
+fn command_sync(request: Value) -> anyhow::Result<Value> {
+    let socket = std::path::PathBuf::from(
+        std::env::var_os("QA_WAYLAND_INPUT_SOCKET")
+            .context("owned Wayland input socket missing")?,
+    );
+    let runtime = std::path::PathBuf::from(
+        std::env::var_os("XDG_RUNTIME_DIR").context("owned Wayland runtime missing")?,
+    );
+    anyhow::ensure!(
+        socket
+            .parent()
+            .context("input socket parent")?
+            .canonicalize()?
+            == runtime.canonicalize()?
+            && socket.metadata()?.file_type().is_socket(),
+        "Wayland input socket is outside the owned runtime"
+    );
+    let mut connection = UnixStream::connect(socket).context("connect owned Mutter broker")?;
+    connection.set_read_timeout(Some(Duration::from_secs(30)))?;
+    connection.set_write_timeout(Some(Duration::from_secs(5)))?;
+    connection.write_all(serde_json::to_string(&request)?.as_bytes())?;
+    connection.write_all(b"\n")?;
+    let mut response = String::new();
+    connection.take(1_048_576).read_to_string(&mut response)?;
+    let response: Value = serde_json::from_str(&response).context("Mutter response")?;
+    anyhow::ensure!(response["ok"] == true, "Mutter command failed: {response}");
+    Ok(response["value"].clone())
+}
+
+/// GTK does not receive Wayland's actual minimized state. Observe the owned
+/// compositor instead; a queued minimize request is not a visibility pass.
+pub(super) fn visible(window: &WebviewWindow) -> anyhow::Result<bool> {
+    command_sync(
+        json!({"command":"geometry", "application":std::env::current_exe()?,
+        "title":window.title()?}),
+    )?["visible"]
+        .as_bool()
+        .context("Mutter window visibility")
 }
 
 pub(super) async fn window(window: &WebviewWindow) -> anyhow::Result<Value> {
@@ -80,17 +93,38 @@ pub(super) fn rect(
 pub(super) async fn inner_rect(
     window: &WebviewWindow,
 ) -> anyhow::Result<(PhysicalPosition<i32>, PhysicalSize<u32>)> {
+    let native = self::window(window).await?;
     rect(
-        &self::window(window).await?["client"],
-        window.scale_factor()?.max(0.5),
+        &native["client"],
+        output_scale(window.app_handle(), &native["client"])?,
     )
+}
+
+/// XWayland's buffer scale is global, while portal pixels are output-specific.
+/// Resolve the actual compositor rectangle before comparing desktop pixels.
+pub(super) fn output_scale(app: &tauri::AppHandle, value: &Value) -> anyhow::Result<f64> {
+    let cx = value["x"].as_f64().context("native x")?
+        + value["width"].as_f64().context("native width")? / 2.0;
+    let cy = value["y"].as_f64().context("native y")?
+        + value["height"].as_f64().context("native height")? / 2.0;
+    super::super::capture::list_displays(app)?
+        .into_iter()
+        .find(|display| {
+            let (x, y, w, h) = display.logical_rect();
+            cx >= x as f64 && cy >= y as f64 && cx < (x + w) as f64 && cy < (y + h) as f64
+        })
+        .map(|display| display.scale_factor)
+        .context("native rectangle is outside actual outputs")
 }
 
 pub(super) async fn control_geometry(
     window: &WebviewWindow,
 ) -> anyhow::Result<(super::super::surfaces::Rect, bool, Value)> {
     let native = self::window(window).await?;
-    let (origin, size) = rect(&native["client"], window.scale_factor()?.max(0.5))?;
+    let (origin, size) = rect(
+        &native["client"],
+        output_scale(window.app_handle(), &native["client"])?,
+    )?;
     let selector = if window.label() == super::super::surfaces::SCROLL_LABEL {
         "screenshot-scroll-controller"
     } else {

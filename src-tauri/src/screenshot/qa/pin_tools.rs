@@ -187,16 +187,21 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     let zoomed = pin.inner_size().map_err(|e| e.to_string())?;
     // Verify the compositor really reveals the desktop, rather than merely
     // accepting a CSS opacity value inside an opaque native window.
+    // Drag leaves the OS pointer in the pin centre, where its help tooltip
+    // would cover the pixel oracle. Move it outside before both snapshots.
+    park_pointer(input_point((display.x + display.width as i32 - 32,
+        display.y + display.height as i32 - 64), display.scale_factor))
+        .await.map_err(|e| e.to_string())?;
     pin.hide().map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(350)).await;
     let background = read_desktop(&app, &display).await.map_err(|e| e.to_string())?;
     pin.show().map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(400)).await;
     let composited = read_desktop(&app, &display).await.map_err(|e| e.to_string())?;
-    let position = observed_inner_rect(&pin).await.map_err(|e| e.to_string())?.0;
+    let (position, native_size) = observed_inner_rect(&pin).await.map_err(|e| e.to_string())?;
     let sample = (
-        (position.x - display.x + (100.0 * scale) as i32) as u32,
-        (position.y - display.y + (100.0 * scale) as i32) as u32,
+        (position.x - display.x + native_size.width as i32 / 2) as u32,
+        (position.y - display.y + native_size.height as i32 / 2) as u32,
     );
     let underlying = background.get_pixel(sample.0, sample.1).0;
     let actual = composited.get_pixel(sample.0, sample.1).0;

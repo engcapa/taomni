@@ -2,6 +2,26 @@
 
 关联问题：[滚动截图 #695](https://github.com/engcapa/taomni/issues/695)、[Ubuntu 自动滚动抢鼠标 #694](https://github.com/engcapa/taomni/issues/694)、[Ubuntu 多屏截图 #693](https://github.com/engcapa/taomni/issues/693)。
 
+## 最终交付与验证
+
+修复已推送到 `fix/screenshop-autoscroll-20261010`。`origin/main` 的 `4318a510` 已合并，合并提交为 `209d546dbcdfba0bfe572c1ea6fdb5cfed868ee3`，两个 CI 脚本冲突均已解决。最终产品提交为 `52975cc99598abf71645241de09346a3391f4805`。
+
+[第十轮 GitHub 验证 38029127638](https://github.com/engcapa/taomni/actions/runs/38029127638) 使用 `.github/workflows/qa-ui-auto-platforms.yml`，实际执行结果为 **146/146 通过**，失败、跳过、基础设施错误、能力缺口和未审查用例均为 0。
+
+| 平台与模式 | 实际通过 |
+|---|---:|
+| Windows browser | 39/39 |
+| macOS browser | 39/39 |
+| Linux browser | 39/39 |
+| Windows native | 8/8 |
+| macOS native | 7/7 |
+| Linux X11 native | 7/7 |
+| Ubuntu 26.04 GNOME Wayland native | 7/7 |
+
+原始报告的签名、summary 哈希、selection、case、runner、构建及桌面身份已通过汇总校验。源码身份为 `7b8dbad721141105c33df4f01ad3046371c07fdd04940345e2e3762e4cd6368b`，与本机 QA build10 和补测一致。Wayland N16 的实际窗口为初始 1100×800、调整后 760×620，完整拼接像素误差为 0；N17 的覆盖、新建、仅复制、备注、收藏及系统剪贴板断言全部通过。之前失败的报告保留在各轮 Actions 中。
+
+本机 Win11 已完成 YouTube 主页真实滚轮验证、截图 native 全组 8/8 和最终 N16/N17 补测 2/2；最新三组件文件 46/46、四个相关 browser 用例 4/4 通过。QA 二进制为 `D:\code\person\taomni-fix-screenshop-autoscroll-20261010\src-tauri\target\qa-ui-auto\debug\taomni.exe`，应用身份为 `com.taomni.app.qa`。本次完成范围不包含真实双屏／混合 DPI 验收或修复全仓既有格式、Terminal/VNC/ChatDrawer 测试问题，具体边界见下文。
+
 ## 原因与处理
 
 - 视频列表中的悬停播放、缩略图更新会持续改变局部像素。原稳定性判断要求所有采样区域静止，重叠匹配对动画像素也过于敏感。现在允许少量内部区域变化，保持边缘严格检测，并限制异常像素对匹配分数的影响；广泛布局变化仍需要恢复重叠。

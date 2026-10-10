@@ -72,6 +72,7 @@
           "java_test_bundle",
           "linux_x11_required",
           "linux_desktop_required",
+          "dual_display_required",
           "workspace_root",
           "java_sample_projects",
           "java25_projects",
@@ -575,7 +576,7 @@
           "additionalProperties": false,
           "required": ["scenario"],
           "properties": {
-            "scenario": {"enum": ["capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand", "controls", "full-recorder", "macos-capture-source", "scroll-permission-error", "capture-permission-error", "scroll-manual", "scroll-exit", "pin-tools", "pin-arrangement", "colors", "annotation-tools"]},
+            "scenario": {"enum": ["displays", "capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand", "controls", "full-recorder", "macos-capture-source", "scroll-permission-error", "capture-permission-error", "scroll-manual", "scroll-exit", "pin-tools", "pin-arrangement", "colors", "annotation-tools"]},
             "format": {"enum": ["gif", "mp4"]},
             "secs": {"type": "integer", "minimum": 1, "maximum": 8}
           }

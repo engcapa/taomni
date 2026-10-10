@@ -24,32 +24,52 @@ steps:
     equals: select
 - eval_readonly:
     expression: JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_switch_display","args":{"displayId":"-400,0"}')
+- select_option:
+    selector: '[data-testid="screenshot-display-select"]'
+    value: 0,0
+- wait_for: '[data-testid="screenshot-base-image"]'
+- eval_readonly:
+    expression: document.querySelector('select').value === '0,0' && JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_switch_display","args":{"displayId":"0,0"}')
+- select_option:
+    selector: '[data-testid="screenshot-display-select"]'
+    value: -400,0
+- wait_for: '[data-testid="screenshot-hint"]'
+- eval_readonly:
+    expression: document.querySelector('select').value === '-400,0' && document.querySelector('img').naturalWidth === 400
 - press: Escape
 - wait_for: '[data-testid="system-screenshot"]'
 verification:
   review: reviewed
   requirements:
   - id: display-selection
-    requirement: Select a monitor with negative desktop origin through the screenshot overlay, retain selection mode and exit
+    requirement: Select a monitor with negative desktop origin through the screenshot overlay, switch back and forth, retain selection mode and exit
       normally.
     actions:
     - 3
     - 7
+    - 10
+    - 13
     checkpoints:
     - step: 5
       expectation: The selection surface remains usable.
     - step: 6
       expectation: The selected display ID reaches the capture boundary.
-    - step: 8
+    - step: 9
+      expectation: Returning to the first display updates the picker and capture boundary.
+    - step: 12
+      expectation: Switching again retains a loaded image and the selected monitor value.
+    - step: 14
       expectation: Closing restores the app.
     results:
     - 5
     - 6
-    - 8
+    - 9
+    - 12
+    - 14
   native:
   - check: The overlay moves to and captures the selected physical monitor.
     method: external
-    reason: Requires a desktop with multiple attached monitors; browser mocks validate only the selection workflow.
+    reason: TC-SHOT-N23 verifies OS dual-output pixels and placement; physical hardware remains a separate external acceptance. Browser mocks validate the selection workflow.
   visual:
   - check: The selected controls remain visible and readable.
     method: external

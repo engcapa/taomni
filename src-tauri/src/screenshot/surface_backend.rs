@@ -47,6 +47,39 @@ pub(super) fn webview(window: &tauri::WebviewWindow) -> Result<(), String> {
         .map_err(|e| format!("configure floating capture window: {e}"))?
 }
 
+/// Portal/display pixels are per-monitor physical coordinates. XWayland
+/// floating windows use a global buffer scale; use compositor logical geometry
+/// so that scale cannot shrink or move controls into the captured region.
+pub(super) fn place_webview(
+    window: &tauri::WebviewWindow,
+    position: super::surfaces::ControlPosition,
+) -> Result<(), String> {
+    let rect = position.rect;
+    if super::pins::native_wayland() {
+        let scale = position.scale;
+        window
+            .set_size(tauri::LogicalSize::new(
+                rect.w as f64 / scale,
+                rect.h as f64 / scale,
+            ))
+            .map_err(|e| e.to_string())?;
+        window
+            .set_position(tauri::LogicalPosition::new(
+                rect.x as f64 / scale,
+                rect.y as f64 / scale,
+            ))
+            .map_err(|e| e.to_string())?;
+    } else {
+        window
+            .set_size(tauri::PhysicalSize::new(rect.w as u32, rect.h as u32))
+            .map_err(|e| e.to_string())?;
+        window
+            .set_position(tauri::PhysicalPosition::new(rect.x, rect.y))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 pub(super) fn border(window: &tauri::Window) -> Result<(), String> {
     let target = window.clone();
     let (tx, rx) = std::sync::mpsc::sync_channel(1);

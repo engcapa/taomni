@@ -442,7 +442,7 @@ fn scroll_layout(
     app: &AppHandle,
     display: &DisplayInfo,
     requested: (u32, u32, u32, u32),
-) -> Result<((u32, u32, u32, u32), Option<surfaces::Rect>), String> {
+) -> Result<((u32, u32, u32, u32), Option<surfaces::ControlPosition>), String> {
     let rect = surfaces::region_rect(display, requested);
     let mut displays = capture::list_displays(app).map_err(internal_error)?;
     displays.sort_by_key(|d| d.id != display.id);
@@ -467,22 +467,28 @@ fn scroll_layout(
                     capture.w as u32,
                     capture.h as u32,
                 ),
-                Some(controls),
+                Some(surfaces::ControlPosition {
+                    rect: controls,
+                    scale: display.scale_factor.max(1.0),
+                }),
             ));
         }
         return Ok((requested, None));
     }
-    Ok((requested, surfaces::control_position(&displays, rect)))
+    Ok((
+        requested,
+        surfaces::control_placement(&displays, display, rect),
+    ))
 }
 
 fn capture_control_position(
     app: &AppHandle,
     display: &DisplayInfo,
     region: surfaces::Rect,
-) -> Result<Option<surfaces::Rect>, String> {
+) -> Result<Option<surfaces::ControlPosition>, String> {
     let mut displays = capture::list_displays(app).map_err(internal_error)?;
     displays.sort_by_key(|d| d.id != display.id);
-    let position = surfaces::control_position(&displays, region);
+    let position = surfaces::control_placement(&displays, display, region);
     if position.is_none() && !shortcut::current_status().registered {
         return Err("No room for controls outside the capture. Select a smaller region or enable the system screenshot hotkey before capturing the whole display.".into());
     }
@@ -492,7 +498,7 @@ fn capture_control_position(
 fn open_scroll_bar(
     app: &AppHandle,
     display: &DisplayInfo,
-    position: Option<surfaces::Rect>,
+    position: Option<surfaces::ControlPosition>,
     control: Arc<scroll::ScrollControl>,
 ) -> Result<(), String> {
     let window = window_builder(
@@ -519,13 +525,19 @@ fn open_scroll_bar(
     });
     #[cfg(target_os = "linux")]
     surface_backend::webview(&window)?;
-    if let Some(rect) = position {
-        window
-            .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
-            .map_err(|e| e.to_string())?;
-        window
-            .set_position(PhysicalPosition::new(rect.x, rect.y))
-            .map_err(|e| e.to_string())?;
+    if let Some(position) = position {
+        #[cfg(target_os = "linux")]
+        surface_backend::place_webview(&window, position)?;
+        #[cfg(not(target_os = "linux"))]
+        {
+            let rect = position.rect;
+            window
+                .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
+                .map_err(|e| e.to_string())?;
+            window
+                .set_position(PhysicalPosition::new(rect.x, rect.y))
+                .map_err(|e| e.to_string())?;
+        }
         window.show().map_err(|e| e.to_string())?;
     }
     let _ = display;
@@ -677,9 +689,20 @@ fn hide_app_windows(app: &AppHandle) -> bool {
         if !window.is_visible().unwrap_or(false) {
             continue;
         }
+        #[cfg(target_os = "linux")]
+        if window.is_minimized().unwrap_or(false) {
+            continue;
+        }
         #[cfg(all(debug_assertions, target_os = "macos"))]
         QA_WINDOW_HIDE_CALLS.fetch_add(1, Ordering::SeqCst);
-        if window.hide().is_ok() {
+        // GTK hide/show unmaps the toplevel: X11 resets its position and
+        // Wayland may place the new mapping on a different output. Iconifying
+        // removes it from capture while retaining the compositor's placement.
+        #[cfg(target_os = "linux")]
+        let hidden = window.minimize();
+        #[cfg(not(target_os = "linux"))]
+        let hidden = window.hide();
+        if hidden.is_ok() {
             hid_any = true;
             if !state.hidden.contains(&label) {
                 state.hidden.push(label);
@@ -689,8 +712,8 @@ fn hide_app_windows(app: &AppHandle) -> bool {
     hid_any
 }
 
-/// Wait for UI-thread unmapping, then allow compositor fade-out to complete.
-/// A queued hide returning Ok is not proof of native visibility on GTK.
+/// Wait for UI-thread hiding/minimization and compositor fade-out to complete.
+/// A queued request returning Ok is not proof of native visibility on GTK.
 async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
     let labels = tool_state().hidden.clone();
     let until = std::time::Instant::now() + Duration::from_secs(3);
@@ -698,7 +721,18 @@ async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
         let mut visible = false;
         for label in &labels {
             if let Some(window) = app.get_webview_window(label) {
-                visible |= window.is_visible().map_err(|e| e.to_string())?;
+                let mapped = window.is_visible().map_err(|e| e.to_string())?;
+                #[cfg(target_os = "linux")]
+                if pins::native_wayland() {
+                    // xdg-toplevel has no minimized state acknowledgement.
+                    // GTK/Tao's ICONIFIED cache therefore cannot establish
+                    // visibility here. Drain GTK below and allow compositor
+                    // suspension/fade; native QA observes Mutter and pixels.
+                    continue;
+                }
+                #[cfg(target_os = "linux")]
+                let mapped = mapped && !window.is_minimized().map_err(|e| e.to_string())?;
+                visible |= mapped;
             }
         }
         if !visible {
@@ -736,6 +770,23 @@ fn restore_app_windows(app: &AppHandle) {
     let hidden = std::mem::take(&mut tool_state().hidden);
     for label in hidden {
         if let Some(window) = app.get_webview_window(&label) {
+            #[cfg(target_os = "linux")]
+            if pins::native_wayland() {
+                let target = window.clone();
+                let _ = window.run_on_main_thread(move || {
+                    use gtk::prelude::*;
+                    if let Ok(gtk) = target.gtk_window() {
+                        // Tao skips focus while its queued minimized cache is
+                        // still set. Present the mapped GTK toplevel directly.
+                        gtk.deiconify();
+                        gtk.show();
+                        gtk.present();
+                    }
+                });
+                continue;
+            }
+            #[cfg(target_os = "linux")]
+            let _ = window.unminimize();
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -743,7 +794,7 @@ fn restore_app_windows(app: &AppHandle) {
 }
 
 /// Place a borderless window exactly over `display` (physical pixels).
-fn cover_display(window: &WebviewWindow, display: &DisplayInfo) {
+async fn cover_display(window: &WebviewWindow, display: &DisplayInfo) -> Result<(), String> {
     let _ = window.set_position(PhysicalPosition::new(display.x, display.y));
     let _ = window.set_size(PhysicalSize::new(display.width, display.height));
     #[cfg(target_os = "macos")]
@@ -756,6 +807,34 @@ fn cover_display(window: &WebviewWindow, display: &DisplayInfo) {
     {
         let _ = window.set_fullscreen(true);
     }
+    #[cfg(target_os = "linux")]
+    {
+        let target = window.clone();
+        let rect = display.logical_rect();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        window.run_on_main_thread(move || {
+            use gtk::prelude::*;
+            let result = (|| -> Result<(), String> {
+                let window = target.gtk_window().map_err(|e| e.to_string())?;
+                let display = window.display();
+                let index = (0..display.n_monitors()).find(|&index| {
+                    display.monitor(index).is_some_and(|monitor| {
+                        let g = monitor.geometry();
+                        (g.x(), g.y(), g.width(), g.height()) == rect
+                    })
+                }).ok_or("selected monitor is no longer available to GTK")?;
+                // Wayland ignores global set_position. Fullscreen must name
+                // the actual GDK output, using its logical geometry.
+                window.fullscreen_on_monitor(&display.default_screen(), index);
+                Ok(())
+            })();
+            let _ = tx.send(result);
+        }).map_err(|e| e.to_string())?;
+        tokio::time::timeout(Duration::from_secs(5), rx).await
+            .map_err(|_| "GTK monitor placement timed out")?
+            .map_err(|e| e.to_string())??;
+    }
+    Ok(())
 }
 
 /// Hide app windows, capture `display_id` (default: the display under the
@@ -839,6 +918,12 @@ async fn open_overlay_inner(
     display_id: Option<String>,
     current_window: Option<WebviewWindow>,
 ) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if current_window.is_some() && pins::native_wayland() {
+        // GDK returns a synthetic origin on Wayland. It must never be used
+        // as a crop of the first output (or rejected only on another output).
+        return Err("Wayland does not expose the current window's screen coordinates. Use Screen region and select the window on the desired display.".into());
+    }
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     capture::request_capture_permission(app)
         .await
@@ -918,7 +1003,7 @@ async fn open_overlay_inner(
         .build()
         .map_err(|e| format!("open overlay window: {e}"))?;
     watch_session_window(&window);
-    cover_display(&window, &display);
+    cover_display(&window, &display).await?;
     window
         .show()
         .map_err(|e| format!("show overlay window: {e}"))?;
@@ -934,6 +1019,14 @@ pub async fn screenshot_open_overlay(
     display_id: Option<String>,
     include_current_window: Option<bool>,
 ) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    let display_id = if display_id.as_ref().is_none_or(|id| id.trim().is_empty())
+        && pins::native_wayland()
+    {
+        let worker = app.clone();
+        let caller = window.clone();
+        Some(blocking("invoking display", move || capture::display_for_window(&worker, &caller)).await?.id)
+    } else { display_id };
     open_overlay_with_window(
         &app,
         display_id,
@@ -977,8 +1070,11 @@ pub async fn screenshot_switch_display(app: AppHandle, window: WebviewWindow, di
         scale_factor: display.scale_factor, window_region: None, document: false, source_pin: None,
     });
     if let Ok(init) = &result {
+        if let Err(error) = cover_display(&window, &display).await {
+            let _ = window.show();
+            return Err(error);
+        }
         tool_state().overlay = Some(init.clone());
-        cover_display(&window, &display);
     }
     let _ = window.show();
     let _ = window.set_focus();
@@ -1559,18 +1655,29 @@ async fn open_recorder_bar(
     // Bottom-center of the recorded display.
     let s = display.scale_factor.max(0.5);
     let (pw, ph) = position
-        .map(|r| (r.w, r.h))
+        .map(|p| (p.rect.w, p.rect.h))
         .unwrap_or(((lw * s) as i32, (lh * s) as i32));
     let x = display.x + (display.width as i32 - pw) / 2;
     // Leave room above for the grown preview (240 logical px).
     let y = display.y + display.height as i32 - ph - (240.0 * s) as i32;
-    let (x, y) = position.map(|r| (r.x, r.y)).unwrap_or((x, y));
-    window
-        .set_position(PhysicalPosition::new(x, y))
-        .map_err(|e| format!("position recording controls: {e}"))?;
-    window
-        .set_size(PhysicalSize::new(pw as u32, ph as u32))
-        .map_err(|e| format!("size recording controls: {e}"))?;
+    let (x, y) = position.map(|p| (p.rect.x, p.rect.y)).unwrap_or((x, y));
+    #[cfg(target_os = "linux")]
+    if let Some(position) = position {
+        surface_backend::place_webview(&window, position)?;
+    } else {
+        window
+            .set_size(PhysicalSize::new(pw as u32, ph as u32))
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        window
+            .set_position(PhysicalPosition::new(x, y))
+            .map_err(|e| format!("position recording controls: {e}"))?;
+        window
+            .set_size(PhysicalSize::new(pw as u32, ph as u32))
+            .map_err(|e| format!("size recording controls: {e}"))?;
+    }
     // Finish loading and mapping the controls before the first recording
     // snapshot. Creating a hidden WebView does not finish its navigation;
     // showing it after capture starts can stall WindowServer and lose motion.

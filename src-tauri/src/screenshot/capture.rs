@@ -1,12 +1,13 @@
 //! Display model, still capture and frame sources for the screenshot tool.
 //!
 //! Displays come from Tauri's monitor API, so every coordinate the tool
-//! exchanges (display origin, size, cursor position, window placement) is in
-//! the same physical-pixel space. Capture backends:
+//! exchanges uses Tauri's per-monitor physical coordinates. On Linux, convert
+//! those coordinates back to GDK logical geometry for portal/GTK monitor lookup.
+//! Capture backends:
 //!
 //! - Windows / macOS stills: `xcap::Monitor::capture_image` (one shot).
 //! - Linux stills: the RDP server's X11 SHM / Wayland portal capturer, which
-//!   grabs the whole virtual desktop; the target display is cropped out.
+//!   crops the X11 virtual desktop, or selects the target Wayland monitor stream.
 //! - macOS recording: one-shot CoreGraphics snapshots, avoiding the display
 //!   stream / selective-sharing path implicated in a macOS 14 WindowServer
 //!   crash on a VMware display. Both GIF and MP4 use this compatibility path.
@@ -25,7 +26,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use anyhow::Context;
 use image::RgbaImage;
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::servers::rdp::capture::{Capturer, Frame};
 
@@ -50,6 +51,17 @@ pub struct DisplayInfo {
 }
 
 impl DisplayInfo {
+    #[cfg(target_os = "linux")]
+    pub(super) fn logical_rect(&self) -> (i32, i32, i32, i32) {
+        let scale = self.scale_factor.max(1.0);
+        (
+            (self.x as f64 / scale).round() as i32,
+            (self.y as f64 / scale).round() as i32,
+            (self.width as f64 / scale).round() as i32,
+            (self.height as f64 / scale).round() as i32,
+        )
+    }
+
     pub fn contains(&self, px: f64, py: f64) -> bool {
         px >= self.x as f64
             && py >= self.y as f64
@@ -266,6 +278,15 @@ pub fn resolve_display(app: &AppHandle, id: Option<&str>) -> anyhow::Result<Disp
 /// The display under the mouse pointer (hotkey / button trigger), falling
 /// back to the primary display.
 pub fn display_at_cursor(app: &AppHandle) -> anyhow::Result<DisplayInfo> {
+    #[cfg(target_os = "linux")]
+    if crate::servers::rdp::capture::wayland::is_wayland_session() {
+        // Wayland cannot expose the global cursor; Tao returns a synthetic
+        // (0,0). Choose the invoking/main window's monitor before hiding it.
+        if let Some(window) = app.get_webview_window("main") {
+            return display_for_window(app, &window);
+        }
+        return resolve_display(app, None);
+    }
     let displays = list_displays(app)?;
     if let Ok(pos) = app.cursor_position() {
         if let Some(d) = displays.iter().find(|d| d.contains(pos.x, pos.y)) {
@@ -273,6 +294,28 @@ pub fn display_at_cursor(app: &AppHandle) -> anyhow::Result<DisplayInfo> {
         }
     }
     Ok(primary_of(displays))
+}
+
+#[cfg(target_os = "linux")]
+pub(super) fn display_for_window(
+    app: &AppHandle,
+    window: &tauri::WebviewWindow,
+) -> anyhow::Result<DisplayInfo> {
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    let window = window.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(window.current_monitor().map(|m| {
+            m.map(|m| {
+                let p = m.position();
+                format!("{},{}", p.x, p.y)
+            })
+        }));
+    })
+    .context("dispatch invoking monitor lookup to GTK")?;
+    let id = rx
+        .recv_timeout(Duration::from_secs(5))
+        .context("wait for invoking monitor")??;
+    resolve_display(app, id.as_deref())
 }
 
 fn primary_of(displays: Vec<DisplayInfo>) -> DisplayInfo {
@@ -520,6 +563,8 @@ fn frame_region_to_rgba(frame: &Frame, region: (u32, u32, u32, u32)) -> anyhow::
 enum Backend {
     Persistent(Box<dyn Capturer>),
     OneShot,
+    #[cfg(target_os = "linux")]
+    Unavailable(String),
     #[cfg(target_os = "macos")]
     MacRegion(anyhow::Result<mac_snapshot::RegionSnapshot>),
 }
@@ -564,13 +609,39 @@ impl FrameSource {
         let log =
             crate::servers::engine::LogEmitter::new(app.clone(), crate::servers::ServerType::Rdp);
         let native_id = native_display_id(&display);
-        let backend = match crate::servers::rdp::capture::create_capturer_for_display(
+        #[cfg(target_os = "linux")]
+        let capture = if crate::servers::rdp::capture::wayland::is_wayland_session() {
+            wayland_monitor_capture(app, &log, &display, request_input)
+        } else {
+            crate::servers::rdp::capture::create_capturer_for_display(
+                &log,
+                native_id.as_deref(),
+                request_input,
+            )
+        };
+        #[cfg(not(target_os = "linux"))]
+        let capture = crate::servers::rdp::capture::create_capturer_for_display(
             &log,
             native_id.as_deref(),
             request_input,
-        ) {
+        );
+        let backend = match capture {
             Ok(capturer) => Backend::Persistent(capturer),
             Err(e) => {
+                #[cfg(target_os = "linux")]
+                if crate::servers::rdp::capture::wayland::is_wayland_session() {
+                    // Retrying a generic one-shot source would silently capture
+                    // a different monitor and mask denial/metadata errors.
+                    return Self {
+                        app: app.clone(),
+                        display,
+                        backend: Backend::Unavailable(format!("{e:#}")),
+                        last: None,
+                        captured_at: None,
+                        region: None,
+                        desktop_origin: (0, 0),
+                    };
+                }
                 log::warn!(
                     "screenshot: persistent capture unavailable ({e:#}); using one-shot capture"
                 );
@@ -646,12 +717,7 @@ impl FrameSource {
                     self.app.clone(),
                     crate::servers::ServerType::Rdp,
                 );
-                let native_id = native_display_id(&self.display);
-                let replacement = crate::servers::rdp::capture::create_capturer_for_display(
-                    &log,
-                    native_id.as_deref(),
-                    true,
-                )?;
+                let replacement = wayland_monitor_capture(&self.app, &log, &self.display, true)?;
                 anyhow::ensure!(
                     replacement.supports_portal_input(),
                     "Wayland pointer permission was not granted. Allow remote control to use automatic scrolling, or continue manually."
@@ -718,8 +784,12 @@ impl FrameSource {
         let (width, height) = (u32::from(frame.width), u32::from(frame.height));
         #[cfg(target_os = "linux")]
         let rect = {
-            if (width, height) == (self.display.width, self.display.height) {
-                region
+            if crate::servers::rdp::capture::wayland::is_wayland_session() {
+                map_region(
+                    region,
+                    (self.display.width, self.display.height),
+                    (width, height),
+                )
             } else {
                 let x = (self.display.x - self.desktop_origin.0).max(0) as u32;
                 let y = (self.display.y - self.desktop_origin.1).max(0) as u32;
@@ -804,6 +874,8 @@ impl FrameSource {
                 self.captured_at = Some(Instant::now());
                 Some(image)
             }
+            #[cfg(target_os = "linux")]
+            Backend::Unavailable(error) => anyhow::bail!("{error}"),
             #[cfg(target_os = "macos")]
             Backend::MacRegion(snapshot) => {
                 ensure_capture_permission()?;
@@ -836,6 +908,8 @@ impl FrameSource {
                         self.captured_at = Some(Instant::now());
                         image
                     }
+                    #[cfg(target_os = "linux")]
+                    Backend::Unavailable(error) => anyhow::bail!("{error}"),
                     #[cfg(target_os = "macos")]
                     Backend::MacRegion(_) => {
                         unreachable!("region snapshots always return an image")
@@ -863,13 +937,37 @@ impl FrameSource {
     fn crop_desktop(&self, desktop: RgbaImage) -> RgbaImage {
         #[cfg(target_os = "linux")]
         {
-            crop_desktop_to_display(&self.app, desktop, &self.display)
+            if crate::servers::rdp::capture::wayland::is_wayland_session() {
+                desktop
+            } else {
+                crop_desktop_to_display(&self.app, desktop, &self.display)
+            }
         }
         #[cfg(not(target_os = "linux"))]
         {
             desktop
         }
     }
+}
+
+#[cfg(target_os = "linux")]
+fn wayland_monitor_capture(
+    app: &AppHandle,
+    log: &crate::servers::engine::LogEmitter,
+    display: &DisplayInfo,
+    request_input: bool,
+) -> anyhow::Result<Box<dyn Capturer>> {
+    use crate::servers::rdp::capture::wayland::{MonitorTarget, try_new_for_monitor};
+    let (x, y, width, height) = display.logical_rect();
+    try_new_for_monitor(
+        log,
+        request_input,
+        MonitorTarget {
+            position: (x, y),
+            size: (width, height),
+            single_monitor: list_displays(app)?.len() == 1,
+        },
+    )
 }
 
 fn capture_one_shot(app: &AppHandle, display: &DisplayInfo) -> anyhow::Result<RgbaImage> {
@@ -901,7 +999,7 @@ fn crop_desktop_to_display(
     if desktop.dimensions() == (display.width, display.height) {
         return desktop;
     }
-    // The X11 root / portal stream origin is the top-left of the bounding
+    // The X11 root origin is the top-left of the bounding
     // box of all monitors.
     let (min_x, min_y) = list_displays(app)
         .map(|ds| {
@@ -919,6 +1017,22 @@ fn crop_desktop_to_display(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn gdk_geometry_restores_each_monitors_logical_origin_and_size() {
+        let display = DisplayInfo {
+            id: "-3840,0".into(),
+            name: "left 200%".into(),
+            x: -3840,
+            y: 0,
+            width: 2560,
+            height: 1440,
+            scale_factor: 2.0,
+            primary: false,
+        };
+        assert_eq!(display.logical_rect(), (-1920, 0, 1280, 720));
+    }
 
     #[test]
     fn clamp_region_stays_inside_image() {

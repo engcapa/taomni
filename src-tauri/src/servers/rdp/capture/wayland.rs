@@ -54,7 +54,57 @@ pub(crate) fn try_new(log: &LogEmitter, request_input: bool) -> anyhow::Result<B
         "Wayland session: requesting one RemoteDesktop portal session for persistent \
          PipeWire capture and optional keyboard/pointer control",
     );
-    Ok(Box::new(WaylandCapturer::new(log, request_input)?))
+    Ok(Box::new(WaylandCapturer::new(log, request_input, None)?))
+}
+
+/// Portal metadata uses compositor logical coordinates, including on mixed-DPI desktops.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct MonitorTarget {
+    pub position: (i32, i32),
+    pub size: (i32, i32),
+    pub single_monitor: bool,
+}
+
+pub(crate) fn try_new_for_monitor(
+    log: &LogEmitter,
+    request_input: bool,
+    target: MonitorTarget,
+) -> anyhow::Result<Box<dyn Capturer>> {
+    Ok(Box::new(WaylandCapturer::new(
+        log,
+        request_input,
+        Some(target),
+    )?))
+}
+
+fn monitor_stream_index(
+    streams: &[(Option<(i32, i32)>, Option<(i32, i32)>)],
+    target: MonitorTarget,
+) -> anyhow::Result<usize> {
+    let matches: Vec<_> = streams
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (position, size))| {
+            (*position == Some(target.position) && *size == Some(target.size)).then_some(index)
+        })
+        .collect();
+    if matches.len() == 1 {
+        return Ok(matches[0]);
+    }
+    // Metadata is optional in the portal protocol. A unique stream is safe
+    // only when the OS itself reports one monitor, never on a dual desktop.
+    if target.single_monitor
+        && streams.len() == 1
+        && streams[0].0.is_none_or(|p| p == target.position)
+        && streams[0].1.is_none_or(|s| s == target.size)
+    {
+        return Ok(0);
+    }
+    bail!(
+        "The screen-sharing portal did not identify the selected monitor at {:?} ({:?}). Share the selected screen or all screens and retry. Returned streams: {streams:?}",
+        target.position,
+        target.size
+    )
 }
 
 #[derive(Debug)]
@@ -131,7 +181,7 @@ struct PortalContext {
 }
 
 impl PortalContext {
-    fn new(request_input: bool) -> anyhow::Result<(Self, OwnedFd)> {
+    fn new(request_input: bool, target: Option<MonitorTarget>) -> anyhow::Result<(Self, OwnedFd)> {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -166,7 +216,7 @@ impl PortalContext {
                     &session,
                     CursorMode::Embedded,
                     SourceType::Monitor.into(),
-                    false,
+                    target.is_some(),
                     None,
                     PersistMode::DoNot,
                 )
@@ -174,10 +224,27 @@ impl PortalContext {
                 .response()?;
 
             let response = remote_desktop.start(&session, None).await?.response()?;
-            let stream = response
+            let streams = response
                 .streams()
-                .and_then(|streams| streams.first())
+                .filter(|streams| !streams.is_empty())
                 .ok_or_else(|| anyhow::anyhow!("portal did not return a monitor stream"))?;
+            let index = match target {
+                Some(target) => match monitor_stream_index(
+                    &streams
+                        .iter()
+                        .map(|s| (s.position(), s.size()))
+                        .collect::<Vec<_>>(),
+                    target,
+                ) {
+                    Ok(index) => index,
+                    Err(error) => {
+                        let _ = session.close().await;
+                        return Err(error);
+                    }
+                },
+                None => 0,
+            };
+            let stream = &streams[index];
             let logical_size = stream.size().and_then(|(width, height)| {
                 u32::try_from(width).ok().zip(u32::try_from(height).ok())
             });
@@ -284,8 +351,12 @@ pub(crate) struct WaylandCapturer {
 }
 
 impl WaylandCapturer {
-    fn new(log: &LogEmitter, request_input: bool) -> anyhow::Result<Self> {
-        let (portal, pipewire_fd) = PortalContext::new(request_input).map_err(|error| {
+    fn new(
+        log: &LogEmitter,
+        request_input: bool,
+        target: Option<MonitorTarget>,
+    ) -> anyhow::Result<Self> {
+        let (portal, pipewire_fd) = PortalContext::new(request_input, target).map_err(|error| {
             anyhow::anyhow!(
                 "Wayland RemoteDesktop portal authorization failed: {error}. \
                  Approve the monitor and requested input devices in the compositor dialog."
@@ -718,6 +789,38 @@ fn copy_pipewire_bgra(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn monitor_stream_selection_uses_logical_geometry_not_stream_order() {
+        let target = MonitorTarget {
+            position: (1920, 0),
+            size: (1280, 720),
+            single_monitor: false,
+        };
+        let streams = [
+            (Some((0, 0)), Some((1920, 1080))),
+            (Some((1920, 0)), Some((1280, 720))),
+        ];
+        assert_eq!(monitor_stream_index(&streams, target).unwrap(), 1);
+        assert_eq!(
+            monitor_stream_index(&[streams[1], streams[0]], target).unwrap(),
+            0
+        );
+        assert!(monitor_stream_index(&[streams[0]], target).is_err());
+        assert!(monitor_stream_index(&[(None, None)], target).is_err());
+        assert!(monitor_stream_index(&[streams[1], streams[1]], target).is_err());
+    }
+
+    #[test]
+    fn only_an_os_single_monitor_allows_missing_portal_metadata() {
+        let target = MonitorTarget {
+            position: (-1920, 0),
+            size: (1920, 1080),
+            single_monitor: true,
+        };
+        assert_eq!(monitor_stream_index(&[(None, None)], target).unwrap(), 0);
+        assert!(monitor_stream_index(&[(Some((0, 0)), None)], target).is_err());
+    }
 
     #[test]
     fn session_detection_prefers_wayland_even_with_xwayland() {
