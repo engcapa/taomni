@@ -7,6 +7,44 @@
 #[cfg(not(feature = "std"))]
 use alloc::{boxed::Box, vec::Vec};
 
+/// Reusable scratch for estimates with a fresh MPPC history on every call.
+/// It is independent of the connection's send/receive compression histories.
+pub struct MppcSizeEstimator {
+    context: MppcContext,
+    output: Vec<u8>,
+}
+
+impl Default for MppcSizeEstimator {
+    fn default() -> Self {
+        Self {
+            context: MppcContext::new(1),
+            output: Vec::new(),
+        }
+    }
+}
+
+impl core::fmt::Debug for MppcSizeEstimator {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("MppcSizeEstimator").finish_non_exhaustive()
+    }
+}
+
+impl MppcSizeEstimator {
+    pub fn estimate(&mut self, data: &[u8]) -> Result<usize, BulkError> {
+        if BulkCompressor::should_skip_compression(data.len()) {
+            return Ok(data.len());
+        }
+        self.context.reset_for_estimate();
+        self.output.resize(data.len(), 0);
+        let (size, packet_flags) = self.context.compress(data, &mut self.output)?;
+        Ok(if packet_flags & crate::flags::PACKET_COMPRESSED != 0 {
+            size + 1
+        } else {
+            data.len() + usize::from(packet_flags & BULK_COMPRESSION_FLAGS_MASK != 0)
+        })
+    }
+}
+
 use crate::CompressionType;
 use crate::error::BulkError;
 use crate::mppc::MppcContext;
@@ -313,11 +351,16 @@ mod tests {
                 seed as u8
             })
             .collect();
+        let mut reusable = MppcSizeEstimator::default();
         for input in [
             vec![],
             vec![42; 50],
             vec![42; 16374],
-            noise,
+            noise.clone(),
+            vec![42; 1024],
+            noise[..64].to_vec(),
+            noise[..1024].to_vec(),
+            vec![0; 8192],
             vec![42; 16384],
         ] {
             let mut full = BulkCompressor::new(CompressionType::Rdp5).unwrap();
@@ -329,6 +372,7 @@ mod tests {
             };
             // Repeat to prove that earlier estimates never contribute history.
             for _ in 0..2 {
+                assert_eq!(reusable.estimate(&input).unwrap(), expected);
                 assert_eq!(
                     BulkCompressor::estimate_mppc64k_size(&input).unwrap(),
                     expected

@@ -9,6 +9,9 @@ Encoder-adaptive patch (`docs-feature/rdp-server-parity/encoder-adaptive-design.
   resize reset and connection-local error fallback.
 - Independent scratch MPPC estimate from at most four separated 256-byte planar strips;
   select planar bitmap or default-quantization RemoteFX per dirty rectangle.
+- Keep the estimator's scratch allocation per adaptive handler while starting
+  every estimate with a fresh logical history. Sampling, size estimates and
+  wire compression histories retain their previous semantics.
 - For raw planar candidates, derive the exact length and those same sample bytes
   directly from the cropped pixels; materialize all planes only if planar wins.
   Byte-layout tests cover eight pixel formats, parent strides and split bitmaps.

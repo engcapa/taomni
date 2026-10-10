@@ -559,6 +559,7 @@ mod tests {
 
     #[test]
     fn lazy_raw_planar_samples_match_materialized_bytes_across_crops_and_layouts() {
+        let mut estimator = ironrdp_bulk::MppcSizeEstimator::default();
         for format in [
             PixelFormat::ARgb32,
             PixelFormat::XRgb32,
@@ -614,8 +615,9 @@ mod tests {
                         };
                         assert_eq!(sample, expected, "{width}x{height} {format:?}");
                         assert_eq!(
-                            super::super::estimate_bulk_sample(length, &sample).unwrap(),
-                            super::super::estimate_bulk_size(&output).unwrap(),
+                            super::super::estimate_bulk_sample(&mut estimator, length, &sample)
+                                .unwrap(),
+                            super::super::estimate_bulk_size(&mut estimator, &output).unwrap(),
                         );
                     }
                 }
