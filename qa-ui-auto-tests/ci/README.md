@@ -163,7 +163,7 @@ fixture owns the null sink, and desktop teardown stops the session daemons.
 The VNC desktop binds loopback, uses a disposable VNCAuth password outside
 uploaded reports, and authenticates an actual RFB handshake before launch.
 Dual-display selections use a job-owned Xorg dummy server with two RandR
-outputs and `x0tigervncserver` serving that same desktop; the authenticated RFB
+outputs and the foreground `X0tigervnc` binary serving that same desktop; the authenticated RFB
 probe must observe the full 3840×1080 framebuffer. Single-display selections
 continue to use Xtigervnc. Ubuntu 22.04 dual-display profiles install a
 checksum-pinned dummy 0.4.1 driver built against Jammy's Xorg ABI, because its
