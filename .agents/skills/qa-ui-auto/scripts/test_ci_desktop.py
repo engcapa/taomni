@@ -473,6 +473,11 @@ class DesktopTests(unittest.TestCase):
             def activate(command, **kwargs):
                 if command[0] == 'dbus-update-activation-environment':
                     activation_env.update({key: os.environ[key] for key in command[1:]})
+                elif command[0] == '/usr/bin/python3' and command[1].endswith('ci_wayland_activation_probe.py'):
+                    self.assertEqual(command[2:], ['--output', str(Path(d) / 'activation-probe.json')])
+                    self.assertEqual(kwargs, {'check': True, 'timeout': 45})
+                    self.assertEqual(os.environ['DISPLAY'], ':42')
+                    self.assertEqual(os.environ['GDK_BACKEND'], 'wayland')
                 else:
                     self.assertEqual(command, [
                         'gdbus', 'call', '--session', '--dest', 'org.a11y.Bus',
