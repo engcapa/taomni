@@ -27,7 +27,8 @@ verification:
   - id: workflow
     requirement: The public manual mode stays alive across pauses and at page end, switches to automatic and back, receives actual OS wheel input, finishes with the
       complete original page pixels, and cancellation returns the original selection. The completed scroll editor has native decorations,
-      exits fullscreen and can resize to 760 by 620 logical pixels while keeping the original stitched image dimensions.
+      exits fullscreen and can resize to 760 by 620 logical pixels while keeping the original stitched image dimensions. Wait for the
+      native window transition after the result event, and retain separate resizable/fullscreen/decorated facts on failure.
     actions:
     - 1
     - 3

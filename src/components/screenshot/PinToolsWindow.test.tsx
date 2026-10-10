@@ -18,6 +18,20 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("separate pin options", () => {
+  it("waits for the source pin before exposing editable controls", async () => {
+    let initialize!: (value: unknown) => void;
+    api.invoke.mockReturnValueOnce(new Promise((resolve) => { initialize = resolve; }));
+    render(<PinToolsWindow />);
+    expect(screen.queryByTestId("screenshot-pin-note-input")).not.toBeInTheDocument();
+    expect(screen.getByTestId("screenshot-pin-tools-close")).toBeEnabled();
+    await waitFor(() => expect(api.invoke).toHaveBeenCalled());
+    await act(async () => initialize({ label: "screenshot-pin-9", view: { zoom: 1, opacity: 1, note: "Original", busy: false, error: null, notice: null } }));
+    expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Original");
+    fireEvent.change(screen.getByTestId("screenshot-pin-note-input"), { target: { value: "New note" } });
+    fireEvent.click(screen.getByTestId("screenshot-pin-note-save"));
+    expect(api.emitTo).toHaveBeenCalledWith("screenshot-pin-9", "screenshot://pin-tool", { action: "note", value: "New note" });
+  });
+
   it("keeps consecutive opacity changes through delayed source replies", async () => {
     render(<PinToolsWindow />);
     const slider = await screen.findByTestId("screenshot-pin-opacity");

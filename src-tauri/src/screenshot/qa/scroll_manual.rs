@@ -170,9 +170,20 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
       const img=document.querySelector('[data-testid="screenshot-scroll-result-image"]');
       return {preview:!!img,width:img?.naturalWidth,height:img?.naturalHeight};
     "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
-    let editor_resizable = overlay.is_resizable().map_err(|e| e.to_string())?
-        && !overlay.is_fullscreen().map_err(|e| e.to_string())?
-        && overlay.is_decorated().map_err(|e| e.to_string())?;
+    // The result event can reach the renderer before the capture command has
+    // finished configuring the native document window. Observe the completed
+    // transition instead of sampling the old fullscreen selection state.
+    let mut editor_state = json!({});
+    let mut editor_resizable = false;
+    for _ in 0..100 {
+        let resizable = overlay.is_resizable().map_err(|e| e.to_string())?;
+        let fullscreen = overlay.is_fullscreen().map_err(|e| e.to_string())?;
+        let decorated = overlay.is_decorated().map_err(|e| e.to_string())?;
+        editor_state = json!({"resizable":resizable,"fullscreen":fullscreen,"decorated":decorated});
+        editor_resizable = resizable && !fullscreen && decorated;
+        if editor_resizable { break; }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     overlay.set_size(tauri::LogicalSize::new(760.0, 620.0)).map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(250)).await;
     let editor_size = observed_inner_rect(&overlay).await.map_err(|e| e.to_string())?.1;
@@ -260,6 +271,6 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
             && comparison["passed"] == true
             && cancelled == true
             && artifact.is_some(),
-        json!({"editorResizable":editor_resizable,"editorResized":editor_resized,"editorSize":editor_size,"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
+        json!({"editorState":editor_state,"editorResizable":editor_resizable,"editorResized":editor_resized,"editorSize":editor_size,"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
     ))
 }
