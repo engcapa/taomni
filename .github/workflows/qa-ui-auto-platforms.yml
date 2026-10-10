@@ -459,12 +459,18 @@ jobs:
         if: always()
         with:
           name: qa-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
+          # Authentic updater bundles and disposable installs are fixture data.
+          # Keep staged manifests/signatures and host verification evidence.
           path: |
             qa-ui-auto-report/${{ matrix.id }}/
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
             !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/_updater-assets/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/artifacts/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/staged/*.app.tar.gz
+            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/Disposable.app/**
           if-no-files-found: warn
           retention-days: 14
       - name: Retain compact native diagnostics
@@ -483,6 +489,10 @@ jobs:
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
             !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/_updater-assets/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/artifacts/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/staged/*.app.tar.gz
+            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/Disposable.app/**
           if-no-files-found: warn
           retention-days: 14
 
