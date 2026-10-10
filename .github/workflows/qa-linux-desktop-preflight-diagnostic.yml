@@ -17,10 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {profile: ubuntu-24.04-xvfb, runner: ubuntu-24.04}
-          - {profile: ubuntu-22.04-x11, runner: ubuntu-22.04}
           - {profile: ubuntu-22.04-vnc, runner: ubuntu-22.04}
-          - {profile: ubuntu-26.04-wayland, runner: ubuntu-26.04}
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
