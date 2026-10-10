@@ -117,7 +117,7 @@ def main() -> None:
     parser.add_argument("--ready", type=Path, required=True)
     parser.add_argument("--socket", type=Path, required=True)
     parser.add_argument("--absolute-pointer", action="store_true",
-                        help="inject logical absolute motion on the owned Clutter seat for mixed DPI")
+                        help="position the owned native Clutter seat in logical coordinates for mixed DPI")
     args = parser.parse_args()
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     destination = "org.gnome.Mutter.RemoteDesktop"
@@ -152,12 +152,13 @@ def main() -> None:
 
     def pointer(x, y):
         if args.absolute_pointer:
-            # The job-owned Shell hosts a real virtual input device. Absolute
-            # logical motion avoids relative-motion seams across output scales;
-            # acceptance still requires Mutter's observed global pointer.
+            # Mutter 50's headless virtual-device motion clips at mixed-DPI
+            # output boundaries. Its public native-seat warp API positions the
+            # actual OS pointer; RemoteDesktop supplies balanced button events.
+            # Always verify global.get_pointer() before issuing a button.
             def absolute_motion(px, py):
-                evaluate("(() => { global.__taomniQaPointer.notify_absolute_motion("
-                         f"imports.gi.GLib.get_monotonic_time(), {px}, {py}); return true; }})()")
+                evaluate("(() => { global.__taomniQaSeat.warp_pointer("
+                         f"{int(px)}, {int(py)}); return true; }})()")
             return move_pointer(evaluate, absolute_motion, x, y, absolute=True)
         return move_pointer(evaluate, lambda dx, dy: call(
             session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (dx, dy))), x, y)
@@ -229,8 +230,7 @@ def main() -> None:
         call(session, interface, "NotifyKeyboardKeycode", GLib.Variant("(ub)", (29, False)))
         call(session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (0.0, 0.0)))
         if args.absolute_pointer:
-            evaluate("(() => { global.__taomniQaPointer = global.stage.context.get_backend().get_default_seat()"
-                     ".create_virtual_device(imports.gi.Clutter.InputDeviceType.POINTER_DEVICE); return true; })()")
+            evaluate("(() => { global.__taomniQaSeat = global.stage.context.get_backend().get_default_seat(); return true; })()")
         listener.bind(str(args.socket))
         args.socket.chmod(0o600)
         listener.listen(1)
@@ -352,7 +352,7 @@ def main() -> None:
             "[Math.round(global.stage.width / 2), Math.round(global.stage.height / 2)]"))
         args.ready.write_text(json.dumps({"session": session, "devices": ["keyboard", "pointer"],
                                          "transport": "Mutter RemoteDesktop",
-                                         "pointer_transport": "Clutter virtual absolute motion" if args.absolute_pointer
+                                         "pointer_transport": "Clutter native seat warp and Mutter RemoteDesktop buttons" if args.absolute_pointer
                                              else "Mutter RemoteDesktop relative motion",
                                          "layout": layout, "pointer_probes": pointer_probes,
                                          "initial_pointer": initial_pointer}), encoding="utf-8")
