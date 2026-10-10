@@ -244,10 +244,13 @@ def make_plan(args) -> dict:
                 entry_capabilities = capabilities(eligible, mode)
                 if mode == "native" and getattr(args, "native_release", False):
                     entry_capabilities = sorted(set(entry_capabilities) | {"release"})
+                expected_desktop = (profile.identity(
+                    profile_name, dual_display="dual-display" in entry_capabilities
+                ) if profile else {})
                 entries.append({"id": entry_id, "platform": target, "platform_key": platform_key,
                                 "runner": runner, "arch": arch, "mode": mode, "selected_ids": ids,
                                 "linux_profile": profile_name, "linux_wrapper": profile.wrapper if profile else "",
-                                "desktop": profile.identity(profile_name) if profile else {},
+                                "desktop": expected_desktop,
                                 "cache_key": profile_name if profile_name and profile_name != DEFAULT_LINUX_PROFILE else platform_key,
                                 "capabilities": entry_capabilities,
                                 "case_digests": {c.id: input_digest(c.source_path) for c in eligible}})

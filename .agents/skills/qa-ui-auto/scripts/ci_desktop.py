@@ -283,6 +283,12 @@ EndSection
                              "-noreset", "-nolisten", "tcp", "-novtswitch", "-sharevts", "-ac"])
         self._wait(server, lambda: subprocess.run(["xdpyinfo"], stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL, timeout=5).returncode == 0, "owned dual-output Xorg")
+        # Xorg's dummy driver does not attach the host keyboard map. Without
+        # an explicit XKB layout, XKeysymToKeycode resolves arrows and End to
+        # unrelated keycodes (WebKit then reports NumpadEnter/Unidentified),
+        # so native editor and dialog shortcuts silently target the wrong key.
+        subprocess.run(["setxkbmap", "-display", os.environ["DISPLAY"], "us"],
+                       check=True, timeout=20)
 
     def _display_patterns(self, facts):
         report = (self.root / "multi-display-fixture.json").resolve()

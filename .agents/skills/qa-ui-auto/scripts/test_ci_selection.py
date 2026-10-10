@@ -86,6 +86,16 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(set(wayland['selected_ids']), {'TC-NATIVE-CORE-001', 'TC-MAIN-RAIL-03'})
         self.assertFalse(plan['gaps'])
 
+    def test_dual_display_x11_selection_binds_owned_xorg_identity(self):
+        plan = make_plan(args(scope='selected', platforms='linux', modes='native',
+                              linux_profiles=','.join(LINUX_PROFILES),
+                              case_ids='TC-SHOT-N23'))
+        for entry in plan['entries']:
+            if entry['linux_profile'] == 'ubuntu-26.04-wayland':
+                self.assertEqual(entry['desktop']['display_server'], 'Mutter')
+            else:
+                self.assertEqual(entry['desktop']['display_server'], 'Xorg dummy')
+
     def test_full_wayland_native_selection_matches_x11_case_ids(self):
         plan = make_plan(args(scope='all', platforms='linux', modes='native',
                               linux_profiles='ubuntu-24.04-xvfb,ubuntu-26.04-wayland'))
