@@ -797,7 +797,20 @@ fn restore_app_windows(app: &AppHandle) {
 /// Place a borderless window exactly over `display` (physical pixels).
 async fn cover_display(window: &WebviewWindow, display: &DisplayInfo) -> Result<(), String> {
     let _ = window.set_position(PhysicalPosition::new(display.x, display.y));
-    let _ = window.set_size(PhysicalSize::new(display.width, display.height));
+    #[cfg(target_os = "linux")]
+    if pins::native_wayland() {
+        // The hidden window still has the previous output's scale. A physical
+        // size request converted with that cache doubles GTK/WebKit's logical
+        // allocation when switching from 100% to 200% before output-enter.
+        let scale = display.scale_factor.max(1.0);
+        window.set_size(tauri::LogicalSize::new(
+            display.width as f64 / scale, display.height as f64 / scale,
+        )).map_err(|e| e.to_string())?;
+    } else {
+        window.set_size(PhysicalSize::new(display.width, display.height)).map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "linux"))]
+    window.set_size(PhysicalSize::new(display.width, display.height)).map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     {
         // Simple fullscreen hides the menu bar and Dock without the Space
