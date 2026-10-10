@@ -50,3 +50,5 @@ Wayland 新增状态记录明确显示 `maximized=true`、1920×1048。Tao 的 f
 第五轮 [38024966329](https://github.com/engcapa/taomni/actions/runs/38024966329) 的 Wayland 窗口已退出全屏和最大化，完整拼接像素和取消恢复通过，但尺寸断言仍失败。原始 `window-activation.jsonl` 显示 Mutter 的实际 frame 为 1100×800、调整后 760×620；GTK client-side shadow buffer 分别为 1152×852、812×672。测试误把含阴影的 buffer 当成配置窗口尺寸。N16 现在使用独立 Mutter frame 观察，保留 frame/buffer 原始几何，继续使用原严格尺寸阈值；不通过增加 52 像素容差掩盖窗口回归。其他平台仍检查原生 inner size。
 
 合并后提交 `209d546d` 本机 7 个前端文件共 314/314 通过（截图 63、main 的工作区补全 251），CI 执行脚本 3 项通过，4 项真实 Gio 合同测试因 Win11 平台不适用而跳过、由 Linux CI 验证。重新构建当前 QA 应用后，Win11 native N16、N17 为 2/2，构建身份、源码与报告一致。上述尺寸观察修正只影响 QA 场景，不改变产品窗口行为；继续由更新后的平台场景验证。
+
+第六轮合并提交 [38025524364](https://github.com/engcapa/taomni/actions/runs/38025524364) 的 macOS browser 在 TC-SHOT-033 发出源贴图透明度快捷键后立即读取设置滑块，早于异步 view 回传。用例补充等待实际滑块达到 90%，再保留原值断言，避免把窗口间异步状态传播当成同步操作；超时或最终错误值仍失败。

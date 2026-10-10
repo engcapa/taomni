@@ -35,6 +35,7 @@ steps:
 - press:
     key: Mod+-
     selector: '[data-testid="screenshot-pin-window"]'
+- wait_for: '[data-testid="screenshot-pin-opacity"][value="90"]'
 - assert_attribute:
     selector: '[data-testid="screenshot-pin-opacity"]'
     name: value
@@ -156,32 +157,32 @@ verification:
     - 11
     - 14
     - 16
-    - 18
-    - 20
-    - 22
+    - 19
+    - 21
     - 23
     - 24
     - 25
     - 26
-    - 29
-    - 32
-    - 36
-    - 38
-    - 41
-    - 43
+    - 27
+    - 30
+    - 33
+    - 37
+    - 39
+    - 42
     - 44
-    - 47
-    - 50
-    - 52
-    - 54
+    - 45
+    - 48
+    - 51
+    - 53
     - 55
-    - 59
-    - 61
-    - 66
-    - 69
-    - 71
+    - 56
+    - 60
+    - 62
+    - 67
+    - 70
     - 72
-    - 75
+    - 73
+    - 76
     checkpoints:
     - step: 10
       expectation: 'assert_not_visible: [data-testid="screenshot-pin-menu"]'
@@ -190,69 +191,69 @@ verification:
         this device''}'
     - step: 15
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''100%''}'
-    - step: 17
+    - step: 18
       expectation: Source pin opacity shortcut updates the separate options slider after resetting an already confirmed value.
-    - step: 19
+    - step: 20
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''110%''}'
-    - step: 21
+    - step: 22
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''100%''}'
-    - step: 28
+    - step: 29
       expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
         === 0.5''}'
-    - step: 31
+    - step: 32
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-window"]'', ''name'': ''data-collapsed'',
         ''equals'': ''true''}'
-    - step: 34
+    - step: 35
       expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
         === 0.5''}'
-    - step: 35
+    - step: 36
       expectation: 'assert_visible: [data-testid="screenshot-pin-surface"]'
-    - step: 40
+    - step: 41
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_copy_image"''}'
-    - step: 46
+    - step: 47
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_save_image"
         && window.__taomniStubScreenshotCalls.at(-1).args.dest === "pinned-original.png"''}'
-    - step: 49
+    - step: 50
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
         ''equals'': ''true''}'
-    - step: 57
+    - step: 58
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 1}'
-    - step: 64
+    - step: 65
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
         ''equals'': ''true''}'
-    - step: 65
+    - step: 66
       expectation: 'eval_readonly: {''expression'': "document.querySelector(''img'').naturalWidth === 400 && document.querySelector(''img'').naturalHeight
         === 300"}'
-    - step: 68
+    - step: 69
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
         ''equals'': ''false''}'
-    - step: 74
+    - step: 75
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 0}'
-    - step: 76
-      expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
     - step: 77
+      expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
+    - step: 78
       expectation: Main screenshot entry remains usable.
     results:
     - 10
     - 13
     - 15
-    - 17
-    - 19
-    - 21
-    - 28
-    - 31
-    - 34
+    - 18
+    - 20
+    - 22
+    - 29
+    - 32
     - 35
-    - 40
-    - 46
-    - 49
-    - 57
-    - 64
+    - 36
+    - 41
+    - 47
+    - 50
+    - 58
     - 65
-    - 68
-    - 74
-    - 76
+    - 66
+    - 69
+    - 75
     - 77
+    - 78
   visual:
   - check: Visible controls, state and image dimensions
     method: automated
