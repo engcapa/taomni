@@ -190,6 +190,7 @@ def main() -> None:
             return window
         if request["command"] == "place":
             rect = request["rect"]
+            activate = "Main.activateWindow(w); " if request.get("activate", False) else ""
             selector = f"w.get_pid() === {pid}" + (f" && w.get_title() === {json.dumps(title)}"
                 if title is not None else " && w.get_window_type() === imports.gi.Meta.WindowType.NORMAL")
             evaluate(f"(() => {{ const w = global.get_window_actors().map(a => a.meta_window)"
@@ -199,7 +200,7 @@ def main() -> None:
                      "if(!m) throw new Error('fixture target is outside actual monitors'); "
                      "w.unmaximize(3); w.move_to_monitor(m.index); "
                      f"w.move_resize_frame(true, {int(rect['x'])}, {int(rect['y'])}, "
-                     f"{int(rect['width'])}, {int(rect['height'])}); return true; }})()")
+                     f"{int(rect['width'])}, {int(rect['height'])}); {activate}return true; }})()")
             return True
         raise ValueError("unknown window command")
 
