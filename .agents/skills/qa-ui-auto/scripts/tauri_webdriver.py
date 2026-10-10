@@ -962,7 +962,10 @@ class NativeSession:
         # WebDriver /clear unfocuses form controls. Blur-committing inputs
         # (path breadcrumbs, rename fields) disappear before /value arrives.
         # Select and replace through keyboard input while retaining focus.
-        self.request("POST", self.element_path(element, "/click"), {})
+        # WebKit's coordinate click can also hit a neighbouring status row
+        # while an auto-focused input is moving during layout. Focus the
+        # resolved control without a pointer action, then use real keys.
+        self.focus(selector)
         if platform.system() == "Linux" and os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
             self._select_wayland_fill_input(selector)
         else:

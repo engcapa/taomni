@@ -380,6 +380,7 @@ class NativeSessionFillTest(TestCase):
         session.find = Mock(return_value="element-1")
         session.request = Mock(return_value=None)
         execute_results: list[bool] = [contenteditable]
+        session.focus = Mock(return_value="focused")
         if contenteditable:
             execute_results.extend(focus_results or [True])
         else:
@@ -430,8 +431,18 @@ class NativeSessionFillTest(TestCase):
             session.request.call_args_list,
         )
         self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
+        self.assertFalse(any(c.args[1].endswith('/click') for c in session.request.call_args_list))
+        session.focus.assert_called_once_with("input[name=title]")
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_called_once_with("Taomni")
+
+    def test_input_fill_rejects_missing_focus_before_typing(self) -> None:
+        session = self.session(False)
+        session.focus.side_effect = WebDriverError("element could not receive focus")
+        with self.assertRaisesRegex(WebDriverError, "could not receive focus"):
+            session.fill("input[name=title]", "Taomni")
+        session.press_combo.assert_not_called()
+        session.type_text.assert_not_called()
 
     def test_empty_password_fill_deletes_and_observes_value_without_empty_value_request(self) -> None:
         session = self.session(False)
@@ -500,10 +511,9 @@ class NativeSessionFillTest(TestCase):
             result = session.fill('input[type="password"]', text)
         self.assertEqual(result, 'filled input[type="password"]')
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
-        session.request.assert_has_calls([
-            call("POST", "/session/session-1/element/element-1/click", {}),
-            call("POST", "/session/session-1/element/element-1/value", {"text": text}),
-        ])
+        session.focus.assert_called_once_with('input[type="password"]')
+        session.request.assert_called_once_with(
+            "POST", "/session/session-1/element/element-1/value", {"text": text})
         session.type_text.assert_not_called()
         self.assertIn('el.value === "Qa1_test:@!"', session.execute.call_args.args[0])
 
