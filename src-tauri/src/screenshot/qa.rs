@@ -2175,6 +2175,35 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let (fixture, display, region) = open_fixture(&app, "anim")
         .await
         .map_err(|e| format!("{e:#}"))?;
+    #[cfg(target_os = "linux")]
+    let selection_layer_entry = wayland::active() && format == "gif";
+    #[cfg(not(target_os = "linux"))]
+    let selection_layer_entry = false;
+    if selection_layer_entry {
+        // Exercise the native selection-to-recorder lifecycle with the same
+        // fixture region. Closing the transferred selection surface must not
+        // unminimize main into the live recording or end the recorder session.
+        super::open_overlay(&app, Some(display.id.clone())).await?;
+        let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
+            .await
+            .map_err(|e| format!("{e:#}"))?;
+        let ready = run_js(
+            &overlay,
+            r#"
+            for(let i=0;i<100;i++) {
+                const image=document.querySelector('[data-testid="screenshot-base-image"]');
+                if(image?.complete && image.naturalWidth>0 && document.querySelector('[data-testid="screenshot-hint"]')) return true;
+                await new Promise(r=>setTimeout(r,100));
+            } return false;
+        "#,
+            Duration::from_secs(15),
+        )
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+        if ready != json!(true) {
+            return Err("native selection layer did not load before recording".into());
+        }
+    }
     let started = super::screenshot_start_recording(
         app.clone(),
         Some(display.id.clone()),
@@ -2188,6 +2217,8 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     .await?;
     let output =
         super::record::output_path(&started.recording_id).ok_or("recording output not tracked")?;
+    let selection_layer_closed = !selection_layer_entry
+        || wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
     let main_hidden = !main_visible(&app);
     let bar = wait_window(&app, super::RECORDER_LABEL, Duration::from_secs(10))
         .await
@@ -2258,6 +2289,7 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
         && info["naturalHeight"].as_u64() == Some(clip.height as u64)
         && (format != "mp4" || info["playbackMoved"] == json!(true));
     let ok = main_hidden
+        && selection_layer_closed
         && geometry["controlsOutside"] == json!(true)
         && geometry["bordersOutside"] == json!(true)
         && geometry["borderCount"].as_u64().unwrap_or(0) >= 2
@@ -2276,6 +2308,7 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     Ok(report(
         ok,
         json!({ "page":info,"clip":clip,"barClosed":closed,"mainHidden":main_hidden,"mainRestored":restored,
+        "selectionLayerEntry":selection_layer_entry,"selectionLayerClosed":selection_layer_closed,
         "gifCopied":copied,"previewRetained":preview_retained,"tempRemoved":output_removed,"format":format,"originalComparison":content,"artifact":artifact,"captureGeometry":geometry }),
     ))
 }

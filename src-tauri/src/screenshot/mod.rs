@@ -1168,22 +1168,33 @@ fn watch_session_window(window: &WebviewWindow) {
     let app = window.app_handle().clone();
     let label = window.label().to_string();
     window.on_window_event(move |event| {
+        if !matches!(
+            event,
+            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+        ) {
+            return;
+        }
+        let active = {
+            let state = tool_state();
+            if label == OVERLAY_LABEL {
+                state.overlay.is_some()
+            } else {
+                state.recorder_open
+            }
+        };
         #[cfg(target_os = "linux")]
         if matches!(event, tauri::WindowEvent::CloseRequested { .. }) && pins::native_wayland() {
-            log::info!("capture close requested: label={label}");
+            let ends_session = label != OVERLAY_LABEL || active;
+            log::info!("capture close requested: label={label}, ends_session={ends_session}");
             // GTK still has the focused source surface here. Destroyed is too
             // late to authorize activation of a minimized Wayland toplevel.
-            restore_app_windows(&app);
+            // A selection overlay closed after starting recording has already
+            // transferred ownership to the recorder; it must not restore yet.
+            if ends_session {
+                restore_app_windows(&app);
+            }
         }
         if matches!(event, tauri::WindowEvent::Destroyed) {
-            let active = {
-                let state = tool_state();
-                if label == OVERLAY_LABEL {
-                    state.overlay.is_some()
-                } else {
-                    state.recorder_open
-                }
-            };
             if active {
                 let app = app.clone();
                 // Joining recorder threads must not block the event loop.
