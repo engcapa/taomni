@@ -249,6 +249,17 @@ class Desktop:
   Option "AutoAddDevices" "false"
   Option "AllowMouseOpenFail" "true"
 EndSection
+Section "InputDevice"
+  Identifier "QA-Keyboard"
+  Driver "kbd"
+  Option "XkbModel" "pc105"
+  Option "XkbLayout" "us"
+EndSection
+Section "ServerLayout"
+  Identifier "QA-Layout"
+  Screen "QA-Screen"
+  InputDevice "QA-Keyboard" "CoreKeyboard"
+EndSection
 Section "Device"
   Identifier "QA-Dummy"
   Driver "dummy"
@@ -400,6 +411,11 @@ EndSection
             time.sleep(0.25)
             if compositor.poll() is not None:
                 raise RuntimeError("desktop compositor exited during startup")
+        # Xvfb and the job-owned Xorg dummy server have no host keyboard to
+        # inherit. Install an explicit US map before native XTest input so
+        # navigation keysyms resolve to the standard WebKit keycodes.
+        subprocess.run(["setxkbmap", "-display", os.environ["DISPLAY"], "-layout", "us", "-option", ""],
+                       check=True, timeout=20)
         # X11's own idle blanking is independent of the desktop's screen saver.
         subprocess.run(["xset", "s", "off"], check=True, timeout=10)
         subprocess.run(["xset", "s", "noblank"], check=True, timeout=10)

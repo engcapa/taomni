@@ -888,6 +888,11 @@ def _x11_keysyms_for_chord(chord: str) -> list[int]:
         "ArrowDown": 0xFF54,
         "ArrowLeft": 0xFF51,
         "ArrowRight": 0xFF53,
+        "PageUp": 0xFF55,
+        "PageDown": 0xFF56,
+        "Insert": 0xFF63,
+        "Delete": 0xFFFF,
+        "Backspace": 0xFF08,
         "Escape": 0xFF1B,
         "Space": 0x0020,
         "Control": 0xFFE3,
@@ -924,6 +929,50 @@ def _x11_keysyms_for_chord(chord: str) -> list[int]:
     return keysyms
 
 
+# Ubuntu's virtual X servers use the pc105 keycode table.  XKeysymToKeycode
+# can return a misleading alias when a server was started without a physical
+# keyboard (for example ArrowDown resolving to the keypad Enter code), which
+# makes WebKit report a wrong KeyboardEvent.code. Keep the navigation and
+# modifier keycodes explicit and use Xlib lookup for printable characters.
+_X11_PC105_KEYCODES = {
+    0xFF1B: 9,    # Escape
+    0xFF08: 22,   # BackSpace
+    0xFF09: 23,   # Tab
+    0xFF0D: 36,   # Return
+    0x0020: 65,   # Space
+    0xFFE3: 37,   # Control_L
+    0xFFE4: 105,  # Control_R
+    0xFFE1: 50,   # Shift_L
+    0xFFE2: 62,   # Shift_R
+    0xFFE9: 64,   # Alt_L
+    0xFFEA: 108,  # Alt_R
+    0xFFE7: 133,  # Meta_L
+    0xFFE8: 134,  # Meta_R
+    0xFF50: 110,  # Home
+    0xFF51: 113,  # Left
+    0xFF52: 111,  # Up
+    0xFF53: 114,  # Right
+    0xFF54: 116,  # Down
+    0xFF55: 112,  # PageUp
+    0xFF56: 117,  # PageDown
+    0xFF57: 115,  # End
+    0xFF63: 118,  # Insert
+    0xFFFF: 119,  # Delete
+    0xFFBE: 67,   # F1
+    0xFFBF: 68,   # F2
+    0xFFC0: 69,   # F3
+    0xFFC1: 70,   # F4
+    0xFFC2: 71,   # F5
+    0xFFC3: 72,   # F6
+    0xFFC4: 73,   # F7
+    0xFFC5: 74,   # F8
+    0xFFC6: 75,   # F9
+    0xFFC7: 76,   # F10
+    0xFFC8: 95,   # F11
+    0xFFC9: 96,   # F12
+}
+
+
 def _inject_x11_keys(keys: list[str]) -> None:
     x11 = ctypes.CDLL("libX11.so.6")
     xtst = ctypes.CDLL("libXtst.so.6")
@@ -948,7 +997,8 @@ def _inject_x11_keys(keys: list[str]) -> None:
         for chord in keys:
             keycodes: list[int] = []
             for keysym in _x11_keysyms_for_chord(chord):
-                keycode = x11.XKeysymToKeycode(display, keysym)
+                keycode = (_X11_PC105_KEYCODES[keysym] if keysym in _X11_PC105_KEYCODES
+                           else x11.XKeysymToKeycode(display, keysym))
                 if keycode == 0:
                     raise StepError(f"native_keys: no X11 keycode for {chord!r}")
                 keycodes.append(keycode)
