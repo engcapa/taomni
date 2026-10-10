@@ -19,6 +19,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    # The runner keeps its own backend Wayland-only. This probe, like the
+    # application's driver process, needs both connections in one GTK process.
+    os.environ["GDK_BACKEND"] = "wayland,x11"
     Gdk.set_allowed_backends("wayland,x11")
     Gtk.init([])
     native = Gtk.Window(title="QA activation native")
