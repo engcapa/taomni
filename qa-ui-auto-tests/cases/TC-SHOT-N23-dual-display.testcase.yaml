@@ -16,11 +16,11 @@ verification:
   review: reviewed
   requirements:
   - id: dual-capture
-    requirement: OS-enumerated dual outputs (100% and 200% on Wayland) capture their own independent GTK pixel originals. Verify persistent region frames used by recording and scrolling on both outputs. Invoke from each output, switch away and back using the public picker, then drag with actual OS input and Copy. Monitor surface geometry, viewport/DPR, PNG size and clipboard crop must match the target; the main window returns without migrating.
+    requirement: OS-enumerated dual outputs (100% and 200% on Wayland) capture their own independent GTK pixel originals. Verify persistent region frames used by recording and scrolling on both outputs. Invoke from each output, switch away and back using the public picker, then drag with actual OS input and Copy. Monitor surface geometry, viewport/DPR, PNG size and clipboard crop must match the target; the main window returns to the same invoking monitor. The compositor may reposition normal windows within that monitor; absolute main-window coordinates are not a screenshot correctness requirement.
     actions: [1, 3]
     checkpoints:
     - step: 3
-      expectation: Two actual GDK outputs, correct full-monitor PNGs, explicit monitor fullscreen, both DPI selection crops and unchanged main geometry pass with retained originals and observations.
+      expectation: Two actual GDK outputs, correct full-monitor PNGs, explicit monitor fullscreen, both DPI selection crops and main restoration to its invoking monitor pass with retained originals and observations.
     - step: 4
       expectation: Copy closes the surface and restores the main application.
     results: [3, 4]

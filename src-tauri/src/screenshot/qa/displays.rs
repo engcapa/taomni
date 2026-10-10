@@ -40,6 +40,32 @@ async fn geometry(window: &WebviewWindow) -> anyhow::Result<Value> {
 }
 
 #[cfg(target_os = "linux")]
+async fn place_main(main: &WebviewWindow, x: i32, y: i32) -> anyhow::Result<()> {
+    if wayland::active() {
+        wayland::command(
+            json!({"command":"place", "application":std::env::current_exe()?,
+            "title":main.title()?, "rect":{"x":x+100,"y":y+100,"width":800,"height":600}}),
+        )
+        .await?;
+    } else {
+        main.set_position(tauri::PhysicalPosition::new(x + 100, y + 100))?;
+    }
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn on_monitor(window: &Value, monitor: &Value) -> bool {
+    let coordinate = |value: &Value, key: &str| value[key].as_f64().unwrap_or(f64::NAN);
+    let x = coordinate(window, "x") + coordinate(window, "width") / 2.0;
+    let y = coordinate(window, "y") + coordinate(window, "height") / 2.0;
+    x >= coordinate(monitor, "x")
+        && x < coordinate(monitor, "x") + coordinate(monitor, "width")
+        && y >= coordinate(monitor, "y")
+        && y < coordinate(monitor, "y") + coordinate(monitor, "height")
+}
+
+#[cfg(target_os = "linux")]
 async fn verify(app: &AppHandle) -> anyhow::Result<String> {
     let _cleanup = ScenarioCleanup(app.clone());
     super::super::close_session(app);
@@ -68,17 +94,7 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         let logical = &monitors[initial]["logical"];
         let x = logical["x"].as_i64().context("monitor x")? as i32;
         let y = logical["y"].as_i64().context("monitor y")? as i32;
-        if wayland::active() {
-            wayland::command(
-                json!({"command":"place", "application":std::env::current_exe()?,
-                "title":main.title()?, "rect":{"x":x+100,"y":y+100,"width":800,"height":600}}),
-            )
-            .await?;
-        } else {
-            main.set_position(tauri::PhysicalPosition::new(x + 100, y + 100))?;
-        }
-        tokio::time::sleep(Duration::from_millis(400)).await;
-        let main_before = geometry(&main).await?;
+        place_main(&main, x, y).await?;
         // Park outside the next captured monitor. CursorMode::Embedded cannot
         // then contaminate the independent full-screen pixel comparison.
         // X11 exposes the real pointer and uses its monitor for the default;
@@ -149,6 +165,15 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
             "persistent monitor region mismatch: {region_evidence}"
         );
         attempts.push(region_evidence);
+        // The standalone backend probe above remaps main as part of fixture
+        // cleanup. Establish the actual invoking monitor again before the
+        // public button workflow; Wayland owns normal-window placement.
+        place_main(&main, x, y).await?;
+        let main_before = geometry(&main).await?;
+        anyhow::ensure!(
+            on_monitor(&main_before, logical),
+            "fixture did not place invoking main on the target monitor: {main_before}"
+        );
         run_js(
             &main,
             "document.querySelector('[data-testid=\"system-screenshot\"]').click(); return true;",
@@ -270,7 +295,7 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
                 let until = Instant::now() + Duration::from_secs(5);
                 let main_after = loop {
                     let observed = geometry(&main).await.unwrap_or(Value::Null);
-                    if main_visible(app) && observed == main_before {
+                    if main_visible(app) && on_monitor(&observed, logical) {
                         break observed;
                     }
                     if Instant::now() >= until {
@@ -283,7 +308,7 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
                     "clipboard":keep_image(&clip,&format!("dual-{initial}-clipboard.png"))});
                 keep_json(&copied, &format!("dual-{initial}-copy.json"))?;
                 anyhow::ensure!(
-                    pixels.passed && main_visible(app) && main_before == main_after,
+                    pixels.passed && main_visible(app) && on_monitor(&main_after, logical),
                     "selection/DPI/restore mismatch: {copied}"
                 );
                 attempts.push(copied);
