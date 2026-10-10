@@ -69,6 +69,7 @@ fn on_monitor(window: &Value, monitor: &Value) -> bool {
 #[cfg(target_os = "linux")]
 async fn verify(app: &AppHandle) -> anyhow::Result<String> {
     let _cleanup = ScenarioCleanup(app.clone());
+    let _portal_selection = wayland::PortalMonitorSelection;
     super::super::close_session(app);
     let fixture_path =
         std::env::var("QA_MULTI_DISPLAY_FIXTURE").context("dual output fixture missing")?;
@@ -92,6 +93,7 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
     // Keep Taomni on the first output while capturing both. Then invoke from
     // the second output to prove Wayland's synthetic cursor does not select 0,0.
     for initial in 0..2usize {
+        wayland::select_portal_monitor(initial).await?;
         let logical = &monitors[initial]["logical"];
         let x = logical["x"].as_i64().context("monitor x")? as i32;
         let y = logical["y"].as_i64().context("monitor y")? as i32;
@@ -198,6 +200,7 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
                 .find(|d| d.logical_rect() == rect)
                 .context("GDK/Tauri monitor mismatch")?;
             if step > 0 {
+                wayland::select_portal_monitor(index).await?;
                 let other = &monitors[1 - index]["logical"];
                 park_pointer((
                     other["x"].as_i64().unwrap() as i32 + 64,

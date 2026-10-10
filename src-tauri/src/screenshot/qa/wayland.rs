@@ -19,6 +19,25 @@ pub(super) async fn command(request: Value) -> anyhow::Result<Value> {
         .context("Mutter observation/input task")?
 }
 
+/// The dual-output scenario tells the owned consent helper which real preview
+/// to approve. Clear that intention on every exit, including failed scenarios.
+pub(super) struct PortalMonitorSelection;
+
+impl Drop for PortalMonitorSelection {
+    fn drop(&mut self) {
+        if active() {
+            let _ = command_sync(json!({"command":"portal_monitor", "index":null}));
+        }
+    }
+}
+
+pub(super) async fn select_portal_monitor(index: usize) -> anyhow::Result<()> {
+    if active() {
+        command(json!({"command":"portal_monitor", "index":index})).await?;
+    }
+    Ok(())
+}
+
 fn command_sync(request: Value) -> anyhow::Result<Value> {
     let socket = std::path::PathBuf::from(
         std::env::var_os("QA_WAYLAND_INPUT_SOCKET")

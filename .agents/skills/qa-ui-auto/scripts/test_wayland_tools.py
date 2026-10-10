@@ -41,6 +41,19 @@ class WaylandToolsTests(unittest.TestCase):
         row[1]["checked"] = switch[1]["checked"] = True
         self.assertEqual(consent_control(pairs, "portal"), (*share, "consent"))
 
+    def test_dual_monitor_consent_selects_requested_preview_before_share(self):
+        first = self.control("MetaVendor", "toggle button", checked=True)
+        second = self.control("MetaVendor", "toggle button")
+        share = self.control("Share", "button")
+        pairs = [first, second, share]
+        self.assertEqual(consent_control(pairs, "portal", monitor_index=1), (*second, "select"))
+        first[1]["checked"], second[1]["checked"] = False, True
+        self.assertEqual(consent_control(pairs, "portal", monitor_index=1), (*share, "consent"))
+        self.assertEqual(consent_control(pairs, "portal", monitor_index=0), (*first, "select"))
+        self.assertIsNone(consent_control(pairs, "portal", monitor_index=2))
+        second[1]["checked"], second[1]["action_count"] = False, 0
+        self.assertIsNone(consent_control(pairs, "portal", monitor_index=1))
+
     def test_consent_never_activates_unknown_hidden_or_disabled_controls(self):
         allow = self.control("Allow", "button")
         self.assertIsNone(consent_control([allow], None))
