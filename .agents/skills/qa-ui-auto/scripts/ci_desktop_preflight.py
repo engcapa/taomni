@@ -25,12 +25,9 @@ def main():
                 str(args.report.resolve()), "true" if "rdp" in desktop.capabilities else "false"],
                 cwd=probe.parent, text=True, timeout=180)
             desktop.facts["portal_requests"] = json.loads(result)
-            app_info = subprocess.check_output(["/usr/bin/python3", "-c",
-                "import gi; from gi.repository import Gio; "
-                "app=Gio.DesktopAppInfo.new('com.taomni.app.qa.desktop'); "
-                "assert app is not None, 'QA portal application metadata missing'; "
-                "print(app.get_id())"], text=True, timeout=20).strip()
-            desktop.facts["portal_application"]["observed_id"] = app_info
+            # The executable may not exist yet on a cold cache. ci_execute
+            # requires real Gio application metadata after native_build and
+            # before starting cases; this preflight proves the desktop/portals.
         print(json.dumps(desktop.facts, indent=2), flush=True)
 
 

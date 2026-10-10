@@ -88,24 +88,20 @@ class Desktop:
     def _wayland(self, facts):
         runtime = Path(self.temporary.name) / "runtime"
         runtime.mkdir(mode=0o700)
-        # The QA build runs as a bare executable rather than an installed
-        # bundle. Registry requires real GDesktopAppInfo for its compiled ID.
-        # Make that packaging identity visible to this session's portal only.
+        # Publish the session's application directory before Shell/portal
+        # activation. Register the real QA executable after compilation:
+        # GDesktopAppInfo rejects Exec targets missing on a cold build cache.
         from native_build import QA_APP_ID, qa_binary
         data = Path(self.temporary.name) / "data"
         applications = data / "applications"
         applications.mkdir(parents=True)
         desktop_file = applications / (QA_APP_ID + ".desktop")
         binary = qa_binary(release="release" in self.capabilities)
-        desktop_file.write_text(
-            "[Desktop Entry]\nType=Application\nName=Taomni QA\n"
-            # Anonymous GTK applications use the executable's program name
-            # as their Wayland app_id. Match that real surface to this entry.
-            f'Exec="{binary}"\nStartupWMClass={binary.name}\n', encoding="utf-8")
         os.environ["XDG_DATA_DIRS"] = str(data) + ":" + os.environ.get(
             "XDG_DATA_DIRS", "/usr/local/share:/usr/share")
         facts["portal_application"] = {"identifier": QA_APP_ID,
-                                       "desktop_file": str(desktop_file), "binary": str(binary)}
+                                       "desktop_file": str(desktop_file), "binary": str(binary),
+                                       "verification": "awaiting-build"}
         os.environ.pop("DISPLAY", None)
         os.environ.pop("XAUTHORITY", None)
         os.environ.update(XDG_RUNTIME_DIR=str(runtime), WAYLAND_DISPLAY="wayland-qa",
@@ -201,6 +197,33 @@ class Desktop:
                      portal_interfaces=["Screenshot", "ScreenCast", "RemoteDesktop"],
                      portal_consent="AT-SPI on owned GNOME portal and Shell screenshot access dialogs",
                      note="GNOME virtual monitor; physical GPU/input remain unverified")
+
+    def verify_application(self):
+        """Register and verify the built QA app before any Wayland case."""
+        application = self.facts.get("portal_application")
+        if not application:
+            return
+        binary = Path(application["binary"])
+        if not binary.is_file() or not os.access(binary, os.X_OK):
+            raise RuntimeError(f"QA portal application executable is unavailable: {binary}")
+        desktop_file = Path(application["desktop_file"])
+        # Adding the entry now also notifies the already-running Shell/portal
+        # application monitors; no invalid pre-build entry is cached by them.
+        desktop_file.write_text(
+            "[Desktop Entry]\nType=Application\nName=Taomni QA\n"
+            # Match GTK's real program name, used for the Wayland app_id.
+            f'Exec="{binary}"\nStartupWMClass={binary.name}\n', encoding="utf-8")
+        result = subprocess.check_output(["/usr/bin/python3", "-c",
+            "import gi,json,sys; from pathlib import Path; from gi.repository import Gio; "
+            "app=Gio.DesktopAppInfo.new(sys.argv[1]); "
+            "assert app is not None, 'QA portal application metadata missing'; "
+            "assert Path(app.get_filename()).resolve()==Path(sys.argv[2]).resolve(), 'QA desktop entry shadowed'; "
+            "assert Path(app.get_executable()).resolve()==Path(sys.argv[3]).resolve(), 'QA executable mismatch'; "
+            "assert app.get_startup_wm_class()==Path(sys.argv[3]).name, 'QA window class mismatch'; "
+            "print(json.dumps({'observed_id':app.get_id(),'observed_executable':app.get_executable()}))",
+            desktop_file.name, str(desktop_file), str(binary)], text=True, timeout=20)
+        application.update(json.loads(result), verification="verified")
+        (self.root / "desktop-readiness.json").write_text(json.dumps(self.facts, indent=2), encoding="utf-8")
 
     def _linux(self, facts):
         profile = LINUX_PROFILES[self.linux_profile]

@@ -420,9 +420,7 @@ class DesktopTests(unittest.TestCase):
                     data = Path(activation_env['XDG_RUNTIME_DIR']).parent / 'data'
                     self.assertTrue(activation_env['XDG_DATA_DIRS'].startswith(str(data) + ':'))
                     entry = data / 'applications/com.taomni.app.qa.desktop'
-                    self.assertIn('Name=Taomni QA', entry.read_text())
-                    self.assertIn('Exec="', entry.read_text())
-                    self.assertIn('StartupWMClass=taomni\n', entry.read_text())
+                    self.assertFalse(entry.exists())
                     self.assertEqual(accessibility_enabled, [True])
                     self.assertIn('pipewire', started)
                     self.assertIn('--unsafe-mode', command)
@@ -442,6 +440,7 @@ class DesktopTests(unittest.TestCase):
                 self.assertEqual(desktop.facts['input_devices'], ['keyboard', 'pointer'])
                 self.assertEqual(desktop.facts['portal_interfaces'], ['Screenshot', 'ScreenCast', 'RemoteDesktop'])
                 self.assertTrue(desktop.facts['ready'])
+                self.assertEqual(desktop.facts['portal_application']['verification'], 'awaiting-build')
                 self.assertEqual([call.args[2] for call in wait.call_args_list], [
                     'PipeWire', 'GNOME Wayland compositor', 'Mutter RemoteDesktop service',
                     'Wayland keyboard and pointer',
