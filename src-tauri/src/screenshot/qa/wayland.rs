@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use serde_json::{Value, json};
-use tauri::{PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 pub(super) fn active() -> bool {
     super::super::pins::native_wayland()

@@ -5,6 +5,7 @@
 
 use gtk::prelude::*;
 use std::cell::RefCell;
+use tauri::Manager;
 
 thread_local! {
     static FLOATING_DISPLAY: RefCell<Option<gtk::gdk::Display>> = const { RefCell::new(None) };
