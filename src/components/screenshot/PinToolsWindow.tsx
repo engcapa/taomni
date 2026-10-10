@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -11,6 +11,8 @@ export function PinToolsWindow() {
   const t = useT();
   const [target, setTarget] = useState("");
   const [view, setView] = useState<PinView>({ zoom: 1, opacity: 1, note: "", busy: false, error: null, notice: null });
+  const pendingOpacity = useRef<number | null>(null);
+  const confirmedOpacity = useRef(1);
   const [localError, setLocalError] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [pins, setPins] = useState<PinSummary[]>([]);
@@ -23,12 +25,20 @@ export function PinToolsWindow() {
     const unlisteners: (() => void)[] = [];
     const refresh = () => { void listPins().then((items) => { if (active) setPins(items); }).catch((e) => { if (active) setLocalError(formatUnknownError(e)); }); };
     void (async () => {
-      const offView = await listen<PinView>(PIN_VIEW_EVENT, ({ payload }) => { if (active) setView(payload); });
+      const offView = await listen<PinView>(PIN_VIEW_EVENT, ({ payload }) => {
+        if (!active) return;
+        confirmedOpacity.current = payload.opacity;
+        if (pendingOpacity.current === payload.opacity) pendingOpacity.current = null;
+        // Keep keyboard repeats and slider drags responsive while the source
+        // window acknowledges the latest value. Older replies must not reset it.
+        setView(pendingOpacity.current === null ? payload : { ...payload, opacity: pendingOpacity.current });
+      });
       if (!active) { offView(); return; } unlisteners.push(offView);
       const offPins = await listen(PINS_CHANGED_EVENT, refresh);
       if (!active) { offPins(); return; } unlisteners.push(offPins);
       const data = await invoke<{ label: string; view: PinView }>("screenshot_pin_tools_init");
       if (!active) return;
+      confirmedOpacity.current = data.view.opacity;
       setTarget(data.label); setView(data.view); refresh();
       await emitTo(data.label, PIN_TOOL_EVENT, { action: "sync" });
     })().catch((e) => { if (active) setLocalError(formatUnknownError(e)); });
@@ -37,7 +47,13 @@ export function PinToolsWindow() {
   const send = async (action: string, value?: unknown) => {
     setLocalError(null);
     try { await emitTo(target, PIN_TOOL_EVENT, { action, value }); }
-    catch (e) { setLocalError(formatUnknownError(e)); }
+    catch (e) {
+      if (action === "opacity" && pendingOpacity.current === value) {
+        pendingOpacity.current = null;
+        setView((current) => ({ ...current, opacity: confirmedOpacity.current }));
+      }
+      setLocalError(formatUnknownError(e));
+    }
   };
   const close = () => { void getCurrentWindow().close().catch((e) => setLocalError(formatUnknownError(e))); };
   useEffect(() => {
@@ -46,7 +62,11 @@ export function PinToolsWindow() {
     return () => window.removeEventListener("keydown", onKey);
   });
   const resize = (value: number) => send("zoom", value);
-  const setOpacity = (value: number) => { void send("opacity", value); };
+  const setOpacity = (value: number) => {
+    pendingOpacity.current = value;
+    setView((current) => ({ ...current, opacity: value }));
+    void send("opacity", value);
+  };
   const saveNote = () => send("note", noteDraft);
   const openPinEditor = () => send("edit");
   const editExternal = (choose: boolean) => send("external", choose);

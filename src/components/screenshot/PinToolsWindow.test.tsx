@@ -18,6 +18,31 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("separate pin options", () => {
+  it("keeps consecutive opacity changes through delayed source replies", async () => {
+    render(<PinToolsWindow />);
+    const slider = await screen.findByTestId("screenshot-pin-opacity");
+    await waitFor(() => expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Original"));
+    fireEvent.change(slider, { target: { value: "20" } });
+    expect(slider).toHaveValue("20");
+    fireEvent.change(slider, { target: { value: "50" } });
+    const source = { zoom: 1, note: "Original", busy: false, error: null, notice: null };
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: { ...source, opacity: 0.2 } }));
+    expect(slider).toHaveValue("50");
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: { ...source, opacity: 0.5 } }));
+    expect(slider).toHaveValue("50");
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: { ...source, opacity: 1 } }));
+    expect(slider).toHaveValue("100");
+  });
+
+  it("restores confirmed opacity if the source window cannot receive a change", async () => {
+    render(<PinToolsWindow />);
+    await waitFor(() => expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Original"));
+    api.emitTo.mockRejectedValueOnce(new Error("source closed"));
+    fireEvent.change(screen.getByTestId("screenshot-pin-opacity"), { target: { value: "50" } });
+    await waitFor(() => expect(screen.getByTestId("screenshot-pin-opacity")).toHaveValue("100"));
+    expect(screen.getByRole("alert")).toHaveTextContent("source closed");
+  });
+
   it("keeps per-pin and all-pin actions in accessible tabs and targets the original window", async () => {
     render(<PinToolsWindow />);
     await waitFor(() => expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Original"));

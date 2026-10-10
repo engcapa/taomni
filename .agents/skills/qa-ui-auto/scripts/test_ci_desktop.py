@@ -106,6 +106,33 @@ class LinuxImeTests(unittest.TestCase):
 
 
 class DesktopTests(unittest.TestCase):
+    def test_portal_application_preflight_defers_only_a_missing_binary(self):
+        with tempfile.TemporaryDirectory() as directory, patch('ci_desktop.subprocess.check_output') as probe:
+            desktop = Desktop(Path(directory), ['display'], 'ubuntu-26.04-wayland')
+            binary = Path(directory) / 'taomni'
+            desktop.facts = {'portal_application': {'binary': str(binary)}}
+            desktop.verify_portal_application(require_binary=False)
+            probe.assert_not_called()
+            self.assertEqual(desktop.facts['portal_application']['validation'], 'deferred-until-build')
+            with self.assertRaisesRegex(RuntimeError, 'binary missing'):
+                desktop.verify_portal_application()
+            binary.write_bytes(b'compiled QA binary')
+            probe.return_value = 'com.taomni.app.qa.desktop\n'
+            desktop.verify_portal_application()
+            self.assertEqual(desktop.facts['portal_application']['validation'], 'verified')
+            self.assertEqual(json.loads((Path(directory) / 'desktop-readiness.json').read_text())[
+                'portal_application']['observed_id'], 'com.taomni.app.qa.desktop')
+
+    def test_existing_binary_does_not_hide_a_broken_portal_desktop_entry(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch('ci_desktop.subprocess.check_output', side_effect=subprocess.CalledProcessError(1, 'Gio')):
+            desktop = Desktop(Path(directory), ['display'], 'ubuntu-26.04-wayland')
+            binary = Path(directory) / 'taomni'
+            binary.write_bytes(b'compiled QA binary')
+            desktop.facts = {'portal_application': {'binary': str(binary)}}
+            with self.assertRaises(subprocess.CalledProcessError):
+                desktop.verify_portal_application(require_binary=False)
+
     def setUp(self):
         release = patch('ci_desktop.platform.freedesktop_os_release',
                         return_value={'ID': 'ubuntu', 'VERSION_ID': '24.04'})

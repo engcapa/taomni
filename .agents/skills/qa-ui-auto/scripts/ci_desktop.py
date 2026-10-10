@@ -38,6 +38,30 @@ class Desktop:
         self.environment_before = dict(os.environ)
         self.temporary = None
 
+    def verify_portal_application(self, *, require_binary=True):
+        application = self.facts.get("portal_application")
+        if not application:
+            return
+        # GLib validates the desktop entry's Exec target. Desktop preflight
+        # runs before compilation, so a cache miss legitimately has no binary.
+        # The execution path must repeat this check after native_build succeeds.
+        binary = Path(application["binary"])
+        if not binary.is_file():
+            if require_binary:
+                raise RuntimeError(f"QA portal application binary missing: {binary}")
+            application["validation"] = "deferred-until-build"
+        else:
+            from native_build import QA_APP_ID
+            app_info = subprocess.check_output(["/usr/bin/python3", "-c",
+                "import gi,sys; from gi.repository import Gio; "
+                "app=Gio.DesktopAppInfo.new(sys.argv[1]); "
+                "assert app is not None, 'QA portal application metadata missing'; "
+                "print(app.get_id())", QA_APP_ID + ".desktop"], text=True, timeout=20).strip()
+            if app_info != QA_APP_ID + ".desktop":
+                raise RuntimeError(f"unexpected QA portal application identity: {app_info}")
+            application.update(observed_id=app_info, validation="verified")
+        (self.root / "desktop-readiness.json").write_text(json.dumps(self.facts, indent=2), encoding="utf-8")
+
     def start(self, command, *, env=None):
         name = Path(command[1]).name if len(command) > 1 and command[1].endswith(".py") else Path(command[0]).name
         log = (self.root / (name + ".log")).open("w", encoding="utf-8")

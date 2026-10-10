@@ -27,4 +27,8 @@
 
 详细本机日志和截图保存在忽略目录 `qa-ui-auto-report/screenshot-20261010/`，不向 GitHub 上传用户登录页面的内容。
 
-GitHub 验证使用 `.github/workflows/qa-ui-auto-platforms.yml`、精确提交、selected 用例，三端 browser/native 加 Ubuntu 26.04 Wayland。最终执行结果与链接在完成后补充。
+GitHub 验证使用 `.github/workflows/qa-ui-auto-platforms.yml`、精确提交、selected 用例，三端 browser/native 加 Ubuntu 26.04 Wayland。首轮运行 [38020622709](https://github.com/engcapa/taomni/actions/runs/38020622709) 中，Windows 与 Linux browser 均 39/39 通过；macOS browser 38/39，连续调整透明度时独立窗口的旧回传覆盖了最新输入。设置窗口现在立即显示输入值，直到源贴图确认最新透明度；延迟回传与发送失败恢复均有组件测试。
+
+首轮 Wayland 在编译前预检失败：GLib 加载启动项时会检查 Exec 指向的二进制，缓存未命中时该文件尚不存在。预检现在明确记录等待构建，构建成功后执行强制应用身份检查，再开始 native 用例；已有二进制但启动项错误仍直接失败。相关测试保护这两个阶段，最终执行结果与链接在完成后补充。
+
+本机补测发现贴图底部保存提示会拦截缩略图恢复按钮；提示改为不接收鼠标事件。补修后 17 项贴图/设置组件测试、TypeScript 检查、5 项预检/执行测试和 `TC-SHOT-033/036/037/038` 四个 browser 用例通过。Linux 桌面测试模块中的其他既有用例依赖 POSIX `/proc`、符号链接和权限位，在 Win11 运行失败；模块整体由 GitHub 的 Linux 工具校验执行。

@@ -267,6 +267,6 @@ export function PinnedImage() {
 
     </>}
     {!collapsed && note && <p data-pin-controls data-testid="screenshot-pin-note" title={note} className="absolute bottom-1 left-1 right-1 max-h-[30%] overflow-auto whitespace-pre-wrap break-words rounded bg-black/80 text-white text-[12px] p-2 cursor-text select-text">{note}</p>}
-    {(error || notice) && <p data-pin-controls data-testid="screenshot-pin-notice" role={error ? "alert" : "status"} className="absolute bottom-1 left-1 right-1 rounded bg-black/85 text-white text-[11px] p-2 cursor-default break-words">{error ?? notice}</p>}
+    {(error || notice) && <p data-pin-controls data-testid="screenshot-pin-notice" role={error ? "alert" : "status"} className="absolute bottom-1 left-1 right-1 rounded bg-black/85 text-white text-[11px] p-2 cursor-default break-words pointer-events-none">{error ?? notice}</p>}
   </div>;
 }

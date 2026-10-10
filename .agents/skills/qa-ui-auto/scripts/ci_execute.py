@@ -163,6 +163,9 @@ def main():
                 from native_build import identity_path, qa_binary
                 binary = qa_binary(release=release)
                 (args.report / "build-identity.json").write_bytes(identity_path(binary).read_bytes())
+                desktop.verify_portal_application()
+                if entry.get("desktop"):
+                    cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
                 if platform.system() == "Windows":
                     outcome["stage"] = "native-startup"
                     from qa_ui_auto.native_diagnostics import windows_startup_probe
