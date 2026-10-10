@@ -99,8 +99,14 @@ class SelectionTests(unittest.TestCase):
     def test_full_wayland_native_selection_matches_x11_case_ids(self):
         plan = make_plan(args(scope='all', platforms='linux', modes='native',
                               linux_profiles='ubuntu-24.04-xvfb,ubuntu-26.04-wayland'))
-        x11, wayland = plan['entries']
-        self.assertEqual(x11['selected_ids'], wayland['selected_ids'])
+        x11 = [e for e in plan['entries'] if e['linux_profile'] == 'ubuntu-24.04-xvfb']
+        wayland = [e for e in plan['entries'] if e['linux_profile'] == 'ubuntu-26.04-wayland']
+        self.assertEqual({cid for entry in x11 for cid in entry['selected_ids']}, {
+            cid for entry in wayland for cid in entry['selected_ids']
+        })
+        self.assertEqual(len(x11), 2)
+        self.assertEqual(len(wayland), 2)
+        self.assertEqual(sum('dual-display' in e['capabilities'] for e in wayland), 1)
         # The user's external project remains unavailable on both desktops.
         self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']], [
             ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-24.04-xvfb'),

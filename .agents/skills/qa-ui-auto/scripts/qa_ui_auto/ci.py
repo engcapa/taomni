@@ -231,29 +231,51 @@ def make_plan(args) -> dict:
                         gaps.append({"case": cid, **combination, "reason": reason})
                         continue
                     eligible.append(case)
-                ids = [c.id for c in eligible]
-                for cid in ids:
-                    if set(dependencies.get(cid, [])) - set(ids):
-                        raise ValueError(f"prerequisite unavailable for {platform_key}/{profile_name}/{mode}/{cid}")
-                if not ids:
-                    continue
-                reachable.update(ids)
-                entry_id = f"{platform_key}-{mode}"
-                if profile_name and profile_name != DEFAULT_LINUX_PROFILE:
-                    entry_id = f"linux-{profile_name}-{mode}"
-                entry_capabilities = capabilities(eligible, mode)
-                if mode == "native" and getattr(args, "native_release", False):
-                    entry_capabilities = sorted(set(entry_capabilities) | {"release"})
-                expected_desktop = (profile.identity(
-                    profile_name, dual_display="dual-display" in entry_capabilities
-                ) if profile else {})
-                entries.append({"id": entry_id, "platform": target, "platform_key": platform_key,
-                                "runner": runner, "arch": arch, "mode": mode, "selected_ids": ids,
-                                "linux_profile": profile_name, "linux_wrapper": profile.wrapper if profile else "",
-                                "desktop": expected_desktop,
-                                "cache_key": profile_name if profile_name and profile_name != DEFAULT_LINUX_PROFILE else platform_key,
-                                "capabilities": entry_capabilities,
-                                "case_digests": {c.id: input_digest(c.source_path) for c in eligible}})
+                # A Wayland/Mutter dual-output desktop changes global window
+                # placement and pointer coordinates for every native case. Run
+                # the dual-display cases in their own entry so ordinary cases
+                # retain the single-display desktop they were authored for.
+                variants = [("", eligible)]
+                if profile and mode == "native" and "dual-display" in capabilities(eligible, mode):
+                    dual_ids = {c.id for c in eligible if "dual_display_required" in c.fixtures}
+                    # Keep prerequisites with the variant that needs them.
+                    changed = True
+                    while changed:
+                        changed = False
+                        for cid in tuple(dual_ids):
+                            for previous in dependencies.get(cid, []):
+                                if previous in {c.id for c in eligible} and previous not in dual_ids:
+                                    dual_ids.add(previous)
+                                    changed = True
+                    if dual_ids and dual_ids != {c.id for c in eligible}:
+                        variants = [("", [c for c in eligible if c.id not in dual_ids]),
+                                    ("dual-display", [c for c in eligible if c.id in dual_ids])]
+                for variant, variant_cases in variants:
+                    ids = [c.id for c in variant_cases]
+                    for cid in ids:
+                        if set(dependencies.get(cid, [])) - set(ids):
+                            raise ValueError(f"prerequisite unavailable for {platform_key}/{profile_name}/{mode}/{cid}")
+                    if not ids:
+                        continue
+                    reachable.update(ids)
+                    entry_id = f"{platform_key}-{mode}"
+                    if profile_name and profile_name != DEFAULT_LINUX_PROFILE:
+                        entry_id = f"linux-{profile_name}-{mode}"
+                    if variant:
+                        entry_id += f"-{variant}"
+                    entry_capabilities = capabilities(variant_cases, mode)
+                    if mode == "native" and getattr(args, "native_release", False):
+                        entry_capabilities = sorted(set(entry_capabilities) | {"release"})
+                    expected_desktop = (profile.identity(
+                        profile_name, dual_display="dual-display" in entry_capabilities
+                    ) if profile else {})
+                    entries.append({"id": entry_id, "platform": target, "platform_key": platform_key,
+                                    "runner": runner, "arch": arch, "mode": mode, "selected_ids": ids,
+                                    "linux_profile": profile_name, "linux_wrapper": profile.wrapper if profile else "",
+                                    "desktop": expected_desktop,
+                                    "cache_key": profile_name if profile_name and profile_name != DEFAULT_LINUX_PROFILE else platform_key,
+                                    "capabilities": entry_capabilities,
+                                    "case_digests": {c.id: input_digest(c.source_path) for c in variant_cases}})
     # These Rust contracts do not depend on the desktop. Select one available
     # Linux native entry, including when a targeted run excludes the default.
     rdp_unit_owner = next((entry["id"] for entry in entries
