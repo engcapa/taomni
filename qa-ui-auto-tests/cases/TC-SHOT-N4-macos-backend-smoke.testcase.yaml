@@ -19,7 +19,7 @@ verification:
     actions: [1]
     checkpoints:
     - {step: 3, expectation: Saved bytes identical and 320x200 pin loaded then closed with copy removed.}
-    - {step: 4, expectation: "Real OS chord triggers loaded overlay, native close restores main, disabled chord does not open and original registration/config restored."}
+    - {step: 4, expectation: "Real OS chord triggers loaded overlay, OS window close on Wayland restores main, disabled chord does not open and original registration/config restored."}
     - {step: 5, expectation: Main window usable.}
     results: [3, 4, 5]
   visual:

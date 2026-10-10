@@ -2745,7 +2745,18 @@ pub async fn screenshot_qa_hotkey(app: AppHandle) -> Result<String, String> {
         press_hotkey().await?;
         let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e|e.to_string())?;
         let ready = run_js(&overlay, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-hint\"]');i++) await new Promise(r=>setTimeout(r,100)); return !!document.querySelector('[data-testid=\"screenshot-hint\"]');", Duration::from_secs(15)).await.map_err(|e|e.to_string())?;
-        // Closing through the native window lifecycle must restore the app.
+        // Exercise an OS window-close action with its real input serial.
+        // Programmatic close has no Wayland user activation context.
+        #[cfg(target_os = "linux")]
+        if wayland::active() {
+            wayland::click_control(&overlay, "[data-testid=\"screenshot-hint\"]")
+                .await.map_err(|e| e.to_string())?;
+            wayland::keys(vec![vec![0xffe9, 0xffc1]])
+                .await.map_err(|e| e.to_string())?;
+        } else {
+            overlay.close().map_err(|e|e.to_string())?;
+        }
+        #[cfg(not(target_os = "linux"))]
         overlay.close().map_err(|e|e.to_string())?;
         let closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
         tokio::time::sleep(Duration::from_millis(400)).await;

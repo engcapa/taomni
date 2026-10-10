@@ -782,16 +782,23 @@ fn restore_app_windows(app: &AppHandle) {
                     use gtk::prelude::*;
                     if let Ok(gtk) = target.gtk_window() {
                         let id = surface_backend::activation_id();
-                        log::info!("capture restoration: target={}, backend={}, startup_id={}",
-                            target.label(), gtk.display().type_().name(), id.is_some());
-                        if let Some(id) = id {
-                            gtk.set_startup_id(&id);
-                        }
+                        log::info!("capture restoration: target={}, backend={}, mapped={}, startup_id={}",
+                            target.label(), gtk.display().type_().name(), gtk.is_mapped(), id.is_some());
                         // Tao skips focus while its queued minimized cache is
                         // still set. Present the mapped GTK toplevel directly.
                         gtk.deiconify();
                         gtk.show();
-                        gtk.present();
+                        if let Some((id, surface)) = id.zip(gtk.window()) {
+                            // Activate the existing surface directly. GTK's
+                            // startup property only forwards while mapped and
+                            // present() also creates a second activation token.
+                            surface.set_startup_id(&id);
+                        } else {
+                            gtk.present();
+                        }
+                        // Keep the source alive until the compositor has
+                        // processed activation of the target surface.
+                        gtk.display().sync();
                     }
                 };
                 if gtk::is_initialized_main_thread() {

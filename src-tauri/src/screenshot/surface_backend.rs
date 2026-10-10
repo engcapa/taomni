@@ -13,35 +13,40 @@ thread_local! {
 /// Bridge a user action on an XWayland capture control to the main Wayland
 /// toplevel. GTK's Wayland seat cannot supply the X11 control's input serial;
 /// the compositor can resolve its startup notification using the X11 timestamp.
-/// Call on the GTK thread while the focused floating window is still mapped.
+/// Call on the GTK thread while the focused capture window is still mapped.
 pub(super) fn activation_id() -> Option<String> {
-    FLOATING_DISPLAY.with(|slot| {
-        let display = slot.borrow();
-        let display = display.as_ref()?;
-        let active = gtk::Window::list_toplevels()
-            .into_iter()
-            .filter_map(|widget| widget.downcast::<gtk::Window>().ok())
-            .any(|window| window.is_active() && window.display() == *display);
-        log::info!("capture activation: floating_display={}, active={active}", display.type_().name());
-        if !active {
-            return None;
-        }
-        let executable = std::env::current_exe().ok()?;
-        let command = gtk::glib::shell_quote(executable);
-        let info = gtk::gio::AppInfo::create_from_commandline(
-            &command,
-            Some("Taomni"),
-            gtk::gio::AppInfoCreateFlags::SUPPORTS_STARTUP_NOTIFICATION,
-        )
-        .ok()?;
-        let id = display
-            .app_launch_context()?
-            .startup_notify_id(&info, &[])?;
-        // Startup notification and xdg activation travel on different display
-        // connections. Publish the X11 sequence before activating Wayland.
-        display.sync();
-        Some(id.to_string())
-    })
+    let active_displays: Vec<_> = gtk::Window::list_toplevels()
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Window>().ok())
+        .filter(|window| window.is_active())
+        .map(|window| window.display())
+        .collect();
+    let display = FLOATING_DISPLAY
+        .with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .filter(|display| active_displays.contains(display))
+                .cloned()
+        })
+        .or_else(|| active_displays.into_iter().next())?;
+    let executable = std::env::current_exe().ok()?;
+    let command = gtk::glib::shell_quote(executable);
+    let info = gtk::gio::AppInfo::create_from_commandline(
+        &command,
+        Some("Taomni"),
+        gtk::gio::AppInfoCreateFlags::SUPPORTS_STARTUP_NOTIFICATION,
+    )
+    .ok()?;
+    let id = display.app_launch_context()?.startup_notify_id(&info, &[])?;
+    // Startup notification and xdg activation travel on different display
+    // connections. Publish the X11 sequence before activating Wayland.
+    display.sync();
+    log::info!(
+        "capture activation: source={}, timestamp={:?}",
+        display.type_().name(),
+        id.rsplit_once("_TIME").map(|(_, time)| time)
+    );
+    Some(id.to_string())
 }
 
 fn configure(window: &gtk::ApplicationWindow) -> Result<(), String> {

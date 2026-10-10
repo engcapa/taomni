@@ -24,6 +24,7 @@ WINDOW_STATE = """(() => ({
                 wm_class: window.get_wm_class(),
                 normal: window.get_window_type() === imports.gi.Meta.WindowType.NORMAL,
                 focused: window.has_focus(), minimized: window.minimized,
+                user_time: window.get_user_time(),
                 visible: actor.visible && !window.minimized, above: window.is_above(),
                 actor: (() => { const [x, y] = actor.get_transformed_position();
                     const [width, height] = actor.get_transformed_size();
