@@ -31,6 +31,25 @@ pub struct ControlPosition {
     pub scale: f64,
 }
 
+/// Map compositor logical coordinates into an auxiliary display's uniform
+/// coordinate space (XWayland can expose the whole desktop at 2x).
+pub(super) fn bridge_rect(rect: Rect, source: Rect, target: Rect) -> Option<Rect> {
+    if source.w <= 0 || source.h <= 0 || target.w <= 0 || target.h <= 0 {
+        return None;
+    }
+    let sx = target.w as f64 / source.w as f64;
+    let sy = target.h as f64 / source.h as f64;
+    if (sx - sy).abs() > 0.01 {
+        return None;
+    }
+    Some(Rect {
+        x: target.x + ((rect.x - source.x) as f64 * sx).round() as i32,
+        y: target.y + ((rect.y - source.y) as f64 * sy).round() as i32,
+        w: (rect.w as f64 * sx).round().max(1.0) as i32,
+        h: (rect.h as f64 * sy).round().max(1.0) as i32,
+    })
+}
+
 /// Keep the chosen output's scale with the rectangle. Per-output physical
 /// spaces can overlap even though the actual logical outputs are disjoint.
 pub fn control_placement(
@@ -320,15 +339,7 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
             super::surface_backend::border(&window)?;
             #[cfg(target_os = "linux")]
             if super::pins::native_wayland() {
-                window
-                    .set_position(tauri::LogicalPosition::new(
-                        rect.x as f64 / scale,
-                        rect.y as f64 / scale,
-                    ))
-                    .map_err(|e| e.to_string())?;
-                window
-                    .set_size(tauri::LogicalSize::new(width, height))
-                    .map_err(|e| e.to_string())?;
+                super::surface_backend::place_border(&window, ControlPosition { rect, scale })?;
             } else {
                 window
                     .set_position(PhysicalPosition::new(rect.x, rect.y))
@@ -347,7 +358,9 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
                     .map_err(|e| e.to_string())?;
             }
             #[cfg(target_os = "linux")]
-            request_gtk_border_size(&window, width, height)?;
+            if !super::pins::native_wayland() {
+                request_gtk_border_size(&window, width, height)?;
+            }
             // GTK creates its GDK surface on show. Applying an input shape
             // before that makes Tao unwrap a missing native window.
             window.show().map_err(|e| e.to_string())?;
@@ -405,6 +418,79 @@ pub fn configure_wayland_scroll(window: &tauri::WebviewWindow) -> Result<(), Str
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn auxiliary_global_scale_keeps_controls_below_capture() {
+        let native = Rect {
+            x: 0,
+            y: 0,
+            w: 3200,
+            h: 1080,
+        };
+        let auxiliary = Rect {
+            x: 0,
+            y: 0,
+            w: 6400,
+            h: 2160,
+        };
+        let controls = Rect {
+            x: 780,
+            y: 880,
+            w: 360,
+            h: 200,
+        };
+        assert_eq!(
+            bridge_rect(controls, native, auxiliary),
+            Some(Rect {
+                x: 1560,
+                y: 1760,
+                w: 720,
+                h: 400
+            })
+        );
+        assert_eq!(bridge_rect(controls, native, native), Some(controls));
+    }
+
+    #[test]
+    fn auxiliary_origin_translation_handles_left_output() {
+        let native = Rect {
+            x: -1280,
+            y: 0,
+            w: 3200,
+            h: 1080,
+        };
+        let auxiliary = Rect {
+            x: 0,
+            y: 0,
+            w: 6400,
+            h: 2160,
+        };
+        let controls = Rect {
+            x: -1200,
+            y: 400,
+            w: 360,
+            h: 200,
+        };
+        assert_eq!(
+            bridge_rect(controls, native, auxiliary),
+            Some(Rect {
+                x: 160,
+                y: 800,
+                w: 720,
+                h: 400
+            })
+        );
+        assert!(
+            bridge_rect(
+                controls,
+                native,
+                Rect {
+                    h: 1080,
+                    ..auxiliary
+                }
+            )
+            .is_none()
+        );
+    }
     fn display(x: i32, y: i32, scale: f64) -> DisplayInfo {
         DisplayInfo {
             id: format!("{x},{y}"),

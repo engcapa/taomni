@@ -47,28 +47,102 @@ pub(super) fn webview(window: &tauri::WebviewWindow) -> Result<(), String> {
         .map_err(|e| format!("configure floating capture window: {e}"))?
 }
 
-/// Portal/display pixels are per-monitor physical coordinates. XWayland
-/// floating windows use a global buffer scale; use compositor logical geometry
-/// so that scale cannot shrink or move controls into the captured region.
+fn desktop_bounds(display: &gtk::gdk::Display) -> Result<super::surfaces::Rect, String> {
+    let monitors: Vec<_> = (0..display.n_monitors())
+        .filter_map(|index| display.monitor(index).map(|monitor| monitor.geometry()))
+        .collect();
+    let x = monitors
+        .iter()
+        .map(|g| g.x())
+        .min()
+        .ok_or("display has no monitors")?;
+    let y = monitors
+        .iter()
+        .map(|g| g.y())
+        .min()
+        .ok_or("display has no monitors")?;
+    let right = monitors.iter().map(|g| g.x() + g.width()).max().unwrap();
+    let bottom = monitors.iter().map(|g| g.y() + g.height()).max().unwrap();
+    Ok(super::surfaces::Rect {
+        x,
+        y,
+        w: right - x,
+        h: bottom - y,
+    })
+}
+
+fn place_gtk(
+    window: &gtk::ApplicationWindow,
+    position: super::surfaces::ControlPosition,
+    border: bool,
+) -> Result<(), String> {
+    let source_display = gtk::gdk::Display::default().ok_or("default display missing")?;
+    let source = desktop_bounds(&source_display)?;
+    let target = desktop_bounds(&window.display())?;
+    let scale = position.scale.max(1.0);
+    let rect = position.rect;
+    let logical = super::surfaces::Rect {
+        x: (rect.x as f64 / scale).round() as i32,
+        y: (rect.y as f64 / scale).round() as i32,
+        w: (rect.w as f64 / scale).round() as i32,
+        h: (rect.h as f64 / scale).round() as i32,
+    };
+    let rect = super::surfaces::bridge_rect(logical, source, target).ok_or_else(|| {
+        format!("XWayland geometry does not match the compositor: {source:?} -> {target:?}")
+    })?;
+    log::debug!(
+        "floating screenshot geometry: {logical:?}; native={source:?}; auxiliary={target:?}; gtk={rect:?}; widget_scale={}",
+        window.scale_factor()
+    );
+    if border {
+        let geometry = gtk::gdk::Geometry::new(
+            rect.w,
+            rect.h,
+            rect.w,
+            rect.h,
+            0,
+            0,
+            1,
+            1,
+            0.0,
+            0.0,
+            gtk::gdk::Gravity::NorthWest,
+        );
+        window.set_geometry_hints(
+            None::<&gtk::Widget>,
+            Some(&geometry),
+            gtk::gdk::WindowHints::MIN_SIZE | gtk::gdk::WindowHints::MAX_SIZE,
+        );
+        window.set_size_request(rect.w, rect.h);
+    }
+    // Use the actual auxiliary GTK display instead of Tao's scale cache from
+    // the Wayland display on which this window was originally constructed.
+    window.set_default_size(rect.w, rect.h);
+    window.resize(rect.w, rect.h);
+    window.move_(rect.x, rect.y);
+    Ok(())
+}
+
+/// Convert through both GDK desktops, including XWayland's global scale.
 pub(super) fn place_webview(
     window: &tauri::WebviewWindow,
     position: super::surfaces::ControlPosition,
 ) -> Result<(), String> {
     let rect = position.rect;
     if super::pins::native_wayland() {
-        let scale = position.scale;
+        let target = window.clone();
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
         window
-            .set_size(tauri::LogicalSize::new(
-                rect.w as f64 / scale,
-                rect.h as f64 / scale,
-            ))
+            .run_on_main_thread(move || {
+                let result = target
+                    .gtk_window()
+                    .map_err(|e| e.to_string())
+                    .and_then(|gtk| place_gtk(&gtk, position, false));
+                let _ = tx.send(result);
+            })
             .map_err(|e| e.to_string())?;
-        window
-            .set_position(tauri::LogicalPosition::new(
-                rect.x as f64 / scale,
-                rect.y as f64 / scale,
-            ))
-            .map_err(|e| e.to_string())?;
+        rx.recv_timeout(std::time::Duration::from_secs(5))
+            .map_err(|e| format!("place floating screenshot controls: {e}"))??;
     } else {
         window
             .set_size(tauri::PhysicalSize::new(rect.w as u32, rect.h as u32))
@@ -78,6 +152,25 @@ pub(super) fn place_webview(
             .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+pub(super) fn place_border(
+    window: &tauri::Window,
+    position: super::surfaces::ControlPosition,
+) -> Result<(), String> {
+    let target = window.clone();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            let result = target
+                .gtk_window()
+                .map_err(|e| e.to_string())
+                .and_then(|gtk| place_gtk(&gtk, position, true));
+            let _ = tx.send(result);
+        })
+        .map_err(|e| e.to_string())?;
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("place floating screenshot border: {e}"))?
 }
 
 pub(super) fn border(window: &tauri::Window) -> Result<(), String> {
