@@ -18309,6 +18309,10 @@ export function CodeWorkspaceTab({
         label: `Rename symbol to "${nextName}"`,
         semanticGeneration: buildToken.generation,
         semanticRevision: buildToken.revision,
+        // Background provider progress does not change the workspace revision.
+        // Keep the same freshness rule at the final mutation boundary as at
+        // the rename response gate above; owner and preimage checks still run.
+        semanticRequireReady: false,
         semanticWorkspaceOnly: true,
         plan,
         // DEC-07: the Extract owner/receipt guard runs after the preview and
