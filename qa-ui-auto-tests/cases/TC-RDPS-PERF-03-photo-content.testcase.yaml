@@ -3,7 +3,8 @@ title: Adaptive RDP encoding keeps photo bandwidth and frame rate at the RemoteF
 description: 'AC-E02/V-E12: measure the same deterministic noisy photo animation with compression disabled and RDP6.1
   enabled on one release server, restarting each target at the same initial photo frame. Preserve both decoded
   snapshots, source telemetry including macOS process activity and draw timings, bulk statistics and frame rate ratios. Animated macOS targets hold a process-local user-initiated activity to keep their timers eligible throughout both measurements. Bandwidth
-  cannot improve by dropping delivered frames.'
+  cannot improve by dropping delivered frames. Retains the same four-strip planar selection after the small-damage
+  sampling optimization; FPS and bandwidth limits stay unchanged.'
 covers:
 - F-RdpServer-1
 tags:
