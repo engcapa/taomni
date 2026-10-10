@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import sys
 
 
 def monitor_configuration(state):
@@ -111,13 +112,25 @@ def patterns(report):
             observed_index = next((i for i in range(2) if display.get_monitor(i) == monitor), None)
             observed = {"width": size[0], "height": size[1], "scale": window.get_scale_factor(),
                         "mapped": window.get_mapped(), "monitor": observed_index}
+            if os.environ.get("XDG_SESSION_TYPE") == "wayland":
+                from qa_ui_auto.wayland import command
+                try:
+                    observed["compositor"] = command("geometry", application=sys.executable,
+                                                      title=window.get_title())["frame"]
+                except RuntimeError as error:
+                    observed["compositorError"] = str(error)
             fact["observedWindow"] = observed
             observations.append(observed)
         if observations != last[0]:
             print(json.dumps({"monitors": facts}), flush=True)
             last[0] = observations
+            if os.environ.get("XDG_SESSION_TYPE") == "wayland":
+                print(subprocess.check_output(["gdbus", "call", "--session", "--dest", "org.gnome.Mutter.DisplayConfig",
+                    "--object-path", "/org/gnome/Mutter/DisplayConfig", "--method",
+                    "org.gnome.Mutter.DisplayConfig.GetCurrentState"], text=True, timeout=5), flush=True)
         if any(not o["mapped"] or o["monitor"] != f["index"] or o["scale"] != f["scale"]
                or (o["width"], o["height"]) != (f["logical"]["width"], f["logical"]["height"])
+               or (os.environ.get("XDG_SESSION_TYPE") == "wayland" and o.get("compositor") != f["logical"])
                for o, f in zip(observations, facts)):
             if time.monotonic() - started > 25:
                 print("display pattern mapping timed out", flush=True)

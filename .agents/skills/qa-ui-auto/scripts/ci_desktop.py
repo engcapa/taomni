@@ -119,6 +119,13 @@ class Desktop:
                         "--object-path", "/org/a11y/bus", "--method",
                         "org.freedesktop.DBus.Properties.Set", "org.a11y.Status", "IsEnabled",
                         "<true>"], check=True, timeout=20)
+        if "dual-display" in self.capabilities:
+            # GNOME's legacy global scale cannot realize a 100%/200% layout.
+            # This is a disposable runner session; enable real per-output
+            # framebuffer scaling before Mutter creates its virtual monitors.
+            subprocess.run(["gsettings", "set", "org.gnome.mutter", "experimental-features",
+                            "['scale-monitor-framebuffer']"], check=True, timeout=10)
+            facts["monitor_scaling"] = "Mutter scale-monitor-framebuffer"
         pipewire = self.start(["pipewire"])
         self._wait(pipewire, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire")
         self.start(["wireplumber"])

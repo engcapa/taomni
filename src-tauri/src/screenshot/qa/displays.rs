@@ -186,7 +186,7 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
                     wait_closed(app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await,
                     "copy did not close overlay"
                 );
-                let clip = read_clipboard_image()?;
+                let clip = read_clipboard_image(app)?;
                 let scale = fact["scale"].as_f64().unwrap();
                 let reference = capture::crop(
                     &expected,
