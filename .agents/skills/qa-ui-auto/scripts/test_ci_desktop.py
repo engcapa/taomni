@@ -166,7 +166,7 @@ class DesktopTests(unittest.TestCase):
                         desktop._vnc(facts, mirror=True)
                     self.assertNotIn('vnc', facts)
                 argv = start.call_args.args[0]
-                self.assertEqual(argv[:3], ['x0tigervncserver', '-display', ':70'])
+                self.assertEqual(argv[:3], ['X0tigervnc', '-display', ':70'])
                 self.assertIn('-localhost', argv)
                 self.assertEqual(argv[argv.index('-SecurityTypes')+1], 'VncAuth')
                 self.assertEqual((Path(d) / 'vnc.passwd').stat().st_mode & 0o777, 0o600)

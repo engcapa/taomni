@@ -78,7 +78,9 @@ class Desktop:
                 raise RuntimeError("no unused display for the VNC desktop")
             os.environ["DISPLAY"] = f":{number}"
         port = free_port()
-        command = (["x0tigervncserver", "-display", os.environ["DISPLAY"]] if mirror else
+        # Use the foreground binary so Desktop owns its lifetime/process group;
+        # Debian's x0tigervncserver wrapper daemonizes and exits successfully.
+        command = (["X0tigervnc", "-display", os.environ["DISPLAY"]] if mirror else
                    ["Xtigervnc", os.environ["DISPLAY"], "-geometry", "1920x1080", "-depth", "24",
                     "-nolisten", "tcp", "-ac"])
         server = self.start([*command, "-localhost", "-rfbport", str(port), "-SecurityTypes", "VncAuth",
