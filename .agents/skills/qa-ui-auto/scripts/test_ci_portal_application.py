@@ -56,6 +56,14 @@ class PortalApplicationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertRegex(result.stderr, "constructor returned NULL|AssertionError")
 
+    def test_quoted_exec_path_with_spaces_is_verified_without_weakening_identity(self):
+        self.binary = self.root / "built binaries" / "taomni"
+        self.binary.parent.mkdir()
+        self.binary.symlink_to("/usr/bin/true")
+        self.desktop.facts["portal_application"]["binary"] = str(self.binary)
+        self.desktop.verify_application()
+        self.assertEqual(self.desktop.facts["portal_application"]["observed_executable"], str(self.binary))
+
     def test_real_gio_shadowed_desktop_entry_cannot_be_accepted(self):
         self.binary.symlink_to("/usr/bin/true")
         other = Path(os.environ["XDG_DATA_HOME"]) / "applications"

@@ -214,13 +214,16 @@ class Desktop:
             # Match GTK's real program name, used for the Wayland app_id.
             f'Exec="{binary}"\nStartupWMClass={binary.name}\n', encoding="utf-8")
         result = subprocess.check_output(["/usr/bin/python3", "-c",
-            "import gi,json,sys; from pathlib import Path; from gi.repository import Gio; "
+            "import gi,json,sys; from pathlib import Path; from gi.repository import Gio,GLib; "
             "app=Gio.DesktopAppInfo.new(sys.argv[1]); "
             "assert app is not None, 'QA portal application metadata missing'; "
             "assert Path(app.get_filename()).resolve()==Path(sys.argv[2]).resolve(), 'QA desktop entry shadowed'; "
-            "assert Path(app.get_executable()).resolve()==Path(sys.argv[3]).resolve(), 'QA executable mismatch'; "
+            # get_executable() retains Exec quotes (and truncates at a space).
+            # Parse the actual command line using the loader's GLib parser.
+            "argv=GLib.shell_parse_argv(app.get_commandline())[1]; "
+            "assert len(argv)==1 and Path(argv[0]).resolve()==Path(sys.argv[3]).resolve(), 'QA executable mismatch'; "
             "assert app.get_startup_wm_class()==Path(sys.argv[3]).name, 'QA window class mismatch'; "
-            "print(json.dumps({'observed_id':app.get_id(),'observed_executable':app.get_executable()}))",
+            "print(json.dumps({'observed_id':app.get_id(),'observed_executable':argv[0]}))",
             desktop_file.name, str(desktop_file), str(binary)], text=True, timeout=20)
         application.update(json.loads(result), verification="verified")
         (self.root / "desktop-readiness.json").write_text(json.dumps(self.facts, indent=2), encoding="utf-8")
