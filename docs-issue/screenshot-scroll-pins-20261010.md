@@ -46,3 +46,7 @@ macOS 实际窗口已有边框并退出全屏，但 `resizable=false`。Tao 0.37
 Wayland 新增状态记录明确显示 `maximized=true`、1920×1048。Tao 的 fullscreen 标记在请求发出时就清除，并不代表 Mutter 已完成转换；隐藏的 GTK 窗口还保留整屏默认尺寸，显示时可能再次最大化。现在窗口显示后在 GTK 主线程读取实际 GDK surface 状态，等待退出全屏，再清除最大化并恢复默认/当前文档尺寸。等待有五秒上限，错误保持明确，严格窗口尺寸和完整拼接像素断言继续保留。
 
 按用户要求拉取并合并 `origin/main`（`4318a510`）。冲突仅涉及 Wayland CI 预检和执行脚本。采用 main 的构建后注册实现，移除本分支旧的重复校验函数，使用真实 Gio/GLib 检查桌面文件、可执行文件、窗口类及含空格的 Exec 路径；冷构建前记录 `awaiting-build`，对应 Linux 合同测试保留。截图产品代码和本分支新增用例均保留。
+
+第五轮 [38024966329](https://github.com/engcapa/taomni/actions/runs/38024966329) 的 Wayland 窗口已退出全屏和最大化，完整拼接像素和取消恢复通过，但尺寸断言仍失败。原始 `window-activation.jsonl` 显示 Mutter 的实际 frame 为 1100×800、调整后 760×620；GTK client-side shadow buffer 分别为 1152×852、812×672。测试误把含阴影的 buffer 当成配置窗口尺寸。N16 现在使用独立 Mutter frame 观察，保留 frame/buffer 原始几何，继续使用原严格尺寸阈值；不通过增加 52 像素容差掩盖窗口回归。其他平台仍检查原生 inner size。
+
+合并后提交 `209d546d` 本机 7 个前端文件共 314/314 通过（截图 63、main 的工作区补全 251），CI 执行脚本 3 项通过，4 项真实 Gio 合同测试因 Win11 平台不适用而跳过、由 Linux CI 验证。重新构建当前 QA 应用后，Win11 native N16、N17 为 2/2，构建身份、源码与报告一致。上述尺寸观察修正只影响 QA 场景，不改变产品窗口行为；继续由更新后的平台场景验证。
