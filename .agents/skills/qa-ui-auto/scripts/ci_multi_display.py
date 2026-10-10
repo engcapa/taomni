@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import time
 
 
 def monitor_configuration(state):
@@ -44,12 +45,14 @@ def configure(report):
         observed = call("GetCurrentState")
         report.write_text(json.dumps({"transport": "Mutter DisplayConfig", "state": observed}, indent=2))
     else:
-        # RandR 1.5 monitor objects subdivide a real Xvfb framebuffer. GTK must
-        # independently enumerate both; a list in the app stub is insufficient.
-        subprocess.run(["xrandr", "--setmonitor", "QA-LEFT", "1920/508x1080/286+0+0", "screen"], check=True)
-        subprocess.run(["xrandr", "--setmonitor", "QA-RIGHT", "1920/508x1080/286+1920+0", "none"], check=True)
+        # Xvfb accepts SetMonitor but cannot establish these outputs. The
+        # Desktop owns an Xorg dummy server with independent RandR CRTCs.
+        subprocess.run(["xrandr", "--addmode", "DUMMY1", "1920x1080"], check=True)
+        subprocess.run(["xrandr", "--output", "DUMMY0", "--mode", "1920x1080", "--pos", "0x0", "--primary",
+                        "--output", "DUMMY1", "--mode", "1920x1080", "--pos", "1920x0"], check=True)
         observed = subprocess.check_output(["xrandr", "--listmonitors"], text=True)
-        report.write_text(json.dumps({"transport": "X11 RandR 1.5", "state": observed}, indent=2))
+        report.write_text(json.dumps({"transport": "Xorg dummy RandR outputs", "state": observed,
+                                     "outputs": subprocess.check_output(["xrandr", "--verbose"], text=True)}, indent=2))
     print(report.read_text(), flush=True)
 
 
@@ -81,12 +84,14 @@ def patterns(report):
         window = Gtk.Window(title=f"Taomni QA display pattern {index}")
         window.set_decorated(False)
         window.set_keep_above(True)
+        window.set_default_size(rect.width, rect.height)
         area = Gtk.DrawingArea()
         area.connect("draw", lambda widget, context, i=index: paint(
             context, widget.get_allocated_width(), widget.get_allocated_height(), i))
         window.add(area)
-        window.fullscreen_on_monitor(display.get_default_screen(), index)
         window.show_all()
+        # Send the explicit output request after creating the native surface.
+        window.fullscreen_on_monitor(display.get_default_screen(), index)
         windows.append(window)
         expected = report.parent / f"display-{index}-expected.png"
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, rect.width * scale, rect.height * scale)
@@ -97,12 +102,28 @@ def patterns(report):
         facts.append({"index": index, "name": monitor.get_model(), "logical": {
             "x": rect.x, "y": rect.y, "width": rect.width, "height": rect.height},
             "scale": scale, "expected": str(expected.resolve()), "primary": monitor == display.get_primary_monitor()})
+    started, last = time.monotonic(), [None]
     def ready():
+        observations = []
         for window, fact in zip(windows, facts):
             size = window.get_size()
-            if not window.get_mapped() or tuple(size) != (fact["logical"]["width"], fact["logical"]["height"]):
-                return True
-            fact["observedWindow"] = {"width": size[0], "height": size[1], "scale": window.get_scale_factor()}
+            monitor = display.get_monitor_at_window(window.get_window()) if window.get_window() else None
+            observed_index = next((i for i in range(2) if display.get_monitor(i) == monitor), None)
+            observed = {"width": size[0], "height": size[1], "scale": window.get_scale_factor(),
+                        "mapped": window.get_mapped(), "monitor": observed_index}
+            fact["observedWindow"] = observed
+            observations.append(observed)
+        if observations != last[0]:
+            print(json.dumps({"monitors": facts}), flush=True)
+            last[0] = observations
+        if any(not o["mapped"] or o["monitor"] != f["index"] or o["scale"] != f["scale"]
+               or (o["width"], o["height"]) != (f["logical"]["width"], f["logical"]["height"])
+               for o, f in zip(observations, facts)):
+            if time.monotonic() - started > 25:
+                print("display pattern mapping timed out", flush=True)
+                Gtk.main_quit()
+                return False
+            return True
         scales = {fact["scale"] for fact in facts}
         if os.environ.get("XDG_SESSION_TYPE") == "wayland" and scales != {1, 2}:
             raise RuntimeError(f"Wayland fixture did not establish 100%/200% scales: {facts}")
@@ -112,6 +133,8 @@ def patterns(report):
         return False
     GLib.timeout_add(100, ready)
     Gtk.main()
+    if not report.is_file():
+        raise RuntimeError("OS display patterns did not map to their target geometry/scale")
 
 
 def main():

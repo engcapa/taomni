@@ -139,7 +139,7 @@ jobs:
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
       - name: Wayland automation contracts
-        run: python -m unittest test_wayland_tools
+        run: python -m unittest test_wayland_tools test_multi_display
       - name: Plan exact cases and dependencies
         id: plan
         env:
@@ -393,6 +393,28 @@ jobs:
             cargo test --locked --release --lib rdp::
             cargo test --locked --release --bin rdp-probe
           ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/rdp-unit.log'
+      - name: Verify owned X11 dual-output desktop before compilation
+        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb' && contains(matrix.capabilities, 'dual-display')
+        env:
+          QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
+        run: >-
+          dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24 -nolisten tcp'
+          python .agents/skills/qa-ui-auto/scripts/ci_desktop_preflight.py
+          --profile ubuntu-24.04-xvfb --capabilities "$QA_CAPABILITIES"
+          --report 'qa-ui-auto-report/${{ matrix.id }}/desktop-preflight'
+      - name: Dual-display Rust contracts
+        if: runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'dual-display')
+        env:
+          CARGO_TARGET_DIR: target/qa-ui-auto
+        run: |
+          mkdir -p 'qa-ui-auto-report/${{ matrix.id }}'
+          (
+            set -e
+            pnpm build --mode qa
+            cd src-tauri
+            cargo test --locked --lib screenshot::capture::tests
+            cargo test --locked --lib servers::rdp::capture::wayland::tests
+          ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/dual-display-unit.log'
       - name: Run selected cases (Linux Xvfb desktop)
         if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb'
         env:

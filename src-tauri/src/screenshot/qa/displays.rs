@@ -67,7 +67,15 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         let main_before = geometry(&main).await?;
         // Park outside the next captured monitor. CursorMode::Embedded cannot
         // then contaminate the independent full-screen pixel comparison.
-        let other = &monitors[1 - initial]["logical"];
+        // X11 exposes the real pointer and uses its monitor for the default;
+        // its root image excludes the cursor. Wayland uses the invoking
+        // window's monitor, so keep the embedded pointer on the other output.
+        let pointer_monitor = if wayland::active() {
+            1 - initial
+        } else {
+            initial
+        };
+        let other = &monitors[pointer_monitor]["logical"];
         park_pointer((
             other["x"].as_i64().unwrap() as i32 + 16,
             other["y"].as_i64().unwrap() as i32 + 16,
@@ -136,6 +144,8 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
                     && dom["width"] == rect.2
                     && dom["height"] == rect.3
                     && dom["dpr"] == fact["scale"]
+                    && dom["imageWidth"] == init.width
+                    && dom["imageHeight"] == init.height
                 {
                     break (init, native, dom);
                 }

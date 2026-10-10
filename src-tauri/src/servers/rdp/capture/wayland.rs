@@ -229,13 +229,19 @@ impl PortalContext {
                 .filter(|streams| !streams.is_empty())
                 .ok_or_else(|| anyhow::anyhow!("portal did not return a monitor stream"))?;
             let index = match target {
-                Some(target) => monitor_stream_index(
+                Some(target) => match monitor_stream_index(
                     &streams
                         .iter()
                         .map(|s| (s.position(), s.size()))
                         .collect::<Vec<_>>(),
                     target,
-                )?,
+                ) {
+                    Ok(index) => index,
+                    Err(error) => {
+                        let _ = session.close().await;
+                        return Err(error);
+                    }
+                },
                 None => 0,
             };
             let stream = &streams[index];

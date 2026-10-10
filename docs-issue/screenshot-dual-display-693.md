@@ -15,7 +15,7 @@
 
 `TC-SHOT-N23` 使用真实 OS 枚举的两个虚拟输出，外部 GTK 窗口分别绘制独立色块原图：
 
-- Ubuntu 24.04 / X11：RandR monitor objects 分割 Xvfb framebuffer，必须由 GDK 实际枚举为两屏。
+- Ubuntu 24.04 / X11：独立 Xorg dummy server 提供两块实际 RandR 输出，必须由 GDK 枚举为两屏。第一轮证实 Xvfb 的 SetMonitor 请求并未建立输出，因此不使用该方案。
 - Ubuntu 26.04 / GNOME Wayland：两块 Mutter virtual monitor，1920×1080 / 100% 和 2560×1440 / 200%；实际配置、映射窗口几何和缩放率必须符合，缺失即失败。
 - 分别从两屏调用公共截图入口，公共选择器切换到另一屏后返回；检查完整 PNG 原图像素、原生遮罩位置、viewport/DPR、真实 OS 拖选后剪贴板裁剪像素、主窗口恢复且不迁移。
 - 原图由外部 GTK/Cairo 绘制生成，不从产品捕获结果构造。独立输出、元数据、原图与实际 PNG 保留为 artifacts。

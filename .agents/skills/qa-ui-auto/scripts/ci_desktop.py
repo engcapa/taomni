@@ -216,6 +216,49 @@ class Desktop:
                         "configure", "--report", str(self.root / "display-configuration.json")],
                        check=True, timeout=30)
 
+    def _xorg_dual(self):
+        # Use an independent server: Xvfb does not implement the RandR output
+        # topology even when xrandr --setmonitor returns success.
+        config = Path(self.temporary.name) / "dual-xorg.conf"
+        config.write_text('''Section "ServerFlags"
+  Option "AutoAddDevices" "false"
+  Option "AllowMouseOpenFail" "true"
+EndSection
+Section "Device"
+  Identifier "QA-Dummy"
+  Driver "dummy"
+  VideoRam 256000
+EndSection
+Section "Monitor"
+  Identifier "QA-Monitor"
+  HorizSync 5.0 - 1000.0
+  VertRefresh 5.0 - 200.0
+  Modeline "1920x1080" 148.5 1920 2008 2052 2200 1080 1084 1089 1125 +HSync +VSync
+EndSection
+Section "Screen"
+  Identifier "QA-Screen"
+  Device "QA-Dummy"
+  Monitor "QA-Monitor"
+  DefaultDepth 24
+  SubSection "Display"
+    Depth 24
+    Modes "1920x1080"
+    Virtual 3840 1080
+  EndSubSection
+EndSection
+''', encoding="utf-8")
+        number = next((n for n in range(70, 130) if not Path(f"/tmp/.X{n}-lock").exists()
+                       and not Path(f"/tmp/.X11-unix/X{n}").exists()), None)
+        if number is None:
+            raise RuntimeError("no free owned Xorg display")
+        os.environ.update(DISPLAY=f":{number}")
+        os.environ.pop("XAUTHORITY", None)
+        server = self.start(["/usr/lib/xorg/Xorg", os.environ["DISPLAY"], "-config", str(config),
+                             "-logfile", str((self.root / "xorg-server.log").resolve()),
+                             "-noreset", "-nolisten", "tcp", "-novtswitch", "-sharevts", "-ac"])
+        self._wait(server, lambda: subprocess.run(["xdpyinfo"], stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, timeout=5).returncode == 0, "owned dual-output Xorg")
+
     def _display_patterns(self, facts):
         report = (self.root / "multi-display-fixture.json").resolve()
         fixture = self.start(["/usr/bin/python3", str(Path(__file__).with_name("ci_multi_display.py")),
@@ -282,6 +325,7 @@ class Desktop:
         if not os.environ.get("DISPLAY"):
             raise RuntimeError("native desktop requires DISPLAY; launch the complete session wrapper")
         if "dual-display" in self.capabilities:
+            self._xorg_dual()
             self._configure_displays()
         display = subprocess.check_output(["xdpyinfo"], text=True)
         if "XTEST" not in display:

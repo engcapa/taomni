@@ -35,6 +35,9 @@ if [[ "$profile" == *wayland ]]; then
 else
   install_packages xvfb xauth openbox xcompmgr wmctrl xdotool x11-utils \
     x11-xserver-utils libxtst6 xclip imagemagick fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons
+  if [[ ",${QA_CAPABILITIES:-}," == *,dual-display,* ]]; then
+    install_packages xserver-xorg-core xserver-xorg-video-dummy
+  fi
   if [[ "$profile" == ubuntu-22.04-* ]]; then
     install_packages lxqt-core
   fi

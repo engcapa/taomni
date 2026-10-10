@@ -1013,11 +1013,11 @@ pub async fn screenshot_switch_display(app: AppHandle, window: WebviewWindow, di
         scale_factor: display.scale_factor, window_region: None, document: false, source_pin: None,
     });
     if let Ok(init) = &result {
-        tool_state().overlay = Some(init.clone());
         if let Err(error) = cover_display(&window, &display).await {
             let _ = window.show();
             return Err(error);
         }
+        tool_state().overlay = Some(init.clone());
     }
     let _ = window.show();
     let _ = window.set_focus();
