@@ -1169,6 +1169,7 @@ pub fn run() {
             screenshot::qa::scroll_manual::screenshot_qa_scroll_manual,
             screenshot::qa::scroll_exit::screenshot_qa_scroll_exit,
             screenshot::qa::colors::screenshot_qa_colors,
+            screenshot::qa::displays::screenshot_qa_displays,
             screenshot::qa::screenshot_qa_freehand,
             screenshot::qa::screenshot_qa_hotkey,
             lanchat::commands::lanchat_send_clipboard_image,

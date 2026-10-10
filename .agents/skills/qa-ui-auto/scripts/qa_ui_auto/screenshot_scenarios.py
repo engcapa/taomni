@@ -11,6 +11,7 @@ from .deadline import CaseTimeout, budget_time as time
 from .steps import StepError
 
 SCENARIOS = {
+    "displays": "screenshot_qa_displays",
     "capture": "screenshot_qa_capture",
     "capture-fidelity": "screenshot_qa_capture_fidelity",
     "ocr-redact": "screenshot_qa_ocr_redact",

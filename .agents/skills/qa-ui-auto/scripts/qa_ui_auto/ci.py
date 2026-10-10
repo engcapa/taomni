@@ -95,6 +95,8 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("ard")
         if mode == "native":
             result.add("display")
+            if "dual_display_required" in fixtures:
+                result.add("dual-display")
             if "macos_updater" in fixtures:
                 result.add("updater")
             if fixtures & {"jdtls_required", "java25_projects", "java_test_bundle", "java_sample_projects", "sortable_java_fixtures"}:

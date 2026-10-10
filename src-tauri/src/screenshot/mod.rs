@@ -743,7 +743,7 @@ fn restore_app_windows(app: &AppHandle) {
 }
 
 /// Place a borderless window exactly over `display` (physical pixels).
-fn cover_display(window: &WebviewWindow, display: &DisplayInfo) {
+async fn cover_display(window: &WebviewWindow, display: &DisplayInfo) -> Result<(), String> {
     let _ = window.set_position(PhysicalPosition::new(display.x, display.y));
     let _ = window.set_size(PhysicalSize::new(display.width, display.height));
     #[cfg(target_os = "macos")]
@@ -756,6 +756,34 @@ fn cover_display(window: &WebviewWindow, display: &DisplayInfo) {
     {
         let _ = window.set_fullscreen(true);
     }
+    #[cfg(target_os = "linux")]
+    {
+        let target = window.clone();
+        let rect = display.logical_rect();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        window.run_on_main_thread(move || {
+            use gtk::prelude::*;
+            let result = (|| -> Result<(), String> {
+                let window = target.gtk_window().map_err(|e| e.to_string())?;
+                let display = window.display();
+                let index = (0..display.n_monitors()).find(|&index| {
+                    display.monitor(index).is_some_and(|monitor| {
+                        let g = monitor.geometry();
+                        (g.x(), g.y(), g.width(), g.height()) == rect
+                    })
+                }).ok_or("selected monitor is no longer available to GTK")?;
+                // Wayland ignores global set_position. Fullscreen must name
+                // the actual GDK output, using its logical geometry.
+                window.fullscreen_on_monitor(&display.default_screen(), index);
+                Ok(())
+            })();
+            let _ = tx.send(result);
+        }).map_err(|e| e.to_string())?;
+        tokio::time::timeout(Duration::from_secs(5), rx).await
+            .map_err(|_| "GTK monitor placement timed out")?
+            .map_err(|e| e.to_string())??;
+    }
+    Ok(())
 }
 
 /// Hide app windows, capture `display_id` (default: the display under the
@@ -918,7 +946,7 @@ async fn open_overlay_inner(
         .build()
         .map_err(|e| format!("open overlay window: {e}"))?;
     watch_session_window(&window);
-    cover_display(&window, &display);
+    cover_display(&window, &display).await?;
     window
         .show()
         .map_err(|e| format!("show overlay window: {e}"))?;
@@ -934,6 +962,14 @@ pub async fn screenshot_open_overlay(
     display_id: Option<String>,
     include_current_window: Option<bool>,
 ) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    let display_id = if display_id.as_ref().is_none_or(|id| id.trim().is_empty())
+        && pins::native_wayland()
+    {
+        let worker = app.clone();
+        let caller = window.clone();
+        Some(blocking("invoking display", move || capture::display_for_window(&worker, &caller)).await?.id)
+    } else { display_id };
     open_overlay_with_window(
         &app,
         display_id,
@@ -978,7 +1014,10 @@ pub async fn screenshot_switch_display(app: AppHandle, window: WebviewWindow, di
     });
     if let Ok(init) = &result {
         tool_state().overlay = Some(init.clone());
-        cover_display(&window, &display);
+        if let Err(error) = cover_display(&window, &display).await {
+            let _ = window.show();
+            return Err(error);
+        }
     }
     let _ = window.show();
     let _ = window.set_focus();

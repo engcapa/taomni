@@ -23,6 +23,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow};
 use super::capture::{self, DisplayInfo};
 use super::qa_oracle;
 pub mod colors;
+pub mod displays;
 #[cfg(target_os = "macos")]
 mod macos_save_dialog;
 pub mod pin_arrangement;

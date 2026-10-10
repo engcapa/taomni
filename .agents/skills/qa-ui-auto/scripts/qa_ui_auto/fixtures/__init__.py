@@ -73,6 +73,7 @@ from . import rdp_audio_required
 from . import xrdp_server_required
 from . import backup_policy
 from . import path_completion
+from . import dual_display_required
 
 
 class FixtureContext(Protocol):
@@ -90,6 +91,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "dual_display_required": Fixture("dual_display_required", dual_display_required.setup),
     "path_completion": Fixture("path_completion", path_completion.setup),
     "backup_policy": Fixture("backup_policy", backup_policy.setup),
     "project_tree": Fixture("project_tree", project_tree.setup),

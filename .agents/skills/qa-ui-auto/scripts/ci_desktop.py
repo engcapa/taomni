@@ -124,7 +124,10 @@ class Desktop:
         self.start(["wireplumber"])
         # Use GNOME's standard session without Ubuntu's forced desktop-icons
         # extension and background indexing; this compositor belongs to QA.
-        shell = self.start(["gnome-shell", "--wayland", "--headless", "--virtual-monitor=1920x1080",
+        monitors = ["--virtual-monitor=1920x1080"]
+        if "dual-display" in self.capabilities:
+            monitors.append("--virtual-monitor=2560x1440")
+        shell = self.start(["gnome-shell", "--wayland", "--headless", *monitors,
                             "--wayland-display=wayland-qa", "--mode=user", "--unsafe-mode"])
         # Eval is limited to this disposable compositor on the job's private
         # session bus. It lets the helper inspect and activate OS windows.
@@ -146,6 +149,8 @@ class Desktop:
             return protocols if wayland_has_input(protocols) else False
 
         protocols = self._wait(input_owner, input_ready, "Wayland keyboard and pointer")
+        if "dual-display" in self.capabilities:
+            self._configure_displays()
         (self.root / "wayland-info.txt").write_text(protocols, encoding="utf-8")
         for interface in ("wl_compositor", "xdg_wm_base", "wl_output"):
             if interface not in protocols:
@@ -197,6 +202,34 @@ class Desktop:
                      portal_interfaces=["Screenshot", "ScreenCast", "RemoteDesktop"],
                      portal_consent="AT-SPI on owned GNOME portal and Shell screenshot access dialogs",
                      note="GNOME virtual monitor; physical GPU/input remain unverified")
+        if "dual-display" in self.capabilities:
+            self._display_patterns(facts)
+
+    def _configure_displays(self):
+        if os.environ.get("XDG_SESSION_TYPE") == "wayland":
+            self._wait(self.processes[-1], lambda: subprocess.check_output([
+                "gdbus", "call", "--session", "--dest", "org.freedesktop.DBus",
+                "--object-path", "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.NameHasOwner",
+                "org.gnome.Mutter.DisplayConfig"], text=True, timeout=5).strip() == "(true,)",
+                "Mutter DisplayConfig service")
+        subprocess.run(["/usr/bin/python3", str(Path(__file__).with_name("ci_multi_display.py")),
+                        "configure", "--report", str(self.root / "display-configuration.json")],
+                       check=True, timeout=30)
+
+    def _display_patterns(self, facts):
+        report = (self.root / "multi-display-fixture.json").resolve()
+        fixture = self.start(["/usr/bin/python3", str(Path(__file__).with_name("ci_multi_display.py")),
+                              "patterns", "--report", str(report)])
+        self._wait(fixture, report.is_file, "two mapped OS display patterns")
+        observed = json.loads(report.read_text(encoding="utf-8"))
+        if len(observed["monitors"]) != 2:
+            raise RuntimeError("dual-display fixture did not observe two GTK monitors")
+        facts.update(monitors=2, monitor_topology=observed["monitors"],
+                     mixed_dpi=observed["mixedDpi"], display_fixture="OS virtual outputs")
+        rectangles = [m["logical"] for m in observed["monitors"]]
+        facts["screen"] = [max(r["x"]+r["width"] for r in rectangles)-min(r["x"] for r in rectangles),
+                           max(r["y"]+r["height"] for r in rectangles)-min(r["y"] for r in rectangles)]
+        os.environ["QA_MULTI_DISPLAY_FIXTURE"] = str(report)
 
     def verify_application(self):
         """Register and verify the built QA app before any Wayland case."""
@@ -248,6 +281,8 @@ class Desktop:
             self._vnc(facts)
         if not os.environ.get("DISPLAY"):
             raise RuntimeError("native desktop requires DISPLAY; launch the complete session wrapper")
+        if "dual-display" in self.capabilities:
+            self._configure_displays()
         display = subprocess.check_output(["xdpyinfo"], text=True)
         if "XTEST" not in display:
             raise RuntimeError("X11 display lacks XTEST")
@@ -292,6 +327,8 @@ class Desktop:
         facts.update(display=os.environ["DISPLAY"], wm=wm.strip(), input_transport="X11/WebDriver",
                      idle_blanking=False, dpms_disabled=dpms.returncode == 0)
         subprocess.run([sys.executable, "-c", "import tkinter as t; w=t.Tk(); w.update(); w.destroy()"], check=True)
+        if "dual-display" in self.capabilities:
+            self._display_patterns(facts)
         if "ime" in self.capabilities:
             self._ime(facts)
 
@@ -483,7 +520,8 @@ class Desktop:
             # Desktop changed, without discarding unrelated service variables.
             for key in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "PULSE_SERVER", "XDG_SESSION_TYPE",
                         "XDG_CURRENT_DESKTOP", "GDK_BACKEND", "LIBGL_ALWAYS_SOFTWARE",
-                        "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_IM_MODULE", "QT_IM_MODULE", "XMODIFIERS"):
+                        "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_IM_MODULE", "QT_IM_MODULE", "XMODIFIERS",
+                        "QA_MULTI_DISPLAY_FIXTURE"):
                 if key in self.environment_before:
                     os.environ[key] = self.environment_before[key]
                 else:
