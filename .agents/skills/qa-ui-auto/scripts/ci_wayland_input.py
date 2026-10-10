@@ -215,7 +215,7 @@ def main() -> None:
         call(session, interface, "NotifyKeyboardKeycode", GLib.Variant("(ub)", (29, False)))
         call(session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (0.0, 0.0)))
         if args.absolute_pointer:
-            evaluate("(() => { global.__taomniQaPointer = global.backend.get_default_seat()"
+            evaluate("(() => { global.__taomniQaPointer = global.stage.context.get_backend().get_default_seat()"
                      ".create_virtual_device(imports.gi.Clutter.InputDeviceType.POINTER_DEVICE); return true; })()")
         listener.bind(str(args.socket))
         args.socket.chmod(0o600)
