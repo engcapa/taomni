@@ -5,7 +5,6 @@
 
 use gtk::prelude::*;
 use std::cell::RefCell;
-use tauri::Manager;
 
 thread_local! {
     static FLOATING_DISPLAY: RefCell<Option<gtk::gdk::Display>> = const { RefCell::new(None) };
@@ -53,25 +52,11 @@ pub(super) fn webview(window: &tauri::WebviewWindow) -> Result<(), String> {
 /// so that scale cannot shrink or move controls into the captured region.
 pub(super) fn place_webview(
     window: &tauri::WebviewWindow,
-    rect: super::surfaces::Rect,
+    position: super::surfaces::ControlPosition,
 ) -> Result<(), String> {
+    let rect = position.rect;
     if super::pins::native_wayland() {
-        let displays =
-            super::capture::list_displays(window.app_handle()).map_err(|e| e.to_string())?;
-        let owners: Vec<_> = displays
-            .iter()
-            .filter(|d| {
-                rect.x >= d.x
-                    && rect.y >= d.y
-                    && rect.x + rect.w <= d.x + d.width as i32
-                    && rect.y + rect.h <= d.y + d.height as i32
-            })
-            .collect();
-        let owner = match owners.as_slice() {
-            [owner] => owner,
-            _ => return Err("Cannot resolve the floating capture control's monitor".into()),
-        };
-        let scale = owner.scale_factor.max(1.0);
+        let scale = position.scale;
         window
             .set_size(tauri::LogicalSize::new(
                 rect.w as f64 / scale,

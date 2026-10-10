@@ -442,7 +442,7 @@ fn scroll_layout(
     app: &AppHandle,
     display: &DisplayInfo,
     requested: (u32, u32, u32, u32),
-) -> Result<((u32, u32, u32, u32), Option<surfaces::Rect>), String> {
+) -> Result<((u32, u32, u32, u32), Option<surfaces::ControlPosition>), String> {
     let rect = surfaces::region_rect(display, requested);
     let mut displays = capture::list_displays(app).map_err(internal_error)?;
     displays.sort_by_key(|d| d.id != display.id);
@@ -467,22 +467,28 @@ fn scroll_layout(
                     capture.w as u32,
                     capture.h as u32,
                 ),
-                Some(controls),
+                Some(surfaces::ControlPosition {
+                    rect: controls,
+                    scale: display.scale_factor.max(1.0),
+                }),
             ));
         }
         return Ok((requested, None));
     }
-    Ok((requested, surfaces::control_position(&displays, rect)))
+    Ok((
+        requested,
+        surfaces::control_placement(&displays, display, rect),
+    ))
 }
 
 fn capture_control_position(
     app: &AppHandle,
     display: &DisplayInfo,
     region: surfaces::Rect,
-) -> Result<Option<surfaces::Rect>, String> {
+) -> Result<Option<surfaces::ControlPosition>, String> {
     let mut displays = capture::list_displays(app).map_err(internal_error)?;
     displays.sort_by_key(|d| d.id != display.id);
-    let position = surfaces::control_position(&displays, region);
+    let position = surfaces::control_placement(&displays, display, region);
     if position.is_none() && !shortcut::current_status().registered {
         return Err("No room for controls outside the capture. Select a smaller region or enable the system screenshot hotkey before capturing the whole display.".into());
     }
@@ -492,7 +498,7 @@ fn capture_control_position(
 fn open_scroll_bar(
     app: &AppHandle,
     display: &DisplayInfo,
-    position: Option<surfaces::Rect>,
+    position: Option<surfaces::ControlPosition>,
     control: Arc<scroll::ScrollControl>,
 ) -> Result<(), String> {
     let window = window_builder(
@@ -519,11 +525,12 @@ fn open_scroll_bar(
     });
     #[cfg(target_os = "linux")]
     surface_backend::webview(&window)?;
-    if let Some(rect) = position {
+    if let Some(position) = position {
         #[cfg(target_os = "linux")]
-        surface_backend::place_webview(&window, rect)?;
+        surface_backend::place_webview(&window, position)?;
         #[cfg(not(target_os = "linux"))]
         {
+            let rect = position.rect;
             window
                 .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
                 .map_err(|e| e.to_string())?;
@@ -1633,15 +1640,15 @@ async fn open_recorder_bar(
     // Bottom-center of the recorded display.
     let s = display.scale_factor.max(0.5);
     let (pw, ph) = position
-        .map(|r| (r.w, r.h))
+        .map(|p| (p.rect.w, p.rect.h))
         .unwrap_or(((lw * s) as i32, (lh * s) as i32));
     let x = display.x + (display.width as i32 - pw) / 2;
     // Leave room above for the grown preview (240 logical px).
     let y = display.y + display.height as i32 - ph - (240.0 * s) as i32;
-    let (x, y) = position.map(|r| (r.x, r.y)).unwrap_or((x, y));
+    let (x, y) = position.map(|p| (p.rect.x, p.rect.y)).unwrap_or((x, y));
     #[cfg(target_os = "linux")]
-    if position.is_some() {
-        surface_backend::place_webview(&window, surfaces::Rect { x, y, w: pw, h: ph })?;
+    if let Some(position) = position {
+        surface_backend::place_webview(&window, position)?;
     } else {
         window
             .set_size(PhysicalSize::new(pw as u32, ph as u32))

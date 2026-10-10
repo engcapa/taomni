@@ -415,6 +415,7 @@ jobs:
             # One root test invocation covers screenshot mapping and the
             # retained X11/Wayland capture contracts without repeated links.
             cargo test --locked --lib capture::
+            cargo test --locked --lib screenshot::surfaces::
           ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/dual-display-unit.log'
       - name: Run selected cases (Linux Xvfb desktop)
         if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb'

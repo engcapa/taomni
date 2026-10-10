@@ -25,6 +25,65 @@ pub struct Rect {
     pub h: i32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ControlPosition {
+    pub rect: Rect,
+    pub scale: f64,
+}
+
+/// Keep the chosen output's scale with the rectangle. Per-output physical
+/// spaces can overlap even though the actual logical outputs are disjoint.
+pub fn control_placement(
+    displays: &[DisplayInfo],
+    captured: &DisplayInfo,
+    region: Rect,
+) -> Option<ControlPosition> {
+    control_placement_for_layout(displays, captured, region, super::pins::native_wayland())
+}
+
+fn control_placement_for_layout(
+    displays: &[DisplayInfo],
+    captured: &DisplayInfo,
+    region: Rect,
+    logical: bool,
+) -> Option<ControlPosition> {
+    let convert = |value: i32, scale: f64| (value as f64 / scale).round() as i32;
+    let region = if logical {
+        let scale = captured.scale_factor.max(1.0);
+        Rect {
+            x: convert(region.x, scale),
+            y: convert(region.y, scale),
+            w: convert(region.w, scale),
+            h: convert(region.h, scale),
+        }
+    } else {
+        region
+    };
+    for display in displays {
+        let scale = display.scale_factor.max(1.0);
+        let mut normalized = display.clone();
+        if logical {
+            normalized.x = convert(display.x, scale);
+            normalized.y = convert(display.y, scale);
+            normalized.width = convert(display.width as i32, scale) as u32;
+            normalized.height = convert(display.height as i32, scale) as u32;
+            normalized.scale_factor = 1.0;
+        }
+        if let Some(mut rect) = control_position(&[normalized], region) {
+            if logical {
+                rect = Rect {
+                    x: (rect.x as f64 * scale).round() as i32,
+                    y: (rect.y as f64 * scale).round() as i32,
+                    w: (rect.w as f64 * scale).round() as i32,
+                    h: (rect.h as f64 * scale).round() as i32,
+                };
+            }
+            return Some(ControlPosition { rect, scale });
+        }
+    }
+    None
+}
+
 impl Rect {
     pub fn intersects(self, other: Self) -> bool {
         self.x < other.x + other.w
@@ -412,5 +471,39 @@ mod tests {
         let bar = control_position(&[d, display(-1920, 0, 1.0)], region).unwrap();
         assert!(!region.intersects(bar));
         assert!(bar.x < 0);
+    }
+
+    #[test]
+    fn mixed_dpi_controls_keep_their_owner_when_physical_spaces_overlap() {
+        let high = display(0, 0, 2.0); // logical 0..960
+        let low = display(960, 0, 1.0); // logical 960..2880
+        let region = region_rect(&high, (1400, 80, 450, 300));
+        let position =
+            control_placement_for_layout(&[high.clone(), low], &high, region, true).unwrap();
+        assert_eq!(position.scale, 2.0);
+        assert!(position.rect.x >= 960); // also lies in the low output's physical range
+        assert!(position.rect.x + position.rect.w <= 1920);
+        assert!(!position.rect.intersects(region));
+    }
+
+    #[test]
+    fn mixed_dpi_full_screen_controls_use_another_logical_output() {
+        for offset in [-960, 1920] {
+            let captured = display(0, 0, 1.0);
+            let other = display(offset * 2, 0, 2.0);
+            let region = region_rect(&captured, (0, 0, 1920, 1080));
+            let position =
+                control_placement_for_layout(&[captured.clone(), other], &captured, region, true)
+                    .unwrap();
+            assert_eq!(position.scale, 2.0);
+            let logical = Rect {
+                x: position.rect.x / 2,
+                y: position.rect.y / 2,
+                w: position.rect.w / 2,
+                h: position.rect.h / 2,
+            };
+            assert!(!logical.intersects(region));
+            assert!(logical.x >= offset && logical.x + logical.w <= offset + 960);
+        }
     }
 }
