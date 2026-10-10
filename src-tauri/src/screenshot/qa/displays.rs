@@ -221,7 +221,23 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
                 let init = super::super::screenshot_overlay_init()
                     .await
                     .map_err(anyhow::Error::msg)?;
-                let native = geometry(&overlay).await?;
+                let native = match geometry(&overlay).await {
+                    Ok(native) => native,
+                    Err(error)
+                        if wayland::active()
+                            && error.to_string().contains(
+                                "expected one QA application window in the owned desktop; found 0",
+                            )
+                            && Instant::now() < deadline =>
+                    {
+                        // The public switch hides its surface while capturing
+                        // the new output. Mutter has no actor during that
+                        // interval; require the remapped geometry below.
+                        tokio::time::sleep(Duration::from_millis(120)).await;
+                        continue;
+                    }
+                    Err(error) => return Err(error),
+                };
                 let dom = run_js(&overlay, r#"
                     const img=document.querySelector('[data-testid="screenshot-base-image"]');
                     return {width:innerWidth,height:innerHeight,dpr:devicePixelRatio,

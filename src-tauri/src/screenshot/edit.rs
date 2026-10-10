@@ -164,7 +164,8 @@ pub(super) async fn settle_document_window(window: &WebviewWindow, display: &cap
                     let Some(surface) = gtk.window() else { return (false, false, "unrealized".to_string()); };
                     let state = surface.state();
                     let size = gtk.size();
-                    let facts = format!("mapped={}, resizable={}, state={state:?}, size={size:?}, default={:?}, minimum={:?}", gtk.is_mapped(), gtk.is_resizable(), gtk.default_size(), gtk.preferred_size().0);
+                    let minimum = gtk.preferred_size().0;
+                    let facts = format!("mapped={}, resizable={}, state={state:?}, size={size:?}, default={:?}, minimum=({}, {})", gtk.is_mapped(), gtk.is_resizable(), gtk.default_size(), minimum.width, minimum.height);
                     if !gtk.is_mapped() || state.contains(gtk::gdk::WindowState::FULLSCREEN) {
                         return (false, false, facts);
                     }

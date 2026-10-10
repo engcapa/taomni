@@ -1144,6 +1144,10 @@ pub(crate) fn close_session(app: &AppHandle) {
     if let Some(id) = recording {
         let _ = record::cancel_recording(&id);
     }
+    // Wayland activation tokens need the currently focused selection surface.
+    // Request restoration before destroying that surface and its input serial.
+    #[cfg(target_os = "linux")]
+    if pins::native_wayland() { restore_app_windows(app); }
     surfaces::close_borders(app);
     for label in [OVERLAY_LABEL, RECORDER_LABEL, surfaces::SCROLL_LABEL] {
         if let Some(window) = app.get_webview_window(label) {
@@ -1171,6 +1175,11 @@ pub async fn screenshot_pin_to_screen(app: AppHandle, path: String) -> Result<St
         Ok((dest, width, height))
     })
     .await?;
+    // A floating XWayland pin takes keyboard focus away from the Wayland
+    // selection surface. Restore main while that surface can still authorize
+    // activation, then let the new pin receive focus as usual.
+    #[cfg(target_os = "linux")]
+    if pins::native_wayland() { restore_app_windows(&app); }
     open_pin(&app, pinned, width, height, None)
 }
 
