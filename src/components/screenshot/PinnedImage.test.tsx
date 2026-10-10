@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   copy: vi.fn(), save: vi.fn(), choosePath: vi.fn(), addFavorite: vi.fn(), removeFavorite: vi.fn(),
   setSize: vi.fn(), setResizable: vi.fn(), innerSize: vi.fn(), scaleFactor: vi.fn(),
   setPinCompact: vi.fn(), setPinNote: vi.fn(), listPins: vi.fn(), arrangePins: vi.fn(), pinsBatch: vi.fn(), focusPin: vi.fn(), openPinEditor: vi.fn(), openImageEditor: vi.fn(),
+  openPinTools: vi.fn(), closePinTools: vi.fn(), emitTo: vi.fn(), listeners: new Map<string, (event: { payload: unknown }) => void>(),
   translate: (key: string) => key,
 }));
 vi.mock("../../lib/i18n", () => ({ useT: () => mocks.translate }));
@@ -19,10 +20,12 @@ vi.mock("../../lib/screenshot", () => ({
   setPinCompact: mocks.setPinCompact, setPinNote: mocks.setPinNote, listPins: mocks.listPins,
   arrangePins: mocks.arrangePins, pinsBatch: mocks.pinsBatch, focusPin: mocks.focusPin,
   openPinEditor: mocks.openPinEditor, openImageEditor: mocks.openImageEditor,
+  openPinTools: mocks.openPinTools, closePinTools: mocks.closePinTools,
+  PIN_UPDATED_EVENT: "screenshot://pin-updated", PIN_TOOL_EVENT: "screenshot://pin-tool", PIN_VIEW_EVENT: "screenshot://pin-view",
   PIN_ACTION_EVENT: "screenshot://pin-action", PINS_CHANGED_EVENT: "screenshot://pins-changed",
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: mocks.choosePath }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => undefined) }));
+vi.mock("@tauri-apps/api/event", () => ({ emitTo: mocks.emitTo, listen: vi.fn(async (event, fn) => { mocks.listeners.set(event, fn); return () => mocks.listeners.delete(event); }) }));
 vi.mock("@tauri-apps/api/window", () => ({
   LogicalSize: class { constructor(public width: number, public height: number) {} },
   getCurrentWindow: () => ({ label: "screenshot-pin-unit", close: mocks.closeWindow, startDragging: mocks.startDragging,
@@ -31,6 +34,10 @@ vi.mock("@tauri-apps/api/window", () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.listeners.clear();
+  mocks.emitTo.mockResolvedValue(undefined);
+  mocks.openPinTools.mockResolvedValue("screenshot-tools-screenshot-pin-unit");
+  mocks.closePinTools.mockResolvedValue(undefined);
   mocks.fetchPinInit.mockResolvedValue({ path: "pin.png", width: 160, height: 120 });
   mocks.loadScreenshotUrl.mockResolvedValue("blob:pin-unit");
   mocks.closePin.mockResolvedValue(undefined);
@@ -55,6 +62,17 @@ afterEach(cleanup);
 
 // Mounted renderer/IPC checks only; N11 measures actual OS window displacement.
 describe("PinnedImage", () => {
+  it("reloads updated pixels and uses the new file for copy while preserving the note", async () => {
+    render(<PinnedImage />);
+    await screen.findByTestId("screenshot-pin-image");
+    mocks.loadScreenshotUrl.mockResolvedValueOnce("blob:edited");
+    act(() => mocks.listeners.get("screenshot://pin-updated")?.({ payload: { path: "edited.png", width: 160, height: 120, note: "Reference" } }));
+    await waitFor(() => expect(screen.getByTestId("screenshot-pin-image")).toHaveAttribute("src", "blob:edited"));
+    fireEvent.click(screen.getByTestId("screenshot-pin-copy"));
+    await waitFor(() => expect(mocks.copy).toHaveBeenCalledWith("edited.png"));
+    expect(screen.getByTestId("screenshot-pin-note")).toHaveTextContent("Reference");
+    expect(mocks.revokeScreenshotUrl).toHaveBeenCalledWith("blob:pin-unit");
+  });
   it("retains the image over a checkerboard and requests native drag only for a first left press", async () => {
     const view = render(<PinnedImage />);
     expect(await screen.findByTestId("screenshot-pin-image")).toHaveAttribute("src", "blob:pin-unit");
@@ -81,48 +99,22 @@ describe("PinnedImage", () => {
     expect(mocks.closeWindow).not.toHaveBeenCalled();
   });
 
-  it("opens right-click options without closing or dragging the pin", async () => {
+  it("opens a separate options window without covering, closing or dragging the pin", async () => {
     render(<PinnedImage />);
     const pin = await screen.findByTestId("screenshot-pin-window");
     fireEvent.contextMenu(pin);
-    expect(screen.getByTestId("screenshot-pin-help")).toBeVisible();
+    await waitFor(() => expect(mocks.openPinTools).toHaveBeenCalledOnce());
+    expect(screen.queryByTestId("screenshot-pin-menu")).not.toBeInTheDocument();
     expect(mocks.closePin).not.toHaveBeenCalled();
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByTestId("screenshot-pin-menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(mocks.closePinTools).toHaveBeenCalledOnce());
     expect(mocks.closePin).not.toHaveBeenCalled();
-  });
-
-  it("splits the menu into this-pin and all-pins tabs with the compact toolbar unchanged", async () => {
-    render(<PinnedImage />);
-    const pin = await screen.findByTestId("screenshot-pin-window");
-    fireEvent.contextMenu(pin);
-    expect(screen.getByTestId("screenshot-pin-tab-pin")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { selected: true })).toHaveAttribute("data-testid", "screenshot-pin-tab-pin");
-    expect(screen.getByTestId("screenshot-pin-help")).toBeVisible();
-    expect(screen.queryByTestId("screenshot-pins-tile")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("screenshot-pin-tab-all"));
-    expect(screen.getByTestId("screenshot-pin-tab-all")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("screenshot-pins-tile")).toBeVisible();
-    expect(screen.getByTestId("screenshot-pin-list")).toBeVisible();
-    expect(screen.queryByTestId("screenshot-pin-help")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("screenshot-pin-tab-pin"));
-    expect(screen.getByTestId("screenshot-pin-help")).toBeVisible();
-    // The tab switch keeps the menu open; the toggle closes it.
-    fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
-    expect(screen.queryByTestId("screenshot-pin-menu")).not.toBeInTheDocument();
-    // Right-click always reopens on the this-pin tab.
-    fireEvent.contextMenu(pin);
-    expect(screen.getByTestId("screenshot-pin-tab-pin")).toHaveAttribute("aria-selected", "true");
   });
 
   it("shows the note truncated on the collapsed thumbnail with a full tooltip", async () => {
     render(<PinnedImage />);
     await screen.findByTestId("screenshot-pin-window");
-    fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
-    fireEvent.change(screen.getByTestId("screenshot-pin-note-input"), { target: { value: "登录页对照图" } });
-    fireEvent.click(screen.getByTestId("screenshot-pin-note-save"));
-    // The note bar shows only while the menu is closed.
-    fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
+    act(() => mocks.listeners.get("screenshot://pin-tool")?.({ payload: { action: "note", value: "登录页对照图" } }));
     await screen.findByTestId("screenshot-pin-note");
     expect(screen.getByTestId("screenshot-pin-note")).toHaveTextContent("登录页对照图");
     fireEvent.click(screen.getByTestId("screenshot-pin-collapse"));
@@ -133,8 +125,7 @@ describe("PinnedImage", () => {
     fireEvent.click(screen.getByTestId("screenshot-pin-expand"));
     await screen.findByTestId("screenshot-pin-toolbar");
     expect(screen.getByTestId("screenshot-pin-window")).toHaveAttribute("title", "screenshot.pinHint");
-    fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
-    expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("登录页对照图");
+    expect(screen.getByTestId("screenshot-pin-note")).toHaveTextContent("登录页对照图");
   });
 
   it("copies and saves original pixels while keeping the pin open, and save cancellation does not write", async () => {
@@ -172,7 +163,7 @@ describe("PinnedImage", () => {
     render(<PinnedImage />);
     await screen.findByTestId("screenshot-pin-window");
     fireEvent.click(screen.getByTestId("screenshot-pin-menu-toggle"));
-    fireEvent.change(screen.getByTestId("screenshot-pin-opacity"), { target: { value: "50" } });
+    act(() => mocks.listeners.get("screenshot://pin-tool")?.({ payload: { action: "opacity", value: 0.5 } }));
     fireEvent.click(screen.getByTestId("screenshot-pin-collapse"));
     await screen.findByTestId("screenshot-pin-expand");
     expect(mocks.setSize).toHaveBeenCalledWith({ width: 64, height: 64 });

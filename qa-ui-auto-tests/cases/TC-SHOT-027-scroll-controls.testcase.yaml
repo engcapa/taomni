@@ -34,7 +34,7 @@ steps:
 - wait_for: '[data-testid="screenshot-scroll-mode-hint"]'
 - assert_text:
     selector: '[data-testid="screenshot-scroll-mode-hint"]'
-    contains: Pauses are allowed
+    contains: Scroll one notch every 0.5 seconds
 - click: '[data-testid="screenshot-scroll-switch-mode"]'
 - assert_text:
     selector: '[data-testid="screenshot-scroll-mode-hint"]'
@@ -45,7 +45,7 @@ steps:
 - click: '[data-testid="screenshot-scroll-switch-mode"]'
 - assert_text:
     selector: '[data-testid="screenshot-scroll-mode-hint"]'
-    contains: Pauses are allowed
+    contains: Scroll one notch every 0.5 seconds
 - eval_readonly:
     expression: window.__taomniStubScreenshotCalls.at(-1).args.mode === "manual"
 - click: '[data-testid="screenshot-scroll-cancel"]'
@@ -89,14 +89,14 @@ verification:
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture"
         && window.__taomniStubScreenshotCalls.at(-1).args.cancel === true''}'
     - step: 16
-      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-scroll-mode-hint"]'', ''contains'': ''Pauses are allowed''}'
+      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-scroll-mode-hint"]'', ''contains'': ''Scroll one notch every 0.5 seconds''}'
     - step: 18
       expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-scroll-mode-hint"]'', ''contains'': ''Taomni will scroll''}'
     - step: 19
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_set_scroll_mode"
         && window.__taomniStubScreenshotCalls.at(-1).args.mode === "auto"''}'
     - step: 21
-      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-scroll-mode-hint"]'', ''contains'': ''Pauses are allowed''}'
+      expectation: 'assert_text: {''selector'': ''[data-testid="screenshot-scroll-mode-hint"]'', ''contains'': ''Scroll one notch every 0.5 seconds''}'
     - step: 22
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).args.mode === "manual"''}'
     - step: 27

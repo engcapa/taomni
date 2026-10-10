@@ -1665,6 +1665,22 @@ let stubScreenshotScrollAttempts = 0;
 const stubScreenshotFavoritesFails = createScreenshotFavoritesFault();
 let stubScreenshotActivePin: { path: string; width: number; height: number; favoriteId: string | null; note?: string } | null = null;
 let stubScreenshotDocument = false;
+let stubPinToolsView = { zoom: 1, opacity: 1, note: "", busy: false, error: null as string | null, notice: null as string | null };
+
+/** Browser preview has one route; simulate only the absent parent window. */
+export async function stubPinToolAction(request: { action: string; value?: any }): Promise<void> {
+  const { action, value } = request;
+  if (action === "zoom") stubPinToolsView.zoom = Math.max(0.1, Math.min(4, Number(value)));
+  if (action === "opacity") stubPinToolsView.opacity = Math.max(0.1, Math.min(1, Number(value)));
+  if (action === "note") stubPinToolsView.note = await invoke<string>("screenshot_set_pin_note", { note: value });
+  if (action === "edit") await invoke("screenshot_edit_pin");
+  if (action === "external") await invoke("screenshot_open_editor", { path: stubScreenshotActivePin?.path });
+  if (action === "arrange") await invoke("screenshot_arrange_pins", { mode: value });
+  if (action === "batch") await invoke("screenshot_pins_batch", { action: value });
+  if (action === "focus") await invoke("screenshot_focus_pin", { label: value });
+  const { emit } = await import("./tauri-event");
+  await emit("screenshot://pin-view", { ...stubPinToolsView });
+}
 let stubPinSequence = 0;
 const stubPins = new Map<string, { path: string; width: number; height: number; note: string; order: number }>();
 let stubActivePinLabel = "screenshot-pin-1";
@@ -5085,10 +5101,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "screenshot_list_displays": {
       return ([
         { id: "0,0", name: "Stub Display", width: 400, height: 300, x: 0, y: 0, scaleFactor: 1, primary: true },
+        { id: "-400,0", name: "Second Display", width: 400, height: 300, x: -400, y: 0, scaleFactor: 1, primary: false },
       ] as unknown) as T;
     }
+    case "screenshot_switch_display": {
+      stubScreenshotCall(cmd, args);
+      return { path: STUB_SCREENSHOT_DATA_URL, displayId: args?.displayId, width: 400, height: 300, scaleFactor: 1 } as T;
+    }
     case "screenshot_overlay_init": {
-      if (stubScreenshotDocument && stubScreenshotActivePin) return { ...stubScreenshotActivePin, displayId: "0,0", scaleFactor: 1, document: true } as T;
+      if (stubScreenshotDocument && stubScreenshotActivePin) return { ...stubScreenshotActivePin, displayId: "0,0", scaleFactor: 1, document: true, sourcePin: stubActivePinLabel } as T;
       return ({
         windowRegion: stubScreenshotIncludeWindow ? { x: 40, y: 30, width: 320, height: 240 } : null,
         path: STUB_SCREENSHOT_DATA_URL,
@@ -5109,7 +5130,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       stubScreenshotCall(cmd, args);
       // A pin is a separate native window; keep its browser route alive
       // when the originating overlay session closes.
-      if (location.hash !== "#screenshot-pin") location.hash = "";
+      if (location.hash !== "#screenshot-pin") location.hash = stubScreenshotDocument ? "screenshot-pin" : "";
       return (undefined as unknown) as T;
     }
     case "screenshot_capture_full": {
@@ -5216,6 +5237,25 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "screenshot_pin_init": {
       const files = [...stubScreenshotFiles.values()];
       return (stubScreenshotActivePin ?? { path: files[files.length - 1] ?? STUB_SCREENSHOT_DATA_URL, width: 400, height: 300, favoriteId: null }) as T;
+    }
+    case "screenshot_update_pin": {
+      stubScreenshotCall(cmd, args);
+      const dataUrl = stubScreenshotFiles.get(String(args?.path)) ?? STUB_SCREENSHOT_DATA_URL;
+      const pin = stubPins.get(stubActivePinLabel);
+      stubScreenshotActivePin = { path: dataUrl, ...await screenshotImageSize(dataUrl), note: pin?.note ?? "", favoriteId: null };
+      if (pin) stubPins.set(stubActivePinLabel, { ...pin, ...stubScreenshotActivePin, note: pin.note });
+      return undefined as T;
+    }
+    case "screenshot_open_pin_tools": {
+      stubScreenshotCall(cmd, args);
+      stubPinToolsView = { ...stubPinToolsView, ...args?.view };
+      location.hash = "screenshot-pin-tools";
+      return `screenshot-tools-${stubActivePinLabel}` as T;
+    }
+    case "screenshot_pin_tools_init": return { label: stubActivePinLabel, view: { ...stubPinToolsView } } as T;
+    case "screenshot_close_pin_tools": {
+      if (location.hash === "#screenshot-pin-tools") location.hash = "screenshot-pin";
+      return undefined as T;
     }
     case "screenshot_set_pin_note": {
       stubScreenshotCall(cmd, args);

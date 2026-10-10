@@ -15,6 +15,7 @@
     "screenshot-scroll",
     "screenshot-boundary-*",
     "screenshot-pin-*",
+    "screenshot-tools-*",
     "screenshot-qa-fixture"
   ],
   "permissions": [

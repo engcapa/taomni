@@ -22,6 +22,57 @@ pub const MAX_NOTE_CHARS: usize = 500;
 /// Smallest pin arranged by tiling (logical px), so content stays legible.
 const MIN_ARRANGED: f64 = 96.0;
 
+pub(super) fn tools_label(pin: &str) -> String { format!("screenshot-tools-{pin}") }
+
+pub(super) fn close_pin_tools(app: &AppHandle, pin: &str) {
+    if let Some(window) = app.get_webview_window(&tools_label(pin)) { let _ = window.close(); }
+}
+
+#[tauri::command]
+pub async fn screenshot_open_pin_tools(app: AppHandle, window: WebviewWindow, view: serde_json::Value) -> Result<String, String> {
+    let pin = window.label().to_string();
+    if !tool_state().pins.contains_key(&pin) { return Err("not a pin window".into()); }
+    let label = tools_label(&pin);
+    tool_state().pin_tools.insert(label.clone(), serde_json::json!({"label":pin,"view":view}));
+    if let Some(tools) = app.get_webview_window(&label) {
+        tools.show().map_err(|e| e.to_string())?;
+        tools.set_focus().map_err(|e| e.to_string())?;
+        return Ok(label);
+    }
+    let tools = super::window_builder(&app, &label, tauri::WebviewUrl::App("index.html#screenshot-pin-tools".into()))
+        .title("Pin options").inner_size(420.0, 620.0).min_inner_size(360.0, 400.0)
+        .resizable(true).always_on_top(true).visible(false).build().map_err(|e| e.to_string())?;
+    let monitor = pin_monitor(&app, window).await?;
+    let area = monitor.work_area();
+    let scale = monitor.scale_factor().max(1.0);
+    tools.set_position(tauri::LogicalPosition::new(
+        area.position.x as f64 / scale + (area.size.width as f64 / scale - 420.0).max(0.0) / 2.0,
+        area.position.y as f64 / scale + (area.size.height as f64 / scale - 620.0).max(0.0) / 2.0,
+    )).map_err(|e| e.to_string())?;
+    let closed_app = app.clone();
+    let closed_label = label.clone();
+    tools.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            tool_state().pin_tools.remove(&closed_label);
+            let _ = closed_app.emit_to(&pin, "screenshot://pin-tool", serde_json::json!({"action":"toolsClosed"}));
+        }
+    });
+    tools.show().map_err(|e| e.to_string())?;
+    tools.set_focus().map_err(|e| e.to_string())?;
+    Ok(label)
+}
+
+#[tauri::command]
+pub async fn screenshot_pin_tools_init(window: WebviewWindow) -> Result<serde_json::Value, String> {
+    tool_state().pin_tools.get(window.label()).cloned().ok_or("pin options are closed".into())
+}
+
+#[tauri::command]
+pub async fn screenshot_close_pin_tools(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    close_pin_tools(&app, window.label());
+    Ok(())
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum PinArrangement {

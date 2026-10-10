@@ -21,7 +21,7 @@ steps:
 - wait_for: '[data-testid="screenshot-pin-image"]'
 - click: '[data-testid="screenshot-pin-menu-toggle"]'
 - wait_for: '[data-testid="screenshot-pin-menu"]'
-- click: '[data-testid="screenshot-pin-menu-toggle"]'
+- click: '[data-testid="screenshot-pin-tools-close"]'
 - assert_not_visible: '[data-testid="screenshot-pin-menu"]'
 - right_click: '[data-testid="screenshot-pin-window"]'
 - wait_for: '[data-testid="screenshot-pin-menu"]'
@@ -55,6 +55,7 @@ steps:
 - press:
     key: ArrowRight
     selector: '[data-testid="screenshot-pin-opacity"]'
+- click: '[data-testid="screenshot-pin-tools-close"]'
 - eval_readonly:
     expression: Number(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"screenshot-pin-surface"]')).opacity)
       === 0.5
@@ -154,25 +155,25 @@ verification:
     - 22
     - 23
     - 24
-    - 26
-    - 29
-    - 33
-    - 35
-    - 38
-    - 40
+    - 27
+    - 30
+    - 34
+    - 36
+    - 39
     - 41
-    - 44
-    - 47
-    - 49
-    - 51
+    - 42
+    - 45
+    - 48
+    - 50
     - 52
-    - 56
-    - 58
-    - 63
-    - 66
-    - 68
+    - 53
+    - 57
+    - 59
+    - 64
+    - 67
     - 69
-    - 72
+    - 70
+    - 73
     checkpoints:
     - step: 10
       expectation: 'assert_not_visible: [data-testid="screenshot-pin-menu"]'
@@ -185,41 +186,41 @@ verification:
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''110%''}'
     - step: 19
       expectation: 'assert_text_equals: {''selector'': ''[data-testid="screenshot-pin-zoom"]'', ''equals'': ''100%''}'
-    - step: 25
+    - step: 26
       expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
         === 0.5''}'
-    - step: 28
+    - step: 29
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-window"]'', ''name'': ''data-collapsed'',
         ''equals'': ''true''}'
-    - step: 31
+    - step: 32
       expectation: 'eval_readonly: {''expression'': ''Number(getComputedStyle(document.querySelector(\''[data-testid\''+String.fromCharCode(61)+\''"screenshot-pin-surface"]\'')).opacity)
         === 0.5''}'
-    - step: 32
+    - step: 33
       expectation: 'assert_visible: [data-testid="screenshot-pin-surface"]'
-    - step: 37
+    - step: 38
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_copy_image"''}'
-    - step: 43
+    - step: 44
       expectation: 'eval_readonly: {''expression'': ''window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_save_image"
         && window.__taomniStubScreenshotCalls.at(-1).args.dest === "pinned-original.png"''}'
-    - step: 46
+    - step: 47
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
         ''equals'': ''true''}'
-    - step: 54
+    - step: 55
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 1}'
-    - step: 61
+    - step: 62
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
         ''equals'': ''true''}'
-    - step: 62
+    - step: 63
       expectation: 'eval_readonly: {''expression'': "document.querySelector(''img'').naturalWidth === 400 && document.querySelector(''img'').naturalHeight
         === 300"}'
-    - step: 65
+    - step: 66
       expectation: 'assert_attribute: {''selector'': ''[data-testid="screenshot-pin-favorite"]'', ''name'': ''aria-pressed'',
         ''equals'': ''false''}'
-    - step: 71
+    - step: 72
       expectation: 'assert_count: {''selector'': ''[data-testid="screenshot-favorite-item"]'', ''equal'': 0}'
-    - step: 73
-      expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
     - step: 74
+      expectation: 'assert_not_visible: [data-testid="screenshot-favorites"]'
+    - step: 75
       expectation: Main screenshot entry remains usable.
     results:
     - 10
@@ -227,20 +228,20 @@ verification:
     - 15
     - 17
     - 19
-    - 25
-    - 28
-    - 31
+    - 26
+    - 29
     - 32
-    - 37
-    - 43
-    - 46
-    - 54
-    - 61
+    - 33
+    - 38
+    - 44
+    - 47
+    - 55
     - 62
-    - 65
-    - 71
-    - 73
+    - 63
+    - 66
+    - 72
     - 74
+    - 75
   visual:
   - check: Visible controls, state and image dimensions
     method: automated

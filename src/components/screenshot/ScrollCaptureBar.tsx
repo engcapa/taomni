@@ -23,6 +23,7 @@ export function ScrollCaptureBar() {
   }, []);
   const [mode, setMode] = useState<ScrollMode>("manual");
   const [needsOverlap, setNeedsOverlap] = useState(false);
+  const [waitingForContent, setWaitingForContent] = useState(false);
   const [changingMode, setChangingMode] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const finishingRef = useRef(false);
@@ -36,6 +37,7 @@ export function ScrollCaptureBar() {
       setFrames((n) => Math.max(n, status.frames));
       setMode(status.mode ?? "manual");
       setNeedsOverlap(status.needsOverlap ?? false);
+      setWaitingForContent(status.waitingForContent ?? false);
       setInputError(status.inputError ?? null);
     };
     void listen<ScrollStatus>(SCROLL_PROGRESS_EVENT, ({ payload }) => {
@@ -77,7 +79,7 @@ export function ScrollCaptureBar() {
   return <div data-testid="screenshot-scroll-controller" className="fixed left-0 right-0 bottom-0 px-3 py-2 text-[12px] select-none overflow-auto"
     style={{ height: fullscreenSurface ? 200 : "100%", background: "var(--taomni-panel-bg)", color: "var(--taomni-text)", border: "1px solid var(--taomni-divider)" }}>
     <p data-testid="screenshot-scroll-progress" role="status" className="mb-1 font-medium">{t("screenshot.scrollProgress", { count: frames })}</p>
-    <p data-testid="screenshot-scroll-mode-hint" className="text-[var(--taomni-text-muted)] mb-2">{t(finishing ? "screenshot.scrollFinishing" : needsOverlap ? "screenshot.scrollOverlapHint" : mode === "manual" ? "screenshot.scrollManualHint" : "screenshot.scrollRunningHint")}</p>
+    <p data-testid="screenshot-scroll-mode-hint" className="text-[var(--taomni-text-muted)] mb-2">{t(finishing ? "screenshot.scrollFinishing" : needsOverlap ? "screenshot.scrollOverlapHint" : waitingForContent ? "screenshot.scrollWaitingHint" : mode === "manual" ? "screenshot.scrollManualHint" : "screenshot.scrollRunningHint")}</p>
     <div className="flex justify-end gap-2">
       <button data-testid="screenshot-scroll-switch-mode" type="button" disabled={finishing || changingMode} onClick={() => void changeMode()} className="px-2 py-1 rounded disabled:opacity-40">{t(mode === "auto" ? "screenshot.scrollUseManual" : "screenshot.scrollUseAuto")}</button>
       <button data-testid="screenshot-scroll-cancel" type="button" disabled={finishing} onClick={() => void finish(true)} className="px-3 py-1 rounded disabled:opacity-40">{t("screenshot.cancel")}</button>

@@ -170,6 +170,14 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
       const img=document.querySelector('[data-testid="screenshot-scroll-result-image"]');
       return {preview:!!img,width:img?.naturalWidth,height:img?.naturalHeight};
     "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    let editor_resizable = overlay.is_resizable().map_err(|e| e.to_string())?
+        && !overlay.is_fullscreen().map_err(|e| e.to_string())?
+        && overlay.is_decorated().map_err(|e| e.to_string())?;
+    overlay.set_size(tauri::LogicalSize::new(760.0, 620.0)).map_err(|e| e.to_string())?;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    let editor_size = observed_inner_rect(&overlay).await.map_err(|e| e.to_string())?.1;
+    let editor_resized = (editor_size.width as f64 / source.scale - 760.0).abs() < 3.0
+        && (editor_size.height as f64 / source.scale - 620.0).abs() < 3.0;
     let output = super::super::tool_state()
         .overlay
         .clone()
@@ -247,10 +255,11 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     trace.mark("cancelled", cancelled.clone());
     Ok(report(
         bottom_still_active
+            && editor_resizable && editor_resized
             && preview["preview"] == true
             && comparison["passed"] == true
             && cancelled == true
             && artifact.is_some(),
-        json!({"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
+        json!({"editorResizable":editor_resizable,"editorResized":editor_resized,"editorSize":editor_size,"pause":paused,"switchedAuto":switched_auto,"switchedManual":switched_manual,"bottomStatus":at_bottom,"positions":positions,"preview":preview,"originalComparison":comparison,"cancelReturnedOriginal":cancelled,"artifact":artifact}),
     ))
 }

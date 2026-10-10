@@ -44,10 +44,11 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         json!({"labels":windows.iter().map(|w| w.label()).collect::<Vec<_>>()}),
     );
     trace.mark("note-begin", json!({"label": windows[0].label()}));
-    let note = run_js(&windows[0], r#"
+    windows[0].eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()")?;
+    let tools = wait_window(app, &super::super::pins::tools_label(windows[0].label()), Duration::from_secs(10)).await?;
+    run_js(&tools, r#"
         const q=id=>document.querySelector('[data-testid="'+id+'"]');
         const wait=()=>new Promise(r=>setTimeout(r,50));
-        q('screenshot-pin-menu-toggle').click();
         for(let i=0;i<100&&!q('screenshot-pin-note-input');i++) await wait();
         const input=q('screenshot-pin-note-input');
         input.focus();
@@ -59,10 +60,9 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         for(let i=0;i<100&&input.value!=='QA original A';i++) await wait();
         q('screenshot-pin-note-save').click();
         for(let i=0;i<100&&q('screenshot-pin-note-save')?.disabled;i++) await wait();
-        q('screenshot-pin-menu-toggle').click();
-        for(let i=0;i<100&&q('screenshot-pin-note')?.textContent!=='QA original A';i++) await wait();
-        return q('screenshot-pin-note')?.textContent;
+        return input.value;
     "#, Duration::from_secs(20)).await?;
+    let note = run_js(&windows[0], "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-note\"]')?.textContent!=='QA original A';i++) await new Promise(r=>setTimeout(r,50)); return document.querySelector('[data-testid=\"screenshot-pin-note\"]')?.textContent;", Duration::from_secs(10)).await?;
     anyhow::ensure!(
         note == "QA original A",
         "pin note was not saved through the UI: {note}"
@@ -78,10 +78,9 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         "native pin note/list mismatch"
     );
     // Drive the same menu entry users use; this invokes native arrangement.
-    run_js(&windows[0], r#"
+    run_js(&tools, r#"
         const q=id=>document.querySelector('[data-testid="'+id+'"]');
         const wait=()=>new Promise(r=>setTimeout(r,50));
-        q('screenshot-pin-menu-toggle').click();
         for(let i=0;i<100&&!q('screenshot-pin-tab-all');i++) await wait();
         q('screenshot-pin-tab-all').click();
         for(let i=0;i<100&&!q('screenshot-pins-tile');i++) await wait();

@@ -1,0 +1,56 @@
+id: TC-SHOT-039
+title: Display picker captures another monitor without moving the main application
+covers:
+- F27.1
+tags:
+- screenshot
+- displays
+- regression
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-display-select"]'
+- select_option:
+    selector: '[data-testid="screenshot-display-select"]'
+    value: -400,0
+- wait_for: '[data-testid="screenshot-hint"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-overlay"]'
+    name: data-phase
+    equals: select
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_switch_display","args":{"displayId":"-400,0"}')
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: display-selection
+    requirement: Select a monitor with negative desktop origin through the screenshot overlay, retain selection mode and exit
+      normally.
+    actions:
+    - 3
+    - 7
+    checkpoints:
+    - step: 5
+      expectation: The selection surface remains usable.
+    - step: 6
+      expectation: The selected display ID reaches the capture boundary.
+    - step: 8
+      expectation: Closing restores the app.
+    results:
+    - 5
+    - 6
+    - 8
+  native:
+  - check: The overlay moves to and captures the selected physical monitor.
+    method: external
+    reason: Requires a desktop with multiple attached monitors; browser mocks validate only the selection workflow.
+  visual:
+  - check: The selected controls remain visible and readable.
+    method: external
+    reason: Inspect the case screenshots and native evidence for independent windows.

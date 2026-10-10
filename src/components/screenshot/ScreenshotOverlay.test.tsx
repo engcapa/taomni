@@ -4,7 +4,7 @@ vi.mock("../../lib/ipc", () => ({ listSystemFonts: async () => ["Arial", "Noto S
 import { ScreenshotOverlay } from "./ScreenshotOverlay";
 
 const api = vi.hoisted(() => ({
-  fetchOverlayInit: vi.fn(), captureFull: vi.fn(), loadScreenshotUrl: vi.fn(), revokeScreenshotUrl: vi.fn(),
+  updateSourcePin: vi.fn(), listDisplays: vi.fn(), switchScreenshotDisplay: vi.fn(), fetchOverlayInit: vi.fn(), captureFull: vi.fn(), loadScreenshotUrl: vi.fn(), revokeScreenshotUrl: vi.fn(),
   closeScreenshotOverlay: vi.fn(), saveDataUrl: vi.fn(), copyImageToClipboard: vi.fn(),
   saveImageToFile: vi.fn(), pinToScreen: vi.fn(), ocrImage: vi.fn(), autoRedact: vi.fn(),
   scrollCapture: vi.fn(), scrollPlan: vi.fn(), openImageEditor: vi.fn(), updateOverlayImage: vi.fn(), startRecording: vi.fn(),
@@ -17,6 +17,8 @@ vi.mock("../../lib/appDialogs", () => ({ formatUnknownError: (error: unknown) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  api.listDisplays.mockResolvedValue([]);
+  api.updateSourcePin.mockResolvedValue(undefined);
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 768 });
@@ -71,6 +73,43 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it.each(["replace", "new", "copy"])("Done in a pin editor copies and performs the chosen %s action", async (action) => {
+    api.fetchOverlayInit.mockResolvedValueOnce({ path: "pin.png", displayId: "0,0", width: 2048, height: 1152, scaleFactor: 1, document: true, sourcePin: "screenshot-pin-1" });
+    render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-scroll-result-copy");
+    fireEvent.click(screen.getByTestId("screenshot-scroll-result-copy"));
+    expect(await screen.findByTestId("screenshot-pin-done-dialog")).toBeVisible();
+    expect(api.copyImageToClipboard).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId(`screenshot-pin-done-${action}`));
+    await waitFor(() => expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce());
+    expect(api.copyImageToClipboard).toHaveBeenCalledExactlyOnceWith("export.png");
+    expect(api.updateSourcePin).toHaveBeenCalledTimes(action === "replace" ? 1 : 0);
+    expect(api.pinToScreen).toHaveBeenCalledTimes(action === "new" ? 1 : 0);
+  });
+
+  it("keeps edited annotations when replacement fails and Escape only closes the choice dialog", async () => {
+    api.fetchOverlayInit.mockResolvedValueOnce({ path: "pin.png", displayId: "0,0", width: 2048, height: 1152, scaleFactor: 1, document: true, sourcePin: "screenshot-pin-1" });
+    api.updateSourcePin.mockRejectedValueOnce(new Error("source pin is closed"));
+    render(<ScreenshotOverlay />);
+    fireEvent.click(await screen.findByTestId("screenshot-scroll-result-copy"));
+    fireEvent.click(screen.getByTestId("screenshot-pin-done-replace"));
+    await screen.findByText("Error: source pin is closed");
+    expect(api.closeScreenshotOverlay).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("screenshot-pin-done-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("screenshot-scroll-result")).toBeVisible();
+    expect(api.closeScreenshotOverlay).not.toHaveBeenCalled();
+  });
+
+  it("switches the selection to a display outside the app's monitor", async () => {
+    api.listDisplays.mockResolvedValue([{ id: "0,0", name: "First", width: 2048, height: 1152 }, { id: "-2048,0", name: "Second", width: 2048, height: 1152 }]);
+    api.switchScreenshotDisplay.mockResolvedValue({ path: "second.png", displayId: "-2048,0", width: 2048, height: 1152, scaleFactor: 1 });
+    await open();
+    fireEvent.change(await screen.findByTestId("screenshot-display-select"), { target: { value: "-2048,0" } });
+    await waitFor(() => expect(screen.getByTestId("screenshot-display-select")).toHaveValue("-2048,0"));
+    expect(api.switchScreenshotDisplay).toHaveBeenCalledExactlyOnceWith("-2048,0");
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+  });
   it("resets selection with Escape after leaving an empty tool while more tools are expanded", async () => {
     await open();
     fireEvent.click(screen.getByTestId("screenshot-fullscreen"));

@@ -47,3 +47,11 @@ export async function emit(event: string, payload?: unknown): Promise<void> {
     cb(e);
   }
 }
+
+export async function emitTo(_target: string, event: string, payload?: unknown): Promise<void> {
+  if (event === "screenshot://pin-tool" && location.hash === "#screenshot-pin-tools" && !document.querySelector('[data-testid="screenshot-pin-window"]')) {
+    const { stubPinToolAction } = await import("./tauri-core");
+    return stubPinToolAction(payload as { action: string; value?: unknown });
+  }
+  return emit(event, payload);
+}

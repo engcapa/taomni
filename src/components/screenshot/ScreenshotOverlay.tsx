@@ -47,6 +47,9 @@ import {
   closeScreenshotOverlay,
   copyImageToClipboard,
   fetchOverlayInit,
+  listDisplays,
+  switchScreenshotDisplay,
+  type ScreenshotDisplay,
   loadScreenshotUrl,
   normalizeRect,
   ocrImage,
@@ -61,6 +64,7 @@ import {
   startRecording,
   toPhysicalRect,
   updateOverlayImage,
+  updateSourcePin,
   type OverlayInit,
   type RecordFormat,
   type ScreenshotPoint,
@@ -328,6 +332,7 @@ export function ScreenshotOverlay() {
   const t = useT();
   const stopShortcut = screenshotShortcutLabel(useScreenshotShortcutStore((s) => s.status));
   const [init, setInit] = useState<OverlayInit | null>(null);
+  const [displays, setDisplays] = useState<ScreenshotDisplay[]>([]);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -357,6 +362,8 @@ export function ScreenshotOverlay() {
   const [systemFonts, setSystemFonts] = useState<string[]>([]);
   const [textSelected, setTextSelected] = useState(false);
   const [scrollResult, setScrollResult] = useState<{ frames: number; w: number; h: number } | null>(null);
+  const [pinDoneOpen, setPinDoneOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [annotationSelected, setAnnotationSelected] = useState(false);
@@ -474,6 +481,7 @@ export function ScreenshotOverlay() {
         return;
       }
       setInit(data);
+      if (!data.document) void listDisplays().then((items) => { if (!cancelled) setDisplays(items); }).catch(() => undefined);
       setImg(loaded.img);
       setImgUrl(loaded.url);
       if (data.document) {
@@ -708,10 +716,12 @@ export function ScreenshotOverlay() {
   const runBusy = async (action: () => Promise<void>) => {
     if (busyRef.current) return;
     busyRef.current = true;
+    setBusy(true);
     try {
       await action();
     } finally {
       busyRef.current = false;
+      setBusy(false);
     }
   };
 
@@ -770,7 +780,32 @@ export function ScreenshotOverlay() {
     } catch (e) { showToast(formatUnknownError(e)); }
   });
 
-  const handleCopy = () =>
+  const finishPinEdit = (action: "replace" | "new" | "copy") => runBusy(async () => {
+    try {
+      const file = await saveDataUrl(await exportCropped());
+      await copyImageToClipboard(file.path);
+      if (action === "replace") await updateSourcePin(file.path);
+      if (action === "new") await pinToScreen(file.path);
+      await closeScreenshotOverlay();
+    } catch (e) { showToast(formatUnknownError(e)); }
+  });
+
+  const changeDisplay = (displayId: string) => runBusy(async () => {
+    try {
+      const data = await switchScreenshotDisplay(displayId);
+      const loaded = await loadArtifact(data.path);
+      canvasRef.current?.clear();
+      setInit(data); setImg(loaded.img); setImgUrl(loaded.url);
+      setSel(null); setContour(null); setPhase("select"); setTool("select");
+    } catch (e) { showToast(formatUnknownError(e)); }
+  });
+
+  const handleCopy = () => {
+    if (init?.sourcePin) { setPinDoneOpen(true); return; }
+    return copyAndClose();
+  };
+
+  const copyAndClose = () =>
     runBusy(async () => {
       try {
         const file = await saveDataUrl(await exportCropped());
@@ -920,6 +955,7 @@ export function ScreenshotOverlay() {
       const typing = !!target?.closest("input, textarea, select, [contenteditable='true']");
       const mod = e.ctrlKey || e.metaKey;
       if (e.key === "Escape") {
+        if (pinDoneOpen) { e.preventDefault(); if (!busyRef.current) setPinDoneOpen(false); return; }
         e.preventDefault();
         if (scrollError) close();
         else if (editOpen) setEditOpen(false);
@@ -934,7 +970,7 @@ export function ScreenshotOverlay() {
         else close();
         return;
       }
-      if (typing || editOpen || editBusy || (phase !== "annotate" && phase !== "preview")) return;
+      if (pinDoneOpen || typing || editOpen || editBusy || (phase !== "annotate" && phase !== "preview")) return;
       if ((e.key === "Delete" || e.key === "Backspace") && tool === "move") {
         if (canvasRef.current?.deleteSelected()) e.preventDefault();
         return;
@@ -1505,6 +1541,27 @@ export function ScreenshotOverlay() {
       )}
 
       {!scrollResult && toolbar}
+
+      {phase === "select" && displays.length > 1 && <label data-testid="screenshot-display-picker" className="fixed top-4 left-4 z-50 rounded-lg p-2 text-[13px]" style={panelStyle}>
+        {t("screenshot.selectDisplay")}
+        <select data-testid="screenshot-display-select" aria-label={t("screenshot.selectDisplay")} disabled={busy} value={init?.displayId ?? ""} onChange={(e) => void changeDisplay(e.target.value)} className="ml-2 rounded p-1 bg-[var(--taomni-panel-bg)]">
+          {displays.map((display, i) => <option key={display.id} value={display.id}>{i + 1}. {display.name} · {display.width} × {display.height}</option>)}
+        </select>
+      </label>}
+
+      {pinDoneOpen && <div data-testid="screenshot-pin-done-dialog" role="dialog" aria-modal="true" aria-label={t("screenshot.pinDoneTitle")}
+        className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 90, background: "rgba(0,0,0,0.45)" }}>
+        <div className="rounded-xl shadow-2xl p-5 max-w-md text-[13px]" style={panelStyle}>
+          <p className="font-medium mb-2">{t("screenshot.pinDoneTitle")}</p>
+          <p className="mb-4">{t("screenshot.pinDoneHint")}</p>
+          <div className="flex flex-wrap gap-2">
+            <button data-testid="screenshot-pin-done-replace" disabled={busy} onClick={() => void finishPinEdit("replace")}>{t("screenshot.pinReplace")}</button>
+            <button data-testid="screenshot-pin-done-new" disabled={busy} onClick={() => void finishPinEdit("new")}>{t("screenshot.pinNew")}</button>
+            <button data-testid="screenshot-pin-done-copy" disabled={busy} onClick={() => void finishPinEdit("copy")}>{t("screenshot.copyOnly")}</button>
+            <button data-testid="screenshot-pin-done-cancel" disabled={busy} onClick={() => setPinDoneOpen(false)}>{t("screenshot.cancel")}</button>
+          </div>
+        </div>
+      </div>}
 
       {phase === "preview" && scrollResult && img && imgUrl && <ScrollCaptureResult url={imgUrl} width={img.naturalWidth} height={img.naturalHeight}
         frames={scrollResult.frames} toolbar={toolbar} onCopy={() => void handleCopy()} onSave={() => void handleSave()}
