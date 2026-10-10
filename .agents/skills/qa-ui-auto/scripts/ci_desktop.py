@@ -126,6 +126,12 @@ class Desktop:
             subprocess.run(["gsettings", "set", "org.gnome.mutter", "experimental-features",
                             "['scale-monitor-framebuffer']"], check=True, timeout=10)
             facts["monitor_scaling"] = "Mutter scale-monitor-framebuffer"
+            # App activation during this external-pixel fixture can post
+            # GNOME's "is ready" banner over the independent originals.
+            # Keep the disposable desktop's scene free of notification UI.
+            subprocess.run(["gsettings", "set", "org.gnome.desktop.notifications",
+                            "show-banners", "false"], check=True, timeout=10)
+            facts["notification_banners"] = "disabled in owned dual-output fixture"
         pipewire = self.start(["pipewire"])
         self._wait(pipewire, lambda: (runtime / "pipewire-0").is_socket(), "PipeWire")
         self.start(["wireplumber"])

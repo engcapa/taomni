@@ -771,6 +771,21 @@ fn restore_app_windows(app: &AppHandle) {
     for label in hidden {
         if let Some(window) = app.get_webview_window(&label) {
             #[cfg(target_os = "linux")]
+            if pins::native_wayland() {
+                let target = window.clone();
+                let _ = window.run_on_main_thread(move || {
+                    use gtk::prelude::*;
+                    if let Ok(gtk) = target.gtk_window() {
+                        // Tao skips focus while its queued minimized cache is
+                        // still set. Present the mapped GTK toplevel directly.
+                        gtk.deiconify();
+                        gtk.show();
+                        gtk.present();
+                    }
+                });
+                continue;
+            }
+            #[cfg(target_os = "linux")]
             let _ = window.unminimize();
             let _ = window.show();
             let _ = window.set_focus();

@@ -2593,9 +2593,14 @@ pub async fn screenshot_qa_freehand(app: AppHandle) -> Result<String, String> {
             "actual":keep_image(&actual, &format!("freehand-{action}-actual.png")),
             "difference":keep_image(&qa_oracle::mask_difference(&actual, &expected), &format!("freehand-{action}-difference.png")),
         });
+        let restore_deadline = Instant::now() + Duration::from_secs(5);
+        while !main_visible(&app) && Instant::now() < restore_deadline {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        let main_restored = main_visible(&app);
         let passed = comparison.passed
             && overlay_closed
-            && main_visible(&app)
+            && main_restored
             && !std::path::Path::new(&init.path).exists()
             && page["closed"] == json!(true)
             && page["mode"] == json!("freehand")
@@ -2607,7 +2612,7 @@ pub async fn screenshot_qa_freehand(app: AppHandle) -> Result<String, String> {
                 .is_some_and(|a| a.values().all(Value::is_string));
         results.push(json!({"action":action,"passed":passed,"comparison":comparison,"polygon":polygon,
             "sourceOffset":[offset,offset],"expectedSize":[width,height],"page":page,"pin":pin,
-            "overlayClosed":overlay_closed,"sessionSourceRemoved":!std::path::Path::new(&init.path).exists(),
+            "overlayClosed":overlay_closed,"mainRestored":main_restored,"sessionSourceRemoved":!std::path::Path::new(&init.path).exists(),
             "artifacts":artifacts}));
     }
     let passed = results.iter().all(|r| r["passed"] == json!(true));
