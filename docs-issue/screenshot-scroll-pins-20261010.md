@@ -54,3 +54,7 @@ Wayland 新增状态记录明确显示 `maximized=true`、1920×1048。Tao 的 f
 第六轮合并提交 [38025524364](https://github.com/engcapa/taomni/actions/runs/38025524364) 的 macOS browser 在 TC-SHOT-033 发出源贴图透明度快捷键后立即读取设置滑块，早于异步 view 回传。用例补充等待实际滑块达到 90%，再保留原值断言，避免把窗口间异步状态传播当成同步操作；超时或最终错误值仍失败。
 
 第八轮 [38026397377](https://github.com/engcapa/taomni/actions/runs/38026397377) 的 Wayland N16 证明尺寸观察修正后仍有间歇性产品失败：实际 frame 停在 1717×965，滚动结果未进入预览，手动调整窗口可到 760×620。GTK 3 的窗口布局会等待 configure 回传并推迟新 resize；原等待循环每 50ms 重发 default-size/resize，会干扰待确认的布局。窗口恢复改为等待实际全屏及最大化状态退出后只发送一次尺寸请求，再仅观察 GTK 几何；超时返回映射、resizable、原生状态、当前和默认尺寸。N12/N16 缺少预览时保留真实 renderer 错误，避免后续把未替换的选区误作滚动结果比较。
+
+第九轮 [38027471105](https://github.com/engcapa/taomni/actions/runs/38027471105) 的 Wayland N12、N16 已通过：初始窗口 1100×800、调整后 760×620，完整拼接像素误差为 0，取消恢复通过。N17 暴露连续编辑时设置窗口脚本回复超时：源贴图原先在打开编辑器的异步请求结束后关闭设置窗口，编辑完成并重开设置若早于该回复，旧请求会关闭新窗口。关闭动作现在放在打开编辑器之前；组件测试用延迟回复和重开窗口验证不会再晚关。native Done 脚本先返回断言结果，再独立点击关闭窗口的按钮，移除 150ms 定时关闭与 120ms 回复轮询之间的竞争，并等待下一次 Edit 真实可用。
+
+第九轮原始报告汇总为 145/146，通过的其余六组包括三端 browser 各 39/39、Windows native 8/8、macOS 与 Linux X11 native 各 7/7；Wayland 为 6/7。上述连续编辑修复后，本机三组件文件 46/46、四个相关 browser 用例 4/4、Win11 native N16/N17 2/2 通过。QA build10 与执行源码身份一致，覆盖、新建、仅复制及系统剪贴板全部通过，catalog audit 和 development case contract 也通过。

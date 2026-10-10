@@ -190,7 +190,13 @@ export function PinnedImage() {
     else if (action === "note" && typeof value === "string") void run(async () => {
       setNote(await setPinNote(value)); setNotice(t("screenshot.saved"));
     });
-    else if (action === "edit") void run(async () => { await openPinEditor(); hideTools(); });
+    else if (action === "edit") void run(async () => {
+      // The editor can finish before its opening IPC resolves. Close the old
+      // options first so its late completion cannot close newly opened tools.
+      setMenuOpen(false);
+      await closePinTools();
+      await openPinEditor();
+    });
     else if (action === "external") void editExternal(value === true);
     else if (action === "arrange" && ["tile", "cascade", "stackRight", "stackBottom"].includes(String(value))) void run(async () => { await arrangePins(value as PinArrangement); });
     else if (action === "batch" && ["collapse", "expand", "resetOpacity", "closeAll"].includes(String(value))) void run(async () => { await pinsBatch(value as PinBatchAction); });

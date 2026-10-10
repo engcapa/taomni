@@ -62,6 +62,24 @@ afterEach(cleanup);
 
 // Mounted renderer/IPC checks only; N11 measures actual OS window displacement.
 describe("PinnedImage", () => {
+  it("closes the old options before editing and leaves reopened options alive after a late editor reply", async () => {
+    let finishOpening!: () => void;
+    mocks.openPinEditor.mockReturnValueOnce(new Promise<void>((resolve) => { finishOpening = resolve; }));
+    render(<PinnedImage />);
+    const pin = await screen.findByTestId("screenshot-pin-window");
+    fireEvent.contextMenu(pin);
+    await waitFor(() => expect(mocks.openPinTools).toHaveBeenCalledOnce());
+    act(() => mocks.listeners.get("screenshot://pin-tool")?.({ payload: { action: "edit" } }));
+    await waitFor(() => expect(mocks.openPinEditor).toHaveBeenCalledOnce());
+    expect(mocks.closePinTools).toHaveBeenCalledOnce();
+    expect(mocks.closePinTools.mock.invocationCallOrder[0]).toBeLessThan(mocks.openPinEditor.mock.invocationCallOrder[0]);
+    act(() => mocks.listeners.get("screenshot://pin-tool")?.({ payload: { action: "toolsClosed" } }));
+    fireEvent.contextMenu(pin);
+    await waitFor(() => expect(mocks.openPinTools).toHaveBeenCalledTimes(2));
+    await act(async () => finishOpening());
+    expect(mocks.closePinTools).toHaveBeenCalledOnce();
+  });
+
   it("reloads updated pixels and uses the new file for copy while preserving the note", async () => {
     render(<PinnedImage />);
     await screen.findByTestId("screenshot-pin-image");

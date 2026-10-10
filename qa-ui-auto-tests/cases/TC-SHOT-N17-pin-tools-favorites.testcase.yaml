@@ -31,6 +31,7 @@ verification:
       is stored on the persistent favorite, and reopening the favorite after temporary artifacts are deleted shows the same note.
       Options use an independent window. The editor is resizable. Done replacement updates only the original pin and preserves its note;
       new pin retains the original and creates annotated pixels; copy only retains the original pin. Every branch writes the same annotated pixels to the OS clipboard.
+      Close the old options before opening the editor so a late opening reply cannot close reopened options. Read scripts before clicking controls that close their window, and wait for enabled Edit controls across consecutive edit sessions.
     actions:
     - 1
     - 3

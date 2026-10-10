@@ -3,7 +3,7 @@ use super::*;
 async fn edit_done_branch(app: &AppHandle, pin: &tauri::WebviewWindow, action: &str) -> Result<(), String> {
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
     let tools = wait_window(app, &super::super::pins::tools_label(pin.label()), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
-    run_js(&tools, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-pin-edit\"]');i++) await new Promise(r=>setTimeout(r,50)); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    run_js(&tools, "const q=()=>document.querySelector('[data-testid=\"screenshot-pin-edit\"]'); for(let i=0;i<100 && (!q() || q().disabled);i++) await new Promise(r=>setTimeout(r,50)); if(!q() || q().disabled) throw new Error('pin Edit is not ready'); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     tools.eval("document.querySelector('[data-testid=\"screenshot-pin-edit\"]').click()").map_err(|e| e.to_string())?;
     let editor = wait_window(app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     let script = r#"
@@ -18,9 +18,10 @@ async fn edit_done_branch(app: &AppHandle, pin: &tauri::WebviewWindow, action: &
       fire(layer,'mousedown',150,100); await sleep(50); fire(layer,'mousemove',220,180); await sleep(50); fire(window,'mouseup',220,180); await sleep(100);
       q('screenshot-scroll-result-copy').click(); await sleep(100);
       if(!q('screenshot-pin-done-dialog')) throw new Error('Done choice missing');
-      setTimeout(()=>q('screenshot-pin-done-ACTION').click(),150); return true;
-    "#.replace("ACTION", action);
+      return true;
+    "#;
     run_js(&editor, &script, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    editor.eval(&format!("document.querySelector('[data-testid=\"screenshot-pin-done-{action}\"]').click()")).map_err(|e| e.to_string())?;
     if !wait_closed(app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await {
         return Err(format!("Done {action} did not close the editor"));
     }
@@ -301,11 +302,13 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
       q('screenshot-pin-note-save').click(); return true;
     "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     let favorite_note = run_js(&pin, "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-note\"]')?.textContent!=='QA pin note';i++) await new Promise(r=>setTimeout(r,50)); return document.querySelector('[data-testid=\"screenshot-pin-note\"]')?.textContent;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    trace.mark("note-written", favorite_note.clone());
     tools.close().map_err(|e| e.to_string())?;
     run_js(&pin, "document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').click(); for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed')!=='true';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-pin-favorite\"]').getAttribute('aria-pressed');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
     let items = super::super::favorites::screenshot_list_favorites(app.clone()).await?;
     let favorite = items.first().ok_or("favorite write missing")?.clone();
     let favorite_note_saved = favorite.note == "QA pin note";
+    trace.mark("favorite-written", json!({"label":label,"noteSaved":favorite_note_saved}));
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-close\"]').click()")
         .map_err(|e| e.to_string())?;
     let closed = wait_closed(&app, &label, Duration::from_secs(10)).await;
@@ -330,6 +333,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     let reopened_label = reopened_label.ok_or("favorite did not reopen")?;
+    trace.mark("favorite-reopened", json!({"label":reopened_label}));
     let reopened = wait_window(&app, &reopened_label, Duration::from_secs(10))
         .await
         .map_err(|e| e.to_string())?;
@@ -360,7 +364,7 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     // Public re-edit entry, native resizing, annotation, and Done replacement.
     reopened.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
     let tools = wait_window(&app, &super::super::pins::tools_label(&reopened_label), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
-    run_js(&tools, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-pin-edit\"]');i++) await new Promise(r=>setTimeout(r,50)); return !!document.querySelector('[data-testid=\"screenshot-pin-edit\"]');", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    run_js(&tools, "const q=()=>document.querySelector('[data-testid=\"screenshot-pin-edit\"]'); for(let i=0;i<100 && (!q() || q().disabled);i++) await new Promise(r=>setTimeout(r,50)); if(!q() || q().disabled) throw new Error('pin Edit is not ready'); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     // Clicking closes this options window. Do not await a script reply from it.
     tools.eval("document.querySelector('[data-testid=\"screenshot-pin-edit\"]').click()").map_err(|e| e.to_string())?;
     let editor = wait_window(&app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
@@ -379,8 +383,9 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
       if(q('screenshot-annotation-canvas')?.dataset.shapes!=='1') throw new Error('pin annotation missing');
       q('screenshot-scroll-result-copy').click(); await sleep(100);
       if(!q('screenshot-pin-done-dialog')) throw new Error('Done replacement choice missing');
-      setTimeout(()=>q('screenshot-pin-done-replace').click(),150); return true;
+      return true;
     "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+    editor.eval("document.querySelector('[data-testid=\"screenshot-pin-done-replace\"]').click()").map_err(|e| e.to_string())?;
     let edit_closed = wait_closed(&app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await;
     let updated = super::super::tool_state().pins.get(&reopened_label).cloned().ok_or("replacement created another pin")?;
     let updated_pixels = image::open(&updated.path).map_err(|e| e.to_string())?.to_rgba8();
