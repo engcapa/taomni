@@ -48,3 +48,8 @@ verification:
     method: automated
     reason: Real WebView2/WebKitGTK/WKWebView video element must decode and play. Every frame retains the native capture time,
       including macOS region snapshots before buffer conversion; VIDEO tag presence alone cannot pass.
+  - check: Wayland preview restoration ownership
+    method: automated
+    reason: Stop retains the original hidden-window record until Done. The MP4 preview plays, reentry focuses it, and a real
+      compositor click on Done must restore the main window before closing the source, even if the earlier Stop activation
+      was superseded by preview focus.

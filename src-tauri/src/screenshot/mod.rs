@@ -769,6 +769,23 @@ async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
 
 fn restore_app_windows(app: &AppHandle) {
     let hidden = std::mem::take(&mut tool_state().hidden);
+    restore_hidden_windows(app, hidden);
+}
+
+fn restore_app_windows_for_preview(app: &AppHandle) {
+    #[cfg(target_os = "linux")]
+    if pins::native_wayland() {
+        // Wayland does not acknowledge whether activation deiconified the
+        // window. Keep ownership through preview so its final user action
+        // can still restore the original windows before closing the source.
+        let hidden = tool_state().hidden.clone();
+        restore_hidden_windows(app, hidden);
+        return;
+    }
+    restore_app_windows(app);
+}
+
+fn restore_hidden_windows(app: &AppHandle, hidden: Vec<String>) {
     #[cfg(target_os = "linux")]
     if pins::native_wayland() {
         log::info!("capture restoration: hidden={hidden:?}, GTK_thread={}", gtk::is_initialized_main_thread());
@@ -784,11 +801,15 @@ fn restore_app_windows(app: &AppHandle) {
                         let id = surface_backend::activation_id();
                         log::info!("capture restoration: target={}, backend={}, mapped={}, startup_id={}",
                             target.label(), gtk.display().type_().name(), gtk.is_mapped(), id.is_some());
-                        // Tao skips focus while its queued minimized cache is
-                        // still set. Present the mapped GTK toplevel directly.
+                        // Restore the retained GTK surface while the source
+                        // of the activation context still exists.
                         gtk.deiconify();
                         gtk.show();
                         if let Some((id, surface)) = id.zip(gtk.window()) {
+                            // The X11 startup sequence was published on another
+                            // connection. Let the compositor dispatch it before
+                            // sending Wayland's activation request.
+                            gtk.display().sync();
                             // Activate the existing surface directly. GTK's
                             // startup property only forwards while mapped and
                             // present() also creates a second activation token.
@@ -1599,7 +1620,7 @@ pub async fn screenshot_stop_recording(
     // windows hidden for the capture session must become available again.
     // Without this, the process stays alive while its main window is hidden,
     // so macOS app switching has no visible Taomni window to activate.
-    restore_app_windows(&app);
+    restore_app_windows_for_preview(&app);
     let info = info?;
     Ok(RecordingFile {
         path: info.path.to_string_lossy().into_owned(),
