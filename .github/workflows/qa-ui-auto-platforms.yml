@@ -412,8 +412,9 @@ jobs:
             set -e
             pnpm build --mode qa
             cd src-tauri
-            cargo test --locked --lib screenshot::capture::tests
-            cargo test --locked --lib servers::rdp::capture::wayland::tests
+            # One root test invocation covers screenshot mapping and the
+            # retained X11/Wayland capture contracts without repeated links.
+            cargo test --locked --lib capture::
           ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/dual-display-unit.log'
       - name: Run selected cases (Linux Xvfb desktop)
         if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb'

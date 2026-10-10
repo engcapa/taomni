@@ -20,9 +20,23 @@ async fn geometry(window: &WebviewWindow) -> anyhow::Result<Value> {
     if wayland::active() {
         return Ok(wayland::window(window).await?["frame"].clone());
     }
-    let position = window.outer_position()?;
-    let size = window.outer_size()?;
-    Ok(json!({"x":position.x,"y":position.y,"width":size.width,"height":size.height}))
+    // GTK can cache transient 0,0 coordinates around unmap/remap. Observe
+    // the X server independently, as we do with Mutter on Wayland.
+    let title = window.title()?;
+    let output = tokio::task::spawn_blocking(move || {
+        std::process::Command::new("xwininfo")
+            .args(["-name", &title])
+            .output()
+    })
+    .await??;
+    anyhow::ensure!(
+        output.status.success(),
+        "X11 geometry probe failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let (rect, _) = x11_control_geometry(&String::from_utf8_lossy(&output.stdout))
+        .context("X11 native window rectangle")?;
+    Ok(json!({"x":rect.x,"y":rect.y,"width":rect.w,"height":rect.h}))
 }
 
 #[cfg(target_os = "linux")]
@@ -250,7 +264,20 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
                     (256.0 * scale) as u32,
                 );
                 let pixels = qa_oracle::compare(&clip, &reference, false);
-                let main_after = geometry(&main).await?;
+                // Showing main and closing the tool are independent native
+                // requests. Wait for the compositor acknowledgement instead
+                // of treating its transient 0,0 geometry as final placement.
+                let until = Instant::now() + Duration::from_secs(5);
+                let main_after = loop {
+                    let observed = geometry(&main).await.unwrap_or(Value::Null);
+                    if main_visible(app) && observed == main_before {
+                        break observed;
+                    }
+                    if Instant::now() >= until {
+                        break observed;
+                    }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                };
                 let copied = json!({"initial":initial,"selection":selection,"pixels":pixels,
                     "mainBefore":main_before,"mainAfter":main_after,"mainVisible":main_visible(app),
                     "clipboard":keep_image(&clip,&format!("dual-{initial}-clipboard.png"))});
