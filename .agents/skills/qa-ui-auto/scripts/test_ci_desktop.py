@@ -112,6 +112,65 @@ class DesktopTests(unittest.TestCase):
         release.start()
         self.addCleanup(release.stop)
 
+    def test_vnc_dual_display_serves_the_app_xorg_outputs_without_outer_display(self):
+        with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DBUS_SESSION_BUS_ADDRESS": "test-bus"}), \
+             patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '22.04'}), \
+             patch.object(Desktop, '_xorg_dual') as xorg, patch.object(Desktop, '_configure_displays') as configure, \
+             patch.object(Desktop, '_vnc') as vnc, patch.object(Desktop, '_display_patterns') as patterns, \
+             patch.object(Desktop, 'start') as start, patch('ci_desktop.time.sleep'), \
+             patch('ci_desktop.subprocess.run'), \
+             patch('ci_desktop.subprocess.check_output', side_effect=['XTEST', 'window id # 1']):
+            os.environ.pop('DISPLAY', None)
+            order = []
+            def own_xorg():
+                os.environ['DISPLAY'] = ':70'
+                order.append('xorg')
+            def configure_outputs():
+                self.assertEqual(os.environ['DISPLAY'], ':70')
+                order.append('outputs')
+            def serve(facts, *, mirror):
+                self.assertTrue(mirror)
+                self.assertEqual(os.environ['DISPLAY'], ':70')
+                order.append('vnc')
+            xorg.side_effect = own_xorg
+            configure.side_effect = configure_outputs
+            vnc.side_effect = serve
+            start.return_value.poll.return_value = None
+            with Desktop(Path(d), ['display', 'dual-display'], 'ubuntu-22.04-vnc') as desktop:
+                self.assertEqual(desktop.facts['display'], ':70')
+                self.assertEqual(desktop.facts['display_server'], 'Xorg dummy')
+                self.assertEqual(desktop.facts['profile'], 'ubuntu-22.04-vnc')
+                patterns.assert_called_once()
+            self.assertEqual(order, ['xorg', 'outputs', 'vnc'])
+            vnc.assert_called_once()
+
+    def test_vnc_mirror_requires_authenticated_full_dual_output_framebuffer(self):
+        for size in ((3840, 1080), (1920, 1080)):
+            with self.subTest(size=size), tempfile.TemporaryDirectory() as d, \
+                 patch.dict(os.environ, {'DISPLAY': ':70'}), \
+                 patch('ci_services.rfb_probe', return_value=(*size, 'QA VNC')), \
+                 patch('ci_services.free_port', return_value=5999), \
+                 patch('ci_desktop.subprocess.check_output', return_value=b'private-password'), \
+                 patch.object(Desktop, 'start') as start:
+                desktop = Desktop(Path(d), ['dual-display'], 'ubuntu-22.04-vnc')
+                desktop.temporary = Mock(name=d)
+                desktop.temporary.name = d
+                start.return_value.poll.return_value = None
+                facts = {}
+                if size == (3840, 1080):
+                    desktop._vnc(facts, mirror=True)
+                    self.assertEqual(facts['vnc']['size'], [3840, 1080])
+                    self.assertEqual(facts['vnc']['display'], ':70')
+                else:
+                    with self.assertRaisesRegex(RuntimeError, 'did not serve both Xorg outputs'):
+                        desktop._vnc(facts, mirror=True)
+                    self.assertNotIn('vnc', facts)
+                argv = start.call_args.args[0]
+                self.assertEqual(argv[:3], ['X0tigervnc', '-display', ':70'])
+                self.assertIn('-localhost', argv)
+                self.assertEqual(argv[argv.index('-SecurityTypes')+1], 'VncAuth')
+                self.assertEqual((Path(d) / 'vnc.passwd').stat().st_mode & 0o777, 0o600)
+
     def test_wayland_window_identity_rejects_other_executables_and_desktops(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

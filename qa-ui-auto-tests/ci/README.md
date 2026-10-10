@@ -162,6 +162,13 @@ fixture owns the null sink, and desktop teardown stops the session daemons.
 
 The VNC desktop binds loopback, uses a disposable VNCAuth password outside
 uploaded reports, and authenticates an actual RFB handshake before launch.
+Dual-display selections use a job-owned Xorg dummy server with two RandR
+outputs and the foreground `X0tigervnc` binary serving that same desktop; the authenticated RFB
+probe must observe the full 3840×1080 framebuffer. Single-display selections
+continue to use Xtigervnc. Ubuntu 22.04 dual-display profiles install a
+checksum-pinned dummy 0.4.1 driver built against Jammy's Xorg ABI, because its
+stock 0.3.8 driver exposes only the legacy `default` output. This overlay is QA
+environment evidence, not evidence for the stock Jammy dummy driver.
 It does not expose a public VNC endpoint. It is independent of `vnc_required`:
 that service fixture is the programmable RFB server the Taomni VNC client
 connects to. The profile currently establishes hosted-desktop operation; remote
@@ -183,6 +190,9 @@ Those responses are retained in `desktop-preflight/portal-preflight.json`.
 AT-SPI is explicitly enabled on the private session bus. A missing consent
 action fails this preflight instead of blocking the remaining WebViews behind
 a Shell modal dialog. No portal permission database is seeded.
+For dialogs with multiple exclusive display previews, consent keeps an already
+selected display and activates Share instead of repeatedly selecting the other
+unchecked preview. Each action refreshes the accessibility snapshot.
 On a cold native build, application desktop-entry validation records
 `awaiting-build`: GLib requires the entry's Exec binary to exist. The entry is
 registered after compilation, then execution requires a real `GDesktopAppInfo`

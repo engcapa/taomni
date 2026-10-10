@@ -118,6 +118,39 @@ def activate_accessible(node, record, coordinates, click):
             "bounds": [rect.x, rect.y, rect.width, rect.height], "pointer": [x, y]}
 
 
+def consent_control(pairs, kind):
+    """Choose one action from the current dialog snapshot, then refresh it."""
+    if kind is None:
+        return None
+    interactive = [(node, record) for node, record in pairs
+                   if record["showing"] and record["enabled"]]
+    if kind == "portal":
+        for node, record in interactive:
+            if (record["name"] == "Allow Remote Interaction"
+                    and record["role"] in {"switch", "check box", "toggle button"}
+                    and not record["checked"]
+                    and record["action_count"]):
+                return node, record, "select"
+        monitors = [(node, record) for node, record in interactive
+                    if record["role"] in {"toggle button", "check box"}
+                    and "remember" not in record["name"].lower()
+                    and record["name"] != "Allow Remote Interaction"]
+        # With multiple exclusive monitor previews, selecting each unchecked
+        # toggle alternates forever and starves Share. Keep any live selection.
+        if monitors and not any(record["checked"] for _, record in monitors):
+            for node, record in monitors:
+                if record["action_count"]:
+                    return node, record, "select"
+            return None
+    labels = ({"Allow"} if kind == "screenshot-access" else {"Add"}
+              if kind == "global-shortcuts" else {"Share", "Allow"})
+    for node, record in interactive:
+        if (record["name"].replace("_", "") in labels
+                and record["role"] in {"push button", "button"}):
+            return node, record, "consent"
+    return None
+
+
 def main():
     import gi
     gi.require_version("Atspi", "2.0")
@@ -164,28 +197,11 @@ def main():
                 records = [record for _, record in pairs]
                 kind = consent_kind(executable, records)
                 actions = []
-                # With one monitor GNOME selects it automatically. Handle the
-                # unselected preview too, using its accessible toggle action.
-                for node, record in pairs:
-                    if kind is None or not record["showing"] or not record["enabled"]:
-                        continue
-                    state = node.get_state_set()
-                    if (kind == "portal" and record["role"] in {"toggle button", "check box", "switch"}
-                            and not selected_state(state, Atspi.StateType)
-                            and "remember" not in record["name"].lower()):
-                        # AdwSwitchRow and its child GtkSwitch share a label.
-                        # The row has no action; use the child's actual toggle.
-                        if record["action_count"] == 0:
-                            continue
-                        result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
-                        actions.append({"name": record["name"], "action": "select", **result})
-                        # Refresh the live states before toggling another
-                        # control or activating Share; snapshots may be stale.
-                        break
-                    labels = {"Allow"} if kind == "screenshot-access" else {"Add"} if kind == "global-shortcuts" else {"Share", "Allow"}
-                    if record["name"].replace("_", "") in labels and record["role"] in {"push button", "button"}:
-                        result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
-                        actions.append({"name": record["name"], "action": "consent", **result})
+                control = consent_control(pairs, kind)
+                if control:
+                    node, record, action = control
+                    result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
+                    actions.append({"name": record["name"], "action": action, **result})
                 observation = {"pid": pid, "executable": executable, "kind": kind,
                                "tree": records, "actions": actions}
                 signature = json.dumps(observation, sort_keys=True)

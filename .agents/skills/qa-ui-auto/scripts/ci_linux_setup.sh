@@ -37,12 +37,31 @@ else
     x11-xserver-utils libxtst6 xclip imagemagick fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons
   if [[ ",${QA_CAPABILITIES:-}," == *,dual-display,* ]]; then
     install_packages xserver-xorg-core xserver-xorg-video-dummy
+    if [[ "$profile" == ubuntu-22.04-* ]]; then
+      # Jammy's dummy 0.3.8 exposes only the legacy "default" output. Build
+      # the RandR-capable driver against Jammy's own Xorg ABI for two CRTCs.
+      install_packages build-essential pkg-config xserver-xorg-dev xorg-sgml-doctools
+      dummy_work="$(mktemp -d "${RUNNER_TEMP:-/tmp}/qa-xorg-dummy-XXXXXX")"
+      trap 'rm -rf "$dummy_work"' EXIT
+      curl --fail --location --retry 3 \
+        https://www.x.org/releases/individual/driver/xf86-video-dummy-0.4.1.tar.xz \
+        --output "$dummy_work/dummy.tar.xz"
+      echo "351920a7fd0f759a3ac972a5999b3ffed46f07fb52a99f319bfb5b6a59d3dfaf  $dummy_work/dummy.tar.xz" | sha256sum --check
+      tar -xJf "$dummy_work/dummy.tar.xz" -C "$dummy_work" --strip-components=1
+      (cd "$dummy_work" && ./configure --with-xorg-module-dir=/usr/lib/xorg/modules && make -j2)
+      sudo make -C "$dummy_work" install
+      rm -rf "$dummy_work"
+      trap - EXIT
+    fi
   fi
   if [[ "$profile" == ubuntu-22.04-* ]]; then
     install_packages lxqt-core
   fi
   if [[ "$profile" == ubuntu-22.04-vnc ]]; then
     install_packages tigervnc-standalone-server tigervnc-tools
+    if [[ ",${QA_CAPABILITIES:-}," == *,dual-display,* ]]; then
+      install_packages tigervnc-scraping-server
+    fi
   fi
 fi
 

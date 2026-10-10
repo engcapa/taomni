@@ -4,13 +4,57 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from ci_wayland_portal import owned_portal, owned_process, consent_kind, activate_accessible, interactive_state, selected_state, descendants, observe_nodes
+from ci_wayland_portal import owned_portal, owned_process, consent_kind, consent_control, activate_accessible, interactive_state, selected_state, descendants, observe_nodes
 from ci_wayland_input import focus_window, move_pointer, owned_window_pid
 from qa_ui_auto import host_clipboard, wayland
 from qa_ui_auto.native_steps import _read_wayland_clipboard
 
 
 class WaylandToolsTests(unittest.TestCase):
+    def control(self, name, role, *, checked=False, enabled=True, showing=True, actions=1):
+        return Mock(), dict(name=name, role=role, checked=checked, enabled=enabled,
+                            showing=showing, action_count=actions)
+
+    def test_single_monitor_selection_reaches_share_with_two_exclusive_previews(self):
+        first = self.control("MetaVendor", "toggle button")
+        second = self.control("MetaVendor", "toggle button")
+        share = self.control("Share", "button", enabled=False)
+        pairs = [first, second, share]
+        self.assertEqual(consent_control(pairs, "portal"), (*first, "select"))
+        # GTK's live snapshot after selecting one exclusive preview. The
+        # other stays unchecked; selecting it would deselect the first.
+        first[1]["checked"] = True
+        share[1]["enabled"] = True
+        self.assertEqual(consent_control(pairs, "portal"), (*share, "consent"))
+        first[1]["checked"], second[1]["checked"] = False, True
+        self.assertEqual(consent_control(pairs, "portal"), (*share, "consent"))
+
+    def test_remote_interaction_uses_actionable_switch_then_retains_selection(self):
+        row = self.control("Allow Remote Interaction", "switch", actions=0)
+        switch = self.control("Allow Remote Interaction", "switch")
+        label = self.control("Allow Remote Interaction", "label", actions=8)
+        monitor = self.control("MetaVendor", "toggle button", checked=True)
+        remember = self.control("Remember this decision", "check box")
+        share = self.control("Share", "button")
+        pairs = [row, label, switch, monitor, remember, share]
+        self.assertEqual(consent_control(pairs, "portal"), (*switch, "select"))
+        row[1]["checked"] = switch[1]["checked"] = True
+        self.assertEqual(consent_control(pairs, "portal"), (*share, "consent"))
+
+    def test_consent_never_activates_unknown_hidden_or_disabled_controls(self):
+        allow = self.control("Allow", "button")
+        self.assertIsNone(consent_control([allow], None))
+        self.assertIsNone(consent_control([allow], "global-shortcuts"))
+        self.assertEqual(consent_control([allow], "screenshot-access"), (*allow, "consent"))
+        for property in ("enabled", "showing"):
+            with self.subTest(property=property):
+                pair = self.control("Share", "button", **{property: False})
+                self.assertIsNone(consent_control([pair], "portal"))
+        # An unselected preview without an accessible action is not consent.
+        self.assertIsNone(consent_control([
+            self.control("MetaVendor", "toggle button", actions=0),
+            self.control("Share", "button")], "portal"))
+
     def test_auxiliary_x11_allowance_retains_wayland_input_transport(self):
         with patch.dict(os.environ, {"GDK_BACKEND": "wayland,x11"}, clear=True):
             self.assertTrue(wayland.active())
