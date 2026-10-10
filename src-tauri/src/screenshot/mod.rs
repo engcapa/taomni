@@ -677,9 +677,20 @@ fn hide_app_windows(app: &AppHandle) -> bool {
         if !window.is_visible().unwrap_or(false) {
             continue;
         }
+        #[cfg(target_os = "linux")]
+        if window.is_minimized().unwrap_or(false) {
+            continue;
+        }
         #[cfg(all(debug_assertions, target_os = "macos"))]
         QA_WINDOW_HIDE_CALLS.fetch_add(1, Ordering::SeqCst);
-        if window.hide().is_ok() {
+        // GTK hide/show unmaps the toplevel: X11 resets its position and
+        // Wayland may place the new mapping on a different output. Iconifying
+        // removes it from capture while retaining the compositor's placement.
+        #[cfg(target_os = "linux")]
+        let hidden = window.minimize();
+        #[cfg(not(target_os = "linux"))]
+        let hidden = window.hide();
+        if hidden.is_ok() {
             hid_any = true;
             if !state.hidden.contains(&label) {
                 state.hidden.push(label);
@@ -689,8 +700,8 @@ fn hide_app_windows(app: &AppHandle) -> bool {
     hid_any
 }
 
-/// Wait for UI-thread unmapping, then allow compositor fade-out to complete.
-/// A queued hide returning Ok is not proof of native visibility on GTK.
+/// Wait for UI-thread hiding/minimization and compositor fade-out to complete.
+/// A queued request returning Ok is not proof of native visibility on GTK.
 async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
     let labels = tool_state().hidden.clone();
     let until = std::time::Instant::now() + Duration::from_secs(3);
@@ -698,7 +709,10 @@ async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
         let mut visible = false;
         for label in &labels {
             if let Some(window) = app.get_webview_window(label) {
-                visible |= window.is_visible().map_err(|e| e.to_string())?;
+                let mapped = window.is_visible().map_err(|e| e.to_string())?;
+                #[cfg(target_os = "linux")]
+                let mapped = mapped && !window.is_minimized().map_err(|e| e.to_string())?;
+                visible |= mapped;
             }
         }
         if !visible {
@@ -736,6 +750,8 @@ fn restore_app_windows(app: &AppHandle) {
     let hidden = std::mem::take(&mut tool_state().hidden);
     for label in hidden {
         if let Some(window) = app.get_webview_window(&label) {
+            #[cfg(target_os = "linux")]
+            let _ = window.unminimize();
             let _ = window.show();
             let _ = window.set_focus();
         }

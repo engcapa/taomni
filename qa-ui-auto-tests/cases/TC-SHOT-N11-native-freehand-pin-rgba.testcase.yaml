@@ -30,4 +30,4 @@ verification:
   visual:
   - {check: Original content and alpha, method: automated, reason: Native screen pixels and clipboard/Pin outputs are compared with actual original canvas PNGs across all pixels and spatial tiles rather than checking nonblank content or dimensions alone.}
   native:
-  - {check: Physical gesture and window displacement, method: automated, reason: 'Real Enigo/SetCursorPos OS input draws and drags; before/after native positions and topmost state are recorded. DOM automation selects toolbar actions and dispatches Escape, so the close check proves renderer/native lifecycle, not a physical Escape-key test.'}
+  - {check: Physical gesture and window displacement, method: automated, reason: 'Real Enigo/SetCursorPos or owned Mutter/Clutter OS input draws and drags; Wayland input converts per-monitor physical coordinates to compositor logical points and verifies the observed pointer. Before/after native positions and topmost state are recorded. DOM automation selects toolbar actions and dispatches Escape, so the close check proves renderer/native lifecycle, not a physical Escape-key test.'}

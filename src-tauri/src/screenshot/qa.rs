@@ -232,7 +232,12 @@ async fn wait_closed(app: &AppHandle, label: &str, timeout: Duration) -> bool {
 
 fn main_visible(app: &AppHandle) -> bool {
     app.get_webview_window("main")
-        .and_then(|w| w.is_visible().ok())
+        .and_then(|w| {
+            let visible = w.is_visible().ok()?;
+            #[cfg(target_os = "linux")]
+            let visible = visible && !w.is_minimized().ok()?;
+            Some(visible)
+        })
         .unwrap_or(false)
 }
 
@@ -290,6 +295,52 @@ async fn open_fixture(
     .await?;
     if ready != Value::Bool(true) {
         anyhow::bail!("QA fixture '{route}' did not render");
+    }
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        let (x, y, _, _) = display.logical_rect();
+        wayland::command(
+            json!({"command":"place", "application":std::env::current_exe()?,
+            "title":window.title()?, "rect":{"x":x+120,"y":y+120,"width":520,"height":440}}),
+        )
+        .await?;
+        let until = Instant::now() + Duration::from_secs(5);
+        loop {
+            let observed = wayland::window(&window).await?;
+            if observed["frame"]["x"] == x + 120
+                && observed["frame"]["y"] == y + 120
+                && (window.scale_factor()? - s).abs() < 0.01
+            {
+                break;
+            }
+            anyhow::ensure!(
+                Instant::now() < until,
+                "fixture did not map to the selected output/DPI: {observed}"
+            );
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        // The original canvas was drawn before compositor placement, possibly
+        // at another output's DPI. Reload only this QA scene to retain fresh
+        // originals drawn at the confirmed native scale, before OS capture.
+        window.eval("window.location.reload()")?;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let ready = run_js(
+            &window,
+            &format!(r#"
+            for(let i=0;i<100;i++) {{
+                const root=document.querySelector('[data-testid="screenshot-qa-fixture-ready"]');
+                if(root && (!root.querySelector('canvas') ||
+                    (root.dataset.sourceReady==='true' && window.__qaScreenshotSource?.scale==={s}))) return true;
+                await new Promise(r=>setTimeout(r,50));
+            }} return false;
+        "#),
+            Duration::from_secs(10),
+        )
+        .await?;
+        anyhow::ensure!(
+            ready == true,
+            "fixture original did not redraw at target DPI {s}"
+        );
     }
     let _ = window.set_focus();
     // Let the window manager map and raise it.
@@ -2268,9 +2319,14 @@ async fn mouse_path(points: Vec<(i32, i32)>) -> anyhow::Result<()> {
     .context("desktop mouse task")?
 }
 
-/// Enigo uses Quartz logical points on macOS, physical screen pixels elsewhere.
+/// Quartz and the owned Mutter broker use logical points. Enigo/X11/Win32
+/// receive physical pixels. Tao's Linux coordinates are per-monitor scaled.
 fn input_point(point: (i32, i32), scale: f64) -> (i32, i32) {
-    if cfg!(target_os = "macos") {
+    #[cfg(target_os = "linux")]
+    let logical = wayland::active();
+    #[cfg(not(target_os = "linux"))]
+    let logical = false;
+    if cfg!(target_os = "macos") || logical {
         (
             (point.0 as f64 / scale).round() as i32,
             (point.1 as f64 / scale).round() as i32,

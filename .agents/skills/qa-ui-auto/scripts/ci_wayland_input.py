@@ -97,14 +97,14 @@ def focus_window(evaluate, pid: int, diagnostics: dict) -> dict:
         time.sleep(0.05)
 
 
-def move_pointer(evaluate, notify, x: int, y: int) -> list[int]:
+def move_pointer(evaluate, notify, x: int, y: int, *, absolute=False) -> list[int]:
     # Mutter queues virtual motion. Observe its resulting coordinates before
     # issuing a button event or computing the next relative displacement.
     for _ in range(20):
         current = evaluate("global.get_pointer().slice(0, 2)")
         if abs(x - current[0]) <= 1 and abs(y - current[1]) <= 1:
             return current
-        notify(float(x - current[0]), float(y - current[1]))
+        notify(float(x if absolute else x - current[0]), float(y if absolute else y - current[1]))
         time.sleep(0.02)
     raise RuntimeError(f"Mutter pointer did not reach {(x, y)}; observed {current}")
 
@@ -116,6 +116,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ready", type=Path, required=True)
     parser.add_argument("--socket", type=Path, required=True)
+    parser.add_argument("--absolute-pointer", action="store_true",
+                        help="inject logical absolute motion on the owned Clutter seat for mixed DPI")
     args = parser.parse_args()
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     destination = "org.gnome.Mutter.RemoteDesktop"
@@ -149,6 +151,14 @@ def main() -> None:
             time.sleep(0.12)
 
     def pointer(x, y):
+        if args.absolute_pointer:
+            # The job-owned Shell hosts a real virtual input device. Absolute
+            # logical motion avoids relative-motion seams across output scales;
+            # acceptance still requires Mutter's observed global pointer.
+            def absolute_motion(px, py):
+                evaluate("(() => { global.__taomniQaPointer.notify_absolute_motion("
+                         f"imports.gi.GLib.get_monotonic_time(), {px}, {py}); return true; }})()")
+            return move_pointer(evaluate, absolute_motion, x, y, absolute=True)
         return move_pointer(evaluate, lambda dx, dy: call(
             session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (dx, dy))), x, y)
 
@@ -204,6 +214,9 @@ def main() -> None:
         call(session, interface, "NotifyKeyboardKeycode", GLib.Variant("(ub)", (29, True)))
         call(session, interface, "NotifyKeyboardKeycode", GLib.Variant("(ub)", (29, False)))
         call(session, interface, "NotifyPointerMotionRelative", GLib.Variant("(dd)", (0.0, 0.0)))
+        if args.absolute_pointer:
+            evaluate("(() => { global.__taomniQaPointer = global.backend.get_default_seat()"
+                     ".create_virtual_device(imports.gi.Clutter.InputDeviceType.POINTER_DEVICE); return true; })()")
         listener.bind(str(args.socket))
         args.socket.chmod(0o600)
         listener.listen(1)
@@ -317,6 +330,8 @@ def main() -> None:
             "[Math.round(global.stage.width / 2), Math.round(global.stage.height / 2)]"))
         args.ready.write_text(json.dumps({"session": session, "devices": ["keyboard", "pointer"],
                                          "transport": "Mutter RemoteDesktop",
+                                         "pointer_transport": "Clutter virtual absolute motion" if args.absolute_pointer
+                                             else "Mutter RemoteDesktop relative motion",
                                          "initial_pointer": initial_pointer}), encoding="utf-8")
         # The session is tied to this DBus connection, so a one-shot gdbus
         # command would remove the devices immediately after provisioning.
@@ -328,6 +343,8 @@ def main() -> None:
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signum, quit_loop)
         loop.run()
     finally:
+        if args.absolute_pointer:
+            evaluate("(() => { global.__taomniQaPointer = null; return true; })()")
         listener.close()
         args.socket.unlink(missing_ok=True)
         args.ready.unlink(missing_ok=True)

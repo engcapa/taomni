@@ -135,6 +135,16 @@ class WaylandToolsTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "did not reach"):
                 move_pointer(Mock(return_value=[0, 0]), notify, 24, 18)
 
+    def test_absolute_pointer_waits_for_observed_logical_position_across_dpi_seam(self):
+        evaluate = Mock(side_effect=[[1919, 292], [1920, 292], [1936, 16]])
+        notify = Mock()
+        with patch("ci_wayland_input.time.sleep"):
+            self.assertEqual(move_pointer(evaluate, notify, 1936, 16, absolute=True), [1936, 16])
+        self.assertEqual(notify.call_args_list, [((1936.0, 16.0),), ((1936.0, 16.0),)])
+        with patch("ci_wayland_input.time.sleep"):
+            with self.assertRaisesRegex(RuntimeError, "did not reach"):
+                move_pointer(Mock(return_value=[1920, 16]), notify, 1936, 16, absolute=True)
+
     def test_fixture_readiness_waits_for_os_focus_and_reports_real_geometry(self):
         rect = {"x": 120, "y": 80, "width": 600, "height": 400}
         window = {"pid": 42, "focused": True, "frame": rect}

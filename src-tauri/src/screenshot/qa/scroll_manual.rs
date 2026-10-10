@@ -270,25 +270,33 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
             cancel_region.3,
         )
         .await?;
-        let (position, size) = observed_inner_rect(&cancel_bar)
-            .await
-            .map_err(|e| e.to_string())?;
         let captured = super::super::surfaces::region_rect(
             &display,
             (plan.x, plan.y, plan.width, plan.height),
         );
-        let controls = super::super::surfaces::Rect {
-            x: position.x,
-            y: position.y,
-            w: size.width as i32,
-            h: size.height as i32,
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let controls = loop {
+            let (position, size) = observed_inner_rect(&cancel_bar)
+                .await
+                .map_err(|e| e.to_string())?;
+            let controls = super::super::surfaces::Rect {
+                x: position.x,
+                y: position.y,
+                w: size.width as i32,
+                h: size.height as i32,
+            };
+            if cancel_bar.is_visible().map_err(|e| e.to_string())?
+                && !captured.intersects(controls)
+            {
+                break controls;
+            }
+            if Instant::now() >= deadline {
+                return Err(format!(
+                    "Wayland full-display scroll controls are hidden or inside the captured pixels: captured={captured:?}; controls={controls:?}"
+                ));
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
         };
-        if !cancel_bar.is_visible().map_err(|e| e.to_string())? || captured.intersects(controls) {
-            return Err(
-                "Wayland full-display scroll controls are hidden or inside the captured pixels"
-                    .into(),
-            );
-        }
         trace.mark("full-display-controls", json!({"plan":plan,"controls":{"x":controls.x,"y":controls.y,"width":controls.w,"height":controls.h}}));
     }
     run_js(&cancel_bar, "for(let i=0;i<100 && !document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]');i++) await new Promise(r=>setTimeout(r,100)); if(!document.querySelector('[data-testid=\"screenshot-scroll-cancel\"]')) throw new Error('manual Cancel control missing'); return true;", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
