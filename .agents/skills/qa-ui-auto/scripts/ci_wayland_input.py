@@ -152,9 +152,9 @@ def main() -> None:
 
     def pointer(x, y):
         if args.absolute_pointer:
-            # Mutter 50's headless virtual-device motion clips at mixed-DPI
-            # output boundaries. Its public native-seat warp API positions the
-            # actual OS pointer; RemoteDesktop supplies balanced button events.
+            # The public native-seat API positions the actual OS pointer;
+            # RemoteDesktop supplies balanced button events. Shell's panel and
+            # hot-corner barriers still apply, so preflight parks below them.
             # Always verify global.get_pointer() before issuing a button.
             def absolute_motion(px, py):
                 evaluate("(() => { global.__taomniQaSeat.warp_pointer("
@@ -340,13 +340,16 @@ def main() -> None:
         # WebDriver clicks don't move this OS pointer, so several read-only
         # RDP connects can reopen Overview before the first measured input.
         # Park it in the desktop interior before any app/target is launched.
-        layout = evaluate("({width:global.stage.width,height:global.stage.height,monitors:Main.layoutManager.monitors.map(m=>({x:m.x,y:m.y,width:m.width,height:m.height,index:m.index}))})")
+        layout = evaluate("({width:global.stage.width,height:global.stage.height,panelHeight:Main.layoutManager.panelBox.height,monitors:Main.layoutManager.monitors.map(m=>({x:m.x,y:m.y,width:m.width,height:m.height,index:m.index}))})")
         pointer_probes = []
         if args.absolute_pointer:
             if len(layout["monitors"]) != 2:
                 raise RuntimeError(f"mixed-DPI pointer needs two actual monitors: {layout}")
             for monitor in layout["monitors"]:
-                target = [monitor["x"] + 16, monitor["y"] + 16]
+                # The primary panel has a right-edge barrier spanning its
+                # height. Origin+16 crosses that barrier at the DPI seam.
+                inset = max(64, int(layout["panelHeight"]) + 16)
+                target = [monitor["x"] + inset, monitor["y"] + inset]
                 pointer_probes.append({"target": target, "observed": pointer(*target)})
         initial_pointer = pointer(*evaluate(
             "[Math.round(global.stage.width / 2), Math.round(global.stage.height / 2)]"))

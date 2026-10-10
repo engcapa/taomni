@@ -107,8 +107,8 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
         };
         let other = &monitors[pointer_monitor]["logical"];
         park_pointer((
-            other["x"].as_i64().unwrap() as i32 + 16,
-            other["y"].as_i64().unwrap() as i32 + 16,
+            other["x"].as_i64().unwrap() as i32 + 64,
+            other["y"].as_i64().unwrap() as i32 + 64,
         ))
         .await?;
         // Recording and Wayland scrolling crop a persistent monitor stream;
@@ -198,8 +198,8 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
             if step > 0 {
                 let other = &monitors[1 - index]["logical"];
                 park_pointer((
-                    other["x"].as_i64().unwrap() as i32 + 16,
-                    other["y"].as_i64().unwrap() as i32 + 16,
+                    other["x"].as_i64().unwrap() as i32 + 64,
+                    other["y"].as_i64().unwrap() as i32 + 64,
                 ))
                 .await?;
                 run_js(
