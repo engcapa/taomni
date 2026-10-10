@@ -30,7 +30,7 @@ verification:
       exits fullscreen and maximized state, opens at the configured 80% display size (capped at 1100 by 800), and can resize to 760 by 620 logical pixels while keeping the original stitched image dimensions.
       Wait for native state and compositor geometry transitions after the result event, including a hidden Wayland selection surface being remapped as a normal document. Retain separate resizable/fullscreen/decorated/maximized facts on failure.
       On Wayland, measure the visible Mutter frame instead of its GTK buffer containing client-side shadows; retain both frame and buffer geometry without adding a shadow tolerance to the target dimensions.
-      Native size restoration waits for fullscreen/maximized state to clear, retries at bounded intervals when a configure acknowledgement supersedes a request, and requires the actual target size. A missing preview reports the actual renderer error and fails before comparing the original selection as if it were a result.
+      Native size restoration resets the hidden Wayland backing surface before changing fullscreen geometry, waits for fullscreen/maximized state to clear, retries at bounded intervals when a configure acknowledgement supersedes a request, and requires the actual target size. A missing preview reports the actual renderer error and fails before comparing the original selection as if it were a result.
       On Wayland, establish the source on its selected output and redraw originals after the native DPI transition. Wait for the second capture's control placement to settle, then require visible controls outside captured pixels; timeout retains actual capture/control rectangles without relaxing that requirement.
     actions:
     - 1

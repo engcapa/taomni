@@ -376,6 +376,7 @@ pub async fn screenshot_scroll_capture(
     }
     if let Some(window) = overlay {
         if result.is_ok() {
+            edit::reset_hidden_surface(&window).await?;
             edit::configure_document_window(&window, &editor_display)?;
         }
         let _ = window.show();
@@ -1070,6 +1071,7 @@ pub async fn screenshot_switch_display(app: AppHandle, window: WebviewWindow, di
         scale_factor: display.scale_factor, window_region: None, document: false, source_pin: None,
     });
     if let Ok(init) = &result {
+        edit::reset_hidden_surface(&window).await?;
         if let Err(error) = cover_display(&window, &display).await {
             let _ = window.show();
             return Err(error);
