@@ -249,17 +249,6 @@ class Desktop:
   Option "AutoAddDevices" "false"
   Option "AllowMouseOpenFail" "true"
 EndSection
-Section "InputDevice"
-  Identifier "QA-Keyboard"
-  Driver "kbd"
-  Option "XkbModel" "pc105"
-  Option "XkbLayout" "us"
-EndSection
-Section "ServerLayout"
-  Identifier "QA-Layout"
-  Screen "QA-Screen"
-  InputDevice "QA-Keyboard" "CoreKeyboard"
-EndSection
 Section "Device"
   Identifier "QA-Dummy"
   Driver "dummy"
@@ -294,11 +283,12 @@ EndSection
                              "-noreset", "-nolisten", "tcp", "-novtswitch", "-sharevts", "-ac"])
         self._wait(server, lambda: subprocess.run(["xdpyinfo"], stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL, timeout=5).returncode == 0, "owned dual-output Xorg")
-        # Xorg's dummy driver does not attach the host keyboard map. Without
-        # an explicit XKB layout, XKeysymToKeycode resolves arrows and End to
-        # unrelated keycodes (WebKit then reports NumpadEnter/Unidentified),
-        # so native editor and dialog shortcuts silently target the wrong key.
-        subprocess.run(["setxkbmap", "-display", os.environ["DISPLAY"], "us"],
+        # Without a keyboard device Xorg defaults to legacy xfree86 keycodes.
+        # WebKitGTK interprets hardware codes as evdev, so e.g. Down at 104
+        # becomes code=NumpadEnter even though key=ArrowDown. A layout alone
+        # preserves that mismatch; select evdev rules before starting clients.
+        subprocess.run(["setxkbmap", "-display", os.environ["DISPLAY"], "-rules", "evdev",
+                        "-model", "pc105", "-layout", "us", "-option", ""],
                        check=True, timeout=20)
 
     def _display_patterns(self, facts):
@@ -411,11 +401,6 @@ EndSection
             time.sleep(0.25)
             if compositor.poll() is not None:
                 raise RuntimeError("desktop compositor exited during startup")
-        # Xvfb and the job-owned Xorg dummy server have no host keyboard to
-        # inherit. Install an explicit US map before native XTest input so
-        # navigation keysyms resolve to the standard WebKit keycodes.
-        subprocess.run(["setxkbmap", "-display", os.environ["DISPLAY"], "-layout", "us", "-option", ""],
-                       check=True, timeout=20)
         # X11's own idle blanking is independent of the desktop's screen saver.
         subprocess.run(["xset", "s", "off"], check=True, timeout=10)
         subprocess.run(["xset", "s", "noblank"], check=True, timeout=10)

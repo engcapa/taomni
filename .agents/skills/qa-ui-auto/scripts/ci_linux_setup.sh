@@ -37,10 +37,7 @@ else
   install_packages xvfb xauth openbox xcompmgr wmctrl xdotool x11-utils \
     x11-xserver-utils libxtst6 xclip imagemagick fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons
   if [[ ",${QA_CAPABILITIES:-}," == *,dual-display,* ]]; then
-    # The owned Xorg dummy server needs a real core keyboard device. Hosted
-    # images often carry libinput but omit the legacy kbd module, leaving
-    # XTest navigation events with an unusable keycode map.
-    install_packages xserver-xorg-core xserver-xorg-video-dummy xserver-xorg-input-kbd
+    install_packages xserver-xorg-core xserver-xorg-video-dummy
     if [[ "$profile" == ubuntu-22.04-* ]]; then
       # Jammy's dummy 0.3.8 exposes only the legacy "default" output. Build
       # the RandR-capable driver against Jammy's own Xorg ABI for two CRTCs.
