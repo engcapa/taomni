@@ -9,6 +9,28 @@ from qa_ui_auto.steps.navigation import step_open
 
 
 class StartupNavigationTest(TestCase):
+    def test_fragment_navigation_retry_reloads_the_failed_document(self):
+        with TemporaryDirectory() as directory:
+            page = Mock()
+            mounted = {"app": False}
+
+            def navigate(*args, **kwargs):
+                if page.goto.call_count == 1:
+                    handler = page.on.call_args.args[1]
+                    handler(SimpleNamespace(resource_type="script", failure="net::ERR_NETWORK_CHANGED"))
+                    return Mock()  # A new document rendered the startup crash.
+                return None  # Navigating to the same fragment retains that document.
+
+            def reload_document(*args, **kwargs):
+                mounted["app"] = True
+
+            page.goto.side_effect = navigate
+            page.reload.side_effect = reload_document
+            ctx = StepContext(page, "TC-startup", Path(directory), {}, {})
+            step_open(ctx, "http://127.0.0.1:5000/#screenshot-overlay")
+            self.assertTrue(mounted["app"], "the retry must replace the failed startup document")
+            self.assertIn("ERR_NETWORK_CHANGED", (Path(directory) / "startup-network-retries.log").read_text())
+
     def test_dynamic_import_network_change_retries_before_interaction(self):
         with TemporaryDirectory() as directory:
             page = Mock()
