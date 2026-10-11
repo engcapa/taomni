@@ -2,8 +2,9 @@ id: TC-DB-EXEC-001-execution-log-native
 title: Native execution log lists each successful statement with a summary
 description: |
   DB-EXEC-001 V5. Connects a real MySQL/MariaDB session, runs two SELECT
-  statements with the Run toolbar button, verifies the view stays on the last
-  result sheet, then opens the Log tab and checks two SUCCESS entries and the
+  statements with the Run toolbar button, waits for the second result sheet
+  and its column b, then verifies the view stays on that last result sheet.
+  Opens the Log tab and checks two SUCCESS entries and the
   "Success: 2" summary.
 covers:
 - F-DB-1
@@ -86,6 +87,13 @@ steps:
     selector: '[data-testid="query-result-grid"]'
     timeout_sec: 60
 - wait_for:
+    selector: '[data-testid="result-sheet-tab"] + [data-testid="result-sheet-tab"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: b
+    timeout_sec: 60
+- wait_for:
     selector: '[data-testid="result-log-tab"][data-active="false"]'
     timeout_sec: 30
 - assert_count:
@@ -93,10 +101,10 @@ steps:
     equal: 2
 - click: '[data-testid="result-log-tab"]'
 - wait_for: '[data-testid="db-execution-log"]'
-- assert_count:
-    selector: '[data-testid="db-execution-log-entry"][data-status="success"]'
-    equal: 2
 - assert_text:
     selector: '[data-testid="db-execution-log-summary"]'
     contains: 'Success: 2'
+- assert_count:
+    selector: '[data-testid="db-execution-log-entry"][data-status="success"]'
+    equal: 2
 - screenshot: db-exec-001-execution-log-native.png
