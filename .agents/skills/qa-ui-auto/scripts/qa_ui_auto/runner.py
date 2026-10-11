@@ -23,7 +23,7 @@ import platform
 import sys
 import time
 import traceback
-from contextlib import nullcontext, suppress
+from contextlib import contextmanager, nullcontext, suppress
 from pathlib import Path
 from typing import Any
 
@@ -767,13 +767,22 @@ def _reap_matching_pids(
 def _capture_native_failure(session: Any, case_dir: Path) -> dict:
     """Capture the failing session before cleanup changes its state."""
     artifacts: dict[str, str] = {}
-    with suppress(Exception):
+    errors: list[dict[str, str]] = []
+
+    @contextmanager
+    def capture(diagnostic: str):
+        try:
+            yield
+        except Exception as exc:  # diagnostics must retain the original failure
+            errors.append({"diagnostic": diagnostic, "type": type(exc).__name__, "error": str(exc)[:2000]})
+
+    with capture("editor_input"):
         editor_input = session.execute("return window.__QA_UI_AUTO_EDITOR_INPUT__ || [];")
         if isinstance(editor_input, list) and editor_input:
             input_file = case_dir / "editor-input-failure.json"
             input_file.write_text(json.dumps(editor_input, ensure_ascii=False), encoding="utf-8")
             artifacts["editor_input"] = str(input_file)
-    with suppress(Exception):
+    with capture("focus"):
         focus = session.execute("""
             const describe = el => el ? {
                 tag: el.tagName, id: el.id, class: el.className,
@@ -793,20 +802,23 @@ def _capture_native_failure(session: Any, case_dir: Path) -> dict:
             focus_file = case_dir / "focus-failure.json"
             focus_file.write_text(json.dumps(focus, ensure_ascii=False), encoding="utf-8")
             artifacts["focus"] = str(focus_file)
-    try:
+    with capture("screenshot"):
         shot = case_dir / "failure-native.png"
         session.screenshot(shot)
         artifacts["screenshot"] = str(shot)
-    except Exception:  # noqa: BLE001
-        pass
-    with suppress(Exception):
+    with capture("html"):
         html = case_dir / "failure-native.html"
         html.write_text(str(session.execute("return document.documentElement.outerHTML")), encoding="utf-8")
         artifacts["html"] = str(html)
-    with suppress(Exception):
+    with capture("console"):
         log = case_dir / "console-failure.json"
         log.write_text(json.dumps(session.console_entries()[-300:], ensure_ascii=False), encoding="utf-8")
         artifacts["console"] = str(log)
+    if errors:
+        with suppress(OSError):
+            errors_file = case_dir / "native-diagnostic-errors.json"
+            errors_file.write_text(json.dumps(errors, ensure_ascii=False, indent=2), encoding="utf-8")
+            artifacts["diagnostic_errors"] = str(errors_file)
     return artifacts
 
 

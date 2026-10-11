@@ -244,6 +244,21 @@ class VerificationTest(unittest.TestCase):
             session.close.assert_called_once()
             self.assertEqual(results[0]["failure"]["step_index"], 1)
 
+    def test_native_failure_capture_retains_driver_errors_without_masking_failure(self):
+        import tauri_webdriver
+        with tempfile.TemporaryDirectory() as directory:
+            session = Mock()
+            session.execute.side_effect = tauri_webdriver.WebDriverError("no such window: target closed")
+            session.screenshot.side_effect = tauri_webdriver.WebDriverError("no such window: target closed")
+            session.console_entries.return_value = []
+            artifacts = runner._capture_native_failure(session, Path(directory))
+            errors = json.loads(Path(artifacts["diagnostic_errors"]).read_text())
+            self.assertEqual({item["diagnostic"] for item in errors}, {"editor_input", "focus", "screenshot", "html"})
+            self.assertTrue(all(item["error"] == "no such window: target closed" for item in errors))
+            self.assertTrue(all(item["type"] == "WebDriverError" for item in errors))
+            self.assertIn("console", artifacts)
+            session.close.assert_not_called()
+
     def test_build_cache_requires_matching_recipe_and_binary(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
