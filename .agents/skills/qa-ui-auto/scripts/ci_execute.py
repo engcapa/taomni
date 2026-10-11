@@ -108,6 +108,11 @@ def main():
                    "python": platform.python_version(), "head": manifest["head"], "capabilities": entry["capabilities"],
                    "linux_profile": entry.get("linux_profile", ""), "desktop": entry.get("desktop", {})})
         with ExitStack() as stack:
+            consent = None
+            if entry["mode"] == "native" and platform.system() == "Darwin" and os.environ.get("GITHUB_ACTIONS") == "true":
+                log = stack.enter_context((args.report / "macos-fixture-consent.log").open("w", encoding="utf-8"))
+                consent = launch(stack, ["osascript", "-l", "JavaScript", str(scripts / "ci_macos_consent.js")],
+                                 stdout=log, stderr=subprocess.STDOUT)
             # The SSH account, the VNC fixture's per-case event log and the
             # macOS console session behind Screen Sharing are shared.
             serial = set(entry["capabilities"]) & {"ssh", "vnc", "ard"}
@@ -195,6 +200,8 @@ def main():
                         time.sleep(1)
                 else:
                     raise RuntimeError("Vite not ready in 90s")
+            if consent is not None and consent.poll() is not None:
+                raise RuntimeError("macOS fixture consent monitor exited; see macos-fixture-consent.log")
             outcome["stage"] = "cases"
             write_json(args.report / "ci-outcome.json", outcome)
             command = [sys.executable, "-m", "qa_ui_auto", "run", "--selection", str(args.selection),

@@ -153,7 +153,7 @@ jobs:
           node-version: '24'
       - name: Updater packaging unit contracts
         if: inputs.scope != 'selected'
-        run: node --test scripts/compose-updater-manifest.test.mjs
+        run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
       - name: Wayland automation contracts
