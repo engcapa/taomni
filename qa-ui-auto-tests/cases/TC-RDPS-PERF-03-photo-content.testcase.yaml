@@ -4,7 +4,7 @@ description: 'AC-E02/V-E12: measure the same deterministic noisy photo animation
   enabled on one release server, restarting each target at the same initial photo frame. Preserve both decoded
   snapshots, source telemetry including macOS process activity and draw timings, bulk statistics and frame rate ratios. Animated macOS targets hold a process-local user-initiated activity to keep their timers eligible throughout both measurements. Bandwidth
   cannot improve by dropping delivered frames. Retains the same four-strip planar selection after the small-damage
-  sampling optimization; FPS and bandwidth limits stay unchanged.'
+  sampling optimization and reuse of independent estimator scratch buffers; FPS and bandwidth limits stay unchanged.'
 covers:
 - F-RdpServer-1
 tags:

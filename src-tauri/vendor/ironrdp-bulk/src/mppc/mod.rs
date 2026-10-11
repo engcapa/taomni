@@ -78,6 +78,16 @@ impl MppcContext {
         }
     }
 
+    /// Start an independent estimate without reallocating its scratch buffers.
+    /// Empty match entries and a zero high-water mark prevent previous bytes
+    /// from participating in a match; current input overwrites bytes before
+    /// the compressor can read them. This is never a wire-history reset.
+    pub(crate) fn reset_for_estimate(&mut self) {
+        self.match_buffer.fill(0);
+        self.history_ptr = 0;
+        self.history_offset = 0;
+    }
+
     /// Sets the compression level, adjusting buffer size and mask accordingly.
     pub(crate) fn set_compression_level(&mut self, compression_level: u32) {
         if compression_level < 1 {

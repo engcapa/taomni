@@ -27,7 +27,7 @@ verification:
   native:
   - check: Dual OS outputs, mixed DPI, portal selection, window placement and OS clipboard
     method: automated
-    reason: An owned X11 or Mutter desktop supplies actual OS virtual outputs and independent external GTK pixel patterns. Mixed-DPI input uses the native Clutter seat for pointer positioning and Mutter RemoteDesktop for balanced button events, and requires the observed native position; Linux minimization/restoration must retain the invoking monitor. This validates native API boundaries; physical monitor hardware remains a separate external acceptance.
+    reason: An owned X11 or Mutter desktop supplies actual OS virtual outputs and independent external GTK pixel patterns. On Wayland, the consent helper selects the requested real portal monitor preview before Share and retains its selected state and ordinal in portal-consent.jsonl. Mixed-DPI input uses the native Clutter seat for pointer positioning and Mutter RemoteDesktop for balanced button events, and requires the observed native position; Linux minimization/restoration must retain the invoking monitor. This validates native API boundaries; physical monitor hardware remains a separate external acceptance.
   visual:
   - check: The selection surface covers each target output with matching viewport and DPR
     method: automated

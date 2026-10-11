@@ -118,7 +118,7 @@ def activate_accessible(node, record, coordinates, click):
             "bounds": [rect.x, rect.y, rect.width, rect.height], "pointer": [x, y]}
 
 
-def consent_control(pairs, kind):
+def consent_control(pairs, kind, *, monitor_index=None):
     """Choose one action from the current dialog snapshot, then refresh it."""
     if kind is None:
         return None
@@ -135,6 +135,15 @@ def consent_control(pairs, kind):
                     if record["role"] in {"toggle button", "check box"}
                     and "remember" not in record["name"].lower()
                     and record["name"] != "Allow Remote Interaction"]
+        if monitor_index is not None:
+            # A dual-output case must approve the screen it is exercising.
+            # Preview labels can be identical on virtual monitors; retain the
+            # requested ordinal and verify its live selected state before Share.
+            if type(monitor_index) is not int or not 0 <= monitor_index < len(monitors):
+                return None
+            node, record = monitors[monitor_index]
+            if not record["checked"]:
+                return (node, record, "select") if record["action_count"] else None
         # With multiple exclusive monitor previews, selecting each unchecked
         # toggle alternates forever and starves Share. Keep any live selection.
         if monitors and not any(record["checked"] for _, record in monitors):
@@ -197,13 +206,14 @@ def main():
                 records = [record for _, record in pairs]
                 kind = consent_kind(executable, records)
                 actions = []
-                control = consent_control(pairs, kind)
+                monitor_index = command("portal_monitor") if kind == "portal" else None
+                control = consent_control(pairs, kind, monitor_index=monitor_index)
                 if control:
                     node, record, action = control
                     result = activate_accessible(node, record, Atspi.CoordType.SCREEN, click)
                     actions.append({"name": record["name"], "action": action, **result})
                 observation = {"pid": pid, "executable": executable, "kind": kind,
-                               "tree": records, "actions": actions}
+                               "monitor_index": monitor_index, "tree": records, "actions": actions}
                 signature = json.dumps(observation, sort_keys=True)
                 if signature != previous.get(pid):
                     previous[pid] = signature

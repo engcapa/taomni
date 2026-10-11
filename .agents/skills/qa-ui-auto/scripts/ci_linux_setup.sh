@@ -31,7 +31,8 @@ if [[ "$profile" == *wayland ]]; then
   install_packages --no-install-recommends gnome-shell ubuntu-session gnome-settings-daemon gnome-control-center yaru-theme-gnome-shell \
     xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
     pipewire wireplumber wayland-utils wl-clipboard fuse3 \
-    at-spi2-core gir1.2-atspi-2.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons xwayland xclip
+    at-spi2-core gir1.2-atspi-2.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons \
+    xwayland xclip imagemagick
 else
   install_packages xvfb xauth openbox xcompmgr wmctrl xdotool x11-utils \
     x11-xserver-utils libxtst6 xclip imagemagick fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons

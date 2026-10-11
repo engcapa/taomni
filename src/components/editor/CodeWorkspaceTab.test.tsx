@@ -14661,6 +14661,37 @@ end_of_record
       expect(lspMocks.lspRename.mock.calls.length).toBe(renamesBeforeEscape);
     });
 
+    it("renames the extracted method while provider indexing remains active", async () => {
+      runtimeState.tauri = true;
+      const fixture = setupExtract("instance-extract-progress");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      const input = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
+      await waitFor(() => expect(fixture.disk[EXTRACT_PATH]).toBe(B1));
+      await act(async () => {
+        await emit("lsp://work-done-progress", {
+          workspaceId: "instance-extract-progress",
+          presetId: "app",
+          serverLabel: "jdt.ls",
+          rootUri: "file:///repo/app",
+          token: "extract-indexing",
+          kind: "begin",
+          title: "Building",
+          message: null,
+          percentage: null,
+          cancellable: false,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      });
+      fireEvent.change(input, { target: { value: "sumOf" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(fixture.disk[EXTRACT_PATH]).toBe(B2));
+      expect(fixture.text()).toBe(B2);
+      expect(useAppStore.getState().statusMessage).not.toContain("stale");
+      runtimeState.tauri = false;
+    });
+
     it("two editor undos and redos restore each transaction", async () => {
       const fixture = setupExtract("instance-extract-undo");
       const { pane, content } = await mountExtract(fixture);

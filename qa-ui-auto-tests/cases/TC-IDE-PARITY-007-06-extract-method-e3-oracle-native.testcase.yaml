@@ -1,6 +1,6 @@
 id: TC-IDE-PARITY-007-06
 title: Java Extract Method E3 side-effect program oracle on real JDT LS
-description: 'Isolated E3 sample: extracting and renaming must keep next(base) called exactly once, proven by running the program in a fresh JVM at every state.'
+description: 'Isolated E3 sample: extracting and renaming must keep next(base) called exactly once, proven by running the program in a fresh JVM at every state. Background provider indexing without a workspace content revision change must not reject the confirmed rename.'
 covers:
 - F25.5
 tags:

@@ -24,6 +24,7 @@ WINDOW_STATE = """(() => ({
                 wm_class: window.get_wm_class(),
                 normal: window.get_window_type() === imports.gi.Meta.WindowType.NORMAL,
                 focused: window.has_focus(), minimized: window.minimized,
+                user_time: window.get_user_time(),
                 visible: actor.visible && !window.minimized, above: window.is_above(),
                 actor: (() => { const [x, y] = actor.get_transformed_position();
                     const [width, height] = actor.get_transformed_size();
@@ -218,6 +219,7 @@ def main() -> None:
     loop = GLib.MainLoop()
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     clipboard_serial = [0]
+    portal_monitor = [None]
     try:
         call(session, interface, "Start")
         def clipboard_changed(*_):
@@ -264,6 +266,13 @@ def main() -> None:
                             time.sleep(0.02)
                     elif name == "clipboard_serial":
                         value = clipboard_serial[0]
+                    elif name == "portal_monitor":
+                        if "index" in request:
+                            index = request["index"]
+                            if index is not None and (type(index) is not int or index < 0):
+                                raise ValueError("portal monitor index must be a nonnegative integer or null")
+                            portal_monitor[0] = index
+                        value = portal_monitor[0]
                     elif name == "xwayland_display":
                         value = evaluate("imports.gi.GLib.getenv('DISPLAY')")
                     elif name == "xwayland_authority":

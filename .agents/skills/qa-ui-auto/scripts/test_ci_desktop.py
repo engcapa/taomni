@@ -112,6 +112,22 @@ class DesktopTests(unittest.TestCase):
         release.start()
         self.addCleanup(release.stop)
 
+    def test_owned_xorg_selects_evdev_keycodes_before_clients_start(self):
+        with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DISPLAY": ":99"}), \
+             patch('ci_desktop.Path.exists', return_value=False), \
+             patch.object(Desktop, 'start') as start, patch.object(Desktop, '_wait') as wait, \
+             patch('ci_desktop.subprocess.run') as run:
+            desktop = Desktop(Path(d), ['display', 'dual-display'])
+            with tempfile.TemporaryDirectory() as owned:
+                desktop.temporary = Mock(name=owned)
+                desktop.temporary.name = owned
+                desktop._xorg_dual()
+                self.assertEqual(os.environ['DISPLAY'], ':70')
+                wait.assert_called_once()
+                run.assert_called_once_with(
+                    ['setxkbmap', '-display', ':70', '-rules', 'evdev', '-model', 'pc105',
+                     '-layout', 'us', '-option', ''], check=True, timeout=20)
+
     def test_vnc_dual_display_serves_the_app_xorg_outputs_without_outer_display(self):
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DBUS_SESSION_BUS_ADDRESS": "test-bus"}), \
              patch('ci_desktop.platform.freedesktop_os_release', return_value={'ID': 'ubuntu', 'VERSION_ID': '22.04'}), \

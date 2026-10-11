@@ -5,9 +5,11 @@ use std::sync::Arc;
 
 use anyhow::{Context as _, Result, anyhow};
 use ironrdp_acceptor::DesktopSize;
+#[cfg(test)]
 use ironrdp_bulk::BulkCompressor;
 #[cfg(test)]
 use ironrdp_bulk::CompressionType as BulkType;
+use ironrdp_bulk::MppcSizeEstimator;
 use ironrdp_graphics::diff::{Rect, find_different_rects_sub};
 use ironrdp_pdu::encode_vec;
 use ironrdp_pdu::fast_path::UpdateCode;
@@ -47,9 +49,9 @@ pub struct EncoderStats {
 const PLANAR_BULK_GIVE_UP_RATIO: f64 = 0.25;
 const PLANAR_ESTIMATE_SAMPLE_SIZE: usize = 1024;
 
-/// Estimate with a throwaway MPPC-64K history. Never touch the connection's
+/// Estimate with an independent fresh MPPC-64K history. Never touch the connection's
 /// compressor until the selected payload is actually fragmented and sent.
-fn estimate_bulk_size(data: &[u8]) -> Result<usize> {
+fn estimate_bulk_size(estimator: &mut MppcSizeEstimator, data: &[u8]) -> Result<usize> {
     if data.is_empty() {
         return Ok(0);
     }
@@ -68,11 +70,15 @@ fn estimate_bulk_size(data: &[u8]) -> Result<usize> {
         }
         &strips
     };
-    estimate_bulk_sample(data.len(), sample)
+    estimate_bulk_sample(estimator, data.len(), sample)
 }
 
-fn estimate_bulk_sample(length: usize, sample: &[u8]) -> Result<usize> {
-    let encoded = BulkCompressor::estimate_mppc64k_size(sample)?;
+fn estimate_bulk_sample(
+    estimator: &mut MppcSizeEstimator,
+    length: usize,
+    sample: &[u8],
+) -> Result<usize> {
+    let encoded = estimator.estimate(sample)?;
     Ok((encoded * length).div_ceil(sample.len()))
 }
 
@@ -246,6 +252,7 @@ impl UpdateEncoder {
                 let rfx = rfx.clone();
                 self.bulk = Some(bulk::BulkEncoder::new(compression)?);
                 *updater = BitmapUpdater::Adaptive(AdaptiveHandler {
+                    estimator: MppcSizeEstimator::default(),
                     bitmap: BitmapHandler::for_bulk_compression(omit_bitmap_compression_header),
                     rfx,
                 });
@@ -661,6 +668,7 @@ trait BitmapUpdateHandler {
 struct AdaptiveHandler {
     bitmap: BitmapHandler,
     rfx: RemoteFxHandler,
+    estimator: MppcSizeEstimator,
 }
 
 impl BitmapUpdateHandler for AdaptiveHandler {
@@ -675,12 +683,16 @@ impl BitmapUpdateHandler for AdaptiveHandler {
         }
         let (length, estimate, planar) =
             if let Some((length, sample)) = self.bitmap.bitmap.raw_planar_sample(bitmap)? {
-                (length, estimate_bulk_sample(length, &sample)?, None)
+                (
+                    length,
+                    estimate_bulk_sample(&mut self.estimator, length, &sample)?,
+                    None,
+                )
             } else {
                 let planar = self.bitmap.handle(bitmap)?;
                 (
                     planar.data.len(),
-                    estimate_bulk_size(&planar.data)?,
+                    estimate_bulk_size(&mut self.estimator, &planar.data)?,
                     Some(planar),
                 )
             };
@@ -1153,6 +1165,7 @@ mod bulk_tests {
     #[test]
     fn peers_without_header_omission_get_pixel_scan_width_and_odd_width_remotefx() {
         let mut handler = AdaptiveHandler {
+            estimator: MppcSizeEstimator::default(),
             bitmap: BitmapHandler::for_bulk_compression(false),
             rfx: RemoteFxHandler::new(
                 EntropyBits::Rlgr3,
@@ -1201,6 +1214,7 @@ mod bulk_tests {
                 stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
             };
             let mut handler = AdaptiveHandler {
+                estimator: MppcSizeEstimator::default(),
                 bitmap: BitmapHandler::for_bulk_compression(omit_header),
                 rfx: RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height }),
             };
@@ -1240,6 +1254,7 @@ mod bulk_tests {
             stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
         };
         let mut handler = AdaptiveHandler {
+            estimator: MppcSizeEstimator::default(),
             bitmap: BitmapHandler::for_bulk_compression(true),
             rfx: RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height }),
         };
@@ -1303,16 +1318,17 @@ mod bulk_tests {
             let mut planar_time = Duration::ZERO;
             let mut estimate_time = Duration::ZERO;
             let mut sample_time = Duration::ZERO;
+            let mut estimator = MppcSizeEstimator::default();
             for bitmap in frames.iter().cycle().take(512) {
                 let started = Instant::now();
                 let (length, sample) = planar.bitmap.raw_planar_sample(bitmap).unwrap().unwrap();
-                estimate_bulk_sample(length, &sample).unwrap();
+                estimate_bulk_sample(&mut estimator, length, &sample).unwrap();
                 sample_time += started.elapsed();
                 let started = Instant::now();
                 let fragment = planar.handle(bitmap).unwrap();
                 planar_time += started.elapsed();
                 let started = Instant::now();
-                estimate_bulk_size(&fragment.data).unwrap();
+                estimate_bulk_size(&mut estimator, &fragment.data).unwrap();
                 estimate_time += started.elapsed();
             }
             eprintln!(
@@ -1324,6 +1340,7 @@ mod bulk_tests {
             let mut rfx =
                 RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height });
             let mut handler = AdaptiveHandler {
+                estimator: MppcSizeEstimator::default(),
                 bitmap: BitmapHandler::for_bulk_compression(true),
                 rfx: rfx.clone(),
             };

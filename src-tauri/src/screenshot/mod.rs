@@ -769,21 +769,64 @@ async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
 
 fn restore_app_windows(app: &AppHandle) {
     let hidden = std::mem::take(&mut tool_state().hidden);
+    restore_hidden_windows(app, hidden);
+}
+
+fn restore_app_windows_for_preview(app: &AppHandle) {
+    #[cfg(target_os = "linux")]
+    if pins::native_wayland() {
+        // Wayland does not acknowledge whether activation deiconified the
+        // window. Keep ownership through preview so its final user action
+        // can still restore the original windows before closing the source.
+        let hidden = tool_state().hidden.clone();
+        restore_hidden_windows(app, hidden);
+        return;
+    }
+    restore_app_windows(app);
+}
+
+fn restore_hidden_windows(app: &AppHandle, hidden: Vec<String>) {
+    #[cfg(target_os = "linux")]
+    if pins::native_wayland() {
+        log::info!("capture restoration: hidden={hidden:?}, GTK_thread={}", gtk::is_initialized_main_thread());
+    }
     for label in hidden {
         if let Some(window) = app.get_webview_window(&label) {
             #[cfg(target_os = "linux")]
             if pins::native_wayland() {
                 let target = window.clone();
-                let _ = window.run_on_main_thread(move || {
+                let restore = move || {
                     use gtk::prelude::*;
                     if let Ok(gtk) = target.gtk_window() {
-                        // Tao skips focus while its queued minimized cache is
-                        // still set. Present the mapped GTK toplevel directly.
+                        let id = surface_backend::activation_id();
+                        log::info!("capture restoration: target={}, backend={}, mapped={}, startup_id={}",
+                            target.label(), gtk.display().type_().name(), gtk.is_mapped(), id.is_some());
+                        // Restore the retained GTK surface while the source
+                        // of the activation context still exists.
                         gtk.deiconify();
                         gtk.show();
-                        gtk.present();
+                        if let Some((id, surface)) = id.zip(gtk.window()) {
+                            // The X11 startup sequence was published on another
+                            // connection. Let the compositor dispatch it before
+                            // sending Wayland's activation request.
+                            gtk.display().sync();
+                            // Activate the existing surface directly. GTK's
+                            // startup property only forwards while mapped and
+                            // present() also creates a second activation token.
+                            surface.set_startup_id(&id);
+                        } else {
+                            gtk.present();
+                        }
+                        // Keep the source alive until the compositor has
+                        // processed activation of the target surface.
+                        gtk.display().sync();
                     }
-                });
+                };
+                if gtk::is_initialized_main_thread() {
+                    restore();
+                } else {
+                    let _ = window.run_on_main_thread(restore);
+                }
                 continue;
             }
             #[cfg(target_os = "linux")]
@@ -1125,15 +1168,33 @@ fn watch_session_window(window: &WebviewWindow) {
     let app = window.app_handle().clone();
     let label = window.label().to_string();
     window.on_window_event(move |event| {
+        if !matches!(
+            event,
+            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+        ) {
+            return;
+        }
+        let active = {
+            let state = tool_state();
+            if label == OVERLAY_LABEL {
+                state.overlay.is_some()
+            } else {
+                state.recorder_open
+            }
+        };
+        #[cfg(target_os = "linux")]
+        if matches!(event, tauri::WindowEvent::CloseRequested { .. }) && pins::native_wayland() {
+            let ends_session = label != OVERLAY_LABEL || active;
+            log::info!("capture close requested: label={label}, ends_session={ends_session}");
+            // GTK still has the focused source surface here. Destroyed is too
+            // late to authorize activation of a minimized Wayland toplevel.
+            // A selection overlay closed after starting recording has already
+            // transferred ownership to the recorder; it must not restore yet.
+            if ends_session {
+                restore_app_windows(&app);
+            }
+        }
         if matches!(event, tauri::WindowEvent::Destroyed) {
-            let active = {
-                let state = tool_state();
-                if label == OVERLAY_LABEL {
-                    state.overlay.is_some()
-                } else {
-                    state.recorder_open
-                }
-            };
             if active {
                 let app = app.clone();
                 // Joining recorder threads must not block the event loop.
@@ -1570,7 +1631,7 @@ pub async fn screenshot_stop_recording(
     // windows hidden for the capture session must become available again.
     // Without this, the process stays alive while its main window is hidden,
     // so macOS app switching has no visible Taomni window to activate.
-    restore_app_windows(&app);
+    restore_app_windows_for_preview(&app);
     let info = info?;
     Ok(RecordingFile {
         path: info.path.to_string_lossy().into_owned(),

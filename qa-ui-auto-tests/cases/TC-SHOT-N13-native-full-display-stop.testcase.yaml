@@ -21,7 +21,7 @@ verification:
   requirements:
   - id: full-recorder
     requirement: Whole-display recording keeps controls outside captured pixels or hides them; the production screenshot hotkey
-      route stops it before showing the preview; a real GIF decodes and cleanup restores main.
+      route stops it before showing the preview; a real GIF decodes and Done restores main, using real compositor pointer input on Wayland.
     actions:
     - 1
     checkpoints:

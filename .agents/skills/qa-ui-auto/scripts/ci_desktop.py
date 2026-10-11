@@ -283,6 +283,13 @@ EndSection
                              "-noreset", "-nolisten", "tcp", "-novtswitch", "-sharevts", "-ac"])
         self._wait(server, lambda: subprocess.run(["xdpyinfo"], stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL, timeout=5).returncode == 0, "owned dual-output Xorg")
+        # Without a keyboard device Xorg defaults to legacy xfree86 keycodes.
+        # WebKitGTK interprets hardware codes as evdev, so e.g. Down at 104
+        # becomes code=NumpadEnter even though key=ArrowDown. A layout alone
+        # preserves that mismatch; select evdev rules before starting clients.
+        subprocess.run(["setxkbmap", "-display", os.environ["DISPLAY"], "-rules", "evdev",
+                        "-model", "pc105", "-layout", "us", "-option", ""],
+                       check=True, timeout=20)
 
     def _display_patterns(self, facts):
         report = (self.root / "multi-display-fixture.json").resolve()

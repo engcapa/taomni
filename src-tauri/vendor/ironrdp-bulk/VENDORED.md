@@ -18,3 +18,9 @@ six unrelated compression/decompression contexts for every dirty rectangle;
 its estimates match a fresh RDP5 coordinator byte for byte.
 The estimate output is capped at the input length, matching MPPC's own cap.
 Fresh MPPC contexts are already zeroed and need no redundant initial reset.
+
+`MppcSizeEstimator` reuses independent MPPC scratch buffers across estimates.
+Each call clears the match table and resets the history high-water mark, so
+previous inputs cannot participate in matches. Wire compression histories and
+their normal reset behavior are unchanged. Sequence tests compare reused and
+fresh estimates across compressible, incompressible and skipped packet sizes.
