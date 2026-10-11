@@ -450,6 +450,29 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("connects SSH only once when StrictMode replays mount effects", async () => {
+    const onSessionReady = vi.fn();
+    render(
+      <StrictMode>
+        <TerminalPanel visible ssh={sshInfo} onSessionReady={onSessionReady} />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(onSessionReady).toHaveBeenCalledTimes(1));
+    expect(ipcMocks.createSshTerminal).toHaveBeenCalledTimes(1);
+    expect(ipcMocks.closeTerminal).not.toHaveBeenCalled();
+  });
+
+  it("does not connect SSH after its initial mount is cancelled", async () => {
+    const { unmount } = render(<TerminalPanel visible ssh={sshInfo} />);
+    unmount();
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+    });
+    expect(ipcMocks.createSshTerminal).not.toHaveBeenCalled();
+  });
+
   it("launches a SocksCap TUI only once when StrictMode replays mount effects", async () => {
     render(
       <StrictMode>

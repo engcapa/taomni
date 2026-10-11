@@ -2433,6 +2433,7 @@ export function TerminalPanel({
     let cleanupImePositionLock: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
     let activityPromptTimer: ReturnType<typeof setTimeout> | undefined;
+    let sshLaunchTimer: ReturnType<typeof setTimeout> | undefined;
     let sockscapLaunchTimer: ReturnType<typeof setTimeout> | undefined;
     let launchedSockscapPid: number | null = null;
 
@@ -3456,7 +3457,9 @@ export function TerminalPanel({
         .then(() => handleConnected({ sessionId: sid, shellId: null }, "initial"))
         .catch((err) => handleConnectFailure(err, "initial"));
     } else if (ssh) {
-      startSshConnection(sid, "initial");
+      // StrictMode replays mount effects before the next task. Cancel the
+      // discarded mount before it opens a second real remote shell.
+      sshLaunchTimer = window.setTimeout(() => startSshConnection(sid, "initial"), 0);
     } else if (commandTerminal) {
       startCommandTerminal(sid);
     } else if (sockscapTerminal) {
@@ -3533,6 +3536,7 @@ export function TerminalPanel({
       clearTimeout(resizeTimer);
       window.clearInterval(automationStateTimer);
       if (activityPromptTimer) clearTimeout(activityPromptTimer);
+      if (sshLaunchTimer !== undefined) clearTimeout(sshLaunchTimer);
       if (sockscapLaunchTimer) clearTimeout(sockscapLaunchTimer);
       installSshCwdIntegrationRef.current = null;
       automationInputSettlingRef.current = false;
