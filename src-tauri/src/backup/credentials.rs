@@ -4,6 +4,26 @@ use keyring::{Entry, Error};
 use serde::{Deserialize, Serialize};
 use zeroize::{ZeroizeOnDrop, Zeroizing};
 
+// Linux Secret Service uses its own blocking Tokio runtime. Calling it on an
+// async worker panics and poisons the store; keep a whole credential transaction
+// on a plain thread. Synchronous startup callers can use their existing thread.
+fn with_os_store<T: Send>(
+    operation: impl FnOnce() -> Result<T, String> + Send,
+) -> Result<T, String> {
+    if tokio::runtime::Handle::try_current().is_ok() {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .name("backup-credentials".into())
+                .spawn_scoped(scope, operation)
+                .map_err(|_| "Cannot start system credential store operation".to_owned())?
+                .join()
+                .map_err(|_| "System credential store operation failed".to_owned())?
+        })
+    } else {
+        operation()
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Default, ZeroizeOnDrop)]
 pub struct Secrets {
     #[serde(default)]
@@ -61,6 +81,9 @@ fn entry(profile: &str, target: &str) -> Result<Entry, String> {
         .map_err(|_| "System credential store is unavailable".into())
 }
 pub fn get(profile: &str, target: &str) -> Result<Secrets, String> {
+    with_os_store(|| get_inner(profile, target))
+}
+fn get_inner(profile: &str, target: &str) -> Result<Secrets, String> {
     match entry(profile, target)?.get_password() {
         Ok(value) => serde_json::from_str(&Zeroizing::new(value))
             .map_err(|_| "Backup credential data is damaged; reconnect the target".into()),
@@ -69,6 +92,9 @@ pub fn get(profile: &str, target: &str) -> Result<Secrets, String> {
     }
 }
 pub fn put(profile: &str, target: &str, value: &Secrets) -> Result<(), String> {
+    with_os_store(|| put_inner(profile, target, value))
+}
+fn put_inner(profile: &str, target: &str, value: &Secrets) -> Result<(), String> {
     entry(profile, target)?
         .set_password(&Zeroizing::new(
             serde_json::to_string(value).map_err(|_| "Cannot encode credentials")?,
@@ -77,6 +103,9 @@ pub fn put(profile: &str, target: &str, value: &Secrets) -> Result<(), String> {
 }
 
 pub fn get_connection(profile: &str, id: &str) -> Result<ConnectionSecrets, String> {
+    with_os_store(|| get_connection_inner(profile, id))
+}
+fn get_connection_inner(profile: &str, id: &str) -> Result<ConnectionSecrets, String> {
     let root = entry(profile, id)?;
     for _ in 0..3 {
         let index = match root.get_password() {
@@ -103,6 +132,9 @@ pub fn get_connection(profile: &str, id: &str) -> Result<ConnectionSecrets, Stri
     Err("Feishu credentials changed while being read; retry".into())
 }
 pub fn put_connection(profile: &str, id: &str, value: &ConnectionSecrets) -> Result<(), String> {
+    with_os_store(|| put_connection_inner(profile, id, value))
+}
+fn put_connection_inner(profile: &str, id: &str, value: &ConnectionSecrets) -> Result<(), String> {
     let root = entry(profile, id)?;
     let previous = match root.get_password() {
         Ok(value) => serde_json::from_str::<CredentialParts>(&Zeroizing::new(value)).ok(),
@@ -210,6 +242,20 @@ fn remove_parts(profile: &str, id: &str, parts: &CredentialParts) {
         if let Ok(entry) = part_entry(profile, id, &parts.generation, index) {
             let _ = entry.delete_credential();
         }
+    }
+}
+
+#[cfg(test)]
+mod runtime_tests {
+    #[tokio::test]
+    async fn blocking_store_runtime_is_safe_inside_an_async_command() {
+        let value = super::with_os_store(|| {
+            tokio::runtime::Builder::new_current_thread()
+                .build()
+                .unwrap()
+                .block_on(async { Ok(42) })
+        });
+        assert_eq!(value.unwrap(), 42);
     }
 }
 

@@ -54,3 +54,22 @@ Current release position: suitable for a controlled Windows beta after the selec
 - Hosted run uses only the selected cloud cases. The separate local-policy regression covers automatic scheduling with an empty cloud/manual destination selection; real-account tests remain outside GitHub.
 
 - Local-policy regression: Windows native `TC-BACKUP-001` passed with an empty destination selection, including daily/weekly persistence, no duplicate before the next period, two-copy rotation, manual backup, and disabled-policy suppression. Report: `qa-ui-auto-report/backup-reliability-native/run-20261011-174751-848592900`.
+
+### Readable cloud folders and source labels
+
+The accepted layout is `taomni-backups-v1/<device name> [<full device UUID>]/<destination name> [<full target UUID>]/current.taobak`. New sources default to the system computer name; existing configured names are preserved. Names are public in the user's cloud drive, as disclosed in the bilingual UI. The next upload renames the existing folders in place, including legacy UUID-only folders, preserving folder and file tokens. Paused destinations remain paused. Stable IDs, not display labels, determine source ownership. Duplicate folder identities fail explicitly.
+
+Restore rows and device filters now show readable device names and short identity suffixes, plus the destination name. Existing UUID-only branches remain discoverable. The nonstandard SQLite filename control layout also retains the exact managed cache root name, so the same quota applies to every database source.
+
+- Rust backup suite: 48 passed (`naming-rust-v2.log`), including default-name persistence, canonical source isolation, and legacy/readable folder identity parsing.
+- Browser `TC-BACKUP-CLOUD-002/005`: passed, zero skips; `qa-ui-auto-report/browser/run-20261011-180826-327944900`. Device-filter screenshot reviewed.
+- `TC-BACKUP-CLOUD-004` adds native legacy migration and repeated rename/upload checks against the loopback API fixture. Live Feishu testing remains separate from this deterministic case.
+
+- Windows native `TC-BACKUP-CLOUD-003/004` passed (`run-20261011-181315-282091400`), including the actual background retry and two uploads retaining the same token after migration/rename. Following the credential-thread fix, `TC-BACKUP-CLOUD-001/004` passed (`run-20261011-182053-655463500`).
+- Real personal Feishu naming test passed (`native-personal-v2/naming-smoke.json`): two sequential name changes and encrypted uploads retained the original file token; fresh downloads matched each upload SHA-256 and decrypted provenance. The isolated test destination is paused again. This confirms real PATCH permissions with the already requested scopes; it is not an enterprise-account test.
+
+### Hosted Linux failure and correction
+
+Run `38129523449` at `4ab83b84` produced real passing native results on Windows and macOS (three cases each). Linux's three native cases failed: the Secret Service backend attempted to start its blocking Tokio runtime inside an async worker and subsequently poisoned its mutex. A green per-platform supervisor job meant only that a report was produced, not that its cases passed.
+
+Backup credential transactions now run on a plain scoped thread when called from a Tokio context. A focused regression reproducing the nested-runtime boundary and the Windows system-store roundtrip both pass (`store-rust.log`). The hosted credential fixture now also applies to the settings-only case, ensuring an unlocked disposable Linux Secret Service before the first save. Selected workflow runs additionally require the aggregated `passed` flag, while other workflow scopes preserve their report-oriented contract. Linux rerun results must be checked before treating this correction as platform acceptance.

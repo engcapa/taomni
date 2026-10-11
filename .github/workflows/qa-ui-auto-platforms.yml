@@ -528,6 +528,9 @@ jobs:
       - name: Verify results
         if: needs.plan.result == 'success'
         run: python -m qa_ui_auto.ci report --selection qa-ui-auto-report/selection.json --reports qa-ui-auto-report
+      - name: Require selected cases to pass
+        if: needs.plan.result == 'success' && inputs.scope == 'selected'
+        run: python -c "import json, sys; result = json.load(open('qa-ui-auto-report/ci-summary.json')); sys.exit(0 if result['passed'] else 1)"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

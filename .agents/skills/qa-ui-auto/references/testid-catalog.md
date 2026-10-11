@@ -2147,6 +2147,9 @@
 - `[data-testid="backup-cloud-proxy"]` — interactive — F-BACKUP-2.cloud-proxy
 - `[data-testid="backup-cloud-save"]` — interactive — F-BACKUP-2.cloud-save
 - `[data-testid="backup-feishu-folder"]` — interactive — F-BACKUP-2.feishu-folder
+- `[data-testid="backup-device-name"]` — interactive — F-BACKUP-2.device-name
+- `[data-testid="backup-source-device"]` — interactive — F-BACKUP-2.source-device
+- `[data-testid="backup-cloud-row"]` — display — F-BACKUP-2.cloud-row
 - `[data-testid="backup-feishu-app-id"]` — display — F-BACKUP-2.feishu-app-id-legacy
 - `[data-testid="backup-feishu-authorize"]` — interactive — F-BACKUP-2.feishu-authorize
 - `[data-testid="backup-connection-recovery"]` — display — F-BACKUP-2.recovery

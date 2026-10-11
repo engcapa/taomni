@@ -2,6 +2,7 @@ pub mod auth;
 pub mod cli_config;
 mod cli_secret;
 mod device_flow;
+mod naming;
 pub(crate) mod request;
 use super::{
     control,
@@ -185,6 +186,43 @@ impl FeishuProvider {
             .to_owned();
         validate_token(&token)?;
         Ok(token)
+    }
+    async fn named_folder(
+        &self,
+        parent: &str,
+        id: &str,
+        label: &str,
+        ctx: &TransferContext,
+    ) -> Result<String, String> {
+        let title = naming::title(label, id)?;
+        let entries = self.children(parent, ctx).await?;
+        let matches: Vec<_> = entries
+            .iter()
+            .filter(|f| naming::parse(&f.name).is_some_and(|(found, _)| found == id))
+            .collect();
+        if matches.len() > 1 || matches.first().is_some_and(|f| f.kind != "folder") {
+            return Err(
+                "Ambiguous backup folder identity; resolve duplicate folders in Feishu".into(),
+            );
+        }
+        if let Some(folder) = matches.first() {
+            validate_token(&folder.token)?;
+            if folder.name != title {
+                self.send(
+                    || {
+                        self.client
+                            .patch(format!("{}/files/{}", self.base, folder.token))
+                            .query(&[("type", "folder")])
+                            .json(&json!({"new_title":title}))
+                    },
+                    false,
+                    ctx,
+                )
+                .await?;
+            }
+            return Ok(folder.token.clone());
+        }
+        self.folder(parent, &title, ctx).await
     }
     async fn small_upload(
         &self,
@@ -427,11 +465,14 @@ impl DestinationProvider for FeishuProvider {
         };
         let mut result = Vec::new();
         for device in self.children(&root.token, ctx).await? {
-            if device.kind != "folder" || validate_id(&device.name).is_err() {
+            if device.kind != "folder" {
                 continue;
             }
+            let Some((device_id, device_name)) = naming::parse(&device.name) else {
+                continue;
+            };
             for plan in self.children(&device.token, ctx).await? {
-                if plan.kind != "folder" || validate_id(&plan.name).is_err() {
+                if plan.kind != "folder" || naming::parse(&plan.name).is_none() {
                     continue;
                 }
                 let files = self.children(&plan.token, ctx).await?;
@@ -447,11 +488,11 @@ impl DestinationProvider for FeishuProvider {
                 if let Some(file) = current.first() {
                     result.push(RemoteBackup {
                         target_id: self.target.id.clone(),
-                        device_id: device.name.clone(),
-                        device_name: device.name.clone(),
+                        device_id: device_id.into(),
+                        device_name: device_name.into(),
                         source_kind: "taomni".into(),
                         file_token: file.token.clone(),
-                        name: file.name.clone(),
+                        name: format!("{} / {}", naming::parse(&plan.name).unwrap().1, file.name),
                         modified_at: file.modified_time.clone(),
                     });
                 }
@@ -470,8 +511,12 @@ impl DestinationProvider for FeishuProvider {
         let root = self
             .folder(&self.target.root_token, "taomni-backups-v1", ctx)
             .await?;
-        let device_folder = self.folder(&root, &device.id, ctx).await?;
-        let parent = self.folder(&device_folder, &self.target.id, ctx).await?;
+        let device_folder = self
+            .named_folder(&root, &device.id, &device.name, ctx)
+            .await?;
+        let parent = self
+            .named_folder(&device_folder, &self.target.id, &self.target.name, ctx)
+            .await?;
         self.probe(&parent, ctx).await?;
         let candidates: Vec<_> = self
             .children(&parent, ctx)

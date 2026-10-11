@@ -8,7 +8,7 @@ description: >-
 covers: [F-BACKUP-2]
 tags: [backup, settings, native-boundary, p1]
 modes: [native]
-fixtures: [reset_db]
+fixtures: [reset_db, credential_store]
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}

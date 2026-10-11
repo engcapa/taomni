@@ -10494,6 +10494,15 @@ controls:
   - id: feishu-folder
     selector: '[data-testid="backup-feishu-folder"]'
     kind: interactive
+  - id: device-name
+    selector: '[data-testid="backup-device-name"]'
+    kind: interactive
+  - id: source-device
+    selector: '[data-testid="backup-source-device"]'
+    kind: interactive
+  - id: cloud-row
+    selector: '[data-testid="backup-cloud-row"]'
+    kind: display
   - id: feishu-app-id-legacy
     selector: '[data-testid="backup-feishu-app-id"]'
     kind: display

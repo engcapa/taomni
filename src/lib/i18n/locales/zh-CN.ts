@@ -3445,6 +3445,7 @@ export const zhCN: DeepPartial<typeof en> = {
     "startSelected": "立即备份到所选目的地",
     "destinationsHint": "所选云端目的地沿用下方统一周期。本地自动备份继续按原策略运行，不受此处多选影响。各云端目标独立设置范围和代理；同一 SQLite 路径的多开实例共用一个备份来源。",
     "deviceName": "本机名称",
+    "deviceNameHint": "用于飞书文件夹名称和恢复列表。名称在云盘中明文可见；修改后在下次备份时同步，保留原文件及版本历史。",
     "targetLabel": "云端备份目标",
     "newTarget": "新飞书目标",
     "connectionSettings": "连接与代理设置",

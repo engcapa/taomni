@@ -63,6 +63,7 @@
           "reset_db",
           "backup_policy",
           "backup_cloud",
+          "credential_store",
           "path_completion",
           "ssh_required",
           "sftp_required",

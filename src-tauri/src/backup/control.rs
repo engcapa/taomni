@@ -30,16 +30,47 @@ fn root_for_database(path: &Path) -> Result<PathBuf, String> {
     let parent = path.parent().ok_or("Missing SQLite parent directory")?;
     // Preserve existing controls/credentials for the standard database. Resolve
     // directory aliases before locking, so additional app processes share it.
-    let name = if path.file_name().and_then(|v| v.to_str()) == Some("taomni.db") {
-        "backup-control".to_owned()
+    let relative = if path.file_name().and_then(|v| v.to_str()) == Some("taomni.db") {
+        PathBuf::from("backup-control")
     } else {
         use sha2::{Digest, Sha256};
-        format!(
-            "backup-control-{}",
-            hex::encode(Sha256::digest(path.to_string_lossy().as_bytes()))
-        )
+        PathBuf::from(".taomni-backup-sources")
+            .join(hex::encode(Sha256::digest(
+                path.to_string_lossy().as_bytes(),
+            )))
+            .join("backup-control")
     };
-    Ok(parent.join(name))
+    Ok(parent.join(relative))
+}
+
+fn default_device_name() -> String {
+    #[cfg(windows)]
+    let name = std::env::var("COMPUTERNAME").unwrap_or_default();
+    #[cfg(unix)]
+    let name = {
+        let mut buffer = [0u8; 256];
+        // gethostname writes at most buffer.len() bytes; read only on success.
+        if unsafe { libc::gethostname(buffer.as_mut_ptr().cast(), buffer.len()) } == 0 {
+            let end = buffer.iter().position(|b| *b == 0).unwrap_or(buffer.len());
+            String::from_utf8_lossy(&buffer[..end]).into_owned()
+        } else {
+            String::new()
+        }
+    };
+    #[cfg(not(any(windows, unix)))]
+    let name = String::new();
+    let mut clean = String::new();
+    for c in name.trim().chars().filter(|c| !c.is_control()) {
+        if clean.len() + c.len_utf8() > 128 {
+            break;
+        }
+        clean.push(c);
+    }
+    if clean.is_empty() {
+        "Taomni".into()
+    } else {
+        clean
+    }
 }
 pub fn write_json<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), String> {
     let parent = path.parent().ok_or("Missing backup control directory")?;
@@ -69,7 +100,7 @@ fn read_at(root: &Path) -> Result<ControlConfig, String> {
         format_version: 1,
         device: DeviceIdentity {
             id: uuid::Uuid::new_v4().to_string(),
-            name: "Taomni".into(),
+            name: default_device_name(),
         },
         targets: vec![],
         connections: vec![],
@@ -222,6 +253,10 @@ mod tests {
         );
         let other = dir.path().join("other.db");
         std::fs::write(&other, b"").unwrap();
+        assert_eq!(
+            root_for_database(&other).unwrap().file_name().unwrap(),
+            "backup-control"
+        );
         assert_ne!(
             load_at(&a).unwrap().device.id,
             load_at(&root_for_database(&other).unwrap())
@@ -234,7 +269,12 @@ mod tests {
     fn identity_is_stable_and_corruption_does_not_silently_reenroll() {
         let dir = tempfile::tempdir().unwrap();
         let a = load_at(dir.path()).unwrap();
+        assert_eq!(a.device.name, default_device_name());
         assert_eq!(a.device.id, load_at(dir.path()).unwrap().device.id);
+        let mut renamed = a.clone();
+        renamed.device.name = "Office laptop".into();
+        write_json(&dir.path().join("config.json"), &renamed).unwrap();
+        assert_eq!(load_at(dir.path()).unwrap().device.name, "Office laptop");
         let other = tempfile::tempdir().unwrap();
         assert_ne!(a.device.id, load_at(other.path()).unwrap().device.id);
         std::fs::write(dir.path().join("config.json"), b"{").unwrap();

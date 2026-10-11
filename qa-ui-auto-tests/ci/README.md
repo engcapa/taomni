@@ -309,7 +309,13 @@ the report workflow. Missing reports, native build/source mismatch, failed
 setup, selected skips without a completed runner report, and other
 infrastructure errors make the aggregate fail. `build.log`, `runner.log`, `ci-outcome.json`,
 service/desktop readiness and screenshot metadata identify the failing phase.
-Original failures remain available in each Actions run. Issue sync deduplicates
+Original failures remain available in each Actions run.
+
+`scope=selected` additionally requires `ci-summary.json.passed` to be true: a
+complete report with failed or skipped selected cases fails the final workflow
+gate. Other scopes retain the existing report-completeness behavior.
+
+Issue sync deduplicates
 by combination/case and updates the run link; it does not close issues from a
 partial passing scope.
 

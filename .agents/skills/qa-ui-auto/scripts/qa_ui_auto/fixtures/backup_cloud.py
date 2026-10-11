@@ -9,9 +9,6 @@ import email.parser
 import email.policy
 import hashlib
 import json
-import os
-import platform
-import subprocess
 import threading
 import time
 import uuid
@@ -21,6 +18,7 @@ from urllib.parse import parse_qs, urlsplit
 from typing import Any
 
 from .backup_policy import isolated_data_root
+from .credential_store import setup as setup_credential_store
 
 
 def setup(ctx: Any) -> None:
@@ -36,16 +34,13 @@ def setup(ctx: Any) -> None:
     ctx.values.update(backup_waiting_id=jobs[0]["id"], backup_failed_id=jobs[1]["id"], backup_completed_id=jobs[2]["id"])
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         state = {"config": {"config": config, "statuses": [{"targetId": target, "connected": True, "passwordConfigured": True}], "cache": {"usedBytes": 384, "limitBytes": 2147483648, "retentionDays": 7}}, "jobs": jobs, "sessions": sessions, "files": []}
+        if ctx.case_id == "TC-BACKUP-CLOUD-005":
+            state["files"] = [{"targetId": target, "deviceId": id, "deviceName": name, "sourceKind": "taomni", "fileToken": "file" + id[0], "name": "Daily / current.taobak", "modifiedAt": ""} for id, name in [("11111111-1111-4111-8111-111111111111", "Office laptop"), ("22222222-2222-4222-8222-222222222222", "Home desktop")]]
         script = "if (!sessionStorage.getItem('qa.backup.seeded')) { localStorage.setItem('taomni.qa.backup.v1', " + json.dumps(json.dumps(state)) + "); sessionStorage.setItem('qa.backup.seeded','1'); }"
         ctx.page.context.add_init_script(script)
         return
     root = isolated_data_root(ctx) / "backup-control"
-    if platform.system() == "Linux" and os.environ.get("GITHUB_ACTIONS") == "true":
-        if not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
-            raise RuntimeError("Native backup fixture requires the hosted private D-Bus session")
-        # Only GitHub's disposable user/session is unlocked. Never change a
-        # developer's keyring or substitute an in-memory store for native QA.
-        subprocess.run(["gnome-keyring-daemon", "--unlock", "--components=secrets"], input="qa-disposable-backup-keyring\n", text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=20)
+    setup_credential_store(ctx)
     root.mkdir(parents=True, exist_ok=True)
     (root.parent / "backup_policy.json").write_text(json.dumps({"autoBackupEnabled": False, "frequency": "daily", "maxRetainedCopies": 7, "defaultScope": "core", "customBackupDir": None, "lastBackupAt": None}), encoding="utf-8")
     (root / "config.json").write_text(json.dumps(config), encoding="utf-8")
@@ -65,7 +60,13 @@ def setup(ctx: Any) -> None:
     mode_path.write_text("normal", encoding="utf-8")
     events_path.write_text("", encoding="utf-8")
     ctx.values.update(backup_service_mode=str(mode_path), backup_service_events=str(events_path))
-    state = {"files": {}, "list_failures": 0, "counter": 0}
+    naming_case = ctx.case_id == "TC-BACKUP-CLOUD-004"
+    legacy = {
+        "legacyRoot": {"token": "legacyRoot", "name": "taomni-backups-v1", "type": "folder", "parent": ""},
+        "legacyDevice": {"token": "legacyDevice", "name": device, "type": "folder", "parent": "legacyRoot"},
+        "legacyPlan": {"token": "legacyPlan", "name": target, "type": "folder", "parent": "legacyDevice"},
+    } if naming_case else {}
+    state = {"files": legacy, "list_failures": 3 if naming_case else 0, "counter": 0, "archive_token": None}
     mutex = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
@@ -131,8 +132,25 @@ def setup(ctx: Any) -> None:
                     state["files"][token] = {"token": token, "name": parts["file_name"].decode(), "type": "file", "parent": parts["parent_node"].decode(), "bytes": data}
                     if parts["file_name"] == b"current.taobak":
                         self.event("upload_sha256=" + hashlib.sha256(data).hexdigest())
+                        if state["archive_token"] is not None:
+                            if token != state["archive_token"]:
+                                self.event("ERROR: archive identity changed")
+                            else:
+                                self.event("same_archive_token_after_rename")
+                        state["archive_token"] = token
                     return self.reply(200, {"code": 0, "data": {"file_token": token, "version": "2"}})
                 return self.reply(404, {})
+
+        def do_PATCH(self) -> None:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+            with mutex:
+                path = urlsplit(self.path)
+                token = path.path.split("/")[-1]
+                if parse_qs(path.query).get("type") != ["folder"] or token not in state["files"]:
+                    return self.reply(400, {})
+                state["files"][token]["name"] = body["new_title"]
+                self.event("renamed=" + token + ":" + body["new_title"])
+                return self.reply(200, {"code": 0})
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)

@@ -83,14 +83,15 @@ Rust 采用 `async_trait` 的 provider 接口，数据源的阻塞快照在 bloc
 飞书选择的根目录下：
 
 ```text
-Taomni/
-  devices/
-    <deviceUuid>/
-      taomni/<planUuid>/current.taobak
-      device.json
+taomni-backups-v1/
+  办公电脑 [<完整 deviceUuid>]/
+    日常备份 [<完整 targetUuid>]/
+      current.taobak
 ```
 
-上述为逻辑名称；实际操作必须保留 folder_token/file_token。目录名不等于唯一键，创建后持久化 token；重试先做归属校验。设备条目/描述不含主机用户名、IP、路径或机密。发现两个相同标识对象时返回冲突，不取第一个覆盖。每台设备只写自己的分支，浏览可读取所有设备，默认操作不清理其他设备的数据。
+新建来源默认使用系统计算机名，允许修改；已有名称保持不变。设备和目标显示名在飞书网页明文可见，用户已确认采用。目录名中的完整 UUID 是查找依据，显示名不参与身份判断；兼容旧 UUID-only 目录，下次上传时通过 PATCH 原地改名，保留 folder_token、current.taobak 的 file_token 及版本历史。修改名称也是在下次上传时同步，暂停上传期间不变更云端目录。不另行上传用户名、IP 或数据库路径。发现同一标识的多个目录时返回冲突，不取第一个覆盖。每台设备只写自己的分支，浏览可读取所有设备，默认操作不清理其他设备的数据。
+
+同一机器打开相同规范化 SQLite 路径的多个进程共用来源身份、配置和跨进程任务锁；不同库路径使用不同控制目录。新名称不改变该隔离规则。恢复列表兼容旧目录，并使用设备名和短 ID 区分同名设备；恢复校验仍依赖归档内完整来源信息。
 
 备份 archive 内增加可选来源元数据，旧 formatVersion=1 仍可识别；首期来源信息包括 snapshotId/deviceId/deviceName/sourceKind/sourceSchemaVersion；planId 为后续独立多计划扩展。不能只依赖云端 `device.json` 或本机上传历史判断内容：网页回退后必须重新读取归档内部的来源与 createdAt。
 

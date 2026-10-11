@@ -3468,6 +3468,7 @@ const dict = {
     "startSelected": "Back up to selected destinations",
     "destinationsHint": "Selected cloud destinations use the shared schedule below. Local automatic backups follow their existing policy regardless of this selection. Each cloud destination has its own scope and proxy. Instances using the same SQLite path share one backup source.",
     "deviceName": "Device name",
+    "deviceNameHint": "Used in Feishu folder names and restore lists. Names are visible in the cloud drive; changes sync on the next backup while keeping the same file and version history.",
     "targetLabel": "Cloud backup destination",
     "newTarget": "New Feishu destination",
     "connectionSettings": "Connection and proxy settings",
