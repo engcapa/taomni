@@ -46,7 +46,12 @@ def step_open(ctx: StepContext, args: Any) -> None:
         for attempt in range(3):
             failures.clear()
             try:
-                ctx.page.goto(url, wait_until="domcontentloaded")
+                response = ctx.page.goto(url, wait_until="domcontentloaded")
+                if attempt > 0 and response is None:
+                    # A same-document fragment navigation keeps the failed
+                    # bootstrap and emits no new requestfailed event. Retry
+                    # the document so its module graph can actually recover.
+                    ctx.page.reload(wait_until="domcontentloaded")
                 ctx.page.wait_for_selector("#root > *", state="attached", timeout=30_000)
                 if not failures:
                     return
