@@ -176,13 +176,47 @@ pub struct Timeline {
     first: Option<(u64, f64)>,
     last: Option<(u64, f64)>,
     last_visible_until_ms: f64,
+    source_holds: Vec<(f64, f64)>,
     pub invalid: u32,
     pub worst_drift_ms: f64,
     pub longest_gap_ms: u64,
     pub longest_unexplained_gap_ms: u64,
+    pub longest_source_pause_ms: f64,
 }
 
 impl Timeline {
+    pub fn with_source_frame_times(times: &[f64], interval_ms: f64) -> Self {
+        let mut timeline = Self::default();
+        if !interval_ms.is_finite()
+            || !(0.0..=250.0).contains(&interval_ms)
+            || interval_ms == 0.0
+            || times.iter().any(|time| !time.is_finite())
+            || times.windows(2).any(|pair| pair[1] <= pair[0])
+        {
+            timeline.invalid = 1;
+            return timeline;
+        }
+        // The independently drawn fixture can pause between originals that
+        // the recorder never sampled. Only its hold beyond the declared draw
+        // cadence is stationary time; the cadence itself still counts as
+        // moving content, so skipping a regularly animated scene fails.
+        timeline.source_holds = times
+            .windows(2)
+            .filter_map(|pair| {
+                let start = pair[0] + interval_ms;
+                (pair[1] > start).then_some((start, pair[1]))
+            })
+            .collect();
+        timeline
+    }
+
+    fn source_pause_between(&self, start: f64, end: f64) -> f64 {
+        self.source_holds
+            .iter()
+            .map(|&(held_start, held_end)| (held_end.min(end) - held_start.max(start)).max(0.0))
+            .sum()
+    }
+
     pub fn observe(&mut self, clip_ms: u64, original_ms: f64, visible_until_ms: f64) -> bool {
         let (first_clip, first_original) = *self.first.get_or_insert((clip_ms, original_ms));
         // A drawn image is the original screen state until the next actual
@@ -204,9 +238,12 @@ impl Timeline {
             self.longest_gap_ms = self.longest_gap_ms.max(gap);
             let last_source_ms = first_original + last_clip.saturating_sub(first_clip) as f64;
             let held_ms = (self.last_visible_until_ms.min(source_ms) - last_source_ms).max(0.0);
+            let paused_ms = self
+                .source_pause_between(last_source_ms.max(self.last_visible_until_ms), source_ms);
+            self.longest_source_pause_ms = self.longest_source_pause_ms.max(paused_ms);
             // A long held original is not a dropped moving scene. Count only
             // time after that original actually stopped being visible.
-            let unexplained = (gap as f64 - held_ms).max(0.0).ceil() as u64;
+            let unexplained = (gap as f64 - held_ms - paused_ms).max(0.0).ceil() as u64;
             self.longest_unexplained_gap_ms = self.longest_unexplained_gap_ms.max(unexplained);
         }
         let valid = ordered && drift <= 250.0;
@@ -227,7 +264,10 @@ impl Timeline {
         };
         let (first_clip, _) = self.first.unwrap();
         let end_source_ms = first_original + duration_ms.saturating_sub(first_clip) as f64;
-        let tail_gap = (end_source_ms - self.last_visible_until_ms).max(0.0);
+        let tail_gap = (end_source_ms
+            - self.last_visible_until_ms
+            - self.source_pause_between(self.last_visible_until_ms, end_source_ms))
+        .max(0.0);
         self.invalid == 0
             && self.longest_unexplained_gap_ms <= 700
             && tail_gap <= 700.0
@@ -467,6 +507,49 @@ mod tests {
         assert!(dropped_motion.observe(900, 1900.0, 1950.0));
         assert!(!dropped_motion.complete(1000));
         assert!(dropped_motion.longest_unexplained_gap_ms > 700);
+    }
+
+    #[test]
+    fn unsampled_source_pause_does_not_count_as_dropped_moving_content() {
+        // The source pauses on an intermediate original, not on the last
+        // recorded original. These timings reproduce the macOS GIF report.
+        let source_times = [6046.0, 6095.0, 6150.0, 6846.0, 6920.0, 6931.0];
+        let mut timeline = Timeline::with_source_frame_times(&source_times, 50.0);
+        assert!(timeline.observe(0, source_times[0], source_times[1]));
+        assert!(timeline.observe(930, source_times[4], source_times[5]));
+        assert!(timeline.observe(1040, 6980.0, 7033.0));
+        assert!(timeline.complete(1100));
+        assert_eq!(timeline.longest_gap_ms, 930);
+        assert!(timeline.longest_unexplained_gap_ms < 250);
+        assert_eq!(timeline.longest_source_pause_ms, 675.0);
+
+        let mut stale = Timeline::with_source_frame_times(&source_times, 50.0);
+        assert!(stale.observe(0, source_times[0], source_times[1]));
+        assert!(!stale.observe(1200, source_times[2], source_times[3]));
+        assert!(!stale.complete(1300));
+
+        let moving: Vec<_> = (0..30).map(|i| 6000.0 + i as f64 * 50.0).collect();
+        let mut dropped = Timeline::with_source_frame_times(&moving, 50.0);
+        assert!(dropped.observe(0, 6000.0, 6050.0));
+        assert!(dropped.observe(930, 6900.0, 6950.0));
+        assert!(!dropped.complete(1000));
+        assert!(dropped.longest_unexplained_gap_ms > 700);
+    }
+
+    #[test]
+    fn invalid_source_clock_or_cadence_cannot_establish_timeline_coverage() {
+        for (times, cadence) in [
+            (vec![1000.0, 1100.0], 0.0),
+            (vec![1000.0, 1100.0], f64::NAN),
+            (vec![1000.0, 1100.0], 900.0),
+            (vec![1100.0, 1000.0], 50.0),
+            (vec![1000.0, f64::NAN], 50.0),
+        ] {
+            let mut timeline = Timeline::with_source_frame_times(&times, cadence);
+            timeline.observe(0, 1000.0, 1100.0);
+            timeline.observe(100, 1100.0, 1200.0);
+            assert!(!timeline.complete(200));
+        }
     }
 
     #[test]

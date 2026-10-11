@@ -480,6 +480,7 @@ struct SourceEvidence {
     scale: f64,
     nonce: u32,
     frames: Vec<SourceFrame>,
+    frame_interval_ms: Option<f64>,
     data_url: Option<String>,
 }
 
@@ -640,7 +641,7 @@ fn compare_record_original(
     )?;
     let source_manifest = keep_json(
         &json!({"kind":source.kind,"nonce":source.nonce,"scale":source.scale,
-        "dimensions":[source.width,source.height],"expectedSize":expected_size,"frames":source.frames.iter().map(|f|json!({"id":f.id,"atMs":f.at_ms})).collect::<Vec<_>>()}),
+        "dimensions":[source.width,source.height],"expectedSize":expected_size,"frameIntervalMs":source.frame_interval_ms,"frames":source.frames.iter().map(|f|json!({"id":f.id,"atMs":f.at_ms})).collect::<Vec<_>>()}),
         "record-original-timeline.json",
     )?;
     // Save references before decoding so corrupt or unidentified output still
@@ -657,7 +658,10 @@ fn compare_record_original(
     let mut matched_ids = std::collections::HashSet::new();
     let mut previous = None;
     let mut failures = 0u32;
-    let mut timeline = qa_oracle::Timeline::default();
+    let mut timeline = qa_oracle::Timeline::with_source_frame_times(
+        &source.frames.iter().map(|frame| frame.at_ms).collect::<Vec<_>>(),
+        source.frame_interval_ms.context("missing source animation cadence")?,
+    );
     let source_size = (source.css_width - 12.0, source.css_height - 12.0);
     let inspected = super::record::inspect_clip_frames(path, &mut |image, at_ms| {
         let id = qa_oracle::decode_code(image, source_size, 12, 64.0);
@@ -730,6 +734,7 @@ fn compare_record_original(
         clip,
         json!({"passed":passed,"mismatchedFrames":failures,"matchedDistinctOriginals":matched_ids.len(),"expectedSize":expected_size,
         "nonce":source.nonce,"timelineMatches":timeline_ok,"worstTimelineDriftMs":timeline.worst_drift_ms,"longestFrameGapMs":timeline.longest_gap_ms,"longestUnexplainedGapMs":timeline.longest_unexplained_gap_ms,
+        "longestSourcePauseMs":timeline.longest_source_pause_ms,"sourceFrameIntervalMs":source.frame_interval_ms,
         "sourceTimeline":source_manifest,"comparisonArtifact":checks,"contactArtifact":contact_artifact}),
     ))
 }
@@ -2863,6 +2868,7 @@ mod tests {
             scale,
             nonce: 1,
             frames: Vec::new(),
+            frame_interval_ms: None,
             data_url: None,
         }
     }
