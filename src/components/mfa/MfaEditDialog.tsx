@@ -30,6 +30,9 @@ export function MfaEditDialog({
 
   useEffect(() => {
     firstRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
