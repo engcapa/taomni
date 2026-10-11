@@ -50,6 +50,42 @@ GitHub only registers `workflow_dispatch` on the default branch. Publishing the
 new file on a feature branch alone is insufficient. Branch validation can use a
 temporary branch-specific caller; do not merge that temporary push trigger.
 
+### Shards and reusable native builds
+
+`shards=auto` schedules up to four runners per platform/mode/Linux desktop
+profile. Dependencies remain together in their original order. Full suites use
+recorded case times from `durations.json` (main run 38133668943) to balance work;
+unknown cases receive conservative default weights. Update these estimates from
+actual summaries after suite changes; they are scheduling hints, never evidence.
+
+Native cases stay serial inside each runner. Independent `selected` native
+cases also fan out, up to four runners; a single case or dependency chain stays
+on one runner. Browser cases with shared SSH/VNC/ARD fixtures or dependency
+chains use serial shards; independent cases use two browser workers by default.
+Use `browser_workers=1..4` to tune this. Small independent browser selections
+can run concurrently on one runner. `shards=1` disables runner fan-out;
+`shards=2..8` requests an explicit per-combination cap, bounded by independent
+case groups. No empty shards are created.
+
+The reusable `qa-ui-auto-entry.yml` provisions both producer and execution jobs.
+Browser execution starts alongside native producers. Each native platform/Linux
+profile builds once, with one cache writer, then exports the app, sidecars,
+resources and original QA identity. If any case needs release, that profile's
+ordinary and dual-display shards share the release artifact. Distinct Linux
+profiles retain distinct builds. Execution downloads this invocation's artifact,
+verifies file hashes, source/runner identity, platform, architecture and build
+profile, and preserves executable modes. It never compiles the app again.
+Local native-build cache validation remains unchanged.
+
+`selection.json` records logical groups, exact shard membership, worker counts,
+estimates and build IDs. Collection rejects missing/duplicate cases and verifies
+the original receipts; shards sharing a build must report the same binary hash.
+`ci-summary.json` includes shard details and logical group totals. Failure issue
+keys use logical groups so changing the shard count does not duplicate issues.
+Native consumers currently wait for the complete producer matrix; hosted runner
+quotas, setup, artifact transfer and the slowest build still bound wall time.
+More shards can reduce elapsed time while increasing billed runner minutes.
+
 ### Development case contract
 
 Pull requests that touch product code receive a lightweight **Development case

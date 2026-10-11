@@ -14,7 +14,7 @@ from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES
 def args(**overrides):
     return argparse.Namespace(**({'scope': 'smoke', 'head': '', 'base': '',
         'platforms': 'linux,windows,macos', 'modes': 'browser,native',
-        'case_ids': '', 'features': '', 'tags': ''} | overrides))
+        'case_ids': '', 'features': '', 'tags': '', 'shards': '1'} | overrides))
 
 
 class SelectionTests(unittest.TestCase):

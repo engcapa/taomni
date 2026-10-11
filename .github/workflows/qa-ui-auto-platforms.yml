@@ -26,6 +26,14 @@ on:
         description: 'Linux native profiles (CSV): ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland'
         type: string
         default: ubuntu-24.04-xvfb
+      shards:
+        description: 'Shards per platform/mode/profile: auto or 1-8 (selected also fans out)'
+        type: string
+        default: auto
+      browser_workers:
+        description: Workers within independent browser shards (1-4)
+        type: number
+        default: 2
       native_release:
         description: Use release QA builds for selected native cases (reuse full-run caches)
         type: boolean
@@ -55,6 +63,8 @@ on:
       platforms: {type: string, default: 'linux,windows,macos'}
       modes: {type: string, default: 'browser,native'}
       linux_profiles: {type: string, default: 'ubuntu-24.04-xvfb'}
+      shards: {type: string, default: auto}
+      browser_workers: {type: number, default: 2}
       native_release: {type: boolean, default: false}
       run_rdp_unit_contracts: {type: boolean, default: true}
       case_ids: {type: string, default: ''}
@@ -69,6 +79,7 @@ on:
       - 'qa-ui-auto-tests/**'
       - '.agents/skills/qa-ui-auto/**'
       - '.github/workflows/qa-ui-auto-platforms.yml'
+      - '.github/workflows/qa-ui-auto-entry.yml'
       - '.github/actions/qa-runtime/**'
       - 'docs-feature/code-workspace-idea-parity/**'
   schedule:
@@ -114,6 +125,11 @@ jobs:
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
       has_cases: ${{ steps.plan.outputs.has_cases }}
+      browser_matrix: ${{ steps.plan.outputs.browser_matrix }}
+      native_matrix: ${{ steps.plan.outputs.native_matrix }}
+      build_matrix: ${{ steps.plan.outputs.build_matrix }}
+      has_browser: ${{ steps.plan.outputs.has_browser }}
+      has_native: ${{ steps.plan.outputs.has_native }}
       head: ${{ steps.plan.outputs.head }}
       artifact_key: ${{ steps.invocation.outputs.key }}
     steps:
@@ -131,13 +147,13 @@ jobs:
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
         if: inputs.scope != 'selected'
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_credential_store test_ci_sharding test_ci_native_artifact test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - name: Updater packaging unit contracts
         if: inputs.scope != 'selected'
-        run: node --test scripts/compose-updater-manifest.test.mjs
+        run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
       - name: Wayland automation contracts
@@ -152,6 +168,8 @@ jobs:
           QA_MODES: ${{ inputs.modes }}
           QA_LINUX_PROFILES: ${{ inputs.linux_profiles }}
           QA_NATIVE_RELEASE: ${{ inputs.native_release }}
+          QA_SHARDS: ${{ inputs.shards }}
+          QA_BROWSER_WORKERS: ${{ inputs.browser_workers }}
           QA_CASE_IDS: ${{ inputs.case_ids }}
           QA_FEATURES: ${{ inputs.features }}
           QA_TAGS: ${{ inputs.tags }}
@@ -162,351 +180,43 @@ jobs:
           path: qa-ui-auto-report/selection.json
           if-no-files-found: error
 
-  execute:
-    name: ${{ matrix.id }}
+  execute-browser:
     needs: plan
-    if: needs.plan.outputs.has_cases == 'true'
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 360
-    env:
-      # The QA app inherits tauri-driver's startup environment. Fixture setup
-      # happens later, so enable reference-client diagnostics before the driver.
-      TAOMNI_QA_RDP_TRACE: ${{ contains(matrix.capabilities, 'xrdp') && '1' || '0' }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.plan.outputs.head }}
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: qa-selection-${{ needs.plan.outputs.artifact_key }}
-          path: qa-ui-auto-report
-      - uses: ./.github/actions/qa-runtime
-        with:
-          mode: ${{ matrix.mode }}
-      - name: Updater unit contracts
-        if: contains(matrix.capabilities, 'updater')
-        run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
-      - name: Linux native and service dependencies
-        if: runner.os == 'Linux' && matrix.mode == 'native'
-        # Wayland provisioning installs the GNOME/portal stack on a fresh
-        # runner. Azure mirrors can take more than twenty minutes for this
-        # dependency set; keep setup bounded while allowing a cold install to
-        # finish before the native case timeout starts.
-        timeout-minutes: 35
-        env:
-          QA_LINUX_PROFILE: ${{ matrix.linux_profile }}
-          QA_CAPABILITIES: ${{ join(matrix.capabilities, ',') }}
-        run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
-      - uses: dtolnay/rust-toolchain@stable
-        if: matrix.mode == 'native'
-      - uses: arduino/setup-protoc@v3
-        if: matrix.mode == 'native'
-        with:
-          repo-token: ${{ github.token }}
-      - uses: swatinem/rust-cache@v2
-        if: matrix.mode == 'native'
-        with:
-          workspaces: src-tauri -> target/qa-ui-auto
-          shared-key: qa-platforms-${{ matrix.cache_key }}
-          # Keep the shared dependency/tool cache independent of the QA app.
-          # rust-cache ignores `key` when `shared-key` is also supplied.
-          cache-targets: false
-          cache-on-failure: true
-      # Exercise a real Secret Service in the disposable D-Bus session.
-      - name: Linux backup credential service
-        if: runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')
-        run: sudo apt-get update && sudo apt-get install -y gnome-keyring
-      - name: Windows build tools and WebView2 driver
-        if: runner.os == 'Windows' && matrix.mode == 'native'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $perl = 'C:\Strawberry\perl\bin\perl.exe'
-          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
-          & $perl -MIPC::Cmd -e 'print "Perl ready"'
-          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
-          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
-          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
-          $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
-          $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
-          if (-not $runtime) { throw 'WebView2 runtime unavailable' }
-          $zip = Join-Path $env:RUNNER_TEMP 'qa-edgedriver.zip'
-          $driver = Join-Path $env:RUNNER_TEMP 'qa-edgedriver'
-          Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
-          Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
-          $driver >> $env:GITHUB_PATH
-          if ('${{ contains(matrix.capabilities, 'mstsc') }}' -eq 'true') {
-            $dumpZip = Join-Path $env:RUNNER_TEMP 'qa-procdump.zip'
-            $dumpTools = Join-Path $env:RUNNER_TEMP 'qa-procdump'
-            Invoke-WebRequest 'https://download.sysinternals.com/files/Procdump.zip' -OutFile $dumpZip
-            Expand-Archive -LiteralPath $dumpZip -DestinationPath $dumpTools -Force
-            "QA_MSTSC_PROCDUMP=$(Join-Path $dumpTools 'procdump64.exe')" >> $env:GITHUB_ENV
-            $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe"
-            if (-not (Test-Path -LiteralPath $cdb)) {
-              # Microsoft's signed SDK bootstrapper, debugger feature only.
-              $sdkSetup = Join-Path $env:RUNNER_TEMP 'qa-debugger-setup.exe'
-              Invoke-WebRequest 'https://download.microsoft.com/download/f4b30f2a-4fc3-430e-9b03-c842b5f5f9f1/KIT_BUNDLE_WINDOWSSDK_MEDIACREATION/winsdksetup.exe' -OutFile $sdkSetup
-              if ((Get-FileHash -LiteralPath $sdkSetup -Algorithm SHA256).Hash -ne '6FA0FA27DB77A909F5ECB35183CB26A969A6775936780936FE239E4F9C66B458') { throw 'Unexpected debugger bootstrapper' }
-              $install = Start-Process -FilePath $sdkSetup -ArgumentList '/quiet /norestart /features OptionId.WindowsDesktopDebuggers' -Wait -PassThru -WindowStyle Hidden
-              if ($install.ExitCode -notin @(0,3010)) { throw "Debugger setup failed: $($install.ExitCode)" }
-            }
-            if (-not (Test-Path -LiteralPath $cdb)) { throw 'mstsc dump debugger unavailable' }
-            "QA_MSTSC_CDB=$cdb" >> $env:GITHUB_ENV
-            $gflags = Join-Path (Split-Path -Parent $cdb) 'gflags.exe'
-            if (-not (Test-Path -LiteralPath $gflags)) { throw 'mstsc heap verifier unavailable' }
-            "QA_MSTSC_GFLAGS=$gflags" >> $env:GITHUB_ENV
-          }
-          choco install tesseract --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'Tesseract installation failed' }
-          'C:\Program Files\Tesseract-OCR' >> $env:GITHUB_PATH
-      # Hosted audio cases need a loopback device. BlackHole has no controller
-      # app or microphone consent sheet to cover capture fixtures on macOS.
-      - name: Windows virtual audio output
-        if: runner.os == 'Windows' && contains(matrix.capabilities, 'audio')
-        uses: LABSN/sound-ci-helpers@d08c889a7bba7d9b1b059f8f76dac4672ea3a9cf # v1.0.4
-      - name: macOS virtual audio output
-        if: runner.os == 'macOS' && contains(matrix.capabilities, 'audio')
-        run: |
-          brew install --cask blackhole-2ch
-          sudo launchctl kickstart -kp system/com.apple.audio.coreaudiod
-          python - <<'PYTHON'
-          import time
-          from qa_ui_auto.fixtures.rdp_audio_required import _CoreAudio
-          deadline = time.monotonic() + 30
-          while True:
-              audio = _CoreAudio()
-              outputs = [audio.name(device) for device in audio.devices() if audio.has_output(device)]
-              if any('BlackHole' in name for name in outputs):
-                  print('HAL outputs:', outputs)
-                  break
-              if time.monotonic() >= deadline:
-                  raise SystemExit('BlackHole HAL output unavailable')
-              time.sleep(0.5)
-          PYTHON
-      - name: macOS build dependencies
-        if: runner.os == 'macOS' && matrix.mode == 'native'
-        run: |
-          brew install krb5 tesseract
-          echo "SHELL=/bin/zsh" >> "$GITHUB_ENV"
-          echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
-          echo "LIBGSSAPI_PREFIX=$(brew --prefix krb5)" >> "$GITHUB_ENV"
-          echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> "$GITHUB_ENV"
-      - name: Verify OCR executable and pinned English/Chinese data
-        if: matrix.mode == 'native'
-        run: python .agents/skills/qa-ui-auto/scripts/setup_screenshot_ocr.py
-      - name: Native adapter
-        if: matrix.mode == 'native' && runner.os != 'macOS'
-        run: cargo install tauri-driver --locked
-      - name: Java 25 project runtime
-        uses: actions/setup-java@v4
-        if: contains(matrix.capabilities, 'java25')
-        with:
-          distribution: temurin
-          java-version: '25'
-      - name: Retain Java 25 runtime
-        if: contains(matrix.capabilities, 'java25')
-        run: echo "JAVA25_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
-      - uses: actions/setup-java@v4
-        if: contains(matrix.capabilities, 'java')
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
-        if: contains(matrix.capabilities, 'java')
-        with:
-          gradle-version: '9.1.0'
-      - name: Prepare local service packages
-        if: contains(matrix.capabilities, 'ssh') || contains(matrix.capabilities, 'mysql') || contains(matrix.capabilities, 'vnc') || contains(matrix.capabilities, 'xrdp')
-        env:
-          QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
-        run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
-      - name: Windows mstsc startup diagnostic
-        if: runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'mstsc')
-        run: >-
-          python -m qa_ui_auto.rdp_helpers.mstsc
-          --preflight 'qa-ui-auto-report/${{ matrix.id }}/mstsc-startup'
-      - name: Retain the mstsc startup diagnostic before compiling
-        if: always() && runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'mstsc')
-        uses: actions/upload-artifact@v4
-        with:
-          name: qa-windows-mstsc-startup-${{ needs.plan.outputs.artifact_key }}
-          path: qa-ui-auto-report/${{ matrix.id }}/mstsc-startup/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Native QA build input identity
-        id: native-cache-key
-        if: matrix.mode == 'native'
-        env:
-          QA_RELEASE: ${{ contains(matrix.capabilities, 'release') }}
-        run: |
-          python - <<'PYTHON'
-          import hashlib, json, os
-          from native_build import build_inputs
-          inputs = build_inputs(release=os.environ["QA_RELEASE"] == "true")
-          key = hashlib.sha256(json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"key={key}\n")
-          PYTHON
-      - name: Native QA workspace cache
-        if: matrix.mode == 'native'
-        uses: actions/cache@v4
-        with:
-          path: src-tauri/target/qa-ui-auto
-          # Test/runner-only revisions share the same verified app build.
-          # New source, recipe, toolchain or build environment gets a new key.
-          # Restore prefixes retain useful crates from older build inputs.
-          key: qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-inputs-${{ steps.native-cache-key.outputs.key }}
-          restore-keys: |
-            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
-            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
-      - name: Wayland cold-cache application metadata contracts
-        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_profile == 'ubuntu-26.04-wayland'
-        run: python -m unittest test_ci_portal_application
-      - name: Verify owned Wayland desktop before expensive native checks
-        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_profile == 'ubuntu-26.04-wayland'
-        env:
-          QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
-        run: >-
-          dbus-run-session -- python .agents/skills/qa-ui-auto/scripts/ci_desktop_preflight.py
-          --profile ubuntu-26.04-wayland --capabilities "$QA_CAPABILITIES"
-          --report 'qa-ui-auto-report/${{ matrix.id }}/desktop-preflight'
-      - name: Verify owned X11 or VNC dual-output desktop before compilation
-        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_profile != 'ubuntu-26.04-wayland' && contains(matrix.capabilities, 'dual-display')
-        env:
-          QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
-        run: >-
-          dbus-run-session --
-          python .agents/skills/qa-ui-auto/scripts/ci_desktop_preflight.py
-          --profile '${{ matrix.linux_profile }}' --capabilities "$QA_CAPABILITIES"
-          --report 'qa-ui-auto-report/${{ matrix.id }}/desktop-preflight'
-      - name: RDP unit contracts on the native platform
-        # The IronRDP unit contracts are platform-independent. Run the
-        # expensive release test matrix once on the Linux representative;
-        # Windows/macOS still execute their real release native RDP cases and
-        # startup diagnostics below. This removes a 30–50 minute duplicate
-        # Rust test build from each non-Linux native job without changing any
-        # release app build or product evidence.
-        if: matrix.rdp_unit_contracts && (github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts)
-        env:
-          CARGO_TARGET_DIR: target/qa-ui-auto
-          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'
-          CARGO_PROFILE_RELEASE_INCREMENTAL: 'true'
-        run: |
-          mkdir -p 'qa-ui-auto-report/${{ matrix.id }}'
-          (
-            set -e
-            pnpm build
-            if [[ "$RUNNER_OS" == "macOS" ]]; then bash scripts/bundle-krb5-macos.sh stage; fi
-            cd src-tauri
-            cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server -p ironrdp-session --lib
-            cargo test --locked --release -p ironrdp-server --lib profile_photo_encoder_costs -- --ignored --nocapture
-            # The substring filter includes both rdp::* and servers::rdp::*.
-            # One invocation covers all contracts without repeated root links.
-            cargo test --locked --release --lib rdp::
-            cargo test --locked --release --bin rdp-probe
-          ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/rdp-unit.log'
-      - name: Dual-display Rust contracts
-        if: runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'dual-display')
-        env:
-          CARGO_TARGET_DIR: target/qa-ui-auto
-        run: |
-          mkdir -p 'qa-ui-auto-report/${{ matrix.id }}'
-          (
-            set -e
-            pnpm build --mode qa
-            cd src-tauri
-            # One root test invocation covers screenshot mapping and the
-            # retained X11/Wayland capture contracts without repeated links.
-            cargo test --locked --lib capture::
-            cargo test --locked --lib screenshot::surfaces::
-          ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/dual-display-unit.log'
-      - name: Run selected cases (Linux Xvfb desktop)
-        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb'
-        env:
-          QA_ENTRY: ${{ matrix.id }}
-          QA_DUAL_DISPLAY: ${{ contains(matrix.capabilities, 'dual-display') }}
-        run: |
-          screen=1920x1080x24
-          if [[ "$QA_DUAL_DISPLAY" == true ]]; then screen=3840x1440x24; fi
-          dbus-run-session -- xvfb-run -a -s "-screen 0 $screen -nolisten tcp" \
-            python .agents/skills/qa-ui-auto/scripts/ci_execute.py \
-            --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY" \
-            --report "qa-ui-auto-report/$QA_ENTRY"
-      - name: Run selected cases (Linux VNC or GNOME Wayland desktop)
-        if: runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'dbus'
-        env:
-          QA_ENTRY: ${{ matrix.id }}
-        run: >-
-          dbus-run-session --
-          python .agents/skills/qa-ui-auto/scripts/ci_execute.py
-          --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
-          --report "qa-ui-auto-report/$QA_ENTRY"
-      - name: Run selected cases
-        if: runner.os != 'Linux' || matrix.mode != 'native'
-        env:
-          QA_ENTRY: ${{ matrix.id }}
-        run: >-
-          python .agents/skills/qa-ui-auto/scripts/ci_execute.py
-          --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
-          --report "qa-ui-auto-report/$QA_ENTRY"
-      - name: Stage screenshot outputs under the report root
-        if: always()
-        env:
-          QA_ENTRY: ${{ matrix.id }}
-        run: >-
-          python .agents/skills/qa-ui-auto/scripts/stage_screenshot_artifacts.py
-          --source "$RUNNER_TEMP/taomni-qa-artifacts"
-          --report "qa-ui-auto-report/$QA_ENTRY"
-          --macos-crash-reports
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: qa-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
-          # Authentic updater bundles and disposable installs are fixture data.
-          # Keep staged manifests/signatures and host verification evidence.
-          path: |
-            qa-ui-auto-report/${{ matrix.id }}/
-            !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/_updater-assets/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/artifacts/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/staged/*.app.tar.gz
-            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/Disposable.app/**
-          if-no-files-found: warn
-          retention-days: 14
-      - name: Retain compact native diagnostics
-        uses: actions/upload-artifact@v4
-        if: always() && matrix.mode == 'native'
-        with:
-          # Keep this outside the aggregate's qa-* pattern: these are copies
-          # for diagnosis, not a second set of execution receipts.
-          name: diagnostics-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
-          path: |
-            qa-ui-auto-report/${{ matrix.id }}/**/*.json
-            qa-ui-auto-report/${{ matrix.id }}/**/*.jsonl
-            qa-ui-auto-report/${{ matrix.id }}/**/*.log
-            qa-ui-auto-report/${{ matrix.id }}/**/*.html
-            !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/_updater-assets/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/artifacts/**
-            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/staged/*.app.tar.gz
-            !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/Disposable.app/**
-          if-no-files-found: warn
-          retention-days: 14
+    if: needs.plan.outputs.has_browser == 'true'
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      matrix: ${{ needs.plan.outputs.browser_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: run
+      run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
+
+  native-build:
+    needs: plan
+    if: needs.plan.outputs.has_native == 'true'
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      matrix: ${{ needs.plan.outputs.build_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: build
+      run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
+
+  execute-native:
+    needs: [plan, native-build]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.has_native == 'true' }}
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      matrix: ${{ needs.plan.outputs.native_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: run
+      run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
 
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, execute]
+    needs: [plan, execute-browser, native-build, execute-native]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -571,7 +281,7 @@ jobs:
             const issues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
             const groups = new Map();
             for (const failure of summary.failures || []) {
-              const key = `${failure.entry}/${failure.case}`;
+              const key = `${failure.group_id || failure.entry}/${failure.case}`;
               if (!groups.has(key)) groups.set(key, []);
               groups.get(key).push(String(failure.message).slice(0, 2500));
             }

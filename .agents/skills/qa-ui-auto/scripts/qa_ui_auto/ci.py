@@ -289,7 +289,10 @@ def make_plan(args) -> dict:
         raise ValueError(f"explicit cases unavailable in requested combinations: {sorted(explicit-reachable)}")
     if not entries and args.scope != "impacted":
         raise ValueError("selection contains no runnable cases")
-    return {"schema": "qa-ui-auto.ci-selection.v1", "head": head, "base": base,
+    from .ci_sharding import schedule
+    entries, groups, builds = schedule(entries, by_id, dependencies, scope=args.scope,
+        shards=getattr(args, "shards", "auto"), browser_workers=getattr(args, "browser_workers", 2))
+    return {"schema": "qa-ui-auto.ci-selection.v1", "groups": groups, "builds": builds, "head": head, "base": base,
             "linux_profiles": linux_profiles, "native_release": bool(getattr(args, "native_release", False)),
             "merge_base": ancestor, "scope": args.scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
@@ -333,9 +336,14 @@ def github_output(name: str, value: str) -> None:
 
 def aggregate(manifest: dict, root: Path) -> dict:
     from .runner_receipt import verify_runner_receipt
+    from .ci_sharding import validate_partition
+    if "groups" in manifest:
+        validate_partition(manifest["groups"], manifest["entries"])
     entries, failures = [], []
+    build_hashes = {}
     for entry in manifest["entries"]:
         entry_root = root / entry["id"]
+        group_id = entry.get("group_id", entry["id"])
         seen, totals = set(), Counter()
         errors = []
         summaries = sorted(entry_root.rglob("run-*/summary.json"))
@@ -364,6 +372,10 @@ def aggregate(manifest: dict, root: Path) -> dict:
                             or identity.get("binary_sha256") != build.get("binary_sha256")
                             or identity.get("source_sha256") != manifest["identity"]["source_sha256"]):
                         raise ValueError("native binary identity differs from build/source")
+                    if build_id := entry.get("build_id"):
+                        digest = identity["binary_sha256"]
+                        if build_hashes.setdefault(build_id, digest) != digest:
+                            raise ValueError("shards used different binaries for the same build")
                     if entry.get("desktop"):
                         desktop = summary.get("desktop_identity", {})
                         if desktop.get("ready") is not True or any(
@@ -387,7 +399,7 @@ def aggregate(manifest: dict, root: Path) -> dict:
                     totals[case["status"]] += 1
                     if case["status"] != "passed":
                         message = (case.get("failure") or {}).get("message") or case.get("fixtures_skipped") or case["status"]
-                        failures.append({"entry": entry["id"], "case": cid, "message": message[:2500]})
+                        failures.append({"entry": entry["id"], "group_id": group_id, "case": cid, "message": message[:2500]})
                 seen.update(ids)
             except (KeyError, ValueError, OSError) as exc:
                 errors.append(f"{path.relative_to(root)}: {exc}")
@@ -406,17 +418,25 @@ def aggregate(manifest: dict, root: Path) -> dict:
                 errors.append(actual.get("error", "execution failed"))
         except (OSError, ValueError):
             errors.append("missing execution outcome (build/setup/cancellation)")
-        failures.extend({"entry": entry["id"], "case": "infrastructure", "message": e[:2500]} for e in errors)
-        entries.append({"id": entry["id"], "selected": len(entry["selected_ids"]),
+        failures.extend({"entry": entry["id"], "group_id": group_id, "case": "infrastructure", "message": e[:2500]} for e in errors)
+        entries.append({"id": entry["id"], "group_id": group_id, "selected": len(entry["selected_ids"]),
                         "linux_profile": entry.get("linux_profile", ""), "desktop": entry.get("desktop", {}),
                         "counts": dict(totals), "errors": errors})
+    groups = {}
+    for entry in entries:
+        group = groups.setdefault(entry["group_id"], {"id": entry["group_id"], "selected": 0,
+                                  "counts": Counter(), "errors": [], "shards": []})
+        group["selected"] += entry["selected"]
+        group["counts"].update(entry["counts"])
+        group["errors"].extend(entry["errors"])
+        group["shards"].append(entry["id"])
     infrastructure_errors = [
         {"entry": entry["id"], "message": error}
         for entry in entries
         for error in entry["errors"]
     ]
     return {"head": manifest["head"], "run_id": manifest.get("run_id"), "attempt": manifest.get("attempt"),
-            "entries": entries, "failures": failures, "gaps": manifest["gaps"],
+            "entries": entries, "groups": list(groups.values()), "build_hashes": build_hashes, "failures": failures, "gaps": manifest["gaps"],
             "not_applicable": manifest.get("not_applicable", []),
             "unreviewed": manifest["unreviewed"],
             # `passed` remains a strict all-cases signal for consumers that
@@ -433,9 +453,10 @@ def main(argv=None):
     plan = subs.add_parser("plan")
     for name, default in [("scope", "smoke"), ("head", ""), ("base", ""),
                           ("platforms", "linux,windows,macos"), ("modes", "browser,native"),
-                          ("linux_profiles", DEFAULT_LINUX_PROFILE),
+                          ("linux_profiles", DEFAULT_LINUX_PROFILE), ("shards", "auto"),
                           ("case_ids", ""), ("features", ""), ("tags", "")]:
         plan.add_argument("--" + name.replace("_", "-"), default=os.environ.get("QA_" + name.upper()) or default)
+    plan.add_argument("--browser-workers", type=int, default=int(os.environ.get("QA_BROWSER_WORKERS") or 2))
     plan.add_argument("--native-release", action="store_true",
                       default=os.environ.get("QA_NATIVE_RELEASE", "").lower() in {"true", "1"})
     plan.add_argument("--output", type=Path, default=Path("qa-ui-auto-report/selection.json"))
@@ -450,8 +471,13 @@ def main(argv=None):
             result = make_plan(args)
             write_json(args.output, result)
             matrix = {"include": [{k: e[k] for k in ("id", "runner", "arch", "mode", "platform_key", "capabilities",
-                                                     "linux_profile", "linux_wrapper", "cache_key", "rdp_unit_contracts")} for e in result["entries"]]}
+                                                     "linux_profile", "linux_wrapper", "cache_key", "rdp_unit_contracts", "build_id", "workers")} for e in result["entries"]]}
             github_output("matrix", json.dumps(matrix, separators=(",", ":")))
+            for mode in ("browser", "native"):
+                items = [e for e in matrix["include"] if e["mode"] == mode]
+                github_output(mode + "_matrix", json.dumps({"include": items}, separators=(",", ":")))
+                github_output("has_" + mode, str(bool(items)).lower())
+            github_output("build_matrix", json.dumps({"include": [{k: v for k, v in b.items() if k not in {"selected_ids", "case_digests"}} for b in result["builds"]]}, separators=(",", ":")))
             github_output("has_cases", str(bool(result["entries"])).lower())
             github_output("head", result["head"])
             if summary_path := os.environ.get("GITHUB_STEP_SUMMARY"):
@@ -476,7 +502,7 @@ def main(argv=None):
         lines = ["# QA platform results", "", f"Commit: `{result['head']}`", "",
                  "| Combination | Selected | Passed | Failed | Skipped | Infrastructure errors |",
                  "|---|---:|---:|---:|---:|---:|"]
-        for entry in result["entries"]:
+        for entry in result["groups"]:
             c = entry["counts"]
             lines.append(f"| {entry['id']} | {entry['selected']} | {c.get('passed',0)} | {c.get('failed',0)} | {c.get('skipped',0)} | {len(entry['errors'])} |")
         lines.extend(["", f"Declared capability gaps: {len(result['gaps'])}; unreviewed cases: {len(result['unreviewed'])}.",

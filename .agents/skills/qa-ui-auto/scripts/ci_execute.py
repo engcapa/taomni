@@ -108,11 +108,16 @@ def main():
                    "python": platform.python_version(), "head": manifest["head"], "capabilities": entry["capabilities"],
                    "linux_profile": entry.get("linux_profile", ""), "desktop": entry.get("desktop", {})})
         with ExitStack() as stack:
+            consent = None
+            if entry["mode"] == "native" and platform.system() == "Darwin" and os.environ.get("GITHUB_ACTIONS") == "true":
+                log = stack.enter_context((args.report / "macos-fixture-consent.log").open("w", encoding="utf-8"))
+                consent = launch(stack, ["osascript", "-l", "JavaScript", str(scripts / "ci_macos_consent.js")],
+                                 stdout=log, stderr=subprocess.STDOUT)
             # The SSH account, the VNC fixture's per-case event log and the
             # macOS console session behind Screen Sharing are shared.
             serial = set(entry["capabilities"]) & {"ssh", "vnc", "ard"}
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
-                      "worker": {"parallel": 1 if serial else 2},
+                      "worker": {"parallel": 1 if serial else entry.get("workers", 2)},
                       "report": {"dir": str(args.report), "keep_runs": 0}}
             if set(entry["capabilities"]) & {"ssh", "mysql", "vnc", "ard"}:
                 from ci_services import Services
@@ -152,11 +157,16 @@ def main():
                 outcome["stage"] = "build"
                 write_json(args.report / "ci-outcome.json", outcome)
                 build_log = stack.enter_context((args.report / "build.log").open("w", encoding="utf-8"))
-                build = launch(stack, [sys.executable, str(scripts / "native_build.py"),
-                                       *(["--release"] if release else [])],
-                               stdout=build_log, stderr=subprocess.STDOUT)
-                if build.wait():
-                    raise RuntimeError("native build failed; see build.log")
+                if os.environ.get("QA_NATIVE_ARTIFACT"):
+                    from ci_native_artifact import install
+                    install(Path(os.environ["QA_NATIVE_ARTIFACT"]), manifest, entry)
+                    build_log.write("Verified shared native build artifact; no compilation in this shard.\n")
+                else:
+                    build = launch(stack, [sys.executable, str(scripts / "native_build.py"),
+                                           *(["--release"] if release else [])],
+                                   stdout=build_log, stderr=subprocess.STDOUT)
+                    if build.wait():
+                        raise RuntimeError("native build failed; see build.log")
                 from native_build import identity_path, qa_binary
                 binary = qa_binary(release=release)
                 (args.report / "build-identity.json").write_bytes(identity_path(binary).read_bytes())
@@ -190,6 +200,8 @@ def main():
                         time.sleep(1)
                 else:
                     raise RuntimeError("Vite not ready in 90s")
+            if consent is not None and consent.poll() is not None:
+                raise RuntimeError("macOS fixture consent monitor exited; see macos-fixture-consent.log")
             outcome["stage"] = "cases"
             write_json(args.report / "ci-outcome.json", outcome)
             command = [sys.executable, "-m", "qa_ui_auto", "run", "--selection", str(args.selection),
