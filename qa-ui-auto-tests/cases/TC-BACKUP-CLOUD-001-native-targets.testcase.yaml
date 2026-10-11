@@ -16,7 +16,7 @@ steps:
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
-- wait_for: '[data-testid="backup-feishu-add"]'
+- wait_for: '[data-testid="backup-feishu-add"]:not([disabled])'
 - click: '[data-testid="backup-feishu-add"]'
 - fill: {selector: '[data-testid="backup-cloud-name"]', value: QA Feishu Direct}
 - assert_not_visible: '[data-testid="backup-feishu-app-id"]'
