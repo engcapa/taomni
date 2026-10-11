@@ -1,0 +1,69 @@
+id: TC-BACKUP-CLOUD-003
+title: Native cloud backup refreshes tokens, retries temporary failures and rejects revoked authorization
+description: >-
+  Uses an isolated QA profile and loopback protocol server. Production Tauri IPC,
+  reqwest, OS credential storage, encrypted SQLite snapshots, scheduler and upload
+  readback all run. Server rejects the first bearer, then three list requests;
+  the persisted job must retry without user action. A later invalid_grant must
+  make the connection visibly unauthorized. This is not real Feishu evidence.
+covers: [F-BACKUP-2]
+tags: [backup, native-boundary, recovery, p1]
+modes: [native]
+fixtures: [reset_db, backup_cloud]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-cloud-start"]:not([disabled])'
+- click: '[data-testid="backup-cloud-start"]'
+- wait_for: {selector: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="retry_wait"]', timeout_sec: 45}
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: refresh_ok}
+- assert_text: {selector: '[data-testid="backup-cloud-job"][data-operation="upload"] [data-testid="backup-retry-notice"]', contains: Automatic retry}
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="retry_wait"]'
+- wait_for: {selector: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="completed"]', timeout_sec: 120}
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: upload_sha256=}
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: download_sha256=}
+- click: '[data-testid="backup-cache-clean"]'
+- wait_for: '[data-testid="backup-cache-clean"]:not([disabled])'
+- assert_visible: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_waiting_id}"] [data-testid="backup-job-retry"]'
+- host_write_file: {path: '${fixture.backup_service_mode}', text: revoked}
+- click: '[data-testid="backup-cloud-refresh"]'
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: refresh_rejected, timeout_sec: 30}
+- wait_for: '[data-testid="backup-cloud-start"][disabled]'
+- assert_visible: '[data-testid="backup-feishu-authorize"]:not([disabled])'
+- screenshot: backup-native-revoked.png
+verification:
+  review: reviewed
+  visual:
+  - check: Revoked authorization exposes recovery without enabling upload.
+    method: manual
+    reason: Review the final native screenshot.
+  native:
+  - check: Real HTTP token refresh, persisted scheduling and encrypted upload readback run against loopback.
+    method: automated
+    reason: Native backend boundaries cannot be established with browser stubs.
+  requirements:
+  - id: R1
+    requirement: Expired access token refreshes once and transient failure creates a persisted automatic retry.
+    actions: [7, 11, 12]
+    checkpoints:
+    - {step: 9, expectation: Real HTTP refresh reaches the fixture}
+    - {step: 13, expectation: Retry state survives panel remount}
+    - {step: 14, expectation: Scheduler completes the encrypted upload without manual retry}
+    - {step: 15, expectation: Fixture receives encrypted archive bytes}
+    - {step: 16, expectation: Native provider downloads bytes for integrity verification}
+    results: [9, 13, 14, 15, 16]
+  - id: R2
+    requirement: Cleanup preserves unfinished data and permanent refresh rejection disables cloud actions.
+    actions: [17, 20, 21]
+    checkpoints:
+    - {step: 19, expectation: Unfinished task remains resumable}
+    - {step: 22, expectation: Real refresh receives invalid_grant}
+    - {step: 23, expectation: Upload disabled after authorization invalidation}
+    - {step: 24, expectation: Reauthorization remains available}
+    results: [19, 22, 23, 24]

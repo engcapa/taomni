@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,13 @@ def setup(ctx: Any) -> None:
         "lastBackupAt": None,
     }
     policy_path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+    # The local scheduler must remain independent from cloud/manual selection.
+    control = data_root / "backup-control"
+    control.mkdir(exist_ok=True)
+    (control / "config.json").write_text(json.dumps({
+        "formatVersion": 1, "device": {"id": str(uuid.uuid4()), "name": "QA local policy"},
+        "targets": [], "connections": [], "selectedTargetIds": [],
+    }), encoding="utf-8")
     ctx.values["backup_policy_path"] = str(policy_path)
     # Two days is due for daily but still inside the weekly interval.
     expired_at = int(time.time() * 1_000) - 2 * 24 * 60 * 60 * 1_000

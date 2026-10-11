@@ -44,6 +44,7 @@ pub fn start(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             run_backup(app.clone(), BackupTrigger::Periodic).await;
+            super::jobs::scheduled(&app, BackupTrigger::Periodic).await;
             tokio::time::sleep(CHECK_INTERVAL).await;
         }
     });
@@ -88,6 +89,7 @@ pub fn handle_exit_request(app: &AppHandle, code: Option<i32>, api: &ExitRequest
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         run_backup(app.clone(), BackupTrigger::Exit).await;
+        super::jobs::scheduled(&app, BackupTrigger::Exit).await;
         app.state::<BackupCoordinator>()
             .exit_finished
             .store(true, Ordering::SeqCst);

@@ -24,6 +24,7 @@ import {
 import { relaunchApp } from "../../lib/updateService";
 import type { BackupManifest, BackupScope } from "../../lib/backup";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { RemoteBackupPanel } from "./RemoteBackupPanel";
 
 export function BackupSettingsPanel() {
   const t = useT();
@@ -214,7 +215,7 @@ export function BackupSettingsPanel() {
       const msg = e instanceof Error ? e.message : String(e);
       setInspectError(
         msg.includes("BACKUP_BAD_PASSWORD")
-          ? "密码错误，请重新输入。"
+          ? t("backupSettings.badArchivePassword")
           : msg,
       );
     } finally {
@@ -296,6 +297,7 @@ export function BackupSettingsPanel() {
       )}
 
       {/* Card 1: Target Directory */}
+      <RemoteBackupPanel onRestore={(path) => void openRestoreModal(path)} />
       <div className="p-4 rounded-lg bg-theme-surface border border-theme-border space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -585,7 +587,7 @@ export function BackupSettingsPanel() {
                 data-testid="backup-history-refresh"
                 onClick={() => void refreshHistory()}
                 className="p-1 rounded text-theme-muted hover:text-theme-text"
-                title="刷新"
+                title={t("common.refresh")}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
@@ -603,8 +605,8 @@ export function BackupSettingsPanel() {
                       <th className="py-2 px-2">{t("backupSettings.fileName")}</th>
                       <th className="py-2 px-2">{t("backupSettings.size")}</th>
                       <th className="py-2 px-2">{t("backupSettings.date")}</th>
-                      <th className="py-2 px-2">状态</th>
-                      <th className="py-2 px-2 text-right">操作</th>
+                      <th className="py-2 px-2">{t("backupSettings.status")}</th>
+                      <th className="py-2 px-2 text-right">{t("backupSettings.actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-theme-border/40">
@@ -709,6 +711,10 @@ export function BackupSettingsPanel() {
               </div>
             ) : manifest ? (
               <div className="space-y-3 text-xs">
+                <p className="text-[var(--taomni-text-muted)]">
+                  {t("backupSettings.provenance", { source: manifest.provenance ? `${manifest.provenance.deviceName} · ${manifest.provenance.deviceId}` : t("backupSettings.unknownSource") })}
+                  {t("backupSettings.restoreIdentityHint")}
+                </p>
                 <div
                   className="grid grid-cols-2 gap-2 rounded border p-3"
                   style={{
@@ -730,7 +736,7 @@ export function BackupSettingsPanel() {
                   </div>
                   <div>
                     <span className="text-[var(--taomni-text-muted)]">{t("backupSettings.archiveFilesCount")}:</span>
-                    <div className="font-mono">{manifest.files.length} 个文件</div>
+                    <div className="font-mono">{t("backupSettings.filesCount", { count: manifest.files.length })}</div>
                   </div>
                 </div>
 
@@ -809,7 +815,7 @@ export function BackupSettingsPanel() {
                     type="password"
                     value={restorePassword}
                     onChange={(e) => setRestorePassword(e.target.value)}
-                    placeholder="输入解密密码"
+                    placeholder={t("backupSettings.archivePasswordPh")}
                     className="w-full rounded border px-3 py-2 text-xs text-[var(--taomni-text)] outline-none focus:border-[var(--taomni-accent)] placeholder:text-[var(--taomni-text-muted)]"
                     style={{
                       background: "var(--taomni-input-bg)",
@@ -825,7 +831,7 @@ export function BackupSettingsPanel() {
                       borderColor: "var(--taomni-input-border)",
                     }}
                   >
-                    解锁并验证备份
+                    {t("backupSettings.unlockAndVerify")}
                   </button>
                 </div>
               </div>
@@ -860,7 +866,7 @@ export function BackupSettingsPanel() {
                   borderColor: "var(--taomni-input-border)",
                 }}
               >
-                取消
+                {t("common.cancel")}
               </button>
               {manifest && (
                 <button

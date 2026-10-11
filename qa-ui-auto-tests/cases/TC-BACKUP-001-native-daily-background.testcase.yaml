@@ -11,6 +11,8 @@ description: >-
   cannot establish native timer, SQLite snapshot or filesystem behavior.
   The linked native subprocess probe separately verifies two real instances
   contending for the same due interval, foreign history refresh and manual queuing.
+  The destination selection starts empty: local automatic backup must still obey
+  the original policy, independently of cloud/manual destination selection.
 covers: [F-BACKUP-1, F-MFA-3]
 tags: [backup, settings, native-boundary, p1]
 modes: [native]

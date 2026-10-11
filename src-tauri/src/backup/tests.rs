@@ -191,7 +191,7 @@ fn test_backup_restore_full_lifecycle_unencrypted() {
     assert!(app_data.join(PENDING_RESTORE_DIR).is_dir());
 
     // 6. Apply pending restore
-    apply_pending_restore(&app_data);
+    apply_pending_restore(&app_data).unwrap();
 
     // 7. Verify restore cleanup and safety copy
     assert!(!app_data.join(RESTORE_INTENT_FILE).exists());
@@ -298,7 +298,7 @@ fn test_backup_restore_full_lifecycle_encrypted() {
     assert!(stage_ok.restart_required);
 
     // Apply restore
-    apply_pending_restore(&app_data);
+    apply_pending_restore(&app_data).unwrap();
 
     // Verify restored database has only Alice
     let restored_conn = Connection::open(&taomni_db_path).unwrap();
@@ -429,7 +429,7 @@ fn test_backup_restore_replaces_mfa_db_and_keeps_safety_copy() {
     assert_eq!(count(&mfa_path), 2);
 
     stage_restore_to_dir(&app_data, &archive, None).unwrap();
-    apply_pending_restore(&app_data);
+    apply_pending_restore(&app_data).unwrap();
     assert_eq!(
         count(&mfa_path),
         1,

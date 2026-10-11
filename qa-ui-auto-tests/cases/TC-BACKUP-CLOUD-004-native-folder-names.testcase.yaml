@@ -1,0 +1,69 @@
+id: TC-BACKUP-CLOUD-004
+title: Readable cloud folders migrate in place and keep backup file identity
+description: >-
+  Native loopback fixture starts with UUID-only device and destination folders.
+  Two real encrypted uploads migrate and rename those folders through PATCH,
+  retaining folder tokens and the backup file token used for version history.
+  This verifies production networking against a fixture, not real Feishu service behavior.
+covers: [F-BACKUP-2]
+tags: [backup, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db, backup_cloud]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-cloud-start"]:not([disabled])'
+- click: '[data-testid="backup-cloud-start"]'
+- wait_for: {selector: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="completed"]', timeout_sec: 45}
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: 'renamed=legacyDevice:QA device ['}
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: 'renamed=legacyPlan:QA cloud ['}
+- fill: {selector: '[data-testid="backup-device-name"]', value: Office laptop}
+- click: '[data-testid="backup-cloud-edit"]'
+- wait_for: '[data-testid="backup-cloud-save"]:not([disabled])'
+- fill: {selector: '[data-testid="backup-cloud-name"]', value: Daily backup}
+- click: '[data-testid="backup-cloud-save"]'
+- wait_for: '[data-testid="backup-cloud-start"]:not([disabled])'
+- click: '[data-testid="backup-cloud-start"]'
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: same_archive_token_after_rename, timeout_sec: 45}
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: 'renamed=legacyDevice:Office laptop ['}
+- assert_file_contains: {path: '${fixture.backup_service_events}', contains: 'renamed=legacyPlan:Daily backup ['}
+- click: '[data-testid="backup-cloud-refresh"]'
+- wait_for: '[data-testid="backup-cloud-row"]'
+- assert_text: {selector: '[data-testid="backup-cloud-row"]', contains: Office laptop}
+- assert_text: {selector: '[data-testid="backup-cloud-row"]', contains: Daily backup / current.taobak}
+- click: '[data-testid="backup-cloud-row"]'
+- press: PageDown
+- screenshot: backup-readable-folders.png
+verification:
+  review: reviewed
+  native:
+  - check: Actual native PATCH requests and repeated encrypted uploads preserve cloud object tokens.
+    method: automated
+    reason: Browser fixtures cannot verify native network payloads or file identity.
+  visual:
+  - check: Source and destination names are readable in the restore list.
+    method: manual
+    reason: Review the retained native screenshot.
+  requirements:
+  - id: R1
+    requirement: Legacy UUID folders are renamed without replacing their cloud tokens.
+    actions: [7]
+    checkpoints:
+    - {step: 8, expectation: Initial encrypted upload completed}
+    - {step: 9, expectation: Original device folder token receives a readable title}
+    - {step: 10, expectation: Original destination folder token receives a readable title}
+    results: [8, 9, 10]
+  - id: R2
+    requirement: Editing names updates the original folders and preserves the backup file identity.
+    actions: [11, 12, 14, 15, 17, 21]
+    checkpoints:
+    - {step: 18, expectation: Second upload reused the original archive token}
+    - {step: 19, expectation: Device rename reused its folder token}
+    - {step: 20, expectation: Destination rename reused its folder token}
+    - {step: 23, expectation: Restore row displays the source name}
+    - {step: 24, expectation: Restore row displays the destination name}
+    results: [18, 19, 20, 23, 24]

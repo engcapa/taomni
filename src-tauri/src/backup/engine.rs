@@ -147,6 +147,7 @@ pub fn create_backup(
         target_path,
         password,
         load_policy(app),
+        true,
     )
 }
 
@@ -164,7 +165,34 @@ pub fn create_scheduled_backup(
     }
     let state = app.state::<AppState>();
     let scope = policy.default_scope.clone();
-    create_backup_locked(&state, app, &scope, None, None, None, policy).map(Some)
+    create_backup_locked(&state, app, &scope, None, None, None, policy, true).map(Some)
+}
+
+pub fn create_cloud_snapshot(
+    app: &AppHandle,
+    source: &super::model::SourceSpec,
+    path: String,
+    password: String,
+) -> Result<BackupResult, String> {
+    let coordinator = app.state::<BackupCoordinator>();
+    let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
+    let _process_operation = BackupProcessLock::acquire(app)?;
+    if crate::resolved_app_data_dir(app)?
+        .join(super::restore::RESTORE_INTENT_FILE)
+        .exists()
+    {
+        return Err("A restore is staged; restart before creating cloud backups".into());
+    }
+    create_backup_locked(
+        &app.state::<AppState>(),
+        app,
+        &source.scope,
+        source.custom_options.clone(),
+        Some(path),
+        Some(password),
+        load_policy(app),
+        false,
+    )
 }
 
 fn create_backup_locked(
@@ -175,6 +203,7 @@ fn create_backup_locked(
     target_path: Option<String>,
     password: Option<String>,
     policy: BackupPolicy,
+    update_local_policy: bool,
 ) -> Result<BackupResult, String> {
     let app_data = crate::resolved_app_data_dir(app)?;
 
@@ -345,12 +374,21 @@ fn create_backup_locked(
     }
 
     let app_version = app.package_info().version.to_string();
-    let (manifest, file_size) = pack_staged_archive(
+    let device = super::control::load(app)?.device;
+    let provenance = super::model::Provenance {
+        snapshot_id: uuid::Uuid::new_v4().to_string(),
+        device_id: device.id,
+        device_name: device.name,
+        source_kind: "taomni".into(),
+        source_schema_version: 1,
+    };
+    let (manifest, file_size) = pack_staged_archive_with_provenance(
         &staged_files,
         &app_version,
         scope,
         password.as_deref(),
         &out_file_path,
+        Some(provenance),
     )?;
 
     // If backup was written into the configured backup directory, perform retention rotation
@@ -363,7 +401,9 @@ fn create_backup_locked(
     // Update policy last backup time
     let mut updated_policy = policy;
     updated_policy.last_backup_at = Some(manifest.created_at);
-    save_policy(app, &updated_policy)?;
+    if update_local_policy {
+        save_policy(app, &updated_policy)?;
+    }
 
     let result = BackupResult {
         file_path: out_file_path.to_string_lossy().into_owned(),
@@ -470,9 +510,28 @@ pub fn pack_staged_archive(
     password: Option<&str>,
     out_file_path: &Path,
 ) -> Result<(BackupManifest, u64), String> {
+    pack_staged_archive_with_provenance(
+        staged_files,
+        app_version,
+        scope,
+        password,
+        out_file_path,
+        None,
+    )
+}
+
+fn pack_staged_archive_with_provenance(
+    staged_files: &[StagedFile],
+    app_version: &str,
+    scope: &str,
+    password: Option<&str>,
+    out_file_path: &Path,
+    provenance: Option<super::model::Provenance>,
+) -> Result<(BackupManifest, u64), String> {
     let is_encrypted = password.as_ref().is_some_and(|p| !p.trim().is_empty());
     let mut manifest =
         BackupManifest::new(app_version.to_string(), scope.to_string(), is_encrypted);
+    manifest.provenance = provenance;
 
     // Build in-memory Zip archive
     let mut zip_buffer = Cursor::new(Vec::new());
@@ -541,6 +600,7 @@ pub fn pack_staged_archive(
     let _cleanup = scopeguard::guard(pending_path.clone(), |path| {
         let _ = std::fs::remove_file(path);
     });
+    let _cache_reservation = super::cache::reserve(out_file_path, final_bytes.len() as u64)?;
     std::fs::write(&pending_path, &final_bytes)
         .map_err(|e| format!("write backup output file {}: {e}", out_file_path.display()))?;
     std::fs::rename(&pending_path, out_file_path).map_err(|e| {

@@ -39,6 +39,7 @@ export interface BackupFileEntry {
 }
 
 export interface BackupManifest {
+  provenance?: { snapshotId: string; deviceId: string; deviceName: string; sourceKind: string; sourceSchemaVersion: number };
   formatVersion: number;
   appName: string;
   appVersion: string;

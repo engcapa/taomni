@@ -180,7 +180,7 @@ describe("BackupSettingsPanel", () => {
 
     expect(listenMock).toHaveBeenCalledWith("backup-completed", expect.any(Function));
     await act(async () => {
-      listenMock.mock.calls[0][1]({ payload: {} });
+      listenMock.mock.calls.find(([event]) => event === "backup-completed")![1]({ payload: {} });
     });
 
     expect(screen.getByText(history[0].fileName)).toBeDefined();
@@ -219,7 +219,9 @@ describe("BackupSettingsPanel", () => {
   it("removes a listener whose registration finishes after the panel closes", async () => {
     const unlisten = vi.fn();
     let registered!: (unlisten: () => void) => void;
-    listenMock.mockReturnValue(new Promise<() => void>((resolve) => { registered = resolve; }));
+    listenMock.mockImplementation((event: string) => event === "backup-completed"
+      ? new Promise<() => void>((resolve) => { registered = resolve; })
+      : Promise.resolve(vi.fn()));
     const { unmount } = render(<BackupSettingsPanel />);
     unmount();
 

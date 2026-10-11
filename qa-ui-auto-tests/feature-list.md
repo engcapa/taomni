@@ -10455,6 +10455,104 @@ controls:
 - 轻量核心与完整备份都包含 `databases/mfa.db`；自定义范围勾选 MFA 时强制同时包含 `vault.db`（数据密钥在保险库中）。从未使用 MFA 的配置不生成 `mfa.db`。
 - 恢复时替换 `mfa.db` 并为原文件保留安全副本；恢复后若保险库与 `mfa.db` 不匹配，MFA 标签提示并提供清空重建入口。
 
+### 27.4a 云端备份连接（开发中）
+
+<!-- feature
+id: F-BACKUP-2
+status: partial
+area: settings/backup
+components: [RemoteBackupPanel]
+files:
+  - src/components/settings/RemoteBackupPanel.tsx
+  - src/lib/remoteBackup.ts
+  - src-tauri/src/backup/commands.rs
+  - src-tauri/src/backup/control.rs
+  - src-tauri/src/backup/credentials.rs
+  - src-tauri/src/backup/feishu/auth.rs
+controls:
+  - id: cloud-panel
+    selector: '[data-testid="backup-cloud-panel"]'
+    kind: display
+  - id: feishu-add
+    selector: '[data-testid="backup-feishu-add"]'
+    kind: interactive
+  - id: cloud-target
+    selector: '[data-testid="backup-cloud-target"]'
+    kind: interactive
+  - id: cloud-name
+    selector: '[data-testid="backup-cloud-name"]'
+    kind: interactive
+  - id: cloud-edit
+    selector: '[data-testid="backup-cloud-edit"]'
+    kind: interactive
+  - id: cloud-proxy
+    selector: '[data-testid="backup-cloud-proxy"]'
+    kind: interactive
+  - id: cloud-save
+    selector: '[data-testid="backup-cloud-save"]'
+    kind: interactive
+  - id: feishu-folder
+    selector: '[data-testid="backup-feishu-folder"]'
+    kind: interactive
+  - id: device-name
+    selector: '[data-testid="backup-device-name"]'
+    kind: interactive
+  - id: source-device
+    selector: '[data-testid="backup-source-device"]'
+    kind: interactive
+  - id: cloud-row
+    selector: '[data-testid="backup-cloud-row"]'
+    kind: display
+  - id: feishu-app-id-legacy
+    selector: '[data-testid="backup-feishu-app-id"]'
+    kind: display
+  - id: feishu-authorize
+    selector: '[data-testid="backup-feishu-authorize"]'
+    kind: interactive
+  - id: recovery
+    selector: '[data-testid="backup-connection-recovery"]'
+    kind: display
+  - id: restart-confirm
+    selector: '[data-testid="backup-restart-confirm"]'
+    kind: interactive
+  - id: restart-application
+    selector: '[data-testid="backup-restart-application"]'
+    kind: interactive
+  - id: cache
+    selector: '[data-testid="backup-cache"]'
+    kind: display
+  - id: cache-clean
+    selector: '[data-testid="backup-cache-clean"]'
+    kind: interactive
+  - id: job-cancel
+    selector: '[data-testid="backup-job-cancel"]'
+    kind: interactive
+  - id: job-retry
+    selector: '[data-testid="backup-job-retry"]'
+    kind: interactive
+  - id: job-discard
+    selector: '[data-testid="backup-job-discard"]'
+    kind: interactive
+  - id: discard-confirm
+    selector: '[data-testid="backup-discard-confirm"]'
+    kind: interactive
+  - id: retry-notice
+    selector: '[data-testid="backup-retry-notice"]'
+    kind: display
+  - id: job
+    selector: '[data-testid="backup-cloud-job"]'
+    kind: display
+  - id: cloud-start
+    selector: '[data-testid="backup-cloud-start"]'
+    kind: interactive
+  - id: cloud-refresh
+    selector: '[data-testid="backup-cloud-refresh"]'
+    kind: interactive
+-->
+
+- 飞书使用原生应用复用/浏览器注册和设备授权，目标可保存独立代理；不需要手工应用密钥或回调设置。
+- `TC-BACKUP-CLOUD-001` 验证原生目标配置保存/重开与中英文切换；个人真实授权、上传、历史回退及重启恢复已有专门实测，具体范围与未完成项见 `docs-feature/unified-backup/implementation-status.md`，该 UI case 不代替云端链路验收。
+
 ### 27.4 后台自动备份 ✅
 
 <!-- feature

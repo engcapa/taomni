@@ -95,6 +95,8 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("ard")
         if mode == "native":
             result.add("display")
+            if fixtures & {"backup_cloud", "credential_store"}:
+                result.add("secret-service")
             if "dual_display_required" in fixtures:
                 result.add("dual-display")
             if "macos_updater" in fixtures:

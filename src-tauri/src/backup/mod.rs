@@ -1,10 +1,25 @@
+pub mod batch;
+pub mod cache;
+pub mod commands;
+pub mod control;
 mod coordination;
+pub mod credentials;
 pub mod crypto;
 pub mod engine;
+pub mod failure;
+pub mod feishu;
+pub mod jobs;
 pub mod manifest;
+pub mod model;
+pub mod network;
 pub mod policy;
+pub mod provider;
+pub mod qa;
 pub mod restore;
 pub mod scheduler;
+pub mod source;
+pub mod transfer;
+pub mod worker;
 
 #[cfg(test)]
 mod tests;

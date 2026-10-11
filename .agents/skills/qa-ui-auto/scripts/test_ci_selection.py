@@ -18,6 +18,13 @@ def args(**overrides):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_cloud_settings_provision_secret_service_without_protocol_fixture(self):
+        plan = make_plan(args(scope="selected", case_ids="TC-BACKUP-CLOUD-001",
+                              platforms="linux", modes="native"))
+        self.assertEqual(len(plan["entries"]), 1)
+        self.assertEqual(plan["entries"][0]["selected_ids"], ["TC-BACKUP-CLOUD-001"])
+        self.assertIn("secret-service", plan["entries"][0]["capabilities"])
+
     def test_release_override_changes_only_native_build_capability_not_case_selection(self):
         selection = dict(scope="selected", platforms="linux", modes="browser,native",
                          case_ids="TC-SHOT-N20,TC-SHOT-036")

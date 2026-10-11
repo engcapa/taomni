@@ -2137,6 +2137,35 @@
 - `[data-testid="backup-last-success"]` — display — F-BACKUP-1.last-success
 - `[data-testid="backup-history-refresh"]` — interactive — F-BACKUP-1.history-refresh
 
+## settings/backup (F-BACKUP-2)
+
+- `[data-testid="backup-cloud-panel"]` — display — F-BACKUP-2.cloud-panel
+- `[data-testid="backup-feishu-add"]` — interactive — F-BACKUP-2.feishu-add
+- `[data-testid="backup-cloud-target"]` — interactive — F-BACKUP-2.cloud-target
+- `[data-testid="backup-cloud-name"]` — interactive — F-BACKUP-2.cloud-name
+- `[data-testid="backup-cloud-edit"]` — interactive — F-BACKUP-2.cloud-edit
+- `[data-testid="backup-cloud-proxy"]` — interactive — F-BACKUP-2.cloud-proxy
+- `[data-testid="backup-cloud-save"]` — interactive — F-BACKUP-2.cloud-save
+- `[data-testid="backup-feishu-folder"]` — interactive — F-BACKUP-2.feishu-folder
+- `[data-testid="backup-device-name"]` — interactive — F-BACKUP-2.device-name
+- `[data-testid="backup-source-device"]` — interactive — F-BACKUP-2.source-device
+- `[data-testid="backup-cloud-row"]` — display — F-BACKUP-2.cloud-row
+- `[data-testid="backup-feishu-app-id"]` — display — F-BACKUP-2.feishu-app-id-legacy
+- `[data-testid="backup-feishu-authorize"]` — interactive — F-BACKUP-2.feishu-authorize
+- `[data-testid="backup-connection-recovery"]` — display — F-BACKUP-2.recovery
+- `[data-testid="backup-restart-confirm"]` — interactive — F-BACKUP-2.restart-confirm
+- `[data-testid="backup-restart-application"]` — interactive — F-BACKUP-2.restart-application
+- `[data-testid="backup-cache"]` — display — F-BACKUP-2.cache
+- `[data-testid="backup-cache-clean"]` — interactive — F-BACKUP-2.cache-clean
+- `[data-testid="backup-job-cancel"]` — interactive — F-BACKUP-2.job-cancel
+- `[data-testid="backup-job-retry"]` — interactive — F-BACKUP-2.job-retry
+- `[data-testid="backup-job-discard"]` — interactive — F-BACKUP-2.job-discard
+- `[data-testid="backup-discard-confirm"]` — interactive — F-BACKUP-2.discard-confirm
+- `[data-testid="backup-retry-notice"]` — display — F-BACKUP-2.retry-notice
+- `[data-testid="backup-cloud-job"]` — display — F-BACKUP-2.job
+- `[data-testid="backup-cloud-start"]` — interactive — F-BACKUP-2.cloud-start
+- `[data-testid="backup-cloud-refresh"]` — interactive — F-BACKUP-2.cloud-refresh
+
 ## settings/backup (F-MFA-3)
 
 - `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup

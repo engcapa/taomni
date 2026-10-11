@@ -165,7 +165,8 @@ pub fn run() {
             // Runs before the app-data dir is created so the directory rename
             // targets a non-existent destination on every platform.
             migrate::run(&app_data);
-            backup::restore::apply_pending_restore(&app_data);
+            backup::restore::apply_pending_restore(&app_data)
+                .map_err(std::io::Error::other)?;
 
             std::fs::create_dir_all(&app_data).ok();
 
@@ -224,6 +225,8 @@ pub fn run() {
                 .expect("failed to init local history store");
             app.manage(local_history);
 
+            backup::jobs::initialize(app.handle());
+            backup::qa::initialize(app.handle()).map_err(std::io::Error::other)?;
             backup::scheduler::start(app.handle());
 
             let handle_for_reaper = app.handle().clone();
@@ -1231,6 +1234,22 @@ pub fn run() {
             backup::backup_list_history,
             backup::backup_delete_item,
             backup::backup_get_default_dir,
+            backup::commands::backup_remote_get_config,
+            backup::commands::backup_remote_clean_cache,
+            backup::commands::backup_remote_discard,
+            backup::batch::backup_run_selected,
+            backup::commands::backup_remote_save_config,
+            backup::commands::backup_feishu_authorize,
+            backup::commands::backup_feishu_apps,
+            backup::commands::backup_feishu_authorization_status,
+            backup::commands::backup_feishu_authorization_cancel,
+            backup::commands::backup_remote_list,
+            backup::commands::backup_remote_start,
+            backup::commands::backup_remote_download,
+            backup::commands::backup_remote_jobs,
+            backup::commands::backup_remote_cancel,
+            backup::commands::backup_remote_retry,
+            backup::commands::backup_remote_history_url,
             exit_app,
         ])
         .build(context)
