@@ -38,7 +38,7 @@ steps:
     selector: '[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}
 - press: Enter
-- wait: 1
+- wait_for: '[data-testid="sftp-remote-pane"]:has([data-testid="sftp-remote-path-segments"] button[data-path$="${cfg.sftp.remote_test_dir}"]) [data-testid="sftp-remote-list"] tr[title$="/alpha.txt"]'
 - click: '[data-testid="sftp-remote-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -46,7 +46,7 @@ steps:
     value: qa-ui-auto-dblclick.txt
 - click: '[data-testid="text-input-dialog-confirm"]'
 - assert_not_visible: '[data-testid="text-input-dialog"]'
-- wait: 1
+- wait_for: '[data-testid="sftp-remote-pane"] tr[title$="/qa-ui-auto-dblclick.txt"]'
 - dblclick: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-dblclick.txt"'
 - wait: 1
 - assert_visible: '[role="dialog"][aria-modal="true"]:has-text("Open remote file?")'
@@ -96,10 +96,14 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 14
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 18
+      expectation: The requested remote directory and its fixture file have loaded before New file is invoked.
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
     - step: 23
       expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 24
+      expectation: The created file appears in the remote directory before it is double-clicked.
     - step: 27
       expectation: '{"assert_visible": "[role=\"dialog\"][aria-modal=\"true\"]:has-text(\"Open remote file?\")"}'
     - step: 28
