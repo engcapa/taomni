@@ -450,6 +450,108 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("connects SSH only once when StrictMode replays mount effects", async () => {
+    const onSessionReady = vi.fn();
+    render(
+      <StrictMode>
+        <TerminalPanel visible ssh={sshInfo} onSessionReady={onSessionReady} />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(onSessionReady).toHaveBeenCalledTimes(1));
+    expect(ipcMocks.createSshTerminal).toHaveBeenCalledTimes(1);
+    expect(ipcMocks.closeTerminal).not.toHaveBeenCalled();
+  });
+
+  it.each(["initial", "reconnect"])(
+    "renders the %s SSH notice before output delivered during connection",
+    async (mode) => {
+      let finishConnect: ((sessionId: string) => void) | undefined;
+      let onOutput: ((data: Uint8Array) => void) | undefined;
+      ipcMocks.createSshTerminal.mockImplementation((...args: unknown[]) => {
+        onOutput = args[9] as (data: Uint8Array) => void;
+        return new Promise<string>((resolve) => { finishConnect = resolve; });
+      });
+      const onSessionReady = vi.fn();
+      render(<TerminalPanel visible ssh={sshInfo} onSessionReady={onSessionReady} />);
+      await waitFor(() => expect(finishConnect).toBeTypeOf("function"));
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+
+      if (mode === "reconnect") {
+        await act(async () => finishConnect?.("terminal-session"));
+        await waitFor(() => expect(ipcMocks.terminalExitHandlers.has("terminal-session")).toBe(true));
+        act(() => ipcMocks.terminalExitHandlers.get("terminal-session")?.());
+        act(() => terminalMocks.state.onDataHandler?.("\r"));
+        await waitFor(() => expect(ipcMocks.createSshTerminal).toHaveBeenCalledTimes(2));
+      }
+
+      term.write.mockClear();
+      const remoteOutput = new TextEncoder().encode("Welcome to OpenSSH Server\r\nrunner$ ");
+      act(() => onOutput?.(remoteOutput));
+      await act(async () => finishConnect?.(mode === "initial" ? "terminal-session" : "terminal-session-reconnect"));
+
+      const writes = (term.write.mock.calls as unknown[][]).map(([data]) =>
+        typeof data === "string" ? data : new TextDecoder().decode(data as Uint8Array),
+      );
+      const noticeIndex = writes.findIndex((text) => text.includes(
+        mode === "initial" ? "Taomni SSH terminal" : "Reconnected to",
+      ));
+      const remoteIndex = writes.findIndex((text) => text.includes("Welcome to OpenSSH Server"));
+      expect(noticeIndex).toBeGreaterThanOrEqual(0);
+      expect(remoteIndex).toBeGreaterThan(noticeIndex);
+      expect(writes.at(-1)).toBe("Welcome to OpenSSH Server\r\nrunner$ ");
+
+      const laterOutput = new TextEncoder().encode("later-output\r\nrunner$ ");
+      act(() => onOutput?.(laterOutput));
+      const lastWrite = (term.write.mock.calls as unknown[][]).at(-1);
+      expect(new TextDecoder().decode(lastWrite?.[0] as Uint8Array)).toBe("later-output\r\nrunner$ ");
+      expect(lastWrite?.[1]).toBeTypeOf("function");
+    },
+  );
+
+  it("keeps early SSH error output without displaying a successful connection banner", async () => {
+    ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
+      (args[9] as (data: Uint8Array) => void)(new TextEncoder().encode("server-error\r\n"));
+      throw new Error("SSH refused");
+    });
+    const onSessionReady = vi.fn();
+    render(<TerminalPanel visible ssh={sshInfo} onSessionReady={onSessionReady} />);
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    await waitFor(() => expect(term.write).toHaveBeenCalledWith(expect.stringContaining("SSH refused")));
+    const writes = (term.write.mock.calls as unknown[][]).map(([data]) =>
+      typeof data === "string" ? data : new TextDecoder().decode(data as Uint8Array),
+    );
+    expect(writes).toContain("server-error\r\n");
+    expect(writes.some((text) => text.includes("Taomni SSH terminal"))).toBe(false);
+    expect(onSessionReady).not.toHaveBeenCalled();
+  });
+
+  it("discards queued SSH output when its panel is closed before connection completes", async () => {
+    let finishConnect: ((sessionId: string) => void) | undefined;
+    ipcMocks.createSshTerminal.mockImplementation((...args: unknown[]) => {
+      (args[9] as (data: Uint8Array) => void)(new TextEncoder().encode("early-prompt$ "));
+      return new Promise<string>((resolve) => { finishConnect = resolve; });
+    });
+    const { unmount } = render(<TerminalPanel visible ssh={sshInfo} />);
+    await waitFor(() => expect(finishConnect).toBeTypeOf("function"));
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    unmount();
+    term.write.mockClear();
+    await act(async () => finishConnect?.("terminal-session"));
+    expect(term.write).not.toHaveBeenCalled();
+    expect(ipcMocks.closeTerminal).toHaveBeenCalledWith("terminal-session");
+  });
+
+  it("does not connect SSH after its initial mount is cancelled", async () => {
+    const { unmount } = render(<TerminalPanel visible ssh={sshInfo} />);
+    unmount();
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+    });
+    expect(ipcMocks.createSshTerminal).not.toHaveBeenCalled();
+  });
+
   it("launches a SocksCap TUI only once when StrictMode replays mount effects", async () => {
     render(
       <StrictMode>

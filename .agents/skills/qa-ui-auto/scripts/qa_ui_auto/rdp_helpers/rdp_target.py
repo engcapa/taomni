@@ -139,7 +139,7 @@ def _run_target(args: argparse.Namespace, activity: str) -> int:
         "flip_samples": [],
     }
 
-    def flip(_event: object = None) -> None:
+    def flip(event: object = None) -> None:
         state["flips"] += 1
         state["color"] = "#ffffff" if state["color"] == "#000000" else "#000000"
         state["last_event_unix_ms"] = int(time.time() * 1000)
@@ -149,6 +149,13 @@ def _run_target(args: argparse.Namespace, activity: str) -> int:
             "flip": state["flips"],
             "event_unix_us": state["last_event_unix_ms"] * 1000,
             "draw_submitted_unix_us": time.time_ns() // 1000,
+            # Distinguish an extra remote button press from a key reaching
+            # the reference desktop while operating local client controls.
+            # Do not retain typed text or character values.
+            "event_type": getattr(getattr(event, "type", None), "name", None),
+            "button": getattr(event, "num", None),
+            "keycode": getattr(event, "keycode", None),
+            "modifiers": getattr(event, "state", None),
         })
         # Preserve a bounded diagnostic trace to split native input delivery
         # from the following capture/encode/decode wait on the same host clock.

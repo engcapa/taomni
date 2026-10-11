@@ -2433,6 +2433,7 @@ export function TerminalPanel({
     let cleanupImePositionLock: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
     let activityPromptTimer: ReturnType<typeof setTimeout> | undefined;
+    let sshLaunchTimer: ReturnType<typeof setTimeout> | undefined;
     let sockscapLaunchTimer: ReturnType<typeof setTimeout> | undefined;
     let launchedSockscapPid: number | null = null;
 
@@ -3236,7 +3237,6 @@ export function TerminalPanel({
       };
       if (ssh && !adopted) {
         if (mode === "reconnect") {
-          term.write(`\r\n\x1b[32m[Reconnected to ${ssh.username}@${ssh.host}:${ssh.port}]\x1b[0m\r\n`);
           setStatusMessage("SSH reconnected");
           window.setTimeout(focusTerminal, 0);
           window.dispatchEvent(
@@ -3244,8 +3244,6 @@ export function TerminalPanel({
               detail: { tabId },
             }),
           );
-        } else {
-          term.write(formatSshInfoBanner(ssh));
         }
         // Install continuous OSC 7 cwd reporting on the remote shell so the tab
         // always knows its working directory — used by SFTP "Sync" and, crucially,
@@ -3380,6 +3378,21 @@ export function TerminalPanel({
       const startupCommand = typeof opts.startupCmd === "string" ? opts.startupCmd.trim() : "";
       const keepStartupCommandOpen = startupCommand.length > 0 && opts.doNotExit !== false;
       const backendStartupCommand = startupCommand && !keepStartupCommandOpen ? startupCommand : null;
+      // The native output channel can deliver the shell's first prompt before
+      // createSshTerminal resolves. Keep those bytes ordered after our notice;
+      // writing the notice after the prompt moves xterm's cursor to a blank
+      // line and strands prompt detection, cwd setup and task readiness.
+      let pendingOutput: Uint8Array[] | null = [];
+      const receiveOutput = (raw: Uint8Array) => {
+        if (destroyed) return;
+        if (pendingOutput) pendingOutput.push(raw.slice());
+        else handleRawOutput(raw);
+      };
+      const releaseOutput = () => {
+        const buffered = pendingOutput;
+        pendingOutput = null;
+        if (!destroyed) buffered?.forEach(handleRawOutput);
+      };
       createSshTerminal(
         targetSid,
         ssh.host,
@@ -3390,7 +3403,7 @@ export function TerminalPanel({
         cols,
         rows,
         JSON.stringify(toNetworkSettingsPayload(ns)),
-        handleRawOutput,
+        receiveOutput,
         // X11 forwarding: enabled per-session (defaults on, matching the
         // SessionEditor default). Trusted mode unless the expert option
         // explicitly opts into untrusted.
@@ -3399,12 +3412,23 @@ export function TerminalPanel({
         backendStartupCommand,
         keepStartupCommandOpen,
       )
-        .then((sessionId) => handleConnected(
-          { sessionId, shellId: null },
-          mode,
-          keepStartupCommandOpen ? startupCommand : undefined,
-        ))
-        .catch((err) => handleConnectFailure(err, mode));
+        .then((sessionId) => {
+          if (!destroyed) {
+            term.write(mode === "reconnect"
+              ? `\r\n\x1b[32m[Reconnected to ${ssh.username}@${ssh.host}:${ssh.port}]\x1b[0m\r\n`
+              : formatSshInfoBanner(ssh));
+          }
+          releaseOutput();
+          return handleConnected(
+            { sessionId, shellId: null },
+            mode,
+            keepStartupCommandOpen ? startupCommand : undefined,
+          );
+        })
+        .catch((err) => {
+          releaseOutput();
+          handleConnectFailure(err, mode);
+        });
     };
 
     const startCommandTerminal = (targetSid: string) => {
@@ -3456,7 +3480,9 @@ export function TerminalPanel({
         .then(() => handleConnected({ sessionId: sid, shellId: null }, "initial"))
         .catch((err) => handleConnectFailure(err, "initial"));
     } else if (ssh) {
-      startSshConnection(sid, "initial");
+      // StrictMode replays mount effects before the next task. Cancel the
+      // discarded mount before it opens a second real remote shell.
+      sshLaunchTimer = window.setTimeout(() => startSshConnection(sid, "initial"), 0);
     } else if (commandTerminal) {
       startCommandTerminal(sid);
     } else if (sockscapTerminal) {
@@ -3533,6 +3559,7 @@ export function TerminalPanel({
       clearTimeout(resizeTimer);
       window.clearInterval(automationStateTimer);
       if (activityPromptTimer) clearTimeout(activityPromptTimer);
+      if (sshLaunchTimer !== undefined) clearTimeout(sshLaunchTimer);
       if (sockscapLaunchTimer) clearTimeout(sockscapLaunchTimer);
       installSshCwdIntegrationRef.current = null;
       automationInputSettlingRef.current = false;

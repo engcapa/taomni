@@ -48,12 +48,24 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
                     .key(*modifier, Direction::Press)
                     .map_err(|e| anyhow::anyhow!("{e}"))?;
             }
+            #[cfg(target_os = "macos")]
+            let result = (|| -> anyhow::Result<()> {
+                // Enigo posts CGEvents without per-event pacing. Keep the
+                // physical shortcut pressed across an OS event-loop turn.
+                std::thread::sleep(Duration::from_millis(20));
+                input.key(key, Direction::Press).map_err(|e| anyhow::anyhow!("{e}"))?;
+                std::thread::sleep(Duration::from_millis(30));
+                input.key(key, Direction::Release).map_err(|e| anyhow::anyhow!("{e}"))
+            })();
+            #[cfg(not(target_os = "macos"))]
             let result = input
                 .key(key, Direction::Click)
                 .map_err(|e| anyhow::anyhow!("{e}"));
             for modifier in modifiers.iter().rev() {
                 let _ = input.key(*modifier, Direction::Release);
             }
+            #[cfg(target_os = "macos")]
+            std::thread::sleep(Duration::from_millis(30));
             result
         };
         #[cfg(target_os = "macos")]

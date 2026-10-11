@@ -214,7 +214,17 @@ class VerificationTest(unittest.TestCase):
             session = Mock()
             session.console_entries.return_value = []
             focus = {"document_has_focus": False, "visibility": "visible", "active": {"tag": "DIV"}}
-            session.execute.side_effect = [focus, "<html>failure</html>"]
+            editor_input = [{"type": "input", "data": "r", "focus": {"offset": 1}}]
+            def execute(script):
+                self.assertFalse(session.close.called)
+                if "__QA_UI_AUTO_EDITOR_INPUT__" in script:
+                    return editor_input
+                if "__QA_UI_AUTO_FOCUS__" in script:
+                    return focus
+                if "document.documentElement.outerHTML" in script:
+                    return "<html>failure</html>"
+                self.fail(f"unexpected diagnostic script: {script}")
+            session.execute.side_effect = execute
             captured = []
             session.screenshot.side_effect = lambda path: captured.append(not session.close.called)
             harness = Mock()
@@ -226,10 +236,28 @@ class VerificationTest(unittest.TestCase):
                 results = runner._native_run([case], {}, {}, root, False)
             self.assertEqual(captured, [True])
             self.assertEqual(json.loads((root / "TC-fail/focus-failure.json").read_text()), focus)
-            self.assertNotIn(".focus(", session.execute.call_args_list[0].args[0])
+            self.assertEqual(json.loads((root / "TC-fail/editor-input-failure.json").read_text()), editor_input)
+            self.assertEqual((root / "TC-fail/failure-native.html").read_text(), "<html>failure</html>")
+            for call in session.execute.call_args_list:
+                self.assertNotIn(".focus(", call.args[0])
             harness.create_session.assert_called_once()
             session.close.assert_called_once()
             self.assertEqual(results[0]["failure"]["step_index"], 1)
+
+    def test_native_failure_capture_retains_driver_errors_without_masking_failure(self):
+        import tauri_webdriver
+        with tempfile.TemporaryDirectory() as directory:
+            session = Mock()
+            session.execute.side_effect = tauri_webdriver.WebDriverError("no such window: target closed")
+            session.screenshot.side_effect = tauri_webdriver.WebDriverError("no such window: target closed")
+            session.console_entries.return_value = []
+            artifacts = runner._capture_native_failure(session, Path(directory))
+            errors = json.loads(Path(artifacts["diagnostic_errors"]).read_text())
+            self.assertEqual({item["diagnostic"] for item in errors}, {"editor_input", "focus", "screenshot", "html"})
+            self.assertTrue(all(item["error"] == "no such window: target closed" for item in errors))
+            self.assertTrue(all(item["type"] == "WebDriverError" for item in errors))
+            self.assertIn("console", artifacts)
+            session.close.assert_not_called()
 
     def test_build_cache_requires_matching_recipe_and_binary(self):
         with tempfile.TemporaryDirectory() as directory:

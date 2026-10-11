@@ -204,6 +204,53 @@ class NativeSessionTransportTest(TestCase):
         self.assertEqual(actions[0]["origin"], {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
         self.assertEqual([a["button"] for a in actions[1:]], [2, 2])
 
+    def test_double_click_resolves_refreshed_row_before_sending_pointer_actions(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.find = Mock(side_effect=["old-row", "new-row"])
+        session.execute = Mock()
+        session.request = Mock(side_effect=[
+            WebDriverError("stale element reference"),
+            {"x": 20, "y": 40, "width": 100, "height": 24},
+            None,
+        ])
+        with patch("tauri_webdriver.time.sleep"):
+            session.dblclick("#row")
+        self.assertEqual(session.find.call_count, 2)
+        requests = session.request.call_args_list
+        self.assertTrue(requests[0].args[1].endswith("/old-row/rect"))
+        self.assertTrue(requests[1].args[1].endswith("/new-row/rect"))
+        pointer = requests[2].args[2]["actions"][0]["actions"]
+        self.assertEqual((pointer[0]["x"], pointer[0]["y"]), (70, 52))
+        self.assertEqual([action["type"] for action in pointer].count("pointerDown"), 2)
+
+    def test_double_click_rejects_persistently_stale_geometry_without_input(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="row")
+        session.execute = Mock()
+        session.request = Mock(side_effect=WebDriverError("stale element reference"))
+        with patch("tauri_webdriver.time.sleep"):
+            with self.assertRaisesRegex(WebDriverError, "stale element reference"):
+                session.dblclick("#row")
+        self.assertEqual(session.find.call_count, 3)
+        self.assertTrue(all(request.args[0] == "GET" for request in session.request.call_args_list))
+
+    def test_double_click_does_not_repeat_pointer_actions_after_transport_failure(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="row")
+        session.execute = Mock()
+        session.request = Mock(side_effect=[
+            {"x": 20, "y": 40, "width": 100, "height": 24},
+            WebDriverError("stale element reference"),
+        ])
+        with patch("tauri_webdriver.time.sleep"):
+            with self.assertRaisesRegex(WebDriverError, "stale element reference"):
+                session.dblclick("#row")
+        self.assertEqual(session.find.call_count, 1)
+        self.assertEqual(sum(request.args[0] == "POST" for request in session.request.call_args_list), 1)
+
     def test_click_retries_webkit_stale_element_error(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
@@ -560,6 +607,63 @@ class NativeSessionFillTest(TestCase):
             with self.assertRaisesRegex(WebDriverError, "paste failed"):
                 session.fill('input[type="password"]', text)
         self.assertEqual(set_text.call_args_list, [call(text), call("previous")])
+
+    def test_linux_password_retry_targets_input_after_validation_moves_dialog(self) -> None:
+        session = self.session(False)
+        selector = 'input[type="password"]'
+        text = "qa-mfa-native-108"
+        state = {"focused": False, "value": "", "clipboard": "previous"}
+
+        def focus(_selector):
+            state["focused"] = True
+
+        def request(method, path, payload):
+            if path.endswith("/value"):
+                # Partial typing shows validation feedback and re-centers the
+                # dialog. WebKit's subsequent coordinate click hits its padding.
+                state["value"] = "q"
+            elif path.endswith("/click"):
+                state["focused"] = False
+
+        def press(combo):
+            if combo == "Control+v":
+                if not state["focused"]:
+                    raise WebDriverError("paste missed the password input")
+                state["value"] = state["clipboard"]
+            elif combo == "Backspace" and state["focused"]:
+                state["value"] = ""
+
+        def execute(script):
+            if "isContentEditable" in script:
+                return False
+            if "el.type === 'password'" in script:
+                return True
+            return state["value"] == text
+
+        session.focus.side_effect = focus
+        session.request.side_effect = request
+        session.press_combo.side_effect = press
+        session.execute.side_effect = execute
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text", side_effect=lambda value: state.update(clipboard=value)):
+            session.fill(selector, text)
+        self.assertEqual(state["value"], text)
+        self.assertEqual(state["clipboard"], "previous")
+
+    def test_linux_password_retry_stops_if_input_cannot_regain_focus(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, False])
+        session.focus.side_effect = ["focused", WebDriverError("element could not receive focus")]
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text:
+            with self.assertRaisesRegex(WebDriverError, "could not receive focus"):
+                session.fill('input[type="password"]', "private-secret")
+        self.assertEqual(session.press_combo.call_args_list, [call("Mod+a"), call("Backspace")])
+        self.assertEqual(set_text.call_args_list, [call("previous")])
 
     def test_windows_password_fill_retains_keyboard_input(self) -> None:
         session = self.session(False)

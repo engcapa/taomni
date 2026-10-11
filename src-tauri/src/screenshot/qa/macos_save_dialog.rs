@@ -45,6 +45,24 @@ fn text(element: AxElement, name: &str) -> String {
         .unwrap_or_default()
 }
 
+fn geometry(element: AxElement) -> Option<Value> {
+    let position = attribute(element, "AXPosition")?;
+    let size = attribute(element, "AXSize")?;
+    let mut point = [0.0f64; 2];
+    let mut dimensions = [0.0f64; 2];
+    // SAFETY: AX CGPoint/CGSize values contain two CGFloat values on macOS
+    // ARM64/x64. The initialized arrays have the matching size and alignment.
+    let valid = unsafe {
+        AXValueGetValue(position.as_CFTypeRef(), 1, point.as_mut_ptr().cast())
+            && AXValueGetValue(size.as_CFTypeRef(), 2, dimensions.as_mut_ptr().cast())
+    } && point
+        .iter()
+        .chain(dimensions.iter())
+        .all(|value| value.is_finite())
+        && dimensions.iter().all(|value| *value > 0.0);
+    valid.then(|| json!({"position":point,"size":dimensions}))
+}
+
 fn owned_process(mut pid: libc::pid_t) -> bool {
     // macOS config dialogs are opened by an osascript child of the QA app.
     // Accept only this app or its descendants before sending global input.
@@ -97,7 +115,8 @@ fn snapshot() -> Value {
         .map(|window| text(window.as_CFTypeRef(), "AXTitle"));
     json!({"ready":owned && enabled && matches!(role.as_str(), "AXTextField" | "AXComboBox"),
         "processId":pid,"ownProcessTree":owned,"role":role,"enabled":enabled,"value":value,
-        "description":text(element,"AXDescription"),"windowTitle":window_title})
+        "description":text(element,"AXDescription"),"windowTitle":window_title,
+        "geometry":geometry(element)})
 }
 
 fn wait_field(stage: &str, accepts: impl Fn(&str) -> bool) -> anyhow::Result<Value> {
@@ -129,7 +148,35 @@ pub(super) fn wait_value(expected: &str) -> anyhow::Result<Value> {
 }
 
 pub(super) fn wait_folder_field(filename: &str) -> anyhow::Result<Value> {
-    wait_field("go-to-folder", |value| value != filename)
+    let started = Instant::now();
+    let mut previous = Value::Null;
+    let mut stable_since = None;
+    loop {
+        let mut state = snapshot();
+        let ready = state["ready"] == true
+            && state["value"]
+                .as_str()
+                .is_some_and(|value| value != filename)
+            && !state["geometry"].is_null();
+        // AX focus alone does not establish that the opening sheet settled.
+        // Require unchanged OS field bounds, process, role and value before
+        // posting Cmd+A/Cmd+V into the newly focused input.
+        if !ready || state != previous {
+            stable_since = ready.then(Instant::now);
+            previous = state.clone();
+        }
+        let stable_ms = stable_since.map_or(0, |at| at.elapsed().as_millis());
+        state["stage"] = json!("go-to-folder");
+        state["waitedMs"] = json!(started.elapsed().as_millis());
+        state["stableMs"] = json!(stable_ms);
+        if ready && stable_ms >= 500 {
+            return Ok(state);
+        }
+        if started.elapsed() >= Duration::from_secs(20) {
+            anyhow::bail!("QA macOS Go to Folder input did not settle: {state}");
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 fn save_button_in_tree(root: &CFType, remaining: &mut usize) -> Option<CFType> {
@@ -244,6 +291,14 @@ impl PathPasteboard {
             .clipboard
             .set_text(text)
             .context("stage folder path")?;
+        anyhow::ensure!(
+            board
+                .clipboard
+                .get_text()
+                .context("read staged folder path")?
+                == text,
+            "OS pasteboard did not retain the requested folder path"
+        );
         Ok(board)
     }
 

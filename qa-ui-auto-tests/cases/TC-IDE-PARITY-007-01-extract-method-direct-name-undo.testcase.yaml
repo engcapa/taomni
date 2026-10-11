@@ -16,6 +16,8 @@ fixtures:
 - parity007_extract
 timeout_sec: 360
 steps:
+# A visible buffer may precede async disk verification. Wait for the public
+# history-completion message before sending the next history/refactor chord.
 - open: ${cfg.app.base_url}
 - wait_for:
     selector: '[data-testid="welcome-panel"]'
@@ -136,6 +138,9 @@ steps:
 - screenshot: tc-ide-parity-007-01-renamed.png
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+z
+- wait_for:
+    selector: "[data-testid=\"status-bar-message\"][title='Undid Rename symbol to \"sumOf\" (1 files)']"
+    timeout_sec: 30
 - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -169,6 +174,9 @@ steps:
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+z
+- wait_for:
+    selector: "[data-testid=\"status-bar-message\"][title='Undid Extract to method (1 files)']"
+    timeout_sec: 30
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -196,6 +204,9 @@ steps:
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+Shift+z
+- wait_for:
+    selector: "[data-testid=\"status-bar-message\"][title='Redid Extract to method (1 files)']"
+    timeout_sec: 30
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -228,6 +239,9 @@ steps:
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+Shift+z
+- wait_for:
+    selector: "[data-testid=\"status-bar-message\"][title='Redid Rename symbol to \"sumOf\" (1 files)']"
+    timeout_sec: 30
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -260,8 +274,14 @@ steps:
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+z
+- wait_for:
+    selector: "[data-testid=\"status-bar-message\"][title='Undid Rename symbol to \"sumOf\" (1 files)']"
+    timeout_sec: 30
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+z
+- wait_for:
+    selector: "[data-testid=\"status-bar-message\"][title='Undid Extract to method (1 files)']"
+    timeout_sec: 30
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -371,6 +391,9 @@ steps:
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+z
+- wait_for:
+    selector: "[data-testid=\"status-bar-message\"][title='Undid Extract to method (1 files)']"
+    timeout_sec: 30
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -450,6 +473,9 @@ steps:
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+z
+- wait_for:
+    selector: "[data-testid=\"status-bar-message\"][title='Undid Extract to method (1 files)']"
+    timeout_sec: 30
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -605,56 +631,56 @@ verification:
       expectation: The committed buffer is B2 with sumOf in the declaration and the call site.
     - step: 33
       expectation: The naming step issued exactly one provider prepare and rename.
-    - step: 38
+    - step: 39
       expectation: The first editor undo returns B1 with no undo confirmation.
-    - step: 41
+    - step: 43
       expectation: The second undo returns the initial B0.
-    - step: 47
+    - step: 51
       expectation: Redo restores B1 and then B2.
-    - step: 37
+    - step: 38
       expectation: No undo confirmation dialog appears for the editor undo.
     results:
     - 32
+    - 39
+    - 43
+    - 51
     - 38
-    - 41
-    - 47
-    - 37
   - id: ED-PARITY-007-V3-01-cancel
     requirement: Escape and the mouse Cancel keep the provider default name, leaving exactly one extraction history entry that one undo reverts.
     actions:
-    - 73
+    - 80
     checkpoints:
-    - step: 65
+    - step: 71
       expectation: Escape leaves B1 with the default name and no extra rename.
-    - step: 72
+    - step: 79
       expectation: One undo after the Escape path returns B0.
-    - step: 87
+    - step: 94
       expectation: Cancel keeps the default name and adds no rename.
-    - step: 91
+    - step: 99
       expectation: One undo after the Cancel path returns B0.
     results:
-    - 65
-    - 72
-    - 87
-    - 91
+    - 71
+    - 79
+    - 94
+    - 99
   - id: ED-PARITY-007-V3-01-validation
     requirement: A provider-rejected name keeps the committed B1 and the user input, and a corrected retry renames without repeating the extraction.
     actions:
-    - 103
+    - 111
     checkpoints:
-    - step: 107
+    - step: 115
       expectation: The dialog reopens with the rejected 1bad input preserved.
-    - step: 108
+    - step: 116
       expectation: The committed buffer is still B1; the extraction was not repeated.
-    - step: 113
+    - step: 121
       expectation: The corrected name commits B2.
-    - step: 114
+    - step: 122
       expectation: Only rename requests grew; the code-action request count did not.
     results:
-    - 107
-    - 108
-    - 113
-    - 114
+    - 115
+    - 116
+    - 121
+    - 122
   visual:
   - check: Dialog geometry, disabled-confirm styling and the extracted call site against the IDEA reference.
     method: manual

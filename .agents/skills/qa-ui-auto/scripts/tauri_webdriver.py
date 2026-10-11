@@ -773,16 +773,26 @@ class NativeSession:
 
     def dblclick(self, selector: str) -> str:
         try:
-            element = self.find(selector, interactive=True)
-            # Scroll element into center of view first so pointer actions hit the target.
-            with suppress(Exception):
-                self.execute(
-                    f"const el = document.querySelector({json.dumps(selector)});"
-                    "if (el) el.scrollIntoView({block:'center', inline:'center'});"
-                )
-                time.sleep(0.1)
+            # A file-watcher refresh can replace a tree row between resolving
+            # it and reading geometry. Retry preparation only: once pointer
+            # input starts, never replay a possibly completed double-click.
+            for attempt in range(3):
+                try:
+                    element = self.find(selector, interactive=True)
+                    with suppress(Exception):
+                        self.execute(
+                            f"const el = document.querySelector({json.dumps(selector)});"
+                            "if (el) el.scrollIntoView({block:'center', inline:'center'});"
+                        )
+                        time.sleep(0.1)
+                    rect = self.request("GET", self.element_path(element, "/rect"))
+                    break
+                except WebDriverError as exc:
+                    if _is_stale_element_error(exc) and attempt < 2:
+                        time.sleep(0.3)
+                        continue
+                    raise
             # Use W3C Actions API so WebKitGTK registers a real double-click.
-            rect = self.request("GET", self.element_path(element, "/rect"))
             x = int((rect.get("x", 0) + rect.get("width", 0) / 2)) if isinstance(rect, dict) else 0
             y = int((rect.get("y", 0) + rect.get("height", 0) / 2)) if isinstance(rect, dict) else 0
             self.request(
@@ -999,7 +1009,7 @@ class NativeSession:
             if self.execute(check) is not True:
                 # The same mapping can affect /value after modifier drags.
                 # Paste through the OS clipboard instead of translating keys.
-                self._paste_linux_password(element, selector, text, check)
+                self._paste_linux_password(selector, text, check)
         else:
             self.type_text(text)
         return f"filled {selector}"
@@ -1026,14 +1036,17 @@ class NativeSession:
                 time.sleep(0.05)
         raise WebDriverError(f"Wayland input did not select its existing value: {selector}")
 
-    def _paste_linux_password(self, element: str, selector: str, text: str, check: str) -> None:
+    def _paste_linux_password(self, selector: str, text: str, check: str) -> None:
         from qa_ui_auto import host_clipboard
 
         previous = ""
         with suppress(RuntimeError):
             previous = host_clipboard.get_text()
         try:
-            self.request("POST", self.element_path(element, "/click"), {})
+            # Partial input can show validation feedback and move a centered
+            # dialog. WebKit's coordinate click can then hit dialog padding and
+            # blur the password field. Resolve and verify focus before real keys.
+            self.focus(selector)
             if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
                 self._select_wayland_fill_input(selector)
             else:
