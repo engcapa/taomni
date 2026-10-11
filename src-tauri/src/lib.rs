@@ -226,6 +226,7 @@ pub fn run() {
             app.manage(local_history);
 
             backup::jobs::initialize(app.handle());
+            backup::qa::initialize(app.handle()).map_err(std::io::Error::other)?;
             backup::scheduler::start(app.handle());
 
             let handle_for_reaper = app.handle().clone();
@@ -1234,6 +1235,8 @@ pub fn run() {
             backup::backup_delete_item,
             backup::backup_get_default_dir,
             backup::commands::backup_remote_get_config,
+            backup::commands::backup_remote_clean_cache,
+            backup::commands::backup_remote_discard,
             backup::batch::backup_run_selected,
             backup::commands::backup_remote_save_config,
             backup::commands::backup_feishu_authorize,

@@ -31,6 +31,28 @@ beforeEach(() => {
 afterEach(() => { cleanup(); setLocale("en"); });
 
 describe("Feishu native backup connection", () => {
+  it("requires acknowledgement before restarting an expired application connection", async () => {
+    setLocale("en");
+    sessions = [{ ...waiting, phase: "expired", verificationUrl: null, error: "BACKUP_REGISTRATION_RECOVERY: expired" }];
+    render(<RemoteBackupPanel onRestore={vi.fn()} />);
+    const restart = await screen.findByTestId("backup-restart-application");
+    expect((restart as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByTestId("backup-restart-confirm"));
+    fireEvent.click(restart);
+    await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("backup_feishu_authorize", { targetId: "target", applicationSelection: null, restartApplication: true }));
+  });
+  it("refreshes connection status when background token refresh requires authorization", async () => {
+    setLocale("en");
+    config.config.targets[0].enabled = true;
+    config.statuses[0].connected = true;
+    render(<RemoteBackupPanel onRestore={vi.fn()} />);
+    const start = await screen.findByTestId("backup-cloud-start");
+    expect((start as HTMLButtonElement).disabled).toBe(false);
+    config = { ...config, statuses: [{ ...config.statuses[0], connected: false }] };
+    await act(async () => { mocks.events.get("backup-connection-changed")!({ payload: "connection" }); });
+    await waitFor(() => expect((start as HTMLButtonElement).disabled).toBe(true));
+    expect((screen.getByTestId("backup-feishu-authorize") as HTMLButtonElement).disabled).toBe(false);
+  });
   it("switches the mounted workflow, pending authorization, errors and notices between languages", async () => {
     setLocale("en");
     sessions = [{ ...waiting, error: "Cannot read the system credential store; unlock it and retry" }];
@@ -62,7 +84,7 @@ describe("Feishu native backup connection", () => {
   it("opens only official session links, ignores stale events, and restores pending state after remount", async () => {
     const view = render(<RemoteBackupPanel onRestore={vi.fn()} />);
     fireEvent.click(await screen.findByTestId("backup-feishu-authorize"));
-    await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("backup_feishu_authorize", { targetId: "target", applicationSelection: null }));
+    await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("backup_feishu_authorize", { targetId: "target", applicationSelection: null, restartApplication: false }));
     await act(async () => { sessions = [waiting]; mocks.events.get("backup-authorization")!({ payload: waiting }); });
     await waitFor(() => expect(mocks.open).toHaveBeenCalledWith(waiting.verificationUrl));
     await act(async () => { mocks.events.get("backup-authorization")!({ payload: { ...waiting, revision: 1, phase: "connected", verificationUrl: null } }); });

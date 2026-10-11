@@ -1756,6 +1756,9 @@ function stubSystemRdpStatus(): Record<string, unknown> {
 }
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (cmd.startsWith("backup_remote_") || cmd.startsWith("backup_feishu_")) {
+    return await (await import("./remoteBackupStub")).remoteBackupStub(cmd, args) as T;
+  }
   // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).
   if (parity008Handles(cmd, args)) return await parity008Invoke(cmd, args) as T;
   // MFA authenticator: localStorage mirror of mfa.db gated by the stub vault.

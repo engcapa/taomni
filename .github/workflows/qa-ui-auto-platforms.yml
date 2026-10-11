@@ -213,6 +213,10 @@ jobs:
           # rust-cache ignores `key` when `shared-key` is also supplied.
           cache-targets: false
           cache-on-failure: true
+      # Exercise a real Secret Service in the disposable D-Bus session.
+      - name: Linux backup credential service
+        if: runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')
+        run: sudo apt-get update && sudo apt-get install -y gnome-keyring
       - name: Windows build tools and WebView2 driver
         if: runner.os == 'Windows' && matrix.mode == 'native'
         shell: pwsh

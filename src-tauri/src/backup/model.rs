@@ -187,6 +187,14 @@ pub struct BackupJob {
     pub remote: Option<RemoteBackup>,
     pub receipt: Option<Receipt>,
     pub created_at: i64,
+    #[serde(default)]
+    pub updated_at: i64,
+    #[serde(default)]
+    pub attempts: u32,
+    #[serde(default)]
+    pub next_retry_at: Option<i64>,
+    #[serde(default)]
+    pub failure_kind: Option<super::failure::FailureKind>,
 }
 
 pub fn now_ms() -> i64 {

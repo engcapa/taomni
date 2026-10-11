@@ -30,6 +30,36 @@ pub struct RegisteredApp {
     pub id: String,
     pub secret: Zeroizing<String>,
 }
+impl Challenge {
+    pub fn save_registration(&self, secrets: &mut ConnectionSecrets) {
+        secrets.registration_device_code = self.device_code.to_string();
+        secrets.registration_url = self.verification_url.clone();
+        secrets.registration_user_code = self.user_code.clone();
+        secrets.registration_expires_at = now_ms()
+            + self
+                .deadline
+                .saturating_duration_since(tokio::time::Instant::now())
+                .as_millis() as i64;
+        secrets.registration_interval = self.interval;
+    }
+
+    pub fn resume_registration(secrets: &ConnectionSecrets) -> Result<Self, String> {
+        if secrets.registration_device_code.is_empty()
+            || secrets.registration_expires_at <= now_ms()
+        {
+            return Err("BACKUP_REGISTRATION_RECOVERY: Registration expired or recovery data is unavailable; restart application connection in Settings".into());
+        }
+        validate_verification_url(&secrets.registration_url)?;
+        Ok(Self {
+            verification_url: secrets.registration_url.clone(),
+            user_code: secrets.registration_user_code.clone(),
+            device_code: Zeroizing::new(secrets.registration_device_code.clone()),
+            deadline: tokio::time::Instant::now()
+                + Duration::from_millis((secrets.registration_expires_at - now_ms()).max(0) as u64),
+            interval: secrets.registration_interval.clamp(1, 60),
+        })
+    }
+}
 pub struct UserIdentity {
     pub open_id: String,
     pub name: String,
@@ -37,6 +67,17 @@ pub struct UserIdentity {
 }
 
 impl FlowClient {
+    pub fn for_app(client: Client, app: &tauri::AppHandle) -> Result<Self, String> {
+        let mut flow = Self::new(client);
+        if let Some(fixture) = crate::backup::qa::fixture(app)? {
+            let base = fixture.endpoint.trim_end_matches('/');
+            flow.registration = format!("{base}/registration");
+            flow.authorization = format!("{base}/authorization");
+            flow.token = format!("{base}/token");
+            flow.user_info = format!("{base}/identity");
+        }
+        Ok(flow)
+    }
     pub fn new(client: Client) -> Self {
         Self {
             client,
@@ -172,12 +213,22 @@ impl FlowClient {
     ) -> Result<ConnectionSecrets, (String, bool)> {
         let request=self.client.post(&self.token).json(&serde_json::json!({"grant_type":"refresh_token","client_id":id,"client_secret":stored.app_secret,"refresh_token":stored.refresh_token}));
         let (status, value) = response(request, cancel).await.map_err(|error| {
-            let uncertain = !error.starts_with("Cannot connect to backup service");
+            let uncertain = !error.contains("Cannot connect to backup service");
             (error, uncertain)
         })?;
         if let Err(error) = checked(status, &value) {
-            // A definitive service rejection (including rate limit) did not issue tokens.
-            return Err((error, false));
+            // A 5xx can occur after a rotating token was consumed. Do not replay
+            // that token automatically; a definitive 429 can be retried later.
+            let kind = crate::backup::failure::classify(&error);
+            let error = if kind == crate::backup::failure::FailureKind::Transient {
+                error
+            } else {
+                crate::backup::failure::tagged(
+                    crate::backup::failure::FailureKind::Authorization,
+                    &error,
+                )
+            };
+            return Err((error, status.is_server_error()));
         }
         if value["code"].as_i64() != Some(0) {
             return Err((
@@ -276,11 +327,11 @@ fn checked(status: StatusCode, value: &Value) -> Result<(), String> {
     }
     // Do not include server descriptions: they can echo credentials or codes.
     Err(match value["error"].as_str().unwrap_or_default() {
-        "invalid_client"=>"Feishu application credentials are invalid; reconnect the same application after repairing its credentials".into(),
+        "invalid_client"=>crate::backup::failure::tagged(crate::backup::failure::FailureKind::Authorization, "Feishu application credentials are invalid; reconnect the application"),
         "invalid_scope"=>"Feishu rejected required backup permissions; check application availability and reconnect".into(),
         "access_denied"=>"Feishu authorization was declined".into(),
-        "expired_token"|"invalid_grant"=>EXPIRED.into(),
-        _=>format!("Feishu authentication failed (HTTP {}, code {}); reconnect or check account restrictions",status.as_u16(),value["code"].as_i64().unwrap_or(-1)),
+        "expired_token"|"invalid_grant"=>crate::backup::failure::tagged(crate::backup::failure::FailureKind::Authorization, EXPIRED),
+        _=>crate::backup::failure::tagged(crate::backup::failure::http_kind(status, value["code"].as_i64().unwrap_or(-1)), &format!("Feishu authentication failed (HTTP {}, code {}); reconnect or check account restrictions",status.as_u16(),value["code"].as_i64().unwrap_or(-1))),
     })
 }
 fn poll_status(status: StatusCode, value: &Value, interval: &mut u64) -> Result<bool, String> {
@@ -364,12 +415,34 @@ fn token_bundle(
         granted_scopes: scope.into(),
         generation: previous.map(|p| p.generation + 1).unwrap_or(1),
         refresh_in_flight: false,
+        authorization_required: false,
+        registration_device_code: String::new(),
+        registration_url: String::new(),
+        registration_user_code: String::new(),
+        registration_expires_at: 0,
+        registration_interval: 0,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn registration_can_resume_from_secure_checkpoint_and_expiry_is_actionable() {
+        let issued = challenge(&serde_json::json!({"device_code":"synthetic-code","user_code":"TEST","expire_in":60,"interval":1}), true).unwrap();
+        let mut secrets = ConnectionSecrets::default();
+        issued.save_registration(&mut secrets);
+        let resumed = Challenge::resume_registration(&secrets).unwrap();
+        assert_eq!(resumed.device_code.as_str(), issued.device_code.as_str());
+        assert_eq!(resumed.verification_url, issued.verification_url);
+        secrets.registration_expires_at = now_ms() - 1;
+        assert!(
+            Challenge::resume_registration(&secrets)
+                .err()
+                .unwrap()
+                .starts_with("BACKUP_REGISTRATION_RECOVERY")
+        );
+    }
     #[test]
     fn scopes_are_sets_and_urls_are_official() {
         assert!(missing_scopes(SCOPES).is_empty());
@@ -405,7 +478,10 @@ mod tests {
                 &mut interval
             )
             .unwrap_err(),
-            EXPIRED
+            crate::backup::failure::tagged(
+                crate::backup::failure::FailureKind::Authorization,
+                EXPIRED
+            )
         );
     }
     #[test]

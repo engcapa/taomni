@@ -3445,16 +3445,28 @@ const dict = {
     upcomingCode: "Upcoming: {code}",
   },
   remoteBackup: {
+    "retryAt": "Attempt {attempts} failed. Automatic retry at {time}.",
+    "actionRequired": "This task needs attention. Repair the connection or settings, then retry. Cancelled tasks do not stop future scheduled backups.",
+    "recoveryHint": "Reconnect to resume registration or reread the same application's credentials. If registration expired or the application is unavailable, restart the browser connection below.",
+    "restartWarning": "I understand that the browser may create another application. Existing cloud files remain available; I will confirm the account and backup folder before resuming uploads.",
+    "restartApplication": "Restart application connection",
+    "cacheUsage": "Local cloud cache: {used} / {limit}. Completed artifacts are kept for {days} days. Unfinished tasks are preserved.",
+    "cleanCache": "Clear completed local cache",
+    "cacheCleaned": "Completed local cache cleared. Cloud files and unfinished tasks are preserved.",
+    "discard": "Discard local task",
+    "discardWarning": "Delete this task’s local archive and partial data? It can no longer resume. Cloud files will remain unchanged.",
+    "discardConfirm": "Delete local task data",
+
     "title": "Cloud backups and restore across devices",
     "addFeishu": "Add Feishu destination",
     "sourceHint": "Source: Taomni data (live SQLite snapshots). S3, Google Drive, OneDrive and SFTP are planned.",
-    "destinations": "Backup destinations (select multiple; also used by scheduled backups)",
+    "destinations": "Backup destinations (select multiple)",
     "localDestination": "Local directory · no network proxy",
     "localScopeLabel": "Local scope for selected destinations",
     "localCore": "Local core data",
     "localFull": "Local full data",
     "startSelected": "Back up to selected destinations",
-    "destinationsHint": "Each cloud destination has its own scope, proxy, result and retry.",
+    "destinationsHint": "Selected cloud destinations use the shared schedule below. Local automatic backups follow their existing policy regardless of this selection. Each cloud destination has its own scope and proxy. Instances using the same SQLite path share one backup source.",
     "deviceName": "Device name",
     "targetLabel": "Cloud backup destination",
     "newTarget": "New Feishu destination",
@@ -3522,6 +3534,10 @@ const dict = {
     "historyNotice": "Restore a version on the Feishu page, then return here and download again. Uploads on this device are paused. For another device’s backup, also pause uploads on the source device to prevent overwriting.",
     "errorDetails": "Technical details",
     "phases": {
+      "retrying": "Retrying after a temporary service error",
+      "retry_wait": "Waiting for automatic retry",
+      "discarded": "Local task discarded",
+
       "queued": "Queued",
       "preparing": "Preparing encrypted snapshot",
       "connecting": "Connecting",
@@ -3549,6 +3565,8 @@ const dict = {
       "interrupted": "Interrupted; reconnect to continue"
     },
     "errors": {
+      "storage": "Local cloud backup cache is full. Clear completed cache or discard an unfinished task you no longer need, then retry.",
+      "otherInstance": "Another Taomni window is processing cloud backups for this database. Wait for it to finish, or manage the task in that window.",
       "failed": "Operation failed. Check the details, then retry.",
       "browser": "Could not open your browser. Select “Open authorization page” to retry.",
       "config": "Backup configuration is still loading. Try again shortly.",
@@ -3562,7 +3580,7 @@ const dict = {
       "password": "Set an independent backup password for each enabled cloud destination.",
       "network": "Network request failed. Check this destination’s connection and proxy settings, then retry.",
       "version": "Feishu did not confirm native version replacement. Upload stopped. Check the details.",
-      "registration": "A previous application registration may have completed. Recover its credentials and reconnect to avoid creating a duplicate.",
+      "registration": "Registration needs recovery. Reconnect to resume it, or use “Restart application connection” after reviewing the warning.",
       "busy": "Another backup or authorization task is running. Finish or cancel it, then retry."
     }
   },

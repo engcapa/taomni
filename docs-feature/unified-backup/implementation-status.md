@@ -32,3 +32,15 @@
 仍待补齐：无应用真实注册、长期/并发刷新服务端行为、跨设备恢复；macOS/Linux 构建及系统存储真机。企业真实账号按用户要求暂不测试。不能据自动化子集称所有 AC 已验收。应用 Secret 轮换后自动重新读取 CLI 来源仍是待办；注册已开始但结果不确定时会阻止重复创建，恢复入口仍需进一步完善。
 
 本次发布评估：Windows 个人账户主流程可用于小范围 Beta，尚未达到正式生产发布条件。代码收尾包括：自动任务失败后目前停止后续调度直到显式重试；401 刷新重试与 429/临时服务错误退避未完整实现；永久授权失效与界面连接状态需要一致；网页历史恢复的暂停操作需与启动任务使用同一把锁；云端任务归档缓存及日志尚缺保留上限与清理机制。正式安装包、真实断网/取消/重启续传和自动计划回归仍需验收。
+
+## Final implementation update (2026-10-11)
+
+The five production-readiness items are implemented in this branch: persisted transient retries with cancellation, registration recovery and secret rotation handling, bounded request retries with token refresh, history-restore locking, and cache retention with explicit unfinished-task discard. Cloud backup uses the existing local backup schedule; the destination multi-select controls cloud destinations only and does not alter the established local SQLite backup policy.
+
+Cloud source identity is derived from the canonical SQLite database path. Multiple Taomni windows on one machine that open the same database share the same device/control directory and a cross-process worker lock. A second process waits for the active owner rather than producing a duplicate period snapshot. A different database path receives a separate source identity. Credentials remain in the operating system credential store.
+
+The cloud cache defaults to a 2 GiB limit and seven-day retention for completed artifacts. Failed, cancelled, retry-waiting, and resumable artifacts remain until an explicit discard; local backup retention and its configured backup directory are unchanged.
+
+Added browser/native coverage: `TC-BACKUP-CLOUD-002` covers cancellation, discard, cache cleanup, registration recovery, and bilingual UI; `TC-BACKUP-CLOUD-003` covers loopback HTTP refresh, transient scheduling, encrypted upload/download verification, and revoked authorization. The native fixture is account-free and never claims real Feishu evidence. Windows native and browser evidence is local; Linux, macOS, and enterprise accounts require hosted or manual validation.
+
+Current release position: suitable for a controlled Windows beta after the selected native/browser checks pass. Formal production release still requires the hosted platform matrix, packaging checks, and a real-account smoke test on each supported Feishu deployment. The existing local SQLite backup policy remains production behavior and is covered independently by `TC-BACKUP-001`.

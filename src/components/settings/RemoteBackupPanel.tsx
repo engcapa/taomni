@@ -7,7 +7,7 @@ import { newFeishuTarget, remoteBackup, type AuthorizationSession, type FeishuAp
 
 const input = "w-full rounded border border-theme-border bg-theme-bg p-2 text-xs text-theme-text";
 const button = "rounded border border-theme-border px-3 py-1.5 text-xs text-theme-text hover:border-accent disabled:opacity-50";
-const finished = new Set(["completed", "failed", "cancelled", "interrupted"]);
+const finished = new Set(["completed", "failed", "cancelled", "interrupted", "discarded", "retry_wait"]);
 const bytes = (n: number) => `${(n / 1024 / 1024).toFixed(2)} MB`;
 const authFinished = new Set(["connected", "failed", "cancelled", "expired", "interrupted"]);
 type BatchResult = Awaited<ReturnType<typeof remoteBackup.runSelected>>;
@@ -16,6 +16,12 @@ type Notice = { key: string } | { results: BatchResult } | null;
 function BackupError({ error, t }: { error: string; t: TranslateFn }) {
   let key = "failed";
   if (error.includes("BACKUP_BROWSER_OPEN_FAILED")) key = "browser";
+  else if (error.startsWith("BACKUP_AUTHORIZATION")) key = "authorization";
+  else if (error.startsWith("BACKUP_PERMISSION")) key = "permissions";
+  else if (error.startsWith("BACKUP_STORAGE")) key = "storage";
+  else if (error.startsWith("BACKUP_OTHER_INSTANCE")) key = "otherInstance";
+  else if (error.startsWith("BACKUP_TRANSIENT")) key = "network";
+  else if (error.startsWith("BACKUP_REGISTRATION_RECOVERY")) key = "registration";
   else if (error.includes("BACKUP_CONFIG_NOT_LOADED")) key = "config";
   else if (/credential store|credentials in the system/i.test(error)) key = "credentialStore";
   else if (/CLI.*(configuration|application|file|credential)|existing CLI/i.test(error)) key = "cli";
@@ -31,7 +37,7 @@ function BackupError({ error, t }: { error: string; t: TranslateFn }) {
   else if (/active.*tasks|Another Feishu connection|being authorized/i.test(error)) key = "busy";
   return <div role="alert" className="break-all text-xs text-red-500">
     <p>{t(`remoteBackup.errors.${key}`)}</p>
-    {!error.startsWith("BACKUP_") && <details><summary>{t("remoteBackup.errorDetails")}</summary><p>{error}</p></details>}
+    {(!error.startsWith("BACKUP_") || error.includes(":")) && <details><summary>{t("remoteBackup.errorDetails")}</summary><p>{error}</p></details>}
   </div>;
 }
 function mergeSessions(old: AuthorizationSession[], values: AuthorizationSession[]) {
@@ -56,6 +62,8 @@ export function RemoteBackupPanel({ onRestore }: { onRestore: (path: string) => 
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [batchScope, setBatchScope] = useState("core");
+  const [restartConfirmed, setRestartConfirmed] = useState(false);
+  const [discardId, setDiscardId] = useState<string | null>(null);
   const generation = useRef(0);
   const activeId = useRef("");
   const requestedAuth = useRef("");
@@ -85,8 +93,9 @@ export function RemoteBackupPanel({ onRestore }: { onRestore: (path: string) => 
       listen<AuthorizationSession>("backup-authorization", ({ payload }) => {
         if (disposed) return;
         setSessions((old) => mergeSessions(old, [payload]));
-        if (payload.phase === "connected") void refreshConfig().catch((e) => setError(String(e)));
+        if (authFinished.has(payload.phase)) void refreshConfig().catch((e) => setError(String(e)));
       }),
+      listen("backup-connection-changed", () => { if (!disposed) void refreshConfig().catch((e) => setError(String(e))); }),
     ]).then((unlisten) => {
       if (disposed) unlisten.forEach((stop) => stop());
       else {
@@ -163,6 +172,11 @@ export function RemoteBackupPanel({ onRestore }: { onRestore: (path: string) => 
         <button data-testid="backup-cloud-save" className={button} disabled={busy} onClick={() => void action(() => save())}>{t("common.save")}</button>
       </div>}
       <p className="text-xs text-theme-muted">{t("remoteBackup.connectHint")}</p>
+      {(connection?.registrationPending || session && ["failed", "expired", "interrupted"].includes(session.phase)) && <div data-testid="backup-connection-recovery" className="space-y-2 rounded border border-theme-border p-3 text-xs text-theme-muted">
+        <p>{t("remoteBackup.recoveryHint")}</p>
+        <label className="flex items-center gap-2"><input data-testid="backup-restart-confirm" type="checkbox" checked={restartConfirmed} onChange={(e) => setRestartConfirmed(e.target.checked)} />{t("remoteBackup.restartWarning")}</label>
+        <button data-testid="backup-restart-application" className={button} disabled={busy || authorizing || !restartConfirmed} onClick={() => void action(async () => { const value = await remoteBackup.authorize(target.id, undefined, true); requestedAuth.current = value.id; setSessions((old) => mergeSessions(old, [value])); setRestartConfirmed(false); })}>{t("remoteBackup.restartApplication")}</button>
+      </div>}
       {(applications.length > 1 || (data?.config.connections.length ?? 0) > 1 || applications.length > 0 && (data?.config.connections.length ?? 0) > 0) && <label className="block text-xs text-theme-muted">{t("remoteBackup.applicationLabel")}<select aria-label={t("remoteBackup.applicationAria")} className={input} value={applicationSelection} disabled={authorizing} onChange={(e) => setApplicationSelection(e.target.value)}><option value="">{t("remoteBackup.automaticApp")}</option>{data?.config.connections.map((c) => <option key={c.id} value={c.id}>{c.label} · {c.accountName || t("remoteBackup.savedConnection")}</option>)}{applications.map((a) => <option key={a.appId} value={a.appId}>{a.label} · {t("remoteBackup.localCli")}{a.isDefault ? t("remoteBackup.defaultSuffix") : ""}</option>)}</select></label>}
       {session && <div data-testid="backup-feishu-session" className="space-y-2 rounded border border-theme-border p-3 text-xs text-theme-muted">
         <p role="status">{t(`remoteBackup.auth.${session.phase}`)}{session.userCode && ` · ${t("remoteBackup.verificationCode", { code: session.userCode })}`}</p>
@@ -186,13 +200,17 @@ export function RemoteBackupPanel({ onRestore }: { onRestore: (path: string) => 
     </>}
     {message && ("key" in message ? <p role="status" className="text-xs text-green-600">{t(`remoteBackup.${message.key}`)}</p> : <div role="status" className="space-y-1 text-xs text-green-600">{message.results.map((result) => <div key={result.targetId}><p>{result.targetId === "local" ? t("remoteBackup.local") : data?.config.targets.find((item) => item.id === result.targetId)?.name ?? result.targetId}: {result.error ? t("remoteBackup.phases.failed") : t(result.jobId ? "remoteBackup.taskCreated" : "remoteBackup.completed")}</p>{result.error && <BackupError error={result.error} t={t} />}</div>)}</div>)}
     {error && <BackupError error={error} t={t} />}
-    {jobs.length > 0 && <div className="space-y-2 border-t border-theme-border pt-3"><h5 className="text-xs font-medium text-theme-text">{t("remoteBackup.jobs")}</h5>{jobs.slice(0, 20).map((job) => <div key={job.id} data-testid="backup-cloud-job" className="space-y-2 rounded border border-theme-border p-2 text-xs text-theme-muted">
+    {data?.cache && <div data-testid="backup-cache" className="space-y-2 text-xs text-theme-muted"><p>{t("remoteBackup.cacheUsage", { used: bytes(data.cache.usedBytes), limit: bytes(data.cache.limitBytes), days: data.cache.retentionDays })}</p><button data-testid="backup-cache-clean" className={button} disabled={busy} onClick={() => void action(async () => { await remoteBackup.cleanCache(); await refreshConfig(); setMessage({ key: "cacheCleaned" }); })}>{t("remoteBackup.cleanCache")}</button></div>}
+    {jobs.length > 0 && <div className="space-y-2 border-t border-theme-border pt-3"><h5 className="text-xs font-medium text-theme-text">{t("remoteBackup.jobs")}</h5>{jobs.slice(0, 20).map((job) => <div key={job.id} data-testid="backup-cloud-job" data-job-id={job.id} data-phase={job.phase} data-operation={job.operation} className="space-y-2 rounded border border-theme-border p-2 text-xs text-theme-muted">
       <p>{t(job.operation === "upload" ? "remoteBackup.upload" : "remoteBackup.download")} · {t(`remoteBackup.phases.${job.phase}`)} · {new Date(job.createdAt).toLocaleString(getLocale())}</p>
       <p>{bytes(job.bytes)}{job.total != null && ` / ${bytes(job.total)} (${job.total ? Math.min(100, Math.round(job.bytes / job.total * 100)) : 0}%)`}</p>
       {!finished.has(job.phase) && <progress className="w-full" max={job.total ?? undefined} value={job.total != null ? job.bytes : undefined} />}
       {job.error && <BackupError error={job.error} t={t} />}
-      {!finished.has(job.phase) && <button className={button} onClick={() => void action(() => remoteBackup.cancel(job.id))}>{t("common.cancel")}</button>}
-      {["failed", "cancelled", "interrupted"].includes(job.phase) && <button className={button} disabled={busy} onClick={() => void action(() => remoteBackup.retry(job.id))}>{t("remoteBackup.retry")}</button>}
+      {job.nextRetryAt && job.phase === "retry_wait" && <p data-testid="backup-retry-notice">{t("remoteBackup.retryAt", { time: new Date(job.nextRetryAt).toLocaleString(getLocale()), attempts: job.attempts ?? 0 })}</p>}
+      {job.phase === "failed" && <p>{t("remoteBackup.actionRequired")}</p>}
+      {(!finished.has(job.phase) || job.phase === "retry_wait") && <button data-testid="backup-job-cancel" className={button} onClick={() => void action(() => remoteBackup.cancel(job.id))}>{t("common.cancel")}</button>}
+      {["failed", "cancelled", "interrupted", "retry_wait"].includes(job.phase) && <><button data-testid="backup-job-retry" className={button} disabled={busy} onClick={() => void action(() => remoteBackup.retry(job.id))}>{t("remoteBackup.retry")}</button><button data-testid="backup-job-discard" className={button} disabled={busy} onClick={() => setDiscardId(job.id)}>{t("remoteBackup.discard")}</button></>}
+      {discardId === job.id && <div role="alertdialog"><p>{t("remoteBackup.discardWarning")}</p><button data-testid="backup-discard-confirm" className={button} disabled={busy} onClick={() => void action(async () => { await remoteBackup.discard(job.id); setDiscardId(null); await refreshConfig(); })}>{t("remoteBackup.discardConfirm")}</button><button className={button} onClick={() => setDiscardId(null)}>{t("common.cancel")}</button></div>}
       {job.phase === "completed" && job.operation === "download" && job.artifact && <button data-testid="backup-cloud-restore" className={button} onClick={() => onRestore(job.artifact!.path)}>{t("remoteBackup.restore")}</button>}
     </div>)}</div>}
   </section>;

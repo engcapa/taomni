@@ -40,6 +40,19 @@ pub struct ConnectionSecrets {
     /// Written before consuming a rotating refresh token; a crash must not replay it.
     #[serde(default)]
     pub refresh_in_flight: bool,
+    #[serde(default)]
+    pub authorization_required: bool,
+    // Registration recovery material is secret and must never enter control JSON.
+    #[serde(default)]
+    pub registration_device_code: String,
+    #[serde(default)]
+    pub registration_url: String,
+    #[serde(default)]
+    pub registration_user_code: String,
+    #[serde(default)]
+    pub registration_expires_at: i64,
+    #[serde(default)]
+    pub registration_interval: u64,
 }
 fn entry(profile: &str, target: &str) -> Result<Entry, String> {
     super::model::validate_id(profile)?;

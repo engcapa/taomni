@@ -2,11 +2,11 @@ pub mod auth;
 pub mod cli_config;
 mod cli_secret;
 mod device_flow;
+pub(crate) mod request;
 use super::{
     control,
     manifest::file_sha256,
     model::*,
-    network,
     provider::{DestinationProvider, TransferContext},
     transfer,
 };
@@ -15,13 +15,14 @@ use serde_json::{Value, json};
 use std::path::Path;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-const BASE: &str = "https://open.feishu.cn/open-apis/drive/v1";
 const SMALL_LIMIT: u64 = 20 * 1024 * 1024;
 
 pub struct FeishuProvider {
+    pub app: tauri::AppHandle,
     pub client: reqwest::Client,
-    pub bearer: String,
+    pub bearer: tokio::sync::Mutex<String>,
     pub target: BackupTarget,
+    pub base: String,
 }
 #[derive(Clone, Deserialize)]
 struct FileEntry {
@@ -44,14 +45,65 @@ struct UploadCheckpoint {
 }
 
 impl FeishuProvider {
-    async fn send(
+    async fn send<F: Fn() -> reqwest::RequestBuilder>(
         &self,
-        request: reqwest::RequestBuilder,
+        build: F,
+        read_only: bool,
         ctx: &TransferContext,
     ) -> Result<Value, String> {
-        ctx.check()?;
-        let response = tokio::select! { _ = ctx.cancel.cancelled() => return Err("BACKUP_CANCELLED".into()), r = request.bearer_auth(&self.bearer).send() => r.map_err(network::network_error)? };
-        tokio::select! { _ = ctx.cancel.cancelled() => Err("BACKUP_CANCELLED".into()), result = network::json(response) => result }
+        let bearer = self.bearer.lock().await.clone();
+        let result = request::json(
+            |token| build().bearer_auth(token),
+            bearer,
+            |rejected| self.refresh(rejected, ctx),
+            read_only,
+            ctx,
+        )
+        .await;
+        if result.as_ref().err().is_some_and(|e| {
+            super::failure::classify(e) == super::failure::FailureKind::Authorization
+        }) {
+            auth::require_authorization(&self.app, &self.target, &ctx.cancel).await?;
+        }
+        result
+    }
+
+    async fn refresh(&self, rejected: String, ctx: &TransferContext) -> Result<String, String> {
+        let token = auth::access_token_after_rejection(
+            &self.app,
+            &self.target,
+            &self.client,
+            &ctx.cancel,
+            &rejected,
+        )
+        .await?;
+        *self.bearer.lock().await = token.clone();
+        Ok(token)
+    }
+
+    async fn download_file(
+        &self,
+        token: &str,
+        path: &Path,
+        ctx: &TransferContext,
+    ) -> Result<(), String> {
+        let bearer = self.bearer.lock().await.clone();
+        let result = transfer::download_with_refresh(
+            &self.client,
+            &format!("{}/files/{token}/download", self.base),
+            &bearer,
+            token,
+            path,
+            ctx,
+            |rejected| self.refresh(rejected, ctx),
+        )
+        .await;
+        if result.as_ref().err().is_some_and(|e| {
+            super::failure::classify(e) == super::failure::FailureKind::Authorization
+        }) {
+            auth::require_authorization(&self.app, &self.target, &ctx.cancel).await?;
+        }
+        result
     }
     async fn children(
         &self,
@@ -67,11 +119,14 @@ impl FeishuProvider {
         loop {
             let value = self
                 .send(
-                    self.client.get(format!("{BASE}/files")).query(&[
-                        ("folder_token", folder),
-                        ("page_size", "200"),
-                        ("page_token", &cursor),
-                    ]),
+                    || {
+                        self.client.get(format!("{}/files", self.base)).query(&[
+                            ("folder_token", folder),
+                            ("page_size", "200"),
+                            ("page_token", &cursor),
+                        ])
+                    },
+                    true,
                     ctx,
                 )
                 .await?;
@@ -115,9 +170,12 @@ impl FeishuProvider {
         }
         let result = self
             .send(
-                self.client
-                    .post(format!("{BASE}/files/create_folder"))
-                    .json(&json!({"folder_token":parent,"name":name})),
+                || {
+                    self.client
+                        .post(format!("{}/files/create_folder", self.base))
+                        .json(&json!({"folder_token":parent,"name":name}))
+                },
+                false,
                 ctx,
             )
             .await?;
@@ -137,26 +195,24 @@ impl FeishuProvider {
         ctx: &TransferContext,
     ) -> Result<Receipt, String> {
         let sha = super::manifest::bytes_sha256(&bytes);
-        let mut form = reqwest::multipart::Form::new()
-            .text("file_name", name.to_owned())
-            .text("parent_type", "explorer")
-            .text("parent_node", parent.to_owned())
-            .text("size", bytes.len().to_string())
-            .part(
-                "file",
-                reqwest::multipart::Part::bytes(bytes).file_name(name.to_owned()),
-            );
-        if let Some(token) = existing {
-            form = form.text("file_token", token.to_owned());
-        }
-        let result = self
-            .send(
-                self.client
-                    .post(format!("{BASE}/files/upload_all"))
-                    .multipart(form),
-                ctx,
-            )
-            .await?;
+        let build = || {
+            let mut form = reqwest::multipart::Form::new()
+                .text("file_name", name.to_owned())
+                .text("parent_type", "explorer")
+                .text("parent_node", parent.to_owned())
+                .text("size", bytes.len().to_string())
+                .part(
+                    "file",
+                    reqwest::multipart::Part::bytes(bytes.clone()).file_name(name.to_owned()),
+                );
+            if let Some(token) = existing {
+                form = form.text("file_token", token.to_owned());
+            }
+            self.client
+                .post(format!("{}/files/upload_all", self.base))
+                .multipart(form)
+        };
+        let result = self.send(build, false, ctx).await?;
         let token = result["data"]["file_token"]
             .as_str()
             .ok_or("Missing upload file token")?
@@ -237,9 +293,12 @@ impl FeishuProvider {
             }
             let value = self
                 .send(
-                    self.client
-                        .post(format!("{BASE}/files/upload_prepare"))
-                        .json(&body),
+                    || {
+                        self.client
+                            .post(format!("{}/files/upload_prepare", self.base))
+                            .json(&body)
+                    },
+                    false,
                     ctx,
                 )
                 .await?;
@@ -286,23 +345,20 @@ impl FeishuProvider {
                 .read_exact(&mut bytes)
                 .await
                 .map_err(|e| e.to_string())?;
-            let form = reqwest::multipart::Form::new()
-                .text("upload_id", progress.upload_id.clone())
-                .text("seq", progress.next.to_string())
-                .text("size", len.to_string())
-                .part(
-                    "file",
-                    reqwest::multipart::Part::bytes(bytes).file_name("block"),
-                );
-            if let Err(error) = self
-                .send(
-                    self.client
-                        .post(format!("{BASE}/files/upload_part"))
-                        .multipart(form),
-                    ctx,
-                )
-                .await
-            {
+            let build = || {
+                let form = reqwest::multipart::Form::new()
+                    .text("upload_id", progress.upload_id.clone())
+                    .text("seq", progress.next.to_string())
+                    .text("size", len.to_string())
+                    .part(
+                        "file",
+                        reqwest::multipart::Part::bytes(bytes.clone()).file_name("block"),
+                    );
+                self.client
+                    .post(format!("{}/files/upload_part", self.base))
+                    .multipart(form)
+            };
+            if let Err(error) = self.send(build, false, ctx).await {
                 // Expired upload IDs may be retried by preparing a fresh transaction.
                 if error.contains("106") {
                     let _ = std::fs::remove_file(checkpoint);
@@ -319,9 +375,14 @@ impl FeishuProvider {
         }
         let value = self
             .send(
-                self.client
-                    .post(format!("{BASE}/files/upload_finish"))
-                    .json(&json!({"upload_id":progress.upload_id,"block_num":progress.block_num})),
+                || {
+                    self.client
+                        .post(format!("{}/files/upload_finish", self.base))
+                        .json(
+                            &json!({"upload_id":progress.upload_id,"block_num":progress.block_num}),
+                        )
+                },
+                false,
                 ctx,
             )
             .await?;
@@ -425,15 +486,7 @@ impl DestinationProvider for FeishuProvider {
         let verification = checkpoint.with_extension("verification.taobak");
         if let Some(token) = existing {
             // Reconcile any previous response lost after a successful commit.
-            transfer::download(
-                &self.client,
-                &format!("{BASE}/files/{token}/download"),
-                &self.bearer,
-                token,
-                &verification,
-                ctx,
-            )
-            .await?;
+            self.download_file(token, &verification, ctx).await?;
             if file_sha256(&verification).map_err(|e| e.to_string())? == artifact.sha256 {
                 let _ = std::fs::remove_file(&verification);
                 let _ = std::fs::remove_file(checkpoint);
@@ -462,15 +515,8 @@ impl DestinationProvider for FeishuProvider {
                 .await?
         };
         ctx.progress("verifying", artifact.size, Some(artifact.size));
-        transfer::download(
-            &self.client,
-            &format!("{BASE}/files/{}/download", receipt.file_token),
-            &self.bearer,
-            &receipt.file_token,
-            &verification,
-            ctx,
-        )
-        .await?;
+        self.download_file(&receipt.file_token, &verification, ctx)
+            .await?;
         if file_sha256(&verification).map_err(|e| e.to_string())? != artifact.sha256 {
             return Err(
                 "Uploaded backup verification failed; keep the local artifact and retry".into(),
@@ -499,14 +545,6 @@ impl DestinationProvider for FeishuProvider {
         {
             return Err("Backup file no longer belongs to the selected target/device".into());
         }
-        transfer::download(
-            &self.client,
-            &format!("{BASE}/files/{}/download", remote.file_token),
-            &self.bearer,
-            &remote.file_token,
-            path,
-            ctx,
-        )
-        .await
+        self.download_file(&remote.file_token, path, ctx).await
     }
 }

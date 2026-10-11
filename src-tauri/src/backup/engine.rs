@@ -607,6 +607,7 @@ fn pack_staged_archive_with_provenance(
     let _cleanup = scopeguard::guard(pending_path.clone(), |path| {
         let _ = std::fs::remove_file(path);
     });
+    let _cache_reservation = super::cache::reserve(out_file_path, final_bytes.len() as u64)?;
     std::fs::write(&pending_path, &final_bytes)
         .map_err(|e| format!("write backup output file {}: {e}", out_file_path.display()))?;
     std::fs::rename(&pending_path, out_file_path).map_err(|e| {

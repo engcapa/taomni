@@ -62,17 +62,24 @@ export interface BackupJob {
   artifact: { path: string; size: number; sha256: string } | null;
   remote: RemoteBackup | null;
   createdAt: number;
+  updatedAt?: number;
+  attempts?: number;
+  nextRetryAt?: number | null;
+  failureKind?: string | null;
 }
 export interface RemoteConfiguration {
   config: BackupControlConfig;
   statuses: { targetId: string; connected: boolean; passwordConfigured: boolean }[];
+  cache?: { usedBytes: number; limitBytes: number; retentionDays: number };
 }
 export const remoteBackup = {
   runSelected: (scope: string) => invoke<{ targetId: string; jobId: string | null; localPath: string | null; error: string | null }[]>("backup_run_selected", { scope }),
   config: () => invoke<RemoteConfiguration>("backup_remote_get_config"),
   save: (config: BackupControlConfig, targetId?: string, archivePassword?: string) => invoke<void>("backup_remote_save_config", { config, targetId: targetId ?? null, archivePassword: archivePassword || null }),
   applications: () => invoke<FeishuApplication[]>("backup_feishu_apps"),
-  authorize: (targetId: string, applicationSelection?: string) => invoke<AuthorizationSession>("backup_feishu_authorize", { targetId, applicationSelection: applicationSelection || null }),
+  authorize: (targetId: string, applicationSelection?: string, restartApplication = false) => invoke<AuthorizationSession>("backup_feishu_authorize", { targetId, applicationSelection: applicationSelection || null, restartApplication }),
+  cleanCache: () => invoke("backup_remote_clean_cache"),
+  discard: (jobId: string) => invoke("backup_remote_discard", { jobId }),
   authorizations: () => invoke<AuthorizationSession[]>("backup_feishu_authorization_status"),
   cancelAuthorization: (sessionId: string) => invoke<void>("backup_feishu_authorization_cancel", { sessionId }),
   list: (targetId: string) => invoke<RemoteBackup[]>("backup_remote_list", { targetId }),

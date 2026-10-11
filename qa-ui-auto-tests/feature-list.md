@@ -10494,8 +10494,50 @@ controls:
   - id: feishu-folder
     selector: '[data-testid="backup-feishu-folder"]'
     kind: interactive
+  - id: feishu-app-id-legacy
+    selector: '[data-testid="backup-feishu-app-id"]'
+    kind: display
   - id: feishu-authorize
     selector: '[data-testid="backup-feishu-authorize"]'
+    kind: interactive
+  - id: recovery
+    selector: '[data-testid="backup-connection-recovery"]'
+    kind: display
+  - id: restart-confirm
+    selector: '[data-testid="backup-restart-confirm"]'
+    kind: interactive
+  - id: restart-application
+    selector: '[data-testid="backup-restart-application"]'
+    kind: interactive
+  - id: cache
+    selector: '[data-testid="backup-cache"]'
+    kind: display
+  - id: cache-clean
+    selector: '[data-testid="backup-cache-clean"]'
+    kind: interactive
+  - id: job-cancel
+    selector: '[data-testid="backup-job-cancel"]'
+    kind: interactive
+  - id: job-retry
+    selector: '[data-testid="backup-job-retry"]'
+    kind: interactive
+  - id: job-discard
+    selector: '[data-testid="backup-job-discard"]'
+    kind: interactive
+  - id: discard-confirm
+    selector: '[data-testid="backup-discard-confirm"]'
+    kind: interactive
+  - id: retry-notice
+    selector: '[data-testid="backup-retry-notice"]'
+    kind: display
+  - id: job
+    selector: '[data-testid="backup-cloud-job"]'
+    kind: display
+  - id: cloud-start
+    selector: '[data-testid="backup-cloud-start"]'
+    kind: interactive
+  - id: cloud-refresh
+    selector: '[data-testid="backup-cloud-refresh"]'
     kind: interactive
 -->
 

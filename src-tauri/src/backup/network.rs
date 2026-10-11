@@ -118,13 +118,14 @@ mod tests {
 
 pub fn network_error(e: reqwest::Error) -> String {
     // reqwest error Display may contain signed URLs or authorization callback data.
-    if e.is_timeout() {
+    let message: String = if e.is_timeout() {
         "Backup network timeout; check the connection or proxy".into()
     } else if e.is_connect() {
         "Cannot connect to backup service; check the connection or proxy".into()
     } else {
         "Backup network request failed".into()
-    }
+    };
+    super::failure::tagged(super::failure::FailureKind::Transient, &message)
 }
 
 pub async fn json(response: reqwest::Response) -> Result<serde_json::Value, String> {

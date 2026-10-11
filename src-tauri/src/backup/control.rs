@@ -17,7 +17,29 @@ fn process_lock(root: &Path) -> Result<std::fs::File, String> {
 }
 
 pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(crate::resolved_app_data_dir(app)?.join("backup-control"))
+    use tauri::Manager;
+    let state = app.state::<crate::state::AppState>();
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let path = db
+        .path()
+        .ok_or("Cloud backups require a file-backed SQLite database")?;
+    root_for_database(Path::new(path))
+}
+fn root_for_database(path: &Path) -> Result<PathBuf, String> {
+    let path = path.canonicalize().map_err(|e| e.to_string())?;
+    let parent = path.parent().ok_or("Missing SQLite parent directory")?;
+    // Preserve existing controls/credentials for the standard database. Resolve
+    // directory aliases before locking, so additional app processes share it.
+    let name = if path.file_name().and_then(|v| v.to_str()) == Some("taomni.db") {
+        "backup-control".to_owned()
+    } else {
+        use sha2::{Digest, Sha256};
+        format!(
+            "backup-control-{}",
+            hex::encode(Sha256::digest(path.to_string_lossy().as_bytes()))
+        )
+    };
+    Ok(parent.join(name))
 }
 pub fn write_json<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), String> {
     let parent = path.parent().ok_or("Missing backup control directory")?;
@@ -186,6 +208,28 @@ pub fn target(app: &tauri::AppHandle, id: &str) -> Result<BackupTarget, String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn database_path_aliases_share_identity_but_other_databases_do_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("taomni.db");
+        std::fs::write(&db, b"").unwrap();
+        let a = root_for_database(&db).unwrap();
+        let b = root_for_database(&dir.path().join(".").join("taomni.db")).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(
+            load_at(&a).unwrap().device.id,
+            load_at(&b).unwrap().device.id
+        );
+        let other = dir.path().join("other.db");
+        std::fs::write(&other, b"").unwrap();
+        assert_ne!(
+            load_at(&a).unwrap().device.id,
+            load_at(&root_for_database(&other).unwrap())
+                .unwrap()
+                .device
+                .id
+        );
+    }
     #[test]
     fn identity_is_stable_and_corruption_does_not_silently_reenroll() {
         let dir = tempfile::tempdir().unwrap();

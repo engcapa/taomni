@@ -2147,7 +2147,21 @@
 - `[data-testid="backup-cloud-proxy"]` — interactive — F-BACKUP-2.cloud-proxy
 - `[data-testid="backup-cloud-save"]` — interactive — F-BACKUP-2.cloud-save
 - `[data-testid="backup-feishu-folder"]` — interactive — F-BACKUP-2.feishu-folder
+- `[data-testid="backup-feishu-app-id"]` — display — F-BACKUP-2.feishu-app-id-legacy
 - `[data-testid="backup-feishu-authorize"]` — interactive — F-BACKUP-2.feishu-authorize
+- `[data-testid="backup-connection-recovery"]` — display — F-BACKUP-2.recovery
+- `[data-testid="backup-restart-confirm"]` — interactive — F-BACKUP-2.restart-confirm
+- `[data-testid="backup-restart-application"]` — interactive — F-BACKUP-2.restart-application
+- `[data-testid="backup-cache"]` — display — F-BACKUP-2.cache
+- `[data-testid="backup-cache-clean"]` — interactive — F-BACKUP-2.cache-clean
+- `[data-testid="backup-job-cancel"]` — interactive — F-BACKUP-2.job-cancel
+- `[data-testid="backup-job-retry"]` — interactive — F-BACKUP-2.job-retry
+- `[data-testid="backup-job-discard"]` — interactive — F-BACKUP-2.job-discard
+- `[data-testid="backup-discard-confirm"]` — interactive — F-BACKUP-2.discard-confirm
+- `[data-testid="backup-retry-notice"]` — display — F-BACKUP-2.retry-notice
+- `[data-testid="backup-cloud-job"]` — display — F-BACKUP-2.job
+- `[data-testid="backup-cloud-start"]` — interactive — F-BACKUP-2.cloud-start
+- `[data-testid="backup-cloud-refresh"]` — interactive — F-BACKUP-2.cloud-refresh
 
 ## settings/backup (F-MFA-3)
 

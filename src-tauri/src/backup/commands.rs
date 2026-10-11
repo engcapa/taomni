@@ -18,6 +18,7 @@ pub struct TargetStatus {
 pub struct Configuration {
     config: ControlConfig,
     statuses: Vec<TargetStatus>,
+    cache: super::cache::CacheStatus,
 }
 #[tauri::command]
 pub async fn backup_remote_get_config(app: AppHandle) -> Result<Configuration, String> {
@@ -36,7 +37,21 @@ pub async fn backup_remote_get_config(app: AppHandle) -> Result<Configuration, S
             password_configured: !secrets.archive_password.is_empty(),
         });
     }
-    Ok(Configuration { config, statuses })
+    Ok(Configuration {
+        config,
+        statuses,
+        cache: super::cache::status(&control::root(&app)?)?,
+    })
+}
+
+#[tauri::command]
+pub fn backup_remote_clean_cache(app: AppHandle) -> Result<super::cache::CacheStatus, String> {
+    jobs::clean_cache(&app, true)
+}
+
+#[tauri::command]
+pub fn backup_remote_discard(app: AppHandle, job_id: String) -> Result<(), String> {
+    jobs::discard(&app, &job_id)
 }
 #[tauri::command]
 pub async fn backup_remote_save_config(
@@ -45,6 +60,7 @@ pub async fn backup_remote_save_config(
     target_id: Option<String>,
     archive_password: Option<String>,
 ) -> Result<(), String> {
+    let _owner = jobs::claim(&app)?;
     let jobs = app.state::<BackupJobs>();
     let _gate = jobs.gate.lock().map_err(|e| e.to_string())?;
     if !jobs.running.lock().map_err(|e| e.to_string())?.is_empty() {
@@ -86,8 +102,14 @@ pub async fn backup_feishu_authorize(
     app: AppHandle,
     target_id: String,
     application_selection: Option<String>,
+    restart_application: Option<bool>,
 ) -> Result<AuthorizationSession, String> {
-    feishu::auth::start(&app, &target_id, application_selection)
+    feishu::auth::start(
+        &app,
+        &target_id,
+        application_selection,
+        restart_application.unwrap_or(false),
+    )
 }
 #[tauri::command]
 pub async fn backup_feishu_apps() -> Result<Vec<feishu::cli_config::ApplicationChoice>, String> {
@@ -134,16 +156,7 @@ pub fn backup_remote_jobs(app: AppHandle) -> Result<Vec<BackupJob>, String> {
 }
 #[tauri::command]
 pub fn backup_remote_cancel(app: AppHandle, job_id: String) -> Result<(), String> {
-    if let Some(token) = app
-        .state::<BackupJobs>()
-        .running
-        .lock()
-        .map_err(|e| e.to_string())?
-        .get(&job_id)
-    {
-        token.cancel();
-    }
-    Ok(())
+    jobs::cancel(&app, &job_id)
 }
 #[tauri::command]
 pub fn backup_remote_retry(app: AppHandle, job_id: String) -> Result<String, String> {
@@ -168,19 +181,24 @@ pub async fn backup_remote_history_url(
     if !found {
         return Err("Backup file no longer belongs to this target".into());
     }
-    if !app
-        .state::<BackupJobs>()
-        .running
-        .lock()
-        .map_err(|e| e.to_string())?
-        .is_empty()
-    {
-        return Err("Finish or cancel active tasks before opening version recovery".into());
-    }
-    let mut config = control::load(&app)?;
-    if let Some(target) = config.targets.iter_mut().find(|t| t.id == remote.target_id) {
-        target.writes_paused = true;
-    }
-    control::save(&app, config)?;
+    let _owner = jobs::claim(&app)?;
+    app.state::<BackupJobs>().while_idle(|| {
+        control::update(&app, |config| {
+            let current = config
+                .targets
+                .iter_mut()
+                .find(|t| t.id == remote.target_id)
+                .ok_or("Backup target was removed")?;
+            if current.connection_id != target.connection_id
+                || current.root_token != target.root_token
+            {
+                return Err(
+                    "Backup target changed; refresh the file list before opening history".into(),
+                );
+            }
+            current.writes_paused = true;
+            Ok(())
+        })
+    })?;
     Ok(format!("https://my.feishu.cn/file/{}", remote.file_token))
 }

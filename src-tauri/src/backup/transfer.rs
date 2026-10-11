@@ -35,6 +35,28 @@ pub async fn download(
     path: &Path,
     ctx: &TransferContext,
 ) -> Result<(), String> {
+    download_with_refresh(client, url, bearer, locator, path, ctx, |_| async {
+        Err(super::failure::tagged(
+            super::failure::FailureKind::Authorization,
+            "Reconnect Feishu to download this backup",
+        ))
+    })
+    .await
+}
+
+pub async fn download_with_refresh<R, Fut>(
+    client: &reqwest::Client,
+    url: &str,
+    bearer: &str,
+    locator: &str,
+    path: &Path,
+    ctx: &TransferContext,
+    refresh: R,
+) -> Result<(), String>
+where
+    R: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<String, String>>,
+{
     let partial = path.with_extension("part");
     let checkpoint_path = path.with_extension("download.json");
     if let Some(parent) = path.parent() {
@@ -56,16 +78,19 @@ pub async fn download(
         offset,
         previous.as_ref().and_then(|p| p.total),
     );
-    let mut request = client
-        .get(url)
-        .bearer_auth(bearer)
-        .header("Accept-Encoding", "identity");
-    if offset > 0 {
-        request = request
-            .header("Range", format!("bytes={offset}-"))
-            .header("If-Range", &previous.as_ref().unwrap().etag);
-    }
-    let response = tokio::select! { _ = ctx.cancel.cancelled() => return Err("BACKUP_CANCELLED".into()), r = request.send() => r.map_err(network::network_error)? };
+    let build = |token: &str| {
+        let mut request = client
+            .get(url)
+            .bearer_auth(token)
+            .header("Accept-Encoding", "identity");
+        if offset > 0 {
+            request = request
+                .header("Range", format!("bytes={offset}-"))
+                .header("If-Range", &previous.as_ref().unwrap().etag);
+        }
+        request
+    };
+    let response = super::feishu::request::download(build, bearer.into(), refresh, ctx).await?;
     // Never forward bearer credentials to a redirect host. Public Feishu downloads
     // currently stream directly; a changed service contract requires an adapter change.
     if response.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
@@ -103,6 +128,7 @@ pub async fn download(
                 response.status().as_u16()
             ));
         };
+    let _cache_reservation = super::cache::reserve(path, expected_response_bytes.unwrap_or(0))?;
     let etag = response
         .headers()
         .get("etag")
@@ -135,6 +161,11 @@ pub async fn download(
         let chunk = tokio::select! { _ = ctx.cancel.cancelled() => return Err("BACKUP_CANCELLED".into()), next = stream.next() => next };
         let Some(chunk) = chunk else { break };
         let bytes = chunk.map_err(network::network_error)?;
+        let _chunk_reservation = if expected_response_bytes.is_none() {
+            super::cache::reserve(path, bytes.len() as u64)?
+        } else {
+            None
+        };
         received += bytes.len() as u64;
         if expected_response_bytes.is_some_and(|expected| received > expected) {
             return Err("Download exceeded its declared size".into());

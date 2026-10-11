@@ -27,6 +27,9 @@ pub struct Authorizations {
     active: Mutex<Option<(String, CancellationToken)>>,
     unsaved: Mutex<HashMap<String, RegisteredApp>>,
 }
+pub fn required_scopes() -> &'static str {
+    device_flow::SCOPES
+}
 struct CredentialLock(File);
 impl Drop for CredentialLock {
     fn drop(&mut self) {
@@ -115,12 +118,16 @@ pub fn terminal(phase: &str) -> bool {
 }
 pub fn connected(secrets: &ConnectionSecrets) -> bool {
     !secrets.refresh_in_flight
+        && !secrets.authorization_required
         && !secrets.refresh_token.is_empty()
         && secrets.refresh_expires_at > now_ms()
         && device_flow::missing_scopes(&secrets.granted_scopes).is_empty()
 }
 pub fn initialize(app: &tauri::AppHandle) {
     app.manage(Authorizations::default());
+    let Ok(_owner) = crate::backup::jobs::claim(app) else {
+        return;
+    };
     match sessions(app) {
         Ok(values) => {
             for mut session in values.into_iter().filter(|s| !terminal(&s.phase)) {
@@ -140,6 +147,7 @@ pub fn initialize(app: &tauri::AppHandle) {
     }
 }
 pub fn cancel(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    let _owner = crate::backup::jobs::claim(app)?;
     let state = app.state::<Authorizations>();
     let active = state
         .active
@@ -156,7 +164,9 @@ pub fn start(
     app: &tauri::AppHandle,
     target_id: &str,
     selection: Option<String>,
+    restart_application: bool,
 ) -> Result<AuthorizationSession, String> {
+    let owner = crate::backup::jobs::claim(app)?;
     let target = control::target(app, target_id)?;
     let state = app.state::<Authorizations>();
     let mut active = state
@@ -199,16 +209,25 @@ pub fn start(
         return Err("Finish or cancel active backup tasks before connecting Feishu".into());
     }
     publish(app, &mut session, "discovering", None, None, None)?;
+    // Old terminal authorization snapshots carry no resumable secret material.
+    // Keep recent feedback without allowing the session directory to grow forever.
+    let mut history = sessions(app)?;
+    history.sort_by_key(|s| std::cmp::Reverse(s.created_at));
+    for old in history.into_iter().skip(50).filter(|s| terminal(&s.phase)) {
+        let _ = std::fs::remove_file(session_path(app, &old.id)?);
+    }
     let key = format!("auth:{}", session.id);
     running.insert(key.clone(), cancel.clone());
     *active = Some((session.id.clone(), cancel.clone()));
     let mut task_session = session.clone();
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
+        let _owner = owner;
         let result = connect(
             &app,
             &target,
             selection.as_deref(),
+            restart_application,
             &mut task_session,
             &cancel,
         )
@@ -216,7 +235,7 @@ pub fn start(
         if let Err(error) = result {
             let phase = if cancel.is_cancelled() {
                 "cancelled"
-            } else if error == device_flow::EXPIRED {
+            } else if error.contains(device_flow::EXPIRED) {
                 "expired"
             } else {
                 "failed"
@@ -285,11 +304,12 @@ async fn connect(
     app: &tauri::AppHandle,
     target: &BackupTarget,
     selection: Option<&str>,
+    restart_application: bool,
     session: &mut AuthorizationSession,
     cancel: &CancellationToken,
 ) -> Result<(), String> {
     let client = network::client(&app.state::<AppState>(), &target.proxy)?;
-    let flow = FlowClient::new(client);
+    let flow = FlowClient::for_app(client, app)?;
     let initialization = lock(app, "initialization", cancel).await?;
     let config = control::load(app)?;
     let profile = config.device.id.clone();
@@ -309,7 +329,7 @@ async fn connect(
                 None
             }
         });
-    let mut conn = if let Some(id) = saved {
+    let mut conn = if let Some(id) = saved.filter(|_| !restart_application) {
         connection(&config, id)?
     } else {
         new_connection()
@@ -335,7 +355,13 @@ async fn connect(
         } else {
             publish(app, session, "resolving_app", None, None, None)?;
             let choice = selection.map(str::to_owned);
+            let skip_cli = restart_application
+                || conn.registration_pending
+                || !secrets.registration_device_code.is_empty();
             let chosen = tauri::async_runtime::spawn_blocking(move || {
+                if skip_cli {
+                    return Ok(None);
+                }
                 let selected = cli_config::selected(choice.as_deref())?;
                 selected
                     .map(|app| {
@@ -362,12 +388,18 @@ async fn connect(
                 credentials::put_connection(&profile, &conn.id, &secrets)?;
                 bind(app, &target.id, &conn)?;
             } else {
-                if conn.registration_pending {
-                    return Err("A previous app registration may have completed. Recover the existing application's credentials before creating another; Taomni will not automatically register a duplicate".into());
-                }
                 bind(app, &target.id, &conn)?;
                 publish(app, session, "registering", None, None, None)?;
-                let challenge = flow.begin_registration(cancel).await?;
+                let challenge =
+                    if conn.registration_pending || !secrets.registration_device_code.is_empty() {
+                        device_flow::Challenge::resume_registration(&secrets)?
+                    } else {
+                        let challenge = flow.begin_registration(cancel).await?;
+                        // Save recovery material before opening the browser or polling.
+                        challenge.save_registration(&mut secrets);
+                        credentials::put_connection(&profile, &conn.id, &secrets)?;
+                        challenge
+                    };
                 conn.registration_pending = true;
                 bind(app, &target.id, &conn)?;
                 publish(
@@ -383,6 +415,8 @@ async fn connect(
                     Err(error) => {
                         if error == "Feishu authorization was declined" {
                             conn.registration_pending = false;
+                            clear_registration(&mut secrets);
+                            credentials::put_connection(&profile, &conn.id, &secrets)?;
                             bind(app, &target.id, &conn)?;
                         }
                         return Err(error);
@@ -391,7 +425,31 @@ async fn connect(
                 persist_registered(app, &target.id, &profile, &mut conn, &mut secrets, issued)?;
             }
         }
-    } else if secrets.app_secret.is_empty() {
+    }
+    if conn.origin == "cli_existing" && !conn.app_id.is_empty() {
+        // The app ID is stable across secret rotation; reread only that source.
+        let id = conn.app_id.clone();
+        let loaded = tauri::async_runtime::spawn_blocking(move || {
+            if !cli_config::applications()?.iter().any(|a| a.app_id == id) {
+                return Ok(None);
+            }
+            cli_config::selected(Some(&id))?
+                .map(|a| cli_secret::resolve(&a))
+                .transpose()
+        });
+        let latest = tokio::select! {
+            _ = cancel.cancelled() => return Err(device_flow::CANCELLED.into()),
+            result = tokio::time::timeout(Duration::from_secs(15), loaded) => result.map_err(|_| "Timed out reading existing CLI credentials")?.map_err(|_| "Cannot read existing CLI credentials")??,
+        };
+        if let Some(secret) = latest {
+            if secrets.app_secret != secret.as_str() {
+                secrets.app_secret = secret.to_string();
+                secrets.authorization_required = true;
+                credentials::put_connection(&profile, &conn.id, &secrets)?;
+            }
+        }
+    }
+    if secrets.app_secret.is_empty() {
         return Err("Saved Feishu application credentials are missing; unlock or repair the system credential store".into());
     }
     drop(initialization);
@@ -399,6 +457,7 @@ async fn connect(
         return Err(device_flow::CANCELLED.into());
     }
     if current != Some(conn.id.as_str())
+        && !secrets.authorization_required
         && secrets.refresh_expires_at > now_ms()
         && !secrets.refresh_in_flight
         && !secrets.refresh_token.is_empty()
@@ -462,6 +521,7 @@ fn persist_registered(
 ) -> Result<(), String> {
     secrets.app_id = issued.id.clone();
     secrets.app_secret = issued.secret.to_string();
+    clear_registration(secrets);
     conn.app_id = issued.id.clone();
     conn.label = issued.id.clone();
     conn.registration_pending = false;
@@ -478,12 +538,59 @@ fn persist_registered(
     Ok(())
 }
 
+fn clear_registration(secrets: &mut ConnectionSecrets) {
+    secrets.registration_device_code.clear();
+    secrets.registration_url.clear();
+    secrets.registration_user_code.clear();
+    secrets.registration_expires_at = 0;
+    secrets.registration_interval = 0;
+}
+
 pub async fn access_token(
     app: &tauri::AppHandle,
     target: &BackupTarget,
     client: &reqwest::Client,
     cancel: &CancellationToken,
 ) -> Result<String, String> {
+    access_token_inner(app, target, client, cancel, None).await
+}
+
+pub async fn access_token_after_rejection(
+    app: &tauri::AppHandle,
+    target: &BackupTarget,
+    client: &reqwest::Client,
+    cancel: &CancellationToken,
+    rejected: &str,
+) -> Result<String, String> {
+    access_token_inner(app, target, client, cancel, Some(rejected)).await
+}
+
+pub async fn require_authorization(
+    app: &tauri::AppHandle,
+    target: &BackupTarget,
+    cancel: &CancellationToken,
+) -> Result<(), String> {
+    let id = target
+        .connection_id
+        .as_deref()
+        .ok_or("Missing Feishu connection")?;
+    let _lock = lock(app, id, cancel).await?;
+    let profile = control::load(app)?.device.id;
+    let mut stored = credentials::get_connection(&profile, id)?;
+    stored.authorization_required = true;
+    credentials::put_connection(&profile, id, &stored)?;
+    let _ = app.emit("backup-connection-changed", id);
+    Ok(())
+}
+
+async fn access_token_inner(
+    app: &tauri::AppHandle,
+    target: &BackupTarget,
+    client: &reqwest::Client,
+    cancel: &CancellationToken,
+    rejected: Option<&str>,
+) -> Result<String, String> {
+    use crate::backup::failure::{self, FailureKind};
     let id = target
         .connection_id
         .as_deref()
@@ -492,24 +599,42 @@ pub async fn access_token(
     let config = control::load(app)?;
     let conn = connection(&config, id)?;
     let mut stored = credentials::get_connection(&config.device.id, id)?;
+    if stored.authorization_required {
+        return Err(failure::tagged(
+            FailureKind::Authorization,
+            "Feishu authorization is no longer valid; authorize again",
+        ));
+    }
     if stored.refresh_in_flight {
-        return Err("Previous Feishu token refresh was interrupted or uncertain; authorize again before backing up".into());
+        return Err(failure::tagged(
+            FailureKind::Authorization,
+            "Previous Feishu token refresh was interrupted or uncertain; authorize again before backing up",
+        ));
     }
     if !device_flow::missing_scopes(&stored.granted_scopes).is_empty() {
-        return Err("Authorize all Feishu backup permissions before using this target".into());
+        return Err(failure::tagged(
+            FailureKind::Authorization,
+            "Authorize all Feishu backup permissions before using this target",
+        ));
     }
-    if !stored.access_token.is_empty() && stored.expires_at > now_ms() + 120_000 {
+    if !stored.access_token.is_empty()
+        && stored.expires_at > now_ms() + 120_000
+        && rejected != Some(stored.access_token.as_str())
+    {
         return Ok(stored.access_token.clone());
     }
     if stored.refresh_token.is_empty() || stored.refresh_expires_at <= now_ms() {
-        return Err("Feishu authorization expired; connect the account again".into());
+        return Err(failure::tagged(
+            FailureKind::Authorization,
+            "Feishu authorization expired; connect the account again",
+        ));
     }
     if cancel.is_cancelled() {
         return Err(device_flow::CANCELLED.into());
     }
     stored.refresh_in_flight = true;
     credentials::put_connection(&config.device.id, id, &stored)?;
-    match FlowClient::new(client.clone())
+    match FlowClient::for_app(client.clone(), app)?
         .refresh(&conn.app_id, &stored, cancel)
         .await
     {
@@ -525,11 +650,19 @@ pub async fn access_token(
         Err((error, uncertain)) => {
             if !uncertain {
                 stored.refresh_in_flight = false;
+                if failure::classify(&error) == FailureKind::Authorization {
+                    stored.authorization_required = true;
+                }
                 credentials::put_connection(&config.device.id, id, &stored)?;
+                let _ = app.emit("backup-connection-changed", id);
                 return Err(error);
             }
-            Err(format!(
-                "{error}. Token refresh did not complete reliably; authorize Feishu again"
+            let _ = app.emit("backup-connection-changed", id);
+            Err(failure::tagged(
+                FailureKind::Authorization,
+                &format!(
+                    "{error}. Token refresh did not complete reliably; authorize Feishu again"
+                ),
             ))
         }
     }

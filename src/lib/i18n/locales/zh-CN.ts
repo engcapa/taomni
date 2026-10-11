@@ -3422,16 +3422,28 @@ export const zhCN: DeepPartial<typeof en> = {
     upcomingCode: "即将更新：{code}",
   },
   remoteBackup: {
+    "retryAt": "第 {attempts} 次尝试失败，将于 {time} 自动重试。",
+    "actionRequired": "此任务需要处理。修复连接或设置后重试；取消单次任务不会停止后续计划备份。",
+    "recoveryHint": "再次连接可继续未完成的注册，或重新读取同一应用的凭据。注册已过期或应用不可用时，可在下方重新开始浏览器连接。",
+    "restartWarning": "我理解浏览器可能创建另一个应用。已有云端文件仍保留；恢复上传前我会确认账户和备份目录。",
+    "restartApplication": "重新开始应用连接",
+    "cacheUsage": "本地云备份缓存：{used} / {limit}。已完成文件保留 {days} 天，未完成任务继续保留。",
+    "cleanCache": "清理已完成的本地缓存",
+    "cacheCleaned": "已清理完成任务的本地缓存，云端文件和未完成任务仍保留。",
+    "discard": "丢弃本地任务",
+    "discardWarning": "删除此任务的本地归档和下载残片？删除后将无法续传，云端文件仍保留。",
+    "discardConfirm": "删除本地任务数据",
+
     "title": "云端备份与跨设备恢复",
     "addFeishu": "添加飞书目标",
     "sourceHint": "数据源：Taomni 数据（SQLite 热备）。S3、Google Drive、OneDrive、SFTP 待支持。",
-    "destinations": "备份目的地（可多选，自动计划也使用此选择）",
+    "destinations": "备份目的地（可多选）",
     "localDestination": "本地目录 · 无网络代理",
     "localScopeLabel": "多目标本地备份范围",
     "localCore": "本地核心数据",
     "localFull": "本地完整数据",
     "startSelected": "立即备份到所选目的地",
-    "destinationsHint": "云端范围在各目标设置中指定；每个目的地独立代理、结果和重试。",
+    "destinationsHint": "所选云端目的地沿用下方统一周期。本地自动备份继续按原策略运行，不受此处多选影响。各云端目标独立设置范围和代理；同一 SQLite 路径的多开实例共用一个备份来源。",
     "deviceName": "本机名称",
     "targetLabel": "云端备份目标",
     "newTarget": "新飞书目标",
@@ -3499,6 +3511,10 @@ export const zhCN: DeepPartial<typeof en> = {
     "historyNotice": "在飞书网页选择并恢复历史版本，然后回此页重新下载。本机已暂停上传；若是其他设备的备份，请暂停源设备上传，避免再次覆盖。",
     "errorDetails": "技术详情",
     "phases": {
+      "retrying": "服务暂时失败，正在重试",
+      "retry_wait": "等待自动重试",
+      "discarded": "已丢弃本地任务",
+
       "queued": "等待中",
       "preparing": "生成加密快照",
       "connecting": "连接中",
@@ -3526,6 +3542,8 @@ export const zhCN: DeepPartial<typeof en> = {
       "interrupted": "已中断，请重新连接"
     },
     "errors": {
+      "storage": "本地云备份缓存已满。请清理已完成的缓存，或丢弃不再需要的未完成任务后重试。",
+      "otherInstance": "另一个 Taomni 窗口正在处理此数据库的云备份。请等待其完成，或在该窗口管理任务。",
       "failed": "操作失败。展开详情查看原因，再重试。",
       "browser": "无法打开浏览器，请点击“打开授权网页”重试。",
       "config": "备份配置尚未加载，请稍后重试。",
@@ -3539,7 +3557,7 @@ export const zhCN: DeepPartial<typeof en> = {
       "password": "请为每个启用的云端目标设置独立备份密码。",
       "network": "网络请求失败，请检查此目标的网络和代理配置后重试。",
       "version": "飞书未确认原生版本覆盖，上传已停止。请查看详情。",
-      "registration": "之前的应用注册可能已完成，请恢复已有应用凭据后重新连接，避免重复创建。",
+      "registration": "注册需要恢复。请再次连接以继续注册，或阅读提示后选择“重新开始应用连接”。",
       "busy": "另一个备份或授权任务正在运行，请完成或取消后再试。"
     }
   },
