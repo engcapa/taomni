@@ -1,0 +1,88 @@
+id: TC-BACKUP-CLOUD-001
+title: Feishu targets save separate proxies without application secrets or callback setup
+description: >-
+  Saves two disabled Feishu destinations through real Tauri IPC, collapses and
+  reopens the backup view, and checks their persisted names and proxy modes.
+  Empty folder uses the user's cloud root. This case does not authorize a real
+  cloud account or claim server-side OAuth, uploads or history restoration.
+covers: [F-BACKUP-2]
+tags: [backup, settings, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-feishu-add"]'
+- click: '[data-testid="backup-feishu-add"]'
+- fill: {selector: '[data-testid="backup-cloud-name"]', value: QA Feishu Direct}
+- assert_not_visible: '[data-testid="backup-feishu-app-id"]'
+- select_option: {selector: '[data-testid="backup-cloud-proxy"]', value: none}
+- click: '[data-testid="backup-cloud-save"]'
+- wait_for: {selector: '[data-testid="backup-feishu-authorize"]:not([disabled])', timeout_sec: 30}
+- click: '[data-testid="backup-feishu-add"]'
+- fill: {selector: '[data-testid="backup-cloud-name"]', value: QA Feishu App Proxy}
+- assert_attribute: {selector: '[data-testid="backup-cloud-proxy"]', name: value, equals: app}
+- click: '[data-testid="backup-cloud-save"]'
+- wait_for: '[data-testid="backup-feishu-authorize"]:not([disabled])'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-cloud-target"]'
+- select_option: {selector: '[data-testid="backup-cloud-target"]', label: QA Feishu Direct}
+- click: '[data-testid="backup-cloud-edit"]'
+- assert_attribute: {selector: '[data-testid="backup-cloud-name"]', name: value, equals: QA Feishu Direct}
+- assert_attribute: {selector: '[data-testid="backup-cloud-proxy"]', name: value, equals: none}
+- assert_attribute: {selector: '[data-testid="backup-feishu-folder"]', name: value, equals: ''}
+- select_option: {selector: '[data-testid="backup-cloud-target"]', label: QA Feishu App Proxy}
+- click: '[data-testid="backup-cloud-edit"]'
+- assert_attribute: {selector: '[data-testid="backup-cloud-proxy"]', name: value, equals: app}
+- assert_text: {selector: '[data-testid="backup-feishu-add"]', contains: Add Feishu destination}
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- assert_text: {selector: '[data-testid="backup-feishu-add"]', contains: 添加飞书目标}
+- assert_text: {selector: '[data-testid="backup-cloud-save"]', contains: 保存}
+- screenshot: backup-cloud-targets-zh.png
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- assert_text: {selector: '[data-testid="backup-cloud-save"]', contains: Save}
+- screenshot: backup-cloud-targets.png
+verification:
+  review: reviewed
+  visual:
+  - check: Saved target names and the selected proxy mode are readable.
+    method: manual
+    reason: Inspect the retained native screenshot.
+  requirements:
+  - id: R1
+    requirement: New targets require no App ID, Secret or callback setup (AC-03).
+    actions: [7, 8, 10, 11, 13, 14, 16]
+    checkpoints:
+    - {step: 9, expectation: Legacy App ID input absent}
+    - {step: 12, expectation: First target saved and connection action available}
+    - {step: 17, expectation: Second target saved}
+    results: [9, 12, 17]
+  - id: R2
+    requirement: Reopening the view restores independent target configuration (AC-05/07).
+    actions: [18, 19, 21, 22, 26, 27]
+    checkpoints:
+    - {step: 23, expectation: First destination name persisted}
+    - {step: 24, expectation: First destination remains direct}
+    - {step: 25, expectation: Empty root remains valid}
+    - {step: 28, expectation: Second destination retains application proxy mode}
+    results: [23, 24, 25, 28]
+  - id: R3
+    requirement: The mounted backup controls follow the application language without losing target settings.
+    actions: [30, 31, 35, 36]
+    checkpoints:
+    - {step: 29, expectation: English controls are visible by default}
+    - {step: 32, expectation: Add destination switches to Chinese}
+    - {step: 33, expectation: Save control switches to Chinese}
+    - {step: 37, expectation: Save control returns to English}
+    results: [29, 32, 33, 37]
+  native:
+  - check: Personal Feishu browser authorization, uploading and web historical recovery.
+    method: external
+    reason: Requires the user to confirm access to the personal account; not simulated by this case.

@@ -76,6 +76,7 @@ russh-sftp = "2.3"
 tokio-util = { version = "0.7", features = ["compat", "io", "codec"] }
 futures = "0.3"
 async-trait = "0.1"
+tempfile = "3"
 async-stream = "0.3"
 # Claude Code agent bridge (agent/cc_bridge/mcp_http.rs): the official Rust MCP
 # SDK. We run an in-app Streamable-HTTP MCP server that CC connects to via its
@@ -86,7 +87,7 @@ rmcp = { version = "1", features = ["server", "client", "transport-streamable-ht
 axum = "0.8"
 schemars = "1"
 thiserror = "2"
-reqwest = { version = "0.13", features = ["rustls", "json", "stream", "query", "socks", "blocking"], default-features = false }
+reqwest = { version = "0.13", features = ["rustls", "json", "form", "stream", "query", "socks", "blocking", "multipart"], default-features = false }
 heck = "0.5"
 regex = "1"
 # Code Workspace text decoding/encoding. chardetng provides deterministic
@@ -322,6 +323,7 @@ windows = { version = "0.62", features = [
   # administrator/UAC elevation type) and clipboard change sequence numbers.
   "Win32_System_Services",
   "Win32_Security",
+  "Win32_Security_Cryptography",
   "Win32_System_Threading",
   "Win32_UI_Shell",
   "Win32_System_DataExchange",

@@ -1,0 +1,512 @@
+pub mod auth;
+pub mod cli_config;
+mod cli_secret;
+mod device_flow;
+use super::{
+    control,
+    manifest::file_sha256,
+    model::*,
+    network,
+    provider::{DestinationProvider, TransferContext},
+    transfer,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use std::path::Path;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+const BASE: &str = "https://open.feishu.cn/open-apis/drive/v1";
+const SMALL_LIMIT: u64 = 20 * 1024 * 1024;
+
+pub struct FeishuProvider {
+    pub client: reqwest::Client,
+    pub bearer: String,
+    pub target: BackupTarget,
+}
+#[derive(Clone, Deserialize)]
+struct FileEntry {
+    token: String,
+    name: String,
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(default)]
+    modified_time: String,
+}
+#[derive(Serialize, Deserialize)]
+struct UploadCheckpoint {
+    sha256: String,
+    parent: String,
+    existing: Option<String>,
+    upload_id: String,
+    block_size: u64,
+    block_num: u64,
+    next: u64,
+}
+
+impl FeishuProvider {
+    async fn send(
+        &self,
+        request: reqwest::RequestBuilder,
+        ctx: &TransferContext,
+    ) -> Result<Value, String> {
+        ctx.check()?;
+        let response = tokio::select! { _ = ctx.cancel.cancelled() => return Err("BACKUP_CANCELLED".into()), r = request.bearer_auth(&self.bearer).send() => r.map_err(network::network_error)? };
+        tokio::select! { _ = ctx.cancel.cancelled() => Err("BACKUP_CANCELLED".into()), result = network::json(response) => result }
+    }
+    async fn children(
+        &self,
+        folder: &str,
+        ctx: &TransferContext,
+    ) -> Result<Vec<FileEntry>, String> {
+        if !folder.is_empty() {
+            validate_token(folder)?;
+        }
+        let mut entries = Vec::new();
+        let mut cursor = String::new();
+        let mut seen = std::collections::HashSet::new();
+        loop {
+            let value = self
+                .send(
+                    self.client.get(format!("{BASE}/files")).query(&[
+                        ("folder_token", folder),
+                        ("page_size", "200"),
+                        ("page_token", &cursor),
+                    ]),
+                    ctx,
+                )
+                .await?;
+            let files: Vec<FileEntry> = serde_json::from_value(value["data"]["files"].clone())
+                .map_err(|_| "Invalid Feishu file list")?;
+            entries.extend(files);
+            if value["data"]["has_more"].as_bool() != Some(true) {
+                break;
+            }
+            cursor = value["data"]["next_page_token"]
+                .as_str()
+                .or_else(|| value["data"]["page_token"].as_str())
+                .ok_or("Missing Feishu page cursor")?
+                .into();
+            if !seen.insert(cursor.clone()) || entries.len() > 100_000 {
+                return Err("Invalid or excessive Feishu pagination".into());
+            }
+        }
+        Ok(entries)
+    }
+    async fn folder(
+        &self,
+        parent: &str,
+        name: &str,
+        ctx: &TransferContext,
+    ) -> Result<String, String> {
+        let matching: Vec<_> = self
+            .children(parent, ctx)
+            .await?
+            .into_iter()
+            .filter(|f| f.name == name)
+            .collect();
+        if matching.len() > 1 || matching.first().is_some_and(|f| f.kind != "folder") {
+            return Err(
+                "Ambiguous backup folder; resolve duplicate names in Feishu before continuing"
+                    .into(),
+            );
+        }
+        if let Some(folder) = matching.first() {
+            return Ok(folder.token.clone());
+        }
+        let result = self
+            .send(
+                self.client
+                    .post(format!("{BASE}/files/create_folder"))
+                    .json(&json!({"folder_token":parent,"name":name})),
+                ctx,
+            )
+            .await?;
+        let token = result["data"]["token"]
+            .as_str()
+            .ok_or("Missing new folder token")?
+            .to_owned();
+        validate_token(&token)?;
+        Ok(token)
+    }
+    async fn small_upload(
+        &self,
+        parent: &str,
+        name: &str,
+        bytes: Vec<u8>,
+        existing: Option<&str>,
+        ctx: &TransferContext,
+    ) -> Result<Receipt, String> {
+        let sha = super::manifest::bytes_sha256(&bytes);
+        let mut form = reqwest::multipart::Form::new()
+            .text("file_name", name.to_owned())
+            .text("parent_type", "explorer")
+            .text("parent_node", parent.to_owned())
+            .text("size", bytes.len().to_string())
+            .part(
+                "file",
+                reqwest::multipart::Part::bytes(bytes).file_name(name.to_owned()),
+            );
+        if let Some(token) = existing {
+            form = form.text("file_token", token.to_owned());
+        }
+        let result = self
+            .send(
+                self.client
+                    .post(format!("{BASE}/files/upload_all"))
+                    .multipart(form),
+                ctx,
+            )
+            .await?;
+        let token = result["data"]["file_token"]
+            .as_str()
+            .ok_or("Missing upload file token")?
+            .to_owned();
+        let version = result["data"]
+            .get("version")
+            .filter(|v| !v.is_null())
+            .map(|v| {
+                v.as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| v.to_string())
+            });
+        if existing.is_some_and(|old| old != token) || (existing.is_some() && version.is_none()) {
+            return Err("FEISHU_NATIVE_VERSION_UNSUPPORTED: overwrite was not confirmed; the original backup remains selected".into());
+        }
+        Ok(Receipt {
+            file_token: token,
+            version,
+            sha256: sha,
+        })
+    }
+    async fn probe(&self, parent: &str, ctx: &TransferContext) -> Result<(), String> {
+        // Probe only disposable synthetic bytes, never a user's sole backup.
+        let matches: Vec<_> = self
+            .children(parent, ctx)
+            .await?
+            .into_iter()
+            .filter(|f| f.name == ".taomni-version-probe")
+            .collect();
+        if matches.len() > 1 {
+            return Err(
+                "Feishu version probe produced duplicate files; native versioning is unavailable"
+                    .into(),
+            );
+        }
+        let token = if let Some(file) = matches.first() {
+            file.token.clone()
+        } else {
+            self.small_upload(
+                parent,
+                ".taomni-version-probe",
+                b"Taomni version capability probe v1".to_vec(),
+                None,
+                ctx,
+            )
+            .await?
+            .file_token
+        };
+        self.small_upload(
+            parent,
+            ".taomni-version-probe",
+            format!("Taomni probe {}", uuid::Uuid::new_v4()).into_bytes(),
+            Some(&token),
+            ctx,
+        )
+        .await?;
+        Ok(())
+    }
+    async fn multipart(
+        &self,
+        artifact: &Artifact,
+        parent: &str,
+        existing: Option<&str>,
+        checkpoint: &Path,
+        ctx: &TransferContext,
+    ) -> Result<Receipt, String> {
+        let previous: Option<UploadCheckpoint> = std::fs::read(checkpoint)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok());
+        let mut progress = if let Some(p) = previous.filter(|p| {
+            p.sha256 == artifact.sha256 && p.parent == parent && p.existing.as_deref() == existing
+        }) {
+            p
+        } else {
+            let mut body = json!({"file_name":"current.taobak", "parent_type":"explorer", "parent_node":parent, "size":artifact.size});
+            if let Some(token) = existing {
+                body["file_token"] = json!(token);
+            }
+            let value = self
+                .send(
+                    self.client
+                        .post(format!("{BASE}/files/upload_prepare"))
+                        .json(&body),
+                    ctx,
+                )
+                .await?;
+            UploadCheckpoint {
+                sha256: artifact.sha256.clone(),
+                parent: parent.into(),
+                existing: existing.map(str::to_owned),
+                upload_id: value["data"]["upload_id"]
+                    .as_str()
+                    .ok_or("Missing upload transaction")?
+                    .into(),
+                block_size: value["data"]["block_size"]
+                    .as_u64()
+                    .ok_or("Missing upload block size")?,
+                block_num: value["data"]["block_num"]
+                    .as_u64()
+                    .ok_or("Missing upload block count")?,
+                next: 0,
+            }
+        };
+        if progress.block_size == 0
+            || progress.block_size > 32 * 1024 * 1024
+            || progress.block_num != artifact.size.div_ceil(progress.block_size)
+            || progress.next > progress.block_num
+        {
+            return Err("Invalid multipart upload checkpoint".into());
+        }
+        control::write_json(checkpoint, &progress)?;
+        let mut input = tokio::fs::File::open(&artifact.path)
+            .await
+            .map_err(|e| e.to_string())?;
+        input
+            .seek(std::io::SeekFrom::Start(
+                progress.next * progress.block_size,
+            ))
+            .await
+            .map_err(|e| e.to_string())?;
+        while progress.next < progress.block_num {
+            ctx.check()?;
+            let offset = progress.next * progress.block_size;
+            let len = progress.block_size.min(artifact.size - offset);
+            let mut bytes = vec![0; len as usize];
+            input
+                .read_exact(&mut bytes)
+                .await
+                .map_err(|e| e.to_string())?;
+            let form = reqwest::multipart::Form::new()
+                .text("upload_id", progress.upload_id.clone())
+                .text("seq", progress.next.to_string())
+                .text("size", len.to_string())
+                .part(
+                    "file",
+                    reqwest::multipart::Part::bytes(bytes).file_name("block"),
+                );
+            if let Err(error) = self
+                .send(
+                    self.client
+                        .post(format!("{BASE}/files/upload_part"))
+                        .multipart(form),
+                    ctx,
+                )
+                .await
+            {
+                // Expired upload IDs may be retried by preparing a fresh transaction.
+                if error.contains("106") {
+                    let _ = std::fs::remove_file(checkpoint);
+                }
+                return Err(error);
+            }
+            progress.next += 1;
+            control::write_json(checkpoint, &progress)?;
+            ctx.progress(
+                "uploading",
+                (progress.next * progress.block_size).min(artifact.size),
+                Some(artifact.size),
+            );
+        }
+        let value = self
+            .send(
+                self.client
+                    .post(format!("{BASE}/files/upload_finish"))
+                    .json(&json!({"upload_id":progress.upload_id,"block_num":progress.block_num})),
+                ctx,
+            )
+            .await?;
+        let token = value["data"]["file_token"]
+            .as_str()
+            .ok_or("Missing completed upload token")?
+            .to_owned();
+        if existing.is_some_and(|old| old != token) {
+            return Err("FEISHU_NATIVE_VERSION_UNSUPPORTED: multipart upload did not preserve file identity".into());
+        }
+        Ok(Receipt {
+            file_token: token,
+            version: None,
+            sha256: artifact.sha256.clone(),
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl DestinationProvider for FeishuProvider {
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities {
+            current_download: true,
+            native_version_upload: true,
+            resume_upload: true,
+            resume_download: true,
+            ..Default::default()
+        }
+    }
+    async fn list(&self, ctx: &TransferContext) -> Result<Vec<RemoteBackup>, String> {
+        let roots: Vec<_> = self
+            .children(&self.target.root_token, ctx)
+            .await?
+            .into_iter()
+            .filter(|f| f.kind == "folder" && f.name == "taomni-backups-v1")
+            .collect();
+        if roots.len() > 1 {
+            return Err("Duplicate Taomni backup roots".into());
+        }
+        let Some(root) = roots.first() else {
+            return Ok(vec![]);
+        };
+        let mut result = Vec::new();
+        for device in self.children(&root.token, ctx).await? {
+            if device.kind != "folder" || validate_id(&device.name).is_err() {
+                continue;
+            }
+            for plan in self.children(&device.token, ctx).await? {
+                if plan.kind != "folder" || validate_id(&plan.name).is_err() {
+                    continue;
+                }
+                let files = self.children(&plan.token, ctx).await?;
+                let current: Vec<_> = files
+                    .iter()
+                    .filter(|f| f.kind == "file" && f.name == "current.taobak")
+                    .collect();
+                if current.len() > 1 {
+                    return Err(
+                        "Ambiguous current backup; duplicate files require reconciliation".into(),
+                    );
+                }
+                if let Some(file) = current.first() {
+                    result.push(RemoteBackup {
+                        target_id: self.target.id.clone(),
+                        device_id: device.name.clone(),
+                        device_name: device.name.clone(),
+                        source_kind: "taomni".into(),
+                        file_token: file.token.clone(),
+                        name: file.name.clone(),
+                        modified_at: file.modified_time.clone(),
+                    });
+                }
+            }
+        }
+        Ok(result)
+    }
+    async fn upload(
+        &self,
+        artifact: &Artifact,
+        device: &DeviceIdentity,
+        checkpoint: &Path,
+        ctx: &TransferContext,
+    ) -> Result<Receipt, String> {
+        validate_id(&device.id)?;
+        let root = self
+            .folder(&self.target.root_token, "taomni-backups-v1", ctx)
+            .await?;
+        let device_folder = self.folder(&root, &device.id, ctx).await?;
+        let parent = self.folder(&device_folder, &self.target.id, ctx).await?;
+        self.probe(&parent, ctx).await?;
+        let candidates: Vec<_> = self
+            .children(&parent, ctx)
+            .await?
+            .into_iter()
+            .filter(|f| f.name == "current.taobak")
+            .collect();
+        if candidates.len() > 1 || candidates.first().is_some_and(|f| f.kind != "file") {
+            return Err("Ambiguous current backup; refusing to overwrite".into());
+        }
+        let existing = candidates.first().map(|f| f.token.as_str());
+        let verification = checkpoint.with_extension("verification.taobak");
+        if let Some(token) = existing {
+            // Reconcile any previous response lost after a successful commit.
+            transfer::download(
+                &self.client,
+                &format!("{BASE}/files/{token}/download"),
+                &self.bearer,
+                token,
+                &verification,
+                ctx,
+            )
+            .await?;
+            if file_sha256(&verification).map_err(|e| e.to_string())? == artifact.sha256 {
+                let _ = std::fs::remove_file(&verification);
+                let _ = std::fs::remove_file(checkpoint);
+                return Ok(Receipt {
+                    file_token: token.into(),
+                    version: None,
+                    sha256: artifact.sha256.clone(),
+                });
+            }
+            let _ = std::fs::remove_file(&verification);
+        }
+        ctx.progress("uploading", 0, Some(artifact.size));
+        let receipt = if artifact.size <= SMALL_LIMIT {
+            self.small_upload(
+                &parent,
+                "current.taobak",
+                tokio::fs::read(&artifact.path)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                existing,
+                ctx,
+            )
+            .await?
+        } else {
+            self.multipart(artifact, &parent, existing, checkpoint, ctx)
+                .await?
+        };
+        ctx.progress("verifying", artifact.size, Some(artifact.size));
+        transfer::download(
+            &self.client,
+            &format!("{BASE}/files/{}/download", receipt.file_token),
+            &self.bearer,
+            &receipt.file_token,
+            &verification,
+            ctx,
+        )
+        .await?;
+        if file_sha256(&verification).map_err(|e| e.to_string())? != artifact.sha256 {
+            return Err(
+                "Uploaded backup verification failed; keep the local artifact and retry".into(),
+            );
+        }
+        let _ = std::fs::remove_file(&verification);
+        let _ = std::fs::remove_file(checkpoint);
+        Ok(receipt)
+    }
+    async fn download(
+        &self,
+        remote: &RemoteBackup,
+        path: &Path,
+        ctx: &TransferContext,
+    ) -> Result<(), String> {
+        validate_token(&remote.file_token)?;
+        // The caller supplies an object selected from this target, not arbitrary credentials/URLs.
+        if remote.target_id != self.target.id {
+            return Err("Backup target mismatch".into());
+        }
+        if !self
+            .list(ctx)
+            .await?
+            .iter()
+            .any(|f| f.file_token == remote.file_token && f.device_id == remote.device_id)
+        {
+            return Err("Backup file no longer belongs to the selected target/device".into());
+        }
+        transfer::download(
+            &self.client,
+            &format!("{BASE}/files/{}/download", remote.file_token),
+            &self.bearer,
+            &remote.file_token,
+            path,
+            ctx,
+        )
+        .await
+    }
+}

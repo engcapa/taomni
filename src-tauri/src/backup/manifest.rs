@@ -28,6 +28,8 @@ pub struct BackupManifest {
     pub backup_scope: String,
     pub encrypted: bool,
     pub files: Vec<BackupFileEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<super::model::Provenance>,
 }
 
 impl BackupManifest {
@@ -44,6 +46,7 @@ impl BackupManifest {
             backup_scope,
             encrypted,
             files: Vec::new(),
+            provenance: None,
         }
     }
 

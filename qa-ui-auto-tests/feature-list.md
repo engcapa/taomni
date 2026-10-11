@@ -10455,6 +10455,53 @@ controls:
 - 轻量核心与完整备份都包含 `databases/mfa.db`；自定义范围勾选 MFA 时强制同时包含 `vault.db`（数据密钥在保险库中）。从未使用 MFA 的配置不生成 `mfa.db`。
 - 恢复时替换 `mfa.db` 并为原文件保留安全副本；恢复后若保险库与 `mfa.db` 不匹配，MFA 标签提示并提供清空重建入口。
 
+### 27.4a 云端备份连接（开发中）
+
+<!-- feature
+id: F-BACKUP-2
+status: partial
+area: settings/backup
+components: [RemoteBackupPanel]
+files:
+  - src/components/settings/RemoteBackupPanel.tsx
+  - src/lib/remoteBackup.ts
+  - src-tauri/src/backup/commands.rs
+  - src-tauri/src/backup/control.rs
+  - src-tauri/src/backup/credentials.rs
+  - src-tauri/src/backup/feishu/auth.rs
+controls:
+  - id: cloud-panel
+    selector: '[data-testid="backup-cloud-panel"]'
+    kind: display
+  - id: feishu-add
+    selector: '[data-testid="backup-feishu-add"]'
+    kind: interactive
+  - id: cloud-target
+    selector: '[data-testid="backup-cloud-target"]'
+    kind: interactive
+  - id: cloud-name
+    selector: '[data-testid="backup-cloud-name"]'
+    kind: interactive
+  - id: cloud-edit
+    selector: '[data-testid="backup-cloud-edit"]'
+    kind: interactive
+  - id: cloud-proxy
+    selector: '[data-testid="backup-cloud-proxy"]'
+    kind: interactive
+  - id: cloud-save
+    selector: '[data-testid="backup-cloud-save"]'
+    kind: interactive
+  - id: feishu-folder
+    selector: '[data-testid="backup-feishu-folder"]'
+    kind: interactive
+  - id: feishu-authorize
+    selector: '[data-testid="backup-feishu-authorize"]'
+    kind: interactive
+-->
+
+- 飞书使用原生应用复用/浏览器注册和设备授权，目标可保存独立代理；不需要手工应用密钥或回调设置。
+- `TC-BACKUP-CLOUD-001` 验证原生目标配置保存/重开与中英文切换；个人真实授权、上传、历史回退及重启恢复已有专门实测，具体范围与未完成项见 `docs-feature/unified-backup/implementation-status.md`，该 UI case 不代替云端链路验收。
+
 ### 27.4 后台自动备份 ✅
 
 <!-- feature

@@ -43,279 +43,388 @@ fn read_archive_zip_bytes(archive_path: &Path, password: Option<&str>) -> Result
     }
 }
 
-/// Inspect a backup archive and return its manifest without modifying any local state.
-pub fn inspect_archive(
-    archive_path: &Path,
-    password: Option<&str>,
-) -> Result<BackupManifest, String> {
-    let zip_bytes = read_archive_zip_bytes(archive_path, password)?;
-    let mut archive =
-        ZipArchive::new(Cursor::new(zip_bytes)).map_err(|e| format!("invalid zip archive: {e}"))?;
+const MAX_ARCHIVE_BYTES: u64 = 1024 * 1024 * 1024;
+const MAX_EXTRACTED_BYTES: u64 = 8 * 1024 * 1024 * 1024;
+const JOURNAL_FILE: &str = "restore_journal.json";
 
-    let mut manifest_file = archive
-        .by_name(MANIFEST_FILE_NAME)
-        .map_err(|_| "backup archive is missing manifest.json".to_string())?;
-
-    let mut manifest_bytes = Vec::new();
-    manifest_file
-        .read_to_end(&mut manifest_bytes)
-        .map_err(|e| format!("failed to read manifest.json: {e}"))?;
-
-    BackupManifest::from_json_bytes(&manifest_bytes)
-        .map_err(|e| format!("failed to parse manifest.json: {e}"))
-}
-
-pub fn stage_restore(
-    app: &AppHandle,
-    archive_path: &Path,
-    password: Option<&str>,
-) -> Result<StageRestoreResult, String> {
-    let app_data = crate::resolved_app_data_dir(app)?;
-    stage_restore_to_dir(&app_data, archive_path, password)
-}
-
-/// Stage all files from the archive into `app_data/.pending_restore/`
-/// and record `restore_intent.json`.
-pub fn stage_restore_to_dir(
-    app_data: &Path,
-    archive_path: &Path,
-    password: Option<&str>,
-) -> Result<StageRestoreResult, String> {
-    let manifest = inspect_archive(archive_path, password)?;
-    let zip_bytes = read_archive_zip_bytes(archive_path, password)?;
-    let mut archive =
-        ZipArchive::new(Cursor::new(zip_bytes)).map_err(|e| format!("invalid zip archive: {e}"))?;
-
-    let pending_dir = app_data.join(PENDING_RESTORE_DIR);
-    if pending_dir.exists() {
-        let _ = std::fs::remove_dir_all(&pending_dir);
+fn checked_path(name: &str) -> Result<(), String> {
+    if name.is_empty()
+        || name.contains('\\')
+        || name.contains(':')
+        || name.starts_with('/')
+        || name.split('/').any(|p| {
+            p.is_empty()
+                || p == "."
+                || p == ".."
+                || p.ends_with('.')
+                || p.ends_with(' ')
+                || p.chars().any(|c| c.is_control())
+        })
+    {
+        return Err(format!("Unsafe backup path: {name}"));
     }
-    std::fs::create_dir_all(&pending_dir)
-        .map_err(|e| format!("create pending restore directory: {e}"))?;
-
-    // Extract files into pending_dir
-    for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .map_err(|e| format!("read zip entry {i}: {e}"))?;
-        let name = file.name().to_string();
-
-        // Skip directories and manifest
-        if file.is_dir() || name == MANIFEST_FILE_NAME {
-            continue;
-        }
-
-        let out_path = pending_dir.join(&name);
-        if let Some(parent) = out_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("create directory {}: {e}", parent.display()))?;
-        }
-
-        let mut out_file = File::create(&out_path)
-            .map_err(|e| format!("create staged file {}: {e}", out_path.display()))?;
-        std::io::copy(&mut file, &mut out_file)
-            .map_err(|e| format!("extract file to {}: {e}", out_path.display()))?;
-    }
-
-    // Verify file checksums
-    for entry in &manifest.files {
-        let staged_file_path = pending_dir.join(&entry.path);
-        if !staged_file_path.is_file() {
-            let _ = std::fs::remove_dir_all(&pending_dir);
-            return Err(format!(
-                "Staged archive missing expected file: {}",
-                entry.path
-            ));
-        }
-        let actual_hash = file_sha256(&staged_file_path)
-            .map_err(|e| format!("compute hash for {}: {e}", entry.path))?;
-        if actual_hash != entry.sha256 {
-            let _ = std::fs::remove_dir_all(&pending_dir);
-            return Err(format!(
-                "Checksum mismatch for file {}: expected {}, got {}",
-                entry.path, entry.sha256, actual_hash
-            ));
+    for part in name.split('/') {
+        let base = part.split('.').next().unwrap_or("").to_ascii_uppercase();
+        if ["CON", "PRN", "AUX", "NUL"].contains(&base.as_str())
+            || (base.len() == 4
+                && (base.starts_with("COM") || base.starts_with("LPT"))
+                && base.as_bytes()[3].is_ascii_digit())
+        {
+            return Err("Reserved backup path".into());
         }
     }
-
-    // Write restore_intent.json
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0);
-
-    let intent = RestoreIntent {
-        staged_at: now_ms,
-        manifest: manifest.clone(),
-    };
-    let intent_json = serde_json::to_string_pretty(&intent)
-        .map_err(|e| format!("serialize restore intent: {e}"))?;
-
-    let intent_path = app_data.join(RESTORE_INTENT_FILE);
-    std::fs::write(&intent_path, intent_json)
-        .map_err(|e| format!("write restore intent file: {e}"))?;
-
-    Ok(StageRestoreResult {
-        manifest,
-        restart_required: true,
-        message:
-            "Backup verified and staged successfully. Restart application to complete restore."
-                .into(),
-    })
-}
-
-/// Helper to remove WAL / SHM auxiliary files alongside a database file.
-fn remove_wal_shm(db_path: &Path) {
-    let wal = db_path.with_extension("db-wal");
-    let shm = db_path.with_extension("db-shm");
-    let _ = std::fs::remove_file(wal);
-    let _ = std::fs::remove_file(shm);
-
-    let sqlite_wal = PathBuf::from(format!("{}-wal", db_path.display()));
-    let sqlite_shm = PathBuf::from(format!("{}-shm", db_path.display()));
-    let _ = std::fs::remove_file(sqlite_wal);
-    let _ = std::fs::remove_file(sqlite_shm);
-}
-
-/// Safely copy or replace a file from `src` to `dst`, creating parent directory if needed.
-fn replace_file(src: &Path, dst: &Path) -> Result<(), String> {
-    if let Some(parent) = dst.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if dst.exists() {
-        let _ = std::fs::remove_file(dst);
-    }
-    std::fs::copy(src, dst)
-        .map_err(|e| format!("copy {} -> {}: {e}", src.display(), dst.display()))?;
     Ok(())
 }
 
-/// Invoked at app launch in `lib.rs` setup, BEFORE any SQLite connections are opened.
-///
-/// If `restore_intent.json` and `.pending_restore/` exist:
-/// 1. Backs up current files to `app_data/backups/pre_restore_safety_copy/`.
-/// 2. Overwrites databases and configuration files.
-/// 3. Cleans up `.pending_restore/` and removes `restore_intent.json`.
-pub fn apply_pending_restore(app_data: &Path) {
+fn destination(app_data: &Path, name: &str) -> Result<PathBuf, String> {
+    checked_path(name)?;
+    let target = match name {
+        "databases/taomni.db" => app_data.join("taomni.db"),
+        "databases/notes.db" => app_data.join("notes.db"),
+        "databases/vault.db" => app_data.join("vault.db"),
+        "databases/mfa.db" => app_data.join("mfa.db"),
+        "databases/lanchat.sqlite" => app_data.join("lanchat.sqlite"),
+        "configs/tunnels.json" => app_data.join("tunnels.json"),
+        "configs/ai.json" | "configs/proxy.json" | "configs/mirror.json" | "configs/sdk.json" => {
+            crate::resolved_config_dir()
+                .ok_or("Configuration directory unavailable")?
+                .join("taomni")
+                .join(name.strip_prefix("configs/").unwrap())
+        }
+        "servers/ssh_host_ed25519" => app_data.join("ssh-server/host_ed25519"),
+        "servers/rdp_cert.pem" => app_data.join("rdp-server/cert.pem"),
+        "servers/rdp_key.pem" => app_data.join("rdp-server/key.pem"),
+        "local-history/history.db" => app_data.join(name),
+        _ if name.starts_with("mail-cache/")
+            && name.ends_with(".db")
+            && name.split('/').count() == 2 =>
+        {
+            app_data.join(name)
+        }
+        _ => return Err(format!("Unsupported Taomni backup entry: {name}")),
+    };
+    Ok(target)
+}
+
+fn verified_archive(
+    path: &Path,
+    password: Option<&str>,
+) -> Result<(BackupManifest, ZipArchive<Cursor<Vec<u8>>>), String> {
+    if std::fs::metadata(path).map_err(|e| e.to_string())?.len() > MAX_ARCHIVE_BYTES {
+        return Err("Archive exceeds the supported 1 GiB limit".into());
+    }
+    let encrypted =
+        super::crypto::is_encrypted_stream(File::open(path).map_err(|e| e.to_string())?);
+    let mut archive = ZipArchive::new(Cursor::new(read_archive_zip_bytes(path, password)?))
+        .map_err(|e| format!("Invalid archive: {e}"))?;
+    if archive.len() > 100_000 {
+        return Err("Too many archive entries".into());
+    }
+    let manifest: BackupManifest = {
+        let f = archive
+            .by_name(MANIFEST_FILE_NAME)
+            .map_err(|_| "Missing manifest.json")?;
+        if f.size() > 16 * 1024 * 1024 {
+            return Err("Manifest is too large".into());
+        }
+        serde_json::from_reader(f).map_err(|_| "Invalid backup manifest")?
+    };
+    if manifest.format_version != 1
+        || manifest.app_name != "Taomni"
+        || manifest.encrypted != encrypted
+    {
+        return Err("Unsupported or inconsistent backup format".into());
+    }
+    if manifest
+        .provenance
+        .as_ref()
+        .is_some_and(|p| p.source_kind != "taomni" || p.source_schema_version != 1)
+    {
+        return Err("Unsupported backup source; save the archive without restoring it".into());
+    }
+    let mut entries = std::collections::HashMap::new();
+    let mut names = std::collections::HashSet::new();
+    let mut total = 0u64;
+    for entry in &manifest.files {
+        destination(Path::new("."), &entry.path)?;
+        if !names.insert(entry.path.to_lowercase()) {
+            return Err("Duplicate backup entry".into());
+        }
+        total = total
+            .checked_add(entry.size_bytes)
+            .ok_or("Backup size overflow")?;
+        if total > MAX_EXTRACTED_BYTES {
+            return Err("Unpacked archive exceeds 8 GiB limit".into());
+        }
+        entries.insert(entry.path.as_str(), entry);
+    }
+    if entries.is_empty() {
+        return Err("Backup contains no data".into());
+    }
+    let mut seen = std::collections::HashSet::new();
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let name = file.name().to_owned();
+        if !seen.insert(name.to_lowercase()) {
+            return Err("Duplicate ZIP entry".into());
+        }
+        if name == MANIFEST_FILE_NAME {
+            continue;
+        }
+        checked_path(&name)?;
+        if file.is_dir() || file.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000) {
+            return Err("Directories and symlinks are not backup payload entries".into());
+        }
+        let expected = entries
+            .get(name.as_str())
+            .ok_or("Archive contains an entry absent from its manifest")?;
+        if file.size() != expected.size_bytes {
+            return Err(format!("Size mismatch for {name}"));
+        }
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::new();
+        let mut buffer = [0u8; 65536];
+        let mut length = 0u64;
+        loop {
+            let n = file.read(&mut buffer).map_err(|e| e.to_string())?;
+            if n == 0 {
+                break;
+            }
+            length += n as u64;
+            if length > expected.size_bytes {
+                return Err("Decompressed entry exceeded manifest size".into());
+            }
+            hash.update(&buffer[..n]);
+        }
+        if length != expected.size_bytes || hex::encode(hash.finalize()) != expected.sha256 {
+            return Err(format!("Checksum mismatch for {name}"));
+        }
+    }
+    if seen.len() != manifest.files.len() + 1 {
+        return Err("Archive is missing a manifest entry".into());
+    }
+    Ok((manifest, archive))
+}
+
+pub fn inspect_archive(path: &Path, password: Option<&str>) -> Result<BackupManifest, String> {
+    verified_archive(path, password).map(|(m, _)| m)
+}
+pub fn stage_restore(
+    app: &AppHandle,
+    path: &Path,
+    password: Option<&str>,
+) -> Result<StageRestoreResult, String> {
+    stage_restore_to_dir(&crate::resolved_app_data_dir(app)?, path, password)
+}
+
+pub fn stage_restore_to_dir(
+    app_data: &Path,
+    path: &Path,
+    password: Option<&str>,
+) -> Result<StageRestoreResult, String> {
+    let (manifest, mut archive) = verified_archive(path, password)?;
+    if app_data.join(RESTORE_INTENT_FILE).exists() || app_data.join(JOURNAL_FILE).exists() {
+        return Err("A restore is already staged; restart before preparing another restore".into());
+    }
+    std::fs::create_dir_all(app_data).map_err(|e| e.to_string())?;
+    let temp = tempfile::Builder::new()
+        .prefix(".restore-verify-")
+        .tempdir_in(app_data)
+        .map_err(|e| e.to_string())?;
+    for entry in &manifest.files {
+        let output = temp.path().join(&entry.path);
+        std::fs::create_dir_all(output.parent().unwrap()).map_err(|e| e.to_string())?;
+        let mut out = File::create(&output).map_err(|e| e.to_string())?;
+        std::io::copy(
+            &mut archive.by_name(&entry.path).map_err(|e| e.to_string())?,
+            &mut out,
+        )
+        .map_err(|e| e.to_string())?;
+        out.sync_all().map_err(|e| e.to_string())?;
+        if entry.path.ends_with(".db") || entry.path.ends_with(".sqlite") {
+            let db = rusqlite::Connection::open_with_flags(
+                &output,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )
+            .map_err(|e| format!("Invalid SQLite backup: {e}"))?;
+            let check: String = db
+                .query_row("PRAGMA quick_check", [], |r| r.get(0))
+                .map_err(|e| e.to_string())?;
+            if check != "ok" {
+                return Err(format!("SQLite backup check failed: {check}"));
+            }
+        }
+    }
+    let temp_path = temp.keep();
+    let pending = app_data.join(PENDING_RESTORE_DIR);
+    if pending.exists() {
+        std::fs::remove_dir_all(&pending).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temp_path, &pending).map_err(|e| {
+        let _ = std::fs::remove_dir_all(&temp_path);
+        e.to_string()
+    })?;
+    let intent = RestoreIntent {
+        staged_at: super::model::now_ms(),
+        manifest: manifest.clone(),
+    };
+    super::control::write_json(&app_data.join(RESTORE_INTENT_FILE), &intent)?;
+    Ok(StageRestoreResult {
+        manifest,
+        restart_required: true,
+        message: "Backup verified and staged. Restart to restore.".into(),
+    })
+}
+
+#[derive(Serialize, Deserialize)]
+struct RollbackEntry {
+    path: PathBuf,
+    saved: PathBuf,
+    existed: bool,
+}
+#[derive(Serialize, Deserialize)]
+struct RestoreJournal {
+    entries: Vec<RollbackEntry>,
+    committed: bool,
+}
+
+fn no_symlink_ancestors(path: &Path) -> Result<(), String> {
+    for ancestor in path.ancestors() {
+        if std::fs::symlink_metadata(ancestor).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err("Restore destination contains a symlink".into());
+        }
+    }
+    Ok(())
+}
+fn replace_file(src: &Path, dst: &Path) -> Result<(), String> {
+    no_symlink_ancestors(dst)?;
+    let parent = dst.parent().ok_or("Invalid restore destination")?;
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let tmp = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+    std::fs::copy(src, tmp.path()).map_err(|e| e.to_string())?;
+    tmp.as_file().sync_all().map_err(|e| e.to_string())?;
+    tmp.persist(dst).map_err(|e| e.error.to_string())?;
+    Ok(())
+}
+fn rollback(journal: &RestoreJournal) -> Result<(), String> {
+    for entry in &journal.entries {
+        if entry.existed {
+            replace_file(&entry.saved, &entry.path)?;
+        } else if entry.path.exists() {
+            std::fs::remove_file(&entry.path).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// Fail startup rather than opening a partially restored set of databases.
+pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
     let intent_path = app_data.join(RESTORE_INTENT_FILE);
-    let pending_dir = app_data.join(PENDING_RESTORE_DIR);
-
-    if !intent_path.is_file() || !pending_dir.is_dir() {
-        return;
-    }
-
-    tracing::info!(target: "backup", "Detected pending backup restore intent, applying...");
-
-    // 1. Make a safety rollback copy of existing database files
-    let safety_dir = app_data.join("backups").join("pre_restore_safety_copy");
-    let _ = std::fs::create_dir_all(&safety_dir);
-    for db_name in &[
-        "taomni.db",
-        "notes.db",
-        "vault.db",
-        "lanchat.sqlite",
-        "mfa.db",
-    ] {
-        let curr = app_data.join(db_name);
-        if curr.is_file() {
-            let _ = std::fs::copy(&curr, safety_dir.join(db_name));
+    let journal_path = app_data.join(JOURNAL_FILE);
+    let pending = app_data.join(PENDING_RESTORE_DIR);
+    if journal_path.exists() {
+        let journal: RestoreJournal =
+            serde_json::from_slice(&std::fs::read(&journal_path).map_err(|e| e.to_string())?)
+                .map_err(|_| "Invalid restore journal")?;
+        if !journal.committed {
+            rollback(&journal)?;
         }
+        if intent_path.exists() {
+            std::fs::remove_file(&intent_path).map_err(|e| e.to_string())?;
+        }
+        std::fs::remove_file(&journal_path).map_err(|e| e.to_string())?;
+        if pending.exists() {
+            std::fs::remove_dir_all(&pending).map_err(|e| e.to_string())?;
+        }
+        return Ok(());
     }
-
-    // 2. Overwrite databases
-    let staged_taomni = pending_dir.join("databases").join("taomni.db");
-    if staged_taomni.is_file() {
-        let dest = app_data.join("taomni.db");
-        remove_wal_shm(&dest);
-        let _ = replace_file(&staged_taomni, &dest);
+    if !intent_path.exists() {
+        return Ok(());
     }
-
-    let staged_notes = pending_dir.join("databases").join("notes.db");
-    if staged_notes.is_file() {
-        let dest = app_data.join("notes.db");
-        remove_wal_shm(&dest);
-        let _ = replace_file(&staged_notes, &dest);
+    let intent: RestoreIntent =
+        serde_json::from_slice(&std::fs::read(&intent_path).map_err(|e| e.to_string())?)
+            .map_err(|_| "Invalid restore intent")?;
+    if intent.manifest.format_version != 1 || intent.manifest.app_name != "Taomni" {
+        return Err("Unsupported restore intent".into());
     }
-
-    let staged_vault = pending_dir.join("databases").join("vault.db");
-    if staged_vault.is_file() {
-        let dest = app_data.join("vault.db");
-        remove_wal_shm(&dest);
-        let _ = replace_file(&staged_vault, &dest);
+    let safety = app_data
+        .join("backups")
+        .join(format!("restore-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&safety).map_err(|e| e.to_string())?;
+    let mut journal = RestoreJournal {
+        entries: vec![],
+        committed: false,
+    };
+    let mut mappings = vec![];
+    for entry in &intent.manifest.files {
+        let src = pending.join(&entry.path);
+        let dst = destination(app_data, &entry.path)?;
+        no_symlink_ancestors(&src)?;
+        no_symlink_ancestors(&dst)?;
+        if file_sha256(&src).map_err(|e| e.to_string())? != entry.sha256
+            || std::fs::metadata(&src).map_err(|e| e.to_string())?.len() != entry.size_bytes
+        {
+            return Err("Staged restore data changed".into());
+        }
+        let mut paths = vec![dst.clone()];
+        if entry.path.ends_with(".db") || entry.path.ends_with(".sqlite") {
+            paths.push(PathBuf::from(format!("{}-wal", dst.display())));
+            paths.push(PathBuf::from(format!("{}-shm", dst.display())));
+        }
+        for path in paths {
+            no_symlink_ancestors(&path)?;
+            let saved = safety.join(journal.entries.len().to_string());
+            let existed = path.try_exists().map_err(|e| e.to_string())?;
+            if existed {
+                std::fs::copy(&path, &saved)
+                    .map_err(|e| format!("Cannot save restore rollback copy: {e}"))?;
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(&saved)
+                    .and_then(|f| f.sync_all())
+                    .map_err(|e| e.to_string())?;
+            }
+            journal.entries.push(RollbackEntry {
+                path,
+                saved,
+                existed,
+            });
+        }
+        mappings.push((src, dst));
     }
-
-    let staged_lanchat = pending_dir.join("databases").join("lanchat.sqlite");
-    if staged_lanchat.is_file() {
-        let dest = app_data.join("lanchat.sqlite");
-        remove_wal_shm(&dest);
-        let _ = replace_file(&staged_lanchat, &dest);
-    }
-
-    let staged_mfa = pending_dir.join("databases").join("mfa.db");
-    if staged_mfa.is_file() {
-        let dest = app_data.join("mfa.db");
-        remove_wal_shm(&dest);
-        let _ = replace_file(&staged_mfa, &dest);
-    }
-
-    // 3. Overwrite config files
-    let staged_configs = pending_dir.join("configs");
-    if staged_configs.is_dir() {
-        if let Some(cfg_base) = dirs::config_dir() {
-            let taomni_cfg_dir = cfg_base.join("taomni");
-            let _ = std::fs::create_dir_all(&taomni_cfg_dir);
-            for cfg_name in &["ai.json", "proxy.json", "mirror.json", "sdk.json"] {
-                let staged_cfg = staged_configs.join(cfg_name);
-                if staged_cfg.is_file() {
-                    let _ = replace_file(&staged_cfg, &taomni_cfg_dir.join(cfg_name));
+    super::control::write_json(&journal_path, &journal)?;
+    let apply = (|| -> Result<(), String> {
+        for (src, dst) in &mappings {
+            replace_file(src, dst)?;
+            for suffix in ["-wal", "-shm"] {
+                let aux = PathBuf::from(format!("{}{suffix}", dst.display()));
+                if aux.exists() {
+                    std::fs::remove_file(aux).map_err(|e| e.to_string())?;
                 }
             }
         }
-        let staged_tunnels = staged_configs.join("tunnels.json");
-        if staged_tunnels.is_file() {
-            let _ = replace_file(&staged_tunnels, &app_data.join("tunnels.json"));
-        }
+        Ok(())
+    })();
+    if let Err(error) = apply {
+        rollback(&journal).map_err(|e| {
+            format!("Restore failed ({error}); rollback also failed ({e}); recovery files retained")
+        })?;
+        return Err(format!("Restore failed and was rolled back: {error}"));
     }
-
-    // 4. Overwrite mail-cache
-    let staged_mail = pending_dir.join("mail-cache");
-    if staged_mail.is_dir() {
-        let mail_dest = app_data.join("mail-cache");
-        let _ = std::fs::create_dir_all(&mail_dest);
-        if let Ok(entries) = std::fs::read_dir(&staged_mail) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(file_name) = path.file_name() {
-                        let _ = replace_file(&path, &mail_dest.join(file_name));
-                    }
-                }
+    journal.committed = true;
+    super::control::write_json(&journal_path, &journal)?;
+    // Retain the historical safety-copy location for existing users and tooling.
+    let legacy = app_data.join("backups/pre_restore_safety_copy");
+    std::fs::create_dir_all(&legacy).map_err(|e| e.to_string())?;
+    for entry in &journal.entries {
+        if entry.existed && entry.path.parent() == Some(app_data) {
+            if let Some(name) = entry.path.file_name() {
+                std::fs::copy(&entry.saved, legacy.join(name)).map_err(|e| e.to_string())?;
             }
         }
     }
-
-    // 5. Overwrite server certs
-    let staged_servers = pending_dir.join("servers");
-    if staged_servers.is_dir() {
-        let ssh_dest = app_data.join("ssh-server");
-        let staged_ssh = staged_servers.join("ssh_host_ed25519");
-        if staged_ssh.is_file() {
-            let _ = replace_file(&staged_ssh, &ssh_dest.join("host_ed25519"));
-        }
-        let rdp_dest = app_data.join("rdp-server");
-        let staged_cert = staged_servers.join("rdp_cert.pem");
-        if staged_cert.is_file() {
-            let _ = replace_file(&staged_cert, &rdp_dest.join("cert.pem"));
-        }
-        let staged_key = staged_servers.join("rdp_key.pem");
-        if staged_key.is_file() {
-            let _ = replace_file(&staged_key, &rdp_dest.join("key.pem"));
-        }
-    }
-
-    // 6. Clean up pending staging and intent file
-    let _ = std::fs::remove_dir_all(&pending_dir);
-    let _ = std::fs::remove_file(&intent_path);
-
-    tracing::info!(target: "backup", "Pending backup restore successfully applied!");
+    std::fs::remove_file(&intent_path).map_err(|e| e.to_string())?;
+    std::fs::remove_dir_all(&pending).map_err(|e| e.to_string())?;
+    std::fs::remove_file(&journal_path).map_err(|e| e.to_string())?;
+    Ok(())
 }

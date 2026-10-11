@@ -2137,6 +2137,18 @@
 - `[data-testid="backup-last-success"]` — display — F-BACKUP-1.last-success
 - `[data-testid="backup-history-refresh"]` — interactive — F-BACKUP-1.history-refresh
 
+## settings/backup (F-BACKUP-2)
+
+- `[data-testid="backup-cloud-panel"]` — display — F-BACKUP-2.cloud-panel
+- `[data-testid="backup-feishu-add"]` — interactive — F-BACKUP-2.feishu-add
+- `[data-testid="backup-cloud-target"]` — interactive — F-BACKUP-2.cloud-target
+- `[data-testid="backup-cloud-name"]` — interactive — F-BACKUP-2.cloud-name
+- `[data-testid="backup-cloud-edit"]` — interactive — F-BACKUP-2.cloud-edit
+- `[data-testid="backup-cloud-proxy"]` — interactive — F-BACKUP-2.cloud-proxy
+- `[data-testid="backup-cloud-save"]` — interactive — F-BACKUP-2.cloud-save
+- `[data-testid="backup-feishu-folder"]` — interactive — F-BACKUP-2.feishu-folder
+- `[data-testid="backup-feishu-authorize"]` — interactive — F-BACKUP-2.feishu-authorize
+
 ## settings/backup (F-MFA-3)
 
 - `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup
