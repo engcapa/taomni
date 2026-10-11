@@ -561,6 +561,63 @@ class NativeSessionFillTest(TestCase):
                 session.fill('input[type="password"]', text)
         self.assertEqual(set_text.call_args_list, [call(text), call("previous")])
 
+    def test_linux_password_retry_targets_input_after_validation_moves_dialog(self) -> None:
+        session = self.session(False)
+        selector = 'input[type="password"]'
+        text = "qa-mfa-native-108"
+        state = {"focused": False, "value": "", "clipboard": "previous"}
+
+        def focus(_selector):
+            state["focused"] = True
+
+        def request(method, path, payload):
+            if path.endswith("/value"):
+                # Partial typing shows validation feedback and re-centers the
+                # dialog. WebKit's subsequent coordinate click hits its padding.
+                state["value"] = "q"
+            elif path.endswith("/click"):
+                state["focused"] = False
+
+        def press(combo):
+            if combo == "Control+v":
+                if not state["focused"]:
+                    raise WebDriverError("paste missed the password input")
+                state["value"] = state["clipboard"]
+            elif combo == "Backspace" and state["focused"]:
+                state["value"] = ""
+
+        def execute(script):
+            if "isContentEditable" in script:
+                return False
+            if "el.type === 'password'" in script:
+                return True
+            return state["value"] == text
+
+        session.focus.side_effect = focus
+        session.request.side_effect = request
+        session.press_combo.side_effect = press
+        session.execute.side_effect = execute
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text", side_effect=lambda value: state.update(clipboard=value)):
+            session.fill(selector, text)
+        self.assertEqual(state["value"], text)
+        self.assertEqual(state["clipboard"], "previous")
+
+    def test_linux_password_retry_stops_if_input_cannot_regain_focus(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, False])
+        session.focus.side_effect = ["focused", WebDriverError("element could not receive focus")]
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text:
+            with self.assertRaisesRegex(WebDriverError, "could not receive focus"):
+                session.fill('input[type="password"]', "private-secret")
+        self.assertEqual(session.press_combo.call_args_list, [call("Mod+a"), call("Backspace")])
+        self.assertEqual(set_text.call_args_list, [call("previous")])
+
     def test_windows_password_fill_retains_keyboard_input(self) -> None:
         session = self.session(False)
         with patch("tauri_webdriver.platform.system", return_value="Windows"):

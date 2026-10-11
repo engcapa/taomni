@@ -999,7 +999,7 @@ class NativeSession:
             if self.execute(check) is not True:
                 # The same mapping can affect /value after modifier drags.
                 # Paste through the OS clipboard instead of translating keys.
-                self._paste_linux_password(element, selector, text, check)
+                self._paste_linux_password(selector, text, check)
         else:
             self.type_text(text)
         return f"filled {selector}"
@@ -1026,14 +1026,17 @@ class NativeSession:
                 time.sleep(0.05)
         raise WebDriverError(f"Wayland input did not select its existing value: {selector}")
 
-    def _paste_linux_password(self, element: str, selector: str, text: str, check: str) -> None:
+    def _paste_linux_password(self, selector: str, text: str, check: str) -> None:
         from qa_ui_auto import host_clipboard
 
         previous = ""
         with suppress(RuntimeError):
             previous = host_clipboard.get_text()
         try:
-            self.request("POST", self.element_path(element, "/click"), {})
+            # Partial input can show validation feedback and move a centered
+            # dialog. WebKit's coordinate click can then hit dialog padding and
+            # blur the password field. Resolve and verify focus before real keys.
+            self.focus(selector)
             if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
                 self._select_wayland_fill_input(selector)
             else:
