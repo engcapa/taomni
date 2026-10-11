@@ -73,7 +73,7 @@ jobs:
       # Exercise a real Secret Service in the disposable D-Bus session.
       - name: Linux backup credential service
         if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')) && inputs.operation == 'run'
-        run: sudo apt-get update && sudo apt-get install -y gnome-keyring
+        run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools
       - name: Windows build tools and WebView2 driver
         if: runner.os == 'Windows' && matrix.mode == 'native'
         shell: pwsh
