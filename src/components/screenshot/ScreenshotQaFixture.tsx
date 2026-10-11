@@ -15,6 +15,7 @@ interface SourceEvidence {
   scale: number;
   nonce: number;
   frames: SourceFrame[];
+  frameIntervalMs?: number;
   dataUrl?: string;
 }
 
@@ -126,9 +127,11 @@ function PixelFixture({ animated }: { animated: boolean }) {
     const paintContext = frameCanvas.getContext("2d");
     if (!paintContext) return;
     const nonce = crypto.getRandomValues(new Uint16Array(1))[0] || 1;
+    const frameIntervalMs = 50;
     const source: SourceEvidence = {
       kind: animated ? "anim" : "scroll", cssWidth: width, cssHeight: height,
       width: canvas.width, height: canvas.height, scale, nonce, frames: [],
+      ...(animated ? { frameIntervalMs } : {}),
     };
     window.__qaScreenshotSource = source;
     let id = 0;
@@ -148,7 +151,7 @@ function PixelFixture({ animated }: { animated: boolean }) {
       root.dataset.sourceReady = "true";
     };
     draw();
-    const timer = animated ? window.setInterval(draw, 50) : undefined;
+    const timer = animated ? window.setInterval(draw, frameIntervalMs) : undefined;
     return () => {
       if (timer !== undefined) window.clearInterval(timer);
       if (window.__qaScreenshotSource === source) delete window.__qaScreenshotSource;
