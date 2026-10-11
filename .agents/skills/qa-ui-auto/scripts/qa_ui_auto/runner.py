@@ -768,6 +768,12 @@ def _capture_native_failure(session: Any, case_dir: Path) -> dict:
     """Capture the failing session before cleanup changes its state."""
     artifacts: dict[str, str] = {}
     with suppress(Exception):
+        editor_input = session.execute("return window.__QA_UI_AUTO_EDITOR_INPUT__ || [];")
+        if isinstance(editor_input, list) and editor_input:
+            input_file = case_dir / "editor-input-failure.json"
+            input_file.write_text(json.dumps(editor_input, ensure_ascii=False), encoding="utf-8")
+            artifacts["editor_input"] = str(input_file)
+    with suppress(Exception):
         focus = session.execute("""
             const describe = el => el ? {
                 tag: el.tagName, id: el.id, class: el.className,
