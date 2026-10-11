@@ -4,7 +4,7 @@ description: >-
   V-18 (AC-13). Browser stub. Right-clicking a row lists Edit, Pin, Move up,
   Move down and Delete. Edit refuses an empty name, saves issuer, account,
   group and a searchable note without changing the code, and Cancel or Escape
-  discard changes. Delete asks first: cancelling keeps the account,
+  discard changes. Countdown refreshes preserve focus in the edited field. Delete asks first: cancelling keeps the account,
   confirming removes it and announces the deletion.
 covers: [F-MFA-1]
 tags: [mfa, p1]
@@ -40,6 +40,8 @@ steps:
 - assert_text: {selector: '[data-testid="mfa-edit-error"]', contains: Enter an issuer or an account name}
 - fill: {selector: '[data-testid="mfa-edit-issuer"]', value: QA Renamed}
 - fill: {selector: '[data-testid="mfa-edit-account"]', value: renamed@example.com}
+- wait: 0.6
+- assert_visible: '[data-testid="mfa-edit-account"]:focus'
 - fill: {selector: '[data-testid="mfa-edit-group"]', value: Ops}
 - fill: {selector: '[data-testid="mfa-edit-note"]', value: rotate yearly}
 - click: '[data-testid="mfa-edit-save"]'
@@ -82,41 +84,42 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The row context menu lists the account actions and Edit validates and saves issuer, account, group and note (AC-13).
-    actions: [11, 13, 14, 15, 16, 18, 20, 23, 24, 25, 27, 28, 29, 30, 31, 37]
+    requirement: The row context menu lists the account actions and Edit validates and saves issuer, account, group and note without stealing field focus on countdown refreshes (AC-13).
+    actions: [11, 13, 14, 15, 16, 18, 20, 23, 24, 25, 27, 28, 31, 32, 33, 39]
     checkpoints:
     - {step: 19, expectation: 'menu lists Edit, Pin, Move up, Move down and Delete'}
     - {step: 22, expectation: edit form prefilled}
     - {step: 26, expectation: empty name refused}
-    - {step: 32, expectation: dialog closed after saving}
-    - {step: 33, expectation: account name saved}
-    - {step: 34, expectation: group saved}
-    - {step: 35, expectation: save announced}
-    - {step: 36, expectation: code unchanged and RFC 6238 correct}
-    - {step: 38, expectation: the note is searchable}
-    results: [38]
+    - {step: 30, expectation: account field keeps focus after a countdown refresh}
+    - {step: 34, expectation: dialog closed after saving}
+    - {step: 35, expectation: account name saved}
+    - {step: 36, expectation: group saved}
+    - {step: 37, expectation: save announced}
+    - {step: 38, expectation: code unchanged and RFC 6238 correct}
+    - {step: 40, expectation: the note is searchable}
+    results: [40]
   - id: R2
     requirement: Cancel and Escape discard edits (AC-13, AC-17).
-    actions: [39, 40, 41, 43, 44, 46, 47, 49, 50]
+    actions: [41, 42, 43, 45, 46, 48, 49, 51, 52]
     checkpoints:
-    - {step: 42, expectation: edit dialog open}
-    - {step: 45, expectation: cancel closed it}
-    - {step: 48, expectation: edit dialog open again}
-    - {step: 51, expectation: Escape closed it}
-    - {step: 52, expectation: issuer unchanged}
-    results: [52]
+    - {step: 44, expectation: edit dialog open}
+    - {step: 47, expectation: cancel closed it}
+    - {step: 50, expectation: edit dialog open again}
+    - {step: 53, expectation: Escape closed it}
+    - {step: 54, expectation: issuer unchanged}
+    results: [54]
   - id: R3
     requirement: Delete asks for confirmation; cancel keeps the account and confirm removes it (AC-13).
-    actions: [53, 54, 57, 60, 61, 63]
+    actions: [55, 56, 59, 62, 63, 65]
     checkpoints:
-    - {step: 55, expectation: confirmation shown}
-    - {step: 56, expectation: message names the account}
-    - {step: 58, expectation: dialog closed on cancel}
-    - {step: 59, expectation: account kept}
-    - {step: 62, expectation: confirmation shown again}
-    - {step: 64, expectation: list empty after confirming}
-    - {step: 65, expectation: deletion announced}
-    results: [64, 65]
+    - {step: 57, expectation: confirmation shown}
+    - {step: 58, expectation: message names the account}
+    - {step: 60, expectation: dialog closed on cancel}
+    - {step: 61, expectation: account kept}
+    - {step: 64, expectation: confirmation shown again}
+    - {step: 66, expectation: list empty after confirming}
+    - {step: 67, expectation: deletion announced}
+    results: [66, 67]
   visual:
   - check: Edit dialog and confirmation dialog are legible.
     method: manual

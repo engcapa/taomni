@@ -1294,6 +1294,34 @@ class NativeSession:
               if (window.__QA_UI_AUTO_FOCUS__.length > 64) window.__QA_UI_AUTO_FOCUS__.shift();
             }, true);
           }
+          // Bounded editor-only input history distinguishes driver ordering
+          // from caret changes during async editor updates. Never inspect form
+          // controls (in particular password fields), or modify input/selection.
+          window.__QA_UI_AUTO_EDITOR_INPUT__ = [];
+          for (const type of ['keydown', 'keyup', 'beforeinput', 'input', 'selectionchange']) {
+            document.addEventListener(type, event => {
+              const editor = document.activeElement?.closest?.('.cm-content');
+              if (!editor || (type !== 'selectionchange' && !editor.contains(event.target))) return;
+              const selection = document.getSelection();
+              const describeEndpoint = (node, offset) => {
+                if (!node || !editor.contains(node)) return null;
+                const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+                return {
+                  offset, nodeText: node.textContent?.slice(0, 200) ?? null,
+                  lineText: element?.closest?.('.cm-line')?.textContent?.slice(0, 200) ?? null
+                };
+              };
+              const events = window.__QA_UI_AUTO_EDITOR_INPUT__;
+              events.push({
+                type, time: performance.now(), trusted: event.isTrusted,
+                key: event.key ?? null, data: event.data ?? null,
+                inputType: event.inputType ?? null,
+                anchor: describeEndpoint(selection?.anchorNode, selection?.anchorOffset),
+                focus: describeEndpoint(selection?.focusNode, selection?.focusOffset)
+              });
+              if (events.length > 128) events.shift();
+            }, true);
+          }
           for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
             const original = console[level] ? console[level].bind(console) : console.log.bind(console);
             console[level] = (...args) => {

@@ -1119,6 +1119,29 @@ struct WorkspaceWatchTarget {
     filter_path: PathBuf,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum LocalWatchedSnapshot {
+    Missing,
+    File(String),
+}
+
+#[derive(Clone, Debug)]
+struct LocalWatchedEvent {
+    at: Instant,
+    snapshot: LocalWatchedSnapshot,
+}
+
+fn local_watched_snapshot(path: &Path) -> Option<LocalWatchedSnapshot> {
+    match std::fs::metadata(path) {
+        Ok(metadata) if metadata.is_file() => sha256_hex_file(path).map(LocalWatchedSnapshot::File),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Some(LocalWatchedSnapshot::Missing)
+        }
+        // Directory events and unreadable files cannot establish an own-write echo.
+        _ => None,
+    }
+}
+
 pub struct LspManager {
     sessions: LspSessionRegistry,
     /// Last unexpected exit / start failure per session key. Surfaced by
@@ -1128,7 +1151,7 @@ pub struct LspManager {
     sdk: Arc<SdkManager>,
     client_bridge: Arc<LspClientRequestBridge>,
     workspace_watchers: Arc<Mutex<HashMap<String, WorkspaceWatcherHandle>>>,
-    local_watched_events: Arc<StdMutex<HashMap<(String, String, u8), Instant>>>,
+    local_watched_events: Arc<StdMutex<HashMap<(String, String, u8), LocalWatchedEvent>>>,
     workspace_symbol_resolutions: Arc<Mutex<HashMap<String, WorkspaceSymbolResolutionBatch>>>,
     workspace_symbol_queries: Arc<Mutex<HashMap<String, (u64, CancellationToken)>>>,
     next_workspace_symbol_query_id: AtomicU64,
@@ -1419,12 +1442,18 @@ impl LspManager {
 
     fn mark_local_watched_events(&self, workspace_id: &str, changes: &[LspWatchedFileChange]) {
         let now = Instant::now();
+        let snapshots = changes
+            .iter()
+            .filter_map(|change| {
+                local_watched_snapshot(Path::new(&change.path)).map(|snapshot| (change, snapshot))
+            })
+            .collect::<Vec<_>>();
         let mut local = self
             .local_watched_events
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        local.retain(|_, at| now.duration_since(*at) < Duration::from_secs(3));
-        for change in changes {
+        local.retain(|_, event| now.duration_since(event.at) < Duration::from_secs(3));
+        for (change, snapshot) in snapshots {
             let path = normalized_file_operation_path(Path::new(&change.path));
             let mut event_types = vec![change.change_type];
             // Atomic replacement is reported as Create/Remove by some notify
@@ -1436,7 +1465,13 @@ impl LspManager {
                 event_types.push(2);
             }
             for change_type in event_types {
-                local.insert((workspace_id.to_string(), path.clone(), change_type), now);
+                local.insert(
+                    (workspace_id.to_string(), path.clone(), change_type),
+                    LocalWatchedEvent {
+                        at: now,
+                        snapshot: snapshot.clone(),
+                    },
+                );
             }
         }
     }
@@ -9799,26 +9834,39 @@ fn workspace_watch_target_matches(targets: &[WorkspaceWatchTarget], path: &str) 
 }
 
 fn local_watched_event_suppressed(
-    events: &StdMutex<HashMap<(String, String, u8), Instant>>,
+    events: &StdMutex<HashMap<(String, String, u8), LocalWatchedEvent>>,
     workspace_id: &str,
     path: &str,
     change_type: u8,
     now: Instant,
 ) -> bool {
-    let mut events = events
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    events.retain(|_, at| now.duration_since(*at) < Duration::from_secs(3));
     let normalized_path = normalized_file_operation_path(Path::new(path));
     let mut candidates = vec![change_type];
     if change_type == 1 || change_type == 3 {
         candidates.push(2);
     }
-    candidates.into_iter().any(|candidate| {
-        events
-            .remove(&(workspace_id.to_string(), normalized_path.clone(), candidate))
-            .is_some_and(|at| now.duration_since(at) < Duration::from_secs(3))
-    })
+    let owned = {
+        let mut events = events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        events.retain(|_, event| now.duration_since(event.at) < Duration::from_secs(3));
+        candidates
+            .into_iter()
+            .filter_map(|candidate| {
+                events.remove(&(workspace_id.to_string(), normalized_path.clone(), candidate))
+            })
+            .collect::<Vec<_>>()
+    };
+    if owned.is_empty() {
+        return false;
+    }
+    // A second process can rewrite or delete the file immediately after our
+    // save. Timing alone does not prove an echo: suppress only identical bytes
+    // (or the same absence after a delete), and fail open on read errors.
+    let Some(snapshot) = local_watched_snapshot(Path::new(path)) else {
+        return false;
+    };
+    owned.iter().any(|event| event.snapshot == snapshot)
 }
 
 fn notify_event_changes(event: &NotifyEvent) -> Vec<LspWatchedFileChange> {
@@ -12293,22 +12341,29 @@ mod tests {
     fn local_watcher_suppression_handles_atomic_save_event_variants() {
         let events = StdMutex::new(HashMap::new());
         let now = Instant::now();
-        let path = "/repo/src/Main.java";
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("Main.java");
+        std::fs::write(&file, "saved").unwrap();
+        let path = normalized_file_operation_path(&file);
+        let owned = LocalWatchedEvent {
+            at: now,
+            snapshot: local_watched_snapshot(&file).unwrap(),
+        };
         events
             .lock()
             .unwrap()
-            .insert(("workspace".into(), path.into(), 2), now);
+            .insert(("workspace".into(), path.clone(), 2), owned.clone());
         assert!(local_watched_event_suppressed(
             &events,
             "workspace",
-            path,
+            &path,
             1,
             now,
         ));
         assert!(!local_watched_event_suppressed(
             &events,
             "workspace",
-            path,
+            &path,
             3,
             now,
         ));
@@ -12316,13 +12371,62 @@ mod tests {
         events
             .lock()
             .unwrap()
-            .insert(("workspace".into(), path.into(), 3), now);
+            .insert(("workspace".into(), path.clone(), 3), owned);
         assert!(local_watched_event_suppressed(
             &events,
             "workspace",
-            path,
+            &path,
             3,
             now,
+        ));
+    }
+
+    #[test]
+    fn local_watcher_does_not_suppress_external_rewrite_or_delete_after_save() {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("README.md");
+        std::fs::write(&file, "saved").unwrap();
+        let path = normalized_file_operation_path(&file);
+        let now = Instant::now();
+        let saved = LocalWatchedEvent {
+            at: now,
+            snapshot: local_watched_snapshot(&file).unwrap(),
+        };
+        let events = StdMutex::new(HashMap::from([
+            (("workspace".into(), path.clone(), 2), saved.clone()),
+            (("workspace".into(), path.clone(), 3), saved),
+        ]));
+        // Equal length must not make an unrelated write look like our save.
+        std::fs::write(&file, "other").unwrap();
+        assert!(!local_watched_event_suppressed(
+            &events,
+            "workspace",
+            &path,
+            2,
+            now + Duration::from_millis(1100)
+        ));
+        std::fs::remove_file(&file).unwrap();
+        assert!(!local_watched_event_suppressed(
+            &events,
+            "workspace",
+            &path,
+            3,
+            now + Duration::from_millis(1200)
+        ));
+
+        events.lock().unwrap().insert(
+            ("workspace".into(), path.clone(), 3),
+            LocalWatchedEvent {
+                at: now,
+                snapshot: LocalWatchedSnapshot::Missing,
+            },
+        );
+        assert!(local_watched_event_suppressed(
+            &events,
+            "workspace",
+            &path,
+            3,
+            now + Duration::from_millis(1300)
         ));
     }
 

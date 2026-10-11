@@ -293,9 +293,15 @@ async fn verify(app: &AppHandle) -> anyhow::Result<String> {
                     for(let i=0;i<50&&!document.querySelector('[data-testid="screenshot-copy"]');i++) await new Promise(r=>setTimeout(r,50));
                     const s=document.querySelector('[data-testid="screenshot-selection"]');
                     if(!s) throw new Error('native selection missing');
-                    const rect=s.getBoundingClientRect().toJSON();
-                    document.querySelector('[data-testid="screenshot-copy"]').click(); return rect;
+                    if(!document.querySelector('[data-testid="screenshot-copy"]')) throw new Error('public Copy missing');
+                    return s.getBoundingClientRect().toJSON();
                 "#, Duration::from_secs(8)).await?;
+                // Copy destroys this WebView. Read its selection while it is
+                // alive, then observe completion through the native window and
+                // clipboard instead of polling a result slot in a closed page.
+                overlay
+                    .eval("document.querySelector('[data-testid=\"screenshot-copy\"]').click()")
+                    .context("click public Copy")?;
                 anyhow::ensure!(
                     wait_closed(app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await,
                     "copy did not close overlay"
