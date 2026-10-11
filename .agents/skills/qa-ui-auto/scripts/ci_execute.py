@@ -112,7 +112,7 @@ def main():
             # macOS console session behind Screen Sharing are shared.
             serial = set(entry["capabilities"]) & {"ssh", "vnc", "ard"}
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
-                      "worker": {"parallel": 1 if serial else 2},
+                      "worker": {"parallel": 1 if serial else entry.get("workers", 2)},
                       "report": {"dir": str(args.report), "keep_runs": 0}}
             if set(entry["capabilities"]) & {"ssh", "mysql", "vnc", "ard"}:
                 from ci_services import Services
@@ -152,11 +152,16 @@ def main():
                 outcome["stage"] = "build"
                 write_json(args.report / "ci-outcome.json", outcome)
                 build_log = stack.enter_context((args.report / "build.log").open("w", encoding="utf-8"))
-                build = launch(stack, [sys.executable, str(scripts / "native_build.py"),
-                                       *(["--release"] if release else [])],
-                               stdout=build_log, stderr=subprocess.STDOUT)
-                if build.wait():
-                    raise RuntimeError("native build failed; see build.log")
+                if os.environ.get("QA_NATIVE_ARTIFACT"):
+                    from ci_native_artifact import install
+                    install(Path(os.environ["QA_NATIVE_ARTIFACT"]), manifest, entry)
+                    build_log.write("Verified shared native build artifact; no compilation in this shard.\n")
+                else:
+                    build = launch(stack, [sys.executable, str(scripts / "native_build.py"),
+                                           *(["--release"] if release else [])],
+                                   stdout=build_log, stderr=subprocess.STDOUT)
+                    if build.wait():
+                        raise RuntimeError("native build failed; see build.log")
                 from native_build import identity_path, qa_binary
                 binary = qa_binary(release=release)
                 (args.report / "build-identity.json").write_bytes(identity_path(binary).read_bytes())

@@ -30,6 +30,28 @@ class ReportTests(unittest.TestCase):
             root=Path(d); manifest,_=self.example(root)
             self.assertTrue(aggregate(manifest,root)['passed'])
 
+    def test_shard_group_failure_key_and_missing_shard_are_preserved(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest, run = self.example(root, 'failed')
+            entry = manifest['entries'][0]
+            entry['group_id'] = 'logical-browser'
+            manifest['groups'] = [{'id': 'logical-browser', 'selected_ids': ['TC-X', 'TC-Y']}]
+            manifest['entries'].append({**entry, 'id': 'second-shard', 'selected_ids': ['TC-Y'],
+                                        'case_digests': {'TC-Y': 'hash-y'}})
+            outcome = json.loads((run.parent / 'ci-outcome.json').read_text())
+            outcome['selection_sha256'] = selection_digest(manifest)
+            write_json(run.parent / 'ci-outcome.json', outcome)
+            result = aggregate(manifest, root)
+            self.assertFalse(result['report_ok'])
+            self.assertEqual(result['failures'][0]['group_id'], 'logical-browser')
+            self.assertEqual(result['groups'][0]['selected'], 2)
+            self.assertEqual(result['groups'][0]['counts']['failed'], 1)
+            self.assertEqual(len(result['groups'][0]['shards']), 2)
+            manifest['entries'][1]['selected_ids'] = ['TC-X']
+            with self.assertRaisesRegex(ValueError, 'duplicate'):
+                aggregate(manifest, root)
+
     def test_skip_never_becomes_pass(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); manifest,_=self.example(root,'skipped')
