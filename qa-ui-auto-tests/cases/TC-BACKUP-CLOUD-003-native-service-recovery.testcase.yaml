@@ -38,7 +38,7 @@ steps:
 - assert_visible: '[data-testid="backup-feishu-authorize"]:not([disabled])'
 - screenshot: backup-native-revoked.png
 verification:
-  review: pending
+  review: reviewed
   visual:
   - check: Revoked authorization exposes recovery without enabling upload.
     method: manual

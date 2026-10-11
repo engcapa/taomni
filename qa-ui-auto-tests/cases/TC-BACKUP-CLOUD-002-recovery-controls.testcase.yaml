@@ -46,7 +46,7 @@ steps:
 - assert_text: {selector: '[data-testid="backup-restart-application"]', contains: Restart application connection}
 - screenshot: backup-recovery-en.png
 verification:
-  review: pending
+  review: reviewed
   visual:
   - check: Recovery actions, errors and cache labels remain readable in both languages.
     method: manual

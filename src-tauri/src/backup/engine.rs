@@ -159,13 +159,6 @@ pub fn create_scheduled_backup(
     let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
     let _process_operation = BackupProcessLock::acquire(app)?;
     let policy = load_policy(app);
-    if !super::control::load(app)?
-        .selected_target_ids
-        .iter()
-        .any(|id| id == "local")
-    {
-        return Ok(None);
-    }
     // Recheck inside both locks: any instance may have just completed a backup.
     if !is_backup_due(&policy, chrono::Utc::now().timestamp_millis(), trigger) {
         return Ok(None);
