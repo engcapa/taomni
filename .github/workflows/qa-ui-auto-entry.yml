@@ -44,6 +44,12 @@ jobs:
       - name: Updater unit contracts
         if: (contains(matrix.capabilities, 'updater')) && inputs.operation == 'run'
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
+      - name: Ubuntu 22.04 PipeWire build cache
+        if: runner.os == 'Linux' && matrix.mode == 'native' && startsWith(matrix.linux_profile, 'ubuntu-22.04')
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/taomni-qa/pipewire
+          key: qa-pipewire-1.0.9-${{ runner.os }}-${{ runner.arch }}-ubuntu-22.04-${{ hashFiles('.agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh') }}
       - name: Linux native and service dependencies
         if: runner.os == 'Linux' && matrix.mode == 'native'
         # Wayland provisioning installs the GNOME/portal stack on a fresh
@@ -52,17 +58,18 @@ jobs:
         # finish before the native case timeout starts.
         timeout-minutes: 35
         env:
+          QA_OPERATION: ${{ inputs.operation }}
           QA_LINUX_PROFILE: ${{ matrix.linux_profile }}
           QA_CAPABILITIES: ${{ join(matrix.capabilities, ',') }}
         run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native'
       - uses: arduino/setup-protoc@v3
-        if: (matrix.mode == 'native') && inputs.operation == 'build'
+        if: (matrix.mode == 'native') && inputs.operation != 'run'
         with:
           repo-token: ${{ github.token }}
       - uses: swatinem/rust-cache@v2
-        if: (matrix.mode == 'native') && inputs.operation == 'build'
+        if: (matrix.mode == 'native') && inputs.operation != 'run'
         with:
           workspaces: src-tauri -> target/qa-ui-auto
           shared-key: qa-platforms-${{ matrix.cache_key }}
@@ -152,9 +159,20 @@ jobs:
       - name: Verify OCR executable and pinned English/Chinese data
         if: (matrix.mode == 'native') && inputs.operation == 'run'
         run: python .agents/skills/qa-ui-auto/scripts/setup_screenshot_ocr.py
+      - name: Native adapter cache
+        if: (matrix.mode == 'native' && runner.os != 'macOS') && inputs.operation == 'run'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/taomni-qa/adapter
+          key: qa-tauri-driver-2.0.4-${{ runner.os }}-${{ runner.arch }}-${{ matrix.runner }}
       - name: Native adapter
         if: (matrix.mode == 'native' && runner.os != 'macOS') && inputs.operation == 'run'
-        run: cargo install tauri-driver --locked
+        run: |
+          adapter="$HOME/.cache/taomni-qa/adapter"
+          if ! "$adapter/bin/tauri-driver" --version; then
+            cargo install tauri-driver --version 2.0.4 --locked --root "$adapter"
+          fi
+          echo "$adapter/bin" >> "$GITHUB_PATH"
       - name: Java 25 project runtime
         uses: actions/setup-java@v4
         if: (contains(matrix.capabilities, 'java25')) && inputs.operation == 'run'
@@ -193,7 +211,7 @@ jobs:
           retention-days: 14
       - name: Native QA build input identity
         id: native-cache-key
-        if: (matrix.mode == 'native') && inputs.operation == 'build'
+        if: (matrix.mode == 'native') && inputs.operation != 'run'
         env:
           QA_RELEASE: ${{ contains(matrix.capabilities, 'release') }}
         run: |
@@ -217,6 +235,17 @@ jobs:
           restore-keys: |
             qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-${{ hashFiles('src-tauri/Cargo.lock', 'src-tauri/Cargo.toml') }}-
             qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ contains(matrix.capabilities, 'release') && 'release' || 'debug' }}-
+      - name: Native Rust contracts cache
+        if: inputs.operation == 'contracts'
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target/qa-ui-auto
+          # Contract targets have different build inputs from the QA app. Keep
+          # their completed cache independently, with the app cache as a seed.
+          key: qa-contracts-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ matrix.profile }}-${{ steps.native-cache-key.outputs.key }}-${{ hashFiles('.agents/skills/qa-ui-auto/scripts/ci_rust_contracts.sh') }}
+          restore-keys: |
+            qa-contracts-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ matrix.profile }}-
+            qa-native-v1-${{ matrix.cache_key }}-${{ runner.os }}-${{ runner.arch }}-${{ matrix.profile }}-
       - name: Wayland cold-cache application metadata contracts
         if: (runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_profile == 'ubuntu-26.04-wayland') && inputs.operation == 'run'
         run: python -m unittest test_ci_portal_application
@@ -237,54 +266,24 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/ci_desktop_preflight.py
           --profile '${{ matrix.linux_profile }}' --capabilities "$QA_CAPABILITIES"
           --report 'qa-ui-auto-report/${{ matrix.id }}/desktop-preflight'
-      - name: RDP unit contracts on the native platform
-        # The IronRDP unit contracts are platform-independent. Run the
-        # expensive release test matrix once on the Linux representative;
-        # Windows/macOS still execute their real release native RDP cases and
-        # startup diagnostics below. This removes a 30–50 minute duplicate
-        # Rust test build from each non-Linux native job without changing any
-        # release app build or product evidence.
-        if: (matrix.rdp_unit_contracts && inputs.run_rdp_unit_contracts) && inputs.operation == 'build'
+      - name: Native Rust contracts
+        if: inputs.operation == 'contracts'
         env:
           CARGO_TARGET_DIR: target/qa-ui-auto
-          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'
-          CARGO_PROFILE_RELEASE_INCREMENTAL: 'true'
+          QA_RELEASE: ${{ matrix.profile == 'release' }}
+          QA_RDP_CONTRACTS: ${{ matrix.rdp_unit_contracts && inputs.run_rdp_unit_contracts }}
+          QA_DUAL_CONTRACTS: ${{ contains(matrix.capabilities, 'dual-display') }}
         run: |
-          mkdir -p 'qa-ui-auto-report/${{ matrix.id }}'
-          (
-            set -e
-            pnpm build
-            if [[ "$RUNNER_OS" == "macOS" ]]; then bash scripts/bundle-krb5-macos.sh stage; fi
-            cd src-tauri
-            cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server -p ironrdp-session --lib
-            cargo test --locked --release -p ironrdp-server --lib profile_photo_encoder_costs -- --ignored --nocapture
-            # The substring filter includes both rdp::* and servers::rdp::*.
-            # One invocation covers all contracts without repeated root links.
-            cargo test --locked --release --lib rdp::
-            cargo test --locked --release --bin rdp-probe
-          ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/rdp-unit.log'
-      - name: Dual-display Rust contracts
-        if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'dual-display')) && inputs.operation == 'build'
-        env:
-          CARGO_TARGET_DIR: target/qa-ui-auto
-          QA_RELEASE: ${{ contains(matrix.capabilities, 'release') }}
-        run: |
-          mkdir -p 'qa-ui-auto-report/${{ matrix.id }}'
-          (
-            set -e
-            pnpm build --mode qa
-            cd src-tauri
-            # One root test invocation covers screenshot mapping and the
-            # retained X11/Wayland capture contracts without repeated links.
-            profile=()
-            if [[ "$QA_RELEASE" == true ]]; then
-              profile=(--release)
-              export CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=true
-              export CARGO_PROFILE_RELEASE_INCREMENTAL=true
-            fi
-            cargo test --locked "${profile[@]}" --lib capture::
-            cargo test --locked "${profile[@]}" --lib screenshot::surfaces::
-          ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/dual-display-unit.log'
+          mkdir -p qa-contract-output
+          bash .agents/skills/qa-ui-auto/scripts/ci_rust_contracts.sh 2>&1 | tee qa-contract-output/contracts.log
+      - name: Retain native contract diagnostics
+        if: always() && inputs.operation == 'contracts'
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-${{ matrix.id }}-${{ inputs.artifact_key }}
+          path: qa-contract-output/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Build and export the verified native runtime
         if: inputs.operation == 'build'
         env:

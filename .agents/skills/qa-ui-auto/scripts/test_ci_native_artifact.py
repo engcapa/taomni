@@ -50,6 +50,26 @@ class NativeArtifactTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'identity differs'):
             runtime.install(self.archive,wrong,self.entry)
 
+    @unittest.skipUnless(platform.system() == 'Linux', 'Linux baseline runtime')
+    def test_linux_baseline_import_preserves_build_identity_on_newer_runner(self):
+        self.build.update(runner='ubuntu-22.04', platform_key='linux')
+        self.entry.update(runner='ubuntu-26.04', platform_key='linux')
+        original = native_build.identity_path(self.binary).read_bytes()
+        runtime.export(self.archive, self.selection, self.build)
+        record = runtime.install(self.archive, self.selection, self.entry)
+        self.assertEqual(record['runner'], 'ubuntu-22.04')
+        self.assertEqual(native_build.identity_path(self.binary).read_bytes(), original)
+
+    def test_foreign_runner_and_architecture_are_rejected(self):
+        runtime.export(self.archive, self.selection, self.build)
+        self.entry['runner'] = 'unknown-runner'
+        with self.assertRaisesRegex(ValueError, 'runner combination'):
+            runtime.install(self.archive, self.selection, self.entry)
+        self.entry['runner'] = self.build['runner']
+        self.build['arch'] = 'foreign-arch'
+        with self.assertRaisesRegex(ValueError, 'architecture'):
+            runtime.install(self.archive, self.selection, self.entry)
+
     def test_tampered_sidecar_is_rejected_before_publish(self):
         runtime.export(self.archive,self.selection,self.build)
         with tarfile.open(self.archive) as tar:
