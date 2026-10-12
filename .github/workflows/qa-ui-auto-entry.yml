@@ -172,7 +172,14 @@ jobs:
           if ! "$adapter/bin/tauri-driver" --version; then
             cargo install tauri-driver --version 2.0.4 --locked --root "$adapter"
           fi
-          echo "$adapter/bin" >> "$GITHUB_PATH"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            cygpath -w "$adapter/bin" >> "$GITHUB_PATH"
+          else
+            echo "$adapter/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Verify native adapter is available to Python
+        if: (matrix.mode == 'native' && runner.os != 'macOS') && inputs.operation == 'run'
+        run: python -c "import shutil, subprocess; driver = shutil.which('tauri-driver'); assert driver, 'tauri-driver missing from native PATH'; subprocess.run([driver, '--version'], check=True)"
       - name: Java 25 project runtime
         uses: actions/setup-java@v4
         if: (contains(matrix.capabilities, 'java25')) && inputs.operation == 'run'
