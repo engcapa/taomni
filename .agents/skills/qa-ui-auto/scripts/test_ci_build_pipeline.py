@@ -22,14 +22,18 @@ class BuildPipelineTests(unittest.TestCase):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp); report = root / 'qa-ui-auto-report'; report.mkdir()
                 summary = report / 'ci-summary.json'
-                summary.write_text(json.dumps({'passed': True, 'infrastructure_errors': []}))
+                summary.write_text(json.dumps({'passed': True, 'report_ok': True, 'infrastructure_errors': [], 'failures': []}))
                 env = dict(os.environ, QA_JOB_RESULTS=json.dumps({'native-contracts': {'result': status}}),
                            GITHUB_STEP_SUMMARY=str(root / 'step-summary.md'))
                 result = subprocess.run([sys.executable, '-c', script], cwd=root, env=env, capture_output=True)
                 self.assertEqual(result.returncode, 0 if expected else 1, result.stderr)
                 data = json.loads(summary.read_text())
                 self.assertEqual(data['passed'], expected)
+                self.assertEqual(data['report_ok'], expected)
                 self.assertEqual(data['job_results']['native-contracts'], status)
+                if not expected:
+                    self.assertEqual(data['failures'][0]['case'], 'infrastructure')
+                    self.assertEqual(data['infrastructure_errors'][0]['entry'], 'native-contracts')
 
     def test_each_platform_waits_only_for_its_producer_and_final_gate_keeps_contracts(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']

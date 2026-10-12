@@ -326,7 +326,11 @@ jobs:
               result['job_results'] = jobs
               if failures:
                   result['passed'] = False
-                  result['infrastructure_errors'].extend(f'Workflow job failed: {name}' for name in failures)
+                  result['report_ok'] = False
+                  for name in failures:
+                      message = f'Workflow job failed: {name}'
+                      result['infrastructure_errors'].append({'entry': name, 'message': message})
+                      result['failures'].append({'entry': name, 'group_id': name, 'case': 'infrastructure', 'message': message})
               path.write_text(json.dumps(result, indent=2) + '\n')
           text = '\nSupporting jobs: ' + ', '.join(f'{name}={status}' for name, status in jobs.items()) + '\n'
           for target in ('qa-ui-auto-report/summary.md', os.environ['GITHUB_STEP_SUMMARY']):
