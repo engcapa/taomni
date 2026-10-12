@@ -18,6 +18,30 @@ def entry(ids, mode='native', platform='windows'):
 
 
 class ShardingTests(unittest.TestCase):
+    def test_linux_profiles_share_release_baseline_and_keep_execution_identity(self):
+        from qa_ui_auto.linux_profiles import LINUX_PROFILES
+        entries = []
+        for name, profile in LINUX_PROFILES.items():
+            item = entry(['A', 'B'], platform='linux')
+            item.update(id=name, runner=profile.runner, linux_profile=name,
+                        cache_key=name, desktop=profile.identity(name), capabilities=[])
+            entries.append(item)
+        entries[-1]['capabilities'] = ['release']
+        entries[-1]['rdp_unit_contracts'] = True
+        shards, groups, builds = schedule(entries, cases(['A', 'B']), {}, scope='selected', costs={})
+        self.assertEqual(len(shards), 8)
+        self.assertEqual(len(builds), 1)
+        build = builds[0]
+        self.assertEqual(build['runner'], 'ubuntu-22.04')
+        self.assertEqual(build['profile'], 'release')
+        self.assertTrue(build['rdp_unit_contracts'])
+        for shard in shards:
+            self.assertEqual(shard['build_id'], build['id'])
+            self.assertIn('release', shard['capabilities'])
+            self.assertEqual(shard['desktop'], LINUX_PROFILES[shard['linux_profile']].identity(shard['linux_profile']))
+            self.assertEqual(shard['runner'], LINUX_PROFILES[shard['linux_profile']].runner)
+        validate_partition(groups, shards)
+
     def test_selected_native_fans_out_on_every_platform_without_splitting_dependency(self):
         for platform in ('linux', 'windows', 'macos'):
             base = entry(['A', 'B', 'C', 'D'], platform=platform)

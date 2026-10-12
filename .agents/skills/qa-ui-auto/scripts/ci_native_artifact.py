@@ -82,6 +82,16 @@ def export(archive, selection, entry):
 def install(archive, selection, entry):
     build = build_entry(selection, entry['build_id'])
     arch = {'amd64': 'X64', 'x86_64': 'X64', 'arm64': 'ARM64', 'aarch64': 'ARM64'}.get(platform.machine().lower())
+    if entry['runner'] != build['runner']:
+        # The release Linux baseline supports these explicitly planned hosts.
+        # Preserve the producer's original identity; the receipt still records
+        # the consumer's actual OS and desktop separately.
+        if not (platform.system() == 'Linux' and build.get('platform_key') == 'linux'
+                and entry.get('platform_key') == 'linux' and build['runner'] == 'ubuntu-22.04'
+                and entry['runner'] in {'ubuntu-22.04', 'ubuntu-24.04', 'ubuntu-26.04'}):
+            raise ValueError('unsupported native build/execution runner combination')
+    if build['arch'] != arch:
+        raise ValueError('native build architecture differs from execution host')
     with tarfile.open(archive, 'r:gz') as tar, tempfile.TemporaryDirectory() as directory:
         members = tar.getmembers()
         names = [m.name for m in members]
@@ -90,7 +100,7 @@ def install(archive, selection, entry):
         record = json.load(tar.extractfile(MANIFEST))
         expected = {'schema': 1, 'build_id': entry['build_id'], 'head': selection['head'],
                     'selection_sha256': selection_digest(selection), 'platform': platform.system(),
-                    'arch': arch, 'runner': entry['runner'], 'profile': build['profile'],
+                    'arch': arch, 'runner': build['runner'], 'profile': build['profile'],
                     'identity': selection['identity']}
         if any(record.get(k) != v for k, v in expected.items()):
             raise ValueError('native artifact identity differs from selection/platform/profile')

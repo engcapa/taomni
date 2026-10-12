@@ -68,22 +68,40 @@ can run concurrently on one runner. `shards=1` disables runner fan-out;
 case groups. No empty shards are created.
 
 The reusable `qa-ui-auto-entry.yml` provisions both producer and execution jobs.
-Browser execution starts alongside native producers. Each native platform/Linux
-profile builds once, with one cache writer, then exports the app, sidecars,
-resources and original QA identity. If any case needs release, that profile's
-ordinary and dual-display shards share the release artifact. Distinct Linux
-profiles retain distinct builds. Execution downloads this invocation's artifact,
-verifies file hashes, source/runner identity, platform, architecture and build
-profile, and preserves executable modes. It never compiles the app again.
-Local native-build cache validation remains unchanged.
+Browser execution starts alongside native producers. Each OS/architecture builds
+once, with one app-cache writer, then exports the app, sidecars, resources and
+original QA identity. Linux builds on Ubuntu 22.04, following `release.yml`'s
+glibc baseline; all four Linux desktops execute the same binary. If any native
+case needs release, all consumers on that OS/architecture share release.
+Execution verifies this invocation's file hashes, source identity, producer
+runner, architecture and profile. Linux imports explicitly allow the 22.04
+producer on 22.04/24.04/26.04 consumers; the actual execution desktop is still
+verified independently. Imports preserve original identity and executable modes
+and never compile the app. Local build-cache verification remains unchanged.
+
+Each platform releases its consumers as soon as its own producer completes.
+Native matrices list longer estimated shards first. Rust RDP/dual-display
+contracts run once in a separate Ubuntu 22.04 job; the root Rust test binary
+uses the union of selected filters in one invocation. Tool contracts also run
+outside planning. Both contract jobs remain required by the final workflow
+result, including when all UI cases passed.
+
+GitHub remote caches survive disposable runners: app workspaces retain the
+verified build-input key and can seed from the existing Ubuntu 22.04 X11 cache.
+Rust contracts have a separate cache, seeded from app intermediates on a miss.
+Ubuntu 22.04 PipeWire 1.0.9 installs reuse a staged cache keyed by setup recipe
+and architecture; execution adapters cache pinned tauri-driver 2.0.4 separately
+per runner OS/version/architecture. Python packages use setup-python's pip
+cache. Missing/evicted caches rebuild normally; cached application binaries still
+undergo full verification before reuse. Builds/contracts skip desktop provisioning.
 
 `selection.json` records logical groups, exact shard membership, worker counts,
 estimates and build IDs. Collection rejects missing/duplicate cases and verifies
 the original receipts; shards sharing a build must report the same binary hash.
 `ci-summary.json` includes shard details and logical group totals. Failure issue
 keys use logical groups so changing the shard count does not duplicate issues.
-Native consumers currently wait for the complete producer matrix; hosted runner
-quotas, setup, artifact transfer and the slowest build still bound wall time.
+Hosted runner quotas, setup, artifact transfer and contract compilation still
+bound wall time, even with independent platform pipelines.
 More shards can reduce elapsed time while increasing billed runner minutes.
 
 ### Development case contract
@@ -257,7 +275,8 @@ with `--no-install-recommends`; provisioning runs noninteractively with a
 35-minute dependency timeout. Desktop application metapackages are unnecessary
 for the virtual monitor and add substantial downloads.
 
-Selection entries, cache keys and artifact directories identify the profile.
+Selection entries and execution artifact directories identify the desktop profile;
+the shared Linux build cache identifies the Ubuntu 22.04 build baseline.
 The runner receipt binds `desktop_identity` in the native summary; aggregation
 rejects a different OS release/session/profile even when the binary matches.
 Inspect `desktop/desktop-readiness.json` and `desktop/desktop-failure.json`

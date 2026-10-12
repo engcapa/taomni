@@ -119,11 +119,47 @@ jobs:
           QA_HEAD: ${{ github.event.pull_request.head.sha }}
         run: python .agents/skills/qa-ui-auto/scripts/qa_ui_auto/dev_contract.py --base "$QA_BASE" --head "$QA_HEAD"
 
+  tool-contracts:
+    if: (github.event_name != 'pull_request' || inputs.scope != '') && inputs.scope != 'selected'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
+      - name: Validate QA tools
+        if: inputs.scope != 'selected'
+        run: python -m unittest test_credential_store test_ci_sharding test_ci_build_pipeline test_ci_native_artifact test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Updater packaging unit contracts
+        if: inputs.scope != 'selected'
+        run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs
+      - name: Wayland automation contracts
+        if: inputs.scope != 'selected'
+        run: python -m unittest test_wayland_tools test_multi_display
+
   plan:
     if: github.event_name != 'pull_request' || inputs.scope != ''
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      linux_native_matrix: ${{ steps.plan.outputs.linux_native_matrix }}
+      linux_build_matrix: ${{ steps.plan.outputs.linux_build_matrix }}
+      has_linux_native: ${{ steps.plan.outputs.has_linux_native }}
+      windows_native_matrix: ${{ steps.plan.outputs.windows_native_matrix }}
+      windows_build_matrix: ${{ steps.plan.outputs.windows_build_matrix }}
+      has_windows_native: ${{ steps.plan.outputs.has_windows_native }}
+      macos_native_matrix: ${{ steps.plan.outputs.macos_native_matrix }}
+      macos_build_matrix: ${{ steps.plan.outputs.macos_build_matrix }}
+      has_macos_native: ${{ steps.plan.outputs.has_macos_native }}
+      contracts_matrix: ${{ steps.plan.outputs.contracts_matrix }}
+      has_contracts: ${{ steps.plan.outputs.has_contracts }}
       has_cases: ${{ steps.plan.outputs.has_cases }}
       browser_matrix: ${{ steps.plan.outputs.browser_matrix }}
       native_matrix: ${{ steps.plan.outputs.native_matrix }}
@@ -145,20 +181,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
-      - name: Validate QA tools
-        if: inputs.scope != 'selected'
-        run: python -m unittest test_credential_store test_ci_sharding test_ci_native_artifact test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools test_native_fixture_cleanup test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Updater packaging unit contracts
-        if: inputs.scope != 'selected'
-        run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
-      - name: Wayland automation contracts
-        if: inputs.scope != 'selected'
-        run: python -m unittest test_wayland_tools test_multi_display
       - name: Plan exact cases and dependencies
         id: plan
         env:
@@ -191,32 +215,81 @@ jobs:
       operation: run
       run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
 
-  native-build:
+  build-linux:
     needs: plan
-    if: needs.plan.outputs.has_native == 'true'
+    if: needs.plan.outputs.has_linux_native == 'true'
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
-      matrix: ${{ needs.plan.outputs.build_matrix }}
+      matrix: ${{ needs.plan.outputs.linux_build_matrix }}
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: build
-      run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
 
-  execute-native:
-    needs: [plan, native-build]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.has_native == 'true' }}
+  execute-linux-native:
+    needs: [plan, build-linux]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-linux.result == 'success' && needs.plan.outputs.has_linux_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
-      matrix: ${{ needs.plan.outputs.native_matrix }}
+      matrix: ${{ needs.plan.outputs.linux_native_matrix }}
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: run
+
+  build-windows:
+    needs: plan
+    if: needs.plan.outputs.has_windows_native == 'true'
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      matrix: ${{ needs.plan.outputs.windows_build_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: build
+
+  execute-windows-native:
+    needs: [plan, build-windows]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-windows.result == 'success' && needs.plan.outputs.has_windows_native == 'true' }}
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      matrix: ${{ needs.plan.outputs.windows_native_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: run
+
+  build-macos:
+    needs: plan
+    if: needs.plan.outputs.has_macos_native == 'true'
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      matrix: ${{ needs.plan.outputs.macos_build_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: build
+
+  execute-macos-native:
+    needs: [plan, build-macos]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && needs.plan.outputs.has_macos_native == 'true' }}
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      matrix: ${{ needs.plan.outputs.macos_native_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: run
+
+  native-contracts:
+    needs: plan
+    if: needs.plan.outputs.has_contracts == 'true'
+    uses: ./.github/workflows/qa-ui-auto-entry.yml
+    with:
+      matrix: ${{ needs.plan.outputs.contracts_matrix }}
+      head: ${{ needs.plan.outputs.head }}
+      artifact_key: ${{ needs.plan.outputs.artifact_key }}
+      operation: contracts
       run_rdp_unit_contracts: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' || inputs.run_rdp_unit_contracts }}
 
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, execute-browser, native-build, execute-native]
+    needs: [plan, tool-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -238,6 +311,33 @@ jobs:
       - name: Verify results
         if: needs.plan.result == 'success'
         run: python -m qa_ui_auto.ci report --selection qa-ui-auto-report/selection.json --reports qa-ui-auto-report
+      - name: Include supporting job results
+        if: always() && needs.plan.result == 'success'
+        env:
+          QA_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python - <<'PYTHON'
+          import json, os, pathlib, sys
+          jobs = {name: job['result'] for name, job in json.loads(os.environ['QA_JOB_RESULTS']).items()}
+          failures = [name for name, result in jobs.items() if result not in ('success', 'skipped')]
+          path = pathlib.Path('qa-ui-auto-report/ci-summary.json')
+          if path.exists():
+              result = json.loads(path.read_text())
+              result['job_results'] = jobs
+              if failures:
+                  result['passed'] = False
+                  result['report_ok'] = False
+                  for name in failures:
+                      message = f'Workflow job failed: {name}'
+                      result['infrastructure_errors'].append({'entry': name, 'message': message})
+                      result['failures'].append({'entry': name, 'group_id': name, 'case': 'infrastructure', 'message': message})
+              path.write_text(json.dumps(result, indent=2) + '\n')
+          text = '\nSupporting jobs: ' + ', '.join(f'{name}={status}' for name, status in jobs.items()) + '\n'
+          for target in ('qa-ui-auto-report/summary.md', os.environ['GITHUB_STEP_SUMMARY']):
+              with open(target, 'a') as stream:
+                  stream.write(text)
+          sys.exit(bool(failures))
+          PYTHON
       - name: Require selected cases to pass
         if: needs.plan.result == 'success' && inputs.scope == 'selected'
         run: python -c "import json, sys; result = json.load(open('qa-ui-auto-report/ci-summary.json')); sys.exit(0 if result['passed'] else 1)"

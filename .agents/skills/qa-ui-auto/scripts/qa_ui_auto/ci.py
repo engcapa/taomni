@@ -478,6 +478,20 @@ def main(argv=None):
                 github_output(mode + "_matrix", json.dumps({"include": items}, separators=(",", ":")))
                 github_output("has_" + mode, str(bool(items)).lower())
             github_output("build_matrix", json.dumps({"include": [{k: v for k, v in b.items() if k not in {"selected_ids", "case_digests"}} for b in result["builds"]]}, separators=(",", ":")))
+            for platform_key in ('linux', 'windows', 'macos'):
+                native = [e for e in matrix['include'] if e['mode'] == 'native' and e['platform_key'] == platform_key]
+                estimates = {e['id']: e['estimated_seconds'] for e in result['entries']}
+                native.sort(key=lambda e: (-estimates[e['id']], e['id']))
+                builds = [{k: v for k, v in b.items() if k not in {'selected_ids', 'case_digests'}}
+                          for b in result['builds'] if b['platform_key'] == platform_key]
+                github_output(f'{platform_key}_native_matrix', json.dumps({'include': native}, separators=(',', ':')))
+                github_output(f'{platform_key}_build_matrix', json.dumps({'include': builds}, separators=(',', ':')))
+                github_output(f'has_{platform_key}_native', str(bool(native)).lower())
+            contracts = [{k: v for k, v in b.items() if k not in {'selected_ids', 'case_digests'}}
+                         for b in result['builds'] if b['platform_key'] == 'linux'
+                         and (b['rdp_unit_contracts'] or 'dual-display' in b['capabilities'])]
+            github_output('contracts_matrix', json.dumps({'include': contracts}, separators=(',', ':')))
+            github_output('has_contracts', str(bool(contracts)).lower())
             github_output("has_cases", str(bool(result["entries"])).lower())
             github_output("head", result["head"])
             if summary_path := os.environ.get("GITHUB_STEP_SUMMARY"):

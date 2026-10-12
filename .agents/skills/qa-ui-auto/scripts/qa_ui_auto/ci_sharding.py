@@ -97,9 +97,11 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
             shard['rdp_unit_contracts'] = entry['rdp_unit_contracts'] and index == 0
             scheduled.append(shard)
     validate_partition(groups, scheduled)
-    optimized = {e["cache_key"] for e in scheduled if e["mode"] == "native" and "release" in e["capabilities"]}
+    # Build identity follows the target OS/architecture, not the desktop used
+    # to execute a case. Linux follows release.yml's Ubuntu 22.04 baseline.
+    optimized = {(e['platform_key'], e['arch']) for e in scheduled if e["mode"] == "native" and "release" in e["capabilities"]}
     for e in scheduled:
-        if e["mode"] == "native" and e["cache_key"] in optimized:
+        if e["mode"] == "native" and (e['platform_key'], e['arch']) in optimized:
             e["capabilities"] = sorted(set(e["capabilities"]) | {"release"})
     builds = {}
     for entry in scheduled:
@@ -107,10 +109,13 @@ def schedule(entries, by_id, dependencies, *, scope, shards='auto', browser_work
         if entry['mode'] != 'native':
             continue
         profile = 'release' if 'release' in entry['capabilities'] else 'debug'
-        key = f"native-build-{entry['cache_key']}-{profile}"
+        key = f"native-build-{entry['platform_key']}-{entry['arch'].lower()}-{profile}"
         entry['build_id'] = key
         if key not in builds:
             builds[key] = {**deepcopy(entry), 'id': key, 'profile': profile, 'capabilities': [], 'rdp_unit_contracts': False}
+            if entry['platform_key'] == 'linux':
+                builds[key].update(runner='ubuntu-22.04', linux_profile='ubuntu-22.04-x11',
+                                   linux_wrapper='', desktop={}, cache_key='ubuntu-22.04-x11')
         build = builds[key]
         build['capabilities'] = sorted(set(build['capabilities']) | set(entry['capabilities']))
         build['rdp_unit_contracts'] |= entry['rdp_unit_contracts']
