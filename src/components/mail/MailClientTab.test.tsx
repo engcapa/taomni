@@ -1122,6 +1122,24 @@ describe("MailClientTab", () => {
     await waitFor(() => expect(mailMocks.mailSendMessage).toHaveBeenCalledTimes(1));
   });
 
+  it("blocks an invalid recipient with a send error dialog", async () => {
+    mailMocks.mailSendMessage.mockResolvedValue({ accepted: true, response: "ok" });
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByTestId("mail-compose-open"));
+    const recipientInput = within(await screen.findByTestId("mail-recipient-to")).getByRole("textbox");
+    fireEvent.change(recipientInput, { target: { value: "not-an-email" } });
+    fireEvent.blur(recipientInput);
+    fireEvent.click(screen.getByTestId("mail-compose-send"));
+
+    const dialog = await screen.findByTestId("mail-compose-error-dialog");
+    expect(dialog).toHaveTextContent("Invalid recipient: not-an-email");
+    expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("mail-attach-reminder")).toBeNull();
+    fireEvent.click(screen.getByTestId("mail-compose-error-ok"));
+    expect(screen.queryByTestId("mail-compose-error-dialog")).toBeNull();
+  });
+
   it("shows a calendar invitation and sends the chosen reply (TASK-20)", async () => {
     const invited: MailMessageHeader = {
       ...message,
