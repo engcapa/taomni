@@ -588,7 +588,12 @@ function MailComposePrompt({
         <div className="mt-4 flex justify-end gap-2">
           {attachmentPrompt ? (
             <>
-              <button type="button" className="taomni-btn h-7 px-2.5 text-[12px]" onClick={onClose}>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-2.5 text-[12px]"
+                data-testid="mail-attach-reminder-cancel"
+                onClick={onClose}
+              >
                 Cancel
               </button>
               <button

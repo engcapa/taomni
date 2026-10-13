@@ -1085,6 +1085,8 @@
 
 - `[data-testid="mail-attach-reminder"]` — display — F-MAIL-15.attach-reminder
 - `[data-testid="mail-attach-reminder-send"]` — interactive — F-MAIL-15.attach-reminder-send
+- `[data-testid="mail-attach-reminder-attach"]` — interactive — F-MAIL-15.attach-reminder-attach
+- `[data-testid="mail-attach-reminder-cancel"]` — interactive — F-MAIL-15.attach-reminder-cancel
 
 ## mail/calendar (F-MAIL-18)
 
@@ -1124,6 +1126,8 @@
 - `[data-testid="mail-recipient-suggestions"]` — display — F-MAIL-1.recipient-suggestions
 - `[data-testid="mail-recipient-suggestion"]` — interactive — F-MAIL-1.recipient-suggestion
 - `[data-testid="mail-compose-send"]` — interactive [optional] — F-MAIL-1.compose-send
+- `[data-testid="mail-compose-error-dialog"]` — display [optional] — F-MAIL-1.compose-error-dialog
+- `[data-testid="mail-compose-error-ok"]` — interactive [optional] — F-MAIL-1.compose-error-ok
 
 ## mail/compose (F-MAIL-13)
 

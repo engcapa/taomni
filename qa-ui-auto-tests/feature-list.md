@@ -5688,6 +5688,14 @@ controls:
     selector: '[data-testid="mail-compose-send"]'
     kind: interactive
     optional: true       # send success/failure depends on SMTP config; recipient autocomplete is covered before send
+  - id: compose-error-dialog
+    selector: '[data-testid="mail-compose-error-dialog"]'
+    kind: display
+    optional: true       # only shown when a send preflight validation fails
+  - id: compose-error-ok
+    selector: '[data-testid="mail-compose-error-ok"]'
+    kind: interactive
+    optional: true       # only shown with the send validation dialog
 -->
 
 - `To` / `Cc` / `Bcc` 使用 chip 输入，支持粘贴多联系人、回车/Tab 接受建议、退格删除 chip。
@@ -6351,6 +6359,12 @@ controls:
     kind: display
   - id: attach-reminder-send
     selector: '[data-testid="mail-attach-reminder-send"]'
+    kind: interactive
+  - id: attach-reminder-attach
+    selector: '[data-testid="mail-attach-reminder-attach"]'
+    kind: interactive
+  - id: attach-reminder-cancel
+    selector: '[data-testid="mail-attach-reminder-cancel"]'
     kind: interactive
 -->
 
