@@ -298,6 +298,12 @@ interface MailDraggableDialogProps {
   onClose: () => void;
 }
 
+type ComposePromptState = {
+  kind: "error" | "attachment";
+  title: string;
+  message: string;
+};
+
 type AiAction = "summarize" | "reply" | "tasks";
 type SyncIndicator = "sync" | "more" | "none";
 
@@ -540,6 +546,87 @@ function MailDraggableDialog({
         </button>
       </div>
       {children}
+    </div>
+  );
+}
+
+function MailComposePrompt({
+  prompt,
+  onClose,
+  onAttach,
+  onSendAnyway,
+}: {
+  prompt: ComposePromptState;
+  onClose: () => void;
+  onAttach: () => void;
+  onSendAnyway: () => void;
+}) {
+  const attachmentPrompt = prompt.kind === "attachment";
+  return (
+    <div
+      className="fixed inset-0 z-[960] flex items-center justify-center bg-black/40 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={prompt.title}
+      data-testid={attachmentPrompt ? "mail-attach-reminder" : "mail-compose-error-dialog"}
+      onClick={onClose}
+    >
+      <div
+        className="w-[min(460px,calc(100vw-32px))] rounded-md border p-4 shadow-2xl"
+        style={{ background: "var(--taomni-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start gap-2">
+          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${attachmentPrompt ? "text-amber-500" : "text-red-500"}`} />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">{prompt.title}</div>
+            <div className="mt-2 whitespace-pre-line text-[12px]" data-testid="mail-compose-prompt-message">
+              {prompt.message}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          {attachmentPrompt ? (
+            <>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-2.5 text-[12px]"
+                data-testid="mail-attach-reminder-cancel"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-2.5 text-[12px]"
+                data-testid="mail-attach-reminder-attach"
+                onClick={onAttach}
+              >
+                Attach…
+              </button>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-2.5 text-[12px]"
+                data-primary="true"
+                data-testid="mail-attach-reminder-send"
+                onClick={onSendAnyway}
+              >
+                Send anyway
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="taomni-btn h-7 px-3 text-[12px]"
+              data-primary="true"
+              data-testid="mail-compose-error-ok"
+              onClick={onClose}
+            >
+              OK
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1144,7 +1231,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   );
   const outboxCount = useMemo(() => drafts.filter(isOutbox).length, [drafts]);
   const [sendLaterOpen, setSendLaterOpen] = useState(false);
-  const [attachReminder, setAttachReminder] = useState(false);
+  const [composePrompt, setComposePrompt] = useState<ComposePromptState | null>(null);
   const [sendLaterAt, setSendLaterAt] = useState("");
   const [undoSend, setUndoSend] = useState<{ draftId: string; until: number } | null>(null);
   const [undoNow, setUndoNow] = useState(() => Date.now());
@@ -2858,6 +2945,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const withIdentity = { ...nextDraft, identityId: identity.id };
     const next = includeSignature ? draftWithSignature(withIdentity, identity.signature) : { ...emptyComposeDraft(), ...withIdentity };
     setDraft(next);
+    setComposePrompt(null);
     lastSavedDraftJsonRef.current = serializeDraftContent(next);
     setRecipientSearch({ field: null, query: "", suggestions: [], loading: false });
     setComposeOpen(true);
@@ -3138,8 +3226,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const closeComposer = () => {
     setComposeOpen(false);
     setSendLaterOpen(false);
-    setAttachReminder(false);
+    setComposePrompt(null);
     setDraft(emptyComposeDraft());
+  };
+
+  const showComposeError = (message: string) => {
+    setError(null);
+    setStatus(null);
+    setComposePrompt({ kind: "error", title: "Cannot send message", message });
   };
 
   /** Send one queued message; failures stay queued with a retry backoff. */
@@ -3148,7 +3242,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (!state || outboxBusyIdsRef.current.has(saved.id)) return false;
     const built = buildSendRequest(draftFromSaved(saved));
     if (typeof built === "string") {
-      if (manual) setError(built);
+      if (manual) showComposeError(built);
       return false;
     }
     outboxBusyIdsRef.current.add(saved.id);
@@ -3250,16 +3344,22 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const handleSendDraft = async (skipAttachReminder = false) => {
     const built = buildSendRequest(draft);
     if (typeof built === "string") {
-      setError(built);
+      showComposeError(built);
       return;
     }
     // Thunderbird's attachment reminder: text mentions one, none attached.
     if (!skipAttachReminder && draft.attachments.length === 0
       && mentionsAttachment(draft.subject, draft.textBody, draft.htmlBody)) {
-      setAttachReminder(true);
+      setError(null);
+      setStatus(null);
+      setComposePrompt({
+        kind: "attachment",
+        title: "Attachment missing",
+        message: "The message mentions an attachment, but no file is attached. Add an attachment or send anyway.",
+      });
       return;
     }
-    setAttachReminder(false);
+    setComposePrompt(null);
     setError(null);
     const undoSeconds = Math.max(0, Math.floor(info.undoSendSeconds ?? 0));
     if (undoSeconds > 0) {
@@ -3308,7 +3408,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const handleSendLater = async () => {
     const built = buildSendRequest(draft);
     if (typeof built === "string") {
-      setError(built);
+      showComposeError(built);
       return;
     }
     const at = fromDateTimeLocal(sendLaterAt);
@@ -3575,6 +3675,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const discardCurrentDraft = async () => {
     const draftId = draft.id;
     setComposeOpen(false);
+    setComposePrompt(null);
     setDraft(emptyComposeDraft());
     lastSavedDraftJsonRef.current = "";
     if (!draftId) return;
@@ -5888,6 +5989,21 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       {confirmDialog.render}
       {textInputDialog.render}
 
+      {composePrompt && (
+        <MailComposePrompt
+          prompt={composePrompt}
+          onClose={() => setComposePrompt(null)}
+          onAttach={() => {
+            setComposePrompt(null);
+            void handleAddDraftAttachments();
+          }}
+          onSendAnyway={() => {
+            setComposePrompt(null);
+            void handleSendDraft(true);
+          }}
+        />
+      )}
+
       {sourceView && (
         <div className="absolute inset-0 z-[140] bg-black/35 flex items-center justify-center p-5">
           <MailDraggableDialog
@@ -6312,7 +6428,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
             minWidth={520}
             minHeight={360}
             className="w-[min(920px,calc(100vw-48px))] h-[min(760px,calc(100vh-72px))] max-w-[calc(100vw-48px)] max-h-[calc(100vh-72px)]"
-            onClose={() => setComposeOpen(false)}
+            onClose={() => {
+              setComposeOpen(false);
+              setComposePrompt(null);
+            }}
           >
             <div className="h-8 px-3 flex items-center gap-1 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)] text-[12px]" data-testid="mail-compose-menu-bar">
               <button type="button" className="taomni-btn h-6 px-2" onClick={() => void saveCurrentDraft("manual")} disabled={savingDraft || sending}>File</button>
@@ -6477,34 +6596,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 </div>
               )}
             </div>
-            {attachReminder && (
-              <div
-                className="px-3 py-1.5 flex items-center gap-2 text-[12px] border-t border-[var(--taomni-divider)] bg-[var(--taomni-warning-bg,rgba(217,119,6,0.12))]"
-                role="alert"
-                data-testid="mail-attach-reminder"
-              >
-                <Paperclip className="w-3.5 h-3.5 shrink-0" />
-                <span className="flex-1">The message mentions an attachment, but nothing is attached.</span>
-                <button
-                  type="button"
-                  className="taomni-btn h-6 px-2 text-[11px]"
-                  onClick={() => {
-                    setAttachReminder(false);
-                    void handleAddDraftAttachments();
-                  }}
-                >
-                  Attach…
-                </button>
-                <button
-                  type="button"
-                  className="taomni-btn h-6 px-2 text-[11px]"
-                  data-testid="mail-attach-reminder-send"
-                  onClick={() => void handleSendDraft(true)}
-                >
-                  Send anyway
-                </button>
-              </div>
-            )}
             <div className="h-10 px-3 flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
               <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 mr-auto" onClick={() => void handleAddDraftAttachments()} disabled={sending}>
                 <Paperclip className="w-3.5 h-3.5" />

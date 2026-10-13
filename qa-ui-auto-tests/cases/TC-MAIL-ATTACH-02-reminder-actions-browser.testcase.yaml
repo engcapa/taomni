@@ -1,0 +1,150 @@
+id: TC-MAIL-ATTACH-02
+title: Mail attachment reminder supports cancel and adding a file
+description: |
+  Browser regression for the attachment reminder modal. When the subject
+  mentions an attachment and no file is present, Cancel closes only the
+  reminder and leaves the composer open. Reopening the reminder and choosing
+  Attach… opens the browser file-path prompt; a seeded path becomes an
+  attachment chip, the reminder disappears, and the message can be sent.
+
+  This case is browser-only because it checks modal placement and the browser
+  VFS file-picker stub. Native file-picker and filesystem behavior are outside
+  the scope of this renderer case.
+covers:
+- F-MAIL-15
+tags:
+- mail
+- p1
+- browser
+modes:
+- browser
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: receiver@example.com
+- press: Enter
+- fill:
+    selector: '[data-testid="mail-compose-subject"]'
+    value: Design notes attached
+- type:
+    selector: '[data-testid="mail-compose-editor"]'
+    text: The notes are in the attached file.
+- click: '[data-testid="mail-compose-send"]'
+- wait_for:
+    selector: '[data-testid="mail-attach-reminder"]'
+    timeout_sec: 10
+- click: '[data-testid="mail-attach-reminder-cancel"]'
+- assert_not_visible: '[data-testid="mail-attach-reminder"]'
+- assert_visible: '[data-testid="mail-compose-dialog"]'
+- click: '[data-testid="mail-compose-send"]'
+- wait_for:
+    selector: '[data-testid="mail-attach-reminder"]'
+    timeout_sec: 10
+- seed_dialog:
+    prompt: /tmp/qa-mail-attachment.txt
+- click: '[data-testid="mail-attach-reminder-attach"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-attachment-chip"]'
+    timeout_sec: 20
+- assert_not_visible: '[data-testid="mail-attach-reminder"]'
+- click: '[data-testid="mail-compose-send"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-dialog"]'
+    state: detached
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Message sent
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Sent
+    min: 1
+    timeout_sec: 20
+- screenshot: mail-attach-02-cancel-and-attach.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 缺少附件提醒弹窗的 Cancel 只关闭提醒，写信窗口保持打开。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    checkpoints:
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-attach-reminder\"]", "timeout_sec": 10}}'
+    - step: 17
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-attach-reminder\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"mail-compose-dialog\"]"}'
+    results:
+    - 15
+    - 17
+    - 18
+  - id: R2
+    requirement: 选择 Attach… 后浏览器文件路径进入附件列表，提醒消失，邮件可以继续发送。
+    actions:
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    checkpoints:
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-attach-reminder\"]", "timeout_sec": 10}}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-attachment-chip\"]", "timeout_sec": 20}}'
+    - step: 24
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-attach-reminder\"]"}'
+    - step: 26
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Message sent", "timeout_sec": 30}}'
+    - step: 28
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
+    results:
+    - 20
+    - 23
+    - 24
+    - 26
+    - 27
+    - 28
+  visual:
+  - check: 提醒弹窗位于写信窗口上方；取消后写信窗口仍在；添加文件后附件 chip 和发送结果清晰可见。
+    method: manual
+    reason: 弹窗层级、文件路径提示和附件 chip 的布局需要截图人工评审。
+  native:
+  - check: browser 使用 stub VFS 文件路径与 stub SMTP；原生文件选择器和真实磁盘写入不在本用例中验证。
+    method: not-applicable
+    reason: 本用例专门覆盖 browser renderer controls。

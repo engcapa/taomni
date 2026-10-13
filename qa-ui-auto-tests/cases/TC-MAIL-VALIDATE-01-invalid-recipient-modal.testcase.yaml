@@ -1,0 +1,142 @@
+id: TC-MAIL-VALIDATE-01
+title: Mail blocks an invalid recipient with a visible send validation dialog
+description: |
+  Regression for the mail compose send preflight. An invalid To address is
+  accepted as a chip for editing, but Send must not call the server. The
+  composer remains open while a prominent validation dialog explains the bad
+  address. After dismissing the dialog and removing the invalid chip, the
+  user can enter a valid recipient and send the draft successfully.
+
+  This is a browser case because it verifies the renderer validation,
+  modal placement, recovery controls and stub SMTP orchestration. Native
+  Tauri networking is outside this case and remains covered by the existing
+  mail send cases.
+covers:
+- F-MAIL-1
+tags:
+- mail
+- p1
+- browser
+modes:
+- browser
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: not-an-email
+- press: Enter
+- assert_attribute:
+    selector: '[data-testid="mail-recipient-chip"]'
+    name: data-invalid
+    equals: 'true'
+- click: '[data-testid="mail-compose-send"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-error-dialog"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="mail-compose-error-dialog"]'
+    contains: 'Invalid recipient: not-an-email'
+- assert_visible: '[data-testid="mail-compose-dialog"]'
+- click: '[data-testid="mail-compose-error-ok"]'
+- assert_not_visible: '[data-testid="mail-compose-error-dialog"]'
+- click: '[data-testid="mail-recipient-chip"] button'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: receiver@example.com
+- press: Enter
+- fill:
+    selector: '[data-testid="mail-compose-subject"]'
+    value: Recovered recipient validation
+- type:
+    selector: '[data-testid="mail-compose-editor"]'
+    text: The draft remains editable after validation.
+- click: '[data-testid="mail-compose-send"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-dialog"]'
+    state: detached
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Message sent
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Sent
+    min: 1
+    timeout_sec: 20
+- screenshot: mail-validate-01-recovered.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 输入明显无效的收件人并点击 Send 时，邮件不发送，写信窗口保持打开，并以弹窗明确显示无效地址。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 10
+    - 11
+    - 13
+    checkpoints:
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-recipient-chip\"]", "name": "data-invalid", "equals": "true"}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-error-dialog\"]", "timeout_sec": 10}}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-compose-error-dialog\"]", "contains": "Invalid recipient: not-an-email"}}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"mail-compose-dialog\"]"}'
+    results:
+    - 12
+    - 14
+    - 15
+    - 16
+  - id: R2
+    requirement: 关闭校验弹窗并移除无效地址后，写信窗口仍可恢复编辑并成功发送。
+    actions:
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    checkpoints:
+    - step: 18
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-compose-error-dialog\"]"}'
+    - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Message sent", "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
+    results:
+    - 18
+    - 25
+    - 26
+    - 27
+  visual:
+  - check: 校验弹窗居中覆盖写信窗口，错误信息和 OK 按钮清晰可见；关闭后写信窗口没有被误关闭。
+    method: manual
+    reason: 弹窗层级、遮挡关系和焦点可达性需要截图与人工评审。
+  native:
+  - check: browser 仅验证渲染层与 stub SMTP 编排；真实 Tauri SMTP 和平台 WebView 行为由现有 native mail send cases 覆盖。
+    method: not-applicable
+    reason: 本用例专门验证 browser modal validation and recovery，不主张 native 证据。

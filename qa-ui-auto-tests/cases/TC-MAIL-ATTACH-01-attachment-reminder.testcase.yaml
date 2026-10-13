@@ -57,6 +57,15 @@ steps:
 - wait_for:
     selector: '[data-testid="mail-attach-reminder"]'
     timeout_sec: 10
+- assert_attribute:
+    selector: '[data-testid="mail-attach-reminder"]'
+    name: role
+    equals: dialog
+- assert_text:
+    selector: '[data-testid="mail-attach-reminder"]'
+    contains: no file is attached
+- assert_visible: '[data-testid="mail-attach-reminder-attach"]'
+- assert_visible: '[data-testid="mail-attach-reminder-cancel"]'
 - assert_visible: '[data-testid="mail-compose-dialog"]'
 - click: '[data-testid="mail-attach-reminder-send"]'
 - wait_for:
@@ -89,31 +98,48 @@ verification:
     - 13
     - 14
     - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
     checkpoints:
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 16
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-attach-reminder\"]", "timeout_sec": 10}}'
     - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-attach-reminder\"]", "name": "role", "equals": "dialog"}}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-attach-reminder\"]", "contains": "no file is attached"}}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"mail-attach-reminder-attach\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"mail-attach-reminder-cancel\"]"}'
+    - step: 21
       expectation: '{"assert_visible": "[data-testid=\"mail-compose-dialog\"]"}'
     results:
     - 16
     - 17
-  - id: R2
-    requirement: 点 “Send anyway” 后邮件发出，状态提示发送成功，服务器 Sent 有副本。
-    actions:
     - 18
-    checkpoints:
-    - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached", "timeout_sec": 30}}'
-    - step: 20
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Message sent", "timeout_sec": 30}}'
-    - step: 21
-      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
-    results:
     - 19
     - 20
     - 21
+  - id: R2
+    requirement: 点 “Send anyway” 后邮件发出，状态提示发送成功，服务器 Sent 有副本。
+    actions:
+    - 22
+    checkpoints:
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Message sent", "timeout_sec": 30}}'
+    - step: 25
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
+    results:
+    - 23
+    - 24
+    - 25
   visual:
   - check: 截图中提醒已关闭、状态栏提示已发送。
     method: manual
