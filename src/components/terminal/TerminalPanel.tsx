@@ -325,6 +325,8 @@ type TerminalGitState =
   | { kind: "none"; label: string; title: string }
   | { kind: "error"; label: string; title: string };
 
+const ERASE_SAVED_LINES_SEQUENCE = [0x1b, 0x5b, 0x33, 0x4a] as const; // ESC [ 3 J
+
 export function TerminalPanel({
   tabId,
   tabTitle = "Terminal",
@@ -2485,16 +2487,15 @@ export function TerminalPanel({
     // not require decoding or copying the full output stream.
     let eraseSavedLinesMatch = 0;
     const sawEraseSavedLines = (bytes: Uint8Array): boolean => {
-      const sequence = [0x1b, 0x5b, 0x33, 0x4a]; // ESC [ 3 J
       for (const byte of bytes) {
-        if (byte === sequence[eraseSavedLinesMatch]) {
+        if (byte === ERASE_SAVED_LINES_SEQUENCE[eraseSavedLinesMatch]) {
           eraseSavedLinesMatch += 1;
-          if (eraseSavedLinesMatch === sequence.length) {
+          if (eraseSavedLinesMatch === ERASE_SAVED_LINES_SEQUENCE.length) {
             eraseSavedLinesMatch = 0;
             return true;
           }
         } else {
-          eraseSavedLinesMatch = byte === sequence[0] ? 1 : 0;
+          eraseSavedLinesMatch = byte === ERASE_SAVED_LINES_SEQUENCE[0] ? 1 : 0;
         }
       }
       return false;
