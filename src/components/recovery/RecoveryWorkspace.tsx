@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { RecoveryBootstrap } from "../../lib/runtimeRecovery";
 import { RecoveryTerminalOutput } from "./RecoveryTerminalOutput";
 import { recoveryLimitation } from "../../lib/recoveryPolicy";
+import { RecoveryBackgroundStatus } from "./RecoveryBackgroundStatus";
 
 /** Recovery is deliberately not a normal Tab mount: no connect / cleanup / autosave side effects. */
 export function RecoveryWorkspace({ bootstrap }: { bootstrap: RecoveryBootstrap }) {
@@ -44,7 +45,8 @@ export function RecoveryWorkspace({ bootstrap }: { bootstrap: RecoveryBootstrap 
         {tab.kind === "mail" || tab.kind === "mail-unified"
           ? <p data-testid="recovery-mail-warning">发件箱自动发送已暂停；请核对发送结果与已保存草稿，避免重复发送。</p> : null}
       </section>}
-      <p>关闭窗口会先显示原生退出确认。选择保留后台不会终止原任务。</p>
+      <RecoveryBackgroundStatus />
+      <p>系统标题栏的关闭按钮可打开原生恢复 / 退出选项。选择保留后台不会终止原任务。</p>
     </main>
   );
 }

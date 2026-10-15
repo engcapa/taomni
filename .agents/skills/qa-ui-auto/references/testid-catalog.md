@@ -1398,6 +1398,8 @@
 
 ## main/recovery (F1.10)
 
+- `[data-testid="recovery-background-refresh"]` — interactive — F1.10.recovery-background-refresh
+- `[data-testid="recovery-background-status"]` — display — F1.10.recovery-background-status
 - `[data-testid="recovery-workspace"]` — display — F1.10.recovery-workspace
 - `[data-testid="recovery-handshake"]` — display — F1.10.recovery-handshake
 - `[data-testid="recovery-limitations"]` — display — F1.10.recovery-limitations

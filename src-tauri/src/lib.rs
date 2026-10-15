@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod ai;
+mod app_exit;
 mod appearance;
 mod asr;
 pub mod backup;
@@ -137,9 +138,19 @@ fn should_reap_ai_process(
 
 #[tauri::command]
 async fn exit_app(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    sockscap::prepare_for_exit(&app_handle, state).await?;
-    app_handle.exit(0);
-    Ok(())
+    app_handle
+        .state::<app_exit::ExitGate>()
+        .run(
+            async {
+                sockscap::prepare_for_exit(&app_handle, state).await?;
+                screenshot::wait_for_recovery_recording().await
+            },
+            || {
+                webview_recovery::closing_all(&app_handle);
+                app_handle.exit(0);
+            },
+        )
+        .await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -153,6 +164,7 @@ pub fn run() {
         webview_recovery::terminated(webview.app_handle(), webview.label(), "renderer-exited");
     });
     builder
+        .manage(app_exit::ExitGate::default())
         .manage(webview_recovery::Recovery::default())
         // Auto-update: unconditional (unlike the debug-only log plugin below).
         // `process` provides relaunch() so the user can restart into the new

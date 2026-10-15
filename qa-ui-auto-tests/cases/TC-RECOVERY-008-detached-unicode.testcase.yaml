@@ -1,0 +1,89 @@
+id: TC-RECOVERY-008
+title: Detached recovery keeps the original terminal ID and UTF-8 title at the native
+  byte boundary
+description: Windows/macOS/Linux browser；仅验证恢复描述消费与路由。真实分离窗口投影、TTL、UTF-8 native校验由
+  N12 与 runtimeRecovery 单元测试覆盖。全部未运行。
+covers:
+- F1.10
+tags:
+- recovery
+- terminal
+- regression
+- p0
+modes:
+- browser
+browser_platforms:
+- Linux
+- Windows
+- macOS
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: qa.recovery.bootstrap
+    value: '{"version":1,"instanceId":"qa-detached","generation":2,"revision":4,"recovering":true,"limitation":"terminal-state-unverified","description":{"activeTabId":"logical-tab-42","tabs":[{"id":"logical-tab-42","kind":"terminal","title":"中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中😀😀","savedSessionId":null,"terminalSessionId":"original-pty-42"}]}}'
+- open: ${cfg.app.base_url}#terminal=handoff-window-42
+- wait_for: '[data-testid="recovery-workspace"]'
+- assert_count:
+    selector: '[data-testid="recovery-tab"]'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="recovery-tab"]'
+    equals: 中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中😀😀
+- assert_text:
+    selector: '[data-testid="recovery-terminal-id"]'
+    contains: original-pty-42
+- assert_count:
+    selector: '[data-testid="detached-session-window"]'
+    equal: 0
+- click: '[data-testid="recovery-observe"]'
+- assert_text:
+    selector: '[data-testid="recovery-output"]'
+    contains: QA-ORIGINAL-OUTPUT
+- assert_count:
+    selector: textarea
+    equal: 0
+- click: '[data-testid="recovery-observe"]'
+- assert_text_equals:
+    selector: '[data-testid="recovery-output-status"]'
+    equals: 未订阅输出
+- screenshot: recovery-detached-unicode.png
+verification:
+  review: reviewed
+  requirements:
+  - id: V-FIX-04-05
+    requirement: 路由标识与逻辑标签和PTY标识不同时，有限恢复仍显示原PTY；512字节Unicode标题完整显示，观察可取消，无普通终端重挂载。
+    actions:
+    - 2
+    - 3
+    - 9
+    - 12
+    checkpoints:
+    - step: 6
+      expectation: UTF-8边界标题完整保留
+    - step: 7
+      expectation: 使用原PTY ID
+    - step: 8
+      expectation: 无普通分离业务页面
+    - step: 10
+      expectation: 可只读观察后续输出
+    - step: 13
+      expectation: 取消只读观察
+    - step: 11
+      expectation: 无终端输入框
+    results:
+    - 6
+    - 7
+    - 8
+    - 10
+    - 11
+    - 13
+  visual:
+  - check: Unicode文字和只读提示
+    method: automated
+    reason: 精确文本断言；不代替系统字体视觉评审
+  native:
+  - check: 真实分离PTY、交接过期和多字节标题预算
+    method: manual
+    reason: 见三端N12；fixture不能证明后端元数据投影

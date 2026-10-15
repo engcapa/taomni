@@ -1,0 +1,80 @@
+id: TC-RECOVERY-009
+title: Recovery tools read background status only on request and permit explicit refresh
+description: Windows/macOS/Linux browser。Servers/tunnel/SocksCap使用browser stub；原生状态和无重复副作用见N06/N13。全部未运行。
+covers:
+- F1.10
+tags:
+- recovery
+- tools
+- p0
+modes:
+- browser
+browser_platforms: [Linux, Windows, macOS]
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: qa.recovery.bootstrap
+    value: '{"version":1,"instanceId":"qa-detached","generation":2,"revision":4,"recovering":true,"limitation":"terminal-state-unverified","description":null}'
+- reload_window: null
+- wait_for: '[data-testid="recovery-workspace"]'
+- assert_text_equals:
+    selector: '[data-testid="recovery-background-status"]'
+    equals: 尚未查询后台工具状态。
+- click: '[data-testid="recovery-background-refresh"]'
+- assert_text:
+    selector: '[data-testid="recovery-background-status"]'
+    contains: 'http: stopped'
+- assert_text:
+    selector: '[data-testid="recovery-background-status"]'
+    contains: 'SocksCap: idle — browser preview'
+- assert_text:
+    selector: '[data-testid="recovery-background-status"]'
+    contains: 隧道：
+- click: '[data-testid="recovery-background-refresh"]'
+- assert_text:
+    selector: '[data-testid="recovery-background-status"]'
+    contains: 'http: stopped'
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 0
+- screenshot: recovery-tools-status.png
+verification:
+  review: reviewed
+  requirements:
+  - id: V-TOOLS-READ
+    requirement: 描述缺失仍可显式查询后台工具，默认未查询，重复刷新保持只读显示。
+    actions:
+    - 2
+    - 3
+    - 6
+    - 10
+    checkpoints:
+    - step: 5
+      expectation: 默认不查询
+    - step: 7
+      expectation: 显示服务状态
+    - step: 8
+      expectation: 显示SocksCap状态
+    - step: 9
+      expectation: 显示隧道状态
+    - step: 11
+      expectation: 可再次刷新
+    - step: 12
+      expectation: 未挂载终端
+    results:
+    - 5
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+  visual:
+  - check: 后台状态与查询按钮
+    method: automated
+    reason: 文本断言
+  native:
+  - check: 真实后台PID和端口、仅三次查询、失败独立重试
+    method: manual
+    reason: 三端N13与单测覆盖；browser stub不证明服务存活

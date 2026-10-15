@@ -1,119 +1,112 @@
-# 有限恢复实施报告
+# 有限恢复实施与 review 修正报告
 
-日期：2026-10-15。**已交付受限实现，不宣称执行计划的原生/性能验收全部完成。**
-用户授权开发并限定：本地单元测试；browser/native仅编写、不执行。
-未接触历史白屏实例，未启动测试原生应用、故障注入、SSH/其他服务实验或性能负载，
-未重启项目workflow，未执行browser/native runner或截图检查。
+2026-10-15。本轮按 review 的 5 个问题修正产品代码，仅执行本机单元测试和静态检查。
+Windows/macOS/Linux 的 browser/native 用例已补充，全部 **unrun**；未启动测试应用、
+浏览器 runner、故障注入、真实服务或性能负载，未操作历史白屏 Taomni 实例。
 
-## 1. 实际源码基线
+## 本轮基线与范围
 
-- R0源码：`75d78f9d7e47f215e3c0726aff65cc4ebd46e79c`，开始时`git status --short`为空。
-  这是本次开发基线，不是旧诊断release，也不是设计原记录的`a11c227c`。
-- 单测环境：Linux x86_64 / kernel6.18.56、Node20.20.0、pnpm10.26.1、
-  rustc1.88.0。未采集真实加载WebView库、native build flags、PID/配置目录或
-  二进制hash，因为本轮不启动/故障注入native实例。
-- 未取得R0/R1原生性能原始样本，因此**不能写“无性能退化”**；
-  后续对照必须保持终端文本镜像优化状态一致。独立文本优化feat未在此开发。
+- 修正基线：`4fee990c`，分支 `docs/terminal-performance-and-renderer-recovery`。
+  最终候选为该 HEAD 加本轮工作区 diff。恢复功能整体的性能基线仍为 `75d78f9d`。
+- 本机：Linux x86_64；Node 24.18.0、pnpm 10.30.0、rustc 1.98.0。
+  CI 使用 Node 22，本轮没有以本机版本替代 CI/三平台运行证据。
+- 保留 DEC-08/09：前端性能优先、小范围有限恢复，复杂或不安全的状态明确提示。
+  独立终端文本镜像优化没有改动；不以该优化抵消 recovery 开销。
 
-## 2. 已实现
+## 5 个 review 问题的修正
 
-| 工作包 | 实际交付 |
+| 问题 | 结果及错误/并发处理 |
 |---|---|
-| TASK01 | Linux web-process-terminated、macOS公共Tauri hook、Windows ProcessFailed接线；GPU/frame/unresponsive不当作renderer死亡；main/普通分离/SFTP入口注册；主循环排队；原生提示、手动重试节流、15秒ready超时、失败/close代次状态机；release专用匿名低频轮转日志 |
-| TASK02 | 启动业务组件前IPC握手；主进程instanceId/窗口上下文/版本/revision；只提交标签id/kind/title/已保存配置引用/已知terminalID；128标签、字段长度和全窗口1MiB描述预算；无正文/凭据/全store快照、无恢复定时器 |
-| TASK03 | dev-only官方SerializeAddon0.14.0、MIT、headless xterm6.0.0能力原型。完整普通屏/500历史、备用屏/公开mode、80×24/160×50/240×80/400×80、resize差分；CSI/OSC/DCS/UTF8半包反例成立。无打包WebView成本证据，不进入生产快照 |
-| TASK04 | 输出订阅带真实调用window归属；死亡撤销该window旧Channel，不删PTY/SSH；异步create/attach的旧generation不再注册；恢复UI可显式复用attach观察原ID后续输出；清理仅自己的window/channel，晚到attach也清理；无write/resize/startup/认证；观察最多64K字符，非VT屏幕 |
-| TASK05 | 独立恢复shell不mount普通业务组件，防数据库rollback/disconnect、对象存储close、自动connect/Outbox/宏/AI/下载等重复动作；21种TabKind及未知类型说明；Mail普通组件也有恢复Outbox守卫，冷启动保留旧契约；语音/native AV失去控制时停止，inflight start带窗口代次核对；录屏/scroll控制窗口只detect-and-stop，沿已有收尾保留文件，不通用reload/销毁覆盖层 |
-| TASK06 | 定向本地unit与静态检查；7个可执行QA YAML、CI策略/依赖/feature/control目录；9个详细native手工/外部场景；AC/V与26/21/9分类映射 |
+| #1 原生退出跳过 SocksCap 清理 | 原生恢复选项复用 `exit_app`。应用级 ExitGate 串行化退出：prepare_for_exit → 等待异常录屏收尾 → Closing → app.exit；既有退出备份继续生效。清理失败显示实际错误，应用保持存活，gate释放允许重试。取消的异步退出不永久占用gate。 |
+| #2 录屏返回路径丢失、临时文件误删 | 控制界面死亡时先在截图owner锁内接管录屏并移出临时清理名单；Stop、在飞编码、预览共用一个收尾结果。完成后有界流复制到 app-local-data/recovered-recordings/UUID，flush后发布，原生提示实际路径。关闭控制窗/退出不会删成功文件；失败给出实际错误和可用临时路径，不承诺成功。正常帧循环未修改。 |
+| #3 稍后处理/节流后没有重试入口 | 异常时退出全屏、启用系统标题栏。系统关闭按钮始终可重新打开原生选项：失败可重试/退出/保留，恢复中或ready可退出/保留；Windows browser死亡继续限制重试。60秒节流提示准确说明再进入方式，无定时自动重试。窗口身份+generation令牌拒绝已销毁/替换窗口的旧对话框和timeout。 |
+| #4 分离终端丢失原ID | 元数据读取健康窗口中的实际logical tab及terminalRuntimeByTab，复用原PTY ID；不把route/handoff ID当作session/config ID，不读取过期凭据或复制snapshot。缺失真实身份时保留未知提示。 |
+| #5 中文/emoji标题使整批描述失败 | 前后端统一512 UTF-8字节标题预算；按code point有界扫描，替换孤立surrogate，不切半emoji。不截断身份产生碰撞，非法ID不会阻止其他标签更新。同ID的activity变化提前跳过，标题不随输出量重复构造。 |
 
-正常close/detach/归位沿既有入口，恢复不是关闭资源的原因。
-死renderer下关闭窗口由原生确认“退出应用/保留后台”；确认为应用退出，
-取消继续后台。原生退出仍沿既有backup scheduler，不另造后台任务管理器。
+附带完成两个直接相关的生产缺口：修正 Linux WebKit 的 `WebViewExt` 导入，使完整
+crate 能编译；恢复界面按用户点击查询现有 Servers/隧道/SocksCap 状态，三个查询
+相互独立，单项错误可重试，不启动/停止/修复服务、不自动查询、不加轮询。
+该组件仅在恢复分支加载，状态视图每类最多128项，超过显示上限明确提示。
 
-## 3. 明确未启用/降级
+## 恢复能力和设计取舍
 
-1. **没有默认自动reload**。执行计划要求先证明原生reload/Channel队列清理及
-   平台行为，本轮无此证据。检测后先原生提示；用户可手动重试有限界面。
-   Windows browser进程退出仅提示，不侵入Tauri内部重建。
-2. **无生产终端检查点、有界字节重放或可交互TUI恢复**。
-   部分完整状态能序列化，不等于任意半包/前置过滤/外部副作用可隔离；
-   原型明确存在反例，且没有真实WebView成本测量。生产保持只读/受限，
-   不注入Ctrl+L、不伪装纯文本为完整画面、不修改正常scrollback。
-3. **未自动重连任何恢复客户端，也不自动重挂载业务控制页**。
-   当前恢复shell显示标签/选中项/对应限制；保存的草稿与文件不被空值覆盖，
-   但未声称在恢复shell中已重新读出所有业务内容。
-   服务/隧道/SQL/传输/AI原生任务没有为恢复而stop/restart。
-4. 描述可能落后、缺失或超预算；在飞创建不重新创建。记录对象存在、
-   attach成功、静止无输出不能证明真实PID仍运行。结束/缺失会话不自动替代。
-5. native音视频没有廉价per-renderer归属查询，主窗口死亡时选择安全停止现有
-   native媒体会话；这是隐私与失控采集的保守取舍，不声称通话无损恢复。
-   独立录屏/scroll控制窗仍活着时沿原控制；其renderer退出则请求安全停止。
-6. 不恢复非持久表单/文件编辑/宏续发/未保存草稿，不升级引擎/框架、
-   禁JIT或周期重启；不新增通用任务表、全操作幂等或事件重放系统。
+已交付三端原生退出hook、小型标签描述与启动握手、原window输出撤销、显式只读
+接回原PTY后续输出、全21种TabKind的限制说明、Outbox与重复副作用隔离、失控
+语音/native AV停止、录屏安全收尾，以及简单后台工具的按需只读查询。
+26个session/21个TabKind/9个Tools映射仍以 recovery-policy-matrix.md 为准。
 
-这些限制可在UI/原生提示中看到；不是“全部恢复通过”。
+自动reload继续关闭，等待原生reload/Channel队列实证。Windows browser进程死亡
+只提示。当前不实现终端检查点/500行历史重放或可交互TUI：Serialize原型的
+CSI/OSC/DCS/UTF-8半包反例尚不能低成本安全解决；观察仅为最多64K字符的后续
+输出，不冒充画面/光标/输入模式恢复。不自动新建PTY、SSH认证、发送startup。
 
-## 4. 本次实际检查
+数据库/邮件/文件传输等中间结果不明时保留限制，不自动重连或重挂载可能带副作用
+的业务组件；已保存内容不被空状态覆盖，但不声称所有草稿已在恢复页重新读出。
+Servers/隧道/SocksCap有现成只读接口，故提供显式读取；更昂贵的控制面迁移、
+任务注册/事件重放、逐字符草稿镜像继续排除。符合用户允许高成本恢复降级提示的取舍。
 
-### 本地前端unit/mounted与保留行为回归
+## 本轮实际验证
+
+前端：
 
 ```bash
 pnpm exec vitest run \
   src/lib/runtimeRecovery.test.ts src/lib/recoveryTerminal.test.ts \
   src/components/recovery/RecoveryWorkspace.test.tsx \
-  src/lib/terminalRecoveryPrototype.test.ts src/lib/recoveryPolicy.test.ts \
-  src/lib/detachedSession.test.ts src/components/terminal/TerminalPanel.test.tsx
-pnpm exec vitest run src/components/mail/MailClientTab.test.tsx \
-  -t 'automatic Outbox sending|Outbox and sends|keeps a message in the Outbox'
-pnpm exec tsc -b --pretty false --noEmit
+  src/components/recovery/RecoveryBackgroundStatus.test.tsx \
+  src/lib/recoveryPolicy.test.ts src/lib/detachedSession.test.ts \
+  src/components/detached/DetachedSessionWindow.test.tsx \
+  src/components/terminal/TerminalPanel.test.tsx
+pnpm exec tsc --noEmit
 ```
 
-- 7个测试文件：**131 passed，1 skipped**。skip是既有TerminalPanel文本镜像
-  按构建模式的条件测试，没有为本任务新增skip。
-- Mail定向：**4 passed**；其余44项因`-t`未选中，不是44个环境skip。
-- 合计本次定向有效执行 **135 passed**。TypeScript检查通过。
-- 原型是Node/headless单元测试，不是browser或native用例执行，也不是性能证据。
-- 开始时照旧文档使用`pnpm test -- <文件>`，本环境将额外`--`传给Vitest，
-  意外开始了非定向unit集合并超时；期间观察到其他模块失败，未做基线归因，
-  **不把该次运行描述为全套通过或既有缺陷**。之后改用以上精确命令，
-  未通过重跑/过滤宣称完整suite通过。
+8文件 **133 passed，1 skipped**。skip为已有终端文本镜像构建模式条件，不是新增
+规避。TypeScript通过。新增测试包含Unicode边界/孤立surrogate/超长标题、分离
+路由与原ID不同、缺交接、1000次activity不读标题/不增加IPC、待提交IPC只合并
+最新元数据、工具查询去重/部分失败/手动重试/离开页面/10分钟无自动轮询。
+本地计数不变量不等于真实UI时延或吞吐测量。
 
-### Rust与原生边界
+Rust：
 
 ```bash
-rustc --edition=2021 --test src-tauri/src/webview_recovery/lifecycle.rs \
-  -o /tmp/recovery-lifecycle-tests
-/tmp/recovery-lifecycle-tests
-cargo test --manifest-path src-tauri/Cargo.toml --lib --locked --offline webview_recovery
+HTTP_PROXY=http://10.1.0.80:3228 HTTPS_PROXY=http://10.1.0.80:3228 \
+  cargo test --manifest-path src-tauri/Cargo.toml --lib --locked --offline -- \
+  webview_recovery:: app_exit:: screenshot::record::tests:: screenshot::recovery_file::
 ```
 
-- 独立编译**实际生产状态机源文件**：**5 passed**，包括重复/节流、close优先、
-  旧代次ready/timeout拒绝及死亡后的旧订阅拒绝。
-- 整个Rust crate单测：**blocked**，离线依赖缺少`ironrdp-nscodec`，
-  尚未进入编译。adapter/IPC/采集模块及新增4个描述验证Rust单测
-  **未取得完整crate编译/执行证据**，不以5个纯状态机测试替代它们。
-- 修改的恢复adapter/语音/screenshot/LanChat已做Rust语法解析，
-  不等于Rust类型检查、链接或任何三平台编译通过。
+完整默认feature的Linux crate编译、链接成功；定向 **30 passed，0 failed/ignored**。
+包含退出顺序/失败/并发/取消、旧窗口令牌、节流再进入、原生按钮返回映射、UTF-8
+描述预算、真实临时文件复制/失败不覆盖/临时目录删除后保留、异步收尾等待、
+Stop/active/preview接管竞态，以及原有GIF/MP4编码解码单测。没有采集真实桌面或
+启动Tauri应用。初次编译发现原实现 `webkit2gtk::prelude` 不存在，修复后通过；
+日志保留失败记录。cargo offline不阻止build.rs下载，所需依赖通过指定代理取得。
 
-### QA静态交付检查
+静态检查：
 
-- 7个新增YAML schema及verification索引检查通过。
-- 官方`contracts --gate`定向检查：7/7 reviewed，0 gaps；仅代表行为映射结构通过。
-- 生成后的testid目录check一致；F1.10定向`audit --gate`通过：
-  **16/16控件均有用例触达，无本feature actionable gap**。
-  全仓仍有1个无归属selector，非本feature，不将其当作本次运行缺陷或修复。
-- selected CI plan识别7个ID及browser/native模式，未启动执行。
-- 这些检查只证明目录/契约结构，不提供运行pass。
-- `git diff --check`通过。
+- F1.10 audit gate通过，18/18控件有用例触达；catalog同步。
+- 9个恢复YAML的schema和reviewed行为契约检查通过，0 gaps。
+- TC-RECOVERY-006/008/009选定CI plan生成三端browser/native六个lane，未运行。
+- 工作区diff调用dev_contract.evaluate通过，产品变更、QA case及单测同时可见；
+  CLI只比较committed refs，本轮没有用HEAD对HEAD伪造变更验证。
+- 新增/修改恢复模块和record.rs的定向rustfmt检查通过，其他大文件只格式化改动区。
+  全仓cargo fmt --check仍报告基线文件格式差异（如VNC、voice、integration），
+  不为此重排整个仓库。git diff --check通过。
 
-## 5. Browser/native交接
+本轮证据：`qa-ui-auto-report/recovery-fixes/`（忽略、不提交），主要为
+`unit-final.log`、`typescript-final.log`、`rust-verified.log`、`rustfmt.log`、
+`dev-contract.md`、`case-contracts.txt`。以前报告的135项、纯状态机5项及依赖下载阻塞属于旧轮次，
+不叠加到本轮计数，也不再视为本轮完整crate的阻塞。
 
-详见[test-cases.md](test-cases.md)与
-[原生手册](../../../qa-ui-auto-tests/native/webview-renderer-recovery.md)。
+## 三端与性能用例交接
 
-7个YAML全部unrun（TC-RECOVERY-006同时声明browser/native）；
-9个原生手工场景全部unrun，包含原生事件/对话框、三端、后台PID/端口、
-结束/zombie、Windows browser退出、共享renderer、队列、采集、真实请求计数、
-正常detach/关闭、日志轮转及真实release性能/96h。
-无浏览器、原生故障或“自然GC已修复”的声明。恢复只减少持续白屏风险，
-不修复尚未归因的JSC内部堆损坏。
+更新TC-RECOVERY-006三端冷启动回归，新增008分离恢复/Unicode显示和009工具
+只读查询；policy/dependencies/feature-list/catalog同步。原生手册增加N10–N14，
+覆盖三端安全退出/网络清理、持续可用重试、录屏真实文件与并发、分离ID/UTF-8
+投影、Tools及性能。细节见 [测试映射](test-cases.md) 和
+[原生用例](../../../qa-ui-auto-tests/native/webview-renderer-recovery.md)。
+
+全部9个browser YAML和14个原生手工场景均未执行（006也声明native）。
+原生手工场景不冒充runner支持的kill/dialog verb。性能分别比较恢复整体基线和
+本次修正基线，包含真实release、1/4/16终端、长标题/128标签、输入与帧尾延迟、
+吞吐/CPU/RSS/IPC/分配、录屏流式保存与72–96h长时。任何可重复退化都失败，
+不放宽门槛、不用文本镜像优化抵消。当前没有三端实测、性能未退化或GC根因已修复的声明。

@@ -4,6 +4,23 @@
 按本次用户要求仅执行本地单元测试，另做静态类型/目录检查。
 运行结果见 [implementation-report.md](implementation-report.md)。
 
+## Review 修正增量（2026-10-15）
+
+| 问题/要求 | 本地单元测试 | browser/native用例（只编写，三端全部unrun） |
+|---|---|---|
+| #1 网络安全退出、失败/并发/取消 | `app_exit.rs`三个测试 | N10；006保护正常启动，N04保护关闭/归位 |
+| #2 录屏所有权和持久文件 | `record.rs::recovery_owns_active_inflight_and_preview_files_through_close_and_exit`、`recovery_file.rs`三个测试及原有编码/解码测试 | N11，MP4/GIF、三端权限和真实文件、关闭/退出/预览竞态 |
+| #3 原生重试持续可用、节流与旧回调 | `webview_recovery`对话框/生命周期测试 | N02/N10，三端系统标题栏、Later、15秒超时、60秒重试、旧窗口身份 |
+| #4 分离原PTY身份 | `runtimeRecovery.test.ts`两种route、runtime/交接缺失 | TC-RECOVERY-008仅描述消费；N12证明真实投影/TTL/PTY |
+| #5 UTF-8预算与标题工作量 | frontend字节/emoji/surrogate/超长/非法ID；Rust描述预算 | TC-RECOVERY-008显示；N12/N14真实提交、其他标签继续更新、长标题成本 |
+| Tools低成本读取 | `RecoveryBackgroundStatus.test.tsx`按需/失败/重试/迟到/无轮询 | TC-RECOVERY-009；N13真实查询/无start-stop副作用 |
+| 正常前端性能不退化 | runtime元数据合并、1000次同IDactivity不读标题且0额外IPC；工具10分钟无轮询 | N09/N14和B-PERF；整体/增量双基线，三端真实release配对，不能用单测代替性能实测 |
+
+TC-RECOVERY-006/008/009显式声明Windows/macOS/Linux browser；006同时声明三端native。
+N10–N14的操作、失败/取消/清理、平台差异、证据和性能门槛完整写在原生手册。
+没有原生对话框/进程故障的跨平台runner verb，因此保留为可复现手工用例，不伪造自动化。
+本轮单元结果为前端133通过+1既有模式skip、Rust30通过、TypeScript通过。
+
 ## 测试范围与策略
 
 目标：原生退出提示、后台保留、轻量描述、恢复握手、只读接回、

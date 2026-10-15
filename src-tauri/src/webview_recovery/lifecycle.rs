@@ -8,26 +8,47 @@ pub enum Phase {
     Closing,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Token {
+    window: u64,
+    pub generation: u64,
+}
+
 #[derive(Debug)]
 pub struct Lifecycle {
     pub phase: Phase,
     pub generation: u64,
     pub failed_at: u64,
     last_attempt: Option<u64>,
+    window: u64,
 }
 
 impl Default for Lifecycle {
     fn default() -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT_WINDOW: AtomicU64 = AtomicU64::new(1);
         Self {
             phase: Phase::Healthy,
             generation: 0,
             failed_at: 0,
             last_attempt: None,
+            window: NEXT_WINDOW.fetch_add(1, Ordering::Relaxed),
         }
     }
 }
 
 impl Lifecycle {
+    pub fn token(&self) -> Token {
+        Token {
+            window: self.window,
+            generation: self.generation,
+        }
+    }
+
+    pub fn matches(&self, token: Token) -> bool {
+        self.token() == token
+    }
+
     pub fn terminated(&mut self, now: u64) -> bool {
         if matches!(self.phase, Phase::Failed | Phase::Closing) {
             return false;
@@ -42,7 +63,9 @@ impl Lifecycle {
     // Channel queue probes pass. Manual retry uses the same bounded handshake.
     pub fn retry(&mut self, now: u64) -> Option<u64> {
         if self.phase != Phase::Failed
-            || self.last_attempt.is_some_and(|last| now.saturating_sub(last) < 60_000)
+            || self
+                .last_attempt
+                .is_some_and(|last| now.saturating_sub(last) < 60_000)
         {
             return None;
         }
@@ -85,6 +108,21 @@ impl Lifecycle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn replaced_window_and_new_attempt_reject_old_native_work() {
+        let mut old = Lifecycle::default();
+        old.terminated(0);
+        old.retry(1);
+        let token = old.token();
+        let mut replacement = Lifecycle::default();
+        replacement.terminated(0);
+        replacement.retry(1);
+        assert!(!replacement.matches(token));
+        old.timeout(token.generation);
+        old.retry(60_001);
+        assert!(!old.matches(token));
+    }
 
     #[test]
     fn coalesces_failure_and_rate_limits_retry() {

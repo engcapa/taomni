@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../stores/appStore";
 import { describeTabs, trackRecoveryDescription, validateBootstrap, getRecoveryBootstrap,
-  markRecoveryStartup, isRecoveryStartup, type RecoveryBootstrap } from "./runtimeRecovery";
+  markRecoveryStartup, isRecoveryStartup, boundedUtf8, type RecoveryBootstrap } from "./runtimeRecovery";
 
 const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
@@ -14,7 +14,72 @@ const flush = async () => { await Promise.resolve(); await Promise.resolve(); aw
 
 describe("runtime recovery metadata", () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.invoke.mockResolvedValue(undefined); });
-  afterEach(() => { useAppStore.setState(initial, true); markRecoveryStartup(false); });
+  afterEach(() => { useAppStore.setState(initial, true); markRecoveryStartup(false); window.history.replaceState({}, "", "/"); });
+
+  it("uses UTF-8 byte budgets without splitting code points or emitting lone surrogates", () => {
+    for (const title of ["中".repeat(200), "😀".repeat(200), "a".repeat(511) + "😀", "x\ud800y\udc00z", "e\u0301".repeat(300)]) {
+      const bounded = boundedUtf8(title, 512);
+      expect(new TextEncoder().encode(bounded).length).toBeLessThanOrEqual(512);
+      expect(new TextDecoder().decode(new TextEncoder().encode(bounded))).toBe(bounded);
+    }
+    expect(boundedUtf8("中".repeat(200), 512)).toBe("中".repeat(170));
+    expect(boundedUtf8("😀".repeat(200), 512)).toBe("😀".repeat(128));
+    expect(boundedUtf8("x\ud800y\udc00z", 512)).toBe("x�y�z");
+    expect(boundedUtf8("a".repeat(10_000_000), 512)).toHaveLength(512);
+  });
+
+  it("does not truncate identities or poison other tabs with an invalid ID", () => {
+    const tabs = [
+      { id: "中".repeat(100), type: "terminal" as const, title: "bad id", closable: true },
+      { id: "ok", type: "terminal" as const, title: "中".repeat(200), sessionId: "x".repeat(257), closable: true },
+    ];
+    expect(describeTabs({ tabs, activeTabId: tabs[0].id, terminalRuntimeByTab: {} })).toEqual({
+      tabs: [{ id: "ok", kind: "terminal", title: "中".repeat(170), savedSessionId: null, terminalSessionId: null }],
+      activeTabId: null,
+    });
+  });
+
+  it.each(["/#terminal=detached-42", "/?terminal=detached-42"])("tracks the original detached terminal after handoff expires: %s", async (route) => {
+    window.history.replaceState({}, "", route);
+    const stop = trackRecoveryDescription(cold);
+    useAppStore.setState({ tabs: [{ id: "tab-42", type: "terminal", title: "Original shell", closable: false }], activeTabId: "tab-42",
+      terminalRuntimeByTab: { "tab-42": { backendSessionId: "original-pty-42", state: "running", updatedAt: 1 } } });
+    await flush();
+    expect(mocks.invoke.mock.calls.at(-1)?.[1].description).toEqual({
+      tabs: [{ id: "tab-42", kind: "terminal", title: "Original shell", savedSessionId: null, terminalSessionId: "original-pty-42" }],
+      activeTabId: "tab-42",
+    });
+    stop();
+  });
+
+  it("does not invent a saved config or terminal identity for a missing detached handoff", async () => {
+    window.history.replaceState({}, "", "/#terminal=window-only");
+    const stop = trackRecoveryDescription(cold);
+    await flush();
+    expect(mocks.invoke.mock.calls[0][1].description.tabs[0]).toMatchObject({ id: "window-only", savedSessionId: null, terminalSessionId: null });
+    stop();
+  });
+
+  it("coalesces pending IPC and keeps metadata work independent of output/activity volume", async () => {
+    let resolve!: () => void;
+    mocks.invoke.mockImplementationOnce(() => new Promise<void>((done) => { resolve = done; }));
+    const title = vi.fn(() => "中".repeat(200));
+    useAppStore.setState({ tabs: [{ id: "t", type: "terminal", get title() { return title(); }, closable: true }], activeTabId: "t",
+      terminalRuntimeByTab: { t: { backendSessionId: "pty", state: "running", updatedAt: 0 } } });
+    const stop = trackRecoveryDescription(cold);
+    await flush();
+    title.mockClear();
+    for (let i = 1; i <= 1000; i++) useAppStore.setState({ terminalRuntimeByTab: { t: { backendSessionId: "pty", state: "running", updatedAt: i } } });
+    expect(title).not.toHaveBeenCalled();
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    useAppStore.setState({ tabs: [], activeTabId: "" });
+    useAppStore.setState({ tabs: [{ id: "new", type: "terminal", title: "new", closable: true }], activeTabId: "new" });
+    resolve();
+    await flush(); await flush();
+    expect(mocks.invoke).toHaveBeenCalledTimes(2);
+    expect(mocks.invoke.mock.calls[1][1].description.activeTabId).toBe("new");
+    stop();
+  });
 
   it("projects only bounded metadata, never connection credentials or startup commands", () => {
     const state = {

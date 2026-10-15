@@ -24,18 +24,54 @@ export interface RecoveryBootstrap {
   limitation: string;
 }
 
+// The native contract measures UTF-8 bytes. Stop after the budget, even for
+// unbounded OSC titles; never encode/copy a full terminal-provided string.
+export function boundedUtf8(value: string, budget: number): string {
+  let bytes = 0;
+  let result = "";
+  for (const character of value) {
+    const point = character.codePointAt(0)!;
+    const size = point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4;
+    if (bytes + size > budget) break;
+    bytes += size;
+    result += point >= 0xd800 && point <= 0xdfff ? "\ufffd" : character;
+  }
+  return result;
+}
+
+function identity(value: string | null | undefined): string | null {
+  // Identities must never be truncated or normalized into a different ID.
+  return value && value === boundedUtf8(value, 256) ? value : null;
+}
+
+function terminalId(state: Pick<AppState, "terminalRuntimeByTab">, tab: Tab): string | null {
+  return state.terminalRuntimeByTab[tab.id]?.backendSessionId ?? tab.adoptedTerminal?.sessionId ?? null;
+}
+
 export function describeTabs(state: Pick<AppState, "tabs" | "activeTabId" | "terminalRuntimeByTab">): RecoveryDescription {
+  const tabs = state.tabs.slice(0, 128).filter((tab) => identity(tab.id));
   return {
-    tabs: state.tabs.slice(0, 128).map((tab: Tab) => ({
+    tabs: tabs.map((tab: Tab) => ({
       id: tab.id,
       kind: tab.type,
-      title: tab.title.slice(0, 512),
-      savedSessionId: tab.sessionId ?? null,
-      terminalSessionId: state.terminalRuntimeByTab[tab.id]?.backendSessionId
-        ?? tab.adoptedTerminal?.sessionId ?? null,
+      title: boundedUtf8(tab.title, 512),
+      savedSessionId: identity(tab.sessionId),
+      terminalSessionId: identity(terminalId(state, tab)),
     })),
-    activeTabId: state.tabs.slice(0, 128).some((t) => t.id === state.activeTabId) ? state.activeTabId : null,
+    activeTabId: tabs.some((t) => t.id === state.activeTabId) ? state.activeTabId : null,
   };
+}
+
+function describeDetached(state: AppState, route: NonNullable<ReturnType<typeof detectDetachedRoute>>): RecoveryDescription {
+  // DetachedSessionWindow registers its logical tab during the healthy handoff.
+  // The route is only a window/handoff identity, never a saved config or PTY ID.
+  const candidates = state.tabs.slice(0, 128).filter((tab) => tab.type === route.kind);
+  const tab = candidates.find((entry) => entry.id === state.activeTabId)
+    ?? (candidates.length === 1 ? candidates[0] : undefined);
+  if (tab) return describeTabs({ tabs: [tab], activeTabId: tab.id, terminalRuntimeByTab: state.terminalRuntimeByTab });
+  const id = identity(route.id);
+  return { tabs: id ? [{ id, kind: route.kind, title: boundedUtf8(`${route.kind} — ${id}`, 512),
+    savedSessionId: null, terminalSessionId: null }] : [], activeTabId: id };
 }
 
 export function validateBootstrap(value: RecoveryBootstrap): RecoveryBootstrap {
@@ -82,14 +118,9 @@ export function trackRecoveryDescription(bootstrap: RecoveryBootstrap): () => vo
   };
   const update = (state: AppState, old?: AppState) => {
     if (old && state.tabs === old.tabs && state.activeTabId === old.activeTabId
-      && state.terminalRuntimeByTab === old.terminalRuntimeByTab) return;
-    const description = detached ? {
-      tabs: [{
-        id: detached.id, kind: detached.kind, title: `${detached.kind} — ${detached.id}`,
-        savedSessionId: detached.id, terminalSessionId: null,
-      }],
-      activeTabId: detached.id,
-    } : describeTabs(state);
+      && (state.terminalRuntimeByTab === old.terminalRuntimeByTab
+        || state.tabs.slice(0, 128).every((tab) => terminalId(state, tab) === terminalId(old, tab)))) return;
+    const description = detached ? describeDetached(state, detached) : describeTabs(state);
     if (previous && sameDescription(previous, description)) return;
     previous = description;
     pending = description;

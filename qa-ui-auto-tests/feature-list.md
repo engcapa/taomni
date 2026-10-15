@@ -17,7 +17,7 @@
 id: F1.10
 status: partial
 area: main/recovery
-components: [RecoveryWorkspace, RecoveryTerminalOutput]
+components: [RecoveryWorkspace, RecoveryTerminalOutput, RecoveryBackgroundStatus]
 files:
   - src/main.tsx
   - src/lib/runtimeRecovery.ts
@@ -25,9 +25,18 @@ files:
   - src/lib/recoveryPolicy.ts
   - src/components/recovery/RecoveryWorkspace.tsx
   - src/components/recovery/RecoveryTerminalOutput.tsx
+  - src/components/recovery/RecoveryBackgroundStatus.tsx
+  - src-tauri/src/app_exit.rs
+  - src-tauri/src/screenshot/recovery_file.rs
   - src-tauri/src/webview_recovery/mod.rs
   - src-tauri/src/webview_recovery/lifecycle.rs
 controls:
+  - id: recovery-background-refresh
+    selector: '[data-testid="recovery-background-refresh"]'
+    kind: interactive
+  - id: recovery-background-status
+    selector: '[data-testid="recovery-background-status"]'
+    kind: display
   - id: recovery-workspace
     selector: '[data-testid="recovery-workspace"]'
     kind: display
@@ -80,6 +89,9 @@ controls:
 
 原生 main/普通分离/SFTP 监听退出，保留后台并撤销受影响输出订阅；
 手动重试先完成实例/代次握手，恢复标签说明，可只读接回原终端后续输出。
+白屏时启用系统标题栏，关闭按钮可再次打开原生重试/保留后台/安全退出选项；
+退出复用 SocksCap 清理，录屏收尾后保存到持久目录并提示路径。
+后台工具状态支持显式查询 Servers、隧道、SocksCap，无自动轮询或启动操作。
 所有业务页恢复期间不挂载，21种标签都有受限说明，不重发 SQL/邮件/传输/AI/宏。
 自动重载、交互式终端画面和客户端自动重连未启用；原生、性能、三端用例未执行。
 用例与限制见 `docs-issue/webview-renderer-crash-recovery/test-cases.md`。
