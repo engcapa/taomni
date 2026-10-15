@@ -129,6 +129,11 @@ pub fn purge_tracked() {
     }
 }
 
+/// Recovery assumes ownership before the screenshot session can purge files.
+pub(super) fn untrack_artifact(path: &Path) {
+    tracked().lock().unwrap().retain(|entry| entry != path);
+}
+
 /// Startup cleanup: remove this process's leftovers and stale directories of
 /// other instances. Directories of live instances are younger than the stale
 /// age and survive.

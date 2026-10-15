@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type UIEvent } from "react";
+import { isRecoveryStartup } from "../../lib/runtimeRecovery";
 import {
   Group as PanelGroup,
   Panel,
@@ -3320,8 +3321,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     void syncFolderNow(selectedFolderRef.current, "sync", true);
   }, [info.imap.trustedCert, info.smtp.trustedCert]);
 
-  // Outbox: send due messages only while the tab is open (DEC-01).
+  // Recovery never automatically resends an operation with unknown outcome.
   useEffect(() => {
+    if (isRecoveryStartup()) return;
     const first = window.setTimeout(() => void processOutboxRef.current(), 3000);
     const id = window.setInterval(() => void processOutboxRef.current(), 30_000);
     return () => {

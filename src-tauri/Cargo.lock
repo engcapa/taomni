@@ -10756,6 +10756,7 @@ dependencies = [
  "audiopus",
  "axum",
  "base64 0.22.1",
+ "webview2-com",
  "bcrypt-pbkdf",
  "block2",
  "blowfish",

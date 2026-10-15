@@ -1,0 +1,28 @@
+id: TC-RECOVERY-002
+title: Missing recovery metadata never starts replacement sessions
+covers: [F1.10]
+tags: [recovery, p0]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+  - open: ${cfg.app.base_url}
+  - seed_storage:
+      key: qa.recovery.bootstrap
+      value: '{"version":1,"instanceId":"qa-main","generation":2,"revision":0,"recovering":true,"description":null,"limitation":"terminal-state-unverified"}'
+  - reload_window: null
+  - wait_for: '[data-testid="recovery-missing"]'
+  - assert_text: {selector: '[data-testid="recovery-missing"]', contains: 未自动新建任何会话}
+  - assert_count: {selector: '[data-testid="recovery-tab"]', equal: 0}
+  - assert_count: {selector: '[data-testid="recovery-observe"]', equal: 0}
+  - assert_count: {selector: '[data-testid="welcome-panel"]', equal: 0}
+  - assert_text: {selector: '[data-testid="recovery-limitations"]', contains: 在飞创建仍可能在后台运行}
+verification:
+  review: reviewed
+  requirements:
+    - id: V-01-MISSING
+      requirement: 缺描述与在飞创建显示未知，不走Welcome或默认会话批量创建
+      actions: [2, 3]
+      checkpoints: [{step: 5, expectation: 缺失状态明确}, {step: 6, expectation: 无虚构标签}, {step: 8, expectation: 无Welcome重开入口}, {step: 9, expectation: 在飞创建风险说明}]
+      results: [5, 6, 8, 9]
+  visual: [{check: 空描述提示, method: automated, reason: 文本与控件数量}]
+  native: [{check: 在飞PTY保持, method: manual, reason: 见native runbook N02/N03；未执行}]

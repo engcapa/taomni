@@ -1,6 +1,6 @@
 # TERM-TEXT-PERF 开发任务
 
-日期：2026-10-15。状态：**设计交接完成，4个开发任务均未开始**。唯一行为与验收规范为[独立设计](../terminal-buffer-text-performance-design.md)，完整用例见[测试设计](../terminal-buffer-text-performance-design.md#test-cases)。这些任务不依赖GC crash恢复，不触碰当前白屏实例。
+日期：2026-10-15。状态：**实现与本地单元测试完成；browser/native用例已写，未执行；真实构建/性能验收未完成**。本轮用户指定仅做本地单元测试，原真机执行步骤暂不执行，详见[交付记录](delivery.md)和[完整browser/native用例](../../qa-ui-auto-tests/native/runbooks/terminal-buffer-text-performance.md)。唯一行为与验收规范为[独立设计](../terminal-buffer-text-performance-design.md)，完整用例见[测试设计](../terminal-buffer-text-performance-design.md#test-cases)。这些任务不依赖GC crash恢复，不触碰当前白屏实例。
 
 目标：普通production构建停止自动全缓冲区文本镜像；开发/QA保留原观察协议；ready、CWD/startup、复制/导出/分离/AI按需读取和正常scrollback保持。预期产品修改集中在TerminalPanel和编译配置，不新增后端、任务系统、依赖或用户设置。
 
@@ -8,10 +8,10 @@
 
 | TASK | 职责 | 依赖 | 状态 |
 |---|---|---|---|
-| TASK-01 | 冻结独立基线、保留契约和最小测量输入 | 无GC依赖 | 待开发 |
-| TASK-02 | 编译模式常量、调用点隔离与定向测试 | TASK-01的基线和契约 | 待开发 |
-| TASK-03 | QA/按需消费者/production行为及打包回归 | TASK-02稳定 | 待开发 |
-| TASK-04 | 三端原生性能、证据与独立交付 | P0基线、TASK-02稳定；交付前合并TASK-03结果 | 待开发 |
+| TASK-01 | 冻结独立基线、保留契约和最小测量输入 | 无GC依赖 | 源码/消费者/改前单元证据已记录；原生基线未采样 |
+| TASK-02 | 编译模式常量、调用点隔离与定向测试 | TASK-01的基线和契约 | 实现及default/qa单元测试完成 |
+| TASK-03 | QA/按需消费者/production行为及打包回归 | TASK-02稳定 | mounted消费者通过，browser/native用例已写；真实打包/交互未执行 |
+| TASK-04 | 三端原生性能、证据与独立交付 | P0基线、TASK-02稳定；交付前合并TASK-03结果 | 生产性能用例/配方已写；三端测量未执行 |
 
 按依赖顺序实施即可，不要求并行agent或任务板操作。TASK-02拥有公共产品/配置改动，其他任务提供测试/证据；对TerminalPanel.test.tsx的重叠编辑按顺序交接。保留用户和其他执行者的改动，不回退整个文件来制造基线。
 
@@ -88,10 +88,21 @@ pnpm exec vitest run src/lib/terminal/terminalRegistry.test.ts
 
 ## 6. 实施后的交付记录
 
-当前所有项目为待执行；完成后填写实际值而非删除未覆盖项：
+本轮实际值见[交付记录](delivery.md)，未覆盖项保留以下原验收要求：
 
 - 源码与二进制：P0/P1提交、相关diff、hash、前端mode及镜像开关、Rust flags。
 - 正常行为：V-01至05结果与保留case，原基线失败/未执行情况。
 - 性能：每端负载、样本、波动、无退化判断和已测收益；没有测到的指标明确列出。
 - 改动范围：实际产品/测试文件，是否产生新依赖/接口；超出本设计的小范围改动须说明必要性。
 - 发布边界：独立feat状态、回退方式、与GC恢复无依赖；不改变当前用户故障实例。
+
+### 本轮执行边界
+
+- P0新增生产无扫描断言按预期失败，其余88条通过；最终P1 default为
+  106 passed/1 mode-skipped，qa为85 passed/1 mode-skipped。
+- 新增TC-TERM-TEXT-001至006及N-01至05/C-01/PERF-01完整用例，
+  静态audit/CI plan通过；未运行browser/native、未启动真实测试会话。
+- TypeScript静态检查受qr/tesseract模块解析及关联MFA诊断阻塞；
+  未修改无关模块/依赖，不能称整个工程类型检查通过。
+- 没有实际binary hash、生产CPU/RSS/吞吐/输入采样或三端运行证据；
+  TASK-01/03/04中这些验收条件仍未满足，不以用例编写替代真实验收。

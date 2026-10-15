@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod ai;
+mod app_exit;
 mod appearance;
 mod asr;
 pub mod backup;
@@ -55,6 +56,7 @@ pub use vnc::keyboard_hook::{
 mod structural_search;
 mod voice;
 mod windowing;
+mod webview_recovery;
 mod workspace;
 mod workspace_execution;
 mod workspace_fs;
@@ -136,9 +138,19 @@ fn should_reap_ai_process(
 
 #[tauri::command]
 async fn exit_app(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    sockscap::prepare_for_exit(&app_handle, state).await?;
-    app_handle.exit(0);
-    Ok(())
+    app_handle
+        .state::<app_exit::ExitGate>()
+        .run(
+            async {
+                sockscap::prepare_for_exit(&app_handle, state).await?;
+                screenshot::wait_for_recovery_recording().await
+            },
+            || {
+                webview_recovery::closing_all(&app_handle);
+                app_handle.exit(0);
+            },
+        )
+        .await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -146,7 +158,14 @@ pub fn run() {
     let context = tauri::generate_context!();
     #[cfg(target_os = "linux")]
     screenshot::shortcut::prepare_portal_identity(&context.config().identifier);
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.on_web_content_process_terminate(|webview| {
+        webview_recovery::terminated(webview.app_handle(), webview.label(), "renderer-exited");
+    });
+    builder
+        .manage(app_exit::ExitGate::default())
+        .manage(webview_recovery::Recovery::default())
         // Auto-update: unconditional (unlike the debug-only log plugin below).
         // `process` provides relaunch() so the user can restart into the new
         // version after install.
@@ -446,6 +465,7 @@ pub fn run() {
                     }
                 }
                 let main_window = builder.build()?;
+                webview_recovery::install(&main_window);
 
                 // The macOS QA runner cannot use tauri-driver (there is no
                 // Tauri WebDriver adapter for WKWebView).  An opt-in bridge
@@ -513,6 +533,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            webview_recovery::recovery_get,
+            webview_recovery::recovery_update,
+            webview_recovery::recovery_ready,
+            terminal::detach_terminal_output,
             terminal::list_local_shells,
             terminal::list_common_local_directories,
             terminal::record_local_directory_use,

@@ -325,6 +325,8 @@ type TerminalGitState =
   | { kind: "none"; label: string; title: string }
   | { kind: "error"; label: string; title: string };
 
+const ERASE_SAVED_LINES_SEQUENCE = [0x1b, 0x5b, 0x33, 0x4a] as const; // ESC [ 3 J
+
 export function TerminalPanel({
   tabId,
   tabTitle = "Terminal",
@@ -2477,6 +2479,27 @@ export function TerminalPanel({
     });
     termRef.current = term;
     const taskExitOscParser = createTaskExitOscParser();
+    // Some PTY/WebView combinations render CSI 3 J visually but leave the
+    // old normal-buffer row in xterm's scrollback model. Keep the mirrored
+    // text in sync with the visible terminal by clearing the active buffer
+    // immediately before xterm consumes that explicit erase-saved-lines
+    // sequence. This is a four-byte state machine so split output chunks do
+    // not require decoding or copying the full output stream.
+    let eraseSavedLinesMatch = 0;
+    const sawEraseSavedLines = (bytes: Uint8Array): boolean => {
+      for (const byte of bytes) {
+        if (byte === ERASE_SAVED_LINES_SEQUENCE[eraseSavedLinesMatch]) {
+          eraseSavedLinesMatch += 1;
+          if (eraseSavedLinesMatch === ERASE_SAVED_LINES_SEQUENCE.length) {
+            eraseSavedLinesMatch = 0;
+            return true;
+          }
+        } else {
+          eraseSavedLinesMatch = byte === ERASE_SAVED_LINES_SEQUENCE[0] ? 1 : 0;
+        }
+      }
+      return false;
+    };
 
     const fitAddon = new FitAddon();
     fitAddonRef.current = fitAddon;
@@ -2743,7 +2766,11 @@ export function TerminalPanel({
       ) {
         installSshCwdIntegrationRef.current();
       }
-      panel.setAttribute("data-terminal-text", getBufferText(term));
+      // Only the observation copy is optional. Keep CWD installation, prompt
+      // readiness and the poll lifecycle active in every compilation mode.
+      if (__TAOMNI_TERMINAL_TEXT_MIRROR__) {
+        panel.setAttribute("data-terminal-text", getBufferText(term));
+      }
       if (
         connectionStateRef.current === "connected" &&
         !automationInputSettlingRef.current &&
@@ -2848,6 +2875,9 @@ export function TerminalPanel({
           if (isComposingRef.current) {
             compositionBufferRef.current.push(filtered);
           } else {
+            if (sawEraseSavedLines(filtered) && term.buffer.active.type === "normal") {
+              term.clear();
+            }
             term.write(filtered, () => {
               syncAutomationState();
               installSshCwdIntegrationRef.current?.();

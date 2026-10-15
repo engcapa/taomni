@@ -1,0 +1,29 @@
+id: TC-RECOVERY-004
+title: Original terminal attach failure is explicit and never replaced
+covers: [F1.10]
+tags: [recovery, terminal, p0]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+  - open: ${cfg.app.base_url}
+  - seed_storage:
+      key: qa.recovery.bootstrap
+      value: '{"version":1,"instanceId":"qa-main","generation":2,"revision":1,"recovering":true,"limitation":"terminal-state-unverified","description":{"activeTabId":"t","tabs":[{"id":"t","kind":"terminal","title":"Ended","savedSessionId":null,"terminalSessionId":"qa-ended"}]}}'
+  - reload_window: null
+  - wait_for: '[data-testid="recovery-observe"]'
+  - click: '[data-testid="recovery-observe"]'
+  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: 未创建新终端}
+  - assert_text_equals: {selector: '[data-testid="recovery-output"]', equals: ''}
+  - assert_count: {selector: '[data-testid="terminal-pane"]', equal: 0}
+  - click: '[data-testid="recovery-observe"]'
+  - assert_text_equals: {selector: '[data-testid="recovery-output-status"]', equals: 未订阅输出}
+verification:
+  review: reviewed
+  requirements:
+    - id: V-03-ENDED
+      requirement: attach失败结果明确，未创建替代终端，用户可停止订阅
+      actions: [5, 9]
+      checkpoints: [{step: 6, expectation: 缺失或结束与未创建说明}, {step: 7, expectation: 无假输出}, {step: 8, expectation: 无正常终端实例}, {step: 10, expectation: 停止回到未订阅}]
+      results: [6, 7, 8, 10]
+  visual: [{check: attach错误, method: automated, reason: 明确错误文本}]
+  native: [{check: 真正退出或zombie的原终端, method: manual, reason: browser仅注入not-found；见native runbook N03}]

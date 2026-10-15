@@ -1,0 +1,27 @@
+id: TC-RECOVERY-005
+title: Incompatible bootstrap fails closed before business components mount
+covers: [F1.10]
+tags: [recovery, p0]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+  - open: ${cfg.app.base_url}
+  - seed_storage:
+      key: qa.recovery.bootstrap
+      value: '{"version":99,"instanceId":"other-process","generation":2,"revision":0,"recovering":true,"description":null,"limitation":"invalid"}'
+  - reload_window: null
+  - wait_for: '[data-testid="app-crash"]'
+  - assert_text: {selector: '[data-testid="app-crash-detail"]', contains: Invalid recovery handshake}
+  - assert_count: {selector: '[data-testid="welcome-panel"]', equal: 0}
+  - assert_count: {selector: '[data-testid="terminal-pane"]', equal: 0}
+  - assert_count: {selector: '[data-testid="recovery-workspace"]', equal: 0}
+verification:
+  review: reviewed
+  requirements:
+    - id: V-01-VERSION
+      requirement: 不兼容描述版本不能被当成冷启动或已恢复
+      actions: [2, 3]
+      checkpoints: [{step: 5, expectation: 显式握手失败}, {step: 6, expectation: 不启动Welcome}, {step: 8, expectation: 不假称有限恢复ready}]
+      results: [5, 6, 8]
+  visual: [{check: 启动错误详情, method: automated, reason: 文本断言}]
+  native: [{check: 跨主进程instanceId与迟到ready拒绝, method: manual, reason: native runbook N02；单测辅助，不以browser替代IPC}]

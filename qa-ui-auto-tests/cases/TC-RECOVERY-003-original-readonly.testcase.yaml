@@ -1,0 +1,35 @@
+id: TC-RECOVERY-003
+title: Explicit original-session observation is read-only and stops without closing work
+covers: [F1.10]
+tags: [recovery, terminal, p0]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+  - open: ${cfg.app.base_url}
+  - seed_storage:
+      key: qa.recovery.bootstrap
+      value: '{"version":1,"instanceId":"qa-main","generation":2,"revision":1,"recovering":true,"limitation":"terminal-state-unverified","description":{"activeTabId":"t","tabs":[{"id":"t","kind":"terminal","title":"Original","savedSessionId":null,"terminalSessionId":"qa-original"}]}}'
+  - reload_window: null
+  - wait_for: '[data-testid="recovery-observe"]'
+  - assert_attribute: {selector: '[data-testid="recovery-observe"]', name: aria-pressed, equals: 'false'}
+  - click: '[data-testid="recovery-observe"]'
+  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: 已订阅原终端}
+  - assert_text: {selector: '[data-testid="recovery-output"]', contains: QA-ORIGINAL-OUTPUT}
+  - assert_count: {selector: 'textarea', equal: 0}
+  - click: '[data-testid="recovery-observe"]'
+  - assert_attribute: {selector: '[data-testid="recovery-observe"]', name: aria-pressed, equals: 'false'}
+  - assert_text_equals: {selector: '[data-testid="recovery-output-status"]', equals: 未订阅输出}
+  - assert_text: {selector: '[data-testid="recovery-output"]', contains: QA-ORIGINAL-OUTPUT}
+  - click: '[data-testid="recovery-observe"]'
+  - assert_text: {selector: '[data-testid="recovery-output-status"]', contains: 已订阅原终端}
+  - screenshot: readonly-original-output.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-03-UI
+      requirement: 只读后续输出需显式操作；停止和连续接回可用，无用户输入入口
+      actions: [6, 10, 14]
+      checkpoints: [{step: 8, expectation: 可见fixture后续输出而不是旧画面声明}, {step: 9, expectation: 无输入框}, {step: 12, expectation: 停止观察}, {step: 15, expectation: 可再次观察}]
+      results: [8, 9, 12, 15]
+  visual: [{check: 只读输出提示及控件状态, method: automated, reason: 文字与属性断言}]
+  native: [{check: 真实原终端ID/PID与订阅回收, method: manual, reason: 该输出为browser stub；见native runbook N03/N08}]

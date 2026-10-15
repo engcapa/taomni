@@ -27,6 +27,13 @@ fn current() -> &'static Mutex<Option<Arc<Session>>> {
     static CURRENT: OnceLock<Mutex<Option<Arc<Session>>>> = OnceLock::new();
     CURRENT.get_or_init(|| Mutex::new(None))
 }
+
+/// A dead main renderer cannot review or stop its microphone session. Reuse
+/// cancellation, retain already persisted material, never automatically transcribe/send.
+pub(crate) fn stop_orphaned_capture() {
+    let id = current().lock().ok().and_then(|session| session.as_ref().map(|s| s.id.clone()));
+    if let Some(id) = id { voice_stop_capture(id); }
+}
 // IPC cancellation can arrive before the async start command is polled.
 // Keep a bounded recent ledger, always accessed while holding current().
 fn cancelled_ids() -> &'static Mutex<std::collections::VecDeque<String>> {
@@ -66,8 +73,19 @@ pub fn voice_capture_supported() -> bool {
 pub async fn voice_start_capture(
     session_id: String,
     state: State<'_, AppState>,
+    window: tauri::WebviewWindow,
 ) -> Result<(), String> {
-    voice_start_capture_inner(&session_id, &state, true).await
+    use tauri::Manager as _;
+    let generation = crate::webview_recovery::output_generation(window.app_handle(), window.label());
+    if !crate::webview_recovery::renderer_is_current(window.app_handle(), window.label(), generation) {
+        return Err("Recording owner expired".into());
+    }
+    let result = voice_start_capture_inner(&session_id, &state, true).await;
+    if !crate::webview_recovery::renderer_is_current(window.app_handle(), window.label(), generation) {
+        voice_stop_capture(session_id);
+        return Err("Recording owner expired".into());
+    }
+    result
 }
 
 async fn voice_start_capture_inner(
@@ -160,7 +178,12 @@ pub async fn voice_start_stream(
     session_id: String,
     state: State<'_, AppState>,
     app: AppHandle,
+    window: tauri::WebviewWindow,
 ) -> Result<(), String> {
+    let generation = crate::webview_recovery::output_generation(&app, window.label());
+    if !crate::webview_recovery::renderer_is_current(&app, window.label(), generation) {
+        return Err("Recording owner expired".into());
+    }
     // Resolve one configuration snapshot before acquiring the microphone.
     let (active, language, provider_config, full_local_mode, disabled, hotwords) = {
         let ai = state.ai_ctx.read().await;
@@ -228,6 +251,10 @@ pub async fn voice_start_stream(
     // inside the session-owned backend task.
     crate::voice::vocabulary::validate(&hotwords)?;
     voice_start_capture_inner(&session_id, &state, false).await?;
+    if !crate::webview_recovery::renderer_is_current(&app, window.label(), generation) {
+        voice_stop_capture(session_id);
+        return Err("Recording owner expired".into());
+    }
     let session = current()
         .lock()
         .unwrap()

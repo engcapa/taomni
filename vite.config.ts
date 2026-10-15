@@ -18,11 +18,16 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8")
   version: string;
 };
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ command, mode, isPreview }) => ({
   plugins: [tailwindcss(), react(), screenshotOcrPlugin(), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin(), rdpProxyPlugin(), vncProxyPlugin()])],
   clearScreen: false,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // Default dev serves browser QA too. Preview must retain the built mode;
+    // custom non-QA build modes must not re-enable full-history observation.
+    __TAOMNI_TERMINAL_TEXT_MIRROR__: JSON.stringify(
+      mode === "qa" || (command === "serve" && !isPreview),
+    ),
     // ED-PARITY-002: the isolated QA build (`pnpm build --mode qa`) is the only
     // bundle that can install the save-race probe control object. Normal builds
     // compile the install branch away, so there is no runtime entry to it.

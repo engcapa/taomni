@@ -1248,7 +1248,9 @@ pub async fn sockscap_launch_terminal_app(
     cols: u16,
     rows: u16,
     on_output: crate::terminal::TerminalOutputChannel,
+    window: tauri::WebviewWindow,
 ) -> Result<serde_json::Value, String> {
+    let output_generation = crate::webview_recovery::output_generation(&app, window.label());
     #[cfg(target_os = "linux")]
     {
         if state
@@ -1316,6 +1318,8 @@ pub async fn sockscap_launch_terminal_app(
             on_output,
             state.inner(),
             app,
+            window.label(),
+            output_generation,
         )
         .await
         {

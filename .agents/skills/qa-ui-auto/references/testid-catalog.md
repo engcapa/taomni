@@ -1396,6 +1396,27 @@
 - `[data-testid="context-menu-item-split-terminal"]` — interactive [optional] — F1.8.menu-split-terminal
 - `[data-testid="context-menu-item-toggle-sidebar"]` — interactive [optional] — F1.8.menu-toggle-sidebar
 
+## main/recovery (F1.10)
+
+- `[data-testid="recovery-background-refresh"]` — interactive — F1.10.recovery-background-refresh
+- `[data-testid="recovery-background-status"]` — display — F1.10.recovery-background-status
+- `[data-testid="recovery-workspace"]` — display — F1.10.recovery-workspace
+- `[data-testid="recovery-handshake"]` — display — F1.10.recovery-handshake
+- `[data-testid="recovery-limitations"]` — display — F1.10.recovery-limitations
+- `[data-testid="recovery-missing"]` — display — F1.10.recovery-missing
+- `[data-testid="recovery-tab"]` — interactive — F1.10.recovery-tab
+- `[data-testid="recovery-detail"]` — display — F1.10.recovery-detail
+- `[data-testid="recovery-kind"]` — display — F1.10.recovery-kind
+- `[data-testid="recovery-policy"]` — display — F1.10.recovery-policy
+- `[data-testid="recovery-terminal-id"]` — display — F1.10.recovery-terminal-id
+- `[data-testid="recovery-unknown"]` — display — F1.10.recovery-unknown
+- `[data-testid="recovery-mail-warning"]` — display — F1.10.recovery-mail-warning
+- `[data-testid="recovery-observe"]` — interactive — F1.10.recovery-observe
+- `[data-testid="recovery-output-status"]` — display — F1.10.recovery-output-status
+- `[data-testid="recovery-output"]` — display — F1.10.recovery-output
+- `[data-testid="app-crash"]` — display — F1.10.app-crash
+- `[data-testid="app-crash-detail"]` — display — F1.10.app-crash-detail
+
 ## main/statusbar (F1.7)
 
 - `[data-testid="status-bar"]` — display — F1.7.status-bar

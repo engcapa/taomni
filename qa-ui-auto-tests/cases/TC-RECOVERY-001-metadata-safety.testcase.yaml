@@ -1,0 +1,50 @@
+id: TC-RECOVERY-001
+title: Recovery preserves recorded selection and isolates side-effecting business pages
+covers: [F1.10]
+tags: [recovery, p0]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+  - open: ${cfg.app.base_url}
+  - seed_storage:
+      key: qa.recovery.bootstrap
+      value: '{"version":1,"instanceId":"qa-main","generation":2,"revision":1,"recovering":true,"limitation":"terminal-state-unverified","description":{"activeTabId":"db","tabs":[{"id":"term","kind":"terminal","title":"Original shell","savedSessionId":"saved-shell","terminalSessionId":"qa-original"},{"id":"mail","kind":"mail","title":"Mail","savedSessionId":"saved-mail","terminalSessionId":null},{"id":"db","kind":"database","title":"Database","savedSessionId":"saved-db","terminalSessionId":null},{"id":"s3","kind":"object-storage","title":"Storage","savedSessionId":"saved-s3","terminalSessionId":null},{"id":"code","kind":"code-workspace","title":"Code","savedSessionId":null,"terminalSessionId":null}]}}'
+  - reload_window: null
+  - wait_for: '[data-testid="recovery-workspace"]'
+  - assert_text: {selector: '[data-testid="recovery-handshake"]', contains: 有限恢复界面已就绪}
+  - assert_count: {selector: '[data-testid="recovery-tab"]', equal: 5}
+  - assert_attribute: {selector: '[data-testid="recovery-tab"][data-kind="database"]', name: aria-pressed, equals: 'true'}
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重发 SQL}
+  - click: '[data-testid="recovery-tab"][data-kind="mail"]'
+  - assert_text: {selector: '[data-testid="recovery-mail-warning"]', contains: 发件箱自动发送已暂停}
+  - click: '[data-testid="recovery-tab"][data-kind="object-storage"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重启或取消任务}
+  - click: '[data-testid="recovery-tab"][data-kind="code-workspace"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重跑 build}
+  - click: '[data-testid="recovery-tab"][data-kind="terminal"]'
+  - assert_text: {selector: '[data-testid="recovery-terminal-id"]', contains: qa-original}
+  - assert_attribute: {selector: '[data-testid="recovery-observe"]', name: aria-pressed, equals: 'false'}
+  - assert_text: {selector: '[data-testid="recovery-limitations"]', contains: 当前不开放输入}
+  - assert_count: {selector: '[data-testid="terminal-pane"]', equal: 0}
+  - assert_count: {selector: '[data-testid="welcome-panel"]', equal: 0}
+  - screenshot: recovery-metadata-and-limits.png
+  - click: '[data-testid="recovery-tab"][data-kind="database"]'
+  - assert_text: {selector: '[data-testid="recovery-kind"]', contains: database}
+  - assert_text: {selector: '[data-testid="recovery-detail"]', contains: Database}
+  - assert_text: {selector: '[data-testid="recovery-unknown"]', contains: 不要直接重复操作}
+verification:
+  review: reviewed
+  requirements:
+    - id: V-01
+      requirement: 描述顺序及选中项被恢复，业务页面不作为恢复后的默认路由挂载
+      actions: [2, 3]
+      checkpoints: [{step: 6, expectation: 五个描述标签可见}, {step: 7, expectation: 原选中数据库标签仍选中}, {step: 20, expectation: 不挂载普通Welcome重开入口}]
+      results: [6, 7, 20]
+    - id: V-10
+      requirement: 邮件数据库传输AI及终端的受限说明可通过标签切换访问，不冒充业务或画面恢复
+      actions: [9, 11, 13, 15, 22]
+      checkpoints: [{step: 10, expectation: 发件箱暂停提示}, {step: 12, expectation: 传输不重启说明}, {step: 14, expectation: AI与build不重跑说明}, {step: 18, expectation: 输入模式限制}, {step: 19, expectation: 无普通终端实例}, {step: 23, expectation: 数据库类型正确}, {step: 24, expectation: 详情路由正确}, {step: 25, expectation: 结果未知说明}]
+      results: [10, 12, 14, 18, 19, 23, 24, 25]
+  visual: [{check: 限制及标签文本可见, method: automated, reason: DOM断言；截图仅留存，不声称视觉评审}]
+  native: [{check: 外部请求无重复及PID保活, method: manual, reason: Browser fixture不能证明原生或服务副作用；见native runbook N03/N06}]

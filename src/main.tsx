@@ -50,6 +50,7 @@ function AppCrash({
 
   return (
     <div
+      data-testid="app-crash"
       style={{
         minHeight: "100vh",
         boxSizing: "border-box",
@@ -69,6 +70,7 @@ function AppCrash({
             : "The app hit a React UI error in this WebView. Please include the details below when reporting it."}
         </p>
         <pre
+          data-testid="app-crash-detail"
           style={{
             margin: 0,
             padding: 12,
@@ -94,7 +96,19 @@ function renderStartupCrash(error: unknown): void {
 }
 
 async function bootstrap(): Promise<void> {
+  const { getRecoveryBootstrap, markRecoveryStartup, trackRecoveryDescription } = await import("./lib/runtimeRecovery");
+  const recovery = await getRecoveryBootstrap();
+  markRecoveryStartup(recovery.recovering);
+  if (recovery.recovering) {
+    const { RecoveryWorkspace } = await import("./components/recovery/RecoveryWorkspace");
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <React.StrictMode><RootErrorBoundary><RecoveryWorkspace bootstrap={recovery} /></RootErrorBoundary></React.StrictMode>,
+    );
+    return;
+  }
   const { default: App } = await import("./App");
+  const stopTracking = trackRecoveryDescription(recovery);
+  if (import.meta.hot) import.meta.hot.dispose(stopTracking);
 
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

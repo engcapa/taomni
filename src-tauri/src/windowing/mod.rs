@@ -140,9 +140,10 @@ pub async fn open_detached_window(
     #[cfg(windows)]
     let builder = builder.disable_drag_drop_handler();
 
-    builder
+    let window = builder
         .build()
         .map_err(|e| format!("failed to open detached window: {}", e))?;
+    crate::webview_recovery::install(&window);
     Ok(())
 }
 
