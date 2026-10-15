@@ -211,6 +211,28 @@ pub fn shutdown() {
     capture::purge_tracked();
 }
 
+/// A capture-control renderer died: stop input driving and finalize the clip
+/// through existing owners. Never purge files or destroy/rebuild overlay windows.
+pub(crate) fn stop_orphaned_capture_controls(app: &AppHandle) {
+    SESSION_GENERATION.fetch_add(1, Ordering::SeqCst);
+    let recording = {
+        let state = tool_state();
+        if let Some(control) = &state.scroll {
+            control.request_stop(false);
+        }
+        state.recording.clone()
+    };
+    if let Some(id) = recording {
+        let _ = record::request_stop(&id);
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            if screenshot_stop_recording(handle, id).await.is_err() {
+                log::warn!("capture recovery: recording finalization failed");
+            }
+        });
+    }
+}
+
 async fn blocking<T: Send + 'static>(
     what: &str,
     f: impl FnOnce() -> anyhow::Result<T> + Send + 'static,
@@ -519,6 +541,7 @@ fn open_scroll_bar(
     .focused(false)
     .build()
     .map_err(|e| e.to_string())?;
+    crate::webview_recovery::install_capture_control(&window);
     window.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {
             control.request_stop(true);
@@ -1734,6 +1757,7 @@ async fn open_recorder_bar(
         })
         .build()
         .map_err(|e| format!("open recorder bar: {e}"))?;
+    crate::webview_recovery::install_capture_control(&window);
     #[cfg(target_os = "linux")]
     surface_backend::webview(&window)?;
     watch_session_window(&window);

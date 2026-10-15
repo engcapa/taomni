@@ -12,6 +12,13 @@ unavailable:
     windows/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
     macos/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
 cases:
+- TC-RECOVERY-001
+- TC-RECOVERY-002
+- TC-RECOVERY-003
+- TC-RECOVERY-004
+- TC-RECOVERY-005
+- TC-RECOVERY-006
+- TC-RECOVERY-007
 - TC-TERM-TEXT-001
 - TC-TERM-TEXT-002
 - TC-TERM-TEXT-003

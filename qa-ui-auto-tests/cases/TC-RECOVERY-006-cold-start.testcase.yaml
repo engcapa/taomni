@@ -1,0 +1,22 @@
+id: TC-RECOVERY-006
+title: Cold startup still enters the existing Welcome workflow
+covers: [F1.10, F1.5]
+tags: [recovery, regression, p0]
+modes: [browser, native]
+fixtures: [reset_db]
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - assert_count: {selector: '[data-testid="recovery-workspace"]', equal: 0}
+  - assert_count: {selector: '[data-testid="app-crash"]', equal: 0}
+  - screenshot: recovery-cold-start-regression.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-05-COLD
+      requirement: 新主进程无恢复状态，保留原Welcome默认入口
+      actions: [1]
+      checkpoints: [{step: 2, expectation: Welcome可见}, {step: 3, expectation: 无隔离恢复页面}, {step: 4, expectation: 握手未阻断正常启动}]
+      results: [2, 3, 4]
+  visual: [{check: 冷启动入口, method: automated, reason: DOM可见与数量断言}]
+  native: [{check: 真实Tauri启动握手, method: automated, reason: native模式使用真实IPC而非browser fixture；尚未执行}]

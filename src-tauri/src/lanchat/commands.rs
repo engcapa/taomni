@@ -411,8 +411,13 @@ pub async fn lanchat_reject_file(
 /// return the port the webview connects to. Idempotent — returns the existing
 /// port if the session already exists.
 #[tauri::command]
-pub async fn nmedia_start(state: State<'_, AppState>, call_id: String) -> Result<u16, String> {
+pub async fn nmedia_start(state: State<'_, AppState>, call_id: String, window: tauri::WebviewWindow) -> Result<u16, String> {
+    use tauri::Manager as _;
+    let generation = crate::webview_recovery::output_generation(window.app_handle(), window.label());
     ensure_ready(&state).await?;
+    if !crate::webview_recovery::renderer_is_current(window.app_handle(), window.label(), generation) {
+        return Err("Media owner expired".into());
+    }
     let lan = &state.lanchat;
     if let Some(existing) = lan.media_sessions.read().await.get(&call_id) {
         return Ok(existing.ws_port());
@@ -420,7 +425,12 @@ pub async fn nmedia_start(state: State<'_, AppState>, call_id: String) -> Result
     let session =
         crate::lanchat::media::NativeMediaSession::start(lan.clone(), call_id.clone()).await?;
     let port = session.ws_port();
-    lan.media_sessions.write().await.insert(call_id, session);
+    let mut sessions = lan.media_sessions.write().await;
+    if !crate::webview_recovery::renderer_is_current(window.app_handle(), window.label(), generation) {
+        session.stop();
+        return Err("Media owner expired".into());
+    }
+    sessions.insert(call_id, session);
     Ok(port)
 }
 

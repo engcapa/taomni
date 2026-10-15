@@ -24,7 +24,20 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio::task::JoinHandle;
 
 pub type TerminalOutputChannel = Channel<InvokeResponseBody>;
-type TerminalOutputSubscribers = Arc<Mutex<HashMap<String, Vec<TerminalOutputChannel>>>>;
+pub struct TerminalOutputSubscriber {
+    channel: TerminalOutputChannel,
+    window_label: String,
+}
+type TerminalOutputSubscribers = Arc<Mutex<HashMap<String, Vec<TerminalOutputSubscriber>>>>;
+
+pub(crate) fn revoke_window_outputs(state: &AppState, window_label: &str) {
+    if let Ok(mut outputs) = state.terminal_outputs.lock() {
+        for subscribers in outputs.values_mut() {
+            subscribers.retain(|subscriber| subscriber.window_label != window_label);
+        }
+        outputs.retain(|_, subscribers| !subscribers.is_empty());
+    }
+}
 
 pub enum ActiveTerminal {
     Local {
@@ -250,6 +263,8 @@ pub(crate) async fn register_local_terminal(
     on_output: TerminalOutputChannel,
     state: &AppState,
     app_handle: AppHandle,
+    window_label: &str,
+    output_generation: Option<u64>,
 ) -> Result<(), String> {
     validate_session_id(&session_id)?;
     let terminal = ActiveTerminal::Local {
@@ -265,7 +280,8 @@ pub(crate) async fn register_local_terminal(
         }
         terminals.insert(session_id.clone(), terminal);
     }
-    if let Err(error) = add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)
+    if let Err(error) = crate::webview_recovery::register_output(&app_handle, window_label, output_generation, ||
+        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window_label))
     {
         state.terminals.write().await.remove(&session_id);
         return Err(error);
@@ -386,7 +402,9 @@ pub async fn create_local_terminal(
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
+    window: tauri::WebviewWindow,
 ) -> Result<LocalTerminalCreated, String> {
+    let output_generation = crate::webview_recovery::output_generation(&app_handle, window.label());
     validate_session_id(&session_id)?;
     let sdk_environment = if let Some(root) = workspace_root
         .as_deref()
@@ -436,7 +454,8 @@ pub async fn create_local_terminal(
         }
         terminals.insert(session_id.clone(), terminal);
     }
-    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)?;
+    crate::webview_recovery::register_output(&app_handle, window.label(), output_generation, ||
+        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window.label()))?;
 
     let sid = session_id.clone();
     let app = app_handle.clone();
@@ -510,7 +529,9 @@ pub async fn create_command_terminal(
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
+    window: tauri::WebviewWindow,
 ) -> Result<String, String> {
+    let output_generation = crate::webview_recovery::output_generation(&app_handle, window.label());
     validate_session_id(&session_id)?;
     {
         let terminals = state.terminals.read().await;
@@ -541,7 +562,8 @@ pub async fn create_command_terminal(
         }
         terminals.insert(session_id.clone(), terminal);
     }
-    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)?;
+    crate::webview_recovery::register_output(&app_handle, window.label(), output_generation, ||
+        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window.label()))?;
 
     let sid = session_id.clone();
     let app = app_handle.clone();
@@ -683,7 +705,9 @@ pub async fn create_ssh_terminal(
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
+    window: tauri::WebviewWindow,
 ) -> Result<String, String> {
+    let output_generation = crate::webview_recovery::output_generation(&app_handle, window.label());
     validate_session_id(&session_id)?;
     {
         let terminals = state.terminals.read().await;
@@ -814,7 +838,8 @@ pub async fn create_ssh_terminal(
         terminals.insert(session_id.clone(), terminal);
     }
 
-    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)?;
+    crate::webview_recovery::register_output(&app_handle, window.label(), output_generation, ||
+        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window.label()))?;
 
     let sid = session_id.clone();
     let app = app_handle.clone();
@@ -876,6 +901,7 @@ fn add_terminal_output_channel(
     outputs: &TerminalOutputSubscribers,
     session_id: &str,
     on_output: TerminalOutputChannel,
+    window_label: &str,
 ) -> Result<(), String> {
     let mut outputs = outputs
         .lock()
@@ -883,7 +909,7 @@ fn add_terminal_output_channel(
     outputs
         .entry(session_id.to_string())
         .or_default()
-        .push(on_output);
+        .push(TerminalOutputSubscriber { channel: on_output, window_label: window_label.to_owned() });
     Ok(())
 }
 
@@ -894,7 +920,7 @@ fn send_terminal_output(outputs: &TerminalOutputSubscribers, session_id: &str, d
     let Some(channels) = outputs.get_mut(session_id) else {
         return;
     };
-    channels.retain(|channel| channel.send(InvokeResponseBody::Raw(data.clone())).is_ok());
+    channels.retain(|subscriber| subscriber.channel.send(InvokeResponseBody::Raw(data.clone())).is_ok());
 }
 
 #[tauri::command]
@@ -902,7 +928,10 @@ pub async fn attach_terminal_output(
     session_id: String,
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
+    window: tauri::WebviewWindow,
 ) -> Result<(), String> {
+    use tauri::Manager;
+    let output_generation = crate::webview_recovery::output_generation(window.app_handle(), window.label());
     validate_session_id(&session_id)?;
     {
         let terminals = state.terminals.read().await;
@@ -910,7 +939,20 @@ pub async fn attach_terminal_output(
             return Err(format!("Terminal {} not found", session_id));
         }
     }
-    add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output)
+    crate::webview_recovery::register_output(window.app_handle(), window.label(), output_generation, ||
+        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window.label()))
+}
+
+/// Only remove this caller's particular subscription. Never close a native
+/// terminal as cleanup for a read-only recovery view.
+#[tauri::command]
+pub fn detach_terminal_output(session_id: String, channel_id: u32, window: tauri::WebviewWindow,
+    state: State<'_, AppState>) -> Result<(), String> {
+    let mut outputs = state.terminal_outputs.lock().map_err(|_| "Terminal output lock failed")?;
+    if let Some(subscribers) = outputs.get_mut(&session_id) {
+        subscribers.retain(|s| s.window_label != window.label() || s.channel.id() != channel_id);
+    }
+    Ok(())
 }
 
 fn validate_session_id(session_id: &str) -> Result<(), String> {

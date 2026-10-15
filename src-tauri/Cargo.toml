@@ -295,6 +295,7 @@ local-llm-fim = ["dep:llama-cpp-2"]
 hbase-kerberos = ["dep:cross-krb5"]
 
 [target.'cfg(windows)'.dependencies]
+webview2-com = "=0.39.1"
 winapi = { version = "0.3", features = [
   "fileapi", "commdlg", "shellapi", "winbase", "winuser",
   "libloaderapi", "errhandlingapi", "processthreadsapi",

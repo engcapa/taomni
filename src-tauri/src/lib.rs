@@ -55,6 +55,7 @@ pub use vnc::keyboard_hook::{
 mod structural_search;
 mod voice;
 mod windowing;
+mod webview_recovery;
 mod workspace;
 mod workspace_execution;
 mod workspace_fs;
@@ -146,7 +147,13 @@ pub fn run() {
     let context = tauri::generate_context!();
     #[cfg(target_os = "linux")]
     screenshot::shortcut::prepare_portal_identity(&context.config().identifier);
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.on_web_content_process_terminate(|webview| {
+        webview_recovery::terminated(webview.app_handle(), webview.label(), "renderer-exited");
+    });
+    builder
+        .manage(webview_recovery::Recovery::default())
         // Auto-update: unconditional (unlike the debug-only log plugin below).
         // `process` provides relaunch() so the user can restart into the new
         // version after install.
@@ -446,6 +453,7 @@ pub fn run() {
                     }
                 }
                 let main_window = builder.build()?;
+                webview_recovery::install(&main_window);
 
                 // The macOS QA runner cannot use tauri-driver (there is no
                 // Tauri WebDriver adapter for WKWebView).  An opt-in bridge
@@ -513,6 +521,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            webview_recovery::recovery_get,
+            webview_recovery::recovery_update,
+            webview_recovery::recovery_ready,
+            terminal::detach_terminal_output,
             terminal::list_local_shells,
             terminal::list_common_local_directories,
             terminal::record_local_directory_use,
