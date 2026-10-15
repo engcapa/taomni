@@ -40,7 +40,7 @@ steps:
     timeout_sec: 15
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: "printf '\\033[3J\\033[2J\\033[H\\n\\nCLEAR-NEW-中文🙂\\n\\nCLEAR-WRAP-'; printf '%0120d' 0; printf '\\nCLEAR-DONE\\n'"
+    text: "printf '\\033[3J\\033[2J\\033[H\\n\\nCLEAR-NEW-\\344\\270\\255\\346\\226\\207\\360\\237\\231\\202\\n\\nCLEAR-WRAP-'; printf '%0120d' 0; printf '\\nCLEAR-DONE\\n'"
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'

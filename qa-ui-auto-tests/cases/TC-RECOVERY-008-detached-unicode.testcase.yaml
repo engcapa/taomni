@@ -23,7 +23,7 @@ steps:
 - seed_storage:
     key: qa.recovery.bootstrap
     value: '{"version":1,"instanceId":"qa-detached","generation":2,"revision":4,"recovering":true,"limitation":"terminal-state-unverified","description":{"activeTabId":"logical-tab-42","tabs":[{"id":"logical-tab-42","kind":"terminal","title":"中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中中😀😀","savedSessionId":null,"terminalSessionId":"original-pty-42"}]}}'
-- open: ${cfg.app.base_url}#terminal=handoff-window-42
+- reload_window: null
 - wait_for: '[data-testid="recovery-workspace"]'
 - assert_count:
     selector: '[data-testid="recovery-tab"]'

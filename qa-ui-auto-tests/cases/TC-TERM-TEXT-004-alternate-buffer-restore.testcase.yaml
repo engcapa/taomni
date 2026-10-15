@@ -27,7 +27,7 @@ steps:
     timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: "printf 'NORMAL-KEPT-中文\\n'; printf '\\033[?1049h\\033[2J\\033[H唯一屏幕🙂\\nALT-FAKE$ '; sleep 5; printf '\\033[?1049lNORMAL-RETURNED\\n'"
+    text: "printf 'NORMAL-KEPT-\\344\\270\\255\\346\\226\\207\\n'; printf '\\033[?1049h\\033[2J\\033[H\\345\\224\\257\\344\\270\\200\\345\\261\\217\\345\\271\\225\\360\\237\\231\\202\\nALT-FAKE$ '; sleep 5; printf '\\033[?1049lNORMAL-RETURNED\\n'"
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'

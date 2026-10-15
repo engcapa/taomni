@@ -31,7 +31,7 @@ steps:
     timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: "printf 'COPY-BEGIN-中文🙂\\n'; i=0; while [ \"$i\" -lt 620 ]; do printf 'COPY-ROW-%04d\\n' \"$i\"; i=$((i+1)); done; printf '\\nCOPY-WRAP-'; printf '%0120d' 0; printf '\\nCOPY-END-中文🙂\\n'"
+    text: "printf 'COPY-BEGIN-\\344\\270\\255\\346\\226\\207\\360\\237\\231\\202\\n'; i=0; while [ \"$i\" -lt 620 ]; do printf 'COPY-ROW-%04d\\n' \"$i\"; i=$((i+1)); done; printf '\\nCOPY-WRAP-'; printf '%0120d' 0; printf '\\nCOPY-END-\\344\\270\\255\\346\\226\\207\\360\\237\\231\\202\\n'"
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
