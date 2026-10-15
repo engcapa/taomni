@@ -29,6 +29,9 @@
 ## ai/chat (F-AI-2.4)
 
 - `[data-testid="go-provider-row"]` — interactive [optional] — F-AI-2.4.go-provider-row
+- `[data-testid="go-proxy-mode"]` — interactive [optional] — F-AI-2.4.go-proxy-mode
+- `[data-testid="go-custom-proxy"]` — display [optional] — F-AI-2.4.go-custom-proxy
+- `[data-testid="go-custom-proxy"] input[placeholder="Proxy host"]` — interactive [optional] — F-AI-2.4.go-custom-proxy-host
 - `[data-testid="go-console"]` — interactive [optional] — F-AI-2.4.go-console
 - `[data-testid="go-default-model"]` — display [optional] — F-AI-2.4.go-default-model
 - `[data-testid="go-default-model-search"]` — interactive [optional] — F-AI-2.4.go-default-model-search

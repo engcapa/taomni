@@ -51,8 +51,14 @@ impl OpenCodeGoProvider {
     pub fn new(id: String, base: String, key: String, model: String, proxy: Option<String>, catalog: Arc<CatalogService>, overrides: HashMap<String,String>) -> Self {
         Self { id,base,key,model,proxy,catalog,overrides,clients:Mutex::new(HashMap::new()),session:uuid::Uuid::new_v4().simple().to_string() }
     }
+    fn effective_model<'a>(&'a self, req: &'a ChatRequest) -> &'a str {
+        req.model_override.as_deref().filter(|m| !m.trim().is_empty()).unwrap_or(&self.model)
+    }
+    fn model_supports_tools(&self, model: &str) -> bool {
+        self.catalog.get().models.iter().find(|m| m.id == model).map(|m| m.tool_call).unwrap_or(true)
+    }
     fn transport(&self, req: &ChatRequest) -> LlmResult<(Arc<dyn Llm>, bool)> {
-        let model = req.model_override.as_deref().filter(|m| !m.trim().is_empty()).unwrap_or(&self.model);
+        let model = self.effective_model(req);
         let catalog = self.catalog.get();
         let entry = catalog.models.iter().find(|m| m.id == model);
         let protocol = valid_protocol(self.overrides.get(model).map(String::as_str).or(entry.map(|m| m.protocol.as_str())).unwrap_or("chat"));
@@ -89,7 +95,11 @@ impl Llm for OpenCodeGoProvider {
     }
     async fn chat_with_tools(&self, req: ChatRequest, tools: Vec<ChatTool>) -> LlmResult<ChatResponse> {
         let (transport,unknown) = self.transport(&req)?;
-        let result = transport.chat_with_tools(req,tools).await;
+        let result = if self.supports_tools_for(&req) {
+            transport.chat_with_tools(req,tools).await
+        } else {
+            transport.chat(req).await
+        };
         self.refresh_after(unknown,&result); result
     }
     async fn chat_stream(&self, req: ChatRequest) -> LlmResult<BoxStream<'static,LlmResult<ChatStreamEvent>>> {
@@ -106,14 +116,19 @@ impl Llm for OpenCodeGoProvider {
                     Ok(ChatStreamEvent::Error { message }) => model_missing(&LlmError::Provider { status:400,message:message.clone() }),
                     _ => false,
                 };
-                if !refreshed && missing { catalog.trigger(true); refreshed = true; }
+                let terminal = matches!(&event, Err(_) | Ok(ChatStreamEvent::End { .. } | ChatStreamEvent::Error { .. }));
+                // Consumers stop at terminal events, so refresh before yielding one.
+                if !refreshed && (missing || (unknown && terminal)) { catalog.trigger(true); refreshed = true; }
                 yield event;
             }
             if unknown && !refreshed { catalog.trigger(true); }
         }))
     }
     fn supports_tools(&self) -> bool {
-        self.catalog.get().models.iter().find(|m| m.id == self.model).map(|m| m.tool_call).unwrap_or(true)
+        self.model_supports_tools(&self.model)
+    }
+    fn supports_tools_for(&self, req: &ChatRequest) -> bool {
+        self.model_supports_tools(self.effective_model(req))
     }
     fn provider_id(&self) -> &str { &self.id }
     fn model(&self) -> &str { &self.model }
@@ -245,4 +260,93 @@ mod tests {
         let provider = unavailable("opencode-go".into(),"default".into(),"invalid configured proxy".into());
         assert!(matches!(provider.chat(ChatRequest::default()).await,Err(LlmError::Provider {status:503,message}) if message.contains("proxy")));
     }
+    #[tokio::test]
+    async fn unknown_stream_refreshes_before_consumer_drops_terminal_event() {
+        use serde_json::json;
+        for body in [
+            "data: {\"type\":\"response.completed\",\"response\":{\"model\":\"unknown-pin\"}}\n\n",
+            "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"message\":\"quota exceeded\"}}}\n\n",
+            "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"message\":\"model not found\"}}}\n\n",
+            "data: invalid-json\n\n",
+        ] {
+            let (base, requests, task) = test_gateway::start(3, move |raw| {
+                if raw.starts_with("GET /models ") { return (200, json!({"data":[{"id":"unknown-pin"}]}).to_string(), "application/json"); }
+                if raw.starts_with("GET /metadata ") { return (200, json!({"opencode-go":{"models":{}}}).to_string(), "application/json"); }
+                (200, body.into(), "text/event-stream")
+            }).await;
+            let dir = tempfile::tempdir().unwrap();
+            let catalog = Arc::new(CatalogService::new(dir.path().join("catalog.json")).with_metadata_url(format!("{base}/metadata")));
+            catalog.configure(base.clone(), Ok(None), false);
+            let provider = OpenCodeGoProvider::new("opencode-go".into(), base, "test".into(), "grok-4.7".into(), None, catalog,
+                HashMap::from([("unknown-pin".into(), "responses".into())]));
+            let req = ChatRequest { model_override: Some("unknown-pin".into()), ..Default::default() };
+            let mut stream = provider.chat_stream(req).await.unwrap();
+            loop {
+                let event = stream.next().await.expect("terminal event required");
+                if matches!(event, Err(_) | Ok(ChatStreamEvent::End { .. } | ChatStreamEvent::Error { .. })) { break; }
+            }
+            drop(stream); // Exactly how chat_send consumes End/Error: never poll to EOF.
+            task.await.unwrap();
+            let requests = requests.lock().unwrap();
+            assert_eq!(requests.iter().filter(|r| r.starts_with("POST ")).count(), 1);
+            assert_eq!(requests.iter().filter(|r| r.starts_with("GET /models ")).count(), 1);
+            assert_eq!(requests.iter().filter(|r| r.starts_with("GET /metadata ")).count(), 1);
+            assert_eq!(provider.model(), "grok-4.7");
+        }
+    }
+
+    #[tokio::test]
+    async fn pinned_model_controls_tool_capabilities_and_wire_declarations() {
+        use serde_json::json;
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("catalog.json");
+        let models = catalog::merge(&["with-tools".into(), "without-tools".into()],
+            &json!({"models":{"with-tools":{"tool_call":true},"without-tools":{"tool_call":false}}}),
+            &json!({}), &HashMap::new());
+        std::fs::write(&cache, json!({"fetched_at":1,"digest":catalog::digest(&models),"models":models}).to_string()).unwrap();
+        for (default, pinned, supported) in [("with-tools", "without-tools", false), ("without-tools", "with-tools", true)] {
+            let (base, requests, task) = test_gateway::start(1, |_| (200,
+                json!({"choices":[{"message":{"content":"ok"}}]}).to_string(), "application/json")).await;
+            let provider = OpenCodeGoProvider::new("opencode-go".into(), base, "test".into(), default.into(), None,
+                Arc::new(CatalogService::new(cache.clone())), HashMap::new());
+            let mut req = ChatRequest { model_override: Some(pinned.into()), ..Default::default() };
+            assert_eq!(provider.supports_tools(), !supported);
+            assert_eq!(provider.supports_tools_for(&req), supported);
+            provider.chat_with_tools(req.clone(), vec![ChatTool { name: "example".into(), description: None, input_schema: json!({"type":"object"}) }]).await.unwrap();
+            task.await.unwrap();
+            let raw = requests.lock().unwrap()[0].clone();
+            let body: serde_json::Value = serde_json::from_str(raw.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+            assert_eq!(body["model"], pinned);
+            assert_eq!(body.get("tools").is_some(), supported);
+            req.model_override = Some("  ".into());
+            assert_eq!(provider.supports_tools_for(&req), !supported);
+            req.model_override = Some("unknown".into());
+            assert!(provider.supports_tools_for(&req));
+        }
+    }
+
+    #[tokio::test]
+    async fn configured_proxy_routes_http_and_errors_do_not_retry_direct() {
+        let destination = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target = format!("http://{}/chat/completions", destination.local_addr().unwrap());
+        let (proxy_url, requests, task) = test_gateway::start(1, |_| (502, "proxy failure".into(), "text/plain")).await;
+        let url = reqwest::Url::parse(&proxy_url).unwrap();
+        let mut config = crate::ai::config::default_opencode_go_provider();
+        config.proxy_mode = "custom".into();
+        config.custom_proxy = Some(crate::proxy::AppProxyConfig {
+            enabled: true, host: url.host_str().unwrap().into(), port: url.port().unwrap(), ..Default::default()
+        });
+        let proxy = crate::ai::config::resolve_go_proxy_url(&config, None, None).unwrap();
+        let response = client(proxy.as_deref(), 2).unwrap().get(&target).send().await.unwrap();
+        assert_eq!(response.status(), 502);
+        task.await.unwrap();
+        assert!(requests.lock().unwrap()[0].starts_with(&format!("GET {target} ")));
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(100), destination.accept()).await.is_err());
+        config.proxy_mode = "none".into();
+        let (direct, _, task) = test_gateway::start(1, |_| (200, "direct".into(), "text/plain")).await;
+        let proxy = crate::ai::config::resolve_go_proxy_url(&config, None, None).unwrap();
+        assert_eq!(client(proxy.as_deref(), 2).unwrap().get(direct).send().await.unwrap().text().await.unwrap(), "direct");
+        task.await.unwrap();
+    }
+
 }

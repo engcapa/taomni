@@ -20,6 +20,17 @@ vi.mock("../lib/ipc", () => ({
 }));
 
 describe("OpenCode Go compatibility", () => {
+  it.each([undefined, "app", "custom", "none", "session", "manual"])("preserves Go proxy mode %s and independent settings", async (mode) => {
+    const config = makeConfig([], false);
+    const custom = { enabled: true, mode: "manual", kind: "http", host: "go-proxy", port: 3128, session_id: "", username: "", password_ref: "" };
+    config.llm.providers["opencode-go"] = { base_url: "https://example.invalid", api_key: "", model: "model", runtime: "opencode-go", proxy_mode: mode, proxy_url: "http://retained:3128", custom_proxy: custom };
+    config.llm.providers.deepseek = { base_url: "", api_key: "", model: "model", runtime: "openai-compat" };
+    invokeMock.mockResolvedValueOnce(config);
+    await useAiStore.getState().loadConfig();
+    const loaded = useAiStore.getState().config!;
+    expect(loaded.llm.providers["opencode-go"]).toMatchObject({ proxy_mode: mode ?? "app", custom_proxy: custom });
+    expect(loaded.llm.providers.deepseek.proxy_mode).toBe("none");
+  });
   it("adds Go to old configs without changing routes or providers, and hides only Go under policy", async () => {
     const config = makeConfig([], false);
     config.llm.providers.deepseek = { base_url: "https://example.invalid", api_key: "", model: "old-model", runtime: "openai-compat" };

@@ -3124,7 +3124,7 @@ pub async fn chat_stream(
     let mut is_cancelled = false;
 
     let mut ran_with_tools = false;
-    if provider.supports_tools() {
+    if provider.supports_tools_for(&llm_req) {
         agent_ctx.refresh_runtime_bindings(state.inner()).await;
 
         let runtime_result = tokio::select! {

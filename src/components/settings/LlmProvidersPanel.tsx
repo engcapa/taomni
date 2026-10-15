@@ -6,6 +6,7 @@ import { isVaultLockedError } from "../../lib/ipc";
 import { ensureVaultReady } from "../../lib/vaultGate";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { CodexProxyFields } from "./CodexProxyFields";
+import { GoProxyFields } from "./GoProxyFields";
 import { GoProviderFields } from "./GoProviderFields";
 import { ModelInspectorPanel } from "./ModelInspectorPanel";
 import { openExternalUrl } from "../../lib/sftp";
@@ -256,12 +257,12 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
           </div>
           <div>
             <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
-            <CodexProxyFields
+            {id === "opencode-go" ? <GoProxyFields provider={provider} onChange={onChange} /> : <CodexProxyFields
               mode={provider.proxy_mode ?? "none"}
               sessionId={provider.proxy_session_id}
               proxyUrl={provider.proxy_url}
               onChange={(patch) => onChange({ ...provider, ...patch })}
-            />
+            />}
           </div>
           <div className="flex items-center gap-2 pt-1">
             <button ref={inspectorButton} type="button" data-testid="model-inspector-open" data-provider={id}

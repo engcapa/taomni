@@ -250,6 +250,11 @@ pub trait Llm: Send + Sync {
         false
     }
 
+    /// Request-aware capability check. Existing providers retain their behavior.
+    fn supports_tools_for(&self, _req: &ChatRequest) -> bool {
+        self.supports_tools()
+    }
+
     /// Streaming chat. Default implementation yields a single full event from
     /// the non-streaming `chat` method, so providers that don't natively
     /// stream still satisfy the trait.
