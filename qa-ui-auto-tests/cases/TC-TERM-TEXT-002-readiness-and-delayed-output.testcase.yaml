@@ -1,0 +1,90 @@
+id: TC-TERM-TEXT-002
+title: Text polling keeps half-typed and running commands not ready, then restores idle
+covers: [F2.2, F3.1]
+tags: [terminal, ssh, p1]
+modes: [browser, native]
+fixtures: [reset_db, ssh_required]
+timeout_sec: 120
+# Disposable POSIX SSH fixture; dev/QA mirror=true. No retransmission: exactly-once assertions.
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'READY-BEGIN\\n'; sleep 3; printf 'READY-END\\n'"
+    submit: false
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]:not([data-terminal-ready])'
+    timeout_sec: 10
+- wait: 1
+- eval_readonly:
+    expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^READY-(BEGIN|END)\r?$/gm) || []).length === 0
+    expect_truthy: true
+- click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- press: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^READY-BEGIN\r?$'
+    timeout_sec: 10
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]:not([data-terminal-ready])'
+    timeout_sec: 2
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^READY-END\r?$'
+    timeout_sec: 15
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 15
+- eval_readonly:
+    expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^READY-BEGIN\r?$/gm) || []).length === 1 && (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^READY-END\r?$/gm) || []).length === 1
+    expect_truthy: true
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'READY-NEXT\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^READY-NEXT\r?$'
+    timeout_sec: 15
+- screenshot: terminal-readiness-delayed-output.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 半输入跨越两个轮询周期仍未执行且不标ready；Enter后分段输出只执行一次
+    actions: [11, 15, 16]
+    checkpoints:
+    - {step: 12, expectation: 半输入撤销ready}
+    - {step: 14, expectation: 一秒后无独立BEGIN/END结果行，命令echo不是执行结果}
+    - {step: 18, expectation: sleep期间不把空白行当成idle}
+    - {step: 21, expectation: BEGIN与END恰好各一次，排除安装或轮询重发命令}
+    results: [14, 18, 21]
+  - id: R2
+    requirement: 延迟输出完成后恢复ready并可接受下一条命令
+    actions: [22]
+    checkpoints:
+    - {step: 20, expectation: 返回真正idle prompt后ready恢复}
+    - {step: 23, expectation: NEXT独立输出行存在}
+    results: [23]
+  visual:
+  - {check: 命令echo与分段输出顺序正确且光标正常, method: manual, reason: 截图需独立评审，不从属性断言推导画面通过}
+  native:
+  - {check: QA打包WebView与真实SSH输入完成延迟输出及后续输入, method: automated, reason: 仅实际native运行证明原生SSH/输入链；browser只证明代理及renderer}
+  - {check: production ready与CWD/startup顺序, method: manual, reason: 本用例只用于dev/QA，production按runbook N-02另测}

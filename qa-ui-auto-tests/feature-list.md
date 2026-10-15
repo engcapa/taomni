@@ -627,7 +627,7 @@ controls: []   # backend-only — PTY runtime has no UI surface; the terminal pa
 
 终端自动全文观察仅在开发服务器/QA构建开启，普通production不维护
 `data-terminal-text`；ready、完整scrollback及按需复制/导出/Registry不受影响。
-保留行为用例：TC-TERM-TEXT-001、TC-005/006/022/119/143/144；
+保留行为用例：TC-TERM-TEXT-001至006、TC-005/006/022/119/143/144；
 production原生边界及性能见
 `native/runbooks/terminal-buffer-text-performance.md`（开发阶段未执行）。
 

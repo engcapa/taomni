@@ -50,6 +50,11 @@ Unicode/ANSI在PowerShell或cmd不支持时分别记录引擎/shell边界，不�
 | ID / AC/V | Mode | 步骤及关键结果 | 依赖与边界 |
 |---|---|---|---|
 | TC-TERM-TEXT-001 / AC-02/03/04/06、V-02/05 | browser, native QA | Quick SSH认证→ready→固定620行→锚定首/尾/内部空行/软换行/Unicode→直接属性eval恰好620行→再次输入→新行存在且旧首标记恰好一次 | reset_db、ssh_required；验证完整镜像而非OS导出 |
+| TC-TERM-TEXT-002 / AC-02/03/07、V-02/05 | browser, native QA | 半输入跨1秒无执行/ready→Enter→BEGIN→sleep期间非ready→END各一次→ready恢复→下一条输入 | 独立SSH；无verify重试避免重复执行 |
+| TC-TERM-TEXT-003 / AC-02/07、V-02/05 | browser, native QA | 开启只读时输出未结束→禁止输入不进全文→仍收到10条持续输出与尾标记→解除只读→新输入成功 | 原显示菜单；20秒固定生成流，不用旧尾标记证明持续输出 |
+| TC-TERM-TEXT-004 / AC-02/03/04、V-02/04 | browser, native QA | VT切alternate→假美元prompt仍非ready→正常历史不混入→还原历史/ready→再输入 | 独立POSIX fixture，不依赖vi；完整TUI/画面仍另评审 |
+| TC-TERM-TEXT-005 / AC-02/04/07、V-02/04 | browser, native QA | 620行→VT清除saved lines/画面→旧行计数0→leading/internal空行、Unicode和长行完整→新输入 | 验证无过期文本副本；不改产品历史容量 |
+| TC-TERM-TEXT-006 / AC-04/06、V-04 | **仅native QA** | 620行→Copy All→独立OS核验首尾段/长行/Unicode→新输出再复制保留旧首段 | host_clipboard；Windows/macOS/Linux X11 oracle，Wayland另手测；不宣称逐行核验中段 |
 | TC-022 / AC-02、V-02 | **仅browser** | 录制宏、停止、真实Ctrl+Space回放；直接属性/eval独立输出恰好1→2次 | 可控SSH；保持既有快捷键，不改为native通过 |
 | TC-143 / AC-02/07、V-05 | browser, native QA | 打开显示/事件菜单；readonly输入不产生被禁命令；解除后正常输入，菜单状态准确 | SSH；沿原case断言，不放宽只读负例 |
 | TC-144 / AC-02/03/07、V-05 | browser, native QA | 断开→观察SSH disconnected→Enter重连→再次输出；不向旧session写Enter | SSH；截图与文本分开审核 |
@@ -70,7 +75,7 @@ python -m qa_ui_auto run --config <native-config> --mode native \
 ```
 
 保留case逐个按同一模板替换filter并遵循其modes；长构建/服务按skill的
-background_job脱离启动，native顺序独占。新case的policy及dependencies已注册，
+background_job脱离启动，native顺序独占。6条专题case的policy及dependencies已注册，
 无新增fixture/verb/control；`verification`列明结果步号，静态审核不代表执行通过。
 
 ## 4. production / QA 原生手工用例

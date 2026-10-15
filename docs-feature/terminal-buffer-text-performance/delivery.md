@@ -76,11 +76,27 @@ startup/CWD顺序、StrictMode、失败重连及输入测试，无删减原行�
 | AC-02/03/06/07、V-05 | TC-005/006/119/143/144；N-02/03/05 | 用例交接，native未执行 |
 | AC-05/06、V-06 | PERF-01a/b/c/d | 配方已写，所有平台真实采样/收益/无退化判断未验证 |
 
-可执行新增case：
-`qa-ui-auto-tests/cases/TC-TERM-TEXT-001-full-buffer-observation.testcase.yaml`
-（browser/native QA，covers/fixtures/modes/verification已列明）。
+可执行专题case共6条，位于 `qa-ui-auto-tests/cases/TC-TERM-TEXT-*.testcase.yaml`：
+
+| ID | 内容 | Mode |
+|---|---|---|
+| TC-TERM-TEXT-001 | 620行完整文本、Unicode/ANSI/软换行及连续输出 | browser/native QA |
+| TC-TERM-TEXT-002 | 半输入、延迟分段输出、非idle/idle ready及恰好一次执行 | browser/native QA |
+| TC-TERM-TEXT-003 | 只读禁止输入，但实时输出继续；解除后新输入正常 | browser/native QA |
+| TC-TERM-TEXT-004 | alternate假prompt不得ready，normal历史恢复及后续输入 | browser/native QA |
+| TC-TERM-TEXT-005 | 清除620行旧历史、重建Unicode/空行/长行镜像，无过期文本 | browser/native QA |
+| TC-TERM-TEXT-006 | Copy All的独立OS剪贴板首尾/长行/Unicode及连续复制 | native QA |
+
+前5条支持两种模式，第6条只用native且需要隔离测试账号/剪贴板。
+第6条自动核验必要首尾段，不宣称所有中段逐字节相等；完整比较仍由N-01覆盖。
+每条均有covers/fixtures/modes、分步骤行为契约及visual/native边界。
 已同步policy、dependencies和F2.2说明；未新增控件/verb/fixture，
 无需重生成控件catalog。
+
+本次补充仅改case、目录登记及交接文档，未改产品/单元测试代码；
+6条case的schema及行为契约静态验证通过。扩充后静态audit及CI选例规划
+结果见 `case-expansion-audit.log` / `case-expansion-plan.log`。
+**没有执行browser/native，也没有因case补充重跑单元或重启应用。**
 
 完整用例、OS隔离、数据、顺序步骤、取消/失败/恢复/生命周期、原生边界、
 三端性能与证据模板见：

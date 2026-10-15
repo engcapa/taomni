@@ -100,7 +100,7 @@ pnpm exec vitest run src/lib/terminal/terminalRegistry.test.ts
 
 - P0新增生产无扫描断言按预期失败，其余88条通过；最终P1 default为
   106 passed/1 mode-skipped，qa为85 passed/1 mode-skipped。
-- 新增TC-TERM-TEXT-001及N-01至05/C-01/PERF-01完整用例，
+- 新增TC-TERM-TEXT-001至006及N-01至05/C-01/PERF-01完整用例，
   静态audit/CI plan通过；未运行browser/native、未启动真实测试会话。
 - TypeScript静态检查受qr/tesseract模块解析及关联MFA诊断阻塞；
   未修改无关模块/依赖，不能称整个工程类型检查通过。
