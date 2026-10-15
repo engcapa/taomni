@@ -375,6 +375,7 @@ impl Default for LlmConfig {
                 proxy_mode: default_provider_proxy_mode(),
                 proxy_session_id: None,
                 proxy_url: None,
+                custom_proxy: None,
             },
         );
         providers.insert(
@@ -396,6 +397,7 @@ impl Default for LlmConfig {
                 proxy_mode: default_provider_proxy_mode(),
                 proxy_session_id: None,
                 proxy_url: None,
+                custom_proxy: None,
             },
         );
         providers.insert(
@@ -413,6 +415,7 @@ impl Default for LlmConfig {
                 proxy_mode: default_provider_proxy_mode(),
                 proxy_session_id: None,
                 proxy_url: None,
+                custom_proxy: None,
             },
         );
         providers.insert(
@@ -430,6 +433,7 @@ impl Default for LlmConfig {
                 proxy_mode: default_provider_proxy_mode(),
                 proxy_session_id: None,
                 proxy_url: None,
+                custom_proxy: None,
             },
         );
         providers.insert(
@@ -447,6 +451,7 @@ impl Default for LlmConfig {
                 proxy_mode: default_provider_proxy_mode(),
                 proxy_session_id: None,
                 proxy_url: None,
+                custom_proxy: None,
             },
         );
         providers.insert(
@@ -464,6 +469,7 @@ impl Default for LlmConfig {
                 proxy_mode: default_provider_proxy_mode(),
                 proxy_session_id: None,
                 proxy_url: None,
+                custom_proxy: None,
             },
         );
         providers.insert(
@@ -481,6 +487,7 @@ impl Default for LlmConfig {
                 proxy_mode: default_provider_proxy_mode(),
                 proxy_session_id: None,
                 proxy_url: None,
+                custom_proxy: None,
             },
         );
 
@@ -545,6 +552,7 @@ fn default_agnes_provider() -> LlmProviderConfig {
         proxy_mode: default_provider_proxy_mode(),
         proxy_session_id: None,
         proxy_url: None,
+        custom_proxy: None,
     }
 }
 
@@ -564,13 +572,15 @@ pub struct LlmProviderConfig {
     pub image_model: Option<String>,
     #[serde(default)]
     pub video_model: Option<String>,
-    /// none | session | manual. Default is direct/no-proxy.
-    #[serde(default = "default_provider_proxy_mode")]
+    /// Go: app (default) | custom | none; legacy providers: none | session | manual.
+    #[serde(default)]
     pub proxy_mode: String,
     #[serde(default)]
     pub proxy_session_id: Option<String>,
     #[serde(default)]
     pub proxy_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_proxy: Option<crate::proxy::AppProxyConfig>,
 }
 
 pub fn default_opencode_go_provider() -> LlmProviderConfig {
@@ -583,9 +593,10 @@ pub fn default_opencode_go_provider() -> LlmProviderConfig {
         capabilities: LlmProviderCapabilities::default(),
         image_model: None,
         video_model: None,
-        proxy_mode: default_provider_proxy_mode(),
+        proxy_mode: "app".into(),
         proxy_session_id: None,
         proxy_url: None,
+        custom_proxy: None,
         protocol_overrides: HashMap::new(),
     }
 }
@@ -602,6 +613,10 @@ impl LlmProviderConfig {
             .as_ref()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
+        if self.runtime == "opencode-go" {
+            self.proxy_mode = normalize_go_proxy_mode(&self.proxy_mode);
+            return;
+        }
         self.proxy_mode = normalize_provider_proxy_mode(&self.proxy_mode);
         if self.proxy_url.is_some() && self.proxy_mode == "none" {
             self.proxy_mode = "manual".into();
@@ -664,30 +679,61 @@ pub fn resolve_provider_proxy_url(
     }
 }
 
-/// Strict Go-only wrapper; retained transports keep their existing resolution.
+pub fn normalize_go_proxy_mode(mode: &str) -> String {
+    match mode.trim() {
+        "custom" | "none" | "session" | "manual" => mode.trim().into(),
+        _ => "app".into(),
+    }
+}
+
+/// Go uses the shared Settings proxy format, with strict failure handling.
 pub fn resolve_go_proxy_url(
     provider: &LlmProviderConfig,
     db: Option<&rusqlite::Connection>,
     vault: Option<&crate::vault::Vault>,
 ) -> Result<Option<String>, String> {
-    let mode = normalize_provider_proxy_mode(&provider.proxy_mode);
-    if mode == "session" {
-        if provider.proxy_session_id.as_deref().is_none_or(|s| s.trim().is_empty())
-            || db.is_none() || vault.is_none() {
-            return Err("OpenCode Go proxy session is not available".into());
+    resolve_go_proxy_with_app(provider, db, vault, || {
+        crate::proxy::AppProxyConfig::load_strict(&crate::proxy::default_app_proxy_path())
+    })
+}
+
+fn resolve_go_proxy_with_app(
+    provider: &LlmProviderConfig,
+    db: Option<&rusqlite::Connection>,
+    vault: Option<&crate::vault::Vault>,
+    load_app: impl FnOnce() -> Result<crate::proxy::AppProxyConfig, String>,
+) -> Result<Option<String>, String> {
+    let mode = normalize_go_proxy_mode(&provider.proxy_mode);
+    let config = match mode.as_str() {
+        "none" => return Ok(None),
+        "app" => load_app()?,
+        "custom" => {
+            let mut config = provider
+                .custom_proxy
+                .clone()
+                .ok_or("OpenCode Go custom proxy is not configured")?;
+            config.enabled = true;
+            config
         }
-    }
-    if mode == "manual" && provider.proxy_url.as_deref().is_none_or(|s| s.trim().is_empty()) {
-        return Err("OpenCode Go manual proxy URL is required".into());
-    }
-    let proxy = resolve_provider_proxy_url(provider, db, vault)?;
-    if mode == "session" && proxy.is_none() {
-        return Err("OpenCode Go proxy session could not be resolved".into());
-    }
-    if let Some(url) = proxy.as_deref() {
-        reqwest::Proxy::all(url).map_err(|_| "OpenCode Go proxy URL is invalid".to_string())?;
-    }
-    Ok(proxy)
+        "session" => crate::proxy::AppProxyConfig {
+            enabled: true,
+            mode: "session".into(),
+            session_id: provider.proxy_session_id.clone().unwrap_or_default(),
+            ..Default::default()
+        },
+        "manual" => {
+            let url = provider
+                .proxy_url
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or("OpenCode Go manual proxy URL is required")?;
+            reqwest::Proxy::all(url).map_err(|_| "OpenCode Go proxy URL is invalid")?;
+            return Ok(Some(url.into()));
+        }
+        _ => unreachable!(),
+    };
+    crate::proxy::resolve_strict_with_db(&config, db, vault).map(|proxy| proxy.map(|p| p.to_url()))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -775,6 +821,97 @@ impl Default for WebSearchConfig {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn go_proxy_defaults_and_round_trip_preserve_explicit_modes() {
+        let mut value = serde_json::to_value(super::default_opencode_go_provider()).unwrap();
+        value.as_object_mut().unwrap().remove("proxy_mode");
+        let mut go: super::LlmProviderConfig = serde_json::from_value(value.clone()).unwrap();
+        go.normalize();
+        assert_eq!(go.proxy_mode, "app");
+        value["runtime"] = "openai-compat".into();
+        let mut legacy: super::LlmProviderConfig = serde_json::from_value(value).unwrap();
+        legacy.normalize();
+        assert_eq!(legacy.proxy_mode, "none");
+        go.custom_proxy = Some(crate::proxy::AppProxyConfig {
+            host: "independent".into(),
+            ..Default::default()
+        });
+        go.proxy_url = Some("http://legacy:3128".into());
+        for mode in ["app", "custom", "none", "manual", "session"] {
+            go.proxy_mode = mode.into();
+            let mut restored: super::LlmProviderConfig =
+                serde_json::from_value(serde_json::to_value(&go).unwrap()).unwrap();
+            restored.normalize();
+            assert_eq!(restored.proxy_mode, mode);
+            assert_eq!(restored.custom_proxy, go.custom_proxy);
+        }
+        legacy.proxy_url = go.proxy_url;
+        legacy.normalize();
+        assert_eq!(legacy.proxy_mode, "manual");
+    }
+
+    #[test]
+    fn go_proxy_uses_application_or_independent_settings_and_never_falls_back() {
+        let app = crate::proxy::AppProxyConfig {
+            enabled: true,
+            host: "app-proxy".into(),
+            ..Default::default()
+        };
+        let mut go = super::default_opencode_go_provider();
+        assert_eq!(
+            super::resolve_go_proxy_with_app(&go, None, None, || Ok(app.clone()))
+                .unwrap()
+                .as_deref(),
+            Some("http://app-proxy:3128")
+        );
+        assert!(
+            super::resolve_go_proxy_with_app(&go, None, None, || Err("invalid app config".into()))
+                .is_err()
+        );
+        assert_eq!(
+            super::resolve_go_proxy_with_app(&go, None, None, || Ok(Default::default())).unwrap(),
+            None
+        );
+        go.proxy_mode = "custom".into();
+        assert!(super::resolve_go_proxy_url(&go, None, None).is_err());
+        go.custom_proxy = Some(crate::proxy::AppProxyConfig {
+            host: "custom-proxy".into(),
+            ..Default::default()
+        });
+        assert_eq!(
+            super::resolve_go_proxy_with_app(&go, None, None, || panic!(
+                "custom must not load application proxy"
+            ))
+            .unwrap()
+            .as_deref(),
+            Some("http://custom-proxy:3128")
+        );
+        assert_eq!(app.host, "app-proxy");
+        go.custom_proxy.as_mut().unwrap().password_ref = "vault:missing".into();
+        assert!(super::resolve_go_proxy_url(&go, None, None).is_err());
+        go.proxy_mode = "none".into();
+        go.proxy_url = Some("http://retained:3128".into());
+        go.normalize();
+        assert_eq!(
+            super::resolve_go_proxy_with_app(&go, None, None, || panic!(
+                "none must bypass application proxy"
+            ))
+            .unwrap(),
+            None
+        );
+        go.proxy_mode = "session".into();
+        assert!(super::resolve_go_proxy_url(&go, None, None).is_err());
+        go.proxy_mode = "manual".into();
+        assert_eq!(
+            super::resolve_go_proxy_url(&go, None, None)
+                .unwrap()
+                .as_deref(),
+            Some("http://retained:3128")
+        );
+        go.proxy_url = None;
+        assert!(super::resolve_go_proxy_url(&go, None, None).is_err());
+    }
+
+    #[test]
     fn legacy_go_normalization_preserves_user_configuration() {
         let mut config = super::AiConfig::default();
         config.llm.providers.remove("opencode-go");
@@ -785,8 +922,16 @@ mod tests {
         assert_eq!(go.model, "deepseek-v4.1-flash");
         assert_eq!(go.runtime, "opencode-go");
         assert_eq!(config.llm.task_routing, routes);
-        assert_eq!(serde_json::to_value(&config.llm.providers["deepseek"]).unwrap(), original);
-        assert!(serde_json::to_value(go).unwrap().get("protocol_overrides").is_none());
+        assert_eq!(
+            serde_json::to_value(&config.llm.providers["deepseek"]).unwrap(),
+            original
+        );
+        assert!(
+            serde_json::to_value(go)
+                .unwrap()
+                .get("protocol_overrides")
+                .is_none()
+        );
         let parsed: super::LlmProviderConfig = serde_json::from_value(original).unwrap();
         assert!(parsed.protocol_overrides.is_empty());
         config.llm.providers.get_mut("opencode-go").unwrap().model = "custom".into();

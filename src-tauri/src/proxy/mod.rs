@@ -83,6 +83,16 @@ impl AppProxyConfig {
             .unwrap_or_default()
     }
 
+    /// Missing configuration means disabled; unreadable/invalid configuration is an error.
+    pub fn load_strict(path: &PathBuf) -> Result<Self, String> {
+        match std::fs::read(path) {
+            Ok(bytes) => serde_json::from_slice(&bytes)
+                .map_err(|_| "Application proxy configuration is invalid".into()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(_) => Err("Application proxy configuration could not be read".into()),
+        }
+    }
+
     pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -243,27 +253,90 @@ pub fn resolve_session_proxy_with_db(
     if id.is_empty() {
         return Ok(None);
     }
+    let config = session_proxy_config(db, id)?;
+    Ok(Some(ResolvedProxy {
+        kind: config.kind,
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: resolve_password_with_vault(vault, &config.password_ref),
+    }))
+}
+
+fn session_proxy_config(db: &rusqlite::Connection, id: &str) -> Result<AppProxyConfig, String> {
     let session = crate::session::db::get_session(db, id)
         .map_err(|e| format!("proxy session not found: {e}"))?;
-    let opts: serde_json::Value =
-        serde_json::from_str(&session.options_json).unwrap_or(serde_json::Value::Null);
-    let kind = opts
-        .get("proxyKind")
-        .and_then(|k| k.as_str())
-        .unwrap_or("http")
-        .to_string();
-    let password_ref = opts
-        .get("passwordRef")
-        .and_then(|r| r.as_str())
-        .unwrap_or("")
-        .to_string();
-    Ok(Some(ResolvedProxy {
-        kind,
+    let opts: serde_json::Value = serde_json::from_str(&session.options_json).unwrap_or_default();
+    Ok(AppProxyConfig {
+        enabled: true,
+        kind: opts
+            .get("proxyKind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("http")
+            .into(),
         host: session.host,
         port: session.port,
         username: session.username.unwrap_or_default(),
-        password: resolve_password_with_vault(vault, &password_ref),
-    }))
+        password_ref: opts
+            .get("passwordRef")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .into(),
+        ..Default::default()
+    })
+}
+
+/// Resolve Settings-format proxies without falling back on invalid settings or unavailable secrets.
+/// Explicit handles also support clients constructed before AppState exists.
+pub fn resolve_strict_with_db(
+    config: &AppProxyConfig,
+    db: Option<&rusqlite::Connection>,
+    vault: Option<&Vault>,
+) -> Result<Option<ResolvedProxy>, String> {
+    if !config.enabled {
+        return Ok(None);
+    }
+    let session_config;
+    let config = match config.mode.as_str() {
+        "manual" => config,
+        "session" => {
+            if config.session_id.trim().is_empty() {
+                return Err("Proxy session is required".into());
+            }
+            session_config = session_proxy_config(
+                db.ok_or("Proxy session database is unavailable")?,
+                config.session_id.trim(),
+            )?;
+            &session_config
+        }
+        _ => return Err("Proxy mode is invalid".into()),
+    };
+    if config.host.trim().is_empty()
+        || config.port == 0
+        || !matches!(config.kind.as_str(), "http" | "socks5")
+    {
+        return Err("Proxy host, port or kind is invalid".into());
+    }
+    let password = if config.password_ref.is_empty() {
+        String::new()
+    } else {
+        let vault = vault.ok_or("Proxy password vault is unavailable")?;
+        match vault.resolve(&config.password_ref).map_err(
+            |_| "Proxy password could not be resolved; unlock the vault and check the credential",
+        )? {
+            Some(secret) => (*secret).clone(),
+            None => return Err("Proxy password must be a vault reference".into()),
+        }
+    };
+    let proxy = ResolvedProxy {
+        kind: config.kind.clone(),
+        host: config.host.trim().into(),
+        port: config.port,
+        username: config.username.trim().into(),
+        password,
+    };
+    reqwest::Proxy::all(proxy.to_url()).map_err(|_| "Proxy URL is invalid")?;
+    Ok(Some(proxy))
 }
 
 // ── Tauri commands ─────────────────────────────────────────────────────────
@@ -294,6 +367,41 @@ pub async fn get_app_proxy_url(state: State<'_, AppState>) -> Result<Option<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strict_settings_fail_closed_on_invalid_configuration_and_locked_credentials() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("proxy.json");
+        assert!(!AppProxyConfig::load_strict(&path).unwrap().enabled);
+        std::fs::write(&path, "invalid").unwrap();
+        assert!(AppProxyConfig::load_strict(&path).is_err());
+        let mut config = AppProxyConfig {
+            enabled: true,
+            ..Default::default()
+        };
+        assert!(resolve_strict_with_db(&config, None, None).is_err());
+        config.host = "127.0.0.1".into();
+        config.password_ref = "vault:missing".into();
+        let vault = Vault::open(&dir.path().join("vault.db")).unwrap();
+        assert!(
+            resolve_strict_with_db(&config, None, Some(&vault))
+                .unwrap_err()
+                .contains("unlock the vault")
+        );
+        config.password_ref.clear();
+        assert_eq!(
+            resolve_strict_with_db(&config, None, None)
+                .unwrap()
+                .unwrap()
+                .host,
+            "127.0.0.1"
+        );
+        config.mode = "session".into();
+        config.session_id = "missing".into();
+        assert!(resolve_strict_with_db(&config, None, Some(&vault)).is_err());
+        config.enabled = false;
+        assert_eq!(resolve_strict_with_db(&config, None, None).unwrap(), None);
+    }
 
     #[test]
     fn config_round_trips_through_json() {

@@ -115,7 +115,11 @@ google x-goog-api-key。任何组失败必须保留原文，不用换模型绕�
 6. 两次快速切换、写盘失败 → 错误可见，未保存值不冒充成功；
    恢复可写后重新切换成功。删除线程后不出现孤立模型状态。
 
-证据：SQLite查询摘要/重启身份/四次请求模型和无进程回收旁证。
+7. 目录 fixture 提供 tool_call=true 的 A 和 false 的 B：默认 A/pin B 时不发送工具
+   声明，默认 B/pin A 时可以完成工具回合；清除 pin 使用默认能力，未知 pin 按可用工具
+   处理。同样通过多 key 轮换及 provider group 验证实际声明和工具结果回填。
+
+证据：SQLite查询摘要/重启身份/四次请求模型、工具声明和无进程回收旁证。
 
 ### N-GO-04：目录全生命周期与故障回退（AC-08/09；V-08）
 
@@ -147,11 +151,14 @@ google x-goog-api-key。任何组失败必须保留原文，不用换模型绕�
 1. 在设置协议区分别改一个已分类/未分类/弃用模型到其他协议并保存 →
    后续请求走改后端点；来源 Manual；重启后覆盖仍在；
    每项恢复自动 → 保存后回目录协议。另输入未知字符串配置 → chat+告警、不崩溃。
-2. 原有代理三模式逐一：none、manual、session。设置 none 时环境HTTP_PROXY
-   指向阻断代理仍应直连；manual/session 的请求目录与推理经指定代理；
-   独立 provider 配置不覆盖应用代理。
+2. 三模式逐一：app（新增/缺省默认）、custom、none。设置应用代理 A，Go 默认
+   目录 S1/S2、连接测试和推理均经 A；Go custom 设代理 B（分别 manual/session）
+   后均经 B，Settings 的 A 配置不变；保存、重启后 custom/B 保持。
+   none 时保留 B 设置但直连，环境 HTTP_PROXY/HTTPS_PROXY/ALL_PROXY 指向阻断代理
+   仍直连；切回 app/custom 后分别恢复 A/B。旧 Go manual/session 配置仍可读取使用。
 3. 代理语法无效、代理会话不存在、vault 锁定代理认证、代理连接失败 →
-   显示错误，**绝不静默直连**；修正后恢复。
+   显示错误，**绝不静默直连**；损坏的应用 proxy.json 同样报错而非绕过代理；
+   custom 密码 vault 锁定不能退化为空密码，修正/解锁并保存 AI 配置后恢复。
 4. full_local 开启 → 聊天 Go 不可选，设置刷新/测试禁用并有原因；
    full_disabled 同样不允许目录/推理网络（入口可能完全隐藏）。
 5. 目录请求在途时切full_local/fully_disabled → 请求取消且不发布结果；
@@ -165,6 +172,9 @@ browser只能证明按钮状态，不能证明零网络。
 1. 假网关使已钉模型返回404 Model not found → UI原文；模型仍pin；
    推理请求仅一次，强制目录刷新至多一次，不改模型重发。
    未知目录模型成功/失败均触发一次刷新，不在客户端拦截。
+   分别以未知 pin 返回 SSE End、普通 Error、底层解析错误；让实际聊天消费者
+   收到终止事件立即释放 stream（不额外读 EOF），仍观察到 S1/S2 各一次，
+   推理 POST 仅一次且 pin 不变。已知模型普通错误不触发刷新。
 2. 401/403/429/500、额度错误、超时、断连 → 原文/状态可见；状态释放；
    普通鉴权错误不误触发模型不存在刷新。
 3. Responses SSE delta、工具参数delta、未知事件、completed/failed/incomplete，

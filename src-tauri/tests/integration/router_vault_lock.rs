@@ -37,6 +37,7 @@ fn make_config(api_key: String) -> AiConfig {
             proxy_mode: "none".into(),
             proxy_session_id: None,
             proxy_url: None,
+            custom_proxy: None,
         },
     );
     providers.insert(
@@ -54,6 +55,7 @@ fn make_config(api_key: String) -> AiConfig {
             proxy_mode: "none".into(),
             proxy_session_id: None,
             proxy_url: None,
+            custom_proxy: None,
         },
     );
 

@@ -3778,6 +3778,7 @@ components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble
 files:
   - src/components/chat/ChatDrawer.tsx
   - src/components/chat/GoModelPicker.tsx
+  - src/components/settings/GoProxyFields.tsx
   - src/components/settings/GoProviderFields.tsx
   - src/components/settings/LlmProvidersPanel.tsx
   - src/stores/opencodeGoStore.ts
@@ -3795,6 +3796,9 @@ files:
   - src/stores/chatStore.ts
 controls:
   - {id: go-provider-row, selector: '[data-testid="go-provider-row"]', kind: interactive, optional: true}
+  - {id: go-proxy-mode, selector: '[data-testid="go-proxy-mode"]', kind: interactive, optional: true}
+  - {id: go-custom-proxy, selector: '[data-testid="go-custom-proxy"]', kind: display, optional: true}
+  - {id: go-custom-proxy-host, selector: '[data-testid="go-custom-proxy"] input[placeholder="Proxy host"]', kind: interactive, optional: true}
   - {id: go-console, selector: '[data-testid="go-console"]', kind: interactive, optional: true}
   - {id: go-default-model, selector: '[data-testid="go-default-model"]', kind: display, optional: true}
   - {id: go-default-model-search, selector: '[data-testid="go-default-model-search"]', kind: interactive, optional: true}

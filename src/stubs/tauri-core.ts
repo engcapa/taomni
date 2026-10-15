@@ -5096,7 +5096,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
           const config = JSON.parse(raw);
           config.llm.providers["opencode-go"] ??= {
             base_url: "https://opencode.ai/inference/go/v1", api_key: "",
-            model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true },
+            model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true }, proxy_mode: "app",
           };
           return config as T;
         }

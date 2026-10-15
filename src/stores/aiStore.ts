@@ -49,7 +49,8 @@ export interface LlmProviderConfig {
   capabilities?: LlmProviderCapabilities;
   image_model?: string | null;
   video_model?: string | null;
-  proxy_mode?: "none" | "session" | "manual" | string;
+  proxy_mode?: "app" | "custom" | "none" | "session" | "manual" | string;
+  custom_proxy?: AppProxyConfig;
   proxy_session_id?: string | null;
   proxy_url?: string | null;
 }
@@ -401,7 +402,7 @@ const DEFAULT_CONFIG: AiConfig = {
     active: "deepseek",
     providers: {
       deepseek:    { base_url: "https://api.deepseek.com/v1",                    api_key: "", model: "deepseek-chat",                        runtime: "openai-compat", capabilities: { chat: true } },
-      "opencode-go": { base_url: "https://opencode.ai/inference/go/v1", api_key: "", model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true }, proxy_mode: "none" },
+      "opencode-go": { base_url: "https://opencode.ai/inference/go/v1", api_key: "", model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true }, proxy_mode: "app" },
       agnes:       { base_url: "https://apihub.agnes-ai.com/v1",                 api_key: "", model: "agnes-2.0-flash",                     runtime: "openai-compat", capabilities: { chat: true, image_generation: true, video_generation: true }, image_model: "agnes-image-2.1-flash", video_model: "agnes-video-v2.0" },
       glm:         { base_url: "https://open.bigmodel.cn/api/paas/v4",           api_key: "", model: "glm-4-flash",                          runtime: "openai-compat", capabilities: { chat: true } },
       siliconflow: { base_url: "https://api.siliconflow.cn/v1",                  api_key: "", model: "Qwen/Qwen2.5-Coder-7B-Instruct",       runtime: "openai-compat", capabilities: { chat: true } },
@@ -610,7 +611,9 @@ function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderConfig {
     },
     image_model: provider.image_model ?? null,
     video_model: provider.video_model ?? null,
-    proxy_mode: normalizeNoProxyMode(provider.proxy_mode, provider.proxy_url),
+    proxy_mode: provider.runtime === "opencode-go"
+      ? (["app", "custom", "none", "session", "manual"].includes(provider.proxy_mode?.trim() ?? "") ? provider.proxy_mode!.trim() : "app")
+      : normalizeNoProxyMode(provider.proxy_mode, provider.proxy_url),
     proxy_session_id: provider.proxy_session_id?.trim() || undefined,
     proxy_url: provider.proxy_url?.trim() || undefined,
   };
