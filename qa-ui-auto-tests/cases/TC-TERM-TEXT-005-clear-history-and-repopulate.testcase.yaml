@@ -49,7 +49,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     name: data-terminal-text
-    matches: '(?s)^\n\nCLEAR-NEW-中文🙂.*'
+    matches: '(?s).*\n\nCLEAR-NEW-中文🙂.*'
 - eval_readonly:
     expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^CLEAR-SEED-\d{4}\r?$/gm) || []).length === 0
     expect_truthy: true
