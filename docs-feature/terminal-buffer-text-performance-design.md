@@ -1,6 +1,6 @@
 # 终端全缓冲区文本镜像优化：独立性能 feat
 
-日期：2026-10-15。设计状态：**可实施；未修改产品代码，未运行性能或功能测试**。开发任务见[任务清单](terminal-buffer-text-performance/development-tasks.md)，验收细节见[测试设计](#test-cases)。
+日期：2026-10-15。设计状态：**实现及本地单元测试完成；browser/native用例已写但未执行，真实打包和性能未验收**。用户本轮要求仅做本地单元测试。实际基线/日志/缺项见[交付记录](terminal-buffer-text-performance/delivery.md)，开发任务见[任务清单](terminal-buffer-text-performance/development-tasks.md)，验收细节见[测试设计](#test-cases)。
 
 ## 1. 目标、来源和范围
 
@@ -49,7 +49,7 @@
 
 ### 3.1 编译期模式契约
 
-拟新增常量名：`__TAOMNI_TERMINAL_TEXT_MIRROR__`。名称不带QA，是因为开发服务器也启用。常量在编译时注入，普通release没有动态打开入口。
+已实现常量名：`__TAOMNI_TERMINAL_TEXT_MIRROR__`。名称不带QA，是因为开发服务器也启用。常量在编译时注入，普通release没有动态打开入口。
 
 Vite配置函数读取`command/mode/isPreview`，取值规则为：`mode === "qa" || (command === "serve" && !isPreview)`。此规则只是设计表达，实施沿当前Vite类型写法。不要用“非production模式均开启”或仅依赖`NODE_ENV`，避免自定义release mode误开启。
 
@@ -89,7 +89,7 @@ copyAll、saveBufferToFile、窗口分离/归位、终端断开状态通知、Te
 | DEC-04 | 常量只包住文本生成和属性写入，业务timer/ready/CWD不改 | agent自决：调用链包含真实startup/CWD依赖，减少相邻回归 |
 | DEC-05 | 不宣称降低某一固定比例CPU/内存或修复GC crash；独立基线/候选配对测量 | 证据约束；没有当前性能数据 |
 
-没有新的UI或组件选型取舍需要用户答复。设计可直接进入下列任务，实际实现尚未开始。
+没有新的UI或组件选型取舍需要用户答复。下列为不变的验收要求；当前实现与本地测试状态见交付记录，不能由单元通过推导原生或性能通过。
 
 | AC | 场景与结果 |
 |---|---|
@@ -125,7 +125,9 @@ QA/development镜像仍开启，因此它们的耗时**不能证明生产优化�
 
 <a id="test-cases"></a>
 
-所有V目前均待执行。本feat改变内部构建/性能路径，用户流程及QA观察协议保持；原则上复用现有UI case，不为文档新增可执行YAML或大套件。若实现实际改变case/控件，必须按仓库规则同步case、covers、CI policy/dependencies，并保留原行为断言。
+V-01/02及V-04的本地单元部分已通过，V-03的配置函数矩阵已通过；
+所有browser/native、实际构建及V-06仍未执行。按用户本轮要求已补充
+[可执行TC-TERM-TEXT-001与完整browser/native手工用例](../qa-ui-auto-tests/native/runbooks/terminal-buffer-text-performance.md)，并同步covers/CI policy/dependencies；保留既有case、控件及QA协议，不新增大套件或生产观察接口。
 
 ### V-01：生产关闭镜像、业务仍可用（AC-01/03/07）
 

@@ -2,6 +2,9 @@
 
 declare const __APP_VERSION__: string;
 
+/** Automatic full-buffer observation: enabled in dev/QA, compiled out of production. */
+declare const __TAOMNI_TERMINAL_TEXT_MIRROR__: boolean;
+
 /**
  * ED-PARITY-002: true only in the isolated QA bundle (`vite build --mode qa`,
  * used by the qa-ui-auto `com.taomni.app.qa` binary). Normal builds compile the

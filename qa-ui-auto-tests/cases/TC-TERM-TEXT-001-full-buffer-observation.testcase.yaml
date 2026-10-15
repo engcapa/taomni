@@ -1,0 +1,111 @@
+id: TC-TERM-TEXT-001
+title: Dev/QA retains full terminal text, Unicode and direct attribute observations
+covers:
+- F2.2
+- F3.1
+tags:
+- terminal
+- ssh
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 120
+# Browser: default pnpm dev, authorized disposable POSIX SSH fixture.
+# Native: isolated com.taomni.app.qa, frontend mode=qa (NOT production).
+# Production clipboard/disk/windows/performance: see native runbook; this case
+# intentionally cannot certify those boundaries from an observation attribute.
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'MIRROR-BEGIN-中文🙂\\n'; i=0; while [ \"$i\" -lt 620 ]; do printf 'MIRROR-ROW-%04d\\n' \"$i\"; i=$((i+1)); done; printf '\\nMIRROR-WRAP-'; printf '%0120d' 0; printf '\\n\\033[31mMIRROR-END-中文🙂\\033[0m\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^MIRROR-BEGIN-中文🙂\r?$'
+    timeout_sec: 30
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^MIRROR-ROW-0000\r?\nMIRROR-ROW-0001\r?$'
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^MIRROR-ROW-0619\r?\n\r?\nMIRROR-WRAP-0{120}\r?\nMIRROR-END-中文🙂\r?$'
+- eval_readonly:
+    expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^MIRROR-ROW-\d{4}\r?$/gm) || []).length === 620
+    expect_truthy: true
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 30
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'MIRROR-NEXT-OUTPUT\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^MIRROR-NEXT-OUTPUT\r?$'
+    timeout_sec: 30
+- eval_readonly:
+    expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^MIRROR-BEGIN-中文🙂\r?$/gm) || []).length === 1
+    expect_truthy: true
+- screenshot: terminal-full-buffer-observation.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 正常输入产生620个完整输出行，保留首尾、内部空行、ANSI解码和软换行合并，不截断为500行
+    actions: [5, 6, 8, 9, 11]
+    checkpoints:
+    - step: 10
+      expectation: SSH连接及CWD安装结束后ready可用，输入走真实terminal_input
+    - step: 12
+      expectation: 独立Unicode首标记行；不将命令echo视为命令执行结果
+    - step: 13
+      expectation: 历史最前两条行顺序完整
+    - step: 14
+      expectation: 最后一条、内部空行、120列软换行合并与去ANSI尾标记均存在
+    - step: 15
+      expectation: 直接DOM属性/eval统计恰好620个独立数据行
+    results: [12, 13, 14, 15]
+  - id: R2
+    requirement: 大历史后ready及再次输入仍正常，镜像持续更新且既有历史不丢失
+    actions: [17]
+    checkpoints:
+    - step: 16
+      expectation: 回到idle ready，而非仅文本输出存在
+    - step: 18
+      expectation: 第二次输入产生独立的输出行
+    - step: 19
+      expectation: 旧的Unicode首标记仍恰好一次
+    results: [18, 19]
+  visual:
+  - check: Unicode/emoji、红色尾标记、空行及长行重排正常；无空白屏、遮挡或输入光标异常
+    method: manual
+    reason: 检查真实屏幕及截图；文本属性断言不证明canvas呈现或颜色。
+  native:
+  - check: QA原生WebView/PTY沿原有属性协议读取文本并接受后续命令
+    method: automated
+    reason: 仅在实际native运行时成立；browser代理不证明原生IPC或打包WebView。
+  - check: production剪贴板、导出文件、分离窗口/session/PID、CPU与输入反馈
+    method: manual
+    reason: 本case只适用于mirror=true；使用terminal-buffer-text-performance runbook的production隔离步骤。

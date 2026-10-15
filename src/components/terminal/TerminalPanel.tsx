@@ -2743,7 +2743,11 @@ export function TerminalPanel({
       ) {
         installSshCwdIntegrationRef.current();
       }
-      panel.setAttribute("data-terminal-text", getBufferText(term));
+      // Only the observation copy is optional. Keep CWD installation, prompt
+      // readiness and the poll lifecycle active in every compilation mode.
+      if (__TAOMNI_TERMINAL_TEXT_MIRROR__) {
+        panel.setAttribute("data-terminal-text", getBufferText(term));
+      }
       if (
         connectionStateRef.current === "connected" &&
         !automationInputSettlingRef.current &&

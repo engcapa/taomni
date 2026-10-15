@@ -7,10 +7,11 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8")
   version: string;
 };
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    __TAOMNI_TERMINAL_TEXT_MIRROR__: JSON.stringify(mode === "qa"),
     // Unit tests exercise the probe module directly; the QA-only self-install
     // branch stays compiled out (the mounted gate test installs it explicitly).
     __TAOMNI_QA_SAVE_GATE__: JSON.stringify(false),
@@ -37,4 +38,4 @@ export default defineConfig({
       "scripts/*.test.mjs",
     ],
   },
-});
+}));
