@@ -1,5 +1,9 @@
 # OpenCode Go 本轮开发记录（2026-10-15）
 
+后续模型检查开发已将 Go 的 S2 models.dev 拉取/cache/digest 抽为唯一共享
+`llm/model_catalog.rs`；S1、种子、协议与 Go 自有行集缓存继续保留。
+详见 `../model-inspector/delivery-notes.md`。此对齐不把原未执行的真机项改为通过。
+
 按 `development-tasks.md` 的九个工作包接入：默认配置、四协议目录与传输、
 统一分发、线程模型 SQLite/IPC、设置页与聊天选择器、离线 stub、自动化单测
 及 browser/native 用例。目录自动过期阈值先按设计建议定为 **6 小时**。

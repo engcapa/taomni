@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::PathBuf, sync::{Arc, OnceLock, RwLock}};
 use tokio::sync::Mutex;
 
 pub const TTL_SECONDS: u64 = 6 * 60 * 60;
-pub const METADATA_URL: &str = "https://models.opencode.ai/api.json";
+pub use crate::llm::model_catalog::METADATA_URL;
 pub const SNAPSHOT: &str = include_str!("../../../resources/opencode-go-catalog.snapshot.json");
 const SEED: &str = include_str!("../../../../scripts/opencode-go-protocol-seed.json");
 
@@ -125,6 +125,7 @@ struct Cache { fetched_at: u64, digest: String, models: Vec<GoModelEntry> }
 struct Settings { base: String, proxy: Result<Option<String>, String>, blocked: bool }
 
 pub struct CatalogService {
+    pub metadata: Arc<crate::llm::model_catalog::ModelCatalog>,
     state: RwLock<GoCatalogDto>,
     settings: RwLock<Settings>,
     gate: Mutex<()>,
@@ -146,9 +147,10 @@ impl CatalogService {
             Some(c) => GoCatalogDto { models: Arc::new(c.models), fetched_at: c.fetched_at, source: "cache".into(), last_error: None },
             None => GoCatalogDto { models: Arc::new(snapshot_models()), fetched_at: 0, source: "snapshot".into(), last_error: None },
         };
-        Self { state: RwLock::new(dto), settings: RwLock::new(Settings { base: "https://opencode.ai/inference/go/v1".into(), proxy: Ok(None), blocked: true }), gate: Mutex::new(()), attempts: 0.into(), cache, metadata_url: METADATA_URL.into(), cancel: RwLock::new(tokio_util::sync::CancellationToken::new()) }
+        Self { metadata: crate::llm::model_catalog::shared(), state: RwLock::new(dto), settings: RwLock::new(Settings { base: "https://opencode.ai/inference/go/v1".into(), proxy: Ok(None), blocked: true }), gate: Mutex::new(()), attempts: 0.into(), cache, metadata_url: METADATA_URL.into(), cancel: RwLock::new(tokio_util::sync::CancellationToken::new()) }
     }
     pub fn configure(&self, base: String, proxy: Result<Option<String>, String>, blocked: bool) {
+        self.metadata.configure_network_policy(blocked);
         let next = Settings { base, proxy, blocked };
         let mut settings = self.settings.write().unwrap();
         if *settings != next {
@@ -220,18 +222,20 @@ impl CatalogService {
             Ok::<_, reqwest::Error>(value)
         };
         let s2 = async {
-            let value: Value = client.get(&self.metadata_url).send().await?.error_for_status()?.json().await?;
-            Ok::<_, reqwest::Error>(value)
+            let catalog = if self.metadata_url == METADATA_URL { self.metadata.clone() }
+                else { Arc::new(crate::llm::model_catalog::ModelCatalog::new(self.cache.with_extension("metadata.json"))) };
+            let data = catalog.refresh(settings.proxy.clone(), settings.blocked, true, &self.metadata_url).await;
+            match data.last_error {
+                Some(error) => Err(error),
+                None => Ok(data.providers),
+            }
         };
         let (live, metadata) = tokio::join!(s1, s2);
         let snapshot: Value = serde_json::from_str(SNAPSHOT).unwrap();
         let ids = live.as_ref().ok().and_then(|v| v["data"].as_array()).map(|a| a.iter().filter_map(|v| v["id"].as_str().map(String::from)).collect::<Vec<_>>());
         let meta = metadata.as_ref().ok().map(|v| &v["opencode-go"]).filter(|v| v["models"].is_object());
         if ids.is_none() && meta.is_none() {
-            let status = |result: &Result<Value,reqwest::Error>| result.as_ref().err()
-                .and_then(|e| e.status()).map(|s| s.as_u16().to_string())
-                .unwrap_or_else(|| "unreachable or invalid payload".into());
-            return Err(format!("Go catalog refresh failed: gateway {}, metadata {}; retained last-good catalog",status(&live),status(&metadata)));
+            return Err("Go catalog refresh failed: gateway and metadata unreachable or invalid; retained last-good catalog".into());
         }
         let fallback = current.models.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
         let warning = if ids.is_none() || meta.is_none() { Some("Partial catalog refresh: retained unavailable source".into()) } else { None };

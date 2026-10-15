@@ -7,6 +7,7 @@ import { ensureVaultReady } from "../../lib/vaultGate";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { CodexProxyFields } from "./CodexProxyFields";
 import { GoProviderFields } from "./GoProviderFields";
+import { ModelInspectorPanel } from "./ModelInspectorPanel";
 import { openExternalUrl } from "../../lib/sftp";
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -69,6 +70,8 @@ interface ProviderRowProps {
 function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing, t }: ProviderRowProps) {
   const blocked = useAiStore((s) => !!(s.config?.full_local_mode || s.config?.fully_disabled));
   const [expanded, setExpanded] = useState(false);
+  const [inspecting, setInspecting] = useState(false);
+  const inspectorButton = useRef<HTMLButtonElement>(null);
   const apiKeys = providerApiKeys(provider);
   const capabilities = {
     chat: provider.capabilities?.chat !== false,
@@ -87,7 +90,8 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
 
   return (
     <div
-      data-testid={id === "opencode-go" ? "go-provider-row" : undefined}
+      data-testid={id === "opencode-go" ? "go-provider-row" : "llm-provider-row"}
+      data-provider={id}
       className={`rounded border transition-colors ${
         isActive
           ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/5"
@@ -137,6 +141,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
                   <div key={index} className="flex items-center gap-1.5">
                     <input
                       type="password"
+                      data-testid="llm-provider-key"
                       className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
                       placeholder={`${t("aiSettings.llmApiKeyPlaceholder")} #${index + 1}`}
                       value={key}
@@ -180,6 +185,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
               <GoProviderFields provider={provider} onChange={onChange} blocked={blocked} />
             </> : <input
               type="text"
+              data-testid="llm-provider-model"
               className="taomni-input h-7 w-full text-[12px]"
               value={provider.model}
               onChange={(e) => onChange({ ...provider, model: e.target.value })}
@@ -258,10 +264,14 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
             />
           </div>
           <div className="flex items-center gap-2 pt-1">
+            <button ref={inspectorButton} type="button" data-testid="model-inspector-open" data-provider={id}
+              className="taomni-btn h-7 px-3 text-[12px]" aria-expanded={inspecting}
+              onClick={() => setInspecting((open) => !open)}>{t("modelInspector.title")}</button>
             <button
               type="button"
               className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
               onClick={onTest}
+              data-testid="llm-provider-test"
               disabled={testing || (id === "opencode-go" && blocked)}
             >
               {testing ? (
@@ -280,6 +290,10 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
               </span>
             )}
           </div>
+          {inspecting && <ModelInspectorPanel providerId={id} currentModel={provider.model}
+            blocked={blocked && (provider.runtime !== "llama-server" && provider.runtime !== "ollama"
+              || !!useAiStore.getState().config?.fully_disabled)}
+            onClose={() => { setInspecting(false); inspectorButton.current?.focus(); }} />}
         </div>
       )}
     </div>

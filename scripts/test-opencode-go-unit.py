@@ -49,7 +49,7 @@ def main():
         "\n[profile.dev]\ndebug = 0\n[profile.test]\ndebug = 0\n",
     )
     code = (root / "src-tauri/src/llm/mod.rs").read_text()
-    keep = {"anthropic", "openai_compat", "opencode_go"}
+    keep = {"anthropic", "openai_compat", "opencode_go", "model_catalog"}
     def registration(match):
         name = match.group(1)
         if name not in keep:
@@ -61,10 +61,11 @@ def main():
     (harness / "src/lib.rs").write_text(
         "pub mod llm {\n" + code + "\n}\n"
         f'#[path = {json.dumps(str(store))}] pub mod chat_store;\n'
-        "pub mod ai { pub mod config { pub fn default_ai_config_path() -> std::path::PathBuf "
+        f'pub mod ai {{ #[path = {json.dumps(str(root / "src-tauri/src/ai/model_inspector.rs"))}] pub mod model_inspector; '
+        "pub mod config { pub fn default_ai_config_path() -> std::path::PathBuf "
         '{ std::env::temp_dir().join("taomni-go-unit-config").join("ai.json") } } }\n',
     )
-    print("Scope: production llm contracts, chat/messages/Go transports/catalog, chat SQLite store.", flush=True)
+    print("Scope: production llm contracts, chat/messages/Go transports, shared catalog, inspector core and chat SQLite store.", flush=True)
     print("Excluded: Tauri/AppState, router/config integration, browser/native execution.", flush=True)
     command = [args.cargo, "test", "--offline", "--manifest-path", str(harness / "Cargo.toml"),
                "--lib", "-j", "2"]

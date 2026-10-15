@@ -1,5 +1,6 @@
 import { voiceStub } from "./voiceStub";
 import { goStubCatalog } from "./opencodeGoStub";
+import { inspectorStub, inspectorCheckStub } from "./modelInspectorStub";
 import {
   installStubMailQaControl,
   stubMailAppend,
@@ -5088,6 +5089,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "get_opencode_go_catalog": {
       return goStubCatalog(!!args?.forceRefresh) as T;
+    }
+    case "get_provider_models": {
+      return inspectorStub(String(args?.providerId), !!args?.forceRefresh) as T;
+    }
+    case "test_llm_model": {
+      return inspectorCheckStub(String(args?.providerId), String(args?.model)) as T;
+    }
+    case "test_llm_connection": {
+      return { ok: true, message: "Fixture pong (browser only)", latency_ms: 12 } as T;
     }
     case "get_ai_config": {
       try {

@@ -190,17 +190,25 @@ models.dev 的全量拉取、缓存文件、digest 去噪、刷新时机整套�
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 / 实际证据链接 | 当前缺口 |
 |---|---|---|---|---|---|
-| AC-I01 | §4.1/§4.2 | TASK-I02/I04 | V-I01、V-I03、V-I04、V-I06 | 单测/组件/case/真机记录（待生成） | 未实现 |
-| AC-I02 | §4.2 | TASK-I02 | V-I01 | 单测结果 | 未实现 |
-| AC-I03 | §4.2 | TASK-I02 | V-I01、V-I06 | 单测 + 真机截图 | 未实现 |
-| AC-I04 | §4.2 | TASK-I02 | V-I01、V-I06 | 真机记录 | 未实现 |
-| AC-I05 | §4.3 | TASK-I03 | V-I02、V-I06 | 单测 + 真机记录 | 未实现 |
-| AC-I06 | §4.1 | TASK-I04 | V-I03 | 组件测试 | 未实现 |
-| AC-I07 | §4.4 | TASK-I01 | V-I01（一致性断言）、V-I06 | 对照记录 | 未实现；若 Go 未先行则顺延补验 |
-| AC-I08 | §4.1/§4.3 | TASK-I03 | V-I02 | 单测结果 | 未实现 |
-| AC-I09 | §2.1 | TASK-I05 | V-I04 | 基线对照 | 未实现 |
+| AC-I01 | §4.1/§4.2 | TASK-I02/I04 | V-I01、V-I03、V-I04、V-I06 | [交付记录](model-inspector/delivery-notes.md) | 已实现/本地单测通过；browser/native 未执行 |
+| AC-I02 | §4.2 | TASK-I02 | V-I01 | 同上；组装/子树/差异单测 | 已实现/核心单测通过；IPC 整包未验证 |
+| AC-I03 | §4.2 | TASK-I02 | V-I01、V-I06 | 同上；alias/未收录单测 | 生产 deepseek-chat 目标未确认，显示未收录；真机未执行 |
+| AC-I04 | §4.2 | TASK-I02 | V-I01、V-I06 | 同上；local live/不可用/空态 | 核心与 UI 单测通过；local 真机未执行 |
+| AC-I05 | §4.3 | TASK-I03 | V-I02、V-I06 | 同上；probe/文件/store 单测 | 核心单测通过；vault/IPC/冷重启未验证 |
+| AC-I06 | §4.1 | TASK-I04 | V-I03 | 同上；真实 save 链 mounted/store 测试 | 本地单测通过；原生保存链未验证 |
+| AC-I07 | §4.4 | TASK-I01 | V-I01（一致性断言）、V-I06 | 同上；共享目录与 Go DTO 对照单测 | Go 先行且已改共享；真机流量/四协议未验证 |
+| AC-I08 | §4.1/§4.3 | TASK-I03 | V-I02 | 同上；拒绝/取消与 disabled 单测 | 本地单测通过；系统级零流量未验证 |
+| AC-I09 | §2.1 | TASK-I05 | V-I04 | 同上；改前9条、改后保留回归 | 本地保留单测通过；browser/native 旧流程未执行 |
 
 本轮交付条件：三端代码兼容检查（V-I05）通过、所选自动化（V-I01～V-I04）实际执行通过、Linux 端真机（V-I06）通过且无已知代码不兼容；其他端未验证保留接续计划。推送前门禁同仓库既定规矩（TASK-I05 执行）。
+
+**2026-10-15 本轮授权范围调整**：用户明确仅运行本地单元测试，编写 browser/native
+用例但不执行。因此上述完整验收条件仍未满足，不宣称真机或三端通过。
+TASK-I01～I04 已实现；本地前端 29、Rust 隔离 26、Node 3 条通过，tsc 与
+QA 静态检查通过；整包 Rust 单测被 bindgen/libclang 环境阻塞。
+实际范围和 AC/V 映射见 [delivery-notes.md](model-inspector/delivery-notes.md)，
+TC-AI-012～020 与 [native 接续用例](../qa-ui-auto-tests/native/model-inspector.md)
+全标为未运行。
 
 ## 10. 风险、未决项与回退
 

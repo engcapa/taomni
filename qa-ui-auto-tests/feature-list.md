@@ -11367,6 +11367,74 @@ controls:
 
 ---
 
+### 全 Provider 模型检查
+
+<!-- feature
+id: F-AI-2.8
+status: done
+area: ai/settings
+components: [LlmProvidersPanel, ModelInspectorPanel]
+files:
+  - src/components/settings/LlmProvidersPanel.tsx
+  - src/components/settings/ModelInspectorPanel.tsx
+  - src/stores/modelInspectorStore.ts
+  - src/stubs/modelInspectorStub.ts
+  - src-tauri/src/ai/model_inspector.rs
+  - src-tauri/src/ai/commands.rs
+  - src-tauri/src/llm/model_catalog.rs
+controls:
+  - {id: model-inspector-open, selector: '[data-testid="model-inspector-open"]', kind: interactive}
+  - {id: model-inspector-panel, selector: '[data-testid="model-inspector-panel"]', kind: display}
+  - {id: model-inspector-summary, selector: '[data-testid="model-inspector-summary"]', kind: display}
+  - {id: model-inspector-row, selector: '[data-testid="model-inspector-row"]', kind: display}
+  - {id: model-inspector-result, selector: '[data-testid="model-inspector-result"]', kind: display}
+  - {id: model-inspector-refresh, selector: '[data-testid="model-inspector-refresh"]', kind: interactive}
+  - {id: model-inspector-check-current, selector: '[data-testid="model-inspector-check-current"]', kind: interactive}
+  - {id: model-inspector-check-all, selector: '[data-testid="model-inspector-check-all"]', kind: interactive}
+  - id: model-inspector-check
+    selector: '[data-testid="model-inspector-check"]'
+    kind: interactive
+    aliases:
+      - '[data-testid="model-inspector-row"][data-model="unlisted-model"] [data-testid="model-inspector-check"]'
+      - '[data-testid="model-inspector-row"][data-model="loaded-model"] [data-testid="model-inspector-check"]'
+      - '[data-testid="model-inspector-row"]:first-child [data-testid="model-inspector-check"]'
+  - id: model-inspector-select
+    selector: '[data-testid="model-inspector-select"]'
+    kind: interactive
+    aliases:
+      - '[data-testid="model-inspector-row"][data-model="catalog-model"] [data-testid="model-inspector-select"]'
+      - '[data-testid="model-inspector-row"][data-model="catalog-model-59"] [data-testid="model-inspector-select"]'
+  - {id: model-inspector-close, selector: '[data-testid="model-inspector-close"]', kind: interactive}
+  - {id: model-inspector-confirm, selector: '[data-testid="model-inspector-confirm"]', kind: display}
+  - {id: model-inspector-confirm-all, selector: '[data-testid="model-inspector-confirm-all"]', kind: interactive}
+  - {id: model-inspector-cancel-all, selector: '[data-testid="model-inspector-cancel-all"]', kind: interactive}
+  - {id: model-inspector-disabled, selector: '[data-testid="model-inspector-disabled"]', kind: display}
+  - {id: model-inspector-error, selector: '[data-testid="model-inspector-error"]', kind: display}
+  - {id: model-inspector-empty, selector: '[data-testid="model-inspector-empty"]', kind: display}
+  - {id: model-inspector-unavailable, selector: '[data-testid="model-inspector-unavailable"]', kind: display}
+  - {id: llm-provider-row, selector: '[data-testid="llm-provider-row"]', kind: interactive}
+  - id: llm-provider-model
+    selector: '[data-testid="llm-provider-model"]'
+    kind: interactive
+    aliases: ['[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]']
+  - id: llm-provider-key
+    selector: '[data-testid="llm-provider-key"]'
+    kind: interactive
+    aliases: ['[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-key"]']
+  - id: llm-provider-test
+    selector: '[data-testid="llm-provider-test"]'
+    kind: interactive
+    aliases: ['[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-test"]']
+-->
+
+- 所有配置中的 LLM provider 行（含未来新增 provider）均有模型检查入口。
+  目录精确命中、登记别名、local 实时清单和未收录分开标注；未知值不猜测。
+- 显式逐行检测、逐个批量检测（需确认额度提示）、独立结果文件持久化、
+  现有 vault/配置保存链设为当前模型；AI 网络策略限制 cloud、local 两种边界。
+- 与 Go 共用 models.dev 目录底座，Go 的模型行集和协议覆盖规则不另建副本。
+  TC-AI-012～020 与 `native/model-inspector.md` **已编写但未运行**；
+  全平台 WebView、真实凭据/IPC/网络和冷启动持久化没有通过证据。
+
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >
 > - Ribbon `Tools`（除 Tunneling 之外的网络工具）

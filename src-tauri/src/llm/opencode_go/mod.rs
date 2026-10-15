@@ -3,7 +3,7 @@ pub mod google;
 pub mod responses;
 mod transport;
 #[cfg(test)]
-mod test_gateway;
+pub(crate) mod test_gateway;
 
 use crate::llm::{ChatRequest, ChatResponse, ChatStreamEvent, ChatTool, Llm, LlmError, LlmResult};
 use async_trait::async_trait;

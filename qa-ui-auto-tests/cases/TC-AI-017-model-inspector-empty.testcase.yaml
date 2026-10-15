@@ -1,0 +1,39 @@
+id: TC-AI-017
+title: True empty catalog has explanation and disables check actions
+description: Synthetic empty fixture, not a real provider catalog. Authored, unrun.
+covers: [F-AI-2.8]
+tags: [ai, model-inspector, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}?inspectorFixture=empty
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="local"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="local"]'
+- wait_for: '[data-testid="model-inspector-empty"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-empty"]'
+    contains: No models
+- assert_not_visible: '[data-testid="model-inspector-unavailable"]'
+- assert_attribute: {selector: '[data-testid="model-inspector-check-all"]', name: disabled, equals: ''}
+- assert_attribute: {selector: '[data-testid="model-inspector-check-current"]', name: disabled, equals: ''}
+verification:
+  review: pending
+  requirements:
+  - id: I-EMPTY
+    requirement: A successful empty list is explained, distinct from service failure, and cannot be checked.
+    actions: [7, 8]
+    checkpoints:
+    - {step: 10, expectation: Empty message shown.}
+    - {step: 11, expectation: No false service failure.}
+    - {step: 12, expectation: Batch disabled.}
+    - {step: 13, expectation: Current check disabled.}
+    results: [10, 11, 12, 13]
+  visual:
+  - {check: Empty state, method: automated, reason: Message and control attributes.}
+  native:
+  - {check: Actual successful empty model response, method: manual, reason: N-I-05 uses real loopback HTTP rather than browser stubs.}

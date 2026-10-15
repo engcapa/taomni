@@ -401,6 +401,7 @@ const DEFAULT_CONFIG: AiConfig = {
     active: "deepseek",
     providers: {
       deepseek:    { base_url: "https://api.deepseek.com/v1",                    api_key: "", model: "deepseek-chat",                        runtime: "openai-compat", capabilities: { chat: true } },
+      anthropic:   { base_url: "https://api.anthropic.com/v1", api_key: "", model: "claude-sonnet-4-5", runtime: "anthropic", capabilities: { chat: true } },
       "opencode-go": { base_url: "https://opencode.ai/inference/go/v1", api_key: "", model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true }, proxy_mode: "none" },
       agnes:       { base_url: "https://apihub.agnes-ai.com/v1",                 api_key: "", model: "agnes-2.0-flash",                     runtime: "openai-compat", capabilities: { chat: true, image_generation: true, video_generation: true }, image_model: "agnes-image-2.1-flash", video_model: "agnes-video-v2.0" },
       glm:         { base_url: "https://open.bigmodel.cn/api/paas/v4",           api_key: "", model: "glm-4-flash",                          runtime: "openai-compat", capabilities: { chat: true } },
@@ -654,6 +655,7 @@ function isPlaintextAsrKey(key: string): boolean {
 function normalizeAiConfig(config: AiConfig): AiConfig {
   const providers = {
     agnes: DEFAULT_CONFIG.llm.providers.agnes,
+    anthropic: DEFAULT_CONFIG.llm.providers.anthropic,
     "opencode-go": DEFAULT_CONFIG.llm.providers["opencode-go"],
     ...config.llm.providers,
   };

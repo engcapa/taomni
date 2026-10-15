@@ -6,6 +6,7 @@ pub mod gpu_detect;
 pub mod llama_server;
 pub mod openai_compat;
 pub mod opencode_go;
+pub mod model_catalog;
 pub mod router;
 
 use async_trait::async_trait;

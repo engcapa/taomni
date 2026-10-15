@@ -991,6 +991,8 @@ pub fn run() {
             vault::vault_list,
             ai::commands::get_ai_config,
             ai::commands::get_opencode_go_catalog,
+            ai::commands::get_provider_models,
+            ai::commands::test_llm_model,
             ai::commands::save_ai_config,
             ai::commands::save_ai_api_key,
             ai::commands::test_llm_connection,

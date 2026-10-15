@@ -103,6 +103,39 @@
   ↳ `text="Disable AI completely"` — alias
 - `text="Full local mode"` — interactive [optional] — F-AI-2.1.privacy-fully-local
 
+## ai/settings (F-AI-2.8)
+
+- `[data-testid="model-inspector-open"]` — interactive — F-AI-2.8.model-inspector-open
+- `[data-testid="model-inspector-panel"]` — display — F-AI-2.8.model-inspector-panel
+- `[data-testid="model-inspector-summary"]` — display — F-AI-2.8.model-inspector-summary
+- `[data-testid="model-inspector-row"]` — display — F-AI-2.8.model-inspector-row
+- `[data-testid="model-inspector-result"]` — display — F-AI-2.8.model-inspector-result
+- `[data-testid="model-inspector-refresh"]` — interactive — F-AI-2.8.model-inspector-refresh
+- `[data-testid="model-inspector-check-current"]` — interactive — F-AI-2.8.model-inspector-check-current
+- `[data-testid="model-inspector-check-all"]` — interactive — F-AI-2.8.model-inspector-check-all
+- `[data-testid="model-inspector-check"]` — interactive — F-AI-2.8.model-inspector-check
+  ↳ `[data-testid="model-inspector-row"][data-model="unlisted-model"] [data-testid="model-inspector-check"]` — alias
+  ↳ `[data-testid="model-inspector-row"][data-model="loaded-model"] [data-testid="model-inspector-check"]` — alias
+  ↳ `[data-testid="model-inspector-row"]:first-child [data-testid="model-inspector-check"]` — alias
+- `[data-testid="model-inspector-select"]` — interactive — F-AI-2.8.model-inspector-select
+  ↳ `[data-testid="model-inspector-row"][data-model="catalog-model"] [data-testid="model-inspector-select"]` — alias
+  ↳ `[data-testid="model-inspector-row"][data-model="catalog-model-59"] [data-testid="model-inspector-select"]` — alias
+- `[data-testid="model-inspector-close"]` — interactive — F-AI-2.8.model-inspector-close
+- `[data-testid="model-inspector-confirm"]` — display — F-AI-2.8.model-inspector-confirm
+- `[data-testid="model-inspector-confirm-all"]` — interactive — F-AI-2.8.model-inspector-confirm-all
+- `[data-testid="model-inspector-cancel-all"]` — interactive — F-AI-2.8.model-inspector-cancel-all
+- `[data-testid="model-inspector-disabled"]` — display — F-AI-2.8.model-inspector-disabled
+- `[data-testid="model-inspector-error"]` — display — F-AI-2.8.model-inspector-error
+- `[data-testid="model-inspector-empty"]` — display — F-AI-2.8.model-inspector-empty
+- `[data-testid="model-inspector-unavailable"]` — display — F-AI-2.8.model-inspector-unavailable
+- `[data-testid="llm-provider-row"]` — interactive — F-AI-2.8.llm-provider-row
+- `[data-testid="llm-provider-model"]` — interactive — F-AI-2.8.llm-provider-model
+  ↳ `[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]` — alias
+- `[data-testid="llm-provider-key"]` — interactive — F-AI-2.8.llm-provider-key
+  ↳ `[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-key"]` — alias
+- `[data-testid="llm-provider-test"]` — interactive — F-AI-2.8.llm-provider-test
+  ↳ `[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-test"]` — alias
+
 ## ai/terminal (F-AI-2.2)
 
 - `input[name="inlineSuggestionsSource"][value="history"]` — interactive — F-AI-2.2.inline-suggestions-history

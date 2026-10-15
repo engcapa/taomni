@@ -1,11 +1,13 @@
 // English translation dictionary. This is the authoritative shape for all
 // other locales — adding a key here surfaces type errors elsewhere via the
 // shared `Dict` type.
+import { modelInspectorEn } from "./modelInspector";
 type Dict = {
   [key: string]: string | Dict;
 };
 
 const dict = {
+  modelInspector: modelInspectorEn,
 
   app: {
     name: "Taomni",

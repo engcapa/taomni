@@ -1,10 +1,12 @@
 import type { en } from "./en";
+import { modelInspectorZh } from "./modelInspector";
 
 // Use a deep partial to allow gradual translation while still letting the
 // type system flag obvious shape mismatches against the English dictionary.
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export const zhCN: DeepPartial<typeof en> = {
+  modelInspector: modelInspectorZh,
 
   app: {
     name: "Taomni",

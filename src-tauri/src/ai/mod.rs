@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod model_inspector;
 pub mod config;
 pub mod network_policy;
 pub mod session_safety;
