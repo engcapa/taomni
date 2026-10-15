@@ -25,6 +25,7 @@ const terminalMocks = vi.hoisted(() => {
       rows: 24,
       buffer: {
         active: {
+          type: "normal",
           length: 0,
           viewportY: 0,
           getLine: vi.fn(),
@@ -63,6 +64,7 @@ const terminalMocks = vi.hoisted(() => {
       }),
       refresh: vi.fn(),
       write: vi.fn(),
+      clear: vi.fn(),
       focus,
       dispose: vi.fn(),
       getSelection: vi.fn(() => ""),
@@ -706,6 +708,23 @@ describe("TerminalPanel focus behavior", () => {
       expect(lastWrite?.[1]).toBeTypeOf("function");
     },
   );
+
+  it("synchronizes the mirrored buffer when CSI 3J arrives split across output chunks", async () => {
+    let finishConnect: ((sessionId: string) => void) | undefined;
+    let onOutput: ((data: Uint8Array) => void) | undefined;
+    ipcMocks.createSshTerminal.mockImplementation((...args: unknown[]) => {
+      onOutput = args[9] as (data: Uint8Array) => void;
+      return new Promise<string>((resolve) => { finishConnect = resolve; });
+    });
+    render(<TerminalPanel visible ssh={sshInfo} />);
+    await waitFor(() => expect(finishConnect).toBeTypeOf("function"));
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    await act(async () => finishConnect?.("terminal-session"));
+
+    act(() => onOutput?.(new Uint8Array([0x1b, 0x5b])));
+    act(() => onOutput?.(new Uint8Array([0x33, 0x4a, 0x0a])));
+    expect(term.clear).toHaveBeenCalledOnce();
+  });
 
   it("keeps early SSH error output without displaying a successful connection banner", async () => {
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {

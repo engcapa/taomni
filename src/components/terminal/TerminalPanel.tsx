@@ -2477,6 +2477,28 @@ export function TerminalPanel({
     });
     termRef.current = term;
     const taskExitOscParser = createTaskExitOscParser();
+    // Some PTY/WebView combinations render CSI 3 J visually but leave the
+    // old normal-buffer row in xterm's scrollback model. Keep the mirrored
+    // text in sync with the visible terminal by clearing the active buffer
+    // immediately before xterm consumes that explicit erase-saved-lines
+    // sequence. This is a four-byte state machine so split output chunks do
+    // not require decoding or copying the full output stream.
+    let eraseSavedLinesMatch = 0;
+    const sawEraseSavedLines = (bytes: Uint8Array): boolean => {
+      const sequence = [0x1b, 0x5b, 0x33, 0x4a]; // ESC [ 3 J
+      for (const byte of bytes) {
+        if (byte === sequence[eraseSavedLinesMatch]) {
+          eraseSavedLinesMatch += 1;
+          if (eraseSavedLinesMatch === sequence.length) {
+            eraseSavedLinesMatch = 0;
+            return true;
+          }
+        } else {
+          eraseSavedLinesMatch = byte === sequence[0] ? 1 : 0;
+        }
+      }
+      return false;
+    };
 
     const fitAddon = new FitAddon();
     fitAddonRef.current = fitAddon;
@@ -2852,6 +2874,9 @@ export function TerminalPanel({
           if (isComposingRef.current) {
             compositionBufferRef.current.push(filtered);
           } else {
+            if (sawEraseSavedLines(filtered) && term.buffer.active.type === "normal") {
+              term.clear();
+            }
             term.write(filtered, () => {
               syncAutomationState();
               installSshCwdIntegrationRef.current?.();
