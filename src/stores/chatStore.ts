@@ -22,6 +22,7 @@ export interface ChatThread {
   output_format?: string | null;
   /** Per-thread Claude Code model override. null = inherit the Claude Code default model. */
   cc_model?: string | null;
+  llm_model?: string | null;
 }
 
 /** A live, display-only Claude Code tool-activity card (3.5). */
@@ -348,6 +349,7 @@ interface ChatStore {
   deleteThread: (threadId: string) => Promise<void>;
   setThreadProvider: (threadId: string, providerId: string) => Promise<void>;
   setThreadCcModel: (threadId: string, model: string | null) => Promise<void>;
+  setThreadLlmModel: (threadId: string, model: string | null) => Promise<void>;
   /// Set or clear the per-thread output-format override.
   /// Pass `null` (or omit) to clear so the thread inherits the global setting.
   setThreadOutputFormat: (threadId: string, format: string | null) => Promise<void>;
@@ -624,6 +626,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }));
   },
 
+  setThreadLlmModel: async (threadId: string, model: string | null) => {
+    await invoke("chat_set_thread_llm_model", { threadId, model });
+    set((state) => ({
+      threads: state.threads.map((thread) => thread.id === threadId ? { ...thread, llm_model: model } : thread),
+    }));
+  },
   setThreadCcModel: async (threadId: string, model: string | null) => {
     // Backend recycles the CC process so the next message respawns with the
     // new --model; empty/null clears the override (inherit default).

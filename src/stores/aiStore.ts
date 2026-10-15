@@ -40,6 +40,7 @@ export interface AsrConfig {
 }
 
 export interface LlmProviderConfig {
+  protocol_overrides?: Record<string, string>;
   base_url: string;
   api_key: string;
   api_keys?: string[];
@@ -351,7 +352,7 @@ export function chatDrawerProviderIds(
     preferred && orderedIds.includes(preferred)
       ? [preferred, ...orderedIds]
       : orderedIds,
-  ));
+  )).filter((id) => id !== "opencode-go" || !(config?.full_local_mode || config?.fully_disabled));
 }
 
 interface AiStore {
@@ -400,6 +401,7 @@ const DEFAULT_CONFIG: AiConfig = {
     active: "deepseek",
     providers: {
       deepseek:    { base_url: "https://api.deepseek.com/v1",                    api_key: "", model: "deepseek-chat",                        runtime: "openai-compat", capabilities: { chat: true } },
+      "opencode-go": { base_url: "https://opencode.ai/inference/go/v1", api_key: "", model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true }, proxy_mode: "none" },
       agnes:       { base_url: "https://apihub.agnes-ai.com/v1",                 api_key: "", model: "agnes-2.0-flash",                     runtime: "openai-compat", capabilities: { chat: true, image_generation: true, video_generation: true }, image_model: "agnes-image-2.1-flash", video_model: "agnes-video-v2.0" },
       glm:         { base_url: "https://open.bigmodel.cn/api/paas/v4",           api_key: "", model: "glm-4-flash",                          runtime: "openai-compat", capabilities: { chat: true } },
       siliconflow: { base_url: "https://api.siliconflow.cn/v1",                  api_key: "", model: "Qwen/Qwen2.5-Coder-7B-Instruct",       runtime: "openai-compat", capabilities: { chat: true } },
@@ -650,9 +652,11 @@ function isPlaintextAsrKey(key: string): boolean {
 }
 
 function normalizeAiConfig(config: AiConfig): AiConfig {
-  const providers = config.llm.providers.agnes
-    ? config.llm.providers
-    : { ...config.llm.providers, agnes: DEFAULT_CONFIG.llm.providers.agnes };
+  const providers = {
+    agnes: DEFAULT_CONFIG.llm.providers.agnes,
+    "opencode-go": DEFAULT_CONFIG.llm.providers["opencode-go"],
+    ...config.llm.providers,
+  };
   const providerGroups = Object.fromEntries(
     Object.entries(config.llm.provider_groups ?? {}).map(([id, group]) => [
       id,

@@ -1,0 +1,115 @@
+id: TC-AI-005
+title: OpenCode Go settings, protocol override and per-thread model selection
+description: Production renderer and persistence stubs only. No real gateway,
+  encryption, SQLite, network-policy or subscription evidence. Auth/send/stream
+  boundaries are covered by the linked native runbook; this case is authored, unrun.
+covers: [F-AI-2.4]
+tags: [ai, opencode-go, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: '[data-testid="go-provider-row"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- wait_for: '[data-testid="go-default-model-select"]'
+- assert_attribute:
+    selector: '[data-testid="go-default-model-select"]'
+    name: value
+    equals: deepseek-v4.1-flash
+- assert_text:
+    selector: '[data-testid="go-catalog-status"]'
+    contains: Bundled snapshot
+- click: '[data-testid="go-protocols"] summary'
+- assert_visible: '[data-testid="go-protocol-row"][data-model="omen-alpha"]'
+- assert_text:
+    selector: '[data-testid="go-protocol-row"][data-model="omen-alpha"]'
+    contains: Unclassified
+- select_option:
+    selector: '[data-testid="go-protocol-row"][data-model="deepseek-v4.1-flash"] [data-testid="go-protocol-select"]'
+    value: messages
+- assert_text:
+    selector: '[data-testid="go-protocol-row"][data-model="deepseek-v4.1-flash"]'
+    contains: Manual
+- click: '[data-testid="llm-providers-save"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"deepseek-v4.1-flash":"messages"'
+- click: '[data-testid="go-protocol-row"][data-model="deepseek-v4.1-flash"] [data-testid="go-protocol-reset"]'
+- assert_attribute:
+    selector: '[data-testid="go-protocol-row"][data-model="deepseek-v4.1-flash"] [data-testid="go-protocol-select"]'
+    name: value
+    equals: chat
+- click: '[data-testid="llm-providers-save"]'
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].protocol_overrides['deepseek-v4.1-flash'] === undefined
+    expect_truthy: true
+- click: '[data-testid="tab-chat-toggle"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- select_option:
+    selector: '[data-testid="ai-chat-provider-select"]'
+    value: opencode-go
+- click: '[data-testid="ai-chat-drawer"] button[title="New chat"]'
+- wait_for: '[data-testid="go-thread-model-select"]'
+- select_option:
+    selector: '[data-testid="go-thread-model-select"]'
+    value: kimi-k3
+- assert_attribute:
+    selector: '[data-testid="go-thread-model-select"]'
+    name: value
+    equals: kimi-k3
+- assert_localstorage:
+    key: taomni.stub.chatThreads.v1
+    contains: '"llm_model":"kimi-k3"'
+- select_option:
+    selector: '[data-testid="go-thread-model-select"]'
+    value: ''
+- assert_attribute:
+    selector: '[data-testid="go-thread-model-select"]'
+    name: value
+    equals: ''
+- select_option:
+    selector: '[data-testid="ai-chat-provider-select"]'
+    value: deepseek
+- assert_not_visible: '[data-testid="go-thread-picker"]'
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Default Go configuration and unclassified catalog entries are visible.
+    actions: [5, 6, 8, 12]
+    checkpoints:
+    - {step: 10, expectation: Default model equals deepseek-v4.1-flash.}
+    - {step: 14, expectation: Unclassified model is retained.}
+    results: [10, 14]
+  - id: R2
+    requirement: All-model overrides save and restore through existing configuration path.
+    actions: [15, 17, 19, 21]
+    checkpoints:
+    - {step: 18, expectation: Stub persistence contains the manual protocol override.}
+    - {step: 20, expectation: Restore automatic returns chat.}
+    - {step: 23, expectation: Saved configuration no longer contains the manual override.}
+    results: [18, 20, 23]
+  - id: R3
+    requirement: Go-only picker pins and explicitly clears a thread model without affecting other providers.
+    actions: [26, 27, 29, 32, 34]
+    checkpoints:
+    - {step: 30, expectation: Selected model remains kimi-k3.}
+    - {step: 31, expectation: Browser thread persistence records the pin.}
+    - {step: 33, expectation: Clearing selects the provider default.}
+    - {step: 35, expectation: Switching away hides Go controls.}
+    results: [30, 31, 33, 35]
+  visual:
+  - check: Controls remain readable in narrow drawer and settings panes.
+    method: manual
+    reason: Inspect grouped options and overflow at 380px and 1024px; not executed.
+  native:
+  - check: Vault, SQLite and real gateway protocol effects.
+    method: external
+    reason: See qa-ui-auto-tests/native/opencode-go-provider.md; browser stubs cannot prove them.

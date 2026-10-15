@@ -417,6 +417,7 @@ pub async fn chat_new_thread(
         // New threads inherit the global default; the user can override per-thread later.
         output_format: None,
         cc_model: None,
+        llm_model: None,
     };
     let db = state.db.lock().map_err(|e| e.to_string())?;
     store::create_thread(&db, &thread).map_err(|e| e.to_string())?;
@@ -503,6 +504,20 @@ pub async fn chat_set_thread_cc_model(
     crate::agent::cc_bridge::commands::recycle_thread_process(state.inner(), &thread_id).await;
     crate::agent::codex_bridge::commands::recycle_thread_process(state.inner(), &thread_id).await;
     Ok(())
+}
+
+pub fn thread_session_key(thread_id: &str) -> String {
+    crate::llm::opencode_go::catalog::session_key(thread_id)
+}
+
+#[tauri::command]
+pub async fn chat_set_thread_llm_model(
+    thread_id: String,
+    model: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    store::update_thread_llm_model(&db, &thread_id, model.as_deref()).map_err(|e| e.to_string())
 }
 
 /// Set or clear the per-thread output-format override ("md" | "html" | "plain").
@@ -1520,6 +1535,8 @@ pub async fn chat_send(
         max_tokens: Some(1024),
         temperature: Some(0.7),
         stream: false,
+        model_override: thread.llm_model.clone().filter(|m| !m.trim().is_empty()),
+        session_key: Some(thread_session_key(&thread.id)),
     };
 
     let resp = {
@@ -3029,6 +3046,8 @@ pub async fn chat_stream(
         max_tokens: Some(1024),
         temperature: Some(0.7),
         stream: true,
+        model_override: thread.llm_model.clone().filter(|m| !m.trim().is_empty()),
+        session_key: Some(thread_session_key(&thread.id)),
     };
 
     // Allocate the assistant message id and begin streaming.
@@ -3167,6 +3186,8 @@ pub async fn chat_stream(
                             max_tokens: llm_req.max_tokens,
                             temperature: llm_req.temperature,
                             stream: false,
+                            model_override: llm_req.model_override.clone(),
+                            session_key: llm_req.session_key.clone(),
                         };
                         let resp = tokio::select! {
                             _ = cancel_token.cancelled() => {

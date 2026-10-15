@@ -216,6 +216,8 @@ pub fn run() {
                 ai_ctx,
                 lanchat_state,
             ));
+            let go_catalog = app.state::<AppState>().opencode_go_catalog.clone();
+            tauri::async_runtime::spawn(async move { go_catalog.refresh(true).await; });
             app.state::<AppState>()
                 .lsp
                 .attach_app(app.handle().clone());
@@ -988,6 +990,7 @@ pub fn run() {
             vault::vault_delete,
             vault::vault_list,
             ai::commands::get_ai_config,
+            ai::commands::get_opencode_go_catalog,
             ai::commands::save_ai_config,
             ai::commands::save_ai_api_key,
             ai::commands::test_llm_connection,
@@ -1037,6 +1040,7 @@ pub fn run() {
             chat::chat_delete_thread,
             chat::chat_set_thread_provider,
             chat::chat_set_thread_cc_model,
+            chat::chat_set_thread_llm_model,
             chat::chat_set_thread_output_format,
             chat::chat_purge_old,
             chat::chat_export_archive,

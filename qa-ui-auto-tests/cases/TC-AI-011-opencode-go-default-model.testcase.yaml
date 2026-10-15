@@ -1,0 +1,50 @@
+id: TC-AI-011
+title: OpenCode Go default model selection survives saving and reopening
+description: Browser renderer and stub persistence only; does not send a real
+  request or assert SQLite. Authored, unrun.
+covers: [F-AI-2.4]
+tags: [ai, opencode-go, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: '[data-testid="go-provider-row"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- wait_for: '[data-testid="go-default-model-select"]'
+- select_option:
+    selector: '[data-testid="go-default-model-select"]'
+    value: kimi-k3
+- click: '[data-testid="llm-providers-save"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"model":"kimi-k3"'
+- reload: {}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- wait_for: '[data-testid="go-default-model-select"]'
+- assert_attribute:
+    selector: '[data-testid="go-default-model-select"]'
+    name: value
+    equals: kimi-k3
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Go has an editable default model and stores the choice independently of thread pins.
+    actions: [5, 6, 8, 10, 11, 13, 15, 16, 17]
+    checkpoints:
+    - {step: 12, expectation: Saved configuration contains the selected default model.}
+    - {step: 19, expectation: Reopening shows the same default model.}
+    results: [12, 19]
+  visual:
+  - {check: Dropdown remains legible in a narrow settings pane., method: manual, reason: "Authored, unrun."}
+  native:
+  - {check: Native AI config serialization and network dispatch use the selected default., method: external, reason: "N-GO-01 and N-GO-02; this browser case has no native evidence."}

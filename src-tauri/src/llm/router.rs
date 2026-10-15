@@ -620,6 +620,10 @@ pub fn build_router_with_proxy_db(
     proxy_db: Option<&rusqlite::Connection>,
 ) -> LlmRouter {
     let mut router = LlmRouter::new(&cfg.active);
+    let go_catalog = crate::llm::opencode_go::catalog::shared_catalog();
+    if let Some(go) = cfg.providers.get("opencode-go") {
+        go_catalog.configure(go.base_url.clone(), crate::ai::config::resolve_go_proxy_url(go, proxy_db, vault), full_local_mode);
+    }
 
     for (id, p) in &cfg.providers {
         if !p.capabilities.chat {
@@ -633,20 +637,28 @@ pub fn build_router_with_proxy_db(
 
         if !matches!(
             p.runtime.as_str(),
-            "openai-compat" | "llama-server" | "ollama" | "anthropic"
+            "openai-compat" | "llama-server" | "ollama" | "anthropic" | "opencode-go"
         ) {
             tracing::info!(provider = %id, runtime = %p.runtime, "skipping non-openai-compat provider in router");
             continue;
         }
 
-        let proxy_url = match resolve_provider_proxy_url(p, proxy_db, vault) {
+        let proxy_result = if p.runtime == "opencode-go" {
+            crate::ai::config::resolve_go_proxy_url(p, proxy_db, vault)
+        } else { resolve_provider_proxy_url(p, proxy_db, vault) };
+        let go_proxy_error = if p.runtime == "opencode-go" { proxy_result.as_ref().err().cloned() } else { None };
+        let proxy_url = match proxy_result {
             Ok(proxy_url) => proxy_url,
             Err(e) => {
-                tracing::warn!(
-                    provider = %id,
-                    error = %e,
-                    "provider proxy could not be resolved; using direct connection"
-                );
+                if p.runtime == "opencode-go" {
+                    tracing::warn!(provider = %id, error = %e, "Go proxy resolution failed; requests fail closed");
+                } else {
+                    tracing::warn!(
+                        provider = %id,
+                        error = %e,
+                        "provider proxy could not be resolved; using direct connection"
+                    );
+                }
                 None
             }
         };
@@ -667,6 +679,13 @@ pub fn build_router_with_proxy_db(
             };
 
             let provider: Arc<dyn Llm> = match p.runtime.as_str() {
+                "opencode-go" if go_proxy_error.is_some() => crate::llm::opencode_go::unavailable(
+                    id.clone(), p.model.clone(), go_proxy_error.clone().unwrap(),
+                ),
+                "opencode-go" => Arc::new(crate::llm::opencode_go::OpenCodeGoProvider::new(
+                    id.clone(), p.base_url.clone(), resolved_key, p.model.clone(), proxy_url.clone(),
+                    go_catalog.clone(), p.protocol_overrides.clone(),
+                )),
                 "openai-compat" | "llama-server" | "ollama" => {
                     Arc::new(OpenAiCompatProvider::new_with_proxy_url(
                         id.as_str(),
@@ -750,7 +769,7 @@ pub fn build_router_with_proxy_db(
 
 /// Build a router from a full AiConfig (currently only forwards llm).
 pub fn build_router_from_ai(cfg: &AiConfig, vault: Option<&crate::vault::Vault>) -> LlmRouter {
-    build_router(&cfg.llm, vault, cfg.full_local_mode)
+    build_router_from_ai_with_proxy_db(cfg, vault, None)
 }
 
 pub fn build_router_from_ai_with_proxy_db(
@@ -758,5 +777,13 @@ pub fn build_router_from_ai_with_proxy_db(
     vault: Option<&crate::vault::Vault>,
     proxy_db: Option<&rusqlite::Connection>,
 ) -> LlmRouter {
-    build_router_with_proxy_db(&cfg.llm, vault, cfg.full_local_mode, proxy_db)
+    let router = build_router_with_proxy_db(&cfg.llm, vault, cfg.full_local_mode, proxy_db);
+    if cfg.fully_disabled {
+        if let Some(go) = cfg.llm.providers.get("opencode-go") {
+            crate::llm::opencode_go::catalog::shared_catalog().configure(
+                go.base_url.clone(), crate::ai::config::resolve_go_proxy_url(go, proxy_db, vault), true,
+            );
+        }
+    }
+    router
 }

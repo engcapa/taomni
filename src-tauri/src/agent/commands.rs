@@ -64,6 +64,7 @@ pub async fn agent_explain_error(
         max_tokens: Some(800),
         temperature: Some(0.3),
         stream: false,
+        ..Default::default()
     };
 
     let resp = {

@@ -1,0 +1,10 @@
+{
+  "provenance": "Synthetic IDs from design appendix A. NOT a recording from a live OpenCode Go account.",
+  "data": [
+    {"id": "deepseek-v4.1-flash"},
+    {"id": "kimi-k2.6"},
+    {"id": "fresh-anthropic-model"},
+    {"id": "omen-alpha"},
+    {"id": "grok-4.7"}
+  ]
+}

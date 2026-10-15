@@ -5,6 +5,8 @@ import { useAppStore } from "../../stores/appStore";
 import { useChatStore, type ChatThread } from "../../stores/chatStore";
 import { useTaoHubStore } from "../../stores/taoHubStore";
 import { useNotesStore } from "../../stores/notesStore";
+import { useOpencodeGoStore } from "../../stores/opencodeGoStore";
+import { GO_STUB_CATALOG } from "../../stubs/opencodeGoStub";
 import { DEFAULT_TAO_ALERT_HISTORY_LIMIT, useTaoAlertStore } from "../../stores/taoAlertStore";
 import {
   DEFAULT_CLAUDE_CODE_MODEL,
@@ -22,7 +24,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(),
+  listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
 function resetTaoAlertStore() {
@@ -172,6 +174,30 @@ describe("ChatDrawer provider and echo controls", () => {
       pendingComposerText: "",
       composerDrafts: {},
     });
+  });
+
+  it("shows the Go selector only on Go threads, pins model through IPC and preserves other threads", async () => {
+    const config = makeConfig();
+    config.llm.providers["opencode-go"] = { base_url:"https://example.invalid/v1",api_key:"",model:"deepseek-v4.1-flash",runtime:"opencode-go" };
+    useAiStore.setState({ config });
+    const a = { ...useChatStore.getState().threads[0], provider_id:"opencode-go" };
+    const b = { ...a, id:"thread-2", provider_id:"deepseek" };
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "chat_list_threads") return Promise.resolve([a,b]);
+      if (command === "get_ai_config") return Promise.resolve(config);
+      if (command === "chat_purge_old") return Promise.resolve(0);
+      return Promise.resolve(null);
+    });
+    useChatStore.setState({ threads:[a,b] });
+    useOpencodeGoStore.setState({ ...GO_STUB_CATALOG, loading:false,loaded:true,ensureLoaded:vi.fn().mockResolvedValue(undefined) });
+    render(<ChatDrawer />);
+    expect(screen.getByTestId("go-thread-picker")).toBeTruthy();
+    fireEvent.change(screen.getByTestId("go-thread-model-select"), { target:{value:"kimi-k3"} });
+    await waitFor(() => expect(useChatStore.getState().threads[0].llm_model).toBe("kimi-k3"));
+    expect(invokeMock).toHaveBeenCalledWith("chat_set_thread_llm_model", { threadId:a.id,model:"kimi-k3" });
+    expect(useChatStore.getState().threads[1].llm_model).toBeUndefined();
+    act(() => useChatStore.setState({ activeThreadId:"thread-2" }));
+    expect(screen.queryByTestId("go-thread-picker")).toBeNull();
   });
 
   afterEach(() => {

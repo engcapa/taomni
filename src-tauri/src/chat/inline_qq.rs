@@ -53,6 +53,7 @@ pub async fn inline_qq_stream(
         max_tokens: Some(512),
         temperature: Some(0.4),
         stream: true,
+        ..Default::default()
     };
 
     // Pull provider via the router.

@@ -8,6 +8,22 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+#[cfg(test)]
+mod go_compatibility_tests {
+    use super::*;
+    #[test]
+    fn default_headers_and_request_metadata_do_not_change_legacy_body() {
+        let provider = AnthropicProvider::new("anthropic","https://example.invalid","test","configured-model");
+        assert!(provider.extra_headers.is_empty());
+        let mut req = ChatRequest::simple("system","user");
+        let before = provider.request_body(&req,false,&[]);
+        req.model_override = Some("go-model".into());
+        req.session_key = Some("hashed-thread".into());
+        assert_eq!(before,provider.request_body(&req,false,&[]));
+        assert_eq!(before["model"],"configured-model");
+    }
+}
+
 /// Anthropic Messages API provider (`POST {base_url}/messages`).
 ///
 /// The Messages API differs from OpenAI's chat completions API in three places:
@@ -17,6 +33,7 @@ use serde_json::{Value, json};
 ///    `content_block_delta`, `message_delta`, `message_stop`) rather than
 ///    OpenAI's `data: {choices: [{delta: ...}]}` chunks.
 pub struct AnthropicProvider {
+    extra_headers: reqwest::header::HeaderMap,
     client: Client,
     base_url: String,
     api_key: String,
@@ -53,6 +70,7 @@ impl AnthropicProvider {
             }
         }
         Self {
+            extra_headers: reqwest::header::HeaderMap::new(),
             client: builder.build().expect("failed to build reqwest client"),
             base_url: base_url.into().trim_end_matches('/').to_string(),
             api_key: api_key.into(),
@@ -60,6 +78,12 @@ impl AnthropicProvider {
             provider_id: provider_id.into(),
             api_version: "2023-06-01".into(),
         }
+    }
+
+    pub fn with_go_client(mut self, client: Client, headers: reqwest::header::HeaderMap) -> Self {
+        self.client = client;
+        self.extra_headers = headers;
+        self
     }
 
     pub fn preset(api_key: impl Into<String>, model_override: Option<String>) -> Self {
@@ -126,6 +150,7 @@ impl AnthropicProvider {
             .post(&url)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", &self.api_version)
+            .headers(self.extra_headers.clone())
             .json(&body)
             .send()
             .await?;
@@ -309,6 +334,7 @@ impl Llm for AnthropicProvider {
             .post(&url)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", &self.api_version)
+            .headers(self.extra_headers.clone())
             .json(&body)
             .send()
             .await?;

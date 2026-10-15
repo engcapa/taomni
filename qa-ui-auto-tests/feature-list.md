@@ -3777,6 +3777,11 @@ area: ai/chat
 components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble, SearchProgressChip, CodeBlockToolbar, CcAgentBridge]
 files:
   - src/components/chat/ChatDrawer.tsx
+  - src/components/chat/GoModelPicker.tsx
+  - src/components/settings/GoProviderFields.tsx
+  - src/components/settings/LlmProvidersPanel.tsx
+  - src/stores/opencodeGoStore.ts
+  - src-tauri/src/llm/opencode_go/
   - src/components/chat/ChatThreadList.tsx
   - src/components/chat/Composer.tsx
   - src/components/chat/AttachmentChip.tsx
@@ -3789,6 +3794,27 @@ files:
   - src/lib/chat/renderFormatted.ts
   - src/stores/chatStore.ts
 controls:
+  - {id: go-provider-row, selector: '[data-testid="go-provider-row"]', kind: interactive, optional: true}
+  - {id: go-console, selector: '[data-testid="go-console"]', kind: interactive, optional: true}
+  - {id: go-default-model, selector: '[data-testid="go-default-model"]', kind: display, optional: true}
+  - {id: go-default-model-search, selector: '[data-testid="go-default-model-search"]', kind: interactive, optional: true}
+  - {id: go-default-model-select, selector: '[data-testid="go-default-model-select"]', kind: interactive, optional: true}
+  - {id: go-default-model-fallback, selector: '[data-testid="go-default-model-fallback"]', kind: interactive, optional: true}
+  - {id: go-catalog-status, selector: '[data-testid="go-catalog-status"]', kind: display, optional: true}
+  - {id: go-catalog-refresh, selector: '[data-testid="go-catalog-refresh"]', kind: interactive, optional: true}
+  - {id: go-catalog-error, selector: '[data-testid="go-catalog-error"]', kind: display, optional: true}
+  - {id: go-catalog-blocked, selector: '[data-testid="go-catalog-blocked"]', kind: display, optional: true}
+  - {id: go-protocols, selector: '[data-testid="go-protocols"]', kind: interactive, optional: true}
+  - {id: go-protocol-row, selector: '[data-testid="go-protocol-row"]', kind: display, optional: true}
+  - {id: go-protocol-select, selector: '[data-testid="go-protocol-select"]', kind: interactive, optional: true}
+  - {id: go-protocol-reset, selector: '[data-testid="go-protocol-reset"]', kind: interactive, optional: true}
+  - {id: go-thread-picker, selector: '[data-testid="go-thread-picker"]', kind: display, optional: true}
+  - {id: go-thread-model, selector: '[data-testid="go-thread-model"]', kind: display, optional: true}
+  - {id: go-thread-model-search, selector: '[data-testid="go-thread-model-search"]', kind: interactive, optional: true}
+  - {id: go-thread-model-select, selector: '[data-testid="go-thread-model-select"]', kind: interactive, optional: true}
+  - {id: go-thread-model-fallback, selector: '[data-testid="go-thread-model-fallback"]', kind: interactive, optional: true}
+  - {id: ai-chat-provider-select-testid, selector: '[data-testid="ai-chat-provider-select"]', kind: interactive, optional: true}
+  - {id: llm-providers-save, selector: '[data-testid="llm-providers-save"]', kind: interactive, optional: true}
   - id: ai-chat-drawer
     selector: '[data-testid="ai-chat-drawer"]'
     kind: display

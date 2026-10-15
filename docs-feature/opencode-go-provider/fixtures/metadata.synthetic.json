@@ -1,0 +1,22 @@
+{
+  "provenance": "Synthetic API shape for offline unit tests. NOT live API metadata.",
+  "opencode-go": {
+    "models": {
+      "deepseek-v4.1-flash": {
+        "name": "DeepSeek V4.1 Flash",
+        "provider": {"npm": "@ai-sdk/openai-compatible"},
+        "limit": {"context": 200000, "output": 64000}
+      },
+      "kimi-k2.6": {
+        "name": "Kimi K2.6",
+        "provider": {"npm": "@ai-sdk/anthropic"},
+        "limit": {"context": 256000, "output": 64000}
+      },
+      "fresh-anthropic-model": {
+        "name": "New Anthropic-shaped model",
+        "provider": {"npm": "@ai-sdk/anthropic"}
+      },
+      "omen-alpha": {"name": "Omen Alpha", "provider": {"npm": "@ai-sdk/unclassified"}}
+    }
+  }
+}

@@ -28,6 +28,27 @@
 
 ## ai/chat (F-AI-2.4)
 
+- `[data-testid="go-provider-row"]` — interactive [optional] — F-AI-2.4.go-provider-row
+- `[data-testid="go-console"]` — interactive [optional] — F-AI-2.4.go-console
+- `[data-testid="go-default-model"]` — display [optional] — F-AI-2.4.go-default-model
+- `[data-testid="go-default-model-search"]` — interactive [optional] — F-AI-2.4.go-default-model-search
+- `[data-testid="go-default-model-select"]` — interactive [optional] — F-AI-2.4.go-default-model-select
+- `[data-testid="go-default-model-fallback"]` — interactive [optional] — F-AI-2.4.go-default-model-fallback
+- `[data-testid="go-catalog-status"]` — display [optional] — F-AI-2.4.go-catalog-status
+- `[data-testid="go-catalog-refresh"]` — interactive [optional] — F-AI-2.4.go-catalog-refresh
+- `[data-testid="go-catalog-error"]` — display [optional] — F-AI-2.4.go-catalog-error
+- `[data-testid="go-catalog-blocked"]` — display [optional] — F-AI-2.4.go-catalog-blocked
+- `[data-testid="go-protocols"]` — interactive [optional] — F-AI-2.4.go-protocols
+- `[data-testid="go-protocol-row"]` — display [optional] — F-AI-2.4.go-protocol-row
+- `[data-testid="go-protocol-select"]` — interactive [optional] — F-AI-2.4.go-protocol-select
+- `[data-testid="go-protocol-reset"]` — interactive [optional] — F-AI-2.4.go-protocol-reset
+- `[data-testid="go-thread-picker"]` — display [optional] — F-AI-2.4.go-thread-picker
+- `[data-testid="go-thread-model"]` — display [optional] — F-AI-2.4.go-thread-model
+- `[data-testid="go-thread-model-search"]` — interactive [optional] — F-AI-2.4.go-thread-model-search
+- `[data-testid="go-thread-model-select"]` — interactive [optional] — F-AI-2.4.go-thread-model-select
+- `[data-testid="go-thread-model-fallback"]` — interactive [optional] — F-AI-2.4.go-thread-model-fallback
+- `[data-testid="ai-chat-provider-select"]` — interactive [optional] — F-AI-2.4.ai-chat-provider-select-testid
+- `[data-testid="llm-providers-save"]` — interactive [optional] — F-AI-2.4.llm-providers-save
 - `[data-testid="ai-chat-drawer"]` — display [optional] — F-AI-2.4.ai-chat-drawer
 - `[data-testid="ai-chat-drawer"] textarea` — interactive [optional] — F-AI-2.4.ai-chat-drawer-textarea
 - `[data-testid="ai-chat-composer"]` — interactive [optional] — F-AI-2.4.ai-chat-composer

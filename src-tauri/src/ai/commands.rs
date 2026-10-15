@@ -90,6 +90,12 @@ pub async fn test_llm_connection(
     provider: LlmProviderConfig,
     state: State<'_, AppState>,
 ) -> Result<TestConnectionResult, String> {
+    if provider.runtime == "opencode-go" {
+        let ctx = state.ai_ctx.read().await;
+        if ctx.config.full_local_mode || ctx.config.fully_disabled {
+            return Err("OpenCode Go is disabled by the AI network policy".into());
+        }
+    }
     let test_api_key = provider
         .effective_api_keys()
         .into_iter()
@@ -120,10 +126,19 @@ pub async fn test_llm_connection(
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
-        crate::ai::config::resolve_provider_proxy_url(&provider, Some(&db), Some(&state.vault))?
+        if provider.runtime == "opencode-go" {
+            crate::ai::config::resolve_go_proxy_url(&provider, Some(&db), Some(&state.vault))?
+        } else {
+            crate::ai::config::resolve_provider_proxy_url(&provider, Some(&db), Some(&state.vault))?
+        }
     };
 
     let llm: Arc<dyn Llm> = match provider.runtime.as_str() {
+        "opencode-go" => Arc::new(crate::llm::opencode_go::OpenCodeGoProvider::new(
+            "opencode-go".into(), provider.base_url.clone(), api_key.clone(),
+            provider.model.clone(), proxy_url, state.opencode_go_catalog.clone(),
+            provider.protocol_overrides.clone(),
+        )),
         "anthropic" => {
             let base_url = if provider.base_url.is_empty() {
                 "https://api.anthropic.com/v1".to_string()
@@ -164,6 +179,28 @@ pub async fn test_llm_connection(
     }
 }
 
+#[tauri::command]
+pub async fn get_opencode_go_catalog(
+    force_refresh: bool,
+    state: State<'_, AppState>,
+) -> Result<crate::llm::opencode_go::catalog::GoCatalogDto, String> {
+    // Re-resolve policies and session proxies, not a stale UI snapshot.
+    {
+        let ctx = state.ai_ctx.read().await;
+        if let Some(go) = ctx.config.llm.providers.get("opencode-go") {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            state.opencode_go_catalog.configure(go.base_url.clone(),
+                crate::ai::config::resolve_go_proxy_url(go, Some(&db), Some(state.vault.as_ref())),
+                ctx.config.full_local_mode || ctx.config.fully_disabled);
+        }
+    }
+    if force_refresh { Ok(state.opencode_go_catalog.refresh(true).await) }
+    else {
+        state.opencode_go_catalog.trigger(false);
+        Ok(state.opencode_go_catalog.get())
+    }
+}
+
 /// Generate a shell command from a natural language description.
 /// Returns a CommandPreview for the frontend to display in the confirm card.
 #[tauri::command]
@@ -196,6 +233,7 @@ pub async fn generate_shell_command(
         max_tokens: Some(512),
         temperature: Some(0.2),
         stream: false,
+        ..Default::default()
     };
 
     // Route through LlmRouter using VoiceToShell task — gets fallback for free.

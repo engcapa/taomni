@@ -203,6 +203,13 @@ pnpm dev   # 浏览器层人工走查：设置页 go 行全状态 + 聊天选择
 
 ## 11. 实施后的交付记录
 
+2026-10-15 本轮开发/验证记录见
+`docs-feature/opencode-go-provider/delivery-notes.md`；本地基线见
+`qa-ui-auto-report/opencode-go-provider/baseline.md`。应用户要求，本轮不执行
+browser/native 真机用例；TASK-07 的「浏览器已运行」及 TASK-09 的「真连」
+完成条件未满足，不能把用例已编写等同验收已通过。完整 Rust crate 单测
+在无关 ASR 系统库处中断，其余局部单测结果均写明作用范围。
+
 当前所有项目为待执行；完成后填写实际值，不删除未覆盖项：
 
 - 源码与构建：实现提交、相关未提交变更、被测构建标识与 hash、前端 mode。

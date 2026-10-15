@@ -1,0 +1,50 @@
+id: TC-AI-007
+title: Go catalog refresh failure preserves models and a retry recovers
+description: Browser recovery fixture only; no real offline network assertion. Authored, unrun.
+covers: [F-AI-2.4]
+tags: [ai, opencode-go, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}/?goFixture=recovery
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: '[data-testid="go-provider-row"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- wait_for: '[data-testid="go-default-model-select"]'
+- click: '[data-testid="go-catalog-refresh"]'
+- assert_text:
+    selector: '[data-testid="go-catalog-error"]'
+    contains: last-good catalog retained
+- assert_attribute:
+    selector: '[data-testid="go-default-model-select"]'
+    name: value
+    equals: deepseek-v4.1-flash
+- click: '[data-testid="go-catalog-refresh"]'
+- assert_not_visible: '[data-testid="go-catalog-error"]'
+- assert_text:
+    selector: '[data-testid="go-catalog-status"]'
+    contains: Online
+- assert_attribute:
+    selector: '[data-testid="go-default-model-select"]'
+    name: value
+    equals: deepseek-v4.1-flash
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Refresh failure retains last-good options; explicit retry clears error without resetting selection.
+    actions: [3, 4, 6, 8, 11]
+    checkpoints:
+    - {step: 9, expectation: Offline error is actionable.}
+    - {step: 10, expectation: Last-good default remains selected.}
+    - {step: 12, expectation: Recovery removes the error.}
+    - {step: 13, expectation: Source returns to Online.}
+    - {step: 14, expectation: Recovery does not reset selection.}
+    results: [9, 10, 12, 13, 14]
+  visual:
+  - {check: Error message is readable and not clipped., method: manual, reason: Inspect long errors after execution; currently unrun.}
+  native:
+  - {check: Actual disk cache and network failure retention., method: external, reason: Native runbook N-GO-04 covers the real storage/network boundary.}

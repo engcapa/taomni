@@ -19,6 +19,26 @@ vi.mock("../lib/ipc", () => ({
   VAULT_LOCKED_ERROR: "vault locked",
 }));
 
+describe("OpenCode Go compatibility", () => {
+  it("adds Go to old configs without changing routes or providers, and hides only Go under policy", async () => {
+    const config = makeConfig([], false);
+    config.llm.providers.deepseek = { base_url: "https://example.invalid", api_key: "", model: "old-model", runtime: "openai-compat" };
+    const before = JSON.parse(JSON.stringify(config));
+    invokeMock.mockResolvedValueOnce(config);
+    await useAiStore.getState().loadConfig();
+    const loaded = useAiStore.getState().config!;
+    expect(loaded.llm.providers["opencode-go"].model).toBe("deepseek-v4.1-flash");
+    // Existing normalization already fills capabilities/key/proxy defaults.
+    expect(loaded.llm.providers.deepseek).toMatchObject(before.llm.providers.deepseek);
+    expect(loaded.llm.task_routing).toEqual(before.llm.task_routing);
+    expect(loaded.llm.fallback).toEqual(before.llm.fallback);
+    expect(chatDrawerProviderIds(loaded)).toContain("opencode-go");
+    for (const policy of [{ full_local_mode: true }, { fully_disabled: true }]) {
+      expect(chatDrawerProviderIds({ ...loaded, ...policy })).not.toContain("opencode-go");
+    }
+  });
+});
+
 function makeConfig(profiles: AcpProfileConfig[], bridgeEnabled = true): AiConfig {
   return {
     asr: { active: "local", providers: {}, warm_on_startup: false, vad: "silero" },

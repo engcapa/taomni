@@ -367,6 +367,7 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 api_keys: Vec::new(),
                 model: "deepseek-chat".into(),
+                protocol_overrides: HashMap::new(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
@@ -383,6 +384,7 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 api_keys: Vec::new(),
                 model: "agnes-2.0-flash".into(),
+                protocol_overrides: HashMap::new(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities {
                     chat: true,
@@ -403,6 +405,7 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 api_keys: Vec::new(),
                 model: "glm-4-flash".into(),
+                protocol_overrides: HashMap::new(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
@@ -419,6 +422,7 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 api_keys: Vec::new(),
                 model: "Qwen/Qwen2.5-Coder-7B-Instruct".into(),
+                protocol_overrides: HashMap::new(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
@@ -435,6 +439,7 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 api_keys: Vec::new(),
                 model: "llama-3.3-70b-versatile".into(),
+                protocol_overrides: HashMap::new(),
                 runtime: "openai-compat".into(),
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
@@ -451,6 +456,7 @@ impl Default for LlmConfig {
                 api_key: "local".into(),
                 api_keys: Vec::new(),
                 model: "qwen3-1.7b-q4_k_m".into(),
+                protocol_overrides: HashMap::new(),
                 runtime: "llama-server".into(),
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
@@ -467,6 +473,7 @@ impl Default for LlmConfig {
                 api_key: String::new(),
                 api_keys: Vec::new(),
                 model: "claude-sonnet-4-5".into(),
+                protocol_overrides: HashMap::new(),
                 runtime: "anthropic".into(),
                 capabilities: LlmProviderCapabilities::default(),
                 image_model: None,
@@ -477,6 +484,7 @@ impl Default for LlmConfig {
             },
         );
 
+        providers.insert("opencode-go".into(), default_opencode_go_provider());
         let mut task_routing = HashMap::new();
         task_routing.insert("voice_intent".into(), "deepseek".into());
         task_routing.insert("voice_to_shell".into(), "deepseek".into());
@@ -511,6 +519,9 @@ impl LlmConfig {
 
     fn ensure_default_providers(&mut self) {
         self.providers
+            .entry("opencode-go".into())
+            .or_insert_with(default_opencode_go_provider);
+        self.providers
             .entry("agnes".into())
             .or_insert_with(default_agnes_provider);
     }
@@ -522,6 +533,7 @@ fn default_agnes_provider() -> LlmProviderConfig {
         api_key: String::new(),
         api_keys: Vec::new(),
         model: "agnes-2.0-flash".into(),
+        protocol_overrides: HashMap::new(),
         runtime: "openai-compat".into(),
         capabilities: LlmProviderCapabilities {
             chat: true,
@@ -538,6 +550,8 @@ fn default_agnes_provider() -> LlmProviderConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmProviderConfig {
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub protocol_overrides: HashMap<String, String>,
     pub base_url: String,
     pub api_key: String,
     #[serde(default)]
@@ -557,6 +571,23 @@ pub struct LlmProviderConfig {
     pub proxy_session_id: Option<String>,
     #[serde(default)]
     pub proxy_url: Option<String>,
+}
+
+pub fn default_opencode_go_provider() -> LlmProviderConfig {
+    LlmProviderConfig {
+        base_url: "https://opencode.ai/inference/go/v1".into(),
+        api_key: String::new(),
+        api_keys: Vec::new(),
+        model: "deepseek-v4.1-flash".into(),
+        runtime: "opencode-go".into(),
+        capabilities: LlmProviderCapabilities::default(),
+        image_model: None,
+        video_model: None,
+        proxy_mode: default_provider_proxy_mode(),
+        proxy_session_id: None,
+        proxy_url: None,
+        protocol_overrides: HashMap::new(),
+    }
 }
 
 impl LlmProviderConfig {
@@ -631,6 +662,32 @@ pub fn resolve_provider_proxy_url(
             .map(str::to_string)),
         _ => Ok(None),
     }
+}
+
+/// Strict Go-only wrapper; retained transports keep their existing resolution.
+pub fn resolve_go_proxy_url(
+    provider: &LlmProviderConfig,
+    db: Option<&rusqlite::Connection>,
+    vault: Option<&crate::vault::Vault>,
+) -> Result<Option<String>, String> {
+    let mode = normalize_provider_proxy_mode(&provider.proxy_mode);
+    if mode == "session" {
+        if provider.proxy_session_id.as_deref().is_none_or(|s| s.trim().is_empty())
+            || db.is_none() || vault.is_none() {
+            return Err("OpenCode Go proxy session is not available".into());
+        }
+    }
+    if mode == "manual" && provider.proxy_url.as_deref().is_none_or(|s| s.trim().is_empty()) {
+        return Err("OpenCode Go manual proxy URL is required".into());
+    }
+    let proxy = resolve_provider_proxy_url(provider, db, vault)?;
+    if mode == "session" && proxy.is_none() {
+        return Err("OpenCode Go proxy session could not be resolved".into());
+    }
+    if let Some(url) = proxy.as_deref() {
+        reqwest::Proxy::all(url).map_err(|_| "OpenCode Go proxy URL is invalid".to_string())?;
+    }
+    Ok(proxy)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -717,6 +774,25 @@ impl Default for WebSearchConfig {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn legacy_go_normalization_preserves_user_configuration() {
+        let mut config = super::AiConfig::default();
+        config.llm.providers.remove("opencode-go");
+        let routes = config.llm.task_routing.clone();
+        let original = serde_json::to_value(&config.llm.providers["deepseek"]).unwrap();
+        config.llm.normalize();
+        let go = &config.llm.providers["opencode-go"];
+        assert_eq!(go.model, "deepseek-v4.1-flash");
+        assert_eq!(go.runtime, "opencode-go");
+        assert_eq!(config.llm.task_routing, routes);
+        assert_eq!(serde_json::to_value(&config.llm.providers["deepseek"]).unwrap(), original);
+        assert!(serde_json::to_value(go).unwrap().get("protocol_overrides").is_none());
+        let parsed: super::LlmProviderConfig = serde_json::from_value(original).unwrap();
+        assert!(parsed.protocol_overrides.is_empty());
+        config.llm.providers.get_mut("opencode-go").unwrap().model = "custom".into();
+        config.llm.normalize();
+        assert_eq!(config.llm.providers["opencode-go"].model, "custom");
+    }
     use super::*;
 
     #[test]
