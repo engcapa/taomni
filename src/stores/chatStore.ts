@@ -142,6 +142,26 @@ const CHAT_DRAWER_LAYOUT_STORAGE_KEY = "taomni.chatDrawer.layout.v1";
 const MIN_DRAWER_FLOATING_OPACITY = 0.65;
 const MAX_DRAWER_FLOATING_OPACITY = 1;
 
+// A thread list read can overlap a local create/update (for example while the
+// drawer's initial load is still waiting on SQLite). Keep a small mutation
+// revision outside persisted thread data so a stale read cannot replace a
+// newer in-memory model/provider selection.
+let threadMutationRevision = 0;
+
+function markThreadMutation(): void {
+  threadMutationRevision += 1;
+}
+
+function mergeThreadsPreservingLocal(fetched: ChatThread[], local: ChatThread[]): ChatThread[] {
+  const localById = new Map(local.map((thread) => [thread.id, thread]));
+  const fetchedIds = new Set(fetched.map((thread) => thread.id));
+  const merged = fetched.map((thread) => localById.get(thread.id) ?? thread);
+  for (const thread of local) {
+    if (!fetchedIds.has(thread.id)) merged.unshift(thread);
+  }
+  return merged;
+}
+
 interface ChatDrawerLayoutPrefs {
   position: ChatDrawerPosition;
   pinned: boolean;
@@ -563,9 +583,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   composerDrafts: {},
 
   loadThreads: async () => {
+    const revisionAtRequest = threadMutationRevision;
     try {
       const threads = await invoke<ChatThread[]>("chat_list_threads", { limit: 50 });
-      set({ threads, threadsLoaded: true });
+      const current = get();
+      set({
+        threads: threadMutationRevision === revisionAtRequest
+          ? threads
+          : mergeThreadsPreservingLocal(threads, current.threads),
+        threadsLoaded: true,
+      });
     } catch (e) {
       console.error("chat_list_threads failed:", e);
       set({ threadsLoaded: true });
@@ -580,6 +607,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       linkedSessionId: linkedSessionId ?? null,
       mode: threadMode,
     });
+    markThreadMutation();
     const scope = scopeForThread(thread);
     set((s) => ({
       threads: [thread, ...s.threads],
@@ -597,6 +625,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   deleteThread: async (threadId: string) => {
     await invoke("chat_delete_thread", { threadId });
+    markThreadMutation();
     const active = get().activeThreadId === threadId;
     set((s) => ({
       threads: s.threads.filter((t) => t.id !== threadId),
@@ -619,6 +648,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   setThreadProvider: async (threadId: string, providerId: string) => {
     await invoke("chat_set_thread_provider", { threadId, providerId });
+    markThreadMutation();
     set((s) => ({
       threads: s.threads.map((t) =>
         t.id === threadId ? { ...t, provider_id: providerId } : t
@@ -628,6 +658,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
   setThreadLlmModel: async (threadId: string, model: string | null) => {
     await invoke("chat_set_thread_llm_model", { threadId, model });
+    markThreadMutation();
     set((state) => ({
       threads: state.threads.map((thread) => thread.id === threadId ? { ...thread, llm_model: model } : thread),
     }));
@@ -636,6 +667,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // Backend recycles the CC process so the next message respawns with the
     // new --model; empty/null clears the override (inherit default).
     await invoke("chat_set_thread_cc_model", { threadId, model: model ?? null });
+    markThreadMutation();
     set((s) => ({
       threads: s.threads.map((t) =>
         t.id === threadId ? { ...t, cc_model: model } : t
@@ -649,6 +681,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       threadId,
       outputFormat: format ?? null,
     });
+    markThreadMutation();
     set((s) => ({
       threads: s.threads.map((t) =>
         t.id === threadId ? { ...t, output_format: format } : t
