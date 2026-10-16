@@ -1,0 +1,105 @@
+id: TC-TERM-TEXT-006
+title: Native Copy All preserves large history head, tail and wrapped Unicode in the OS clipboard
+covers: [F2.2, F3.1]
+tags: [terminal, ssh, p1, clipboard]
+modes: [native]
+fixtures: [reset_db, ssh_required]
+timeout_sec: 120
+# QA frontend only. Disposable OS account/clipboard required: overwrites then clears
+# its clipboard. Linux requires X11+xclip; Wayland is a separate manual boundary.
+# Windows/macOS use the runner's independent OS clipboard oracle.
+# Automated OS assertions cover necessary head/tail segments, not every middle row.
+# Full byte-for-byte comparison remains the explicit N-01 manual boundary.
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'COPY-BEGIN-\\344\\270\\255\\346\\226\\207\\360\\237\\231\\202\\n'; i=0; while [ \"$i\" -lt 620 ]; do printf 'COPY-ROW-%04d\\n' \"$i\"; i=$((i+1)); done; printf '\\nCOPY-WRAP-'; printf '%0120d' 0; printf '\\nCOPY-END-\\344\\270\\255\\346\\226\\207\\360\\237\\231\\202\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^COPY-END-中文🙂\r?$'
+    timeout_sec: 15
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 15
+- host_clipboard:
+    action: set
+    kind: text
+    text: COPY-OLD-SENTINEL
+- right_click:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: text="Copy All"
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: "COPY-BEGIN-中文🙂\nCOPY-ROW-0000\nCOPY-ROW-0001"
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: "COPY-ROW-0619\n\nCOPY-WRAP-000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nCOPY-END-中文🙂"
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'COPY-AFTER\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^COPY-AFTER\r?$'
+    timeout_sec: 15
+- right_click:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: text="Copy All"
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: "\nCOPY-AFTER\n"
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: "COPY-BEGIN-中文🙂\nCOPY-ROW-0000"
+- host_clipboard:
+    action: clear
+    kind: text
+- screenshot: terminal-native-copy-all-history.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 通过真实Copy All菜单将超过500行的首尾、Unicode、内部空行和软换行结果写到系统剪贴板
+    actions: [11, 14, 15, 17]
+    checkpoints:
+    - {step: 18, expectation: 独立OS剪贴板读取包含真实输出首段而非原sentinel}
+    - {step: 19, expectation: 剪贴板尾段含第620条行、空行、合并长行及Unicode尾标记}
+    results: [18, 19]
+  - id: R2
+    requirement: 新输出后再次Copy All更新剪贴板且保留旧历史
+    actions: [20, 22, 24]
+    checkpoints:
+    - {step: 21, expectation: 新命令独立结果已进入终端}
+    - {step: 25, expectation: 第二次复制包含新增独立行}
+    - {step: 26, expectation: 第二次复制仍保留旧首段}
+    results: [25, 26]
+  visual:
+  - {check: Copy All菜单可操作且复制后焦点回到终端, method: manual, reason: 后续输入证明可用但不替代焦点/菜单视觉评审}
+  native:
+  - {check: 独立OS读取验证真实系统剪贴板写入及连续复制, method: automated, reason: host_clipboard在Windows用PowerShell/macOS用JXA/Linux X11用xclip，不从renderer或产品arboard获取结果}
+  - {check: production mirror=false复制、Wayland剪贴板及导出文件, method: manual, reason: QA用例不证明生产关闭镜像；按runbook N-01补测，Wayland无该X11 oracle}

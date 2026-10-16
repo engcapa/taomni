@@ -8,3 +8,5 @@
 - [Opt-in Linux native desktop](replit-native-qa-desktop.md) — Replit uses an opt-in Xvfb/Fluxbox/DBus/FCITX5 wrapper; local desktop environments bypass it.
 - [Replit bindgen target variables](replit-native-bindgen-target-vars.md) — generic clang header args did not unblock libspa-sys; validate target-specific x86_64 variables before native build.
 - [Replit latest Rust QA toolchain](replit-latest-rust-qa-toolchain.md) — use rustup stable latest and a rustc wrapper that removes Replit's LD_AUDIT before native builds.
+- [Mounted polling clocks](qa-mounted-polling-clocks.md) — control timer clocks before mounting; frozen waitFor intervals need explicit async state flushing.
+- [Focused unit commands](qa-focused-unit-command.md) — use pnpm exec vitest run for exact files; an extra forwarded -- can accidentally collect the full suite.

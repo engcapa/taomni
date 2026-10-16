@@ -21,7 +21,7 @@ use crate::rdp::ws::RdpSession;
 use crate::sdk::SdkManager;
 use crate::servers::ServerRegistry;
 use crate::sockscap::SocksCapRuntime;
-use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
+use crate::terminal::{ActiveTerminal, TerminalOutputSubscriber};
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
@@ -74,7 +74,7 @@ pub type CcPermissionResponder = tokio::sync::oneshot::Sender<CcPermissionDecisi
 
 pub struct AppState {
     pub terminals: Arc<RwLock<HashMap<String, ActiveTerminal>>>,
-    pub terminal_outputs: Arc<Mutex<HashMap<String, Vec<TerminalOutputChannel>>>>,
+    pub terminal_outputs: Arc<Mutex<HashMap<String, Vec<TerminalOutputSubscriber>>>>,
     pub sftp_sessions: Arc<RwLock<HashMap<String, Arc<ActiveSftp>>>>,
     pub transfers: Arc<RwLock<HashMap<String, Arc<TransferHandle>>>>,
     pub tunnels: Arc<TunnelRegistry>,

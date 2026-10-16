@@ -1,0 +1,90 @@
+id: TC-TERM-TEXT-005
+title: Clearing saved lines removes stale mirrored history and repopulates Unicode text
+covers: [F2.2, F3.1]
+tags: [terminal, ssh, p1]
+modes: [browser, native]
+fixtures: [reset_db, ssh_required]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "i=0; while [ \"$i\" -lt 620 ]; do printf 'CLEAR-SEED-%04d\\n' \"$i\"; i=$((i+1)); done"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^CLEAR-SEED-0619\r?$'
+    timeout_sec: 15
+- eval_readonly:
+    expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^CLEAR-SEED-\d{4}\r?$/gm) || []).length === 620
+    expect_truthy: true
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 15
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf '\\033[3J\\033[2J\\033[H\\n\\nCLEAR-NEW-\\344\\270\\255\\346\\226\\207\\360\\237\\231\\202\\n\\nCLEAR-WRAP-'; printf '%0120d' 0; printf '\\nCLEAR-DONE\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^CLEAR-NEW-中文🙂\r?\n\r?\nCLEAR-WRAP-0{120}\r?\nCLEAR-DONE\r?$'
+    timeout_sec: 15
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    name: data-terminal-text
+    matches: '(?s).*\n\nCLEAR-NEW-中文🙂.*'
+- eval_readonly:
+    expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^CLEAR-SEED-\d{4}\r?$/gm) || []).length === 0
+    expect_truthy: true
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 15
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'CLEAR-NEXT\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^CLEAR-NEXT\r?$'
+    timeout_sec: 15
+- screenshot: terminal-clear-history-repopulated.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 620行历史真实存在后按VT清除saved lines及当前画面，不保留过期文本副本
+    actions: [11, 15]
+    checkpoints:
+    - {step: 13, expectation: 清除前完整620条独立历史行，不是echo}
+    - {step: 18, expectation: 清除后历史数据行计数为零}
+    results: [13, 18]
+  - id: R2
+    requirement: 清除后leading/internal空行、Unicode、长行及后续正常输入仍被观察
+    actions: [15, 20]
+    checkpoints:
+    - {step: 16, expectation: Unicode行、内部空行及合并的120个0顺序完整}
+    - {step: 17, expectation: leading两个空行保留}
+    - {step: 19, expectation: 回到idle后ready存在}
+    - {step: 21, expectation: 下一次输入产生独立NEXT行}
+    results: [16, 17, 21]
+  visual:
+  - {check: 清屏后无残留绘制且长行与空行布局正常, method: manual, reason: DOM全文清除不证明canvas无残影}
+  native:
+  - {check: 原生WebView对真实PTY VT清除与后续输入的处理, method: automated, reason: browser不证明打包引擎呈现或原生输出通道}

@@ -1,5 +1,6 @@
 import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { markRecoveryStartup } from "../../lib/runtimeRecovery";
 import type { MailTabInfo } from "../../types";
 import type { MailDraft, MailFolder, MailFolderSyncResult, MailMessageBody, MailMessageHeader } from "../../lib/mail";
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
@@ -244,6 +245,7 @@ function getMessageRow(): HTMLElement {
 
 describe("MailClientTab", () => {
   beforeEach(() => {
+    markRecoveryStartup(false);
     for (const mock of Object.values(mailMocks)) mock.mockReset();
     for (const mock of Object.values(chatState)) {
       if (typeof mock === "function" && "mockReset" in mock) mock.mockReset();
@@ -288,6 +290,7 @@ describe("MailClientTab", () => {
   });
 
   afterEach(() => {
+    markRecoveryStartup(false);
     cleanup();
     vi.useRealTimers();
     useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
@@ -1010,6 +1013,31 @@ describe("MailClientTab", () => {
       if (index >= 0) store.splice(index, 1);
     });
     return store;
+  }
+
+  for (const recovering of [false, true]) {
+    it(`${recovering ? "recovery pauses" : "cold startup retains"} automatic Outbox sending`, async () => {
+      markRecoveryStartup(recovering);
+      vi.useFakeTimers();
+      const store = useDraftStore();
+      store.push({
+        id: "pending-send", accountId: info.sessionId, to: ["fixture@example.invalid"],
+        cc: [], bcc: [], subject: "fixture only", textBody: "not a real recipient", htmlBody: "",
+        attachments: [], createdAt: 1, updatedAt: 1,
+        replyContext: { outbox: { sendAt: 1, queuedAt: 1, attempts: 0 } },
+      } as MailDraft);
+      mailMocks.mailSendMessage.mockResolvedValue({ accepted: true, response: "ok", sentCopyFolder: "Sent" });
+      renderMailbox();
+      await act(async () => { await vi.advanceTimersByTimeAsync(3100); });
+      expect(mailMocks.mailSendMessage).toHaveBeenCalledTimes(recovering ? 0 : 1);
+      if (recovering) {
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
+        expect(store).toHaveLength(1);
+      } else {
+        expect(store).toHaveLength(0);
+      }
+    });
   }
 
   async function replyAndReach(testId: string) {

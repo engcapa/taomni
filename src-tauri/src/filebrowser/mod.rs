@@ -578,9 +578,10 @@ pub async fn open_sftp_window(
     // paths for terminal path insertion.
     #[cfg(windows)]
     let builder = builder.disable_drag_drop_handler();
-    builder
+    let window = builder
         .build()
         .map_err(|e| format!("failed to open SFTP window: {}", e))?;
+    crate::webview_recovery::install(&window);
     Ok(())
 }
 

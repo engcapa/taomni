@@ -130,7 +130,19 @@ def step_assert_pattern(ctx: StepContext, args: Any) -> None:
             candidates.append(loc.get_attribute("data-terminal-text") or "")
         except Exception:
             pass
-        observed = text
+        # xterm renders its visible canvas beside a style element, so
+        # text_content() can contain only CSS. Prefer the mirrored terminal
+        # attribute in diagnostics when it is available; this keeps failures
+        # actionable without changing the assertion candidates.
+        mirrored = ""
+        try:
+            mirrored = loc.get_attribute("data-terminal-text") or ""
+            if mirrored:
+                observed = mirrored
+            else:
+                observed = text
+        except Exception:
+            observed = text
         return any(pattern.search(candidate) for candidate in candidates)
 
     try:

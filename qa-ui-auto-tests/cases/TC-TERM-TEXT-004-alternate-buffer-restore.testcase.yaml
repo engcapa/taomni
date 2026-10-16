@@ -1,0 +1,84 @@
+id: TC-TERM-TEXT-004
+title: Alternate buffer mirrors current screen without false idle and restores normal history
+covers: [F2.2, F3.1]
+tags: [terminal, ssh, p1]
+modes: [browser, native]
+fixtures: [reset_db, ssh_required]
+timeout_sec: 120
+# Controlled VT stream, not a vi installation dependency; POSIX sleep and UTF-8 required.
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'NORMAL-KEPT-\\344\\270\\255\\346\\226\\207\\n'; printf '\\033[?1049h\\033[2J\\033[H\\345\\224\\257\\344\\270\\200\\345\\261\\217\\345\\271\\225\\360\\237\\231\\202\\nALT-FAKE$ '; sleep 5; printf '\\033[?1049lNORMAL-RETURNED\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^唯一屏幕🙂\r?\nALT-FAKE\$ ?$'
+    timeout_sec: 3
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]:not([data-terminal-ready])'
+    timeout_sec: 2
+- eval_readonly:
+    expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^NORMAL-KEPT-中文\r?$/gm) || []).length === 0
+    expect_truthy: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^NORMAL-RETURNED\r?$'
+    timeout_sec: 15
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 15
+- eval_readonly:
+    expression: (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^NORMAL-KEPT-中文\r?$/gm) || []).length === 1 && (document.querySelector('[data-terminal-active]').getAttribute('data-terminal-text').match(/^唯一屏幕🙂\r?$/gm) || []).length === 0
+    expect_truthy: true
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "printf 'NORMAL-NEXT\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^NORMAL-NEXT\r?$'
+    timeout_sec: 15
+- screenshot: terminal-alternate-buffer-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: alternate buffer只观察当前屏幕；伪装成idle prompt也不能触发ready
+    actions: [11]
+    checkpoints:
+    - {step: 12, expectation: 属性为alternate画面及以美元符结束的假prompt}
+    - {step: 13, expectation: alternate模式ready不存在}
+    - {step: 14, expectation: 旧normal独立历史行不混入alternate文本}
+    results: [12, 13, 14]
+  - id: R2
+    requirement: 退出alternate恢复normal历史、ready和后续输入，不污染全文
+    actions: [18]
+    checkpoints:
+    - {step: 15, expectation: 返回normal后的独立RETURNED行存在}
+    - {step: 16, expectation: normal idle恢复ready}
+    - {step: 17, expectation: 旧normal行恰好一次且alternate独立Unicode行消失}
+    - {step: 19, expectation: 后续独立NEXT行出现}
+    results: [15, 17, 19]
+  visual:
+  - {check: alternate清屏与normal恢复画面、Unicode和光标正确, method: manual, reason: 文本协议无法证明TUI呈现质量}
+  native:
+  - {check: QA原生WebView的VT alternate切换及SSH输出回调, method: automated, reason: 仅native执行验证打包WebView；完整交互TUI仍按N-02手测}

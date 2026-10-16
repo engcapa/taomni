@@ -1,6 +1,6 @@
 # Taomni 渲染进程崩溃后的有限恢复方案
 
-日期：2026-10-14；最终修订：2026-10-15，v3.1（文本镜像优化移交独立feat，恢复流程不变）。状态：**只读诊断与设计完成；未修改产品代码，未实施或测试恢复机制**。当前 Taomni 和终端未被刷新、重启、发送信号或附加调试器。
+日期：2026-10-14；最终修订：2026-10-15，v3.1（文本镜像优化移交独立feat，恢复流程不变）。状态：**检测/提示与受限恢复分支已开发；仅本地unit验证，browser/native及性能未执行**。历史诊断中的真实 Taomni 和终端未被触碰。实际范围见[实施报告](webview-renderer-crash-recovery/implementation-report.md)及[测试映射](webview-renderer-crash-recovery/test-cases.md)；本文其余历史证据与候选能力不可当作本次执行结果。
 
 配套文档：[全类型恢复矩阵](webview-renderer-crash-recovery/recovery-policy-matrix.md)、[详细执行与三端验证计划](webview-renderer-crash-recovery/execution-plan.md)。v3 保留原 AC/TASK/V/DEC 编号，但按用户最后提出的“小概率故障，不能动太多逻辑，代价高就提示”原则收缩范围；v1/v2 中通用运行注册、全操作幂等、完整 VT 状态复制等不再是本次要求。
 

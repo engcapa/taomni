@@ -145,7 +145,7 @@ const MAX_WELCOME_RECENT_SESSION_LIMIT = 100;
 const MIN_UI_FONT_SIZE = 10;
 const MAX_UI_FONT_SIZE = 18;
 
-interface AppState {
+export interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   sidebarCollapsed: boolean;

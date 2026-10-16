@@ -666,7 +666,9 @@ interface InvokeOptions {
   headers?: Record<string, string>;
 }
 
+let nextBrowserChannelId = 0;
 export class Channel<T = unknown> {
+  id = nextBrowserChannelId++;
   onmessage: ((message: T) => void) | null = null;
 }
 
@@ -1770,6 +1772,28 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
   }
   if (cmd.startsWith("voice_")) return await voiceStub(cmd, args) as T;
   switch (cmd) {
+    // Browser fixtures prove recovery UI only, never native death/PID survival.
+    case "recovery_get": {
+      const fixture = localStorage.getItem("qa.recovery.bootstrap");
+      return (fixture ? JSON.parse(fixture) : {
+        version: 1, instanceId: "browser-stub", generation: 0, revision: 0,
+        recovering: false, description: null, limitation: "browser-stub",
+      }) as T;
+    }
+    case "recovery_update":
+    case "recovery_ready":
+      return undefined as T;
+    case "attach_terminal_output": {
+      const fixture = localStorage.getItem("qa.recovery.bootstrap");
+      if (!fixture || !JSON.parse(fixture).recovering) {
+        throw new Error("Browser mode cannot attach native terminals");
+      }
+      if (args?.sessionId === "qa-ended") throw new Error("Terminal not found");
+      args?.onOutput?.onmessage?.(new TextEncoder().encode("QA-ORIGINAL-OUTPUT\n").buffer);
+      return undefined as T;
+    }
+    case "detach_terminal_output":
+      return undefined as T;
     case "structural_search_capabilities":
       return parity009Capabilities() as T;
     case "structural_search_run":

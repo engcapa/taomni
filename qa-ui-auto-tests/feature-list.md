@@ -11,6 +11,91 @@
 
 ## 1. 应用框架与主界面
 
+### 1.10 WebView 退出检测与有限恢复 🟡
+
+<!-- feature
+id: F1.10
+status: partial
+area: main/recovery
+components: [RecoveryWorkspace, RecoveryTerminalOutput, RecoveryBackgroundStatus]
+files:
+  - src/main.tsx
+  - src/lib/runtimeRecovery.ts
+  - src/lib/recoveryTerminal.ts
+  - src/lib/recoveryPolicy.ts
+  - src/components/recovery/RecoveryWorkspace.tsx
+  - src/components/recovery/RecoveryTerminalOutput.tsx
+  - src/components/recovery/RecoveryBackgroundStatus.tsx
+  - src-tauri/src/app_exit.rs
+  - src-tauri/src/screenshot/recovery_file.rs
+  - src-tauri/src/webview_recovery/mod.rs
+  - src-tauri/src/webview_recovery/lifecycle.rs
+controls:
+  - id: recovery-background-refresh
+    selector: '[data-testid="recovery-background-refresh"]'
+    kind: interactive
+  - id: recovery-background-status
+    selector: '[data-testid="recovery-background-status"]'
+    kind: display
+  - id: recovery-workspace
+    selector: '[data-testid="recovery-workspace"]'
+    kind: display
+  - id: recovery-handshake
+    selector: '[data-testid="recovery-handshake"]'
+    kind: display
+  - id: recovery-limitations
+    selector: '[data-testid="recovery-limitations"]'
+    kind: display
+  - id: recovery-missing
+    selector: '[data-testid="recovery-missing"]'
+    kind: display
+  - id: recovery-tab
+    selector: '[data-testid="recovery-tab"]'
+    kind: interactive
+  - id: recovery-detail
+    selector: '[data-testid="recovery-detail"]'
+    kind: display
+  - id: recovery-kind
+    selector: '[data-testid="recovery-kind"]'
+    kind: display
+  - id: recovery-policy
+    selector: '[data-testid="recovery-policy"]'
+    kind: display
+  - id: recovery-terminal-id
+    selector: '[data-testid="recovery-terminal-id"]'
+    kind: display
+  - id: recovery-unknown
+    selector: '[data-testid="recovery-unknown"]'
+    kind: display
+  - id: recovery-mail-warning
+    selector: '[data-testid="recovery-mail-warning"]'
+    kind: display
+  - id: recovery-observe
+    selector: '[data-testid="recovery-observe"]'
+    kind: interactive
+  - id: recovery-output-status
+    selector: '[data-testid="recovery-output-status"]'
+    kind: display
+  - id: recovery-output
+    selector: '[data-testid="recovery-output"]'
+    kind: display
+  - id: app-crash
+    selector: '[data-testid="app-crash"]'
+    kind: display
+  - id: app-crash-detail
+    selector: '[data-testid="app-crash-detail"]'
+    kind: display
+-->
+
+原生 main/普通分离/SFTP 监听退出，保留后台并撤销受影响输出订阅；
+手动重试先完成实例/代次握手，恢复标签说明，可只读接回原终端后续输出。
+白屏时启用系统标题栏，关闭按钮可再次打开原生重试/保留后台/安全退出选项；
+退出复用 SocksCap 清理，录屏收尾后保存到持久目录并提示路径。
+后台工具状态支持显式查询 Servers、隧道、SocksCap，无自动轮询或启动操作。
+所有业务页恢复期间不挂载，21种标签都有受限说明，不重发 SQL/邮件/传输/AI/宏。
+自动重载、交互式终端画面和客户端自动重连未启用；原生、性能、三端用例未执行。
+用例与限制见 `docs-issue/webview-renderer-crash-recovery/test-cases.md`。
+
 ### 1.1 工程基座 ✅
 - Tauri 2 + React 19 + TypeScript + Vite 桌面工程已搭建
 - Rust 后端模块拆分：`terminal / session / filebrowser / tunnel / appearance / config / state`
@@ -624,6 +709,12 @@ controls: []   # backend-only — PTY runtime has no UI surface; the terminal pa
 - 桌面启动器中 `TERM` 缺失的回归已修复（保证 vi、TUI 程序可用）
 
 ### 2.2 终端面板 `TerminalPanel` ✅
+
+终端自动全文观察仅在开发服务器/QA构建开启，普通production不维护
+`data-terminal-text`；ready、完整scrollback及按需复制/导出/Registry不受影响。
+保留行为用例：TC-TERM-TEXT-001至006、TC-005/006/022/119/143/144；
+production原生边界及性能见
+`native/runbooks/terminal-buffer-text-performance.md`（开发阶段未执行）。
 
 <!-- feature
 id: F2.2

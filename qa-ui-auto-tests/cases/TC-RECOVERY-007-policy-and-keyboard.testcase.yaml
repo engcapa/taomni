@@ -1,0 +1,77 @@
+id: TC-RECOVERY-007
+title: Every tab category has a fail-closed explanation and keyboard-accessible selection
+covers: [F1.10]
+tags: [recovery, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+  - open: ${cfg.app.base_url}
+  - seed_storage:
+      key: qa.recovery.bootstrap
+      value: '{"version":1,"instanceId":"qa-main","generation":2,"revision":1,"recovering":true,"limitation":"terminal-state-unverified","description":{"activeTabId":"terminal","tabs":[{"id":"terminal","kind":"terminal","title":"terminal","savedSessionId":null,"terminalSessionId":null},{"id":"sftp","kind":"sftp","title":"sftp","savedSessionId":null,"terminalSessionId":null},{"id":"rdp","kind":"rdp","title":"rdp","savedSessionId":null,"terminalSessionId":null},{"id":"vnc","kind":"vnc","title":"vnc","savedSessionId":null,"terminalSessionId":null},{"id":"nettools","kind":"nettools","title":"nettools","savedSessionId":null,"terminalSessionId":null},{"id":"sockscap","kind":"sockscap","title":"sockscap","savedSessionId":null,"terminalSessionId":null},{"id":"welcome","kind":"welcome","title":"welcome","savedSessionId":null,"terminalSessionId":null},{"id":"settings","kind":"settings","title":"settings","savedSessionId":null,"terminalSessionId":null},{"id":"placeholder","kind":"placeholder","title":"placeholder","savedSessionId":null,"terminalSessionId":null},{"id":"file-browser","kind":"file-browser","title":"file-browser","savedSessionId":null,"terminalSessionId":null},{"id":"database","kind":"database","title":"database","savedSessionId":null,"terminalSessionId":null},{"id":"redis","kind":"redis","title":"redis","savedSessionId":null,"terminalSessionId":null},{"id":"hbase-shell","kind":"hbase-shell","title":"hbase-shell","savedSessionId":null,"terminalSessionId":null},{"id":"proxy-test","kind":"proxy-test","title":"proxy-test","savedSessionId":null,"terminalSessionId":null},{"id":"object-storage","kind":"object-storage","title":"object-storage","savedSessionId":null,"terminalSessionId":null},{"id":"lan-chat","kind":"lan-chat","title":"lan-chat","savedSessionId":null,"terminalSessionId":null},{"id":"git","kind":"git","title":"git","savedSessionId":null,"terminalSessionId":null},{"id":"mail","kind":"mail","title":"mail","savedSessionId":null,"terminalSessionId":null},{"id":"mail-unified","kind":"mail-unified","title":"mail-unified","savedSessionId":null,"terminalSessionId":null},{"id":"code-workspace","kind":"code-workspace","title":"code-workspace","savedSessionId":null,"terminalSessionId":null},{"id":"mfa","kind":"mfa","title":"mfa","savedSessionId":null,"terminalSessionId":null},{"id":"unknown","kind":"future-protocol","title":"unknown","savedSessionId":null,"terminalSessionId":null}]}}'
+  - reload_window: null
+  - wait_for: '[data-testid="recovery-workspace"]'
+  - assert_count: {selector: '[data-testid="recovery-tab"]', equal: 22}
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 输入模式未恢复}
+  - click: '[data-testid="recovery-tab"][data-kind="sftp"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不自动重传}
+  - press: Tab
+  - press: Enter
+  - assert_attribute: {selector: '[data-testid="recovery-tab"][data-kind="rdp"]', name: aria-pressed, equals: 'true'}
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不自动重连}
+  - click: '[data-testid="recovery-tab"][data-kind="vnc"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 剪贴板}
+  - click: '[data-testid="recovery-tab"][data-kind="nettools"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 隧道后台未被停止}
+  - click: '[data-testid="recovery-tab"][data-kind="sockscap"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: boot repair}
+  - click: '[data-testid="recovery-tab"][data-kind="welcome"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 避免重复创建任务}
+  - click: '[data-testid="recovery-tab"][data-kind="settings"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不以空白默认值覆盖}
+  - click: '[data-testid="recovery-tab"][data-kind="placeholder"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不触发占位工具}
+  - click: '[data-testid="recovery-tab"][data-kind="file-browser"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重做删除}
+  - click: '[data-testid="recovery-tab"][data-kind="database"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: ROLLBACK}
+  - click: '[data-testid="recovery-tab"][data-kind="redis"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重复执行 Redis}
+  - click: '[data-testid="recovery-tab"][data-kind="hbase-shell"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不是 PTY}
+  - click: '[data-testid="recovery-tab"][data-kind="proxy-test"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不自动重复测速}
+  - click: '[data-testid="recovery-tab"][data-kind="object-storage"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重启或取消任务}
+  - click: '[data-testid="recovery-tab"][data-kind="lan-chat"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重复发送或重录}
+  - click: '[data-testid="recovery-tab"][data-kind="git"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重做 commit}
+  - click: '[data-testid="recovery-tab"][data-kind="mail"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 自动发送已暂停}
+  - click: '[data-testid="recovery-tab"][data-kind="mail-unified"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 逐账户核对}
+  - click: '[data-testid="recovery-tab"][data-kind="code-workspace"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不重跑 build}
+  - click: '[data-testid="recovery-tab"][data-kind="mfa"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 不导入或覆盖}
+  - click: '[data-testid="recovery-tab"][data-kind="future-protocol"]'
+  - assert_text: {selector: '[data-testid="recovery-policy"]', contains: 未识别}
+  - assert_count: {selector: '[data-testid="terminal-pane"]', equal: 0}
+  - screenshot: recovery-all-policies.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-09-POLICY
+      requirement: 全21种TabKind及未知类型展示对应受限策略，没有默认自动连接路径
+      actions: [2, 3, 7, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49]
+      checkpoints: [{step: 5, expectation: 包含21种当前类型与1个未知类型}, {step: 30, expectation: HBase不被当成PTY}, {step: 50, expectation: 未知类型准确提示}, {step: 51, expectation: 不挂载普通终端}]
+      results: [5, 30, 50, 51]
+    - id: V-05-KEYBOARD
+      requirement: 标签按DOM顺序支持Tab加Enter键选择，不需要鼠标专用路由
+      actions: [7, 9, 10]
+      checkpoints: [{step: 11, expectation: RDP标签通过真实键盘动作选中}, {step: 12, expectation: 内容路由切换到RDP限制}]
+      results: [11, 12]
+  visual: [{check: 对应限制文本及选中状态, method: automated, reason: DOM属性/文本断言；不证明完整视觉布局}]
+  native: [{check: 26个session与9个Tools的真实外部副作用, method: manual, reason: 本例只验证共同路由；完整映射和代表性原生测试见test-cases.md与native runbook}]

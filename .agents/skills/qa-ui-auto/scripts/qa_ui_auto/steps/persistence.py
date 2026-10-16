@@ -43,8 +43,10 @@ def step_reload_window(ctx: StepContext, args: Any) -> None:
         return
     # Wait for the new document. Looking for the old welcome panel immediately
     # after setTimeout(location.reload) can return before navigation starts.
+    # Recovery and startup-error pages intentionally do not render Welcome, so
+    # wait for the application root rather than one normal-workspace route.
     ctx.page.reload(wait_until="domcontentloaded")  # type: ignore[attr-defined]
     try:
-        ctx.page.wait_for_selector("[data-testid='welcome-panel']", timeout=30_000)  # type: ignore[attr-defined]
+        ctx.page.wait_for_selector("#root > *", state="attached", timeout=30_000)  # type: ignore[attr-defined]
     except Exception as e:  # noqa: BLE001
         raise StepError(f"reload_window: page did not come back up ({e})") from e

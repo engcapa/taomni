@@ -217,6 +217,10 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
         # (NEWMOB_*) and QA hooks under `cfg!(debug_assertions)`, so a plain
         # release binary would write into the real QA profile instead.
         env["CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS"] = "true"
+    # Cargo may otherwise rewrite the lockfile while resolving the QA overlay
+    # on a newer toolchain. The provenance snapshot must describe the exact
+    # checkout that was compiled, so a native build is locked.
+    command.extend(["--", "--locked"])
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
     if inputs != build_inputs(release=release, env=env):

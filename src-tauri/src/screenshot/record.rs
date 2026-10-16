@@ -133,6 +133,7 @@ impl FrameQueue {
     }
 }
 
+#[derive(Clone)]
 pub struct RecordingInfo {
     pub path: PathBuf,
     pub width: u32,
@@ -147,6 +148,43 @@ struct Session {
     encoder: Option<JoinHandle<anyhow::Result<RecordingInfo>>>,
     output_path: PathBuf,
     _lease: RecordingLease,
+}
+
+// Stop, renderer failure and preview closure can race. Share one finalization
+// result; only the registry owner may cancel/delete the artifact.
+pub(super) struct Recording {
+    stop: Arc<AtomicBool>,
+    output_path: PathBuf,
+    finished: AtomicBool,
+    inner: Mutex<(Option<Session>, Option<Result<RecordingInfo, String>>)>,
+}
+
+impl From<Session> for Recording {
+    fn from(session: Session) -> Self {
+        Self {
+            stop: session.stop.clone(),
+            output_path: session.output_path.clone(),
+            finished: AtomicBool::new(false),
+            inner: Mutex::new((Some(session), None)),
+        }
+    }
+}
+
+impl Recording {
+    pub(super) fn finish(&self) -> anyhow::Result<RecordingInfo> {
+        self.stop.store(true, Ordering::SeqCst);
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(session) = inner.0.take() {
+            inner.1 = Some(finish_session(session).map_err(|error| format!("{error:#}")));
+            self.finished.store(true, Ordering::Release);
+        }
+        inner
+            .1
+            .as_ref()
+            .expect("recording finalized")
+            .clone()
+            .map_err(anyhow::Error::msg)
+    }
 }
 
 // Includes startup and timed-out startup cleanup, not just inserted sessions.
@@ -169,9 +207,9 @@ impl Drop for RecordingLease {
     }
 }
 
-static SESSIONS: OnceLock<Mutex<HashMap<String, Session>>> = OnceLock::new();
+static SESSIONS: OnceLock<Mutex<HashMap<String, Arc<Recording>>>> = OnceLock::new();
 
-fn sessions() -> &'static Mutex<HashMap<String, Session>> {
+fn sessions() -> &'static Mutex<HashMap<String, Arc<Recording>>> {
     SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -192,10 +230,15 @@ pub fn recording_status(id: &str) -> (bool, bool) {
         .get(id)
         .map(|session| {
             (
-                session
-                    .capture
-                    .as_ref()
-                    .is_none_or(|thread| thread.is_finished()),
+                session.finished.load(Ordering::Acquire)
+                    || session.inner.try_lock().ok().is_some_and(|inner| {
+                        inner.0.as_ref().is_none_or(|session| {
+                            session
+                                .capture
+                                .as_ref()
+                                .is_none_or(|thread| thread.is_finished())
+                        })
+                    }),
                 session.stop.load(Ordering::SeqCst),
             )
         })
@@ -285,15 +328,19 @@ pub fn start_recording(
         }
     }
 
-    sessions().lock().unwrap().insert(
+    let mut sessions = sessions().lock().unwrap();
+    // Keep the latest completed clip for a preview-renderer failure, not a
+    // growing history of recordings. The recording lease bounds active work.
+    sessions.retain(|_, session| !session.finished.load(Ordering::Acquire));
+    sessions.insert(
         id.clone(),
-        Session {
+        Arc::new(Recording::from(Session {
             stop,
             capture: Some(capture),
             encoder: Some(encoder),
             output_path,
             _lease: lease,
-        },
+        })),
     );
     Ok(id)
 }
@@ -308,11 +355,25 @@ pub(crate) fn output_path(recording_id: &str) -> Option<PathBuf> {
 
 /// Stop a recording and finalize the file.
 pub fn stop_recording(recording_id: &str) -> anyhow::Result<RecordingInfo> {
-    let mut session = sessions()
+    let recording = sessions()
         .lock()
         .unwrap()
-        .remove(recording_id)
+        .get(recording_id)
+        .cloned()
         .context("unknown recording id")?;
+    recording.finish()
+}
+
+/// Called while the screenshot owner lock is held, before close can purge its
+/// temp files. Taking ownership also excludes cancel_all during app exit.
+pub(super) fn take_for_recovery(recording_id: &str) -> Option<Arc<Recording>> {
+    let recording = sessions().lock().unwrap().remove(recording_id)?;
+    recording.stop.store(true, Ordering::SeqCst);
+    super::capture::untrack_artifact(&recording.output_path);
+    Some(recording)
+}
+
+fn finish_session(mut session: Session) -> anyhow::Result<RecordingInfo> {
     session.stop.store(true, Ordering::SeqCst);
     let capture_result = session.capture.take().map(|h| {
         h.join()
@@ -339,14 +400,13 @@ pub fn stop_recording(recording_id: &str) -> anyhow::Result<RecordingInfo> {
 
 /// Stop a recording and delete the partial file.
 pub fn cancel_recording(recording_id: &str) -> anyhow::Result<()> {
-    let path = sessions()
+    let recording = sessions()
         .lock()
         .unwrap()
-        .get(recording_id)
-        .map(|s| s.output_path.clone())
+        .remove(recording_id)
         .context("unknown recording id")?;
-    let _ = stop_recording(recording_id);
-    std::fs::remove_file(path).ok();
+    let _ = recording.finish();
+    std::fs::remove_file(&recording.output_path).ok();
     Ok(())
 }
 
@@ -923,6 +983,7 @@ fn inspect_mp4(
 #[cfg(test)]
 mod tests {
     use super::*;
+    static RECORDING_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn frame(w: u32, h: u32, shift: u32) -> RgbaImage {
         RgbaImage::from_fn(w, h, |x, y| {
@@ -1002,6 +1063,7 @@ mod tests {
 
     #[test]
     fn capture_failure_is_not_a_successful_partial_recording_and_releases_lease() {
+        let _guard = RECORDING_TEST_LOCK.lock().unwrap();
         let lease = RecordingLease::acquire().unwrap();
         assert!(RecordingLease::acquire().is_err());
         let path = std::env::temp_dir().join(format!("taomni-failed-recording-{}.gif", nano_id()));
@@ -1010,7 +1072,7 @@ mod tests {
         let id = format!("qa-failed-{}", nano_id());
         sessions().lock().unwrap().insert(
             id.clone(),
-            Session {
+            Arc::new(Recording::from(Session {
                 stop: Arc::new(AtomicBool::new(false)),
                 capture: Some(thread::spawn(|| {
                     anyhow::bail!("capture device disconnected")
@@ -1026,12 +1088,64 @@ mod tests {
                 })),
                 output_path: path.clone(),
                 _lease: lease,
-            },
+            })),
         );
         let error = stop_recording(&id).err().unwrap().to_string();
         assert!(error.contains("capture device disconnected"));
         assert!(!path.exists());
         assert!(RecordingLease::acquire().is_ok());
+    }
+
+    #[test]
+    fn recovery_owns_active_inflight_and_preview_files_through_close_and_exit() {
+        let _guard = RECORDING_TEST_LOCK.lock().unwrap();
+        for preview in [false, true] {
+            let path = temp_artifact_path("recovery-unit", "gif").unwrap();
+            std::fs::write(&path, b"completed recording bytes").unwrap();
+            let encoded_path = path.clone();
+            let (finish_tx, finish_rx) = std::sync::mpsc::channel();
+            let recording = Arc::new(Recording::from(Session {
+                stop: Arc::new(AtomicBool::new(false)),
+                capture: Some(thread::spawn(|| Ok(()))),
+                encoder: Some(thread::spawn(move || {
+                    finish_rx.recv().unwrap();
+                    Ok(RecordingInfo {
+                        path: encoded_path,
+                        width: 16,
+                        height: 16,
+                        frames: 2,
+                        duration_ms: 100,
+                    })
+                })),
+                output_path: path.clone(),
+                _lease: RecordingLease::acquire().unwrap(),
+            }));
+            let id = format!("recovery-unit-{}", nano_id());
+            sessions()
+                .lock()
+                .unwrap()
+                .insert(id.clone(), recording.clone());
+            let normal = recording.clone();
+            let normal_stop = thread::spawn(move || normal.finish());
+            if preview {
+                finish_tx.send(()).unwrap();
+                // The completed preview remains claimable after normal Stop.
+                recording.finish().unwrap();
+            }
+            let recovered = take_for_recovery(&id).unwrap();
+            assert!(take_for_recovery(&id).is_none());
+            assert!(cancel_recording(&id).is_err());
+            cancel_all();
+            super::super::capture::purge_tracked();
+            assert!(path.exists());
+            if !preview {
+                finish_tx.send(()).unwrap();
+            }
+            assert_eq!(recovered.finish().unwrap().frames, 2);
+            assert_eq!(normal_stop.join().unwrap().unwrap().frames, 2);
+            assert_eq!(std::fs::read(&path).unwrap(), b"completed recording bytes");
+            std::fs::remove_file(path).unwrap();
+        }
     }
 
     #[test]
