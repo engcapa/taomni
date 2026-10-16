@@ -5980,8 +5980,10 @@ controls:
 -->
 
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
-- 最近正文缓存改为前端后台 warming：按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_get_message_body`，并用独立进度显示。
+- 最近正文缓存按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_prefetch_message_body` 写入原生磁盘缓存，并用独立进度显示；预取不向前端传输或渲染正文，手动打开邮件使用独立于同步的 IMAP 连接。
 - 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
+- 同步缓存与联系人索引的数据库工作在阻塞线程池执行；新增历史邮件增量收集联系人，正文清理仅更新实际有正文的记录。
+- SMTP 接受后立即显示发送成功并关闭写信窗口；已发送副本由后台保存，通过 `mail-sent-copy` 事件单独提示保存成功或失败。TC-116 覆盖刷新后的阅读/回复，原生并发边界由 `mail::responsiveness_tests` 与隔离 QA 探针验证。
 
 ---
 

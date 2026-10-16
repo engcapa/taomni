@@ -1,14 +1,19 @@
 id: TC-116
-title: Mail sync headers-first refresh
+title: Mail headers-first refresh followed by reading and replying
 description: 'Opens a browser-stub Mail tab and runs the mailbox Sync action. The browser
 
   stub verifies the visible headers-first refresh path; body warming progress is
 
-  optional because the stub messages already include cached bodies.
+  optional because the stub messages already include cached bodies. Reading and
+  replying must still work after refresh. Native lock contention and SMTP/copy
+  ordering are additionally covered by mail::responsiveness_tests; this browser
+  case does not establish native networking latency.
 
   '
 covers:
 - F-MAIL-3
+- F-MAIL-1
+- F-MAIL-2
 tags:
 - mail
 - smoke
@@ -38,6 +43,21 @@ steps:
     contains: Synced
     timeout_sec: 10
 - screenshot: mail-116-sync-headers-first.png
+- click: '[data-testid="mail-message-row"]:first-child'
+- wait_for: '[data-testid="mail-client-tab"] button[title="Reply"]:not(:disabled)'
+- click: '[data-testid="mail-client-tab"] button[title="Reply"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- fill:
+    selector: '[data-testid="mail-compose-editor"]'
+    value: QA reply after refreshing headers.
+- click: '[data-testid="mail-compose-send"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-dialog"]'
+    state: hidden
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Message sent
+- screenshot: mail-116-reply-accepted.png
 verification:
   review: reviewed
   requirements:
@@ -63,6 +83,19 @@ verification:
         10}}'
     results:
     - 11
+  - id: R2
+    requirement: After refresh, open a message and send a reply; acceptance closes the composer and displays Message sent.
+    actions: [13, 15, 17, 18]
+    checkpoints:
+    - step: 14
+      expectation: The selected message can be replied to.
+    - step: 16
+      expectation: The reply composer opens.
+    - step: 19
+      expectation: The composer closes when sending is accepted.
+    - step: 20
+      expectation: The mailbox displays Message sent.
+    results: [19, 20]
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
