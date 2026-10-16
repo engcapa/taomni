@@ -154,6 +154,49 @@ pub(super) fn keep_composited(window: &tauri::WebviewWindow) -> Result<(), Strin
         .map_err(|e| format!("mark capture surface composited: {e}"))?
 }
 
+/// Claim the X11 input focus for a capture surface.
+///
+/// Window managers with a "smart" focus policy (mutter/muffin) can refuse the
+/// `_NET_ACTIVE_WINDOW` activation for a window whose application just hid its
+/// own main window: the overlay is mapped and raised but never focused, so
+/// Escape and every other shortcut stays dead until the user clicks it. The
+/// capture surface is a user-triggered fullscreen modal, so taking the input
+/// focus directly is the intended behaviour; the polite present is tried first.
+pub(super) fn force_input_focus(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let target = window.clone();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            let xid = target.gtk_window().ok().and_then(|gtk| {
+                if gtk.display().type_().name() != "GdkX11Display" {
+                    return None;
+                }
+                gtk.realize();
+                let surface = gtk.window()?;
+                // SAFETY: live GdkX11 surface owned by this thread.
+                Some(unsafe { gdk_x11_window_get_xid(surface.to_glib_none().0) })
+            });
+            let _ = tx.send(xid);
+        })
+        .map_err(|e| e.to_string())?;
+    let xid = rx
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("resolve capture surface: {e}"))?
+        .ok_or("capture surface has no X11 window")?;
+
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{ConnectionExt as _, InputFocus};
+    let (connection, _) = x11rb::connect(None).map_err(|e| e.to_string())?;
+    connection
+        .set_input_focus(InputFocus::PARENT, xid, x11rb::CURRENT_TIME)
+        .map_err(|e| e.to_string())?
+        .check()
+        .map_err(|e| e.to_string())?;
+    connection.flush().map_err(|e| e.to_string())?;
+    log::info!("capture surface {xid:#x}: input focus claimed directly");
+    Ok(())
+}
+
 /// Write `_NET_WM_BYPASS_COMPOSITOR = 2` (META_BYPASS_COMPOSITOR_HINT_OFF).
 fn set_bypass_compositor_off(xid: u32) -> Result<(), String> {
     use x11rb::connection::Connection;
@@ -162,8 +205,11 @@ fn set_bypass_compositor_off(xid: u32) -> Result<(), String> {
     use x11rb::wrapper::ConnectionExt as _;
 
     let (connection, _) = x11rb::connect(None).map_err(|e| e.to_string())?;
+    // `only_if_exists = false`: on a desktop whose compositor never interned
+    // the atom (CI Xvfb/openbox) an existing-only lookup returns 0 and the
+    // property write fails.
     let atom = connection
-        .intern_atom(true, b"_NET_WM_BYPASS_COMPOSITOR")
+        .intern_atom(false, b"_NET_WM_BYPASS_COMPOSITOR")
         .map_err(|e| e.to_string())?
         .reply()
         .map_err(|e| e.to_string())?

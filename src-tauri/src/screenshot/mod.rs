@@ -63,6 +63,10 @@ const HIDE_SETTLE: Duration = Duration::from_millis(250);
 /// no-op there.
 const FOCUS_ATTEMPTS: usize = 20;
 const FOCUS_RETRY: Duration = Duration::from_millis(50);
+/// Attempts to keep re-asserting focus even after the window reports active.
+/// GTK refuses `grab_focus` on a widget that is not mapped yet, and the first
+/// attempts land while `show()` is still mapping the surface.
+const FOCUS_SETTLE_ATTEMPTS: usize = 4;
 
 /// Bring a capture surface to the foreground and hand keyboard focus to its
 /// webview, waiting until the platform window is actually mapped.
@@ -74,6 +78,8 @@ const FOCUS_RETRY: Duration = Duration::from_millis(50);
 pub(crate) async fn focus_capture_window(window: &WebviewWindow) {
     #[cfg(target_os = "linux")]
     let mut presented = false;
+    #[cfg(target_os = "linux")]
+    let mut claimed = false;
     for attempt in 0..FOCUS_ATTEMPTS {
         if window.is_visible().unwrap_or(false) {
             // X11 focus-stealing prevention can refuse the timestamp-less
@@ -88,10 +94,27 @@ pub(crate) async fn focus_capture_window(window: &WebviewWindow) {
             }
             let _ = window.set_focus();
             // Webview-level focus so WebKit/WebView2 route key events to the
-            // DOM (Ctrl+C, typing) and not only to the native window.
+            // DOM (Ctrl+C, typing) and not only to the native window. Re-assert
+            // on every attempt: the first ones can land before the surface is
+            // mapped, where GTK drops the focus request.
             let webview: &tauri::Webview<_> = window.as_ref();
             let _ = webview.set_focus();
-            if window.is_focused().unwrap_or(false) {
+            // Focus policies that refuse the polite activation (mutter/muffin
+            // "smart" mode after the app hid its own window) still leave the
+            // overlay unfocused; claim the input focus once the present had a
+            // chance to land. Claim once only: repeatedly stealing focus back
+            // would fight the user or another window.
+            #[cfg(target_os = "linux")]
+            if !claimed
+                && attempt + 1 >= FOCUS_SETTLE_ATTEMPTS
+                && !window.is_focused().unwrap_or(false)
+            {
+                claimed = true;
+                if let Err(error) = surface_backend::force_input_focus(window) {
+                    log::debug!("capture input focus fallback skipped: {error}");
+                }
+            }
+            if attempt + 1 >= FOCUS_SETTLE_ATTEMPTS && window.is_focused().unwrap_or(false) {
                 return;
             }
         }
@@ -1026,7 +1049,10 @@ async fn cover_display(window: &WebviewWindow, display: &DisplayInfo) -> Result<
     // when the window is managed, so it must be set before it is shown.
     #[cfg(target_os = "linux")]
     if let Err(error) = surface_backend::keep_composited(window) {
-        log::debug!("capture surface compositor hint skipped: {error}");
+        // Visible in release logs: without this property Ubuntu's X11
+        // fractional scaling re-applies the whole display configuration
+        // whenever the overlay opens or closes.
+        log::warn!("capture surface compositor hint skipped: {error}");
     }
     Ok(())
 }
