@@ -61,6 +61,7 @@ pub async fn save_ai_config(
         )
     };
     let mut ai_ctx = state.ai_ctx.write().await;
+    ai_ctx.update_inspector_policy(&config);
     if config.fully_disabled || ai_ctx.config.asr != config.asr {
         crate::voice::commands::cancel_all();
     }
@@ -186,21 +187,22 @@ async fn test_provider_connection(
 pub async fn test_llm_model(
     provider_id: String,
     model: String,
+    provider_draft: Option<LlmProviderConfig>,
     state: State<'_, AppState>,
 ) -> Result<crate::ai::model_inspector::CheckResult, String> {
     use crate::ai::model_inspector::{check_result, checks_disabled, save_result};
     if model.trim().is_empty() { return Err("Model ID is required".into()); }
-    let mut provider = {
+    let (mut provider, cancel) = {
         let ctx = state.ai_ctx.read().await;
-        let provider = ctx.config.llm.providers.get(&provider_id).cloned().ok_or("Unknown provider")?;
+        let provider = crate::ai::model_inspector::inspector_provider(ctx.config.llm.providers.get(&provider_id).ok_or("Unknown provider")?, provider_draft)?;
         if checks_disabled(&provider.runtime, ctx.config.full_local_mode, ctx.config.fully_disabled) {
             return Err("Model checks are disabled by the AI network policy".into());
         }
-        provider
+        (provider, ctx.inspector_cancel.clone())
     };
     provider.model = model.clone();
     let start = std::time::Instant::now();
-    let result = match test_provider_connection(provider, &state, Some(std::time::Duration::from_secs(60))).await {
+    let result = match crate::ai::model_inspector::under_policy(&cancel, test_provider_connection(provider, &state, Some(std::time::Duration::from_secs(60)))).await {
         Ok(result) => check_result(result.ok, result.latency_ms, (!result.ok).then_some(result.message)),
         Err(error) => check_result(false, start.elapsed().as_millis() as u64, Some(error)),
     };
@@ -212,18 +214,24 @@ pub async fn test_llm_model(
 pub async fn get_provider_models(
     provider_id: String,
     force_refresh: Option<bool>,
+    provider_draft: Option<LlmProviderConfig>,
     state: State<'_, AppState>,
 ) -> Result<crate::ai::model_inspector::ProviderModelsDto, String> {
     use crate::ai::model_inspector::*;
-    let (provider, full_local, disabled) = {
+    let (provider, full_local, disabled, cancel) = {
         let ctx = state.ai_ctx.read().await;
-        (ctx.config.llm.providers.get(&provider_id).cloned().ok_or("Unknown provider")?,
-            ctx.config.full_local_mode, ctx.config.fully_disabled)
+        (inspector_provider(ctx.config.llm.providers.get(&provider_id).ok_or("Unknown provider")?, provider_draft)?,
+            ctx.config.full_local_mode, ctx.config.fully_disabled, ctx.inspector_cancel.clone())
     };
     let local = is_local(&provider.runtime);
     let blocked = checks_disabled(&provider.runtime, full_local, disabled);
-    let mut dto = if provider.runtime == "opencode-go" {
-        let go = get_opencode_go_catalog(force_refresh.unwrap_or(false), state.clone()).await?;
+    let request = async {
+    let dto = if provider.runtime == "opencode-go" {
+        let proxy = {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            crate::ai::config::resolve_go_proxy_url(&provider, Some(&db), Some(state.vault.as_ref()))
+        };
+        let go = state.opencode_go_catalog.inspect(provider.base_url.clone(), proxy, blocked, force_refresh.unwrap_or(false)).await;
         ProviderModelsDto { rows: go_rows(&go, &provider.model, &provider.protocol_overrides),
             fetched_at: go.fetched_at, source: go.source, last_error: go.last_error,
             unavailable: false, checks_disabled: blocked }
@@ -259,6 +267,25 @@ pub async fn get_provider_models(
             last_error: live_error.or(catalog.last_error), unavailable: local && live.is_none(),
             checks_disabled: blocked,
         }
+    };
+    Ok(dto)
+    };
+    let mut dto = match under_policy(&cancel, request).await {
+        Ok(dto) => dto,
+        Err(error) if cancel.is_cancelled() => {
+            let ctx = state.ai_ctx.read().await;
+            let catalog = state.opencode_go_catalog.metadata.get();
+            let snapshot: serde_json::Value = serde_json::from_str(crate::llm::model_catalog::SNAPSHOT).unwrap();
+            let key = provider_key(&provider_id, &provider.base_url);
+            ProviderModelsDto {
+                rows: if provider.runtime == "opencode-go" {
+                    go_rows(&state.opencode_go_catalog.get(), &provider.model, &provider.protocol_overrides)
+                } else { assemble(&provider.model, &provider.runtime, &catalog.providers[key], None, &snapshot["aliases"][key]) },
+                fetched_at: catalog.fetched_at, source: catalog.source, last_error: Some(error), unavailable: local,
+                checks_disabled: checks_disabled(&provider.runtime, ctx.config.full_local_mode, ctx.config.fully_disabled),
+            }
+        }
+        Err(error) => return Err(error),
     };
     attach_results(&mut dto.rows, &provider_id, &default_ai_config_path().with_file_name("model-check-results.json"));
     Ok(dto)

@@ -104,10 +104,14 @@
 - `[data-testid="settings-group-toggle-ai"]` — interactive [optional] — F-AI-2.1.settings-group-toggle-ai
 - `[data-testid="ai-master-switch"]` — interactive — F-AI-2.1.ai-master-toggle
   ↳ `text="Disable AI completely"` — alias
-- `text="Full local mode"` — interactive [optional] — F-AI-2.1.privacy-fully-local
+- `[data-testid="ai-full-local-toggle"]` — interactive [optional] — F-AI-2.1.privacy-fully-local
+  ↳ `text="Full local mode"` — alias
 
 ## ai/settings (F-AI-2.8)
 
+- `[data-testid="llm-proxy-mode"]` — interactive — F-AI-2.8.llm-proxy-mode
+- `[data-testid="llm-custom-proxy"]` — display [optional] — F-AI-2.8.llm-custom-proxy
+- `[data-testid="llm-provider-base-url"]` — interactive — F-AI-2.8.llm-provider-base-url
 - `[data-testid="model-inspector-open"]` — interactive — F-AI-2.8.model-inspector-open
 - `[data-testid="model-inspector-panel"]` — display — F-AI-2.8.model-inspector-panel
 - `[data-testid="model-inspector-summary"]` — display — F-AI-2.8.model-inspector-summary

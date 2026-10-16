@@ -17,7 +17,7 @@ beforeEach(async () => {
   await useAiStore.getState().loadConfig();
   mock.mockImplementation(async (command, args) => {
     const params = args as Record<string, unknown> | undefined;
-    if (command === "get_provider_models") return inspectorStub(String(params?.providerId), !!params?.forceRefresh);
+    if (command === "get_provider_models") return inspectorStub(String(params?.providerId), !!params?.forceRefresh, params?.providerDraft as Parameters<typeof inspectorStub>[2]);
     if (command === "test_llm_model") return inspectorCheckStub(String(params?.providerId), String(params?.model));
     return null;
   });
@@ -111,7 +111,7 @@ it("shows loading before data, genuine empty and Chinese text", async () => {
   mock.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
   setLocale("zh-CN");
   open();
-  expect(screen.getByTestId("model-inspector-loading")).toHaveTextContent("正在加载");
+  expect(await screen.findByTestId("model-inspector-loading")).toHaveTextContent("正在加载");
   resolve({ ...inspectorStub("deepseek", false), rows: [] });
   expect(await screen.findByTestId("model-inspector-empty")).toHaveTextContent("没有可用模型");
   expect(screen.queryByTestId("model-inspector-unavailable")).toBeNull();
@@ -146,4 +146,27 @@ it("future configured provider automatically receives an inspector entry", () =>
   const row = document.querySelector('[data-testid="llm-provider-row"][data-provider="future"]')!;
   fireEvent.click(row.firstElementChild!);
   expect(within(row as HTMLElement).getByTestId("model-inspector-open")).toBeVisible();
+});
+
+it("reopens an unsaved current model and checks it without saving the draft", async () => {
+  render(<LlmProvidersPanel />);
+  const row = document.querySelector('[data-testid="llm-provider-row"][data-provider="deepseek"]') as HTMLElement;
+  fireEvent.click(row.firstElementChild!);
+  fireEvent.change(within(row).getByTestId("llm-provider-model"), { target: { value: "unsaved-model" } });
+  fireEvent.click(within(row).getByTestId("model-inspector-open"));
+  await waitFor(() => expect(screen.getAllByTestId("model-inspector-row")[0]).toHaveAttribute("data-model", "unsaved-model"));
+  expect(screen.getByTestId("model-inspector-check-current")).toBeEnabled();
+  fireEvent.click(screen.getByTestId("model-inspector-check-current"));
+  await waitFor(() => expect(mock.mock.calls.find(([c]) => c === "test_llm_model")?.[1]).toMatchObject({ model: "unsaved-model", providerDraft: { model: "unsaved-model" } }));
+  expect(mock.mock.calls.some(([c]) => c === "save_ai_config")).toBe(false);
+});
+it("unblocking policy reloads a mounted disabled snapshot and restores actions", async () => {
+  mock.mockResolvedValueOnce({ ...inspectorStub("deepseek", false), checks_disabled: true });
+  const view = open(true);
+  await screen.findAllByTestId("model-inspector-row");
+  view.rerender(<ModelInspectorPanel providerId="deepseek" currentModel="deepseek-chat" blocked={false} onClose={vi.fn()} />);
+  await waitFor(() => expect(mock.mock.calls.filter(([c]) => c === "get_provider_models")).toHaveLength(2));
+  expect(screen.getByTestId("model-inspector-refresh")).toBeEnabled();
+  fireEvent.click(screen.getByTestId("model-inspector-check-current"));
+  await waitFor(() => expect(mock.mock.calls.filter(([c]) => c === "test_llm_model")).toHaveLength(1));
 });

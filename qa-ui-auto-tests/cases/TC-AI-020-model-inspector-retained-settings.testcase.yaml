@@ -1,11 +1,19 @@
 id: TC-AI-020
 title: Inspector close preserves key/model editing and original save and test controls
-description: Browser vault and connection stubs only; real vault/IPC checked
-  manually in N-I-02/N-I-08. Synthetic key only. Authored, unrun.
-covers: [F-AI-2.8, F-AI-2.4, F6.3]
-tags: [ai, model-inspector, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: Browser vault and connection stubs only; real vault/IPC checked manually
+  in N-I-02/N-I-08. Synthetic key only. Authored, unrun.
+covers:
+- F-AI-2.8
+- F-AI-2.4
+- F6.3
+tags:
+- ai
+- model-inspector
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -23,14 +31,25 @@ steps:
 - fill:
     selector: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]'
     value: manual-browser-model
+- click: '[data-testid="model-inspector-open"][data-provider="deepseek"]'
+- wait_for: '[data-testid="model-inspector-row"][data-model="manual-browser-model"]'
+- click: '[data-testid="model-inspector-check-current"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"]:first-child [data-testid="model-inspector-result"]'
+    contains: ✓ 12ms
+- click: '[data-testid="model-inspector-close"]'
 - click: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-test"]'
 - assert_text:
     selector: '[data-testid="llm-provider-row"][data-provider="deepseek"]'
     contains: Connected
 - click: '[data-testid="llm-providers-save"]'
 - wait_for: '[data-testid="vault-setup-dialog"]'
-- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-browser-fixture-only}
-- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-browser-fixture-only}
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-browser-fixture-only
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-browser-fixture-only
 - click: '[data-testid="vault-setup-confirm"]'
 - assert_localstorage:
     key: taomni.ai.config.v1
@@ -48,15 +67,50 @@ verification:
   review: pending
   requirements:
   - id: I-RETAINED
-    requirement: Original key/model inputs, connection test and vault save path remain wired after inspector closes.
-    actions: [8, 10, 11, 12, 13, 15, 17, 18, 19, 22]
+    requirement: Original key/model inputs, connection test and vault save path remain
+      wired after inspector closes.
+    actions:
+    - 8
+    - 10
+    - 11
+    - 12
+    - 18
+    - 20
+    - 22
+    - 23
+    - 24
+    - 27
     checkpoints:
-    - {step: 14, expectation: Existing connection stub result visible.}
-    - {step: 20, expectation: Manual model saved after vault setup.}
-    - {step: 21, expectation: Synthetic key replaced by vault stub reference.}
-    - {step: 24, expectation: Inspector current choice agrees with original input.}
-    results: [14, 20, 21, 24]
+    - step: 19
+      expectation: Existing connection stub result visible.
+    - step: 25
+      expectation: Manual model saved after vault setup.
+    - step: 26
+      expectation: Synthetic key replaced by vault stub reference.
+    - step: 29
+      expectation: Inspector current choice agrees with original input.
+    results:
+    - 19
+    - 25
+    - 26
+    - 29
+  - id: I-DRAFT
+    requirement: Unsaved manual model enters the inspector and can be checked before
+      Save.
+    actions:
+    - 12
+    - 13
+    - 15
+    checkpoints:
+    - step: 16
+      expectation: Draft model check succeeds.
+    results:
+    - 16
   visual:
-  - {check: Input and inspector state, method: automated, reason: Actual original controls are edited and observed.}
+  - check: Input and inspector state
+    method: automated
+    reason: Actual original controls are edited and observed.
   native:
-  - {check: Real vault encryption and preserved connection semantics, method: manual, reason: N-I-02/N-I-08; browser returns synthetic refs.}
+  - check: Real vault encryption and preserved connection semantics
+    method: manual
+    reason: N-I-02/N-I-08; browser returns synthetic refs.

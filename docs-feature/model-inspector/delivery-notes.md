@@ -100,3 +100,20 @@ env -u LD_AUDIT PATH="$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/b
 移除 inspector 入口与新命令后原 provider 配置仍兼容；结果文件不属于用户配置，
 只删除隔离结果或明确获授权的文件。共享目录由 Go 仍使用，不因撤掉 inspector
 把 Go 的底座一并删除；无 DB migration，不进行破坏性 schema 回退。
+
+## 修复轮验证（2026-10-16）
+
+本轮修复了代理严格路由、策略切换取消、未保存草稿检视、解锁恢复，以及 Go 元数据未知值显示。新增/修改 browser 用例 TC-AI-005、012～017、019、020 和 native 用例 TC-AI-021；TC-AI-021 使用隔离 loopback 网关、三路代理和 QA 配置，不含真实凭据。
+
+| 验证 | 结果 |
+|---|---|
+| Vitest 受影响组件/store | 43/43 passed |
+| Rust `ai::model_inspector` | 8/8 passed |
+| Rust `llm::opencode_go` | 17/17 passed |
+| Rust `ai::config` / `llm::model_catalog` / router capability | 6/6、3/3、1/1 passed |
+| TypeScript | `pnpm exec tsc --noEmit` passed（QA build also passed） |
+| Browser Windows 11 | TC-AI-005、012～017、019、020：9/9 passed |
+| Native Windows 11 | TC-AI-021：1/1 passed；实际 WebView2/EdgeDriver 155、QA app `com.taomni.app.qa`、隔离 HTTP/文件证据 |
+| Linux/macOS browser/native | 未执行，仅保留用例 |
+
+Browser/native 报告保存在 `qa-ui-auto-report/model-inspector/`；native 首次因机器 EdgeDriver 152 与 WebView2 155 不匹配而未启动，随后使用匹配的隔离驱动重跑通过。完整 crate 测试未作为本轮门槛；受影响模块与 QA 构建已验证。

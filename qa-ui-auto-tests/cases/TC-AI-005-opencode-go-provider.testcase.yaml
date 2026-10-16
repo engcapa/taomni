@@ -1,12 +1,18 @@
 id: TC-AI-005
 title: OpenCode Go settings, protocol override and per-thread model selection
-description: Production renderer and persistence stubs only. No real gateway,
-  encryption, SQLite, network-policy or subscription evidence. Auth/send/stream
-  boundaries are covered by the linked native runbook; this case is authored, unrun.
-covers: [F-AI-2.4]
-tags: [ai, opencode-go, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: Production renderer and persistence stubs only. No real gateway, encryption,
+  SQLite, network-policy or subscription evidence. Auth/send/stream boundaries are
+  covered by the linked native runbook; this case is authored, unrun.
+covers:
+- F-AI-2.4
+tags:
+- ai
+- opencode-go
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
@@ -48,7 +54,8 @@ steps:
 - click: '[data-testid="llm-providers-save"]'
 - click: '[data-testid="tab-item"][data-tab-type="terminal"]'
 - eval_readonly:
-    expression: JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].protocol_overrides['deepseek-v4.1-flash'] === undefined
+    expression: JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].protocol_overrides['deepseek-v4.1-flash']
+      === undefined
     expect_truthy: true
 - click: '[data-testid="tab-chat-toggle"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
@@ -79,6 +86,7 @@ steps:
     value: deepseek
 - assert_not_visible: '[data-testid="go-thread-picker"]'
 - click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
 - wait_for: '[data-testid="go-proxy-mode"]'
 - assert_attribute:
     selector: '[data-testid="go-proxy-mode"]'
@@ -92,21 +100,25 @@ steps:
     value: go-proxy.local
 - click: '[data-testid="llm-providers-save"]'
 - eval_readonly:
-    expression: "JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].custom_proxy.host === 'go-proxy.local'"
+    expression: JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].custom_proxy.host
+      === 'go-proxy.local'
     expect_truthy: true
 - select_option:
     selector: '[data-testid="go-proxy-mode"]'
     value: none
 - click: '[data-testid="llm-providers-save"]'
 - eval_readonly:
-    expression: "(() => { const p = JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go']; return p.proxy_mode === 'none' && p.custom_proxy.host === 'go-proxy.local'; })()"
+    expression: JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].proxy_mode
+      === 'none' && JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].custom_proxy.host
+      === 'go-proxy.local'
     expect_truthy: true
 - select_option:
     selector: '[data-testid="go-proxy-mode"]'
     value: app
 - click: '[data-testid="llm-providers-save"]'
 - eval_readonly:
-    expression: "JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].proxy_mode === 'app'"
+    expression: JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].proxy_mode
+      === 'app'
     expect_truthy: true
 - select_option:
     selector: '[data-testid="go-proxy-mode"]'
@@ -135,40 +147,102 @@ verification:
   requirements:
   - id: R1
     requirement: Default Go configuration and unclassified catalog entries are visible.
-    actions: [5, 6, 8, 12]
+    actions:
+    - 5
+    - 6
+    - 8
+    - 12
     checkpoints:
-    - {step: 10, expectation: Default model equals deepseek-v4.1-flash.}
-    - {step: 14, expectation: Unclassified model is retained.}
-    results: [10, 14]
+    - step: 10
+      expectation: Default model equals deepseek-v4.1-flash.
+    - step: 14
+      expectation: Unclassified model is retained.
+    results:
+    - 10
+    - 14
   - id: R2
-    requirement: All-model overrides save and restore through existing configuration path.
-    actions: [15, 17, 19, 21]
+    requirement: All-model overrides save and restore through existing configuration
+      path.
+    actions:
+    - 15
+    - 17
+    - 19
+    - 21
     checkpoints:
-    - {step: 18, expectation: Stub persistence contains the manual protocol override.}
-    - {step: 20, expectation: Restore automatic returns chat.}
-    - {step: 23, expectation: Saved configuration no longer contains the manual override.}
-    results: [18, 20, 23]
+    - step: 18
+      expectation: Stub persistence contains the manual protocol override.
+    - step: 20
+      expectation: Restore automatic returns chat.
+    - step: 23
+      expectation: Saved configuration no longer contains the manual override.
+    results:
+    - 18
+    - 20
+    - 23
   - id: R3
-    requirement: Go-only picker pins and explicitly clears a thread model without affecting other providers.
-    actions: [26, 27, 29, 32, 34]
+    requirement: Go-only picker pins and explicitly clears a thread model without
+      affecting other providers.
+    actions:
+    - 26
+    - 27
+    - 29
+    - 32
+    - 34
     checkpoints:
-    - {step: 30, expectation: Selected model remains kimi-k3.}
-    - {step: 31, expectation: Browser thread persistence records the pin.}
-    - {step: 33, expectation: Clearing selects the provider default.}
-    - {step: 35, expectation: Switching away hides Go controls.}
-    results: [30, 31, 33, 35]
+    - step: 30
+      expectation: Selected model remains kimi-k3.
+    - step: 31
+      expectation: Browser thread persistence records the pin.
+    - step: 33
+      expectation: Clearing selects the provider default.
+    - step: 35
+      expectation: Switching away hides Go controls.
+    results:
+    - 30
+    - 31
+    - 33
+    - 35
   - id: R4
-    requirement: Go defaults to application proxy; independent settings survive mode changes, save and reload.
-    actions: [36, 39, 40, 41, 43, 44, 46, 47, 49, 51, 52, 54, 55, 57]
+    requirement: Go defaults to application proxy; independent settings survive mode
+      changes, save and reload.
+    actions:
+    - 36
+    - 40
+    - 41
+    - 42
+    - 44
+    - 45
+    - 47
+    - 48
+    - 50
+    - 52
+    - 53
+    - 55
+    - 56
+    - 58
     checkpoints:
-    - {step: 38, expectation: New Go configuration selects application proxy.}
-    - {step: 42, expectation: Independent proxy host is persisted under the Go provider.}
-    - {step: 45, expectation: Explicit no-proxy persists while retaining custom settings.}
-    - {step: 48, expectation: Application proxy mode persists.}
-    - {step: 50, expectation: Switching back restores independent proxy host.}
-    - {step: 58, expectation: Reload restores custom mode.}
-    - {step: 59, expectation: Reload restores independent proxy host.}
-    results: [38, 42, 45, 48, 50, 58, 59]
+    - step: 39
+      expectation: New Go configuration selects application proxy.
+    - step: 43
+      expectation: Independent proxy host is persisted under the Go provider.
+    - step: 46
+      expectation: Explicit no-proxy persists while retaining custom settings.
+    - step: 49
+      expectation: Application proxy mode persists.
+    - step: 51
+      expectation: Switching back restores independent proxy host.
+    - step: 59
+      expectation: Reload restores custom mode.
+    - step: 60
+      expectation: Reload restores independent proxy host.
+    results:
+    - 39
+    - 43
+    - 46
+    - 49
+    - 51
+    - 59
+    - 60
   visual:
   - check: Controls remain readable in narrow drawer and settings panes.
     method: manual
@@ -176,4 +250,5 @@ verification:
   native:
   - check: Vault, SQLite and real gateway protocol effects.
     method: external
-    reason: See qa-ui-auto-tests/native/opencode-go-provider.md; browser stubs cannot prove them.
+    reason: See qa-ui-auto-tests/native/opencode-go-provider.md; browser stubs cannot
+      prove them.

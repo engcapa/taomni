@@ -8,24 +8,25 @@ const ipc = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke: ipc }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-it("defaults to app and retains independent settings across proxy mode changes", async () => {
+it.each(["opencode-go", "openai-compat", "anthropic", "llama-server"])("%s defaults to app and retains independent settings across proxy mode changes", async (runtime) => {
+  const selector = runtime === "opencode-go" ? "go-proxy-mode" : "llm-proxy-mode";
   ipc.mockImplementation(async (command) => command === "list_sessions" ? [] : null);
   const changed = vi.fn();
   function Harness() {
     const [provider, setProvider] = useState<LlmProviderConfig>({
-      base_url: "https://example.invalid", api_key: "", model: "model", runtime: "opencode-go",
+      base_url: "https://example.invalid", api_key: "", model: "model", runtime,
     });
     return <GoProxyFields provider={provider} onChange={(next) => { setProvider(next); changed(next); }} />;
   }
   render(<Harness />);
-  expect(screen.getByTestId("go-proxy-mode")).toHaveValue("app");
-  fireEvent.change(screen.getByTestId("go-proxy-mode"), { target: { value: "custom" } });
+  expect(screen.getByTestId(selector)).toHaveValue("app");
+  fireEvent.change(screen.getByTestId(selector), { target: { value: "custom" } });
   fireEvent.change(await screen.findByPlaceholderText("Proxy host"), { target: { value: "go-proxy.local" } });
   await waitFor(() => expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({
     proxy_mode: "custom", custom_proxy: expect.objectContaining({ host: "go-proxy.local" }),
   })));
   for (const mode of ["none", "app", "custom"]) {
-    fireEvent.change(screen.getByTestId("go-proxy-mode"), { target: { value: mode } });
+    fireEvent.change(screen.getByTestId(selector), { target: { value: mode } });
   }
   expect(await screen.findByPlaceholderText("Proxy host")).toHaveValue("go-proxy.local");
   expect(ipc.mock.calls.some(([command]) => ["get_app_proxy_config", "save_app_proxy_config"].includes(command))).toBe(false);

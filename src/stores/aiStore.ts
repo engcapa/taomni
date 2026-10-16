@@ -612,9 +612,8 @@ function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderConfig {
     },
     image_model: provider.image_model ?? null,
     video_model: provider.video_model ?? null,
-    proxy_mode: provider.runtime === "opencode-go"
-      ? (["app", "custom", "none", "session", "manual"].includes(provider.proxy_mode?.trim() ?? "") ? provider.proxy_mode!.trim() : "app")
-      : normalizeNoProxyMode(provider.proxy_mode, provider.proxy_url),
+    proxy_mode: (["app", "custom", "none", "session", "manual"].includes(provider.proxy_mode?.trim() ?? "")
+      ? provider.proxy_mode!.trim() : provider.runtime !== "opencode-go" && provider.proxy_url?.trim() ? "manual" : "app"),
     proxy_session_id: provider.proxy_session_id?.trim() || undefined,
     proxy_url: provider.proxy_url?.trim() || undefined,
   };

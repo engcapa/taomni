@@ -22,6 +22,15 @@ pub struct GoModelEntry {
     pub input_modalities: Vec<String>,
     pub tool_call: bool,
     pub reasoning: bool,
+    // Display metadata is nullable; runtime compatibility defaults stay separate.
+    #[serde(default)]
+    pub metadata_tool_call: Option<bool>,
+    #[serde(default)]
+    pub metadata_reasoning: Option<bool>,
+    #[serde(default)]
+    pub output_modalities: Option<Vec<String>>,
+    #[serde(default)]
+    pub metadata_source: String,
     pub interleaved_field: Option<String>,
     pub status: Option<String>,
     pub training_use: bool,
@@ -96,6 +105,10 @@ pub fn merge(ids: &[String], metadata: &Value, snapshot: &Value, overrides: &Has
             input_modalities: meta["modalities"]["input"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default(),
             tool_call: meta["tool_call"].as_bool().unwrap_or(true),
             reasoning: meta["reasoning"].as_bool().unwrap_or(false),
+            metadata_tool_call: meta["tool_call"].as_bool(),
+            metadata_reasoning: meta["reasoning"].as_bool(),
+            output_modalities: meta["modalities"]["output"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
+            metadata_source: if meta.is_object() { "catalog" } else { "unlisted" }.into(),
             interleaved_field: meta["interleaved"]["field"].as_str().map(String::from),
             status: meta["status"].as_str().map(String::from),
             training_use: id == "gemini-4-argon-contributor" || id.starts_with("muse-spark-"),
@@ -165,6 +178,18 @@ impl CatalogService {
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             let service = self.clone();
             handle.spawn(async move { service.refresh(force).await; });
+        }
+    }
+    /// Inspect an unsaved endpoint/proxy without changing the live chat catalog.
+    /// Both paths use the same fetch, merge and protocol selection implementation.
+    pub async fn inspect(&self, base: String, proxy: Result<Option<String>, String>, blocked: bool, force: bool) -> GoCatalogDto {
+        if blocked { return self.get(); }
+        let settings = Settings { base, proxy, blocked };
+        if *self.settings.read().unwrap() == settings { return self.refresh(force).await; }
+        let current = self.get();
+        match self.fetch(&settings, &current).await {
+            Ok((models, last_error, source)) => GoCatalogDto { models: Arc::new(models), fetched_at: now(), source, last_error },
+            Err(error) => GoCatalogDto { last_error: Some(error), ..current },
         }
     }
     pub async fn refresh(&self, force: bool) -> GoCatalogDto {

@@ -14,6 +14,10 @@ export interface GoModelEntry {
   input_modalities: string[];
   tool_call: boolean;
   reasoning: boolean;
+  metadata_tool_call?: boolean | null;
+  metadata_reasoning?: boolean | null;
+  output_modalities?: string[] | null;
+  metadata_source?: "catalog" | "unlisted";
   interleaved_field: string | null;
   status: string | null;
   training_use: boolean;

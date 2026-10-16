@@ -5091,7 +5091,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return goStubCatalog(!!args?.forceRefresh) as T;
     }
     case "get_provider_models": {
-      return inspectorStub(String(args?.providerId), !!args?.forceRefresh) as T;
+      return inspectorStub(String(args?.providerId), !!args?.forceRefresh, args?.providerDraft as Parameters<typeof inspectorStub>[2]) as T;
     }
     case "test_llm_model": {
       return inspectorCheckStub(String(args?.providerId), String(args?.model)) as T;

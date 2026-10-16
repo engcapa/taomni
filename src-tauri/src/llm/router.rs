@@ -658,19 +658,11 @@ pub fn build_router_with_proxy_db(
         let proxy_result = if p.runtime == "opencode-go" {
             crate::ai::config::resolve_go_proxy_url(p, proxy_db, vault)
         } else { resolve_provider_proxy_url(p, proxy_db, vault) };
-        let go_proxy_error = if p.runtime == "opencode-go" { proxy_result.as_ref().err().cloned() } else { None };
+        let proxy_error = proxy_result.as_ref().err().cloned();
         let proxy_url = match proxy_result {
             Ok(proxy_url) => proxy_url,
             Err(e) => {
-                if p.runtime == "opencode-go" {
-                    tracing::warn!(provider = %id, error = %e, "Go proxy resolution failed; requests fail closed");
-                } else {
-                    tracing::warn!(
-                        provider = %id,
-                        error = %e,
-                        "provider proxy could not be resolved; using direct connection"
-                    );
-                }
+                tracing::warn!(provider = %id, error = %e, "provider proxy resolution failed; requests fail closed");
                 None
             }
         };
@@ -691,8 +683,8 @@ pub fn build_router_with_proxy_db(
             };
 
             let provider: Arc<dyn Llm> = match p.runtime.as_str() {
-                "opencode-go" if go_proxy_error.is_some() => crate::llm::opencode_go::unavailable(
-                    id.clone(), p.model.clone(), go_proxy_error.clone().unwrap(),
+                _ if proxy_error.is_some() => crate::llm::opencode_go::unavailable(
+                    id.clone(), p.model.clone(), proxy_error.clone().unwrap(),
                 ),
                 "opencode-go" => Arc::new(crate::llm::opencode_go::OpenCodeGoProvider::new(
                     id.clone(), p.base_url.clone(), resolved_key, p.model.clone(), proxy_url.clone(),

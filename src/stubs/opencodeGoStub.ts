@@ -4,6 +4,7 @@ function entry(id: string, protocol: GoModelEntry["protocol"], patch: Partial<Go
   return {
     id, name: id, protocol, protocol_source: "seed", context_limit: 1000000,
     output_limit: 8192, cost: null, input_modalities: ["text"], tool_call: true,
+    metadata_tool_call: true, metadata_reasoning: false, metadata_source: "catalog", output_modalities: ["text"],
     reasoning: false, interleaved_field: null, status: null, training_use: false, base_url: null,
     ...patch,
   };
@@ -14,12 +15,12 @@ export const GO_STUB_CATALOG: GoCatalog = {
   models: [
     entry("deepseek-v4.1-flash", "chat"),
     entry("kimi-k3", "chat"),
-    entry("kimi-k2.6", "chat", { status: "deprecated" }),
+    entry("kimi-k2.6", "chat", { status: "deprecated", metadata_tool_call: null, metadata_reasoning: null }),
     entry("minimax-m3", "messages"),
     entry("grok-4.7", "responses"),
     entry("gemini-4-argon-contributor", "google", { training_use: true }),
     entry("muse-spark-1.3-contributor", "responses", { training_use: true }),
-    entry("omen-alpha", "chat", { protocol_source: "default", context_limit: null }),
+    entry("omen-alpha", "chat", { protocol_source: "default", context_limit: null, metadata_tool_call: null, metadata_reasoning: null, metadata_source: "unlisted" }),
   ],
 };
 

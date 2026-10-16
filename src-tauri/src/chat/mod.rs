@@ -1170,7 +1170,7 @@ fn build_provider_http_client(
             .map_err(|_| "session database is unavailable".to_string())?;
         crate::ai::config::resolve_provider_proxy_url(provider, Some(&db), Some(&state.vault))?
     };
-    let mut builder = Client::builder().timeout(timeout);
+    let mut builder = Client::builder().no_proxy().timeout(timeout);
     if let Some(proxy_url) = proxy_url
         .as_deref()
         .map(str::trim)

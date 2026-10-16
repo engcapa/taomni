@@ -3541,7 +3541,8 @@ controls:
     aliases:
       - 'text="Disable AI completely"'
   - id: privacy-fully-local
-    selector: 'text="Full local mode"'
+    selector: '[data-testid="ai-full-local-toggle"]'
+    aliases: ['text="Full local mode"']
     kind: interactive
     optional: true       # only shown when AI master is enabled
 -->
@@ -11387,6 +11388,9 @@ files:
   - src-tauri/src/ai/commands.rs
   - src-tauri/src/llm/model_catalog.rs
 controls:
+  - {id: llm-proxy-mode, selector: '[data-testid="llm-proxy-mode"]', kind: interactive}
+  - {id: llm-custom-proxy, selector: '[data-testid="llm-custom-proxy"]', kind: display, optional: true}
+  - {id: llm-provider-base-url, selector: '[data-testid="llm-provider-base-url"]', kind: interactive}
   - {id: model-inspector-open, selector: '[data-testid="model-inspector-open"]', kind: interactive}
   - {id: model-inspector-panel, selector: '[data-testid="model-inspector-panel"]', kind: display}
   - {id: model-inspector-summary, selector: '[data-testid="model-inspector-summary"]', kind: display}

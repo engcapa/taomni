@@ -35,13 +35,13 @@ export const useModelInspectorStore = create<InspectorState>((set, get) => {
     set((s) => ({ entries: { ...s.entries, [id]: { ...(s.entries[id] ?? emptyEntry()), ...next } } }));
   const checkOne = async (id: string, model: string) => {
     const entry = get().entries[id] ?? emptyEntry();
-    if (entry.pending.includes(model) || entry.data?.checks_disabled) return;
+    if (entry.pending.includes(model)) return;
     const config = useAiStore.getState().config;
     const runtime = config?.llm.providers[id]?.runtime;
     if (config?.fully_disabled || (config?.full_local_mode && !["llama-server", "ollama"].includes(runtime ?? ""))) return;
     patch(id, { pending: [...entry.pending, model], error: null });
     try {
-      const check = await invoke<ModelCheckResult>("test_llm_model", { providerId: id, model });
+      const check = await invoke<ModelCheckResult>("test_llm_model", { providerId: id, model, providerDraft: config?.llm.providers[id] });
       const latest = get().entries[id];
       if (latest?.data) patch(id, { data: {
         ...latest.data, rows: latest.data.rows.map((row) => row.id === model ? { ...row, check } : row),
@@ -52,12 +52,11 @@ export const useModelInspectorStore = create<InspectorState>((set, get) => {
   return {
     entries: {},
     load: async (id, force = false) => {
-      if (get().entries[id]?.loading && !force) return;
       const version = (versions.get(id) ?? 0) + 1;
       versions.set(id, version);
       patch(id, { loading: true, error: null });
       try {
-        const data = await invoke<ProviderModels>("get_provider_models", { providerId: id, forceRefresh: force });
+        const data = await invoke<ProviderModels>("get_provider_models", { providerId: id, forceRefresh: force, providerDraft: useAiStore.getState().config?.llm.providers[id] });
         if (versions.get(id) !== version) return;
         const previous = get().entries[id]?.data;
         // A list read started before a check completed must not erase the new check.
@@ -73,7 +72,7 @@ export const useModelInspectorStore = create<InspectorState>((set, get) => {
     check: async (id, model) => { if (!get().entries[id]?.batch) await checkOne(id, model); },
     checkAll: async (id) => {
       const entry = get().entries[id];
-      if (!entry?.data || entry.batch || entry.pending.length || entry.data.checks_disabled) return;
+      if (!entry?.data || entry.batch || entry.pending.length) return;
       patch(id, { batch: true });
       try { for (const row of entry.data.rows) await checkOne(id, row.id); }
       finally { patch(id, { batch: false }); }

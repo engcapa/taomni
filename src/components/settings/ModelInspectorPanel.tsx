@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
 import { useModelInspectorStore, type InspectorRow } from "../../stores/modelInspectorStore";
 
@@ -6,6 +7,7 @@ interface Props { providerId: string; currentModel: string; blocked: boolean; on
 const unknown = "—";
 export function ModelInspectorPanel({ providerId, currentModel, blocked, onClose }: Props) {
   const t = useT();
+  const provider = useAiStore((s) => s.config?.llm.providers[providerId]);
   const { entries, load, check, checkAll, selectModel } = useModelInspectorStore();
   const entry = entries[providerId];
   const data = entry?.data;
@@ -13,8 +15,13 @@ export function ModelInspectorPanel({ providerId, currentModel, blocked, onClose
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => { void load(providerId); panel.current?.focus(); }, [providerId, load]);
-  const disabled = blocked || !!data?.checks_disabled;
+  useEffect(() => { panel.current?.focus(); }, [providerId]);
+  useEffect(() => {
+    const timer = setTimeout(() => void load(providerId), 150);
+    return () => clearTimeout(timer);
+  }, [providerId, load, blocked, provider]);
+  // The DTO is a historical snapshot; current policy controls recovery.
+  const disabled = blocked;
   const busy = !!entry?.batch || !!entry?.pending.length;
   const rows = [...(data?.rows ?? [])].sort((a, b) =>
     Number(b.id === currentModel) - Number(a.id === currentModel) || a.id.localeCompare(b.id));

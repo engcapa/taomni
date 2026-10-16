@@ -5,7 +5,6 @@ import { useVaultStore } from "../../stores/vaultStore";
 import { isVaultLockedError } from "../../lib/ipc";
 import { ensureVaultReady } from "../../lib/vaultGate";
 import { useT, type TranslateFn } from "../../lib/i18n";
-import { CodexProxyFields } from "./CodexProxyFields";
 import { GoProxyFields } from "./GoProxyFields";
 import { GoProviderFields } from "./GoProviderFields";
 import { ModelInspectorPanel } from "./ModelInspectorPanel";
@@ -251,18 +250,14 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
             <input
               type="text"
               className="taomni-input h-7 w-full text-[12px]"
+              data-testid="llm-provider-base-url"
               value={provider.base_url}
               onChange={(e) => onChange({ ...provider, base_url: e.target.value })}
             />
           </div>
           <div>
             <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
-            {id === "opencode-go" ? <GoProxyFields provider={provider} onChange={onChange} /> : <CodexProxyFields
-              mode={provider.proxy_mode ?? "none"}
-              sessionId={provider.proxy_session_id}
-              proxyUrl={provider.proxy_url}
-              onChange={(patch) => onChange({ ...provider, ...patch })}
-            />}
+            <GoProxyFields provider={provider} onChange={onChange} />
           </div>
           <div className="flex items-center gap-2 pt-1">
             <button ref={inspectorButton} type="button" data-testid="model-inspector-open" data-provider={id}

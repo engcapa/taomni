@@ -113,7 +113,7 @@ impl OpenAiCompatProvider {
         model: impl Into<String>,
         proxy_url: Option<String>,
     ) -> Self {
-        let mut builder = Client::builder().timeout(std::time::Duration::from_secs(30));
+        let mut builder = Client::builder().no_proxy().timeout(std::time::Duration::from_secs(30));
         if let Some(proxy_url) = proxy_url
             .as_deref()
             .map(str::trim)

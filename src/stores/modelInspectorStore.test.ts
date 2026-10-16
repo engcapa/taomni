@@ -18,7 +18,7 @@ beforeEach(async () => {
 it("loading only reads metadata and does not run checks", async () => {
   mock.mockResolvedValue(inspectorStub("deepseek", false));
   await useModelInspectorStore.getState().load("deepseek");
-  expect(mock).toHaveBeenLastCalledWith("get_provider_models", { providerId: "deepseek", forceRefresh: false });
+  expect(mock).toHaveBeenLastCalledWith("get_provider_models", { providerId: "deepseek", forceRefresh: false, providerDraft: useAiStore.getState().config?.llm.providers.deepseek });
   expect(mock.mock.calls.some(([command]) => command === "test_llm_model")).toBe(false);
 });
 it("late reads cannot overwrite a newer refresh or another provider", async () => {
@@ -102,4 +102,16 @@ it("a stale catalog read does not erase a completed check", async () => {
   await useModelInspectorStore.getState().check("deepseek", "deepseek-chat");
   resolve(inspectorStub("deepseek", false)); await read;
   expect(useModelInspectorStore.getState().entries.deepseek.data?.rows[0].check?.checked_at).toBe(100);
+});
+
+it("checks the current draft without saving it, even after a disabled snapshot", async () => {
+  mock.mockResolvedValueOnce({ ...inspectorStub("deepseek", false), checks_disabled: true });
+  await useModelInspectorStore.getState().load("deepseek");
+  const config = useAiStore.getState().config!;
+  const draft = { ...config.llm.providers.deepseek, model: "unsaved", api_keys: [], api_key: "synthetic", base_url: "http://draft.invalid", proxy_mode: "none" };
+  useAiStore.setState({ config: { ...config, llm: { ...config.llm, providers: { ...config.llm.providers, deepseek: draft } } } });
+  mock.mockResolvedValueOnce({ ok: true, checked_at: 100, latency_ms: 5, error: null });
+  await useModelInspectorStore.getState().check("deepseek", "unsaved");
+  expect(mock).toHaveBeenLastCalledWith("test_llm_model", { providerId: "deepseek", model: "unsaved", providerDraft: draft });
+  expect(mock.mock.calls.some(([c]) => c === "save_ai_config")).toBe(false);
 });

@@ -1,3 +1,4 @@
+import type { LlmProviderConfig } from "../stores/aiStore";
 import type { InspectorRow, ModelCheckResult, ProviderModels } from "../stores/modelInspectorStore";
 import { goStubCatalog } from "./opencodeGoStub";
 
@@ -20,21 +21,22 @@ function row(id: string, source: InspectorRow["metadata_source"], protocol = "ch
   };
 }
 // Synthetic renderer samples, NOT metadata or gateway evidence.
-export function inspectorStub(id: string, force: boolean): ProviderModels {
+export function inspectorStub(id: string, force: boolean, draft?: LlmProviderConfig): ProviderModels {
   const scenario = new URLSearchParams(window.location.search).get("inspectorFixture");
   let config;
   try { config = JSON.parse(localStorage.getItem("taomni.ai.config.v1") ?? "null"); } catch {}
-  const provider = config?.llm?.providers?.[id];
+  const provider = draft ?? config?.llm?.providers?.[id];
   const current = provider?.model ?? defaults[id] ?? `${id}-current`;
   const local = id === "local" || ["llama-server", "ollama"].includes(provider?.runtime);
   const blocked = !!config?.fully_disabled || (!!config?.full_local_mode && !local);
   if (force) refreshes++;
   const rows: InspectorRow[] = id === "opencode-go" ? goStubCatalog(force).models.map((m) => ({
-    ...row(m.id, m.protocol_source === "default" ? "unlisted" : "catalog", m.protocol),
-    ...m, metadata_source: m.protocol_source === "default" ? "unlisted" as const : "catalog" as const,
+    ...row(m.id, m.metadata_source ?? "unlisted", m.protocol),
+    ...m, metadata_source: m.metadata_source ?? "unlisted",
     protocol: provider?.protocol_overrides?.[m.id] ?? m.protocol,
     protocol_source: provider?.protocol_overrides?.[m.id] ? "user_override" : m.protocol_source,
-    output_modalities: null,
+    output_modalities: m.output_modalities ?? null, tool_call: m.metadata_tool_call ?? null,
+    reasoning: m.metadata_reasoning ?? null,
   })) : local ? [row("loaded-model", "live")] : [
     row(current, current === "deepseek-chat" ? "alias" : "unlisted", id === "anthropic" ? "messages" : "chat"),
     { ...row("catalog-model", "catalog", id === "anthropic" ? "messages" : "chat"), status: "deprecated", live_exists: false },
@@ -43,12 +45,14 @@ export function inspectorStub(id: string, force: boolean): ProviderModels {
   if (scenario === "large" && id === "siliconflow") {
     for (let i = 0; i < 60; i++) rows.push(row(`catalog-model-${i.toString().padStart(2, "0")}`, "catalog"));
   }
+  if (id === "opencode-go" && !rows.some((r) => r.id === current)) rows.push(row(current, "unlisted"));
+  const uniqueRows = rows.filter((r, index) => rows.findIndex((other) => other.id === r.id) === index);
   const checks = results()[id] ?? {};
   rows.forEach((r) => { r.current = r.id === current; r.check = checks[r.id] ?? null; });
   rows.sort((a, b) => Number(b.current) - Number(a.current) || a.id.localeCompare(b.id));
   const unavailable = local && scenario === "unavailable";
   return {
-    rows: unavailable || scenario === "empty" ? [] : rows, fetched_at: 1760000000,
+    rows: unavailable || scenario === "empty" ? [] : uniqueRows, fetched_at: 1760000000,
     source: force ? "live" : "snapshot", unavailable, checks_disabled: blocked,
     last_error: scenario === "offline" || (scenario === "recovery" && force && refreshes === 1)
       ? "Fixture: offline; last-good catalog retained" : unavailable ? "Fixture: connection refused" : null,

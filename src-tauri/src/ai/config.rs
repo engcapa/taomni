@@ -572,7 +572,7 @@ pub struct LlmProviderConfig {
     pub image_model: Option<String>,
     #[serde(default)]
     pub video_model: Option<String>,
-    /// Go: app (default) | custom | none; legacy providers: none | session | manual.
+    /// app (default) | custom | none; session/manual remain readable for migration.
     #[serde(default)]
     pub proxy_mode: String,
     #[serde(default)]
@@ -613,14 +613,12 @@ impl LlmProviderConfig {
             .as_ref()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
-        if self.runtime == "opencode-go" {
-            self.proxy_mode = normalize_go_proxy_mode(&self.proxy_mode);
-            return;
-        }
-        self.proxy_mode = normalize_provider_proxy_mode(&self.proxy_mode);
-        if self.proxy_url.is_some() && self.proxy_mode == "none" {
-            self.proxy_mode = "manual".into();
-        }
+        // Preserve explicit direct mode, including a dormant legacy URL.
+        self.proxy_mode = if self.runtime != "opencode-go" && self.proxy_mode.trim().is_empty() && self.proxy_url.is_some() {
+            "manual".into()
+        } else {
+            normalize_go_proxy_mode(&self.proxy_mode)
+        };
     }
 
     pub fn effective_api_keys(&self) -> Vec<&str> {
@@ -639,7 +637,7 @@ impl LlmProviderConfig {
 }
 
 fn default_provider_proxy_mode() -> String {
-    "none".into()
+    "app".into()
 }
 
 pub fn normalize_provider_proxy_mode(mode: &str) -> String {
@@ -654,29 +652,8 @@ pub fn resolve_provider_proxy_url(
     db: Option<&rusqlite::Connection>,
     vault: Option<&crate::vault::Vault>,
 ) -> Result<Option<String>, String> {
-    match normalize_provider_proxy_mode(&provider.proxy_mode).as_str() {
-        "session" => {
-            let Some(id) = provider
-                .proxy_session_id
-                .as_deref()
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-            else {
-                return Ok(None);
-            };
-            let (Some(db), Some(vault)) = (db, vault) else {
-                return Ok(None);
-            };
-            Ok(crate::proxy::resolve_session_proxy_with_db(db, vault, id)?.map(|p| p.to_url()))
-        }
-        "manual" => Ok(provider
-            .proxy_url
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)),
-        _ => Ok(None),
-    }
+    resolve_go_proxy_url(provider, db, vault)
+        .map_err(|error| error.replace("OpenCode Go", "LLM provider"))
 }
 
 pub fn normalize_go_proxy_mode(mode: &str) -> String {
@@ -830,7 +807,7 @@ mod tests {
         value["runtime"] = "openai-compat".into();
         let mut legacy: super::LlmProviderConfig = serde_json::from_value(value).unwrap();
         legacy.normalize();
-        assert_eq!(legacy.proxy_mode, "none");
+        assert_eq!(legacy.proxy_mode, "app");
         go.custom_proxy = Some(crate::proxy::AppProxyConfig {
             host: "independent".into(),
             ..Default::default()
@@ -845,6 +822,7 @@ mod tests {
             assert_eq!(restored.custom_proxy, go.custom_proxy);
         }
         legacy.proxy_url = go.proxy_url;
+        legacy.proxy_mode.clear();
         legacy.normalize();
         assert_eq!(legacy.proxy_mode, "manual");
     }

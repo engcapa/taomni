@@ -23,6 +23,7 @@ pub struct AppAiCtx {
     pub asr: Arc<AsrManager>,
     pub llm: LlmRouter,
     pub config: AiConfig,
+    pub inspector_cancel: tokio_util::sync::CancellationToken,
     /// Held so reload() can re-resolve `vault:<id>` api keys.
     vault: Arc<Vault>,
 }
@@ -44,6 +45,7 @@ impl AppAiCtx {
             asr: Arc::new(asr),
             llm,
             config: cfg,
+            inspector_cancel: tokio_util::sync::CancellationToken::new(),
             vault,
         }
     }
@@ -51,6 +53,7 @@ impl AppAiCtx {
     /// Reload after the user saved a new config — rebuilds the LlmRouter
     /// while reusing the existing AsrManager (engines are expensive to warm).
     pub fn reload(&mut self, cfg: AiConfig) {
+        self.update_inspector_policy(&cfg);
         self.llm = build_router_from_ai(&cfg, Some(self.vault.as_ref()));
         if self.config.asr != cfg.asr || cfg.fully_disabled {
             self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), &cfg.asr.language));
@@ -59,6 +62,7 @@ impl AppAiCtx {
     }
 
     pub fn reload_with_proxy_db(&mut self, cfg: AiConfig, proxy_db: Option<&rusqlite::Connection>) {
+        self.update_inspector_policy(&cfg);
         self.llm = build_router_from_ai_with_proxy_db(&cfg, Some(self.vault.as_ref()), proxy_db);
         if self.config.asr != cfg.asr || cfg.fully_disabled {
             self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), &cfg.asr.language));
@@ -67,11 +71,21 @@ impl AppAiCtx {
     }
 
     pub fn reload_with_router(&mut self, cfg: AiConfig, llm: LlmRouter) {
+        self.update_inspector_policy(&cfg);
         self.llm = llm;
         if self.config.asr != cfg.asr || cfg.fully_disabled {
             self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), &cfg.asr.language));
         }
         self.config = cfg;
+    }
+
+    pub(crate) fn update_inspector_policy(&mut self, cfg: &AiConfig) {
+        if self.config.full_local_mode != cfg.full_local_mode
+            || self.config.fully_disabled != cfg.fully_disabled
+        {
+            self.inspector_cancel.cancel();
+            self.inspector_cancel = tokio_util::sync::CancellationToken::new();
+        }
     }
 
     /// Rebuild the LlmRouter against the current vault state without touching

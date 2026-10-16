@@ -92,19 +92,37 @@ pub fn assemble(current: &str, runtime: &str, subtree: &Value, live: Option<&[St
     rows
 }
 pub fn go_rows(dto: &GoCatalogDto, current: &str, overrides: &HashMap<String, String>) -> Vec<InspectorRow> {
-    let mut rows = dto.models.iter().map(|m| InspectorRow {
+    let mut models = dto.models.as_ref().clone();
+    if !current.is_empty() && !models.iter().any(|m| m.id == current) {
+        models.extend(crate::llm::opencode_go::catalog::merge(&[current.into()], &Value::Null,
+            &serde_json::from_str(crate::llm::opencode_go::catalog::SNAPSHOT).unwrap(), overrides));
+    }
+    let mut rows = models.iter().map(|m| InspectorRow {
         id: m.id.clone(), name: m.name.clone(), current: m.id == current,
         protocol: overrides.get(&m.id).map(|p| valid_protocol(p)).unwrap_or(&m.protocol).into(),
         protocol_source: Some(if overrides.contains_key(&m.id) { "user_override".into() } else { m.protocol_source.clone() }),
         context_limit: m.context_limit, output_limit: m.output_limit,
         input_modalities: (!m.input_modalities.is_empty()).then(|| m.input_modalities.clone()),
-        // Go DTO does not yet carry output modalities; never fabricate them.
-        output_modalities: None, tool_call: Some(m.tool_call), reasoning: Some(m.reasoning),
-        cost: m.cost.clone(), status: m.status.clone(), metadata_source: if m.protocol_source == "default" { "unlisted" } else { "catalog" }.into(),
+        output_modalities: m.output_modalities.clone(), tool_call: m.metadata_tool_call, reasoning: m.metadata_reasoning,
+        cost: m.cost.clone(), status: m.status.clone(), metadata_source: if m.metadata_source == "catalog" { "catalog" } else { "unlisted" }.into(),
         live_exists: None, check: None,
     }).collect::<Vec<_>>();
     rows.sort_by(|a, b| b.current.cmp(&a.current).then_with(|| a.id.cmp(&b.id)));
     rows
+}
+/// Biased cancellation prevents polling the next HTTP future after a policy change.
+pub async fn under_policy<T>(cancel: &tokio_util::sync::CancellationToken, request: impl std::future::Future<Output = Result<T, String>>) -> Result<T, String> {
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => Err("Model request cancelled by AI network policy".into()),
+        result = request => result,
+    }
+}
+pub fn inspector_provider(saved: &crate::ai::config::LlmProviderConfig, draft: Option<crate::ai::config::LlmProviderConfig>) -> Result<crate::ai::config::LlmProviderConfig, String> {
+    let mut provider = draft.unwrap_or_else(|| saved.clone());
+    if provider.runtime != saved.runtime { return Err("Provider runtime changed; save configuration first".into()); }
+    provider.normalize();
+    Ok(provider)
 }
 pub async fn live_models(base: &str, key: &str, proxy: Option<&str>) -> Result<Vec<String>, String> {
     let client = crate::llm::opencode_go::client(proxy, 10).map_err(|e| e.to_string())?;
@@ -163,6 +181,84 @@ mod tests {
     use super::*;
     use serde_json::json;
     #[tokio::test]
+    async fn policy_cancels_live_io_and_never_starts_the_next_request() {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let running = {
+            let token = cancel.clone();
+            tokio::spawn(async move { under_policy(&token, live_models(&base, "", None)).await })
+        };
+        let (_socket, _) = listener.accept().await.unwrap();
+        cancel.cancel();
+        assert!(tokio::time::timeout(std::time::Duration::from_secs(1), running).await.unwrap().unwrap().unwrap_err().contains("policy"));
+        let called = std::sync::atomic::AtomicBool::new(false);
+        let result = under_policy(&cancel, async {
+            called.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }).await;
+        assert!(result.is_err());
+        assert!(!called.load(std::sync::atomic::Ordering::SeqCst));
+        // A fresh generation can recover after unlocking.
+        assert!(under_policy(&tokio_util::sync::CancellationToken::new(), async { Ok(()) }).await.is_ok());
+    }
+    #[test]
+    fn draft_selection_preserves_saved_config_and_policy_runtime() {
+        let saved = crate::ai::config::default_opencode_go_provider();
+        let mut draft = saved.clone();
+        draft.model = "manual-unsaved".into();
+        draft.base_url = "http://draft.invalid".into();
+        draft.api_key = "synthetic".into();
+        let selected = inspector_provider(&saved, Some(draft.clone())).unwrap();
+        assert_eq!(selected.model, "manual-unsaved");
+        assert_eq!(selected.base_url, draft.base_url);
+        assert_eq!(selected.api_key, "synthetic");
+        assert_ne!(saved.model, selected.model);
+        draft.runtime = "llama-server".into();
+        assert!(inspector_provider(&saved, Some(draft)).is_err());
+    }
+    #[test]
+    fn go_unknown_metadata_is_not_runtime_fallback_or_protocol_provenance() {
+        let models = crate::llm::opencode_go::catalog::merge(
+            &["kimi-k2.6".into(), "partial".into()],
+            &json!({"models":{"partial":{"tool_call":false,"modalities":{"output":["text"]}}}}),
+            &Value::Null, &HashMap::new());
+        let seeded = models.iter().find(|m| m.id == "kimi-k2.6").unwrap();
+        assert_eq!(seeded.protocol_source, "seed");
+        assert!(seeded.tool_call); // Runtime compatibility remains enabled.
+        let dto = GoCatalogDto { models: std::sync::Arc::new(models), fetched_at: 0, source: "live".into(), last_error: None };
+        let rows = go_rows(&dto, "unsaved", &HashMap::new());
+        assert_eq!(rows[0].id, "unsaved");
+        let unknown = rows.iter().find(|r| r.id == "kimi-k2.6").unwrap();
+        assert_eq!(unknown.tool_call, None);
+        assert_eq!(unknown.reasoning, None);
+        assert_eq!(unknown.metadata_source, "unlisted");
+        let partial = rows.iter().find(|r| r.id == "partial").unwrap();
+        assert_eq!(partial.tool_call, Some(false));
+        assert_eq!(partial.reasoning, None);
+        assert_eq!(partial.output_modalities, Some(vec!["text".into()]));
+        assert_eq!(partial.metadata_source, "catalog");
+    }
+    #[tokio::test]
+    async fn provider_proxy_failure_is_visible_without_direct_retry() {
+        use crate::llm::{anthropic::AnthropicProvider, openai_compat::OpenAiCompatProvider, opencode_go::test_gateway};
+        let direct = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target = format!("http://{}", direct.local_addr().unwrap());
+        let (proxy, requests, task) = test_gateway::start(2, |_| (502, "configured proxy failed".into(), "text/plain")).await;
+        let providers: Vec<Box<dyn crate::llm::Llm>> = vec![
+            Box::new(OpenAiCompatProvider::new_with_proxy_url("unit", &target, "", "draft", Some(proxy.clone()))),
+            Box::new(AnthropicProvider::new_with_proxy_url("unit", &target, "", "draft", Some(proxy))),
+        ];
+        for provider in providers {
+            let (ok, error, _) = probe(provider.as_ref(), None).await;
+            assert!(!ok);
+            assert!(error.contains("configured proxy failed"));
+        }
+        task.await.unwrap();
+        assert_eq!(requests.lock().unwrap().len(), 2);
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(50), direct.accept()).await.is_err());
+    }
+    #[tokio::test]
     async fn gateway_success_error_timeout_and_disabled_zero_requests() {
         use crate::llm::{openai_compat::OpenAiCompatProvider, opencode_go::test_gateway};
         let (base, requests, task) = test_gateway::start(3, |raw| {
@@ -174,8 +270,7 @@ mod tests {
                 (200, json!({"choices":[{"message":{"role":"assistant","content":"pong"}}]}).to_string(), "application/json")
             }
         }).await;
-        let provider = OpenAiCompatProvider::new("unit", &base, "fixture-key", "good")
-            .with_go_client(crate::llm::opencode_go::client(None, 1).unwrap(), Default::default());
+        let provider = OpenAiCompatProvider::new_with_proxy_url("unit", &base, "fixture-key", "good", None);
         assert!(guarded_probe(&provider, true, None).await.is_err());
         assert!(requests.lock().unwrap().is_empty());
         assert_eq!(live_models(&base, "fixture-key", None).await.unwrap(), ["loaded"]);

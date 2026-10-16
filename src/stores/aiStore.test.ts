@@ -29,7 +29,7 @@ describe("OpenCode Go compatibility", () => {
     await useAiStore.getState().loadConfig();
     const loaded = useAiStore.getState().config!;
     expect(loaded.llm.providers["opencode-go"]).toMatchObject({ proxy_mode: mode ?? "app", custom_proxy: custom });
-    expect(loaded.llm.providers.deepseek.proxy_mode).toBe("none");
+    expect(loaded.llm.providers.deepseek.proxy_mode).toBe("app");
   });
   it("adds Go to old configs without changing routes or providers, and hides only Go under policy", async () => {
     const config = makeConfig([], false);
