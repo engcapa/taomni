@@ -31,6 +31,7 @@ steps:
     selector: '[data-testid="go-thread-model-select"]'
     name: value
     equals: kimi-k3
+- wait: 2
 - reload: {}
 - wait_for: '[data-testid="status-bar"]'
 - wait_for: '[data-testid="welcome-restore-last-session"]'
@@ -54,12 +55,12 @@ verification:
   requirements:
   - id: R1
     requirement: Real IPC writes llm_model; renderer reload reads it back, and explicit clear is available.
-    actions: [3, 5, 7, 8, 10, 13, 18, 21]
+    actions: [3, 5, 7, 8, 10, 14, 17, 20, 22]
     checkpoints:
     - {step: 12, expectation: Pin is selected after IPC save.}
-    - {step: 20, expectation: SQLite-backed pin is read after renderer reload.}
-    - {step: 22, expectation: Explicit clear restores inherited selection.}
-    results: [12, 20, 22]
+    - {step: 21, expectation: SQLite-backed pin is read after renderer reload.}
+    - {step: 23, expectation: Explicit clear restores inherited selection.}
+    results: [12, 21, 23]
   visual:
   - {check: Native select keyboard/focus behavior., method: manual, reason: WebKitGTK/WebView2/WKWebView checks are unrun.}
   native:

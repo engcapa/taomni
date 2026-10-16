@@ -39,6 +39,11 @@ export function inspectorStub(id: string, force: boolean, draft?: LlmProviderCon
     reasoning: m.metadata_reasoning ?? null,
   })) : local ? [row("loaded-model", "live")] : [
     row(current, current === "deepseek-chat" ? "alias" : "unlisted", id === "anthropic" ? "messages" : "chat"),
+    // Keep the known alias in the historical catalog after the user selects a
+    // different model. The inspector promises a retained catalog view, so a
+    // current-model change must not make the previously registered alias
+    // disappear from the next load.
+    ...(id === "deepseek" && current !== "deepseek-chat" ? [row("deepseek-chat", "alias")] : []),
     { ...row("catalog-model", "catalog", id === "anthropic" ? "messages" : "chat"), status: "deprecated", live_exists: false },
     row("unlisted-model", "unlisted"),
   ];
