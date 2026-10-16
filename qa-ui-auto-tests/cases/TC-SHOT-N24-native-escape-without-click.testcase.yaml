@@ -1,0 +1,26 @@
+id: TC-SHOT-N24
+title: Native screenshot overlay owns keyboard focus on open and one real Escape closes it without any click
+description: The overlay is opened through the production entry and the scenario sends no pointer input at all. Because this desktop already closes on Escape, the case asserts the focus state *before* the key (X11 active window equals the overlay window, toolkit focus, renderer document focus) instead of only "Escape works". The same result carries X screen size and per-display scale samples taken before opening, after opening and before the key, so a refused activation is distinguishable from a display reconfiguration. A missing pre-key focus fails; the scenario never clicks first to make the case green. Platform focus handoff differs, so the case runs on Linux, Windows and macOS.
+covers: [F27.1]
+tags: [screenshot, native, focus, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: escape-entry}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: focus-before-key
+    requirement: Opening the screenshot overlay gives it keyboard focus without any pointer interaction, and exactly one real OS Escape closes it and restores the main window.
+    actions: [1, 2]
+    checkpoints:
+    - {step: 3, expectation: "Evidence records the pre-key focus (X11 _NET_ACTIVE_WINDOW equals the overlay window id and toolkit focus is true; on non-X11 the toolkit focus), the renderer document focus, then one OS Escape closes the overlay, no screenshot-owned window remains, the main window is visible again, and the three display samples (before open, after open, before the key) are identical."}
+    results: [3]
+  visual:
+  - {check: Overlay and main window visibility, method: automated, reason: The scenario reads real native window visibility/focus state rather than comparing pixels; layout fidelity is not the claimed requirement.}
+  native:
+  - {check: Real OS key delivery and native window focus, method: automated, reason: "Escape is injected as real OS keyboard input (XTest, SendInput, CGEvent or the owned Mutter broker on Wayland) after the case reads the actual window-manager focus; DOM key events and WebDriver injection are not accepted as input."}

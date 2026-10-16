@@ -517,6 +517,8 @@ cases:
 - TC-SHOT-N14
 - TC-SHOT-N15
 - TC-SHOT-N19
+- TC-SHOT-N24
+- TC-SHOT-N25
 - TC-RDPS-NAT-01-start-connect-display
 - TC-RDPS-NAT-02-clipboard-rich
 - TC-RDPS-NAT-03-clipboard-files

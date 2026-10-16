@@ -10,6 +10,9 @@ use std::cell::RefCell;
 #[link(name = "gdk-3")]
 unsafe extern "C" {
     fn gdk_x11_get_server_time(window: *mut gtk::gdk::ffi::GdkWindow) -> u32;
+    /// XIDs are 32-bit; this matches the sibling declaration in the QA oracle
+    /// (a differing signature for the same symbol is a clashing declaration).
+    fn gdk_x11_window_get_xid(window: *mut gtk::gdk::ffi::GdkWindow) -> u32;
 }
 
 thread_local! {
@@ -71,6 +74,154 @@ pub(super) fn activation_id() -> Option<String> {
         id.rsplit_once("_TIME").map(|(_, time)| time)
     );
     Some(id.to_string())
+}
+
+/// Present a capture window with an X11 server timestamp so the session's
+/// focus policy accepts the activation.
+///
+/// tao forwards `set_focus` as `present_with_time(GDK_CURRENT_TIME)`, which
+/// GNOME's focus-stealing prevention can refuse for a window opened from a
+/// global shortcut; the overlay then stays without keyboard focus until the
+/// user clicks it. Reading the time off the window's own X11 surface gives
+/// mutter a timestamp it accepts. Wayland windows only need the plain present
+/// tao already performs, so this is a no-op there.
+pub(super) fn present_for_input(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let target = window.clone();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            let result = target.gtk_window().map_err(|e| e.to_string()).map(|gtk| {
+                if gtk.display().type_().name() != "GdkX11Display" {
+                    return;
+                }
+                let Some(surface) = gtk.window() else {
+                    return;
+                };
+                let events = surface.events();
+                surface.set_events(events | gtk::gdk::EventMask::PROPERTY_CHANGE_MASK);
+                // SAFETY: the live surface belongs to GdkX11Display and
+                // PropertyNotify is selected, as gdk_x11_get_server_time needs
+                // for its blocking round trip.
+                let timestamp = unsafe { gdk_x11_get_server_time(surface.to_glib_none().0) };
+                surface.set_events(events);
+                if timestamp == 0 {
+                    return;
+                }
+                let window: &gtk::Window = gtk.upcast_ref();
+                // SAFETY: `window` is a live GtkWindow owned by this thread.
+                unsafe {
+                    gtk::ffi::gtk_window_present_with_time(window.to_glib_none().0, timestamp);
+                }
+            });
+            let _ = tx.send(result);
+        })
+        .map_err(|e| e.to_string())?;
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("activate capture surface: {e}"))?
+}
+
+/// Ask the compositor not to unredirect this capture surface.
+///
+/// Ubuntu's X11 fractional scaling temporarily disables a monitor's scale while
+/// a fullscreen window is unredirected; that re-applies the whole display
+/// configuration, so the screen flashes and the desktop layout jumps whenever
+/// the screenshot overlay opens or closes. `_NET_WM_BYPASS_COMPOSITOR = 2`
+/// ("do not bypass") keeps the window composited and this path unreachable.
+/// Wayland has no such split, so this is a no-op there.
+pub(super) fn keep_composited(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let target = window.clone();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            let result = target
+                .gtk_window()
+                .map_err(|e| e.to_string())
+                .and_then(|gtk| {
+                    if gtk.display().type_().name() != "GdkX11Display" {
+                        return Ok(());
+                    }
+                    // The property must exist before the window is mapped.
+                    gtk.realize();
+                    let surface = gtk.window().ok_or("capture surface has no GdkWindow")?;
+                    // SAFETY: `surface` is a live GdkX11 window on this thread.
+                    let xid = unsafe { gdk_x11_window_get_xid(surface.to_glib_none().0) } as u32;
+                    set_bypass_compositor_off(xid)
+                });
+            let _ = tx.send(result);
+        })
+        .map_err(|e| e.to_string())?;
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("mark capture surface composited: {e}"))?
+}
+
+/// Claim the X11 input focus for a capture surface.
+///
+/// Window managers with a "smart" focus policy (mutter/muffin) can refuse the
+/// `_NET_ACTIVE_WINDOW` activation for a window whose application just hid its
+/// own main window: the overlay is mapped and raised but never focused, so
+/// Escape and every other shortcut stays dead until the user clicks it. The
+/// capture surface is a user-triggered fullscreen modal, so taking the input
+/// focus directly is the intended behaviour; the polite present is tried first.
+pub(super) fn force_input_focus(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let target = window.clone();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    window
+        .run_on_main_thread(move || {
+            let xid = target.gtk_window().ok().and_then(|gtk| {
+                if gtk.display().type_().name() != "GdkX11Display" {
+                    return None;
+                }
+                gtk.realize();
+                let surface = gtk.window()?;
+                // SAFETY: live GdkX11 surface owned by this thread.
+                Some(unsafe { gdk_x11_window_get_xid(surface.to_glib_none().0) })
+            });
+            let _ = tx.send(xid);
+        })
+        .map_err(|e| e.to_string())?;
+    let xid = rx
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("resolve capture surface: {e}"))?
+        .ok_or("capture surface has no X11 window")?;
+
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{ConnectionExt as _, InputFocus};
+    let (connection, _) = x11rb::connect(None).map_err(|e| e.to_string())?;
+    connection
+        .set_input_focus(InputFocus::PARENT, xid, x11rb::CURRENT_TIME)
+        .map_err(|e| e.to_string())?
+        .check()
+        .map_err(|e| e.to_string())?;
+    connection.flush().map_err(|e| e.to_string())?;
+    log::info!("capture surface {xid:#x}: input focus claimed directly");
+    Ok(())
+}
+
+/// Write `_NET_WM_BYPASS_COMPOSITOR = 2` (META_BYPASS_COMPOSITOR_HINT_OFF).
+fn set_bypass_compositor_off(xid: u32) -> Result<(), String> {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{AtomEnum, ConnectionExt as _, PropMode};
+    // `change_property32` lives on the ergonomic wrapper trait, not xproto.
+    use x11rb::wrapper::ConnectionExt as _;
+
+    let (connection, _) = x11rb::connect(None).map_err(|e| e.to_string())?;
+    // `only_if_exists = false`: on a desktop whose compositor never interned
+    // the atom (CI Xvfb/openbox) an existing-only lookup returns 0 and the
+    // property write fails.
+    let atom = connection
+        .intern_atom(false, b"_NET_WM_BYPASS_COMPOSITOR")
+        .map_err(|e| e.to_string())?
+        .reply()
+        .map_err(|e| e.to_string())?
+        .atom;
+    connection
+        .change_property32(PropMode::REPLACE, xid, atom, AtomEnum::CARDINAL, &[2u32])
+        .map_err(|e| e.to_string())?
+        .check()
+        .map_err(|e| e.to_string())?;
+    connection.flush().map_err(|e| e.to_string())?;
+    log::info!("capture surface {xid:#x}: _NET_WM_BYPASS_COMPOSITOR=2");
+    Ok(())
 }
 
 fn configure(window: &gtk::ApplicationWindow) -> Result<(), String> {

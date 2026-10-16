@@ -57,6 +57,73 @@ pub const PIN_LABEL_PREFIX: &str = "screenshot-pin-";
 /// the desktop is captured (Windows DWM and macOS fade animations).
 const HIDE_SETTLE: Duration = Duration::from_millis(250);
 
+/// Focus retry budget for capture surfaces. `show()` is asynchronous on Linux
+/// and Windows, and tao forwards a focus request only once its cached
+/// visibility flag is set, so a single `set_focus()` right after `show()` is a
+/// no-op there.
+const FOCUS_ATTEMPTS: usize = 20;
+const FOCUS_RETRY: Duration = Duration::from_millis(50);
+/// Attempts to keep re-asserting focus even after the window reports active.
+/// GTK refuses `grab_focus` on a widget that is not mapped yet, and the first
+/// attempts land while `show()` is still mapping the surface.
+const FOCUS_SETTLE_ATTEMPTS: usize = 4;
+
+/// Bring a capture surface to the foreground and hand keyboard focus to its
+/// webview, waiting until the platform window is actually mapped.
+///
+/// Without this the overlay opens without keyboard focus: every shortcut is
+/// dead (Escape cannot close it, Ctrl+C/Ctrl+S do nothing, annotation text
+/// cannot be typed) until the user clicks the surface once, which is what
+/// gives it focus by accident.
+pub(crate) async fn focus_capture_window(window: &WebviewWindow) {
+    #[cfg(target_os = "linux")]
+    let mut presented = false;
+    #[cfg(target_os = "linux")]
+    let mut claimed = false;
+    for attempt in 0..FOCUS_ATTEMPTS {
+        if window.is_visible().unwrap_or(false) {
+            // X11 focus-stealing prevention can refuse the timestamp-less
+            // activation tao sends for a window opened by a global shortcut;
+            // re-present once with a server timestamp as soon as it is mapped.
+            #[cfg(target_os = "linux")]
+            if !presented {
+                presented = true;
+                if let Err(error) = surface_backend::present_for_input(window) {
+                    log::debug!("capture activation skipped: {error}");
+                }
+            }
+            let _ = window.set_focus();
+            // Webview-level focus so WebKit/WebView2 route key events to the
+            // DOM (Ctrl+C, typing) and not only to the native window. Re-assert
+            // on every attempt: the first ones can land before the surface is
+            // mapped, where GTK drops the focus request.
+            let webview: &tauri::Webview<_> = window.as_ref();
+            let _ = webview.set_focus();
+            // Focus policies that refuse the polite activation (mutter/muffin
+            // "smart" mode after the app hid its own window) still leave the
+            // overlay unfocused; claim the input focus once the present had a
+            // chance to land. Claim once only: repeatedly stealing focus back
+            // would fight the user or another window.
+            #[cfg(target_os = "linux")]
+            if !claimed
+                && attempt + 1 >= FOCUS_SETTLE_ATTEMPTS
+                && !window.is_focused().unwrap_or(false)
+            {
+                claimed = true;
+                if let Err(error) = surface_backend::force_input_focus(window) {
+                    log::debug!("capture input focus fallback skipped: {error}");
+                }
+            }
+            if attempt + 1 >= FOCUS_SETTLE_ATTEMPTS && window.is_focused().unwrap_or(false) {
+                return;
+            }
+        }
+        if attempt + 1 < FOCUS_ATTEMPTS {
+            tokio::time::sleep(FOCUS_RETRY).await;
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OverlayInit {
@@ -466,7 +533,7 @@ pub async fn screenshot_scroll_capture(
         if result.is_ok() {
             edit::settle_document_window(&window, &editor_display).await?;
         }
-        let _ = window.set_focus();
+        focus_capture_window(&window).await;
     }
     result
 }
@@ -975,6 +1042,18 @@ async fn cover_display(window: &WebviewWindow, display: &DisplayInfo) -> Result<
             .map_err(|_| "GTK monitor placement timed out")?
             .map_err(|e| e.to_string())??;
     }
+    // Ubuntu's X11 fractional scaling turns a monitor's scale off while a
+    // fullscreen window is unredirected, which re-applies the whole display
+    // configuration (visible as a display-settings change and layout jump).
+    // Ask the compositor to keep composing this surface; the property is read
+    // when the window is managed, so it must be set before it is shown.
+    #[cfg(target_os = "linux")]
+    if let Err(error) = surface_backend::keep_composited(window) {
+        // Visible in release logs: without this property Ubuntu's X11
+        // fractional scaling re-applies the whole display configuration
+        // whenever the overlay opens or closes.
+        log::warn!("capture surface compositor hint skipped: {error}");
+    }
     Ok(())
 }
 
@@ -1148,7 +1227,7 @@ async fn open_overlay_inner(
     window
         .show()
         .map_err(|e| format!("show overlay window: {e}"))?;
-    let _ = window.set_focus();
+    focus_capture_window(&window).await;
     Ok(())
 }
 
@@ -1219,7 +1298,7 @@ pub async fn screenshot_switch_display(app: AppHandle, window: WebviewWindow, di
         tool_state().overlay = Some(init.clone());
     }
     let _ = window.show();
-    let _ = window.set_focus();
+    focus_capture_window(&window).await;
     result
 }
 
@@ -1651,7 +1730,7 @@ pub async fn screenshot_start_recording(
             }
             if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
                 let _ = window.show();
-                let _ = window.set_focus();
+                focus_capture_window(&window).await;
             }
             if !had_overlay {
                 restore_app_windows(&app);
@@ -1784,7 +1863,9 @@ pub(crate) fn recording_ended(app: &AppHandle, id: &str) {
     surfaces::close_borders(app);
     if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
         let _ = window.show();
-        let _ = window.set_focus();
+        tauri::async_runtime::spawn(async move {
+            focus_capture_window(&window).await;
+        });
     }
 }
 

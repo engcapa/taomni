@@ -1205,6 +1205,8 @@ pub fn run() {
             screenshot::qa::displays::screenshot_qa_displays,
             screenshot::qa::screenshot_qa_freehand,
             screenshot::qa::screenshot_qa_hotkey,
+            screenshot::qa::screenshot_qa_escape_entry,
+            screenshot::qa::screenshot_qa_x11_compositor_bypass,
             lanchat::commands::lanchat_send_clipboard_image,
             lanchat::commands::lanchat_send_image_bytes,
             lanchat::commands::lanchat_send_signal,

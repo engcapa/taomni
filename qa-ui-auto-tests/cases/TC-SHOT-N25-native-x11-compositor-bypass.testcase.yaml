@@ -1,0 +1,26 @@
+id: TC-SHOT-N25
+title: Native X11 overlay keeps the compositor from unredirecting it and never reconfigures the display
+description: Linux/X11 only (any X11 session, including an Xvfb CI desktop; a Wayland session is unavailable for this case). While the overlay is fullscreen it must carry the real _NET_WM_BYPASS_COMPOSITOR=2 atom, the X screen size plus every display scale must stay identical across samples taken before opening, after opening, during a fullscreen repaint, and after closing, and Escape must restore the main window. Whether that X11 session also uses fractional scaling is recorded rather than required, and the result carries fractionalScaling (derived from the compositor's real DisplayConfig scales and the product's per-display scale factors) plus every sample; fractionalScaling=false is an explicit note that this run did not exercise the fractional-scaling path - it is not a pass of that path and not a failure of the case. The reporter's Ubuntu GNOME/X11 desktop with a fractional monitor scale is the environment that exercises it.
+covers: [F27.1]
+tags: [screenshot, native, x11, p1]
+modes: [native]
+native_platforms: [Linux]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: x11-compositor-bypass}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: compositor-bypass
+    requirement: On an X11 desktop the screenshot overlay asks the compositor not to unredirect it, and opening, holding and closing the overlay does not change the X screen size or any display scale.
+    actions: [1, 2]
+    checkpoints:
+    - {step: 3, expectation: "Evidence records the overlay X11 window id with _NET_WM_BYPASS_COMPOSITOR read as 2 while fullscreen, four display samples (before, after open, during repaint, after close) with identical screen size and per-display scales, the main window visible after Escape, and fractionalScaling derived from the real compositor scales plus every sample; fractionalScaling=false is recorded as an uncovered fractional-scaling path rather than a pass or a failure."}
+    results: [3]
+  visual:
+  - {check: Display layout stability, method: automated, reason: "Compared numerically (X screen size and per-display scale) instead of screenshots; a reconfiguration is a value change, not a visual judgement."}
+  native:
+  - {check: Real X11 compositor and display configuration, method: automated, reason: "The property and active-window facts are read from the live X server with xprop/x11rb and the session's DisplayConfig; the environment precondition is recorded and an unmet precondition fails the case rather than passing."}
