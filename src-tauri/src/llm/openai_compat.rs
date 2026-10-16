@@ -8,6 +8,23 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+#[cfg(test)]
+mod go_compatibility_tests {
+    use super::*;
+    #[test]
+    fn default_headers_and_request_metadata_do_not_change_legacy_body() {
+        let provider = OpenAiCompatProvider::new("deepseek","https://example.invalid","test","configured-model");
+        assert!(provider.extra_headers.is_empty());
+        let mut req = ChatRequest::simple("system","user");
+        let before = openai_request_body("configured-model",&req,false,&[]);
+        req.model_override = Some("go-model".into());
+        req.session_key = Some("hashed-thread".into());
+        assert_eq!(before,openai_request_body("configured-model",&req,false,&[]));
+        assert_eq!(before["model"],"configured-model");
+        assert!(before.get("model_override").is_none());
+    }
+}
+
 /// Provider capabilities — enables router-level decisions like "do we
 /// register a client-side `web_search` tool, or trust the provider's
 /// native one?". Filled by `OpenAiCompatProvider::preset` and exposed via
@@ -71,6 +88,7 @@ impl ProviderCaps {
 /// Covers DeepSeek, GLM, SiliconFlow, Groq, Cerebras, Mistral, OpenAI, and any
 /// other provider that speaks the OpenAI chat completions API.
 pub struct OpenAiCompatProvider {
+    extra_headers: reqwest::header::HeaderMap,
     client: Client,
     base_url: String,
     api_key: String,
@@ -95,7 +113,7 @@ impl OpenAiCompatProvider {
         model: impl Into<String>,
         proxy_url: Option<String>,
     ) -> Self {
-        let mut builder = Client::builder().timeout(std::time::Duration::from_secs(30));
+        let mut builder = Client::builder().no_proxy().timeout(std::time::Duration::from_secs(30));
         if let Some(proxy_url) = proxy_url
             .as_deref()
             .map(str::trim)
@@ -106,12 +124,20 @@ impl OpenAiCompatProvider {
             }
         }
         Self {
+            extra_headers: reqwest::header::HeaderMap::new(),
             client: builder.build().expect("failed to build reqwest client"),
             base_url: base_url.into().trim_end_matches('/').to_string(),
             api_key: api_key.into(),
             model: model.into(),
             provider_id: provider_id.into(),
         }
+    }
+
+    /// Go-only injection; existing constructors retain an empty header map.
+    pub fn with_go_client(mut self, client: Client, headers: reqwest::header::HeaderMap) -> Self {
+        self.client = client;
+        self.extra_headers = headers;
+        self
     }
 
     /// Build a preset for one of the known providers.
@@ -226,6 +252,7 @@ impl Llm for OpenAiCompatProvider {
             .client
             .post(&url)
             .bearer_auth(&self.api_key)
+            .headers(self.extra_headers.clone())
             .json(&body)
             .send()
             .await?;
@@ -313,6 +340,7 @@ impl OpenAiCompatProvider {
             .client
             .post(&url)
             .bearer_auth(&self.api_key)
+            .headers(self.extra_headers.clone())
             .json(&body)
             .send()
             .await?;

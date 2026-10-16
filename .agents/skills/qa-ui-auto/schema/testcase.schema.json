@@ -63,6 +63,7 @@
           "reset_db",
           "backup_policy",
           "backup_cloud",
+          "model_inspector_gateway",
           "credential_store",
           "path_completion",
           "ssh_required",

@@ -1,0 +1,115 @@
+id: TC-AI-012
+title: Inspector sources, explicit checks, selection and retained settings
+description: Synthetic browser metadata and check persistence only. No gateway,
+  vault encryption or real filesystem evidence. Alias sample is intentionally
+  synthetic; production deepseek-chat remains unlisted until confirmed. Authored, unrun.
+covers: [F-AI-2.8, F-AI-2.4]
+tags: [ai, model-inspector, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="deepseek"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="deepseek"]'
+- wait_for: '[data-testid="model-inspector-row"]'
+- assert_items:
+    selector: '[data-testid="model-inspector-row"]'
+    attribute: data-model
+    equals: [deepseek-chat, catalog-model, unlisted-model]
+- assert_attribute:
+    selector: '[data-testid="model-inspector-row"][data-model="deepseek-chat"]'
+    name: data-current
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-source="alias"]'
+    contains: Alias mapping
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-source="catalog"]'
+    contains: Not in live list
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-source="unlisted"]'
+    contains: '—'
+- click: '[data-testid="model-inspector-check-current"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="deepseek-chat"] [data-testid="model-inspector-result"]'
+    contains: ✓ 12ms
+- click: '[data-testid="model-inspector-row"][data-model="unlisted-model"] [data-testid="model-inspector-check"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="unlisted-model"] [data-testid="model-inspector-result"]'
+    contains: ✗ Fixture 401 Unauthorized
+- assert_attribute:
+    selector: '[data-testid="model-inspector-row"][data-model="unlisted-model"] [data-testid="model-inspector-result"]'
+    name: title
+    equals: "Fixture 401 Unauthorized\nFull gateway error"
+- click: '[data-testid="model-inspector-row"][data-model="catalog-model"] [data-testid="model-inspector-select"]'
+- assert_attribute:
+    selector: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]'
+    name: value
+    equals: catalog-model
+- assert_items:
+    selector: '[data-testid="model-inspector-row"]'
+    attribute: data-model
+    equals: [catalog-model, deepseek-chat, unlisted-model]
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"model":"catalog-model"'
+- click: '[data-testid="model-inspector-close"]'
+- assert_not_visible: '[data-testid="model-inspector-panel"]'
+- click: '[data-testid="llm-provider-row"][data-provider="local"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="local"]'
+- wait_for: '[data-testid="model-inspector-row"][data-source="live"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-source="live"]'
+    contains: Live list
+- click: '[data-testid="model-inspector-close"]'
+- click: '[data-testid="llm-provider-row"][data-provider="anthropic"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="anthropic"]'
+- wait_for: '[data-testid="model-inspector-panel"][data-provider="anthropic"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="catalog-model"]'
+    contains: messages
+- click: '[data-testid="model-inspector-close"]'
+- click: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-test"]'
+- assert_text:
+    selector: '[data-testid="llm-provider-row"][data-provider="deepseek"]'
+    contains: Connected
+- click: '[data-testid="llm-providers-save"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"model":"catalog-model"'
+verification:
+  review: pending
+  requirements:
+  - id: I-SOURCES
+    requirement: All four metadata sources, current ordering and missing values are visible.
+    actions: [7, 8, 26, 27, 31, 32]
+    checkpoints:
+    - {step: 10, expectation: Current model then all catalog choices in exact order.}
+    - {step: 12, expectation: Synthetic alias is labelled as such.}
+    - {step: 13, expectation: Live mismatch does not remove the row.}
+    - {step: 14, expectation: Unlisted metadata is unknown not zero.}
+    - {step: 29, expectation: Local row uses live source.}
+    - {step: 34, expectation: Anthropic protocol is messages.}
+    results: [10, 12, 13, 14, 29, 34]
+  - id: I-ACTIONS
+    requirement: Explicit checks report original errors and selection uses the save chain.
+    actions: [15, 17, 20, 36, 38]
+    checkpoints:
+    - {step: 16, expectation: Current check succeeded.}
+    - {step: 18, expectation: Failure first line is visible.}
+    - {step: 19, expectation: Full error is available in title.}
+    - {step: 21, expectation: Settings input reflects selected model.}
+    - {step: 23, expectation: Selected model saved by existing chain.}
+    - {step: 37, expectation: Existing connection testing still works.}
+    - {step: 39, expectation: Existing save preserves selection.}
+    results: [16, 18, 19, 21, 23, 37, 39]
+  visual:
+  - {check: Table column overflow and keyboard focus, method: manual, reason: Inspect on all three WebViews per native runbook; screenshots alone are not verdicts.}
+  native:
+  - {check: Real gateway and result-file persistence, method: manual, reason: N-I-02 and N-I-03 in native/model-inspector.md; browser uses synthetic stubs.}

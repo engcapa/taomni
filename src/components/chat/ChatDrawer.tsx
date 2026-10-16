@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { GoCatalogStatus, GoModelPicker } from "./GoModelPicker";
 import {
   Bell,
   Bot,
@@ -269,6 +270,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   );
   const setThreadProvider = useChatStore((s) => s.setThreadProvider);
   const setThreadCcModel = useChatStore((s) => s.setThreadCcModel);
+  const setThreadLlmModel = useChatStore((s) => s.setThreadLlmModel);
   const setThreadOutputFormat = useChatStore((s) => s.setThreadOutputFormat);
 
   // Effective format for rendering this thread's messages. Resolution order:
@@ -1052,6 +1054,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
               className="taomni-input h-5 text-[10px] px-1 py-0 bg-transparent text-[var(--taomni-accent)]"
               value={selectedProviderId}
               aria-label={t("chat.threadProviderAria")}
+              data-testid="ai-chat-provider-select"
+              id="ai-chat-provider-select"
               onChange={(e) => {
                 const providerId = e.target.value;
                 rememberProviderForMode(currentMode, providerId);
@@ -1076,6 +1080,16 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             <span className="text-[var(--taomni-accent)]">
               {activeThread?.provider_id ?? t("chat.noProvider")}
             </span>
+          )}
+          {activeThread?.provider_id === "opencode-go" && (
+            <div className="w-full max-w-full" data-testid="go-thread-picker">
+              <GoModelPicker testId="go-thread-model" value={activeThread.llm_model} inherit
+                overrides={aiConfig?.llm.providers["opencode-go"]?.protocol_overrides}
+                defaultModel={aiConfig?.llm.providers["opencode-go"]?.model || "deepseek-v4.1-flash"}
+                blocked={!!(aiConfig?.full_local_mode || aiConfig?.fully_disabled)}
+                onChange={(model) => setThreadLlmModel(activeThread.id, model)} />
+              <GoCatalogStatus blocked={!!(aiConfig?.full_local_mode || aiConfig?.fully_disabled)} />
+            </div>
           )}
           {activeThread && (activeThread.provider_id === "claude-code" || activeThread.provider_id === "codex") && (
             <input
@@ -1550,6 +1564,7 @@ function modeIcon(mode: ChatThreadMode) {
 function providerLabel(id: string, t: TranslateFn, config?: AiConfig | null): string {
   if (id === "claude-code") return t("chat.claudeCodeLocal");
   if (id === "codex") return "Codex local";
+  if (id === "opencode-go") return "OpenCode Go";
   const acpProfileId = acpProfileIdFromProvider(id);
   if (acpProfileId) {
     const profile = config?.acp_bridge.profiles.find((candidate) => candidate.id === acpProfileId);

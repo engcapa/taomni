@@ -1,4 +1,6 @@
 import { voiceStub } from "./voiceStub";
+import { goStubCatalog } from "./opencodeGoStub";
+import { inspectorStub, inspectorCheckStub } from "./modelInspectorStub";
 import {
   installStubMailQaControl,
   stubMailAppend,
@@ -4059,6 +4061,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       ));
       return undefined as T;
     }
+    case "chat_set_thread_llm_model": {
+      const threadId = args?.threadId as string | undefined;
+      const model = (args?.model as string | null | undefined) ?? null;
+      saveChatThreads(loadChatThreads().map((thread) =>
+        thread.id === threadId ? { ...thread, llm_model: model } : thread,
+      ));
+      return undefined as T;
+    }
     case "chat_set_thread_cc_model": {
       const threadId = (args as InvokeArgs | undefined)?.threadId as string | undefined;
       const model = ((args as InvokeArgs | undefined)?.model as string | null | undefined) ?? null;
@@ -5101,10 +5111,29 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "cuda_pack_status": {
       return ({ installed: false, path: "", size_mb: 0 } as unknown) as T;
     }
+    case "get_opencode_go_catalog": {
+      return goStubCatalog(!!args?.forceRefresh) as T;
+    }
+    case "get_provider_models": {
+      return inspectorStub(String(args?.providerId), !!args?.forceRefresh, args?.providerDraft as Parameters<typeof inspectorStub>[2]) as T;
+    }
+    case "test_llm_model": {
+      return inspectorCheckStub(String(args?.providerId), String(args?.model)) as T;
+    }
+    case "test_llm_connection": {
+      return { ok: true, message: "Fixture pong (browser only)", latency_ms: 12 } as T;
+    }
     case "get_ai_config": {
       try {
         const raw = localStorage.getItem("taomni.ai.config.v1");
-        if (raw) return JSON.parse(raw) as T;
+        if (raw) {
+          const config = JSON.parse(raw);
+          config.llm.providers["opencode-go"] ??= {
+            base_url: "https://opencode.ai/inference/go/v1", api_key: "",
+            model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true }, proxy_mode: "app",
+          };
+          return config as T;
+        }
       } catch {}
       return null as unknown as T;
     }

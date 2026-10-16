@@ -5,9 +5,13 @@ import { useVaultStore } from "../../stores/vaultStore";
 import { isVaultLockedError } from "../../lib/ipc";
 import { ensureVaultReady } from "../../lib/vaultGate";
 import { useT, type TranslateFn } from "../../lib/i18n";
-import { CodexProxyFields } from "./CodexProxyFields";
+import { GoProxyFields } from "./GoProxyFields";
+import { GoProviderFields } from "./GoProviderFields";
+import { ModelInspectorPanel } from "./ModelInspectorPanel";
+import { openExternalUrl } from "../../lib/sftp";
 
 const PROVIDER_LABELS: Record<string, string> = {
+  "opencode-go": "OpenCode Go",
   deepseek:    "DeepSeek",
   agnes:       "Agnes",
   glm:         "GLM-4-Flash (Free)",
@@ -64,7 +68,10 @@ interface ProviderRowProps {
 }
 
 function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing, t }: ProviderRowProps) {
+  const blocked = useAiStore((s) => !!(s.config?.full_local_mode || s.config?.fully_disabled));
   const [expanded, setExpanded] = useState(false);
+  const [inspecting, setInspecting] = useState(false);
+  const inspectorButton = useRef<HTMLButtonElement>(null);
   const apiKeys = providerApiKeys(provider);
   const capabilities = {
     chat: provider.capabilities?.chat !== false,
@@ -83,6 +90,8 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
 
   return (
     <div
+      data-testid={id === "opencode-go" ? "go-provider-row" : "llm-provider-row"}
+      data-provider={id}
       className={`rounded border transition-colors ${
         isActive
           ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/5"
@@ -102,7 +111,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-medium">{PROVIDER_LABELS[id] ?? id}</div>
           <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-            {PROVIDER_NOTES[id] ?? provider.base_url}
+            {id === "opencode-go" ? t("opencodeGo.subscription") : PROVIDER_NOTES[id] ?? provider.base_url}
           </div>
         </div>
 
@@ -132,6 +141,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
                   <div key={index} className="flex items-center gap-1.5">
                     <input
                       type="password"
+                      data-testid="llm-provider-key"
                       className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
                       placeholder={`${t("aiSettings.llmApiKeyPlaceholder")} #${index + 1}`}
                       value={key}
@@ -169,12 +179,17 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
           )}
           <div>
             <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmModel")}</label>
-            <input
+            {id === "opencode-go" ? <>
+              <a href="https://opencode.ai/console" data-testid="go-console" className="text-[11px] underline"
+                onClick={(e) => { e.preventDefault(); void openExternalUrl("https://opencode.ai/console"); }}>{t("opencodeGo.console")}</a>
+              <GoProviderFields provider={provider} onChange={onChange} blocked={blocked} />
+            </> : <input
               type="text"
+              data-testid="llm-provider-model"
               className="taomni-input h-7 w-full text-[12px]"
               value={provider.model}
               onChange={(e) => onChange({ ...provider, model: e.target.value })}
-            />
+            />}
           </div>
           <div>
             <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmCapabilities")}</label>
@@ -183,6 +198,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
                 <input
                   type="checkbox"
                   checked={capabilities.chat}
+                  disabled={id === "opencode-go"}
                   onChange={(e) => setCapability("chat", e.target.checked)}
                 />
                 {t("aiSettings.llmCapabilityChat")}
@@ -191,6 +207,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
                 <input
                   type="checkbox"
                   checked={capabilities.image_generation}
+                  disabled={id === "opencode-go"}
                   onChange={(e) => setCapability("image_generation", e.target.checked)}
                 />
                 {t("aiSettings.llmCapabilityImage")}
@@ -199,6 +216,7 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
                 <input
                   type="checkbox"
                   checked={capabilities.video_generation}
+                  disabled={id === "opencode-go"}
                   onChange={(e) => setCapability("video_generation", e.target.checked)}
                 />
                 {t("aiSettings.llmCapabilityVideo")}
@@ -232,25 +250,25 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
             <input
               type="text"
               className="taomni-input h-7 w-full text-[12px]"
+              data-testid="llm-provider-base-url"
               value={provider.base_url}
               onChange={(e) => onChange({ ...provider, base_url: e.target.value })}
             />
           </div>
           <div>
             <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
-            <CodexProxyFields
-              mode={provider.proxy_mode ?? "none"}
-              sessionId={provider.proxy_session_id}
-              proxyUrl={provider.proxy_url}
-              onChange={(patch) => onChange({ ...provider, ...patch })}
-            />
+            <GoProxyFields provider={provider} onChange={onChange} />
           </div>
           <div className="flex items-center gap-2 pt-1">
+            <button ref={inspectorButton} type="button" data-testid="model-inspector-open" data-provider={id}
+              className="taomni-btn h-7 px-3 text-[12px]" aria-expanded={inspecting}
+              onClick={() => setInspecting((open) => !open)}>{t("modelInspector.title")}</button>
             <button
               type="button"
               className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
               onClick={onTest}
-              disabled={testing}
+              data-testid="llm-provider-test"
+              disabled={testing || (id === "opencode-go" && blocked)}
             >
               {testing ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -268,6 +286,10 @@ function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, tes
               </span>
             )}
           </div>
+          {inspecting && <ModelInspectorPanel providerId={id} currentModel={provider.model}
+            blocked={blocked && (provider.runtime !== "llama-server" && provider.runtime !== "ollama"
+              || !!useAiStore.getState().config?.fully_disabled)}
+            onClose={() => { setInspecting(false); inspectorButton.current?.focus(); }} />}
         </div>
       )}
     </div>
@@ -443,6 +465,7 @@ export function LlmProvidersPanel() {
   };
 
   const providerGroups = config.llm.provider_groups ?? {};
+  const fullyDisabled = config.fully_disabled === true;
 
   const handleAddGroup = () => {
     let index = Object.keys(providerGroups).length + 1;
@@ -476,6 +499,7 @@ export function LlmProvidersPanel() {
           type="button"
           className="taomni-btn h-7 px-3 text-[12px]"
           onClick={() => void handleSave()}
+          data-testid="llm-providers-save"
           disabled={saving}
         >
           {saving ? t("aiSettings.llmSaving") : t("aiSettings.llmSave")}
@@ -518,7 +542,7 @@ export function LlmProvidersPanel() {
         </div>
       )}
 
-      {Object.entries(config.llm.providers).map(([id, provider]) => (
+      {!fullyDisabled && Object.entries(config.llm.providers).map(([id, provider]) => (
         <ProviderRow
           key={id}
           id={id}
@@ -533,7 +557,7 @@ export function LlmProvidersPanel() {
         />
       ))}
 
-      <div className="pt-2 space-y-2">
+      {!fullyDisabled && <div className="pt-2 space-y-2">
         <div className="flex items-center justify-between">
           <div className="text-[13px] font-semibold">Provider groups</div>
           <button
@@ -561,7 +585,7 @@ export function LlmProvidersPanel() {
             />
           ))
         )}
-      </div>
+      </div>}
     </div>
   );
 }

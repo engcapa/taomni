@@ -132,6 +132,12 @@ impl Llm for KeyRotatingLlm {
             .any(|provider| provider.supports_tools())
     }
 
+    fn supports_tools_for(&self, req: &ChatRequest) -> bool {
+        self.variants
+            .iter()
+            .any(|provider| provider.supports_tools_for(req))
+    }
+
     async fn chat_stream(
         &self,
         req: ChatRequest,
@@ -252,7 +258,7 @@ impl Llm for ProviderGroupLlm {
             let Some(provider) = self.providers.get(&provider_id).cloned() else {
                 continue;
             };
-            if !provider.supports_tools() {
+            if !provider.supports_tools_for(&req) {
                 continue;
             }
             match provider.chat_with_tools(req.clone(), tools.clone()).await {
@@ -281,6 +287,12 @@ impl Llm for ProviderGroupLlm {
         self.providers
             .values()
             .any(|provider| provider.supports_tools())
+    }
+
+    fn supports_tools_for(&self, req: &ChatRequest) -> bool {
+        self.providers
+            .values()
+            .any(|provider| provider.supports_tools_for(req))
     }
 
     async fn chat_stream(
@@ -620,6 +632,10 @@ pub fn build_router_with_proxy_db(
     proxy_db: Option<&rusqlite::Connection>,
 ) -> LlmRouter {
     let mut router = LlmRouter::new(&cfg.active);
+    let go_catalog = crate::llm::opencode_go::catalog::shared_catalog();
+    if let Some(go) = cfg.providers.get("opencode-go") {
+        go_catalog.configure(go.base_url.clone(), crate::ai::config::resolve_go_proxy_url(go, proxy_db, vault), full_local_mode);
+    }
 
     for (id, p) in &cfg.providers {
         if !p.capabilities.chat {
@@ -633,20 +649,20 @@ pub fn build_router_with_proxy_db(
 
         if !matches!(
             p.runtime.as_str(),
-            "openai-compat" | "llama-server" | "ollama" | "anthropic"
+            "openai-compat" | "llama-server" | "ollama" | "anthropic" | "opencode-go"
         ) {
             tracing::info!(provider = %id, runtime = %p.runtime, "skipping non-openai-compat provider in router");
             continue;
         }
 
-        let proxy_url = match resolve_provider_proxy_url(p, proxy_db, vault) {
+        let proxy_result = if p.runtime == "opencode-go" {
+            crate::ai::config::resolve_go_proxy_url(p, proxy_db, vault)
+        } else { resolve_provider_proxy_url(p, proxy_db, vault) };
+        let proxy_error = proxy_result.as_ref().err().cloned();
+        let proxy_url = match proxy_result {
             Ok(proxy_url) => proxy_url,
             Err(e) => {
-                tracing::warn!(
-                    provider = %id,
-                    error = %e,
-                    "provider proxy could not be resolved; using direct connection"
-                );
+                tracing::warn!(provider = %id, error = %e, "provider proxy resolution failed; requests fail closed");
                 None
             }
         };
@@ -667,6 +683,13 @@ pub fn build_router_with_proxy_db(
             };
 
             let provider: Arc<dyn Llm> = match p.runtime.as_str() {
+                _ if proxy_error.is_some() => crate::llm::opencode_go::unavailable(
+                    id.clone(), p.model.clone(), proxy_error.clone().unwrap(),
+                ),
+                "opencode-go" => Arc::new(crate::llm::opencode_go::OpenCodeGoProvider::new(
+                    id.clone(), p.base_url.clone(), resolved_key, p.model.clone(), proxy_url.clone(),
+                    go_catalog.clone(), p.protocol_overrides.clone(),
+                )),
                 "openai-compat" | "llama-server" | "ollama" => {
                     Arc::new(OpenAiCompatProvider::new_with_proxy_url(
                         id.as_str(),
@@ -750,7 +773,7 @@ pub fn build_router_with_proxy_db(
 
 /// Build a router from a full AiConfig (currently only forwards llm).
 pub fn build_router_from_ai(cfg: &AiConfig, vault: Option<&crate::vault::Vault>) -> LlmRouter {
-    build_router(&cfg.llm, vault, cfg.full_local_mode)
+    build_router_from_ai_with_proxy_db(cfg, vault, None)
 }
 
 pub fn build_router_from_ai_with_proxy_db(
@@ -758,5 +781,88 @@ pub fn build_router_from_ai_with_proxy_db(
     vault: Option<&crate::vault::Vault>,
     proxy_db: Option<&rusqlite::Connection>,
 ) -> LlmRouter {
-    build_router_with_proxy_db(&cfg.llm, vault, cfg.full_local_mode, proxy_db)
+    let router = build_router_with_proxy_db(&cfg.llm, vault, cfg.full_local_mode, proxy_db);
+    if cfg.fully_disabled {
+        if let Some(go) = cfg.llm.providers.get("opencode-go") {
+            crate::llm::opencode_go::catalog::shared_catalog().configure(
+                go.base_url.clone(), crate::ai::config::resolve_go_proxy_url(go, proxy_db, vault), true,
+            );
+        }
+    }
+    router
+}
+
+#[cfg(test)]
+mod capability_tests {
+    use super::*;
+
+    struct RequestCapabilities;
+    #[async_trait]
+    impl Llm for RequestCapabilities {
+        async fn chat(&self, _: ChatRequest) -> LlmResult<ChatResponse> {
+            unreachable!()
+        }
+        async fn chat_with_tools(
+            &self,
+            req: ChatRequest,
+            _: Vec<ChatTool>,
+        ) -> LlmResult<ChatResponse> {
+            assert!(self.supports_tools_for(&req));
+            Ok(ChatResponse {
+                content: "tool-capable pin".into(),
+                model: req.model_override,
+                usage: None,
+                tool_calls: vec![],
+            })
+        }
+        fn supports_tools_for(&self, req: &ChatRequest) -> bool {
+            req.model_override.as_deref() == Some("tools")
+        }
+        fn provider_id(&self) -> &str {
+            "test"
+        }
+        fn model(&self) -> &str {
+            "no-tools"
+        }
+    }
+
+    #[tokio::test]
+    async fn key_rotation_and_groups_forward_request_capabilities() {
+        let rotating: Arc<dyn Llm> = Arc::new(KeyRotatingLlm::new(
+            "test",
+            vec![Arc::new(RequestCapabilities)],
+            Arc::new(KeyRotationState::new()),
+        ));
+        let group = ProviderGroupLlm::new(
+            "group:test",
+            Arc::new(ProviderGroupState::new(vec!["test".into()])),
+            HashMap::from([("test".into(), rotating.clone())]),
+        );
+        let req = ChatRequest {
+            model_override: Some("tools".into()),
+            ..Default::default()
+        };
+        for provider in [rotating.as_ref(), &group as &dyn Llm] {
+            assert!(!provider.supports_tools());
+            assert!(!provider.supports_tools_for(&ChatRequest::default()));
+            assert!(provider.supports_tools_for(&req));
+            assert_eq!(
+                provider
+                    .chat_with_tools(req.clone(), vec![])
+                    .await
+                    .unwrap()
+                    .model
+                    .as_deref(),
+                Some("tools")
+            );
+        }
+        // Providers without the new override still use their old capability implementation.
+        let legacy = crate::llm::openai_compat::OpenAiCompatProvider::new(
+            "legacy",
+            "http://example.invalid",
+            "",
+            "default",
+        );
+        assert_eq!(legacy.supports_tools_for(&req), legacy.supports_tools());
+    }
 }

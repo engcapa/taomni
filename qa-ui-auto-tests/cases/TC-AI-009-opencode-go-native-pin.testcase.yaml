@@ -1,0 +1,69 @@
+id: TC-AI-009
+title: Native Go thread pin survives renderer reload through real SQLite IPC
+description: Native only because model writes/readback cross Tauri IPC and SQLite.
+  Before execution use isolated configuration and block catalog hosts as described
+  in native/opencode-go-provider.md so the bundled snapshot is deterministic.
+  Renderer reload is not process restart; N-GO-03 separately tests cold restart.
+  No key needed, no messages sent. Authored, unrun.
+covers: [F-AI-2.4]
+tags: [ai, opencode-go, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="tab-chat-toggle"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- select_option:
+    selector: '[data-testid="ai-chat-provider-select"]'
+    value: opencode-go
+- click: '[data-testid="ai-chat-drawer"] button[title="New chat"]'
+- wait_for: '[data-testid="go-thread-model-select"]'
+- select_option:
+    selector: '[data-testid="go-thread-model-select"]'
+    value: kimi-k3
+- wait: 5
+- assert_attribute:
+    selector: '[data-testid="go-thread-model-select"]'
+    name: value
+    equals: kimi-k3
+- wait: 5
+- reload: {}
+- wait_for: '[data-testid="status-bar"]'
+- wait_for: '[data-testid="welcome-restore-last-session"]'
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="tab-chat-toggle"]'
+- wait_for: '[data-testid="go-thread-model-select"]'
+- assert_attribute:
+    selector: '[data-testid="go-thread-model-select"]'
+    name: value
+    equals: kimi-k3
+- select_option:
+    selector: '[data-testid="go-thread-model-select"]'
+    value: ''
+- wait: 2
+- assert_attribute:
+    selector: '[data-testid="go-thread-model-select"]'
+    name: value
+    equals: ''
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Real IPC writes llm_model; renderer reload reads it back, and explicit clear is available.
+    actions: [3, 5, 7, 8, 10, 14, 17, 20, 22]
+    checkpoints:
+    - {step: 12, expectation: Pin is selected after IPC save.}
+    - {step: 21, expectation: SQLite-backed pin is read after renderer reload.}
+    - {step: 24, expectation: Explicit clear restores inherited selection.}
+    results: [12, 21, 24]
+  visual:
+  - {check: Native select keyboard/focus behavior., method: manual, reason: WebKitGTK/WebView2/WKWebView checks are unrun.}
+  native:
+  - {check: Tauri IPC and SQLite readback., method: automated, reason: This native case is authored but has not been executed.}
+  - {check: Cold restart and independent thread pins., method: manual, reason: N-GO-03 covers process restart unsupported by the selected runner verbs.}

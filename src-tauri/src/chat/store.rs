@@ -25,6 +25,8 @@ pub struct ChatThread {
     /// child's `--model` at spawn, so changing it recycles the CC process.
     #[serde(default)]
     pub cc_model: Option<String>,
+    #[serde(default)]
+    pub llm_model: Option<String>,
     /// Per-thread output format override: "md" | "html" | "plain".
     /// `None` means "inherit AiConfig.chat_output_format".
     #[serde(default)]
@@ -121,6 +123,7 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
     );
     // Idempotent column add for the per-thread Claude Code model override.
     let _ = conn.execute("ALTER TABLE ai_chat_threads ADD COLUMN cc_model TEXT", []);
+    let _ = conn.execute("ALTER TABLE ai_chat_threads ADD COLUMN llm_model TEXT", []);
     // Idempotent column add for media-generation chat drawer modes.
     let _ = conn.execute(
         "ALTER TABLE ai_chat_threads ADD COLUMN mode TEXT NOT NULL DEFAULT 'chat'",
@@ -135,14 +138,15 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
 
 pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
     conn.execute(
-        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model, mode, acp_session_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model, mode, acp_session_id, llm_model)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             thread.id, thread.title, thread.provider_id,
             thread.created_at, thread.updated_at,
             thread.linked_session_id, thread.source,
             thread.output_format, thread.cc_model, thread.mode,
             thread.acp_session_id,
+            thread.llm_model,
         ],
     )?;
     Ok(())
@@ -150,7 +154,7 @@ pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
 
 pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id, llm_model
          FROM ai_chat_threads WHERE id = ?1",
     )?;
     let mut rows = stmt.query(params![id])?;
@@ -169,6 +173,7 @@ pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> 
         acp_session_id: row.get(11).ok(),
         output_format: row.get(8).ok(),
         cc_model: row.get(9).ok(),
+        llm_model: row.get(12)?,
         mode: row
             .get::<_, Option<String>>(10)?
             .unwrap_or_else(default_thread_mode),
@@ -177,8 +182,8 @@ pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> 
 
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id
-         FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id, llm_model
+         FROM ai_chat_threads ORDER BY updated_at DESC, rowid DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
         Ok(ChatThread {
@@ -193,6 +198,7 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             acp_session_id: row.get(11).ok(),
             output_format: row.get(8).ok(),
             cc_model: row.get(9).ok(),
+            llm_model: row.get(12)?,
             mode: row
                 .get::<_, Option<String>>(10)?
                 .unwrap_or_else(default_thread_mode),
@@ -349,6 +355,12 @@ pub fn update_thread_cc_model(conn: &Connection, id: &str, model: Option<&str>) 
     Ok(())
 }
 
+pub fn update_thread_llm_model(conn: &Connection, id: &str, model: Option<&str>) -> SqlResult<()> {
+    let model = model.map(str::trim).filter(|s| !s.is_empty());
+    conn.execute("UPDATE ai_chat_threads SET llm_model = ?1 WHERE id = ?2", params![model, id])?;
+    Ok(())
+}
+
 /// Set or clear the per-thread output-format override.
 /// `None` (or `Some("")`) clears it so the thread inherits AiConfig.chat_output_format.
 pub fn update_thread_output_format(
@@ -383,6 +395,45 @@ pub fn delete_threads_older_than(conn: &Connection, cutoff_ts: i64) -> SqlResult
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn list_threads_prefers_newest_row_when_updated_at_ties() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_chat_tables(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO ai_chat_threads (id,title,provider_id,created_at,updated_at,source)
+             VALUES ('older','Older','deepseek',10,10,'drawer'),
+                    ('newer','Newer','opencode-go',10,10,'drawer')",
+            [],
+        )
+        .unwrap();
+
+        let threads = list_threads(&conn, 10).unwrap();
+        assert_eq!(threads.first().map(|thread| thread.id.as_str()), Some("newer"));
+    }
+
+    #[test]
+    fn llm_model_is_separate_persistent_and_clearable() {
+        let path = std::env::temp_dir().join(format!("go-chat-{}.sqlite", uuid::Uuid::new_v4()));
+        {
+            let conn = Connection::open(&path).unwrap();
+            init_chat_tables(&conn).unwrap();
+            init_chat_tables(&conn).unwrap();
+            conn.execute("INSERT INTO ai_chat_threads (id,title,provider_id,created_at,updated_at,source) VALUES ('a','A','opencode-go',1,1,'drawer'), ('b','B','opencode-go',2,2,'drawer')", []).unwrap();
+            update_thread_llm_model(&conn,"a",Some("kimi-k3")).unwrap();
+            update_thread_cc_model(&conn,"a",Some("bridge-model")).unwrap();
+        }
+        {
+            let conn = Connection::open(&path).unwrap();
+            let a = get_thread(&conn,"a").unwrap().unwrap();
+            assert_eq!(a.llm_model.as_deref(),Some("kimi-k3"));
+            assert_eq!(a.cc_model.as_deref(),Some("bridge-model"));
+            assert!(get_thread(&conn,"b").unwrap().unwrap().llm_model.is_none());
+            assert_eq!(list_threads(&conn,10).unwrap().len(),2);
+            update_thread_llm_model(&conn,"a",Some(" ")).unwrap();
+            assert!(get_thread(&conn,"a").unwrap().unwrap().llm_model.is_none());
+        }
+        std::fs::remove_file(path).unwrap();
+    }
     use super::*;
 
     #[test]
@@ -401,6 +452,7 @@ mod tests {
             cc_session_id: None,
             acp_session_id: None,
             cc_model: None,
+            llm_model: None,
             output_format: None,
         };
         create_thread(&conn, &thread).unwrap();
@@ -452,6 +504,7 @@ mod tests {
             cc_session_id: None,
             acp_session_id: None,
             cc_model: None,
+            llm_model: None,
             output_format: None,
         };
         create_thread(&conn, &thread).unwrap();

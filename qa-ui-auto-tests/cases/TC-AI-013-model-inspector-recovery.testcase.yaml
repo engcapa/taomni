@@ -1,0 +1,50 @@
+id: TC-AI-013
+title: Model inspector refresh failure retains rows and recovery clears error
+description: Synthetic recovery fixture; no real metadata connectivity. Authored, unrun.
+covers: [F-AI-2.8]
+tags: [ai, model-inspector, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}?inspectorFixture=recovery
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="deepseek"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="deepseek"]'
+- wait_for: '[data-testid="model-inspector-row"]'
+- click: '[data-testid="model-inspector-refresh"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-error"]'
+    contains: last-good catalog retained
+- assert_items:
+    selector: '[data-testid="model-inspector-row"]'
+    attribute: data-model
+    equals: [deepseek-chat, catalog-model, unlisted-model]
+- click: '[data-testid="model-inspector-refresh"]'
+- assert_not_visible: '[data-testid="model-inspector-error"]'
+- assert_attribute:
+    selector: '[data-testid="model-inspector-row"][data-model="deepseek-chat"]'
+    name: data-current
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="model-inspector-summary"]'
+    contains: Live list
+verification:
+  review: pending
+  requirements:
+  - id: I-RECOVERY
+    requirement: Refresh failure preserves exact rows and current choice; retry clears error.
+    actions: [8, 10, 13]
+    checkpoints:
+    - {step: 11, expectation: Failure is visible.}
+    - {step: 12, expectation: Exact rows remain.}
+    - {step: 14, expectation: Successful retry clears error.}
+    - {step: 15, expectation: Current model stays unchanged.}
+    results: [11, 12, 14, 15]
+  visual:
+  - {check: Error visibility, method: automated, reason: Explicit text and row assertions.}
+  native:
+  - {check: Real disk cache and failed HTTP refresh, method: manual, reason: N-I-01/N-I-04; stub is not native evidence.}

@@ -1772,6 +1772,7 @@ export function MainLayout() {
     terminalProfile?: TerminalProfile,
     localShell?: LocalShellSelection,
     initialCwd?: string,
+    chatTabId?: string,
   ): Promise<LocalLaunchOutcome> => {
     // UUID-based tab id: callers of the structured launch outcome correlate
     // by tab id, so same-millisecond ids must never collide.
@@ -1787,6 +1788,7 @@ export function MainLayout() {
     );
     addTab({
       id,
+      ...(chatTabId?.trim() ? { chatTabId: chatTabId.trim() } : {}),
       type: "terminal",
       title: resolvedTitle,
       sessionId,
@@ -2893,6 +2895,7 @@ export function MainLayout() {
         undefined,
         shellSelection,
         entry.confirmedCwd,
+        entry.identity.startsWith("local:") ? entry.identity.slice("local:".length) : undefined,
       );
       switch (outcome.status) {
         case "started":
@@ -3021,7 +3024,7 @@ export function MainLayout() {
           const confirmedCwd = rawCwd ? normalizeLocalStartCwd(rawCwd, getAppPlatform()) : null;
           if (confirmedCwd) {
             entry = localTerminalEntry({
-              tabId: tab.id,
+              tabId: tab.chatTabId ?? tab.id,
               displayName: tab.localShell.name,
               shellId: tab.localShell.id,
               shellArgs: tab.localShell.args,
@@ -3959,7 +3962,7 @@ export function MainLayout() {
         icon: <Bot />,
         active: chatDrawerOpen && activeTabId === railTab.id,
         testId: "tab-chat-toggle",
-        onSelect: () => void toggleTabChat(railTab.id),
+        onSelect: () => void toggleTabChat(chatBindingIdForTab(railTab) ?? railTab.id),
       });
     }
   }
@@ -4376,7 +4379,7 @@ export function MainLayout() {
                             } : undefined}
                             chatToggle={!aiFullyDisabled && !(terminalRailMerged && isActive) ? {
                               open: chatDrawerOpen && activeTabId === tab.id,
-                              onToggle: () => void toggleTabChat(tab.id),
+                              onToggle: () => void toggleTabChat(chatBindingIdForTab(tab) ?? tab.id),
                             } : undefined}
                             sftpToggle={!terminalSplitVisible && tab.ssh && !(terminalRailMerged && isActive) ? {
                               open: sidebarOpen,

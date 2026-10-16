@@ -91,6 +91,7 @@ impl Agent {
             max_tokens: Some(256),
             temperature: Some(0.1),
             stream: false,
+            ..Default::default()
         };
 
         let resp = self.llm.chat(req).await.map_err(|e| e.to_string())?;
@@ -136,6 +137,7 @@ impl Agent {
                 max_tokens: Some(512),
                 temperature: Some(0.1),
                 stream: false,
+                ..Default::default()
             };
 
             let resp = match self.llm.chat(req).await {

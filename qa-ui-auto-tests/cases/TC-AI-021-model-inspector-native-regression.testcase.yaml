@@ -1,0 +1,197 @@
+id: TC-AI-021
+title: Native inspector draft, proxy routing, policy cancellation and recovery
+description: Real IPC and isolated loopback gateway/proxies. No subscription, no real
+  key. HTTP logs prove routes; file hash proves inspection does not save drafts. Fixture
+  teardown rejects policy leaks and direct fallback.
+covers:
+- F-AI-2.8
+tags:
+- ai
+- model-inspector
+- p1
+modes:
+- native
+native_platforms:
+- Windows
+- Linux
+- macOS
+fixtures:
+- reset_db
+- model_inspector_gateway
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="deepseek"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="deepseek"]'
+- wait_for: '[data-testid="model-inspector-row"]'
+- click: '[data-testid="model-inspector-check-current"]'
+- assert_file_contains:
+    path: ${fixture.inspector_events}
+    contains: app POST /v1/chat/completions catalog-model
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]'
+    value: draft-direct
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-base-url"]'
+    value: ${fixture.inspector_draft_base}
+- select_option:
+    selector: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-proxy-mode"]'
+    value: none
+- wait_for: '[data-testid="model-inspector-row"][data-model="draft-direct"]'
+- click: '[data-testid="model-inspector-check-current"]'
+- assert_file_contains:
+    path: ${fixture.inspector_events}
+    contains: direct POST /draft/v1/chat/completions draft-direct
+- assert_file_sha256:
+    path: ${fixture.inspector_config}
+    equals: ${fixture.inspector_config_hash}
+- assert_file_contains:
+    path: ${fixture.inspector_results}
+    contains: draft-direct
+- select_option:
+    selector: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-proxy-mode"]'
+    value: custom
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]'
+    value: fail-model
+- wait_for: '[data-testid="model-inspector-row"][data-model="fail-model"]'
+- click: '[data-testid="model-inspector-check-current"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="fail-model"] [data-testid="model-inspector-result"]'
+    contains: configured proxy failed
+- assert_file_contains:
+    path: ${fixture.inspector_events}
+    contains: custom POST /draft/v1/chat/completions fail-model
+- host_write_file:
+    path: ${fixture.inspector_control}
+    text: hold-metadata
+- click: '[data-testid="model-inspector-refresh"]'
+- assert_file_contains:
+    path: ${fixture.inspector_events}
+    contains: metadata-pending
+- click: '[data-testid="ai-full-local-toggle"]'
+- assert_visible: '[data-testid="model-inspector-disabled"]'
+- assert_file_contains:
+    path: ${fixture.inspector_events}
+    contains: metadata-cancelled
+- host_write_file:
+    path: ${fixture.inspector_control}
+    text: normal
+- click: '[data-testid="ai-full-local-toggle"]'
+- assert_not_visible: '[data-testid="model-inspector-disabled"]'
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]'
+    value: recovered
+- wait_for: '[data-testid="model-inspector-row"][data-model="recovered"]'
+- click: '[data-testid="model-inspector-check-current"]'
+- assert_file_contains:
+    path: ${fixture.inspector_events}
+    contains: custom POST /draft/v1/chat/completions recovered
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="recovered"] [data-testid="model-inspector-result"]'
+    contains: ✓
+- click: '[data-testid="model-inspector-close"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="opencode-go"]'
+- wait_for: '[data-testid="model-inspector-row"][data-model="kimi-k2.6"]'
+- assert_text_equals:
+    selector: '[data-testid="model-inspector-row"][data-model="kimi-k2.6"] td:nth-child(6)'
+    equals: —
+- assert_text_equals:
+    selector: '[data-testid="model-inspector-row"][data-model="kimi-k2.6"] td:nth-child(7)'
+    equals: —
+verification:
+  review: pending
+  requirements:
+  - id: I-NATIVE-REPAIR
+    requirement: Draft requests use the displayed model/endpoint and chosen proxy
+      without config writes; policy cancels metadata before live-list I/O and mounted
+      controls recover.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 16
+    - 20
+    - 21
+    - 23
+    - 26
+    - 27
+    - 29
+    - 32
+    - 33
+    - 35
+    - 37
+    checkpoints:
+    - step: 11
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 17
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 18
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 19
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 24
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 25
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 28
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 30
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 31
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 34
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 38
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    - step: 39
+      expectation: Real HTTP, persistence or visible policy/result assertion succeeds.
+    results:
+    - 11
+    - 17
+    - 18
+    - 19
+    - 24
+    - 25
+    - 28
+    - 30
+    - 31
+    - 34
+    - 38
+    - 39
+  - id: I-GO-UNKNOWN
+    requirement: Seed protocol selection does not turn unknown tools/reasoning metadata
+      into boolean capabilities.
+    actions:
+    - 40
+    - 41
+    - 42
+    checkpoints:
+    - step: 44
+      expectation: Tools remains unknown.
+    - step: 45
+      expectation: Reasoning remains unknown.
+    results:
+    - 44
+    - 45
+  native:
+  - check: Real IPC/HTTP/proxy/disk and cancellation
+    method: automated
+    reason: Three independent loopback listeners, unchanged-config hash, result file,
+      pending CONNECT and cancellation observation.
+  visual:
+  - check: Current row and policy/result state in Windows WebView
+    method: automated
+    reason: Current model row, disabled warning and result assertions use real controls.

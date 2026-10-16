@@ -1,0 +1,49 @@
+id: TC-AI-010
+title: Go refresh and provider selection honor visible AI network policy
+description: Browser policy UI only. Does not prove absence of native network;
+  N-GO-05 covers that boundary. Authored, unrun.
+covers: [F-AI-2.4, F-AI-2.1]
+tags: [ai, opencode-go, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: 'text="Full local mode"'
+- wait_for: '[data-testid="go-provider-row"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- assert_attribute:
+    selector: '[data-testid="go-catalog-refresh"]'
+    name: disabled
+    equals: ''
+- assert_visible: '[data-testid="go-catalog-blocked"]'
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="tab-chat-toggle"]'
+- wait_for: '[data-testid="ai-chat-provider-select"]'
+- eval_readonly:
+    expression: "!document.getElementById('ai-chat-provider-select').textContent.includes('OpenCode Go')"
+    expect_truthy: true
+- click: '[data-testid="ribbon-settings"]'
+- click: 'text="Disable AI completely"'
+- assert_not_visible: '[data-testid="go-provider-row"]'
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Local-only disables directory refresh and removes Go selection; master-disable hides its settings.
+    actions: [5, 6, 7, 9, 12, 13, 16, 17]
+    checkpoints:
+    - {step: 10, expectation: Refresh is disabled.}
+    - {step: 11, expectation: Policy explanation is visible.}
+    - {step: 15, expectation: Go option is absent.}
+    - {step: 18, expectation: Disabled AI hides Go settings.}
+    results: [10, 11, 15, 18]
+  visual:
+  - {check: Disabled explanation remains readable., method: manual, reason: "Authored, unrun."}
+  native:
+  - {check: No network after policy change including in-flight cancellation., method: external, reason: "N-GO-05 proves actual network state, not DOM state."}

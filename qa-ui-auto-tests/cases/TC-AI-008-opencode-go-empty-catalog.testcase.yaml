@@ -1,0 +1,46 @@
+id: TC-AI-008
+title: Empty Go catalog retains editable default-model fallback
+description: Theoretical empty-directory browser fixture only. Authored, unrun.
+covers: [F-AI-2.4]
+tags: [ai, opencode-go, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}/?goFixture=empty
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: '[data-testid="go-provider-row"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- wait_for: '[data-testid="go-default-model-fallback"]'
+- fill:
+    selector: '[data-testid="go-default-model-fallback"]'
+    value: custom-model
+- click: '[data-testid="llm-providers-save"]'
+- assert_localstorage:
+    key: taomni.ai.config.v1
+    contains: '"model":"custom-model"'
+- reload: {}
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: '[data-testid="go-provider-row"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- assert_attribute:
+    selector: '[data-testid="go-default-model-fallback"]'
+    name: value
+    equals: custom-model
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Empty directory offers text input and preserves the custom default across save/reopen.
+    actions: [3, 4, 6, 8, 9, 11, 12, 13, 15]
+    checkpoints:
+    - {step: 10, expectation: Configuration persistence records custom-model.}
+    - {step: 16, expectation: Reopened input contains the same custom model.}
+    results: [10, 16]
+  visual:
+  - {check: Empty-state fallback remains usable., method: manual, reason: Keyboard focus and narrow-layout review remain unrun.}
+  native:
+  - {check: Persisted ai.json and router consumption., method: external, reason: Native runbook N-GO-01 and N-GO-05 prove non-stub persistence/routing.}

@@ -1,10 +1,12 @@
 import type { en } from "./en";
+import { modelInspectorZh } from "./modelInspector";
 
 // Use a deep partial to allow gradual translation while still letting the
 // type system flag obvious shape mismatches against the English dictionary.
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export const zhCN: DeepPartial<typeof en> = {
+  modelInspector: modelInspectorZh,
 
   app: {
     name: "Taomni",
@@ -4073,6 +4075,26 @@ export const zhCN: DeepPartial<typeof en> = {
     sentRewrite: "已向 AI 聊天发送改写请求",
     resentRewrite: "已重新发送改写请求",
     noSelection: "请先把光标放到代码中",
+  },
+  opencodeGo: {
+    subscription: "需要 Go 订阅，仅用于编码 agent 流量；密钥由 OpenCode Console 管理。",
+    console: "打开 OpenCode Console",
+    search: "搜索模型",
+    model: "OpenCode Go 模型",
+    inherit: "默认 · {model}",
+    offlineModel: "已下线？",
+    unclassified: "未分类",
+    deprecated: "已弃用",
+    training: "可能用于训练",
+    catalog: "模型目录：{count} 个",
+    live: "在线", cache: "缓存", snapshot: "内置快照",
+    notRefreshed: "尚未刷新",
+    refreshing: "刷新中…", refresh: "刷新目录",
+    blocked: "仅本地 / 完全禁用 AI 策略已禁止在线刷新",
+    protocols: "模型协议",
+    automatic: "恢复自动",
+    seed: "审定种子", models_dev: "models.dev", default: "默认猜测",
+    user_override: "手工",
   },
   aiSettings: {
     disableAi: "完全禁用 AI",

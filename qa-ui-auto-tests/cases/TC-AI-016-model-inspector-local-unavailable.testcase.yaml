@@ -1,0 +1,41 @@
+id: TC-AI-016
+title: Local service unavailable is distinct from an empty catalog
+description: Browser fixture only, not actual local service readiness. Authored, unrun.
+covers: [F-AI-2.8]
+tags: [ai, model-inspector, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}?inspectorFixture=unavailable
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="local"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="local"]'
+- wait_for: '[data-testid="model-inspector-unavailable"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-unavailable"]'
+    contains: Local service is not running
+- assert_count: {selector: '[data-testid="model-inspector-row"]', equal: 0}
+- assert_not_visible: '[data-testid="model-inspector-empty"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-error"]'
+    contains: connection refused
+verification:
+  review: pending
+  requirements:
+  - id: I-LOCAL-DOWN
+    requirement: Local service failure gives a named unavailable state, never an unexplained empty table.
+    actions: [7, 8]
+    checkpoints:
+    - {step: 10, expectation: Explicit local service message.}
+    - {step: 11, expectation: No fabricated loaded models.}
+    - {step: 12, expectation: Empty catalog message not substituted.}
+    - {step: 13, expectation: Failure reason visible.}
+    results: [10, 11, 12, 13]
+  visual:
+  - {check: Unavailable state, method: automated, reason: Distinct text and no-row assertions.}
+  native:
+  - {check: Actual llama-server start/stop and recovery, method: manual, reason: N-I-05 and TC-AI-018.}

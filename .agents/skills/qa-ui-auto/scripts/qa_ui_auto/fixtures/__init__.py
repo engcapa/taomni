@@ -72,6 +72,7 @@ from . import rdp_baseline_required
 from . import rdp_audio_required
 from . import xrdp_server_required
 from . import backup_policy
+from . import model_inspector_gateway
 from . import backup_cloud
 from . import credential_store
 from . import path_completion
@@ -93,6 +94,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "model_inspector_gateway": Fixture("model_inspector_gateway", model_inspector_gateway.setup, model_inspector_gateway.teardown),
     "dual_display_required": Fixture("dual_display_required", dual_display_required.setup),
     "path_completion": Fixture("path_completion", path_completion.setup),
     "backup_policy": Fixture("backup_policy", backup_policy.setup),

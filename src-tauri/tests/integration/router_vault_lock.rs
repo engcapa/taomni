@@ -29,6 +29,7 @@ fn make_config(api_key: String) -> AiConfig {
             api_key,
             api_keys: Vec::new(),
             model: "claude-sonnet-4-5".into(),
+            protocol_overrides: HashMap::new(),
             runtime: "anthropic".into(),
             capabilities: LlmProviderCapabilities::default(),
             image_model: None,
@@ -36,6 +37,7 @@ fn make_config(api_key: String) -> AiConfig {
             proxy_mode: "none".into(),
             proxy_session_id: None,
             proxy_url: None,
+            custom_proxy: None,
         },
     );
     providers.insert(
@@ -45,6 +47,7 @@ fn make_config(api_key: String) -> AiConfig {
             api_key: "local".into(),
             api_keys: Vec::new(),
             model: "qwen3-1.7b-q4_k_m".into(),
+            protocol_overrides: HashMap::new(),
             runtime: "llama-server".into(),
             capabilities: LlmProviderCapabilities::default(),
             image_model: None,
@@ -52,6 +55,7 @@ fn make_config(api_key: String) -> AiConfig {
             proxy_mode: "none".into(),
             proxy_session_id: None,
             proxy_url: None,
+            custom_proxy: None,
         },
     );
 

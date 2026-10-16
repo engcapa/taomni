@@ -61,6 +61,7 @@ pub async fn save_ai_config(
         )
     };
     let mut ai_ctx = state.ai_ctx.write().await;
+    ai_ctx.update_inspector_policy(&config);
     if config.fully_disabled || ai_ctx.config.asr != config.asr {
         crate::voice::commands::cancel_all();
     }
@@ -90,6 +91,20 @@ pub async fn test_llm_connection(
     provider: LlmProviderConfig,
     state: State<'_, AppState>,
 ) -> Result<TestConnectionResult, String> {
+    test_provider_connection(provider, &state, None).await
+}
+
+async fn test_provider_connection(
+    provider: LlmProviderConfig,
+    state: &AppState,
+    deadline: Option<std::time::Duration>,
+) -> Result<TestConnectionResult, String> {
+    if provider.runtime == "opencode-go" {
+        let ctx = state.ai_ctx.read().await;
+        if ctx.config.full_local_mode || ctx.config.fully_disabled {
+            return Err("OpenCode Go is disabled by the AI network policy".into());
+        }
+    }
     let test_api_key = provider
         .effective_api_keys()
         .into_iter()
@@ -103,6 +118,7 @@ pub async fn test_llm_connection(
     let api_key = if test_api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
         match state.vault.resolve(&test_api_key) {
             Ok(Some(plaintext)) => plaintext.to_string(),
+            Ok(None) if deadline.is_some() => return Err("Credential reference was not found".into()),
             Ok(None) => test_api_key.clone(),
             Err(e) => {
                 if e.contains(crate::vault::ERR_VAULT_LOCKED) {
@@ -120,10 +136,20 @@ pub async fn test_llm_connection(
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
-        crate::ai::config::resolve_provider_proxy_url(&provider, Some(&db), Some(&state.vault))?
+        if provider.runtime == "opencode-go" || deadline.is_some() {
+            crate::ai::config::resolve_go_proxy_url(&provider, Some(&db), Some(&state.vault))
+                .map_err(|error| if deadline.is_some() { error.replace("OpenCode Go", "Model check") } else { error })?
+        } else {
+            crate::ai::config::resolve_provider_proxy_url(&provider, Some(&db), Some(&state.vault))?
+        }
     };
 
     let llm: Arc<dyn Llm> = match provider.runtime.as_str() {
+        "opencode-go" => Arc::new(crate::llm::opencode_go::OpenCodeGoProvider::new(
+            "opencode-go".into(), provider.base_url.clone(), api_key.clone(),
+            provider.model.clone(), proxy_url, state.opencode_go_catalog.clone(),
+            provider.protocol_overrides.clone(),
+        )),
         "anthropic" => {
             let base_url = if provider.base_url.is_empty() {
                 "https://api.anthropic.com/v1".to_string()
@@ -147,20 +173,143 @@ pub async fn test_llm_connection(
         )),
     };
 
-    let start = std::time::Instant::now();
-    let req = ChatRequest::simple("You are a test assistant.", "Reply with exactly: pong");
+    let blocked = if deadline.is_some() {
+        let ctx = state.ai_ctx.read().await;
+        crate::ai::model_inspector::checks_disabled(&provider.runtime, ctx.config.full_local_mode, ctx.config.fully_disabled)
+    } else { false };
+    let (ok, mut message, latency_ms) = crate::ai::model_inspector::guarded_probe(llm.as_ref(), blocked, deadline).await?;
+    // A gateway can echo a credential in its error. Never persist it in the inspector.
+    if deadline.is_some() && !api_key.is_empty() { message = message.replace(&api_key, "[redacted]"); }
+    Ok(TestConnectionResult { ok, message, latency_ms })
+}
 
-    match llm.chat(req).await {
-        Ok(resp) => Ok(TestConnectionResult {
-            ok: true,
-            message: resp.content,
-            latency_ms: start.elapsed().as_millis() as u64,
-        }),
-        Err(e) => Ok(TestConnectionResult {
-            ok: false,
-            message: e.to_string(),
-            latency_ms: start.elapsed().as_millis() as u64,
-        }),
+#[tauri::command]
+pub async fn test_llm_model(
+    provider_id: String,
+    model: String,
+    provider_draft: Option<LlmProviderConfig>,
+    state: State<'_, AppState>,
+) -> Result<crate::ai::model_inspector::CheckResult, String> {
+    use crate::ai::model_inspector::{check_result, checks_disabled, save_result};
+    if model.trim().is_empty() { return Err("Model ID is required".into()); }
+    let (mut provider, cancel) = {
+        let ctx = state.ai_ctx.read().await;
+        let provider = crate::ai::model_inspector::inspector_provider(ctx.config.llm.providers.get(&provider_id).ok_or("Unknown provider")?, provider_draft)?;
+        if checks_disabled(&provider.runtime, ctx.config.full_local_mode, ctx.config.fully_disabled) {
+            return Err("Model checks are disabled by the AI network policy".into());
+        }
+        (provider, ctx.inspector_cancel.clone())
+    };
+    provider.model = model.clone();
+    let start = std::time::Instant::now();
+    let result = match crate::ai::model_inspector::under_policy(&cancel, test_provider_connection(provider, &state, Some(std::time::Duration::from_secs(60)))).await {
+        Ok(result) => check_result(result.ok, result.latency_ms, (!result.ok).then_some(result.message)),
+        Err(error) => check_result(false, start.elapsed().as_millis() as u64, Some(error)),
+    };
+    save_result(&default_ai_config_path().with_file_name("model-check-results.json"), &provider_id, &model, result.clone())?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn get_provider_models(
+    provider_id: String,
+    force_refresh: Option<bool>,
+    provider_draft: Option<LlmProviderConfig>,
+    state: State<'_, AppState>,
+) -> Result<crate::ai::model_inspector::ProviderModelsDto, String> {
+    use crate::ai::model_inspector::*;
+    let (provider, full_local, disabled, cancel) = {
+        let ctx = state.ai_ctx.read().await;
+        (inspector_provider(ctx.config.llm.providers.get(&provider_id).ok_or("Unknown provider")?, provider_draft)?,
+            ctx.config.full_local_mode, ctx.config.fully_disabled, ctx.inspector_cancel.clone())
+    };
+    let local = is_local(&provider.runtime);
+    let blocked = checks_disabled(&provider.runtime, full_local, disabled);
+    let request = async {
+    let dto = if provider.runtime == "opencode-go" {
+        let proxy = {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            crate::ai::config::resolve_go_proxy_url(&provider, Some(&db), Some(state.vault.as_ref()))
+        };
+        let go = state.opencode_go_catalog.inspect(provider.base_url.clone(), proxy, blocked, force_refresh.unwrap_or(false)).await;
+        ProviderModelsDto { rows: go_rows(&go, &provider.model, &provider.protocol_overrides),
+            fetched_at: go.fetched_at, source: go.source, last_error: go.last_error,
+            unavailable: false, checks_disabled: blocked }
+    } else {
+        let proxy = {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            crate::ai::config::resolve_go_proxy_url(&provider, Some(&db), Some(state.vault.as_ref()))
+                .map_err(|error| error.replace("OpenCode Go", "Model catalog"))
+        };
+        let catalog = state.opencode_go_catalog.metadata.refresh(proxy.clone(), blocked || local,
+            force_refresh.unwrap_or(false), crate::llm::model_catalog::METADATA_URL).await;
+        let mut live = None;
+        let mut live_error = None;
+        if !blocked && provider.runtime != "anthropic" {
+            let key = provider.effective_api_keys().into_iter().next().unwrap_or(&provider.api_key);
+            let key = if key.starts_with(crate::vault::VAULT_REF_PREFIX) {
+                state.vault.resolve(key).map(|v| v.map(|k| k.to_string()).unwrap_or_default())
+            } else { Ok(key.to_string()) };
+            match (key, proxy) {
+                (Ok(key), Ok(proxy)) => match live_models(&provider.base_url, &key, proxy.as_deref()).await {
+                    Ok(ids) => live = Some(ids),
+                    Err(error) => live_error = Some(error),
+                },
+                (Err(error), _) | (_, Err(error)) => live_error = Some(error),
+            }
+        }
+        let key = provider_key(&provider_id, &provider.base_url);
+        let snapshot: serde_json::Value = serde_json::from_str(crate::llm::model_catalog::SNAPSHOT).unwrap();
+        ProviderModelsDto {
+            rows: assemble(&provider.model, &provider.runtime, &catalog.providers[key], live.as_deref(), &snapshot["aliases"][key]),
+            fetched_at: if local && live.is_some() { crate::llm::model_catalog::now() } else { catalog.fetched_at },
+            source: if local && live.is_some() { "live".into() } else { catalog.source },
+            last_error: live_error.or(catalog.last_error), unavailable: local && live.is_none(),
+            checks_disabled: blocked,
+        }
+    };
+    Ok(dto)
+    };
+    let mut dto = match under_policy(&cancel, request).await {
+        Ok(dto) => dto,
+        Err(error) if cancel.is_cancelled() => {
+            let ctx = state.ai_ctx.read().await;
+            let catalog = state.opencode_go_catalog.metadata.get();
+            let snapshot: serde_json::Value = serde_json::from_str(crate::llm::model_catalog::SNAPSHOT).unwrap();
+            let key = provider_key(&provider_id, &provider.base_url);
+            ProviderModelsDto {
+                rows: if provider.runtime == "opencode-go" {
+                    go_rows(&state.opencode_go_catalog.get(), &provider.model, &provider.protocol_overrides)
+                } else { assemble(&provider.model, &provider.runtime, &catalog.providers[key], None, &snapshot["aliases"][key]) },
+                fetched_at: catalog.fetched_at, source: catalog.source, last_error: Some(error), unavailable: local,
+                checks_disabled: checks_disabled(&provider.runtime, ctx.config.full_local_mode, ctx.config.fully_disabled),
+            }
+        }
+        Err(error) => return Err(error),
+    };
+    attach_results(&mut dto.rows, &provider_id, &default_ai_config_path().with_file_name("model-check-results.json"));
+    Ok(dto)
+}
+
+#[tauri::command]
+pub async fn get_opencode_go_catalog(
+    force_refresh: bool,
+    state: State<'_, AppState>,
+) -> Result<crate::llm::opencode_go::catalog::GoCatalogDto, String> {
+    // Re-resolve policies and session proxies, not a stale UI snapshot.
+    {
+        let ctx = state.ai_ctx.read().await;
+        if let Some(go) = ctx.config.llm.providers.get("opencode-go") {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            state.opencode_go_catalog.configure(go.base_url.clone(),
+                crate::ai::config::resolve_go_proxy_url(go, Some(&db), Some(state.vault.as_ref())),
+                ctx.config.full_local_mode || ctx.config.fully_disabled);
+        }
+    }
+    if force_refresh { Ok(state.opencode_go_catalog.refresh(true).await) }
+    else {
+        state.opencode_go_catalog.trigger(false);
+        Ok(state.opencode_go_catalog.get())
     }
 }
 
@@ -196,6 +345,7 @@ pub async fn generate_shell_command(
         max_tokens: Some(512),
         temperature: Some(0.2),
         stream: false,
+        ..Default::default()
     };
 
     // Route through LlmRouter using VoiceToShell task — gets fallback for free.

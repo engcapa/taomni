@@ -143,6 +143,7 @@ pub async fn tab_suggest_fim(
         max_tokens: Some(24),
         temperature: Some(0.1),
         stream: false,
+        ..Default::default()
     };
 
     match ai_ctx.llm.complete(req, TaskKind::TabCompletion).await {
@@ -192,6 +193,7 @@ pub async fn tab_rewrite_command(
         max_tokens: Some(120),
         temperature: Some(0.2),
         stream: false,
+        ..Default::default()
     };
 
     let resp = ai_ctx

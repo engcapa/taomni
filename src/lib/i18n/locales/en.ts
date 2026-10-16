@@ -1,11 +1,13 @@
 // English translation dictionary. This is the authoritative shape for all
 // other locales — adding a key here surfaces type errors elsewhere via the
 // shared `Dict` type.
+import { modelInspectorEn } from "./modelInspector";
 type Dict = {
   [key: string]: string | Dict;
 };
 
 const dict = {
+  modelInspector: modelInspectorEn,
 
   app: {
     name: "Taomni",
@@ -4096,6 +4098,26 @@ const dict = {
     sentRewrite: "Sent rewrite request to AI chat",
     resentRewrite: "Re-sent rewrite prompt to AI chat",
     noSelection: "Place the cursor in some code first",
+  },
+  opencodeGo: {
+    subscription: "Go subscription required. Coding-agent traffic only; manage your key in OpenCode Console.",
+    console: "Open OpenCode Console",
+    search: "Search models",
+    model: "OpenCode Go model",
+    inherit: "Default · {model}",
+    offlineModel: "No longer listed?",
+    unclassified: "Unclassified",
+    deprecated: "Deprecated",
+    training: "May be used for training",
+    catalog: "Model catalog: {count}",
+    live: "Online", cache: "Cache", snapshot: "Bundled snapshot",
+    notRefreshed: "Not refreshed",
+    refreshing: "Refreshing…", refresh: "Refresh catalog",
+    blocked: "Online refresh disabled by local-only / AI-disabled policy",
+    protocols: "Model protocols",
+    automatic: "Restore automatic",
+    seed: "Verified seed", models_dev: "models.dev", default: "Guessed",
+    user_override: "Manual",
   },
   aiSettings: {
     disableAi: "Disable AI completely",

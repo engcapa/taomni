@@ -1,0 +1,103 @@
+id: TC-AI-019
+title: Large catalog completeness and Go protocol override consistency
+description: 63 synthetic SiliconFlow rows and existing Go stub; does not prove real
+  model metadata or WebView performance. Authored, unrun.
+covers:
+- F-AI-2.8
+- F-AI-2.4
+tags:
+- ai
+- model-inspector
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}?inspectorFixture=large
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="siliconflow"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="siliconflow"]'
+- wait_for: '[data-testid="model-inspector-row"]'
+- assert_count:
+    selector: '[data-testid="model-inspector-row"]'
+    equal: 63
+- click: '[data-testid="model-inspector-row"][data-model="catalog-model-59"] [data-testid="model-inspector-select"]'
+- assert_attribute:
+    selector: '[data-testid="model-inspector-row"]:first-child'
+    name: data-model
+    equals: catalog-model-59
+- click: '[data-testid="model-inspector-close"]'
+- click: '[data-testid="go-provider-row"] > div:first-child'
+- click: '[data-testid="go-protocols"] summary'
+- select_option:
+    selector: '[data-testid="go-protocol-row"][data-model="deepseek-v4.1-flash"] [data-testid="go-protocol-select"]'
+    value: messages
+- click: '[data-testid="llm-providers-save"]'
+- click: '[data-testid="model-inspector-open"][data-provider="opencode-go"]'
+- wait_for: '[data-testid="model-inspector-panel"][data-provider="opencode-go"] [data-testid="model-inspector-row"]'
+- assert_count:
+    selector: '[data-testid="model-inspector-row"]'
+    equal: 8
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="deepseek-v4.1-flash"]'
+    contains: messages
+- assert_count:
+    selector: '[data-testid="model-inspector-panel"] select'
+    equal: 0
+- assert_text_equals:
+    selector: '[data-testid="model-inspector-row"][data-model="kimi-k2.6"] td:nth-child(6)'
+    equals: —
+- assert_text_equals:
+    selector: '[data-testid="model-inspector-row"][data-model="kimi-k2.6"] td:nth-child(7)'
+    equals: —
+verification:
+  review: pending
+  requirements:
+  - id: I-LARGE-GO
+    requirement: Large catalog remains complete/selectable; Go inspector honors the
+      saved override without protocol editing.
+    actions:
+    - 7
+    - 8
+    - 11
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    checkpoints:
+    - step: 10
+      expectation: All synthetic rows mounted.
+    - step: 12
+      expectation: Selecting last catalog model moves it first.
+    - step: 20
+      expectation: Exactly the eight Go stub models.
+    - step: 21
+      expectation: Inspector protocol matches saved override.
+    - step: 22
+      expectation: Inspector has no protocol editing controls.
+    - step: 23
+      expectation: Seed protocol tools metadata stays unknown.
+    - step: 24
+      expectation: Seed protocol reasoning metadata stays unknown.
+    results:
+    - 10
+    - 12
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+  visual:
+  - check: Scroll and rendering responsiveness on real SiliconFlow data
+    method: manual
+    reason: N-I-08; DOM counts cannot prove performance.
+  native:
+  - check: Shared real metadata fetch/cache and Go four-protocol checks
+    method: manual
+    reason: N-I-01/N-I-07.

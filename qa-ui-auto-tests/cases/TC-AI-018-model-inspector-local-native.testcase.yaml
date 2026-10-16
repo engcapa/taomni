@@ -1,0 +1,46 @@
+id: TC-AI-018
+title: Real local model list, check IPC and configuration selection
+description: Native only. The model_inspector_gateway fixture provisions an
+  isolated loopback local-model service with a loaded chat model and no cloud
+  traffic, exercising the real local-provider IPC path without credentials.
+  See N-I-05 in native/model-inspector.md for the equivalent llama-server
+  lifecycle and cleanup expectations. Cold-restart/disk assertions are manual
+  N-I-03. Authored, unrun on Linux, Windows and macOS.
+covers: [F-AI-2.8]
+tags: [ai, model-inspector, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db, model_inspector_gateway]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="local"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="local"]'
+- wait_for: '[data-testid="model-inspector-row"][data-source="live"]'
+- assert_count: {selector: '[data-testid="model-inspector-row"]', min: 1}
+- assert_not_visible: '[data-testid="model-inspector-unavailable"]'
+- click: '[data-testid="model-inspector-row"]:first-child [data-testid="model-inspector-check"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"]:first-child [data-testid="model-inspector-result"]'
+    contains: ✓
+verification:
+  review: pending
+  requirements:
+  - id: I-NATIVE-LOCAL
+    requirement: Real IPC obtains the server's loaded models and checks a row using its actual ID.
+    actions: [7, 8, 12]
+    checkpoints:
+    - {step: 10, expectation: Actual loaded model list has at least one row.}
+    - {step: 11, expectation: Local service is available.}
+    - {step: 13, expectation: Real LLM request succeeded.}
+    results: [10, 11, 13]
+  visual:
+  - {check: Packaged WebView scrolling and focus, method: manual, reason: N-I-08 contains explicit platform observations.}
+  native:
+  - {check: Actual model list and chat IPC, method: automated, reason: No Tauri/browser stub allowed in this mode.}
+  - {check: Disk file and process cold restart, method: manual, reason: N-I-03 requires host inspection and restart unsupported by this short YAML workflow.}

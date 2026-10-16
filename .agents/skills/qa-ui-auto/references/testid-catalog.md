@@ -28,6 +28,30 @@
 
 ## ai/chat (F-AI-2.4)
 
+- `[data-testid="go-provider-row"]` — interactive [optional] — F-AI-2.4.go-provider-row
+- `[data-testid="go-proxy-mode"]` — interactive [optional] — F-AI-2.4.go-proxy-mode
+- `[data-testid="go-custom-proxy"]` — display [optional] — F-AI-2.4.go-custom-proxy
+- `[data-testid="go-custom-proxy"] input[placeholder="Proxy host"]` — interactive [optional] — F-AI-2.4.go-custom-proxy-host
+- `[data-testid="go-console"]` — interactive [optional] — F-AI-2.4.go-console
+- `[data-testid="go-default-model"]` — display [optional] — F-AI-2.4.go-default-model
+- `[data-testid="go-default-model-search"]` — interactive [optional] — F-AI-2.4.go-default-model-search
+- `[data-testid="go-default-model-select"]` — interactive [optional] — F-AI-2.4.go-default-model-select
+- `[data-testid="go-default-model-fallback"]` — interactive [optional] — F-AI-2.4.go-default-model-fallback
+- `[data-testid="go-catalog-status"]` — display [optional] — F-AI-2.4.go-catalog-status
+- `[data-testid="go-catalog-refresh"]` — interactive [optional] — F-AI-2.4.go-catalog-refresh
+- `[data-testid="go-catalog-error"]` — display [optional] — F-AI-2.4.go-catalog-error
+- `[data-testid="go-catalog-blocked"]` — display [optional] — F-AI-2.4.go-catalog-blocked
+- `[data-testid="go-protocols"]` — interactive [optional] — F-AI-2.4.go-protocols
+- `[data-testid="go-protocol-row"]` — display [optional] — F-AI-2.4.go-protocol-row
+- `[data-testid="go-protocol-select"]` — interactive [optional] — F-AI-2.4.go-protocol-select
+- `[data-testid="go-protocol-reset"]` — interactive [optional] — F-AI-2.4.go-protocol-reset
+- `[data-testid="go-thread-picker"]` — display [optional] — F-AI-2.4.go-thread-picker
+- `[data-testid="go-thread-model"]` — display [optional] — F-AI-2.4.go-thread-model
+- `[data-testid="go-thread-model-search"]` — interactive [optional] — F-AI-2.4.go-thread-model-search
+- `[data-testid="go-thread-model-select"]` — interactive [optional] — F-AI-2.4.go-thread-model-select
+- `[data-testid="go-thread-model-fallback"]` — interactive [optional] — F-AI-2.4.go-thread-model-fallback
+- `[data-testid="ai-chat-provider-select"]` — interactive [optional] — F-AI-2.4.ai-chat-provider-select-testid
+- `[data-testid="llm-providers-save"]` — interactive [optional] — F-AI-2.4.llm-providers-save
 - `[data-testid="ai-chat-drawer"]` — display [optional] — F-AI-2.4.ai-chat-drawer
 - `[data-testid="ai-chat-drawer"] textarea` — interactive [optional] — F-AI-2.4.ai-chat-drawer-textarea
 - `[data-testid="ai-chat-composer"]` — interactive [optional] — F-AI-2.4.ai-chat-composer
@@ -80,7 +104,44 @@
 - `[data-testid="settings-group-toggle-ai"]` — interactive [optional] — F-AI-2.1.settings-group-toggle-ai
 - `[data-testid="ai-master-switch"]` — interactive — F-AI-2.1.ai-master-toggle
   ↳ `text="Disable AI completely"` — alias
-- `text="Full local mode"` — interactive [optional] — F-AI-2.1.privacy-fully-local
+- `[data-testid="ai-full-local-toggle"]` — interactive [optional] — F-AI-2.1.privacy-fully-local
+  ↳ `text="Full local mode"` — alias
+
+## ai/settings (F-AI-2.8)
+
+- `[data-testid="llm-proxy-mode"]` — interactive — F-AI-2.8.llm-proxy-mode
+- `[data-testid="llm-custom-proxy"]` — display [optional] — F-AI-2.8.llm-custom-proxy
+- `[data-testid="llm-provider-base-url"]` — interactive — F-AI-2.8.llm-provider-base-url
+- `[data-testid="model-inspector-open"]` — interactive — F-AI-2.8.model-inspector-open
+- `[data-testid="model-inspector-panel"]` — display — F-AI-2.8.model-inspector-panel
+- `[data-testid="model-inspector-summary"]` — display — F-AI-2.8.model-inspector-summary
+- `[data-testid="model-inspector-row"]` — display — F-AI-2.8.model-inspector-row
+- `[data-testid="model-inspector-result"]` — display — F-AI-2.8.model-inspector-result
+- `[data-testid="model-inspector-refresh"]` — interactive — F-AI-2.8.model-inspector-refresh
+- `[data-testid="model-inspector-check-current"]` — interactive — F-AI-2.8.model-inspector-check-current
+- `[data-testid="model-inspector-check-all"]` — interactive — F-AI-2.8.model-inspector-check-all
+- `[data-testid="model-inspector-check"]` — interactive — F-AI-2.8.model-inspector-check
+  ↳ `[data-testid="model-inspector-row"][data-model="unlisted-model"] [data-testid="model-inspector-check"]` — alias
+  ↳ `[data-testid="model-inspector-row"][data-model="loaded-model"] [data-testid="model-inspector-check"]` — alias
+  ↳ `[data-testid="model-inspector-row"]:first-child [data-testid="model-inspector-check"]` — alias
+- `[data-testid="model-inspector-select"]` — interactive — F-AI-2.8.model-inspector-select
+  ↳ `[data-testid="model-inspector-row"][data-model="catalog-model"] [data-testid="model-inspector-select"]` — alias
+  ↳ `[data-testid="model-inspector-row"][data-model="catalog-model-59"] [data-testid="model-inspector-select"]` — alias
+- `[data-testid="model-inspector-close"]` — interactive — F-AI-2.8.model-inspector-close
+- `[data-testid="model-inspector-confirm"]` — display — F-AI-2.8.model-inspector-confirm
+- `[data-testid="model-inspector-confirm-all"]` — interactive — F-AI-2.8.model-inspector-confirm-all
+- `[data-testid="model-inspector-cancel-all"]` — interactive — F-AI-2.8.model-inspector-cancel-all
+- `[data-testid="model-inspector-disabled"]` — display — F-AI-2.8.model-inspector-disabled
+- `[data-testid="model-inspector-error"]` — display — F-AI-2.8.model-inspector-error
+- `[data-testid="model-inspector-empty"]` — display — F-AI-2.8.model-inspector-empty
+- `[data-testid="model-inspector-unavailable"]` — display — F-AI-2.8.model-inspector-unavailable
+- `[data-testid="llm-provider-row"]` — interactive — F-AI-2.8.llm-provider-row
+- `[data-testid="llm-provider-model"]` — interactive — F-AI-2.8.llm-provider-model
+  ↳ `[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]` — alias
+- `[data-testid="llm-provider-key"]` — interactive — F-AI-2.8.llm-provider-key
+  ↳ `[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-key"]` — alias
+- `[data-testid="llm-provider-test"]` — interactive — F-AI-2.8.llm-provider-test
+  ↳ `[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-test"]` — alias
 
 ## ai/terminal (F-AI-2.2)
 

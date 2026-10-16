@@ -207,6 +207,33 @@ describe("chatStore new thread provider selection", () => {
     });
   });
 
+  it("does not let an in-flight thread list overwrite a newer model pin", async () => {
+    let releaseList!: (threads: ChatThread[]) => void;
+    const list = new Promise<ChatThread[]>((resolve) => { releaseList = resolve; });
+    const stale = makeThread({ id: "thread-1", provider_id: "opencode-go" });
+    invokeMock.mockImplementation((command: string, args: { providerId?: string | null; linkedSessionId?: string | null; mode?: string | null }) => {
+      if (command === "chat_list_threads") return list;
+      if (command === "chat_new_thread") return Promise.resolve({
+        ...stale,
+        provider_id: args.providerId ?? "opencode-go",
+        linked_session_id: args.linkedSessionId ?? null,
+        mode: args.mode ?? "chat",
+      });
+      if (command === "chat_set_thread_llm_model") return Promise.resolve(null);
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    const loading = useChatStore.getState().loadThreads();
+    await useChatStore.getState().newThread("opencode-go", "term-1");
+    await useChatStore.getState().setThreadLlmModel("thread-1", "kimi-k3");
+    releaseList([stale]);
+    await loading;
+
+    expect(useChatStore.getState().threads).toEqual([
+      expect.objectContaining({ id: "thread-1", llm_model: "kimi-k3" }),
+    ]);
+  });
+
   it("reuses an existing tab thread instead of creating one for the default provider", async () => {
     useChatStore.setState({
       threads: [

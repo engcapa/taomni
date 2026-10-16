@@ -3632,7 +3632,8 @@ controls:
     aliases:
       - 'text="Disable AI completely"'
   - id: privacy-fully-local
-    selector: 'text="Full local mode"'
+    selector: '[data-testid="ai-full-local-toggle"]'
+    aliases: ['text="Full local mode"']
     kind: interactive
     optional: true       # only shown when AI master is enabled
 -->
@@ -3868,6 +3869,12 @@ area: ai/chat
 components: [ChatDrawer, ChatThreadList, Composer, AttachmentChip, MessageBubble, SearchProgressChip, CodeBlockToolbar, CcAgentBridge]
 files:
   - src/components/chat/ChatDrawer.tsx
+  - src/components/chat/GoModelPicker.tsx
+  - src/components/settings/GoProxyFields.tsx
+  - src/components/settings/GoProviderFields.tsx
+  - src/components/settings/LlmProvidersPanel.tsx
+  - src/stores/opencodeGoStore.ts
+  - src-tauri/src/llm/opencode_go/
   - src/components/chat/ChatThreadList.tsx
   - src/components/chat/Composer.tsx
   - src/components/chat/AttachmentChip.tsx
@@ -3880,6 +3887,30 @@ files:
   - src/lib/chat/renderFormatted.ts
   - src/stores/chatStore.ts
 controls:
+  - {id: go-provider-row, selector: '[data-testid="go-provider-row"]', kind: interactive, optional: true}
+  - {id: go-proxy-mode, selector: '[data-testid="go-proxy-mode"]', kind: interactive, optional: true}
+  - {id: go-custom-proxy, selector: '[data-testid="go-custom-proxy"]', kind: display, optional: true}
+  - {id: go-custom-proxy-host, selector: '[data-testid="go-custom-proxy"] input[placeholder="Proxy host"]', kind: interactive, optional: true}
+  - {id: go-console, selector: '[data-testid="go-console"]', kind: interactive, optional: true}
+  - {id: go-default-model, selector: '[data-testid="go-default-model"]', kind: display, optional: true}
+  - {id: go-default-model-search, selector: '[data-testid="go-default-model-search"]', kind: interactive, optional: true}
+  - {id: go-default-model-select, selector: '[data-testid="go-default-model-select"]', kind: interactive, optional: true}
+  - {id: go-default-model-fallback, selector: '[data-testid="go-default-model-fallback"]', kind: interactive, optional: true}
+  - {id: go-catalog-status, selector: '[data-testid="go-catalog-status"]', kind: display, optional: true}
+  - {id: go-catalog-refresh, selector: '[data-testid="go-catalog-refresh"]', kind: interactive, optional: true}
+  - {id: go-catalog-error, selector: '[data-testid="go-catalog-error"]', kind: display, optional: true}
+  - {id: go-catalog-blocked, selector: '[data-testid="go-catalog-blocked"]', kind: display, optional: true}
+  - {id: go-protocols, selector: '[data-testid="go-protocols"]', kind: interactive, optional: true}
+  - {id: go-protocol-row, selector: '[data-testid="go-protocol-row"]', kind: display, optional: true}
+  - {id: go-protocol-select, selector: '[data-testid="go-protocol-select"]', kind: interactive, optional: true}
+  - {id: go-protocol-reset, selector: '[data-testid="go-protocol-reset"]', kind: interactive, optional: true}
+  - {id: go-thread-picker, selector: '[data-testid="go-thread-picker"]', kind: display, optional: true}
+  - {id: go-thread-model, selector: '[data-testid="go-thread-model"]', kind: display, optional: true}
+  - {id: go-thread-model-search, selector: '[data-testid="go-thread-model-search"]', kind: interactive, optional: true}
+  - {id: go-thread-model-select, selector: '[data-testid="go-thread-model-select"]', kind: interactive, optional: true}
+  - {id: go-thread-model-fallback, selector: '[data-testid="go-thread-model-fallback"]', kind: interactive, optional: true}
+  - {id: ai-chat-provider-select-testid, selector: '[data-testid="ai-chat-provider-select"]', kind: interactive, optional: true}
+  - {id: llm-providers-save, selector: '[data-testid="llm-providers-save"]', kind: interactive, optional: true}
   - id: ai-chat-drawer
     selector: '[data-testid="ai-chat-drawer"]'
     kind: display
@@ -11431,6 +11462,77 @@ controls:
 - Browser `TC-SHOT-018` 验证重绑、禁用、相机保留入口与恢复默认，明确只验证内存中的 app-local 配置，状态为 `Works while this window is focused.`，不显示 native probe。Native 才负责持久化、系统注册/冲突反馈和采集/OCR/MP4 权限能力，缺少注册不伪装成全局成功。
 
 ---
+
+### 全 Provider 模型检查
+
+<!-- feature
+id: F-AI-2.8
+status: done
+area: ai/settings
+components: [LlmProvidersPanel, ModelInspectorPanel]
+files:
+  - src/components/settings/LlmProvidersPanel.tsx
+  - src/components/settings/ModelInspectorPanel.tsx
+  - src/stores/modelInspectorStore.ts
+  - src/stubs/modelInspectorStub.ts
+  - src-tauri/src/ai/model_inspector.rs
+  - src-tauri/src/ai/commands.rs
+  - src-tauri/src/llm/model_catalog.rs
+controls:
+  - {id: llm-proxy-mode, selector: '[data-testid="llm-proxy-mode"]', kind: interactive}
+  - {id: llm-custom-proxy, selector: '[data-testid="llm-custom-proxy"]', kind: display, optional: true}
+  - {id: llm-provider-base-url, selector: '[data-testid="llm-provider-base-url"]', kind: interactive}
+  - {id: model-inspector-open, selector: '[data-testid="model-inspector-open"]', kind: interactive}
+  - {id: model-inspector-panel, selector: '[data-testid="model-inspector-panel"]', kind: display}
+  - {id: model-inspector-summary, selector: '[data-testid="model-inspector-summary"]', kind: display}
+  - {id: model-inspector-row, selector: '[data-testid="model-inspector-row"]', kind: display}
+  - {id: model-inspector-result, selector: '[data-testid="model-inspector-result"]', kind: display}
+  - {id: model-inspector-refresh, selector: '[data-testid="model-inspector-refresh"]', kind: interactive}
+  - {id: model-inspector-check-current, selector: '[data-testid="model-inspector-check-current"]', kind: interactive}
+  - {id: model-inspector-check-all, selector: '[data-testid="model-inspector-check-all"]', kind: interactive}
+  - id: model-inspector-check
+    selector: '[data-testid="model-inspector-check"]'
+    kind: interactive
+    aliases:
+      - '[data-testid="model-inspector-row"][data-model="unlisted-model"] [data-testid="model-inspector-check"]'
+      - '[data-testid="model-inspector-row"][data-model="loaded-model"] [data-testid="model-inspector-check"]'
+      - '[data-testid="model-inspector-row"]:first-child [data-testid="model-inspector-check"]'
+  - id: model-inspector-select
+    selector: '[data-testid="model-inspector-select"]'
+    kind: interactive
+    aliases:
+      - '[data-testid="model-inspector-row"][data-model="catalog-model"] [data-testid="model-inspector-select"]'
+      - '[data-testid="model-inspector-row"][data-model="catalog-model-59"] [data-testid="model-inspector-select"]'
+  - {id: model-inspector-close, selector: '[data-testid="model-inspector-close"]', kind: interactive}
+  - {id: model-inspector-confirm, selector: '[data-testid="model-inspector-confirm"]', kind: display}
+  - {id: model-inspector-confirm-all, selector: '[data-testid="model-inspector-confirm-all"]', kind: interactive}
+  - {id: model-inspector-cancel-all, selector: '[data-testid="model-inspector-cancel-all"]', kind: interactive}
+  - {id: model-inspector-disabled, selector: '[data-testid="model-inspector-disabled"]', kind: display}
+  - {id: model-inspector-error, selector: '[data-testid="model-inspector-error"]', kind: display}
+  - {id: model-inspector-empty, selector: '[data-testid="model-inspector-empty"]', kind: display}
+  - {id: model-inspector-unavailable, selector: '[data-testid="model-inspector-unavailable"]', kind: display}
+  - {id: llm-provider-row, selector: '[data-testid="llm-provider-row"]', kind: interactive}
+  - id: llm-provider-model
+    selector: '[data-testid="llm-provider-model"]'
+    kind: interactive
+    aliases: ['[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-model"]']
+  - id: llm-provider-key
+    selector: '[data-testid="llm-provider-key"]'
+    kind: interactive
+    aliases: ['[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-key"]']
+  - id: llm-provider-test
+    selector: '[data-testid="llm-provider-test"]'
+    kind: interactive
+    aliases: ['[data-testid="llm-provider-row"][data-provider="deepseek"] [data-testid="llm-provider-test"]']
+-->
+
+- 所有配置中的 LLM provider 行（含未来新增 provider）均有模型检查入口。
+  目录精确命中、登记别名、local 实时清单和未收录分开标注；未知值不猜测。
+- 显式逐行检测、逐个批量检测（需确认额度提示）、独立结果文件持久化、
+  现有 vault/配置保存链设为当前模型；AI 网络策略限制 cloud、local 两种边界。
+- 与 Go 共用 models.dev 目录底座，Go 的模型行集和协议覆盖规则不另建副本。
+  TC-AI-012～020 与 `native/model-inspector.md` **已编写但未运行**；
+  全平台 WebView、真实凭据/IPC/网络和冷启动持久化没有通过证据。
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >

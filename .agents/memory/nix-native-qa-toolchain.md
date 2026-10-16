@@ -14,3 +14,15 @@ On the current Replit Linux runner, the native QA build can be killed by the mem
 **Why:** the normal nightly build reached the main crate and received SIGKILL; the low-memory build avoided that but its linker lacked `libxkbcommon`, and a later `RUSTFLAGS=-L` retry forced a broad rebuild that stalled in Cargo.
 
 **How to apply:** treat a missing native identity file as a failed build, not as permission to run the stale binary. If the low-memory build still cannot produce the identity record, report native QA as blocked rather than mixing results from an older artifact.
+
+Full-crate Rust unit compilation can also fail in unrelated ASR native build
+scripts before compiling product code: Whisper requires CMake on PATH, and
+Sherpa's build script requires a **64-bit** liblzma on the runtime library path.
+The first xz store path returned by a glob may be 32-bit.
+
+**Why:** a unit-only crate run hit those dependencies before reaching the new
+LLM code; providing a random liblzma produced an ELFCLASS32 loader failure.
+
+**How to apply:** check `file -L` before adding native libraries to PATH or
+LD_LIBRARY_PATH. A focused harness importing the production modules can
+verify pure Rust logic locally but cannot validate the Tauri router/IPC build.

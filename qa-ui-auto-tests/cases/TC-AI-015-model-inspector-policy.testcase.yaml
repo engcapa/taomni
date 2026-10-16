@@ -1,0 +1,111 @@
+id: TC-AI-015
+title: Full local mode keeps cloud inspector read-only but local checking available
+description: UI policy only; absence of real packets is asserted by N-I-04. Authored,
+  unrun.
+covers:
+- F-AI-2.8
+- F-AI-2.1
+tags:
+- ai
+- model-inspector
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="ai-full-local-toggle"]'
+- click: '[data-testid="llm-provider-row"][data-provider="deepseek"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="deepseek"]'
+- wait_for: '[data-testid="model-inspector-row"]'
+- assert_visible: '[data-testid="model-inspector-disabled"]'
+- assert_attribute:
+    selector: '[data-testid="model-inspector-check-all"]'
+    name: disabled
+    equals: ''
+- assert_attribute:
+    selector: '[data-testid="model-inspector-refresh"]'
+    name: disabled
+    equals: ''
+- assert_attribute:
+    selector: '[data-testid="model-inspector-row"][data-model="catalog-model"] [data-testid="model-inspector-select"]'
+    name: disabled
+    equals: ''
+- click: '[data-testid="ai-full-local-toggle"]'
+- assert_not_visible: '[data-testid="model-inspector-disabled"]'
+- click: '[data-testid="model-inspector-refresh"]'
+- click: '[data-testid="model-inspector-check-current"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"]:first-child [data-testid="model-inspector-result"]'
+    contains: ✓ 12ms
+- click: '[data-testid="ai-full-local-toggle"]'
+- click: '[data-testid="model-inspector-close"]'
+- click: '[data-testid="llm-provider-row"][data-provider="local"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="local"]'
+- wait_for: '[data-testid="model-inspector-row"][data-source="live"]'
+- assert_not_visible: '[data-testid="model-inspector-disabled"]'
+- click: '[data-testid="model-inspector-row"][data-model="loaded-model"] [data-testid="model-inspector-check"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-result"]'
+    contains: ✓ 12ms
+verification:
+  review: pending
+  requirements:
+  - id: I-POLICY
+    requirement: Cloud actions are read-only under full local policy, local stays
+      available.
+    actions:
+    - 7
+    - 9
+    - 21
+    - 23
+    - 26
+    checkpoints:
+    - step: 11
+      expectation: Policy is explained.
+    - step: 12
+      expectation: Cloud batch is disabled.
+    - step: 13
+      expectation: Cloud refresh is disabled.
+    - step: 14
+      expectation: Cloud selection is read-only.
+    - step: 25
+      expectation: Local is not blocked.
+    - step: 27
+      expectation: Local check succeeds in renderer fixture.
+    results:
+    - 11
+    - 12
+    - 13
+    - 14
+    - 25
+    - 27
+  - id: I-POLICY-RECOVERY
+    requirement: Turning full local off restores refresh and checks while the inspector
+      remains mounted.
+    actions:
+    - 15
+    - 17
+    - 18
+    checkpoints:
+    - step: 16
+      expectation: Policy warning clears.
+    - step: 19
+      expectation: Current check succeeds after unlocking.
+    results:
+    - 16
+    - 19
+  visual:
+  - check: Disabled controls and reason
+    method: automated
+    reason: Attribute and visibility assertions.
+  native:
+  - check: No cloud network or check IPC while disabled
+    method: manual
+    reason: N-I-04; browser cannot establish absence of native traffic.

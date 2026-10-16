@@ -5,6 +5,8 @@ pub mod anthropic;
 pub mod gpu_detect;
 pub mod llama_server;
 pub mod openai_compat;
+pub mod opencode_go;
+pub mod model_catalog;
 pub mod router;
 
 use async_trait::async_trait;
@@ -167,12 +169,16 @@ impl ChatMessage {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatRequest {
     pub messages: Vec<ChatMessage>,
     pub max_tokens: Option<u32>,
     pub temperature: Option<f32>,
     pub stream: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_override: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_key: Option<String>,
 }
 
 impl ChatRequest {
@@ -182,6 +188,7 @@ impl ChatRequest {
             max_tokens: Some(512),
             temperature: Some(0.3),
             stream: false,
+            ..Default::default()
         }
     }
 }
@@ -241,6 +248,11 @@ pub trait Llm: Send + Sync {
 
     fn supports_tools(&self) -> bool {
         false
+    }
+
+    /// Request-aware capability check. Existing providers retain their behavior.
+    fn supports_tools_for(&self, _req: &ChatRequest) -> bool {
+        self.supports_tools()
     }
 
     /// Streaming chat. Default implementation yields a single full event from

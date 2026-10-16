@@ -1,0 +1,73 @@
+id: TC-AI-014
+title: Batch check confirmation, cancel, mixed results and reload persistence
+description: Synthetic test results stored in browser localStorage only. Authored, unrun.
+covers: [F-AI-2.8]
+tags: [ai, model-inspector, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="deepseek"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="deepseek"]'
+- wait_for: '[data-testid="model-inspector-row"]'
+- assert_text_equals:
+    selector: '[data-testid="model-inspector-row"][data-model="deepseek-chat"] [data-testid="model-inspector-result"]'
+    equals: '—'
+- click: '[data-testid="model-inspector-check-all"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-confirm"]'
+    contains: quota
+- click: '[data-testid="model-inspector-cancel-all"]'
+- assert_text_equals:
+    selector: '[data-testid="model-inspector-row"][data-model="deepseek-chat"] [data-testid="model-inspector-result"]'
+    equals: '—'
+- click: '[data-testid="model-inspector-check-all"]'
+- click: '[data-testid="model-inspector-confirm-all"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="catalog-model"] [data-testid="model-inspector-result"]'
+    contains: ✓ 12ms
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="unlisted-model"] [data-testid="model-inspector-result"]'
+    contains: ✗ Fixture 401 Unauthorized
+- assert_localstorage:
+    key: taomni.stub.modelChecks.v1
+    contains: '"ok":false'
+- reload:
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="llm-provider-row"][data-provider="deepseek"] > div:first-child'
+- click: '[data-testid="model-inspector-open"][data-provider="deepseek"]'
+- wait_for: '[data-testid="model-inspector-row"]'
+- assert_text:
+    selector: '[data-testid="model-inspector-row"][data-model="catalog-model"] [data-testid="model-inspector-result"]'
+    contains: ✓ 12ms
+verification:
+  review: pending
+  requirements:
+  - id: I-BATCH
+    requirement: Opening does not check; cancel sends no checks; confirmed batch updates success and failure.
+    actions: [8, 11, 13, 15, 16]
+    checkpoints:
+    - {step: 10, expectation: Initially no saved check.}
+    - {step: 12, expectation: Quota warning is visible.}
+    - {step: 14, expectation: Cancel leaves result untouched.}
+    - {step: 17, expectation: Success row updated.}
+    - {step: 18, expectation: Failure row updated.}
+    - {step: 19, expectation: Failed result persists in browser stub.}
+    results: [10, 12, 14, 17, 18, 19]
+  - id: I-REOPEN
+    requirement: Reload and reopen reads saved results without automatically repeating checks.
+    actions: [20, 22, 23, 24, 25]
+    checkpoints:
+    - {step: 27, expectation: Saved success is visible after reload.}
+    results: [27]
+  visual:
+  - {check: Confirmation text, method: automated, reason: Quota message and cancel assertions.}
+  native:
+  - {check: Actual per-model request count and cold restart result file, method: manual, reason: N-I-03/N-I-06; browser persistence is stub-only.}

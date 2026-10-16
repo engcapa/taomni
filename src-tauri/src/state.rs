@@ -188,6 +188,7 @@ pub struct AppState {
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
+    pub opencode_go_catalog: Arc<crate::llm::opencode_go::catalog::CatalogService>,
     /// Decentralized LAN messenger (LanChat) runtime state. Distinct from the
     /// AI-assistant `chat`/`voice` modules. Holds node identity, peer roster,
     /// and the lanchat.sqlite path; populated by the lanchat background service.
@@ -255,6 +256,7 @@ impl AppState {
             dap,
             sdk,
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
+            opencode_go_catalog: crate::llm::opencode_go::catalog::shared_catalog(),
             lanchat,
         }
     }

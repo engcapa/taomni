@@ -33,6 +33,7 @@ export function PrivacyToggle() {
 
   return (
     <div
+      data-testid="ai-full-local-toggle"
       className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
         isLocalMode
           ? "border-purple-500/50 bg-purple-500/10"

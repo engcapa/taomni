@@ -1,0 +1,20 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { GoProviderFields } from "./GoProviderFields";
+import { GO_STUB_CATALOG } from "../../stubs/opencodeGoStub";
+import { useOpencodeGoStore } from "../../stores/opencodeGoStore";
+const provider = { model: "deepseek-v4.1-flash", base_url: "https://example.invalid/v1", api_key: "", runtime: "opencode-go" };
+beforeEach(() => useOpencodeGoStore.setState({ ...GO_STUB_CATALOG, loading: false, loaded: true, ensureLoaded: vi.fn().mockResolvedValue(undefined) }));
+afterEach(cleanup);
+it("allows overrides on every model, including classified models, and restores automatic", () => {
+  const onChange = vi.fn();
+  const { rerender } = render(<GoProviderFields provider={provider} onChange={onChange} blocked={false} />);
+  expect(screen.getAllByTestId("go-protocol-select")).toHaveLength(GO_STUB_CATALOG.models.length);
+  fireEvent.change(screen.getAllByTestId("go-protocol-select")[0], { target: { value: "messages" } });
+  const saved = onChange.mock.calls[0][0];
+  expect(saved.protocol_overrides).toEqual({ "deepseek-v4.1-flash": "messages" });
+  expect(saved.model).toBe(provider.model);
+  rerender(<GoProviderFields provider={saved} onChange={onChange} blocked={false} />);
+  fireEvent.click(screen.getAllByTestId("go-protocol-reset")[0]);
+  expect(onChange.mock.calls[1][0].protocol_overrides).toEqual({});
+});
