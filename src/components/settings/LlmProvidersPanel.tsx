@@ -465,6 +465,7 @@ export function LlmProvidersPanel() {
   };
 
   const providerGroups = config.llm.provider_groups ?? {};
+  const fullyDisabled = config.fully_disabled === true;
 
   const handleAddGroup = () => {
     let index = Object.keys(providerGroups).length + 1;
@@ -541,7 +542,7 @@ export function LlmProvidersPanel() {
         </div>
       )}
 
-      {Object.entries(config.llm.providers).map(([id, provider]) => (
+      {!fullyDisabled && Object.entries(config.llm.providers).map(([id, provider]) => (
         <ProviderRow
           key={id}
           id={id}
@@ -556,7 +557,7 @@ export function LlmProvidersPanel() {
         />
       ))}
 
-      <div className="pt-2 space-y-2">
+      {!fullyDisabled && <div className="pt-2 space-y-2">
         <div className="flex items-center justify-between">
           <div className="text-[13px] font-semibold">Provider groups</div>
           <button
@@ -584,7 +585,7 @@ export function LlmProvidersPanel() {
             />
           ))
         )}
-      </div>
+      </div>}
     </div>
   );
 }

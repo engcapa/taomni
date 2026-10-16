@@ -18,9 +18,11 @@
   `/messages`、`/responses`、Google 端点；切换 success/401/503/timeout/malformed/
   empty，记录模型、方法、路径、UA、脱敏请求计数，鉴权只记录是否存在。
   先用真实 HTTP 请求检查就绪，端口能连不是模型已加载。
-- TC-AI-018 需运行且已加载 chat 模型的 llama-server。对实际 `base_url/models`
-  验证 `data` 中至少有一个非空 id，并确认最小 chat 请求成功。没有服务按
-  setup failure 记录，不 skip，不把 browser fixture URL 用在 native config。
+- hosted TC-AI-018 使用 `model_inspector_gateway` fixture，在隔离 loopback
+  服务上提供一个已加载的 chat 模型，仍通过真实 native IPC 验证 `base_url/models`
+  与最小 chat 请求；不使用 browser stub。完整 N-I-05 手工验收仍需真实
+  llama-server，并对实际 `base_url/models` 验证 `data` 中至少有一个非空 id。
+  手工环境缺少服务按 setup failure 记录，不 skip。
 - 测试后无论成功/失败都恢复被改 key/代理/网络规则、停止自建假网关、
   移除隔离文件；只清理测试目录，绝不删除用户原有结果/配置。
 - 每个 N-I ID 的证据写入 `qa-ui-auto-report/model-inspector/<platform>/<id>/`：
@@ -116,7 +118,8 @@ alias 行的真实验收在有登记证据前不可声称通过（synthetic 单�
 1. llama-server 未启动：开 local 显示「本地服务未运行」+ 具体原因，不以无说明
    空表替代；不创建配置里尚未 loaded 的模型行。
 2. 启动并加载模型，真实 GET /models 验证就绪，再刷新：行集恰为真实 loaded
-   IDs、来源 live、protocol chat、未知 context/cost `—`。执行 TC-AI-018。
+   IDs、来源 live、protocol chat、未知 context/cost `—`。手工流程使用 llama-server；
+   hosted TC-AI-018 使用同等接口契约的隔离 loopback fixture。
 3. 假网关 `/models` 200/data=[]：空态说明，不是 unavailable；缺 data/坏 JSON/
    无 id/401/timeout 则不可用态。停止后再开，随后恢复并刷新可继续工作。
 4. 若 loaded ID 不同于 configured model，check-current 禁用；检测 loaded 行

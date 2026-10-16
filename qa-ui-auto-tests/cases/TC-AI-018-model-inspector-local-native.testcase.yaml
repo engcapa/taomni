@@ -1,15 +1,16 @@
 id: TC-AI-018
 title: Real local model list, check IPC and configuration selection
-description: Native only. Preconfigure isolated local provider to a running
-  llama-server with a loaded chat model and no cloud traffic. See N-I-05 in
-  native/model-inspector.md for readiness and cleanup. Missing service is a
-  setup failure, not a skip. Cold-restart/disk assertions are manual N-I-03.
-  Authored, unrun on Linux, Windows and macOS.
+description: Native only. The model_inspector_gateway fixture provisions an
+  isolated loopback local-model service with a loaded chat model and no cloud
+  traffic, exercising the real local-provider IPC path without credentials.
+  See N-I-05 in native/model-inspector.md for the equivalent llama-server
+  lifecycle and cleanup expectations. Cold-restart/disk assertions are manual
+  N-I-03. Authored, unrun on Linux, Windows and macOS.
 covers: [F-AI-2.8]
 tags: [ai, model-inspector, p1]
 modes: [native]
 native_platforms: [Linux, Windows, macOS]
-fixtures: [reset_db]
+fixtures: [reset_db, model_inspector_gateway]
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
