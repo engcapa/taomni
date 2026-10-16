@@ -183,7 +183,7 @@ pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> 
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
         "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id, llm_model
-         FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
+         FROM ai_chat_threads ORDER BY updated_at DESC, rowid DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
         Ok(ChatThread {
@@ -395,6 +395,22 @@ pub fn delete_threads_older_than(conn: &Connection, cutoff_ts: i64) -> SqlResult
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn list_threads_prefers_newest_row_when_updated_at_ties() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_chat_tables(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO ai_chat_threads (id,title,provider_id,created_at,updated_at,source)
+             VALUES ('older','Older','deepseek',10,10,'drawer'),
+                    ('newer','Newer','opencode-go',10,10,'drawer')",
+            [],
+        )
+        .unwrap();
+
+        let threads = list_threads(&conn, 10).unwrap();
+        assert_eq!(threads.first().map(|thread| thread.id.as_str()), Some("newer"));
+    }
+
     #[test]
     fn llm_model_is_separate_persistent_and_clearable() {
         let path = std::env::temp_dir().join(format!("go-chat-{}.sqlite", uuid::Uuid::new_v4()));

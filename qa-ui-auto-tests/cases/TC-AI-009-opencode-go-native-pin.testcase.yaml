@@ -26,7 +26,7 @@ steps:
 - select_option:
     selector: '[data-testid="go-thread-model-select"]'
     value: kimi-k3
-- wait: 0.5
+- wait: 2
 - assert_attribute:
     selector: '[data-testid="go-thread-model-select"]'
     name: value
