@@ -71,6 +71,7 @@ import {
   mailGetInvite,
   mailRespondInvite,
   mailGetMessageBody,
+  mailPrefetchMessageBody,
   mailIdleStart,
   mailIdleStop,
   mailIndexCachedContacts,
@@ -2043,7 +2044,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       for (const message of candidates) {
         if (bodyWarmSeqRef.current !== seq || !visibleRef.current) return;
         try {
-          await fetchBodyForMessage(message);
+          // Warm only the native disk cache. Manual opens use the interactive
+          // connection and must not join a request queued behind history sync.
+          await mailPrefetchMessageBody(info, message.folder, message.uid);
         } catch {
           // Body warming is opportunistic; direct message open still reports errors.
         }
@@ -2066,7 +2069,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         }));
       }
     }
-  }, [fetchBodyForMessage, info.cache.bodyRecentLimit, info.cache.enabled, info.sessionId]);
+  }, [info]);
 
   const isNewMailExcludedFolder = useCallback((folder: MailFolder) =>
     NEW_MAIL_EXCLUDED_KINDS.some((kind) => folderMatchesSpecial(folder, kind, info.specialFolders))
@@ -3192,6 +3195,28 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   };
 
+  // SMTP completes independently of the backend's Sent-copy task. Keep copy
+  // failures visible without treating an accepted message as safe to resend.
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen<{ accountId: string; folder?: string | null; error?: string | null }>(
+      "mail-sent-copy",
+      ({ payload }) => {
+        if (disposed || payload.accountId !== info.sessionId) return;
+        if (payload.error) {
+          setError(`Message sent, but saving the Sent copy failed: ${payload.error}`);
+        } else if (payload.folder) {
+          setStatus(`Message sent; copy saved to ${payload.folder}`);
+        }
+      },
+    ).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    return () => { disposed = true; unlisten?.(); };
+  }, [info.sessionId]);
+
   /** Save a composer draft into the local Outbox (TASK-17). */
   const queueToOutbox = async (
     source: ComposeDraft,
@@ -3383,12 +3408,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setSending(true);
     try {
       const result = await mailSendMessage(info, built);
-      if (draft.id) {
-        await mailDeleteDraft(info.sessionId, draft.id).catch(() => undefined);
-        setDrafts((current) => current.filter((item) => item.id !== draft.id));
-      }
       sentStatus(result);
       closeComposer();
+      if (draft.id) {
+        void mailDeleteDraft(info.sessionId, draft.id).catch(() => undefined);
+        setDrafts((current) => current.filter((item) => item.id !== draft.id));
+      }
     } catch (e) {
       const message = mailClientErrorMessage(e);
       // Offline / unreachable server: keep the message in the Outbox (AC-49).

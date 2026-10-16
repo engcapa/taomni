@@ -32,7 +32,7 @@ use native_tls::TlsConnector;
 use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_shell::ShellExt;
 use tokio::task::JoinHandle;
 
@@ -42,11 +42,11 @@ use crate::terminal::network::NetworkSettings;
 pub mod autoconfig;
 pub mod caldav;
 pub mod calendar;
-pub mod contacts;
-pub mod filters;
 pub mod certs;
+pub mod contacts;
 #[cfg(test)]
 mod fake_imap;
+pub mod filters;
 pub mod folders;
 pub mod idle;
 pub mod lists;
@@ -56,6 +56,8 @@ pub mod outgoing;
 mod parts;
 mod pop3;
 pub mod receipts;
+#[cfg(test)]
+mod responsiveness_tests;
 pub mod search;
 mod sync;
 mod vcard;
@@ -1100,12 +1102,20 @@ fn retire_imap_session(mut session: ActiveImapSession) {
 /// session-level proxy forwarder across mail commands. Does not consult the
 /// app global proxy.
 pub struct MailImapPool {
-    entries: std::sync::Mutex<HashMap<String, LiveImapEntry>>,
-    /// Serialize all IMAP work for a given account (pool checkout + op + put).
-    /// Prevents dual live connections for the same account racing through a
-    /// session proxy and desyncing Outlook's tag stream.
-    account_gates: std::sync::Mutex<HashMap<String, Arc<std::sync::Mutex<()>>>>,
+    entries: std::sync::Mutex<HashMap<ImapPoolKey, LiveImapEntry>>,
+    /// Each lane owns its connection and proxy forwarder. Never interleave
+    /// commands on one stream, but keep interactive work independent of sync.
+    account_gates: std::sync::Mutex<HashMap<ImapPoolKey, Arc<std::sync::Mutex<()>>>>,
 }
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+enum ImapLane {
+    #[default]
+    Interactive,
+    Background,
+}
+
+type ImapPoolKey = (String, ImapLane);
 
 struct LiveImapEntry {
     fingerprint: String,
@@ -1115,6 +1125,7 @@ struct LiveImapEntry {
 
 #[derive(Debug, Clone, Copy)]
 struct ImapSessionOpts {
+    lane: ImapLane,
     /// When true, never reuse a pooled session and do not return the session
     /// to the pool (used by connection tests).
     force_fresh: bool,
@@ -1126,8 +1137,18 @@ struct ImapSessionOpts {
 impl Default for ImapSessionOpts {
     fn default() -> Self {
         Self {
+            lane: ImapLane::Interactive,
             force_fresh: false,
             retry_on_error: true,
+        }
+    }
+}
+
+impl ImapSessionOpts {
+    fn background() -> Self {
+        Self {
+            lane: ImapLane::Background,
+            ..Self::default()
         }
     }
 }
@@ -1140,17 +1161,17 @@ impl MailImapPool {
         }
     }
 
-    fn account_gate(&self, account_id: &str) -> Arc<std::sync::Mutex<()>> {
+    fn account_gate(&self, key: &ImapPoolKey) -> Arc<std::sync::Mutex<()>> {
         let mut gates = self.account_gates.lock().unwrap_or_else(|e| e.into_inner());
         gates
-            .entry(account_id.to_string())
+            .entry(key.clone())
             .or_insert_with(|| Arc::new(std::sync::Mutex::new(())))
             .clone()
     }
 
-    fn take(&self, account_id: &str, fingerprint: &str) -> Option<ActiveImapSession> {
-        let mut entries = self.entries.lock().ok()?;
-        let entry = entries.remove(account_id)?;
+    fn take(&self, key: &ImapPoolKey, fingerprint: &str) -> Option<ActiveImapSession> {
+        // LOGOUT can wait for a network timeout; never hold the shared map lock.
+        let entry = self.entries.lock().ok()?.remove(key)?;
         if entry.fingerprint != fingerprint || entry.last_used.elapsed() > IMAP_LIVE_IDLE_TTL {
             // OAuth refresh changes the credential fingerprint. Never call bare
             // imap logout without panic protection — desynced pools panic here.
@@ -1160,29 +1181,38 @@ impl MailImapPool {
         Some(entry.session)
     }
 
-    fn put(&self, account_id: String, fingerprint: String, session: ActiveImapSession) {
-        if let Ok(mut entries) = self.entries.lock() {
-            if let Some(old) = entries.remove(&account_id) {
-                retire_imap_session(old.session);
-            }
-            entries.insert(
-                account_id,
+    fn put(&self, key: ImapPoolKey, fingerprint: String, session: ActiveImapSession) {
+        let old = self
+            .entries
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(
+                key,
                 LiveImapEntry {
                     fingerprint,
                     session,
                     last_used: Instant::now(),
                 },
             );
-        } else {
-            retire_imap_session(session);
+        if let Some(old) = old {
+            retire_imap_session(old.session);
+        }
+    }
+
+    fn invalidate_lane(&self, key: &ImapPoolKey) {
+        let entry = self
+            .entries
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(key);
+        if let Some(entry) = entry {
+            retire_imap_session(entry.session);
         }
     }
 
     fn invalidate(&self, account_id: &str) {
-        if let Ok(mut entries) = self.entries.lock() {
-            if let Some(entry) = entries.remove(account_id) {
-                retire_imap_session(entry.session);
-            }
+        for lane in [ImapLane::Interactive, ImapLane::Background] {
+            self.invalidate_lane(&(account_id.to_string(), lane));
         }
     }
 }
@@ -1282,15 +1312,16 @@ fn with_imap_session<R>(
     mut f: impl FnMut(&mut ActiveImapSession) -> Result<R, String>,
 ) -> Result<R, String> {
     let account_id = account.config.session_id.clone();
+    let key = (account_id.clone(), opts.lane);
     let fingerprint = mail_imap_fingerprint(account);
     let session_proxy = account.network_settings.is_some();
     let total_start = Instant::now();
 
-    // One live IMAP op (and its proxy forwarder) per account at a time.
-    let gate = pool.account_gate(&account_id);
+    let gate = pool.account_gate(&key);
     let _gate = gate
         .lock()
         .map_err(|_| "mail imap account lock poisoned".to_string())?;
+    let queue_ms = total_start.elapsed().as_millis();
 
     let mut attempt =
         |force_connect: bool| -> Result<(R, ActiveImapSession, bool, u128, u128), String> {
@@ -1298,10 +1329,10 @@ fn with_imap_session<R>(
             let mut reused = false;
             let mut session = if force_connect || opts.force_fresh {
                 if opts.force_fresh {
-                    pool.invalidate(&account_id);
+                    pool.invalidate_lane(&key);
                 }
                 imap_catch_result(|| connect_imap(account, runtime))?
-            } else if let Some(mut session) = pool.take(&account_id, &fingerprint) {
+            } else if let Some(mut session) = pool.take(&key, &fingerprint) {
                 match session.noop() {
                     Ok(()) => {
                         reused = true;
@@ -1345,11 +1376,13 @@ fn with_imap_session<R>(
             if opts.force_fresh {
                 retire_imap_session(session);
             } else {
-                pool.put(account_id.clone(), fingerprint.clone(), session);
+                pool.put(key.clone(), fingerprint.clone(), session);
             }
             tracing::info!(
                 account_id = %account_id,
                 session_proxy,
+                lane = ?opts.lane,
+                queue_ms,
                 reused,
                 checkout_ms,
                 op_ms,
@@ -1369,7 +1402,7 @@ fn with_imap_session<R>(
                 account_id = %account_id,
                 "mail imap op failed on live/new session; retrying once: {e}"
             );
-            pool.invalidate(&account_id);
+            pool.invalidate_lane(&key);
             let (value, session, reused, checkout_ms, op_ms) = attempt(true)?;
             Ok(finish(value, session, reused, checkout_ms, op_ms))
         }
@@ -1526,6 +1559,32 @@ fn with_mail_db<T>(
     f(&db).map_err(|e| e.to_string())
 }
 
+/// SQLite and its mutex must not occupy Tokio's workers, which also carry
+/// terminal I/O and proxy forwarding. The closure owns only this operation's
+/// inputs; the cache lock is never held across a network request.
+async fn with_mail_db_async<T: Send + 'static>(
+    state: &State<'_, AppState>,
+    account_id: &str,
+    f: impl FnOnce(&Connection, &str) -> SqlResult<T> + Send + 'static,
+) -> Result<T, String> {
+    let db = state.mail_db(account_id)?;
+    mail_db_task(db, account_id.to_string(), f).await
+}
+
+async fn mail_db_task<T: Send + 'static>(
+    db: crate::state::MailDbHandle,
+    account_id: String,
+    f: impl FnOnce(&Connection, &str) -> SqlResult<T> + Send + 'static,
+) -> Result<T, String> {
+    tokio::task::spawn_blocking(move || {
+        let db = db.lock().map_err(|e| e.to_string())?;
+        init_mail_tables(&db).map_err(|e| e.to_string())?;
+        f(&db, &account_id).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("mail cache task failed: {e}"))?
+}
+
 #[tauri::command]
 pub async fn mail_test_connection(
     config: MailAccountConfig,
@@ -1545,6 +1604,7 @@ pub async fn mail_test_connection(
             ImapSessionOpts {
                 force_fresh: true,
                 retry_on_error: false,
+                ..ImapSessionOpts::default()
             },
             |imap| imap.list_folders(&account.config.session_id),
         )?;
@@ -1748,9 +1808,10 @@ pub async fn mail_sync_headers(
     let refresh_folders = refresh_folders.unwrap_or(true);
 
     let cached_folders = if cache_enabled {
-        with_mail_db(&state, &account_id, |db| {
-            list_cached_folders(db, &account_id)
-        })?
+        with_mail_db_async(&state, &account_id, |db, account_id| {
+            list_cached_folders(db, account_id)
+        })
+        .await?
     } else {
         Vec::new()
     };
@@ -1763,7 +1824,7 @@ pub async fn mail_sync_headers(
             &pool,
             &account,
             &handle,
-            ImapSessionOpts::default(),
+            ImapSessionOpts::background(),
             |imap| {
                 let base_folders = if do_list {
                     imap.list_folders(&account.config.session_id)?
@@ -1790,7 +1851,7 @@ pub async fn mail_sync_headers(
     .map_err(|e| format!("mail sync task failed: {e}"))??;
 
     if cache_enabled {
-        with_mail_db(&state, &account_id, |db| {
+        result = with_mail_db_async(&state, &account_id, move |db, account_id| {
             cache_sync_result(
                 db,
                 &account_id,
@@ -1798,8 +1859,10 @@ pub async fn mail_sync_headers(
                 &result.2,
                 &result.1.name,
                 &cache_settings,
-            )
-        })?;
+            )?;
+            Ok(result)
+        })
+        .await?;
     }
 
     tracing::debug!(
@@ -1862,9 +1925,11 @@ pub async fn mail_sync_folder(
     // Without a cache there is nothing to resume from: every call is a fresh
     // newest page.
     let sync_state = if cache_enabled {
-        with_mail_db(&state, &account_id, |db| {
-            sync::load_folder_sync_state(db, &account_id, &folder)
-        })?
+        let state_folder = folder.clone();
+        with_mail_db_async(&state, &account_id, move |db, account_id| {
+            sync::load_folder_sync_state(db, account_id, &state_folder)
+        })
+        .await?
     } else {
         FolderSyncState::default()
     };
@@ -1878,7 +1943,7 @@ pub async fn mail_sync_folder(
             &pool,
             &account,
             &handle,
-            ImapSessionOpts::default(),
+            ImapSessionOpts::background(),
             |imap| {
                 let params = StepParams {
                     condstore: imap.has_capability("CONDSTORE"),
@@ -1895,9 +1960,11 @@ pub async fn mail_sync_folder(
         Ok(outcome) => outcome,
         Err(e) => {
             if cache_enabled {
-                let _ = with_mail_db(&state, &account_id, |db| {
-                    sync::record_folder_error(db, &account_id, &folder, &e)
-                });
+                let error = e.clone();
+                let _ = with_mail_db_async(&state, &account_id, move |db, account_id| {
+                    sync::record_folder_error(db, account_id, &folder, &error)
+                })
+                .await;
             }
             return Err(e);
         }
@@ -1907,10 +1974,12 @@ pub async fn mail_sync_folder(
         outcome.more = false;
         return Ok(sync::step_result(&account_id, outcome, None));
     }
-    let applied = with_mail_db(&state, &account_id, |db| {
-        sync::apply_folder_step(db, &account_id, &outcome, &cache_settings, started_ms)
-    })?;
-    Ok(sync::step_result(&account_id, outcome, Some(applied)))
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
+        let applied =
+            sync::apply_folder_step(db, account_id, &outcome, &cache_settings, started_ms)?;
+        Ok(sync::step_result(account_id, outcome, Some(applied)))
+    })
+    .await
 }
 
 /// Refresh the folder tree and run one catch-up (plus reconcile) step for
@@ -1942,14 +2011,15 @@ pub async fn mail_sync_all_folders(
     };
     let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
     let sync_states: HashMap<String, FolderSyncState> = if cache_enabled {
-        with_mail_db(&state, &account_id, |db| {
+        with_mail_db_async(&state, &account_id, |db, account_id| {
             let mut states = HashMap::new();
             for folder in list_cached_folders(db, &account_id)? {
                 let folder_state = sync::load_folder_sync_state(db, &account_id, &folder.name)?;
                 states.insert(folder.name, folder_state);
             }
             Ok(states)
-        })?
+        })
+        .await?
     } else {
         HashMap::new()
     };
@@ -1962,7 +2032,7 @@ pub async fn mail_sync_all_folders(
             &pool,
             &account,
             &handle,
-            ImapSessionOpts::default(),
+            ImapSessionOpts::background(),
             |imap| {
                 let mut listed = imap.list_folders(&account.config.session_id)?;
                 let condstore = imap.has_capability("CONDSTORE");
@@ -2082,16 +2152,18 @@ pub async fn mail_sync_all_folders(
         }
     }
     let folders = if cache_enabled {
-        with_mail_db(&state, &account_id, |db| {
-            sync_folder_tree(db, &account_id, &listed)?;
+        let failures = failed.clone();
+        with_mail_db_async(&state, &account_id, move |db, account_id| {
+            sync_folder_tree(db, account_id, &listed)?;
             for outcome in &outcomes {
                 sync::apply_folder_step(db, &account_id, outcome, &cache_settings, started_ms)?;
             }
-            for failure in &failed {
+            for failure in &failures {
                 sync::record_folder_error(db, &account_id, &failure.name, &failure.error)?;
             }
-            list_cached_folders(db, &account_id)
-        })?
+            list_cached_folders(db, account_id)
+        })
+        .await?
     } else {
         let mut folders = listed;
         for outcome in &outcomes {
@@ -2150,9 +2222,10 @@ pub async fn mail_list_cached_folders(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
-    with_mail_db(&state, &account_id, |db| {
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
         list_cached_folders(db, &account_id)
     })
+    .await
 }
 
 #[tauri::command]
@@ -2163,7 +2236,7 @@ pub async fn mail_list_cached_messages(
     offset: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailMessageHeader>, String> {
-    with_mail_db(&state, &account_id, |db| {
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
         list_cached_messages(
             db,
             &account_id,
@@ -2172,6 +2245,7 @@ pub async fn mail_list_cached_messages(
             offset.unwrap_or(0),
         )
     })
+    .await
 }
 
 #[tauri::command]
@@ -2181,14 +2255,41 @@ pub async fn mail_get_message_body(
     uid: u32,
     state: State<'_, AppState>,
 ) -> Result<MailMessageBody, String> {
+    get_message_body(config, folder, uid, false, state).await
+}
+
+/// Warm the disk cache without transferring unused HTML/CID data into the
+/// WebView or updating the reader for every prefetched message.
+#[tauri::command]
+pub async fn mail_prefetch_message_body(
+    config: MailAccountConfig,
+    folder: String,
+    uid: u32,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if config.cache.enabled {
+        get_message_body(config, folder, uid, true, state).await?;
+    }
+    Ok(())
+}
+
+async fn get_message_body(
+    config: MailAccountConfig,
+    folder: String,
+    uid: u32,
+    background: bool,
+    state: State<'_, AppState>,
+) -> Result<MailMessageBody, String> {
     if pop3::is_pop3(&config) {
         return local_cmds::get_body(&state, &config.session_id, folder.trim(), uid);
     }
     let account_id = config.session_id.clone();
     if config.cache.enabled {
-        let cached = with_mail_db(&state, &account_id, |db| {
-            get_cached_body(db, &account_id, &folder, uid)
-        })?;
+        let cache_folder = folder.clone();
+        let cached = with_mail_db_async(&state, &account_id, move |db, account_id| {
+            get_cached_body(db, account_id, &cache_folder, uid)
+        })
+        .await?;
         if let Some(body) = cached {
             return Ok(body);
         }
@@ -2198,12 +2299,16 @@ pub async fn mail_get_message_body(
     let cache_enabled = account.config.cache.enabled;
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    let message = tokio::task::spawn_blocking(move || {
+    let mut message = tokio::task::spawn_blocking(move || {
         with_imap_session(
             &pool,
             &account,
             &handle,
-            ImapSessionOpts::default(),
+            if background {
+                ImapSessionOpts::background()
+            } else {
+                ImapSessionOpts::default()
+            },
             |imap| imap.fetch_body(&account, &folder, uid),
         )
     })
@@ -2211,7 +2316,11 @@ pub async fn mail_get_message_body(
     .map_err(|e| format!("mail body task failed: {e}"))??;
 
     if cache_enabled {
-        with_mail_db(&state, &account_id, |db| upsert_message(db, &message))?;
+        message = with_mail_db_async(&state, &account_id, move |db, _| {
+            upsert_message(db, &message)?;
+            Ok(message)
+        })
+        .await?;
     }
 
     Ok(cached_to_body(message, "remote"))
@@ -2303,6 +2412,16 @@ pub async fn mail_download_attachment(
 pub async fn mail_send_message(
     config: MailAccountConfig,
     request: MailSendRequest,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<MailSendResult, String> {
+    send_message(config, request, Some(app), state).await
+}
+
+async fn send_message(
+    config: MailAccountConfig,
+    request: MailSendRequest,
+    app: Option<AppHandle>,
     state: State<'_, AppState>,
 ) -> Result<MailSendResult, String> {
     if pop3::is_pop3(&config) {
@@ -2313,25 +2432,70 @@ pub async fn mail_send_message(
     validate_send_request(&request)?;
     let account_id = account.config.session_id.clone();
     let sent_request = request.clone();
-    let remote_draft = match request.draft_id.as_deref() {
-        Some(draft_id) => with_mail_db(&state, &account_id, |db| {
-            outgoing::remote_draft_location(db, &account_id, draft_id)
-        })?,
+    let remote_draft = match request.draft_id.clone() {
+        Some(draft_id) => {
+            with_mail_db_async(&state, &account_id, move |db, account_id| {
+                outgoing::remote_draft_location(db, account_id, &draft_id)
+            })
+            .await?
+        }
         None => None,
     };
+    let db = state.mail_db(&account_id)?;
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    let result = tokio::task::spawn_blocking(move || {
-        outgoing::send_and_store_copy(&pool, &account, &request, remote_draft, &handle)
+    let (result, pending, account, handle) = tokio::task::spawn_blocking(move || {
+        let (result, pending) =
+            outgoing::send_with_pending_copy(&account, &request, remote_draft, &handle)?;
+        Ok::<_, String>((result, pending, account, handle))
     })
     .await
     .map_err(|e| format!("mail send task failed: {e}"))??;
     if result.accepted {
-        with_mail_db(&state, &account_id, |db| {
-            upsert_sent_contacts(db, &account_id, &sent_request)
-        })?;
+        // Owned by the backend, not the composer or tab. SMTP acceptance is
+        // returned immediately; neither cache contention nor APPEND can turn
+        // an accepted message into a send error (and an unsafe SMTP retry).
+        tokio::task::spawn_blocking(move || {
+            let contacts = (|| -> Result<(), String> {
+                let db = db.lock().map_err(|e| e.to_string())?;
+                init_mail_tables(&db).map_err(|e| e.to_string())?;
+                upsert_sent_contacts(&db, &account_id, &sent_request).map_err(|e| e.to_string())?;
+                Ok(())
+            })();
+            if let Err(error) = contacts {
+                tracing::warn!(%account_id, %error, "mail sent; contact cache update failed");
+            }
+            if let Some(pending) = pending {
+                let stored = outgoing::store_pending_copy(&pool, &account, pending, &handle);
+                let (folder, error) = match stored {
+                    Ok(folder) => (folder, None),
+                    Err(error) => (None, Some(error)),
+                };
+                if let Some(error) = &error {
+                    tracing::warn!(%account_id, %error, "mail sent; storing Sent copy failed");
+                }
+                if let Some(app) = app {
+                    let _ = app.emit(
+                        "mail-sent-copy",
+                        MailSentCopyEvent {
+                            account_id,
+                            folder,
+                            error,
+                        },
+                    );
+                }
+            }
+        });
     }
     Ok(result)
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MailSentCopyEvent {
+    account_id: String,
+    folder: Option<String>,
+    error: Option<String>,
 }
 
 #[tauri::command]
@@ -2339,7 +2503,10 @@ pub async fn mail_list_drafts(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailDraft>, String> {
-    with_mail_db(&state, &account_id, |db| list_mail_drafts(db, &account_id))
+    with_mail_db_async(&state, &account_id, |db, account_id| {
+        list_mail_drafts(db, account_id)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -2352,9 +2519,10 @@ pub async fn mail_save_draft(
     if account_id.is_empty() {
         return Err("mail account id is required".into());
     }
-    with_mail_db(&state, account_id, |db| {
+    with_mail_db_async(&state, account_id, move |db, account_id| {
         save_mail_draft(db, account_id, draft)
     })
+    .await
 }
 
 #[tauri::command]
@@ -2364,16 +2532,17 @@ pub async fn mail_delete_draft(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let account_id = account_id.trim();
-    let draft_id = draft_id.trim();
+    let draft_id = draft_id.trim().to_string();
     if account_id.is_empty() {
         return Err("mail account id is required".into());
     }
     if draft_id.is_empty() {
         return Err("mail draft id is required".into());
     }
-    with_mail_db(&state, account_id, |db| {
-        delete_mail_draft(db, account_id, draft_id)
+    with_mail_db_async(&state, account_id, move |db, account_id| {
+        delete_mail_draft(db, account_id, &draft_id)
     })
+    .await
 }
 
 #[tauri::command]
@@ -2381,9 +2550,15 @@ pub async fn mail_index_cached_contacts(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    with_mail_db(&state, &account_id, |db| {
-        reindex_cached_contacts(db, &account_id)
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
+        // Rebuilding once when opening a composer must be one transaction,
+        // not a durable SQLite commit for every address in the entire mailbox.
+        let tx = db.unchecked_transaction()?;
+        let count = reindex_cached_contacts(&tx, account_id)?;
+        tx.commit()?;
+        Ok(count)
     })
+    .await
 }
 
 #[tauri::command]
@@ -2394,12 +2569,13 @@ pub async fn mail_search_contacts(
     state: State<'_, AppState>,
 ) -> Result<Vec<MailContactSuggestion>, String> {
     let limit = limit.unwrap_or(8).clamp(1, 20);
-    with_mail_db(&state, &account_id, |db| {
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
         // Address book entries (TASK-19) first, then collected contacts.
         let book = contacts::address_book_suggestions(db, &account_id, &query, limit)?;
         let collected = search_contacts(db, &account_id, &query, limit)?;
         Ok(contacts::merge_suggestions(book, collected, limit))
     })
+    .await
 }
 
 #[tauri::command]
@@ -5404,6 +5580,46 @@ fn contact_email(address: &MailAddress) -> Option<String> {
     }
 }
 
+/// Sync plans normally contain only missing UIDs. Index their contacts once,
+/// instead of rebuilding all accounts' cached addresses after every page.
+/// Replayed/replaced rows request a rebuild so counts stay idempotent.
+fn cache_synced_messages(conn: &Connection, messages: &[MailMessageCached]) -> SqlResult<bool> {
+    let mut replaced = false;
+    let mut exists = conn.prepare_cached(
+        "SELECT EXISTS(SELECT 1 FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3)",
+    )?;
+    for message in messages {
+        let header = &message.header;
+        let known: bool = exists.query_row(
+            params![header.account_id, header.folder, header.uid],
+            |row| row.get(0),
+        )?;
+        upsert_message(conn, message)?;
+        if known {
+            replaced = true;
+        } else {
+            let mut seen = HashSet::new();
+            for address in header.from.iter().chain(&header.to).chain(&header.cc) {
+                let Some(email) = contact_email(address) else {
+                    continue;
+                };
+                if seen.insert(email) {
+                    upsert_contact(
+                        conn,
+                        &header.account_id,
+                        address,
+                        header.date_ts.unwrap_or_else(now_ts),
+                        1,
+                        0,
+                        1,
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(replaced)
+}
+
 fn clean_contact_name(address: &MailAddress) -> Option<String> {
     address
         .name
@@ -5493,6 +5709,9 @@ fn reindex_cached_contacts(conn: &Connection, account_id: &str) -> SqlResult<usi
         mapped.collect::<SqlResult<Vec<_>>>()?
     };
 
+    // One write per distinct address, even for a mailbox with tens of
+    // thousands of messages from the same senders/mailing lists.
+    let mut contacts: HashMap<String, (Option<String>, i64, i64, i64)> = HashMap::new();
     for (from, to, cc, date_ts) in rows {
         let seen_at = date_ts.unwrap_or_else(now_ts);
         let mut seen = HashSet::new();
@@ -5500,19 +5719,35 @@ fn reindex_cached_contacts(conn: &Connection, account_id: &str) -> SqlResult<usi
             let Some(email) = contact_email(&address) else {
                 continue;
             };
-            if !seen.insert(email) {
+            if !seen.insert(email.clone()) {
                 continue;
             }
-            upsert_contact(conn, account_id, &address, seen_at, 1, 0, 1)?;
+            let entry = contacts.entry(email).or_insert((None, seen_at, seen_at, 0));
+            if let Some(name) = clean_contact_name(&address) {
+                entry.0 = Some(name);
+            }
+            entry.1 = entry.1.min(seen_at);
+            entry.2 = entry.2.max(seen_at);
+            entry.3 += 1;
         }
     }
-
-    conn.query_row(
-        "SELECT COUNT(*) FROM mail_contacts WHERE account_id = ?1",
-        params![account_id],
-        |row| row.get::<_, i64>(0),
-    )
-    .map(|count| count as usize)
+    let mut insert = conn.prepare_cached(
+        "INSERT INTO mail_contacts
+         (account_id, email, name, first_seen_at, last_seen_at, message_count, sent_count, received_count, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?6, ?7)",
+    )?;
+    for (email, (name, first, last, count)) in &contacts {
+        insert.execute(params![
+            account_id,
+            email,
+            name,
+            first,
+            last,
+            count,
+            now_ts()
+        ])?;
+    }
+    Ok(contacts.len())
 }
 
 fn mailbox_to_contact(mailbox: Mailbox) -> MailAddress {
@@ -5749,10 +5984,10 @@ fn prune_mail_cache(
     account_id: &str,
     folder: &str,
     cache: &MailCacheSettings,
-) -> SqlResult<()> {
+) -> SqlResult<usize> {
     // POP3 mail exists only locally: never prune it (TASK-21).
     if pop3::has_local_store(conn, account_id)? {
-        return Ok(());
+        return Ok(0);
     }
     // Header pruning only ever cuts the low (oldest-UID) end so the cached span
     // stays contiguous; `sync::apply_prune_cut` moves the watermark with it.
@@ -5793,14 +6028,17 @@ fn prune_mail_cache(
             (a, b) => a.or(b),
         };
     }
-    if let Some(cut) = cut {
-        sync::apply_prune_cut(conn, account_id, folder, cut)?;
-    }
+    let pruned = if let Some(cut) = cut {
+        sync::apply_prune_cut(conn, account_id, folder, cut)?
+    } else {
+        0
+    };
     if cache.body_recent_limit == 0 {
         conn.execute(
             "UPDATE mail_messages
              SET body_text = NULL, body_html = NULL, body_cached_at = NULL
-             WHERE account_id = ?1 AND folder = ?2",
+             WHERE account_id = ?1 AND folder = ?2
+               AND (body_cached_at IS NOT NULL OR body_text IS NOT NULL OR body_html IS NOT NULL)",
             params![account_id, folder],
         )?;
     } else {
@@ -5808,6 +6046,7 @@ fn prune_mail_cache(
             "UPDATE mail_messages
              SET body_text = NULL, body_html = NULL, body_cached_at = NULL
              WHERE account_id = ?1 AND folder = ?2
+               AND (body_cached_at IS NOT NULL OR body_text IS NOT NULL OR body_html IS NOT NULL)
                AND rowid NOT IN (
                  SELECT rowid FROM mail_messages
                  WHERE account_id = ?1 AND folder = ?2 AND body_cached_at IS NOT NULL
@@ -5817,7 +6056,7 @@ fn prune_mail_cache(
             params![account_id, folder, cache.body_recent_limit],
         )?;
     }
-    Ok(())
+    Ok(pruned)
 }
 
 fn list_cached_folders(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailFolder>> {

@@ -20,9 +20,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     MailCacheSettings, MailFolder, MailMessageCached, MailMessageHeader, ResolvedMailAccount,
-    decode_imap_modified_utf7, fetch_flag_strings, imap_fetch_messages_for_uids,
-    imap_page_uids_newest_first, imap_unread_count, now_ts, prune_mail_cache,
-    reindex_cached_contacts, uid_set_string, upsert_folder, upsert_message,
+    cache_synced_messages, decode_imap_modified_utf7, fetch_flag_strings,
+    imap_fetch_messages_for_uids, imap_page_uids_newest_first, imap_unread_count, now_ts,
+    prune_mail_cache, reindex_cached_contacts, uid_set_string, upsert_folder,
 };
 
 /// Newest cached UIDs whose flags a quiet reconcile refreshes when the server
@@ -265,7 +265,7 @@ pub(super) fn apply_prune_cut(
     account_id: &str,
     folder: &str,
     cut: u32,
-) -> SqlResult<()> {
+) -> SqlResult<usize> {
     let deleted = conn.execute(
         "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid < ?3",
         params![account_id, folder, cut],
@@ -279,7 +279,7 @@ pub(super) fn apply_prune_cut(
          WHERE account_id = ?1 AND name = ?2 AND sync_high_uid IS NOT NULL",
         params![account_id, folder, cut, deleted as i64],
     )?;
-    Ok(())
+    Ok(deleted)
 }
 
 /// Record a per-folder sync failure so the UI can show it.
@@ -326,9 +326,7 @@ pub(super) fn apply_folder_step(
         reset_folder_cache(&tx, account_id, folder_name)?;
     }
     upsert_folder(&tx, &outcome.folder)?;
-    for message in &outcome.messages {
-        upsert_message(&tx, message)?;
-    }
+    let replaced = cache_synced_messages(&tx, &outcome.messages)?;
     if !outcome.vanished.is_empty() {
         let mut stmt = tx.prepare(
             "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
@@ -386,8 +384,8 @@ pub(super) fn apply_folder_step(
             can_lower as i64,
         ],
     )?;
-    prune_mail_cache(&tx, account_id, folder_name, cache)?;
-    if !outcome.messages.is_empty() || !outcome.vanished.is_empty() {
+    let pruned = prune_mail_cache(&tx, account_id, folder_name, cache)?;
+    if replaced || pruned > 0 || outcome.uid_validity_reset || !outcome.vanished.is_empty() {
         reindex_cached_contacts(&tx, account_id)?;
     }
     tx.commit()?;
@@ -1104,7 +1102,7 @@ mod tests {
     // -----------------------------------------------------------------
 
     use super::super::fake_imap::FakeImap;
-    use super::super::{MailAccountConfig, init_mail_tables};
+    use super::super::{MailAccountConfig, init_mail_tables, upsert_message};
 
     fn account(cache: serde_json::Value) -> ResolvedMailAccount {
         let config: MailAccountConfig = serde_json::from_value(serde_json::json!({

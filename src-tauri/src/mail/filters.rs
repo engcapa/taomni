@@ -709,7 +709,7 @@ async fn forward_message(
         }],
     }))
     .map_err(|e| format!("forward: {e}"))?;
-    let sent = super::mail_send_message(config.clone(), request, state.clone()).await;
+    let sent = super::send_message(config.clone(), request, None, state.clone()).await;
     let _ = std::fs::remove_file(&path);
     sent.map(|_| ())
 }

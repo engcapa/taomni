@@ -17,6 +17,7 @@ const mailMocks = vi.hoisted(() => ({
   mailDownloadAttachment: vi.fn(),
   mailFetchRaw: vi.fn(),
   mailGetMessageBody: vi.fn(),
+  mailPrefetchMessageBody: vi.fn(),
   mailIndexCachedContacts: vi.fn(),
   mailDeleteDraft: vi.fn(),
   mailDiscardRemoteDraft: vi.fn(),
@@ -254,6 +255,7 @@ describe("MailClientTab", () => {
     mailMocks.mailListCachedFolders.mockResolvedValue([folder]);
     mailMocks.mailListCachedMessages.mockResolvedValue([message]);
     mailMocks.mailGetMessageBody.mockResolvedValue(messageBody);
+    mailMocks.mailPrefetchMessageBody.mockResolvedValue(undefined);
     mailMocks.mailIndexCachedContacts.mockResolvedValue(undefined);
     mailMocks.mailListDrafts.mockResolvedValue([]);
     mailMocks.mailMarkRead.mockResolvedValue({ folder: "INBOX", marked: 0 });
@@ -414,8 +416,8 @@ describe("MailClientTab", () => {
   });
 
   it("syncs headers first and shows body warming as separate progress", async () => {
-    let resolveWarmBody!: (body: MailMessageBody) => void;
-    const warmBodyPromise = new Promise<MailMessageBody>((resolve) => {
+    let resolveWarmBody!: () => void;
+    const warmBodyPromise = new Promise<void>((resolve) => {
       resolveWarmBody = resolve;
     });
     mailMocks.mailListCachedMessages.mockReset();
@@ -423,10 +425,12 @@ describe("MailClientTab", () => {
       .mockResolvedValueOnce([message])
       .mockResolvedValueOnce([uncachedMessage])
       .mockResolvedValueOnce([uncachedMessage]);
-    mailMocks.mailGetMessageBody.mockImplementation((_config: MailTabInfo, _folder: string, uid: number) => {
-      if (uid === uncachedMessage.uid) return warmBodyPromise;
-      return Promise.resolve(messageBody);
-    });
+    mailMocks.mailPrefetchMessageBody.mockReturnValue(warmBodyPromise);
+    mailMocks.mailGetMessageBody.mockImplementation((_config: MailTabInfo, _folder: string, uid: number) =>
+      Promise.resolve(uid === uncachedMessage.uid ? {
+        ...messageBody, uid, messageId: uncachedMessage.messageId, subject: uncachedMessage.subject,
+        text: "Interactive body while warming is pending",
+      } : messageBody));
 
     renderMailbox();
 
@@ -440,14 +444,13 @@ describe("MailClientTab", () => {
     expect(await screen.findByText(/Header arrived before the body cache is warm/)).toBeInTheDocument();
     expect(await screen.findByTestId("mail-body-warming-progress")).toHaveTextContent("Bodies 0/1");
 
-    resolveWarmBody({
-      ...messageBody,
-      uid: uncachedMessage.uid,
-      messageId: uncachedMessage.messageId,
-      subject: uncachedMessage.subject,
-      snippet: uncachedMessage.snippet,
-      source: "remote",
-    });
+    expect(mailMocks.mailPrefetchMessageBody).toHaveBeenCalledWith(info, "INBOX", uncachedMessage.uid);
+    // Warming is still pending; opening that message must use the interactive
+    // path instead of waiting on the background promise or changing the reader.
+    fireEvent.click(screen.getByTestId("mail-message-row"));
+    expect(await screen.findByText("Interactive body while warming is pending")).toBeInTheDocument();
+    expect(screen.getByTestId("mail-body-warming-progress")).toHaveTextContent("Bodies 0/1");
+    resolveWarmBody();
 
     await waitFor(() => expect(screen.queryByTestId("mail-body-warming-progress")).not.toBeInTheDocument());
   });
@@ -938,6 +941,34 @@ describe("MailClientTab", () => {
     expect(request.inReplyTo).toBe("parent@x");
     expect(request.references).toEqual(["root@x"]);
     expect(await screen.findByText(/copy saved to Sent/)).toBeInTheDocument();
+  });
+
+  it("confirms SMTP acceptance before draft cleanup and reports asynchronous copy failures", async () => {
+    useDraftStore();
+    let finishCleanup!: () => void;
+    mailMocks.mailDeleteDraft.mockReturnValue(new Promise<void>((resolve) => { finishCleanup = resolve; }));
+    mailMocks.mailSendMessage.mockResolvedValue({ accepted: true, response: "accepted" });
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    await screen.findByTestId("mail-compose-dialog");
+    fireEvent.click(screen.getByTestId("mail-compose-save-draft"));
+    await waitFor(() => expect(mailMocks.mailSaveDraft).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("mail-compose-save-draft")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("mail-compose-send"));
+    expect(await screen.findByText("Message sent")).toBeInTheDocument();
+    expect(screen.queryByTestId("mail-compose-dialog")).not.toBeInTheDocument();
+    expect(mailMocks.mailDeleteDraft).toHaveBeenCalledWith(info.sessionId, "d1");
+    act(() => eventMocks.handlers.get("mail-sent-copy")?.({
+      payload: { accountId: "another-account", error: "unrelated failure" },
+    }));
+    expect(screen.queryByText(/unrelated failure/)).not.toBeInTheDocument();
+    act(() => eventMocks.handlers.get("mail-sent-copy")?.({
+      payload: { accountId: info.sessionId, error: "Sent folder unavailable" },
+    }));
+    expect(screen.getByText("Message sent, but saving the Sent copy failed: Sent folder unavailable")).toBeInTheDocument();
+    expect(mailMocks.mailSendMessage).toHaveBeenCalledTimes(1);
+    finishCleanup();
   });
 
   it("searches the whole local index and the server (AC-25/AC-26)", async () => {

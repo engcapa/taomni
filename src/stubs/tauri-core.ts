@@ -4317,6 +4317,8 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         invokeArgs?.subscribed === true,
       ) as T;
     }
+    case "mail_prefetch_message_body":
+      return undefined as T;
     case "mail_get_message_body": {
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);

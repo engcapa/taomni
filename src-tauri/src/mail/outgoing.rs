@@ -248,36 +248,28 @@ fn set_remote_draft_location(
     Ok(())
 }
 
-/// SMTP send, then (best effort, never failing the send) store the Sent copy
-/// and remove the draft's server copy.
-pub(super) fn send_and_store_copy(
-    pool: &MailImapPool,
+pub(super) struct PendingSentCopy {
+    copy: Option<Vec<u8>>,
+    remote_draft: Option<RemoteDraftLocation>,
+}
+
+/// Prepare local MIME before SMTP; once SMTP accepts, only the independent
+/// copy task may fail. Such a failure must never cause the caller to resend.
+pub(super) fn send_with_pending_copy(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
     remote_draft: Option<RemoteDraftLocation>,
     runtime: &tokio::runtime::Handle,
-) -> Result<MailSendResult, String> {
+) -> Result<(MailSendResult, Option<PendingSentCopy>), String> {
     let message_id = new_message_id(&account.config.email_address);
-    let mut result = send_smtp_with(
-        account,
-        request,
-        runtime,
-        &MessageBuildOptions {
-            message_id: Some(message_id.clone()),
-            ..MessageBuildOptions::default()
-        },
-    )?;
     let save_copy = save_sent_copy_enabled(&account.config);
-    if !save_copy && remote_draft.is_none() {
-        return Ok(result);
-    }
     let copy = if save_copy {
         Some(
             build_send_message_with(
                 account,
                 request,
                 &MessageBuildOptions {
-                    message_id: Some(message_id),
+                    message_id: Some(message_id.clone()),
                     keep_bcc: true,
                     self_envelope: false,
                 },
@@ -287,31 +279,47 @@ pub(super) fn send_and_store_copy(
     } else {
         None
     };
-    let stored = with_imap_session(pool, account, runtime, ImapSessionOpts::default(), |imap| {
+    let result = send_smtp_with(
+        account,
+        request,
+        runtime,
+        &MessageBuildOptions {
+            message_id: Some(message_id),
+            ..MessageBuildOptions::default()
+        },
+    )?;
+    let pending = (copy.is_some() || remote_draft.is_some())
+        .then_some(PendingSentCopy { copy, remote_draft });
+    Ok((result, pending))
+}
+
+pub(super) fn store_pending_copy(
+    pool: &MailImapPool,
+    account: &ResolvedMailAccount,
+    pending: PendingSentCopy,
+    runtime: &tokio::runtime::Handle,
+) -> Result<Option<String>, String> {
+    // APPEND is not idempotent: a lost response must not duplicate the copy.
+    let opts = ImapSessionOpts {
+        retry_on_error: false,
+        ..ImapSessionOpts::default()
+    };
+    with_imap_session(pool, account, runtime, opts, |imap| {
         let mut sent_folder = None;
-        if let Some(bytes) = &copy {
+        if let Some(bytes) = &pending.copy {
             let folder = imap
                 .special_folder(&account.config, SpecialFolder::Sent, true)?
                 .ok_or_else(|| "no Sent folder".to_string())?;
             imap.append(&folder, bytes, &["\\Seen"])?;
             sent_folder = Some(folder);
         }
-        if let Some(draft) = &remote_draft {
+        if let Some(draft) = &pending.remote_draft {
             if let Err(e) = imap.delete_messages(&draft.folder, &[draft.uid], false) {
                 tracing::debug!("mail: removing server draft after send failed: {e}");
             }
         }
         Ok(sent_folder)
-    });
-    match stored {
-        Ok(folder) => result.sent_copy_folder = folder,
-        Err(e) => {
-            if save_copy {
-                result.sent_copy_error = Some(e);
-            }
-        }
-    }
-    Ok(result)
+    })
 }
 
 fn draft_send_request(draft: &MailDraft) -> MailSendRequest {

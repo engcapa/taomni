@@ -548,6 +548,11 @@ export function mailGetMessageBody(
   );
 }
 
+/** Populate the native disk cache without returning a body to the renderer. */
+export function mailPrefetchMessageBody(config: MailTabInfo, folder: string, uid: number): Promise<void> {
+  return invoke<void>("mail_prefetch_message_body", { config, folder, uid });
+}
+
 export function mailMarkRead(
   config: MailTabInfo,
   folder: string,
