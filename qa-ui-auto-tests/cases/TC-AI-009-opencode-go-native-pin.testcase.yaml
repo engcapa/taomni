@@ -4,7 +4,9 @@ description: Native only because model writes/readback cross Tauri IPC and SQLit
   Before execution use isolated configuration and block catalog hosts as described
   in native/opencode-go-provider.md so the bundled snapshot is deterministic.
   Renderer reload is not process restart; N-GO-03 separately tests cold restart.
-  No key needed, no messages sent. Authored, unrun.
+  Opening tab chat creates the fresh thread after reset_db; wait for its Go
+  picker after switching providers before pinning the model. No key needed,
+  no messages sent.
 covers: [F-AI-2.4]
 tags: [ai, opencode-go, p1]
 modes: [native]
@@ -21,7 +23,6 @@ steps:
 - select_option:
     selector: '[data-testid="ai-chat-provider-select"]'
     value: opencode-go
-- click: '[data-testid="ai-chat-drawer"] button[title="New chat"]'
 - wait_for: '[data-testid="go-thread-model-select"]'
 - select_option:
     selector: '[data-testid="go-thread-model-select"]'
@@ -56,14 +57,14 @@ verification:
   requirements:
   - id: R1
     requirement: Real IPC writes llm_model; renderer reload reads it back, and explicit clear is available.
-    actions: [3, 5, 7, 8, 10, 14, 17, 20, 22]
+    actions: [3, 5, 7, 9, 13, 16, 19, 21]
     checkpoints:
-    - {step: 12, expectation: Pin is selected after IPC save.}
-    - {step: 21, expectation: SQLite-backed pin is read after renderer reload.}
-    - {step: 24, expectation: Explicit clear restores inherited selection.}
-    results: [12, 21, 24]
+    - {step: 11, expectation: Pin is selected after IPC save.}
+    - {step: 20, expectation: SQLite-backed pin is read after renderer reload.}
+    - {step: 23, expectation: Explicit clear restores inherited selection.}
+    results: [11, 20, 23]
   visual:
-  - {check: Native select keyboard/focus behavior., method: manual, reason: WebKitGTK/WebView2/WKWebView checks are unrun.}
+  - {check: Native select keyboard/focus behavior., method: manual, reason: DOM selection does not establish OS keyboard/focus behavior.}
   native:
-  - {check: Tauri IPC and SQLite readback., method: automated, reason: This native case is authored but has not been executed.}
+  - {check: Tauri IPC and SQLite readback., method: automated, reason: The steps save the pin and read it back after renderer reload.}
   - {check: Cold restart and independent thread pins., method: manual, reason: N-GO-03 covers process restart unsupported by the selected runner verbs.}
