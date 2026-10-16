@@ -3962,7 +3962,7 @@ export function MainLayout() {
         icon: <Bot />,
         active: chatDrawerOpen && activeTabId === railTab.id,
         testId: "tab-chat-toggle",
-        onSelect: () => void toggleTabChat(railTab.id),
+        onSelect: () => void toggleTabChat(chatBindingIdForTab(railTab) ?? railTab.id),
       });
     }
   }
@@ -4379,7 +4379,7 @@ export function MainLayout() {
                             } : undefined}
                             chatToggle={!aiFullyDisabled && !(terminalRailMerged && isActive) ? {
                               open: chatDrawerOpen && activeTabId === tab.id,
-                              onToggle: () => void toggleTabChat(tab.id),
+                              onToggle: () => void toggleTabChat(chatBindingIdForTab(tab) ?? tab.id),
                             } : undefined}
                             sftpToggle={!terminalSplitVisible && tab.ssh && !(terminalRailMerged && isActive) ? {
                               open: sidebarOpen,
