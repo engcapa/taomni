@@ -400,7 +400,15 @@ export function ScreenshotOverlay() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(null);
   const canvasRef = useRef<AnnotationCanvasHandle | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const pendingShapes = useRef<Shape[] | null>(null);
+  // The backend focuses the native window once it is mapped; give the document
+  // focus too, so key handlers run even when the window is focused without a
+  // focused element (otherwise the first click has to do it).
+  useEffect(() => {
+    window.focus();
+    rootRef.current?.focus({ preventScroll: true });
+  }, []);
   useLayoutEffect(() => {
     if (pendingShapes.current && canvasRef.current) {
       canvasRef.current.restore(pendingShapes.current);
@@ -1423,10 +1431,12 @@ export function ScreenshotOverlay() {
 
   return (
     <div
+      ref={rootRef}
+      tabIndex={-1}
       data-testid="screenshot-overlay"
       data-phase={phase}
       data-selection-mode={selectionMode}
-      className="fixed inset-0 overflow-hidden select-none"
+      className="fixed inset-0 overflow-hidden select-none outline-none"
       style={{ background: "#000000" }}
     >
       {!scrollResult && img && imgUrl && (

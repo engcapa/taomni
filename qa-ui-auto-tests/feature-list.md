@@ -10719,6 +10719,7 @@ files:
   - src/components/screenshot/ScrollCaptureResult.tsx
   - src/components/screenshot/ScreenshotMenuButton.tsx
   - src-tauri/src/screenshot/surfaces.rs
+  - src-tauri/src/screenshot/surface_backend.rs
   - src/lib/screenshotShortcut.ts
   - src/App.tsx
   - src/lib/screenshot.ts

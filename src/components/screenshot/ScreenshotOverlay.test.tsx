@@ -110,6 +110,22 @@ describe("ScreenshotOverlay", () => {
     expect(api.switchScreenshotDisplay).toHaveBeenCalledExactlyOnceWith("-2048,0");
     expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
   });
+  it("closes with a single Escape before any region is selected", async () => {
+    await open();
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce();
+  });
+
+  it("closes with Escape after a pointer-down that never became a region", async () => {
+    // Starting a drag must not swallow Escape: with no region there is nothing
+    // to clear, so the screenshot has to exit instead of resetting silently.
+    await open();
+    fireEvent.mouseDown(screen.getByTestId("screenshot-select-layer"), { button: 0, clientX: 20, clientY: 20 });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce();
+  });
+
   it("resets selection with Escape after leaving an empty tool while more tools are expanded", async () => {
     await open();
     fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
