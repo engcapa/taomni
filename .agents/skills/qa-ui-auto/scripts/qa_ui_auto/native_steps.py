@@ -3317,3 +3317,14 @@ def _do_mail_performance_probe(ctx: NativeStepContext, args: Any) -> str:
 def _do_mail_multi_instance_probe(ctx: NativeStepContext, args: Any) -> str:
     from .mail_multi_instance import run
     return run(ctx, args)
+
+
+@_verb("mail_server_delay_next_read")
+def _do_mail_server_delay_next_read(ctx: NativeStepContext, args: Any) -> str:
+    milliseconds = (args or {}).get("milliseconds", 0)
+    if not isinstance(milliseconds, int) or not 1 <= milliseconds <= 25000:
+        raise StepError("mail_server_delay_next_read: milliseconds must be 1..25000")
+    state = _mail_server().state
+    with state.lock:
+        state.next_seen_store_delay = milliseconds / 1000
+    return f"next Seen STORE response delayed {milliseconds} ms"

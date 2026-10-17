@@ -1268,6 +1268,11 @@
             }
           }
         },
+        "mail_server_delay_next_read": {
+          "type": "object", "additionalProperties": false,
+          "required": ["milliseconds"],
+          "properties": {"milliseconds": {"type": "integer", "minimum": 1, "maximum": 25000}}
+        },
         "mail_server_deliver": {
           "type": "object",
           "additionalProperties": false,

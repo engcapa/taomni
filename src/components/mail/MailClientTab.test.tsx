@@ -1594,6 +1594,38 @@ describe("MailClientTab", () => {
     expect(screen.getByTestId("mail-delete-selected")).toBeDisabled();
   });
 
+  it("allows deleting a new selection while a folder read is pending", async () => {
+    let finishRead!: (value: { folder: string; marked: number }) => void;
+    mailMocks.mailMarkRead.mockImplementation(() => new Promise((resolve) => { finishRead = resolve; }));
+    mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }, { ...folder, name: "Trash", flags: ["\\Trash"] }]);
+    mailMocks.mailMoveMessages.mockResolvedValue({ count: 1 });
+    renderMailbox();
+    await screen.findByTestId("mail-message-row");
+    fireEvent.click(screen.getByTestId("mail-mark-folder-read"));
+    await waitFor(() => expect(mailMocks.mailMarkRead).toHaveBeenCalledWith(info, "INBOX", [], true));
+    fireEvent.click(within(screen.getByTestId("mail-message-row")).getByRole("checkbox"));
+    expect(screen.getByTestId("mail-delete-selected")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    await waitFor(() => expect(mailMocks.mailMoveMessages).toHaveBeenCalledWith(info, "INBOX", [101], "Trash"));
+    mailMocks.mailListCachedMessages.mockResolvedValue([]);
+    await act(async () => finishRead({ folder: "INBOX", marked: 1 }));
+    await waitFor(() => expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument());
+  });
+
+  it("keeps a user's selection when a folder read finishes", async () => {
+    let finishRead!: (value: { folder: string; marked: number }) => void;
+    mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }]);
+    mailMocks.mailMarkRead.mockImplementation(() => new Promise((resolve) => { finishRead = resolve; }));
+    renderMailbox();
+    await screen.findByTestId("mail-message-row");
+    fireEvent.click(screen.getByTestId("mail-mark-folder-read"));
+    await waitFor(() => expect(mailMocks.mailMarkRead).toHaveBeenCalled());
+    fireEvent.click(within(screen.getByTestId("mail-message-row")).getByRole("checkbox"));
+    await act(async () => finishRead({ folder: "INBOX", marked: 1 }));
+    await waitFor(() => expect(screen.getByTestId("mail-mark-folder-read")).toBeEnabled());
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("1 selected");
+  });
+
   it("supports checkbox ranges and list-only select-all without stealing search input", async () => {
     mailMocks.mailListCachedMessages.mockResolvedValue(Array.from({ length: 4 }, (_, index) => ({
       ...message, uid: 101 + index, subject: `Select range ${index}`, dateTs: (message.dateTs ?? 0) - index,

@@ -108,6 +108,52 @@ steps:
     selector: '[data-testid="mail-message-row"]'
     equal: 0
 - screenshot: mail-bulk-01-deleted.png
+- mail_server_deliver:
+    count: 6
+    prefix: Concurrent read
+- click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 30
+    unread: true
+- mail_server_delay_next_read:
+    milliseconds: 20000
+- click: '[data-testid="mail-mark-folder-read"]'
+- assert_attribute:
+    selector: '[data-testid="mail-mark-folder-read"]'
+    name: aria-busy
+    equals: 'true'
+- click:
+    selector: '[data-testid="mail-message-row"]:nth-child(1)'
+    modifiers:
+    - Mod
+- click:
+    selector: '[data-testid="mail-message-row"]:nth-child(3)'
+    modifiers:
+    - Shift
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 3 selected
+- assert_enabled: '[data-testid="mail-delete-selected"]'
+- assert_attribute:
+    selector: '[data-testid="mail-mark-folder-read"]'
+    name: aria-busy
+    equals: 'true'
+- screenshot: mail-bulk-pending-read-delete.png
+- click: '[data-testid="mail-delete-selected"]'
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 3
+    timeout_sec: 40
+- mail_server_assert_folder_count:
+    folder: INBOX
+    equals: 30
+- mail_server_assert_list_matches:
+    timeout_sec: 40
+    unread: true
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 0 selected
 verification:
   review: reviewed
   requirements:
@@ -176,6 +222,52 @@ verification:
     - 34
     - 37
     - 39
+  - id: R4
+    requirement: A pending folder-read operation must allow deleting a new selection, move exactly those
+      three messages and retain all remaining mail.
+    actions:
+    - 41
+    - 42
+    - 43
+    - 45
+    - 46
+    - 48
+    - 49
+    - 54
+    checkpoints:
+    - step: 44
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 30, ''unread'': True}}'
+    - step: 47
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-mark-folder-read"]'', ''name'':
+        ''aria-busy'', ''equals'': ''true''}}'
+    - step: 50
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
+        ''3 selected''}}'
+    - step: 51
+      expectation: '{''assert_enabled'': ''[data-testid="mail-delete-selected"]''}'
+    - step: 52
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-mark-folder-read"]'', ''name'':
+        ''aria-busy'', ''equals'': ''true''}}'
+    - step: 55
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 3, ''timeout_sec'':
+        40}}'
+    - step: 56
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 30}}'
+    - step: 57
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 40, ''unread'': True}}'
+    - step: 58
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
+        ''0 selected''}}'
+    results:
+    - 44
+    - 47
+    - 50
+    - 51
+    - 52
+    - 55
+    - 56
+    - 57
+    - 58
   visual:
   - check: Selected rows, selection count and Delete selected button are visible without clipping.
     method: manual

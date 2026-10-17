@@ -121,6 +121,7 @@ class FakeMailState:
         # CalDAV resources: href -> (etag, iCalendar text).
         self.caldav: dict[str, tuple[str, str]] = {}
         self.caldav_etag = 0
+        self.next_seen_store_delay = 0.0
         self.fetch_active = 0
         self.fetch_max_parallel = 0
         self.fetch_events: list[dict] = []
@@ -561,6 +562,12 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                         event["finished"] = time.monotonic()
                         state.fetch_events.append(event)
             else:
+                if upper.startswith("UID STORE") and "\\SEEN" in upper and "+FLAGS" in upper:
+                    with state.lock:
+                        delay = state.next_seen_store_delay
+                        state.next_seen_store_delay = 0.0
+                    # Delay the response without blocking other server connections.
+                    time.sleep(delay)
                 self.send(b"".join(out) + ok.encode())
 
     def _idle(self, waiter: threading.Event, tag: str) -> None:

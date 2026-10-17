@@ -137,6 +137,7 @@ import {
 } from "../../lib/mailCalendar";
 import { emptyAddressBookEntry, type MailAddressBookEntry } from "../../lib/mailContacts";
 import {
+  folderLabel,
   isSelectable,
   isSubscribed,
   loadSubscribedOnly,
@@ -640,57 +641,6 @@ function addressLabel(address: MailAddress | null | undefined): string {
   const mail = address.address?.trim();
   if (name && mail) return `${name} <${mail}>`;
   return name || mail || "";
-}
-
-function decodeImapModifiedUtf7(value: string): string {
-  let out = "";
-  let index = 0;
-  while (index < value.length) {
-    if (value[index] !== "&") {
-      out += value[index];
-      index += 1;
-      continue;
-    }
-    const end = value.indexOf("-", index + 1);
-    if (end === -1) {
-      out += value.slice(index);
-      break;
-    }
-    const encoded = value.slice(index + 1, end);
-    if (!encoded) {
-      out += "&";
-      index = end + 1;
-      continue;
-    }
-    const decoded = decodeImapModifiedUtf7Segment(encoded);
-    out += decoded ?? value.slice(index, end + 1);
-    index = end + 1;
-  }
-  return out;
-}
-
-function decodeImapModifiedUtf7Segment(encoded: string): string | null {
-  if (typeof atob === "undefined") return null;
-  try {
-    let b64 = encoded.replace(/,/g, "/");
-    while (b64.length % 4 !== 0) b64 += "=";
-    const binary = atob(b64);
-    if (binary.length % 2 !== 0) return null;
-    let result = "";
-    for (let i = 0; i < binary.length; i += 2) {
-      result += String.fromCharCode((binary.charCodeAt(i) << 8) | binary.charCodeAt(i + 1));
-    }
-    return result;
-  } catch {
-    return null;
-  }
-}
-
-function folderLabel(folder: MailFolder): string {
-  const displayName = folder.displayName?.trim();
-  if (displayName) return displayName;
-  const name = folder.name || "INBOX";
-  return decodeImapModifiedUtf7(name) || name;
 }
 
 function folderDepth(folder: MailFolder): number {
@@ -2711,7 +2661,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       if (selectedFolderRef.current === folderName) {
         await loadCachedMessages(folderName, 0, false, true, messagesRef.current.length);
       }
-      setCheckedMessageKeys(new Set());
+      // Read flags do not change the user’s selection, including selections made
+      // while this potentially long folder operation was running.
       setStatus(result.marked > 0 ? `Marked ${result.marked} messages as read` : "Folder is already read");
     } catch (e) {
       // Completed batches are committed even if a later STORE fails.
@@ -5431,6 +5382,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
           onClick={() => void handleMarkFolderRead()}
           disabled={markingRead || Math.max(activeFolder?.unread ?? 0, visibleUnreadCount) === 0}
+          aria-busy={markingRead}
           data-testid="mail-mark-folder-read"
           title="Mark all messages in this folder as read"
         >
@@ -5911,7 +5863,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   type="button"
                   className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
                   data-testid="mail-delete-selected"
-                  disabled={busyAction || markingRead || checkedMessages.length === 0}
+                  disabled={busyAction || checkedMessages.length === 0}
                   onClick={() => void handleDeleteMessages(checkedMessages)}
                   title="Delete selected messages; use checkboxes, Ctrl/Cmd-click or Shift-click to select"
                 >

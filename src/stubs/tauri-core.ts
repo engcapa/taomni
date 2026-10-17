@@ -4361,7 +4361,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
       const all = Boolean(invokeArgs?.all);
-      return stubMailMarkRead(stubMailAccountId(invokeArgs), mailStubSeed, folder, uids, all) as T;
+      return await stubMailMarkRead(stubMailAccountId(invokeArgs), mailStubSeed, folder, uids, all) as T;
     }
     case "mail_send_message": {
       const invokeArgs = args as InvokeArgs | undefined;

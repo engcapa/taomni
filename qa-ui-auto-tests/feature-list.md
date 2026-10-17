@@ -6376,7 +6376,7 @@ controls:
 -->
 
 - Thunderbird 风格快捷键（列表焦点下，输入框/编辑器内不生效）：F/B 下一封/上一封，N 下一封未读，R 回复，Shift+R 或 Ctrl/Cmd+Shift+R 全部回复，Ctrl/Cmd+L 转发，M 切换已读，S 星标，A 归档，J/Shift+J 垃圾/非垃圾，Del 删除，Ctrl/Cmd+Shift+K 聚焦搜索。Ctrl+Shift+L（聊天）与 Ctrl+Shift+S（服务器）保持全局含义。
-- 列表支持复选框、Ctrl/Cmd 点击、Shift 范围选择；普通点击或键盘导航选择单封，可继续追加选择。列表内 Ctrl/Cmd+A 选择已显示的行，Escape 清空选择。独立工具条显示选中数量和 Delete selected，普通删除移入 Trash，永久删除须确认。批量请求按 250 封分批，成功批次立即更新界面；跨文件夹或未加载页面的搜索结果同样参与批量操作。
+- 列表支持复选框、Ctrl/Cmd 点击、Shift 范围选择；普通点击或键盘导航选择单封，可继续追加选择。列表内 Ctrl/Cmd+A 选择已显示的行，Escape 清空选择。独立工具条显示选中数量和 Delete selected，普通删除移入 Trash，永久删除须确认。标记整文件夹已读进行中仍可删除新选择，已读完成保留当前选择。批量请求按 250 封分批，成功批次立即更新界面；跨文件夹或未加载页面的搜索结果同样参与批量操作。
 - 邮件行可拖到文件夹树：默认移动，按住 Ctrl（macOS 为 Option）复制；勾选多封时拖动全部勾选项。
 - 长列表的行使用 `content-visibility: auto`，屏幕外的行跳过布局和绘制，同时保留在 DOM 中（查找、无障碍与选择不受影响）；未引入虚拟列表依赖。
 
@@ -7038,6 +7038,7 @@ files:
   - src/components/session/SessionEditor.tsx
   - src/components/mail/MailClientTab.tsx
   - src/lib/mail.ts
+  - src/lib/mailFolders.ts
   - src/stubs/mailArchiveStub.ts
   - src-tauri/src/mail/storage.rs
   - src-tauri/src/mail/archive.rs
@@ -7136,6 +7137,7 @@ controls:
 - 每会话可设置目录；默认仍为应用 mail-cache。完整原件按封 gzip 压缩，包含 MIME 正文、内联资源及附件，SHA-256 校验和去重。
 - IMAP 全部/仅选中/排除文件夹均保留其它文件夹的摘要。后台暂停保留可续传片段，普通删除/远端消失保留归档，主动清理才物理删除最后引用。
 - 本地归档独立于实时邮件列表，可以读取/导出服务器已消失的邮件。POP3 原始本地库保持兼容并保留压缩归档。
+- 文件夹候选只来自当前账号的本地同步缓存，离线仍可用；首次连接前为空并显示提示。复选框显示解码名称，保存完整的服务器原始键；切换账号丢弃旧候选和迟到回复。
 - `TC-MAIL-STORAGE-01` 为 browser；`TC-MAIL-STORAGE-02` 为 Linux/Windows/macOS native，分别验证 UI 和独立磁盘/备份字节。`TC-MAIL-PERF-01/02` 覆盖大量邮件、多个会话和终端并发；`TC-MAIL-PERF-03` 用两个真实 QA 进程共享邮箱目录，检查下载互斥、暂停、迁移和清理。用户已授权 Linux 本机执行，Windows/macOS 本轮只编写；具体运行证据及未验证边界见 `docs-feature/mail-complete-storage-design.md`。
 
 
