@@ -5977,11 +5977,16 @@ controls:
     selector: '[data-testid="mail-body-warming-progress"]'
     kind: display
     optional: true       # only visible while recent uncached bodies are warming
+  - id: mark-folder-read
+    selector: '[data-testid="mail-mark-folder-read"]'
+    kind: interactive
 -->
 
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
 - 最近正文缓存按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_prefetch_message_body` 写入原生磁盘缓存，并用独立进度显示；预取不向前端传输或渲染正文，手动打开邮件使用独立于同步的 IMAP 连接。
 - 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
+- 整个 IMAP 文件夹标记已读先查询服务器 UNSEEN，涵盖未下载历史；每批最多 250 个 UID，批间释放账号连接锁，网络断连只重试幂等标记。
+- 标记、移动、删除的 SQLite 写入使用后台线程中的批量事务；本地搜索也在后台线程执行。
 - 同步缓存与联系人索引的数据库工作在阻塞线程池执行；新增历史邮件增量收集联系人，正文清理仅更新实际有正文的记录。
 - SMTP 接受后立即显示发送成功并关闭写信窗口；已发送副本由后台保存，通过 `mail-sent-copy` 事件单独提示保存成功或失败。TC-116 覆盖刷新后的阅读/回复，原生并发边界由 `mail::responsiveness_tests` 与隔离 QA 探针验证。
 
@@ -6104,10 +6109,14 @@ controls:
     selector: '[data-testid="mail-save-sent-copy"]'
     kind: interactive
     optional: true       # session editor mail settings; default automatic by provider
+  - id: sent-copy-status
+    selector: '[data-testid="mail-sent-copy-status"]'
+    kind: display
 -->
 
 - 回复/全部回复发送 `In-Reply-To` 与 `References`（转发开启新会话），Thunderbird/Gmail 可将回复归入原会话；同步时缓存每封邮件的 `In-Reply-To`/`References`（schema v3）。
 - 列表“Threads”切换按邮件头严格线程化（不按主题猜测），会话折叠为最新一封并显示数量与未读数，展开后按回复层级缩进；开关按查看者保存在 localStorage。
+- SMTP 接受后立即反馈，Sent 副本结果通过独立提示显示；事件先于发送响应到达、或随后刷新邮箱，都不会覆盖副本结果。
 - 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
 - 手工保存草稿会把草稿 APPEND 到服务器 Drafts（`\Draft \Seen`，按 Message-ID 找回 UID 并替换旧副本）；发送或删除草稿时移除服务器副本；自动保存仍只写本地。
 
@@ -6343,9 +6352,19 @@ controls:
   - id: folder-drop-target
     selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
     kind: interactive
+  - id: delete-selected
+    selector: '[data-testid="mail-delete-selected"]'
+    kind: interactive
+  - id: selection-count
+    selector: '[data-testid="mail-selection-count"]'
+    kind: display
+  - id: select-all-visible
+    selector: '[aria-label="Select all visible messages"]'
+    kind: interactive
 -->
 
 - Thunderbird 风格快捷键（列表焦点下，输入框/编辑器内不生效）：F/B 下一封/上一封，N 下一封未读，R 回复，Shift+R 或 Ctrl/Cmd+Shift+R 全部回复，Ctrl/Cmd+L 转发，M 切换已读，S 星标，A 归档，J/Shift+J 垃圾/非垃圾，Del 删除，Ctrl/Cmd+Shift+K 聚焦搜索。Ctrl+Shift+L（聊天）与 Ctrl+Shift+S（服务器）保持全局含义。
+- 列表支持复选框、Ctrl/Cmd 点击、Shift 范围选择；普通点击或键盘导航选择单封，可继续追加选择。列表内 Ctrl/Cmd+A 选择已显示的行，Escape 清空选择。独立工具条显示选中数量和 Delete selected，普通删除移入 Trash，永久删除须确认。批量请求按 250 封分批，成功批次立即更新界面；跨文件夹或未加载页面的搜索结果同样参与批量操作。
 - 邮件行可拖到文件夹树：默认移动，按住 Ctrl（macOS 为 Option）复制；勾选多封时拖动全部勾选项。
 - 长列表的行使用 `content-visibility: auto`，屏幕外的行跳过布局和绘制，同时保留在 DOM 中（查找、无障碍与选择不受影响）；未引入虚拟列表依赖。
 

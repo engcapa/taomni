@@ -372,6 +372,15 @@ export function stubMailCachedHeaders(accountId: string, seed: Seed, folderName:
   return [...folderState(account(accountId, seed), folderName).cache.values()];
 }
 
+export function stubMailMarkRead(accountId: string, seed: Seed, folder: string, uids: number[], all: boolean) {
+  const entry = account(accountId, seed).folders.get(folder);
+  const targets = all
+    ? [...(entry?.server.values() ?? [])].filter((message) => !message.flags.includes("\\Seen")).map((message) => message.uid)
+    : uids;
+  stubMailUpdateCachedFlags(accountId, folder, targets, ["\\Seen"], []);
+  return { folder, marked: targets.length, unread: all ? 0 : undefined };
+}
+
 export function stubMailUpdateCachedFlags(accountId: string, folder: string, uids: number[], add: string[], remove: string[]) {
   const state = accounts.get(accountId);
   const entry = state?.folders.get(folder);

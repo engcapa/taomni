@@ -55,6 +55,7 @@ pub mod mbox;
 pub mod outgoing;
 mod parts;
 mod pop3;
+mod read_actions;
 pub mod receipts;
 #[cfg(test)]
 mod responsiveness_tests;
@@ -604,6 +605,8 @@ pub struct MailFolderError {
 pub struct MailMarkReadResult {
     pub folder: String,
     pub marked: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unread: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -939,6 +942,13 @@ impl ActiveImapSession {
         match self {
             Self::Tls { session, .. } => imap_mark_read(session, folder, uids),
             Self::Plain { session, .. } => imap_mark_read(session, folder, uids),
+        }
+    }
+
+    fn unread_uids(&mut self, folder: &str) -> Result<Vec<u32>, String> {
+        match self {
+            Self::Tls { session, .. } => read_actions::unread_uids(session, folder),
+            Self::Plain { session, .. } => read_actions::unread_uids(session, folder),
         }
     }
 
@@ -2599,43 +2609,23 @@ pub async fn mail_mark_read(
     if folder.is_empty() {
         return Err("mail folder is required".into());
     }
-    let account_id = config.session_id.clone();
-    let target_uids = if all.unwrap_or(false) {
-        with_mail_db(&state, &account_id, |db| {
-            unread_cached_uids(db, &account_id, &folder)
-        })?
-    } else {
-        uids.unwrap_or_default()
-            .into_iter()
-            .filter(|uid| *uid > 0)
-            .collect::<Vec<_>>()
-    };
-    if target_uids.is_empty() {
-        return Ok(MailMarkReadResult { folder, marked: 0 });
-    }
-
     let account = resolve_config(&state, config)?;
-    let marked = target_uids.len();
-    let folder_for_task = folder.clone();
-    let uids_for_task = target_uids.clone();
+    let db = state.mail_db(&account.config.session_id)?;
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        with_imap_session(
+        read_actions::mark_read_cached(
             &pool,
             &account,
             &handle,
-            ImapSessionOpts::default(),
-            |imap| imap.mark_read(&folder_for_task, &uids_for_task),
+            &db,
+            &folder,
+            uids.unwrap_or_default(),
+            all.unwrap_or(false),
         )
     })
     .await
-    .map_err(|e| format!("mail mark read task failed: {e}"))??;
-
-    with_mail_db(&state, &account_id, |db| {
-        mark_cached_messages_read(db, &account_id, &folder, &target_uids)
-    })?;
-    Ok(MailMarkReadResult { folder, marked })
+    .map_err(|e| format!("mail mark read task failed: {e}"))?
 }
 
 #[tauri::command]
@@ -2719,13 +2709,15 @@ pub async fn mail_set_flags(
     .await
     .map_err(|e| format!("mail set flags task failed: {e}"))??;
 
-    with_mail_db(&state, &account_id, |db| {
-        update_cached_flags(db, &account_id, &folder, &target_uids, &add, &remove)
-    })?;
-    Ok(MailFlagResult {
-        folder,
-        updated: target_uids.len(),
+    let updated = target_uids.len();
+    let cached_folder = folder.clone();
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
+        let tx = db.unchecked_transaction()?;
+        update_cached_flags(&tx, account_id, &cached_folder, &target_uids, &add, &remove)?;
+        tx.commit()
     })
+    .await?;
+    Ok(MailFlagResult { folder, updated })
 }
 
 #[tauri::command]
@@ -2782,13 +2774,18 @@ pub async fn mail_move_messages(
     .await
     .map_err(|e| format!("mail move task failed: {e}"))??;
 
-    with_mail_db(&state, &account_id, |db| {
-        remove_cached_messages(db, &account_id, &folder, &target_uids)
-    })?;
+    let count = target_uids.len();
+    let cached_folder = folder.clone();
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
+        let tx = db.unchecked_transaction()?;
+        remove_cached_messages(&tx, account_id, &cached_folder, &target_uids)?;
+        tx.commit()
+    })
+    .await?;
     Ok(MailMoveResult {
         folder,
         target: target_folder,
-        count: target_uids.len(),
+        count,
     })
 }
 
@@ -2898,17 +2895,20 @@ pub async fn mail_delete_messages(
     .await
     .map_err(|e| format!("mail delete task failed: {e}"))??;
 
-    with_mail_db(&state, &account_id, |db| {
+    let cached_folder = folder.clone();
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
+        let tx = db.unchecked_transaction()?;
         if all {
-            db.execute(
+            tx.execute(
                 "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
-                params![account_id, folder],
+                params![account_id, cached_folder],
             )?;
         } else {
-            remove_cached_messages(db, &account_id, &folder, &target_uids)?;
+            remove_cached_messages(&tx, account_id, &cached_folder, &target_uids)?;
         }
-        Ok(())
-    })?;
+        tx.commit()
+    })
+    .await?;
     Ok(MailDeleteResult { folder, deleted })
 }
 
@@ -4525,10 +4525,11 @@ fn imap_mark_read<T: Read + Write>(
     session
         .select(folder)
         .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
-    let uid_set = uid_set_string(uids);
-    session
-        .uid_store(uid_set, "+FLAGS.SILENT (\\Seen)")
-        .map_err(|e| format!("IMAP UID STORE \\Seen failed: {e}"))?;
+    for batch in uids.chunks(read_actions::UID_BATCH_SIZE) {
+        session
+            .uid_store(uid_set_string(batch), "+FLAGS.SILENT (\\Seen)")
+            .map_err(|e| format!("IMAP UID STORE \\Seen failed: {e}"))?;
+    }
     Ok(uids.len())
 }
 
@@ -4545,18 +4546,20 @@ fn imap_set_flags<T: Read + Write>(
     session
         .select(folder)
         .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
-    let uid_set = uid_set_string(uids);
-    if !add.is_empty() {
-        let query = format!("+FLAGS.SILENT ({})", add.join(" "));
-        session
-            .uid_store(&uid_set, &query)
-            .map_err(|e| format!("IMAP UID STORE +FLAGS failed: {e}"))?;
-    }
-    if !remove.is_empty() {
-        let query = format!("-FLAGS.SILENT ({})", remove.join(" "));
-        session
-            .uid_store(&uid_set, &query)
-            .map_err(|e| format!("IMAP UID STORE -FLAGS failed: {e}"))?;
+    for batch in uids.chunks(read_actions::UID_BATCH_SIZE) {
+        let uid_set = uid_set_string(batch);
+        if !add.is_empty() {
+            let query = format!("+FLAGS.SILENT ({})", add.join(" "));
+            session
+                .uid_store(&uid_set, &query)
+                .map_err(|e| format!("IMAP UID STORE +FLAGS failed: {e}"))?;
+        }
+        if !remove.is_empty() {
+            let query = format!("-FLAGS.SILENT ({})", remove.join(" "));
+            session
+                .uid_store(&uid_set, &query)
+                .map_err(|e| format!("IMAP UID STORE -FLAGS failed: {e}"))?;
+        }
     }
     Ok(uids.len())
 }
@@ -6164,15 +6167,16 @@ fn mark_cached_messages_read(
     uids: &[u32],
 ) -> SqlResult<()> {
     let mut changed = 0usize;
+    let mut select_flags = conn.prepare_cached(
+        "SELECT flags_json FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+    )?;
+    let mut update_flags = conn.prepare_cached(
+        "UPDATE mail_messages SET flags_json = ?4, updated_at = ?5, flags_local_at = ?6
+         WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+    )?;
     for uid in uids {
-        let flags_json: Option<String> = conn
-            .query_row(
-                "SELECT flags_json
-                 FROM mail_messages
-                 WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-                params![account_id, folder, *uid as i64],
-                |row| row.get(0),
-            )
+        let flags_json: Option<String> = select_flags
+            .query_row(params![account_id, folder, *uid as i64], |row| row.get(0))
             .optional()?;
         let Some(flags_json) = flags_json else {
             continue;
@@ -6183,19 +6187,14 @@ fn mark_cached_messages_read(
         }
         flags.push("\\Seen".into());
         let next_flags_json = serde_json::to_string(&flags).unwrap_or_else(|_| "[]".into());
-        conn.execute(
-            "UPDATE mail_messages
-             SET flags_json = ?4, updated_at = ?5, flags_local_at = ?6
-             WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-            params![
-                account_id,
-                folder,
-                *uid as i64,
-                next_flags_json,
-                now_ts(),
-                sync::now_ms()
-            ],
-        )?;
+        update_flags.execute(params![
+            account_id,
+            folder,
+            *uid as i64,
+            next_flags_json,
+            now_ts(),
+            sync::now_ms()
+        ])?;
         changed += 1;
     }
     if changed > 0 {
@@ -6229,15 +6228,16 @@ fn update_cached_flags(
     if uids.is_empty() || (add.is_empty() && remove.is_empty()) {
         return Ok(());
     }
+    let mut select_flags = conn.prepare_cached(
+        "SELECT flags_json FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+    )?;
+    let mut update_flags = conn.prepare_cached(
+        "UPDATE mail_messages SET flags_json = ?4, updated_at = ?5, flags_local_at = ?6
+         WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+    )?;
     for uid in uids {
-        let flags_json: Option<String> = conn
-            .query_row(
-                "SELECT flags_json
-                 FROM mail_messages
-                 WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-                params![account_id, folder, *uid as i64],
-                |row| row.get(0),
-            )
+        let flags_json: Option<String> = select_flags
+            .query_row(params![account_id, folder, *uid as i64], |row| row.get(0))
             .optional()?;
         let Some(flags_json) = flags_json else {
             continue;
@@ -6253,19 +6253,14 @@ fn update_cached_flags(
             }
         }
         let next_flags_json = serde_json::to_string(&flags).unwrap_or_else(|_| "[]".into());
-        conn.execute(
-            "UPDATE mail_messages
-             SET flags_json = ?4, updated_at = ?5, flags_local_at = ?6
-             WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-            params![
-                account_id,
-                folder,
-                *uid as i64,
-                next_flags_json,
-                now_ts(),
-                sync::now_ms()
-            ],
-        )?;
+        update_flags.execute(params![
+            account_id,
+            folder,
+            *uid as i64,
+            next_flags_json,
+            now_ts(),
+            sync::now_ms()
+        ])?;
     }
     Ok(())
 }
@@ -6276,11 +6271,11 @@ fn remove_cached_messages(
     folder: &str,
     uids: &[u32],
 ) -> SqlResult<()> {
+    let mut delete = conn.prepare_cached(
+        "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+    )?;
     for uid in uids {
-        conn.execute(
-            "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-            params![account_id, folder, *uid as i64],
-        )?;
+        delete.execute(params![account_id, folder, *uid as i64])?;
     }
     Ok(())
 }

@@ -1013,14 +1013,20 @@ function dedupeMessages(messages: readonly MailMessageHeader[]): MailMessageHead
   return unique;
 }
 
-function groupMessagesByFolder(messages: readonly MailMessageHeader[]): Map<string, MailMessageHeader[]> {
+function* messageBatchesByFolder(messages: readonly MailMessageHeader[]): Generator<[string, MailMessageHeader[]]> {
   const map = new Map<string, MailMessageHeader[]>();
   for (const message of messages) {
     const list = map.get(message.folder) ?? [];
     list.push(message);
     map.set(message.folder, list);
   }
-  return map;
+  // Bound UID command length and update the UI after each successful batch.
+  // An error leaves already completed batches removed and the rest selected.
+  for (const [folder, group] of map) {
+    for (let offset = 0; offset < group.length; offset += 250) {
+      yield [folder, group.slice(offset, offset + 250)];
+    }
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -1182,6 +1188,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [messageTabs, setMessageTabs] = useState<OpenMailMessageTab[]>([]);
   const [popupMessageKey, setPopupMessageKey] = useState<string | null>(null);
   const [checkedMessageKeys, setCheckedMessageKeys] = useState<Set<string>>(() => new Set());
+  const selectionAnchorRef = useRef<string | null>(null);
   const [body, setBody] = useState<MailMessageBody | null>(null);
   const [query, setQuery] = useState("");
   const [searchScope, setSearchScope] = useState<"folder" | "all">("folder");
@@ -1218,6 +1225,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [testing, setTesting] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
+  const [sentCopyNotice, setSentCopyNotice] = useState<{ text: string; error: boolean } | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [draft, setDraft] = useState<ComposeDraft>(EMPTY_DRAFT);
   const [drafts, setDrafts] = useState<MailDraft[]>([]);
@@ -1393,12 +1401,18 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (messageAllowsRemote(key)) blockRemoteForMessage(key);
     else allowRemoteForMessage(key);
   }, [allowRemoteForMessage, blockRemoteForMessage, messageAllowsRemote]);
+  // Search can return headers outside the loaded folder/page. They still need
+  // to participate in selection, reading and bulk actions.
+  const availableMessages = useMemo(
+    () => query.trim() && searchResults ? dedupeMessages([...searchResults, ...messages]) : messages,
+    [messages, query, searchResults],
+  );
   const selectedMessage = useMemo(
     () =>
-      messages.find((message) => messageKey(message) === selectedMessageKey)
+      availableMessages.find((message) => messageKey(message) === selectedMessageKey)
       ?? messageTabs.find((tab) => tab.key === selectedMessageKey)?.message
       ?? null,
-    [messageTabs, messages, selectedMessageKey],
+    [availableMessages, messageTabs, selectedMessageKey],
   );
   const activeMessageTab = useMemo(
     () => messageTabs.find((tab) => tab.key === mailViewKey) ?? null,
@@ -1407,15 +1421,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const popupMessage = useMemo(
     () =>
       popupMessageKey
-        ? messages.find((message) => messageKey(message) === popupMessageKey)
+        ? availableMessages.find((message) => messageKey(message) === popupMessageKey)
           ?? messageTabs.find((tab) => tab.key === popupMessageKey)?.message
           ?? null
         : null,
-    [messageTabs, messages, popupMessageKey],
+    [availableMessages, messageTabs, popupMessageKey],
   );
   const checkedMessages = useMemo(
-    () => messages.filter((message) => checkedMessageKeys.has(messageKey(message))),
-    [checkedMessageKeys, messages],
+    () => availableMessages.filter((message) => checkedMessageKeys.has(messageKey(message))),
+    [availableMessages, checkedMessageKeys],
   );
   const checkedUnreadCount = useMemo(
     () => checkedMessages.filter(isUnread).length,
@@ -1576,8 +1590,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       return next;
     });
   }, []);
-  const allFilteredMessagesChecked = filteredMessages.length > 0
-    && filteredMessages.every((message) => checkedMessageKeys.has(messageKey(message)));
+  const allFilteredMessagesChecked = listRows.length > 0
+    && listRows.every(({ message }) => checkedMessageKeys.has(messageKey(message)));
   const selectedBody = useMemo(() => {
     if (!selectedMessage) return null;
     const cached = bodyCache.get(messageKey(selectedMessage));
@@ -1971,6 +1985,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     };
 
     setMessages((current) => current.map(enrichHeader));
+    setSearchResults((current) => current?.map(enrichHeader) ?? null);
     setMessageTabs((current) => current.map((tab) => ({
       ...tab,
       message: enrichHeader(tab.message),
@@ -2473,6 +2488,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setMessages((current) => current.map((message) => {
       return shouldMark(message) ? withSeenFlag(message) : message;
     }));
+    setSearchResults((current) => current?.map((message) => shouldMark(message) ? withSeenFlag(message) : message) ?? null);
     setMessageTabs((current) => current.map((tab) => {
       return shouldMark(tab.message) ? { ...tab, message: withSeenFlag(tab.message) } : tab;
     }));
@@ -2493,22 +2509,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setError(null);
     try {
       let marked = 0;
-      const byFolder = new Map<string, number[]>();
-      for (const message of unread) {
-        const folderUids = byFolder.get(message.folder) ?? [];
-        folderUids.push(message.uid);
-        byFolder.set(message.folder, folderUids);
-      }
-      for (const [folder, uids] of byFolder) {
+      for (const [folder, group] of messageBatchesByFolder(unread)) {
+        const uids = group.map((message) => message.uid);
         const result = await mailMarkRead(info, folder, uids, false);
         marked += result.marked;
         markMessagesReadLocally(folder, uids, result.marked);
+        setCheckedMessageKeys((current) => {
+          const next = new Set(current);
+          for (const message of group) next.delete(messageKey(message));
+          return next;
+        });
       }
-      setCheckedMessageKeys((current) => {
-        const next = new Set(current);
-        for (const message of unread) next.delete(messageKey(message));
-        return next;
-      });
       setStatus(marked > 0 ? `Marked ${marked} selected messages as read` : "No selected unread messages");
     } catch (e) {
       setError(mailClientErrorMessage(e));
@@ -2523,32 +2534,46 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     try {
       const result = await mailMarkRead(info, folderName, [], true);
       markMessagesReadLocally(folderName, null, result.marked);
+      await loadCachedFolders();
+      if (selectedFolderRef.current === folderName) {
+        await loadCachedMessages(folderName, 0, false, true, messagesRef.current.length);
+      }
       setCheckedMessageKeys(new Set());
-      setStatus(result.marked > 0 ? `Marked ${result.marked} cached messages as read` : "No unread cached messages");
+      setStatus(result.marked > 0 ? `Marked ${result.marked} messages as read` : "Folder is already read");
     } catch (e) {
+      // Completed batches are committed even if a later STORE fails.
+      await loadCachedFolders();
+      if (selectedFolderRef.current === folderName) {
+        await loadCachedMessages(folderName, 0, false, true, messagesRef.current.length);
+      }
       setError(mailClientErrorMessage(e));
     } finally {
       setMarkingRead(false);
     }
-  }, [info, markMessagesReadLocally, selectedFolder]);
+  }, [info, loadCachedFolders, loadCachedMessages, markMessagesReadLocally, selectedFolder]);
 
-  const toggleMessageChecked = useCallback((message: MailMessageHeader, checked: boolean) => {
+  const toggleMessageChecked = useCallback((message: MailMessageHeader, checked: boolean, range = false) => {
     const key = messageKey(message);
+    const anchor = listRows.findIndex((row) => messageKey(row.message) === selectionAnchorRef.current);
+    const index = listRows.findIndex((row) => messageKey(row.message) === key);
+    const keys = range && anchor >= 0 && index >= 0
+      ? listRows.slice(Math.min(anchor, index), Math.max(anchor, index) + 1).map((row) => messageKey(row.message))
+      : [key];
+    if (!range || anchor < 0) selectionAnchorRef.current = key;
     setCheckedMessageKeys((current) => {
       const next = new Set(current);
-      if (checked) {
-        next.add(key);
-      } else {
-        next.delete(key);
+      for (const target of keys) {
+        if (checked) next.add(target);
+        else next.delete(target);
       }
       return next;
     });
-  }, []);
+  }, [listRows]);
 
   const toggleFilteredMessagesChecked = useCallback((checked: boolean) => {
     setCheckedMessageKeys((current) => {
       const next = new Set(current);
-      for (const message of filteredMessages) {
+      for (const { message } of listRows) {
         const key = messageKey(message);
         if (checked) {
           next.add(key);
@@ -2558,7 +2583,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       }
       return next;
     });
-  }, [filteredMessages]);
+  }, [listRows]);
 
   const selectMessage = useCallback((message: MailMessageHeader, viewKey = "mailbox") => {
     const key = messageKey(message);
@@ -2572,6 +2597,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         : bodyMatchesMessage(current, message) ? current : null
     ));
   }, [updateSelectedFolder]);
+
+  const selectListMessage = useCallback((message: MailMessageHeader) => {
+    const key = messageKey(message);
+    selectionAnchorRef.current = key;
+    setCheckedMessageKeys(new Set([key]));
+    selectMessage(message, "mailbox");
+  }, [selectMessage]);
 
   const openMessageTab = useCallback((message: MailMessageHeader) => {
     const key = messageKey(message);
@@ -2747,7 +2779,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   }, [idleEnabled, info.sessionId]);
 
   useEffect(() => {
-    if (messages.length === 0) {
+    if (availableMessages.length === 0) {
       if (!selectedMessageKey || !messageTabs.some((tab) => tab.key === selectedMessageKey)) {
         setSelectedMessageKey(null);
       }
@@ -2757,14 +2789,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (
       !selectedMessageKey
       || (
-        !messages.some((message) => messageKey(message) === selectedMessageKey)
+        !availableMessages.some((message) => messageKey(message) === selectedMessageKey)
         && !messageTabs.some((tab) => tab.key === selectedMessageKey)
       )
     ) {
-      setSelectedMessageKey(messageKey(messages[0]));
+      setSelectedMessageKey(messageKey(availableMessages[0]));
       setBody(null);
     }
-  }, [messageTabs, messages, selectedMessageKey]);
+  }, [availableMessages, messageTabs, selectedMessageKey]);
 
   const autoReadKeyRef = useRef<string | null>(null);
   const remoteImagesMessageKeyRef = useRef<string | null>(null);
@@ -2805,13 +2837,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   useEffect(() => {
     setCheckedMessageKeys((current) => {
       if (current.size === 0) return current;
-      const liveKeys = new Set(messages.map(messageKey));
+      const liveKeys = new Set(availableMessages.map(messageKey));
       const next = new Set([...current].filter((key) => liveKeys.has(key)));
       return next.size === current.size ? current : next;
     });
-  }, [messages]);
+  }, [availableMessages]);
 
   const handleFolderSelect = (folder: MailFolder) => {
+    selectionAnchorRef.current = null;
     const changed = folder.name !== selectedFolderRef.current;
     updateSelectedFolder(folder.name);
     if (changed) {
@@ -3184,14 +3217,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     };
   };
 
+  const reportSentCopy = useCallback((folder?: string | null, error?: string | null) => {
+    if (error) setSentCopyNotice({ text: `Message sent, but saving the Sent copy failed: ${error}`, error: true });
+    else if (folder) setSentCopyNotice({ text: `Message sent; copy saved to ${folder}`, error: false });
+  }, []);
+
   const sentStatus = (result: MailSendResult) => {
     if (!result.accepted) {
       setStatus(result.response || "SMTP send returned no acceptance");
-    } else if (result.sentCopyError) {
-      setStatus("Message sent");
-      setError(`Message sent, but saving the Sent copy failed: ${result.sentCopyError}`);
     } else {
-      setStatus(result.sentCopyFolder ? `Message sent; copy saved to ${result.sentCopyFolder}` : "Message sent");
+      setStatus("Message sent");
+      reportSentCopy(result.sentCopyFolder, result.sentCopyError);
     }
   };
 
@@ -3204,18 +3240,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       "mail-sent-copy",
       ({ payload }) => {
         if (disposed || payload.accountId !== info.sessionId) return;
-        if (payload.error) {
-          setError(`Message sent, but saving the Sent copy failed: ${payload.error}`);
-        } else if (payload.folder) {
-          setStatus(`Message sent; copy saved to ${payload.folder}`);
-        }
+        // The event can precede the invoke response. A separate notice must
+        // survive SMTP completion and unrelated mailbox refresh status.
+        reportSentCopy(payload.folder, payload.error);
       },
     ).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;
     }).catch(() => {});
     return () => { disposed = true; unlisten?.(); };
-  }, [info.sessionId]);
+  }, [info.sessionId, reportSentCopy]);
 
   /** Save a composer draft into the local Outbox (TASK-17). */
   const queueToOutbox = async (
@@ -3272,6 +3306,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       return false;
     }
     outboxBusyIdsRef.current.add(saved.id);
+    setSentCopyNotice(null);
     try {
       const result = await mailSendMessage(info, { ...built, draftId: saved.id });
       await mailDeleteDraft(info.sessionId, saved.id).catch(() => undefined);
@@ -3406,6 +3441,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       return;
     }
     setSending(true);
+    setSentCopyNotice(null);
     try {
       const result = await mailSendMessage(info, built);
       sentStatus(result);
@@ -3898,6 +3934,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const uidSet = new Set(uids);
     const applies = (message: MailMessageHeader) => message.folder === folder && uidSet.has(message.uid);
     setMessages((current) => current.map((message) => (applies(message) ? withFlagsMutation(message, add, remove) : message)));
+    setSearchResults((current) => current?.map((message) => applies(message) ? withFlagsMutation(message, add, remove) : message) ?? null);
     setMessageTabs((current) => current.map((tab) => (applies(tab.message) ? { ...tab, message: withFlagsMutation(tab.message, add, remove) } : tab)));
     if (unreadDelta !== 0) {
       setFolders((current) => current.map((entry) => {
@@ -3910,6 +3947,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const removeMessagesLocally = (folder: string, uids: number[], unreadRemoved: number) => {
     const removedKeys = new Set(uids.map((uid) => `${folder}:${uid}`));
     setMessages((current) => current.filter((message) => !removedKeys.has(messageKey(message))));
+    setSearchResults((current) => current?.filter((message) => !removedKeys.has(messageKey(message))) ?? null);
     setMessageTabs((current) => current.filter((tab) => !removedKeys.has(tab.key)));
     setCheckedMessageKeys((current) => {
       if (current.size === 0) return current;
@@ -4000,7 +4038,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const allFlagged = unique.every(isFlagged);
     const add = allFlagged ? [] : ["\\Flagged"];
     const remove = allFlagged ? ["\\Flagged"] : [];
-    for (const [folder, group] of groupMessagesByFolder(unique)) {
+    for (const [folder, group] of messageBatchesByFolder(unique)) {
       const uids = group.map((message) => message.uid);
       await mailSetFlags(info, folder, uids, add, remove);
       applyFlagsLocally(folder, uids, add, remove, 0);
@@ -4012,7 +4050,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const unique = dedupeMessages(targets);
     if (unique.length === 0) return;
     const plan = toggleKeywordPlan(unique, keyword);
-    for (const [folder, group] of groupMessagesByFolder(unique)) {
+    for (const [folder, group] of messageBatchesByFolder(unique)) {
       const uids = group.map((message) => message.uid);
       await mailSetFlags(info, folder, uids, plan.add, plan.remove);
       applyFlagsLocally(folder, uids, plan.add, plan.remove, 0);
@@ -4023,7 +4061,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const handleClearTags = (targets: MailMessageHeader[]) => runMailAction(async () => {
     const unique = dedupeMessages(targets).filter((message) => messageTags(message).length > 0);
     const remove = MAIL_TAGS.map((tag) => tag.keyword);
-    for (const [folder, group] of groupMessagesByFolder(unique)) {
+    for (const [folder, group] of messageBatchesByFolder(unique)) {
       const uids = group.map((message) => message.uid);
       await mailSetFlags(info, folder, uids, [], remove);
       applyFlagsLocally(folder, uids, [], remove, 0);
@@ -4035,7 +4073,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const setJunkKeywords = async (targets: MailMessageHeader[], junk: boolean) => {
     const add = [junk ? JUNK_KEYWORD : NOT_JUNK_KEYWORD];
     const remove = [junk ? NOT_JUNK_KEYWORD : JUNK_KEYWORD];
-    for (const [folder, group] of groupMessagesByFolder(dedupeMessages(targets))) {
+    for (const [folder, group] of messageBatchesByFolder(dedupeMessages(targets))) {
       const uids = group.map((message) => message.uid);
       try {
         await mailSetFlags(info, folder, uids, add, remove);
@@ -4052,7 +4090,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       setStatus("Selected messages are already unread");
       return;
     }
-    for (const [folder, group] of groupMessagesByFolder(unique)) {
+    for (const [folder, group] of messageBatchesByFolder(unique)) {
       const uids = group.map((message) => message.uid);
       await mailSetFlags(info, folder, uids, [], ["\\Seen"]);
       applyFlagsLocally(folder, uids, [], ["\\Seen"], group.length);
@@ -4062,7 +4100,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const moveTargetsTo = async (targets: MailMessageHeader[], target: string): Promise<number> => {
     let moved = 0;
-    for (const [folder, group] of groupMessagesByFolder(dedupeMessages(targets))) {
+    for (const [folder, group] of messageBatchesByFolder(dedupeMessages(targets))) {
       if (folder === target) continue;
       const uids = group.map((message) => message.uid);
       await mailMoveMessages(info, folder, uids, target);
@@ -4079,7 +4117,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const handleCopyMessages = (targets: MailMessageHeader[], target: string) => runMailAction(async () => {
     let copied = 0;
-    for (const [folder, group] of groupMessagesByFolder(dedupeMessages(targets))) {
+    for (const [folder, group] of messageBatchesByFolder(dedupeMessages(targets))) {
       const uids = group.map((message) => message.uid);
       await mailCopyMessages(info, folder, uids, target);
       copied += uids.length;
@@ -4128,7 +4166,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         danger: true,
       });
       if (!confirmed) return;
-      for (const [folder, group] of groupMessagesByFolder(unique)) {
+      for (const [folder, group] of messageBatchesByFolder(unique)) {
         const uids = group.map((message) => message.uid);
         await mailDeleteMessages(info, folder, uids, false);
         removeMessagesLocally(folder, uids, group.filter(isUnread).length);
@@ -4790,7 +4828,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const index = current ? rows.findIndex((message) => messageKey(message) === messageKey(current)) : -1;
     const go = (message: MailMessageHeader | undefined) => {
       if (!message) return false;
-      selectMessage(message, "mailbox");
+      selectListMessage(message);
       document.querySelector<HTMLElement>(
         `[data-testid="mail-message-row"][data-uid="${message.uid}"]`,
       )?.scrollIntoView?.({ block: "nearest" });
@@ -5233,7 +5271,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
           onClick={() => void handleMarkFolderRead()}
           disabled={markingRead || Math.max(activeFolder?.unread ?? 0, visibleUnreadCount) === 0}
-          title="Mark all cached messages in this folder as read"
+          data-testid="mail-mark-folder-read"
+          title="Mark all messages in this folder as read"
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
           All read
@@ -5409,6 +5448,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         </div>
       )}
 
+      {sentCopyNotice && (
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-[var(--taomni-divider)] text-[12px]" data-testid="mail-sent-copy-status" role="status">
+          {sentCopyNotice.error ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />}
+          <span className={`min-w-0 flex-1 break-words ${sentCopyNotice.error ? "text-red-500" : "text-[var(--taomni-text-muted)]"}`}>{sentCopyNotice.text}</span>
+          <button type="button" className="taomni-btn h-6 w-6 p-0 shrink-0 inline-flex items-center justify-center" aria-label="Dismiss Sent copy status" onClick={() => setSentCopyNotice(null)}><X className="w-3 h-3" /></button>
+        </div>
+      )}
       {(error || status) && (
         <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[11px] bg-[var(--taomni-sidebar-bg)]">
           {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
@@ -5662,10 +5708,41 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   {loadingMessages ? "Loading" : `${filteredMessages.length}/${messages.length}${!query.trim() && hasMoreMessages ? "+" : ""}`}
                 </span>
               </div>
+              <div className="min-h-8 shrink-0 px-3 py-1 flex flex-wrap items-center gap-2 border-b border-[var(--taomni-divider)]">
+                <button
+                  type="button"
+                  className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+                  data-testid="mail-delete-selected"
+                  disabled={busyAction || markingRead || checkedMessages.length === 0}
+                  onClick={() => void handleDeleteMessages(checkedMessages)}
+                  title="Delete selected messages; use checkboxes, Ctrl/Cmd-click or Shift-click to select"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete selected
+                </button>
+                <span className="text-[11px] text-[var(--taomni-text-muted)]" data-testid="mail-selection-count" aria-live="polite">
+                  {checkedMessages.length} selected
+                </span>
+                {checkedMessages.length > 0 && (
+                  <button type="button" className="taomni-btn h-6 px-1.5 text-[11px]" onClick={() => setCheckedMessageKeys(new Set())}>
+                    Clear selection
+                  </button>
+                )}
+              </div>
               <div
                 className="flex-1 min-h-0 overflow-auto"
+                data-testid="mail-message-list"
                 onScroll={handleMessageListScroll}
                 onContextMenu={(event) => mailMenu.show(event, messageListMenuItems())}
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "a") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    toggleFilteredMessagesChecked(true);
+                  } else if (event.key === "Escape") {
+                    setCheckedMessageKeys(new Set());
+                  }
+                }}
               >
                 {loadingMessages && messages.length === 0 ? (
                   <div className="h-20 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
@@ -5681,6 +5758,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     {listRows.map((row) => {
                       const { message } = row;
                       const active = messageKey(message) === selectedMessageKey;
+                      const checked = checkedMessageKeys.has(messageKey(message));
                       const unread = isUnread(message);
                       return (
                         <div
@@ -5709,16 +5787,23 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                           aria-pressed={active}
                           data-testid="mail-message-row"
                           data-uid={message.uid}
+                          data-checked={checked ? "true" : "false"}
                           data-unread={unread ? "true" : "false"}
                           data-flagged={isFlagged(message) ? "true" : "false"}
-                          className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] cursor-pointer ${active ? "bg-[var(--taomni-selected)]" : ""}`}
-                          onClick={() => selectMessage(message, "mailbox")}
+                          className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] cursor-pointer ${active || checked ? "bg-[var(--taomni-selected)]" : ""}`}
+                          onClick={(event) => {
+                            if (event.shiftKey || event.ctrlKey || event.metaKey) {
+                              toggleMessageChecked(message, event.shiftKey || !checked, event.shiftKey);
+                            } else {
+                              selectListMessage(message);
+                            }
+                          }}
                           onDoubleClick={() => openMessageTab(message)}
                           onContextMenu={(event) => mailMenu.show(event, messageMenuItems(message))}
                           onKeyDown={(event) => {
                             if (event.key !== "Enter" && event.key !== " ") return;
                             event.preventDefault();
-                            selectMessage(message, "mailbox");
+                            selectListMessage(message);
                           }}
                         >
                           <div className="flex items-start gap-2">
@@ -5726,9 +5811,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                               type="checkbox"
                               className="taomni-checkbox mt-1 shrink-0"
                               aria-label={`Select ${message.subject || "message"}`}
-                              checked={checkedMessageKeys.has(messageKey(message))}
+                              checked={checked}
                               onClick={(event) => event.stopPropagation()}
-                              onChange={(event) => toggleMessageChecked(message, event.target.checked)}
+                              onKeyDown={(event) => {
+                                if (event.key === " " || event.key === "Enter") event.stopPropagation();
+                              }}
+                              onChange={(event) => toggleMessageChecked(message, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey)}
                             />
                             {threadView && row.isRoot && row.threadSize > 1 && (
                               <button

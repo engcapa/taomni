@@ -194,6 +194,7 @@ pub(super) fn mark_read(
     Ok(MailMarkReadResult {
         folder: folder.to_string(),
         marked,
+        unread: None,
     })
 }
 

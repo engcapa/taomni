@@ -1252,6 +1252,7 @@
 - `[data-testid="mail-thread-view-toggle"]` — interactive — F-MAIL-6.thread-view-toggle
 - `[data-testid="mail-thread-expand"]` — interactive [optional] — F-MAIL-6.thread-expand
 - `[data-testid="mail-save-sent-copy"]` — interactive [optional] — F-MAIL-6.save-sent-copy
+- `[data-testid="mail-sent-copy-status"]` — display — F-MAIL-6.sent-copy-status
 
 ## mail/compose (F-MAIL-9)
 
@@ -1328,6 +1329,9 @@
 
 - `[data-testid="mail-message-row"][aria-pressed="true"]` — interactive — F-MAIL-12.message-row-shortcuts
 - `[data-testid="mail-folder-row"][data-folder-name="Archive"]` — interactive — F-MAIL-12.folder-drop-target
+- `[data-testid="mail-delete-selected"]` — interactive — F-MAIL-12.delete-selected
+- `[data-testid="mail-selection-count"]` — display — F-MAIL-12.selection-count
+- `[aria-label="Select all visible messages"]` — interactive — F-MAIL-12.select-all-visible
 
 ## mail/lists (F-MAIL-14)
 
@@ -1376,6 +1380,7 @@
 
 - `[data-testid="mail-sync-button"]` — interactive — F-MAIL-3.sync-button
 - `[data-testid="mail-body-warming-progress"]` — display [optional] — F-MAIL-3.body-warming-progress
+- `[data-testid="mail-mark-folder-read"]` — interactive — F-MAIL-3.mark-folder-read
 
 ## mail/sync (F-MAIL-5)
 

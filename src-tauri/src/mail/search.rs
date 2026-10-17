@@ -16,7 +16,8 @@ use tauri::State;
 use super::sync::quote_imap_string;
 use super::{
     ActiveImapSession, ImapSessionOpts, MailAccountConfig, MailMessageHeader, ResolvedMailAccount,
-    imap_fetch_messages_for_uids, resolve_config, row_to_header, with_imap_session, with_mail_db,
+    imap_fetch_messages_for_uids, resolve_config, row_to_header, with_imap_session,
+    with_mail_db_async,
 };
 use crate::state::AppState;
 
@@ -243,9 +244,10 @@ pub async fn mail_search_messages(
     query: MailSearchQuery,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailMessageHeader>, String> {
-    with_mail_db(&state, &account_id, |db| {
-        search_cached_messages(db, &account_id, &query)
+    with_mail_db_async(&state, &account_id, move |db, account_id| {
+        search_cached_messages(db, account_id, &query)
     })
+    .await
 }
 
 /// IMAP SEARCH criteria for the text query (every term must match).
@@ -349,9 +351,10 @@ pub async fn mail_search_server(
             folder: Some(folder.clone()),
             ..query.clone()
         };
-        return with_mail_db(&state, &config.session_id, |db| {
-            search_cached_messages(db, &config.session_id, &local)
-        });
+        return with_mail_db_async(&state, &config.session_id, move |db, account_id| {
+            search_cached_messages(db, account_id, &local)
+        })
+        .await;
     }
     let account = resolve_config(&state, config)?;
     let pool = Arc::clone(&state.mail_imap_pool);

@@ -21,6 +21,82 @@ fn account(port: u16) -> ResolvedMailAccount {
 }
 
 #[test]
+fn marking_a_large_folder_read_respects_server_command_limits() {
+    let fake = fake_imap::FakeImap::start(false);
+    let uids = fake.deliver("INBOX", 33913, "large-folder");
+    fake.state.lock().unwrap().max_command_bytes = Some(4096);
+    assert_eq!(
+        imap_mark_read(&mut fake.session(), "INBOX", &uids).unwrap(),
+        uids.len()
+    );
+    assert!(
+        uids.iter()
+            .all(|uid| fake.flags("INBOX", *uid).contains(&"\\Seen".into()))
+    );
+    assert!(
+        fake.log()
+            .iter()
+            .filter(|line| line.starts_with("UID STORE"))
+            .count()
+            > 1
+    );
+}
+
+#[test]
+fn folder_read_includes_uncached_mail_and_recovers_a_lost_store_response() {
+    let fake = fake_imap::FakeImap::start(false);
+    fake.deliver("INBOX", 700, "folder-read");
+    fake.set_flags("INBOX", 1, &["\\Seen"]);
+    {
+        let mut state = fake.state.lock().unwrap();
+        state.max_command_bytes = Some(4096);
+        state.drop_store_response_once = true;
+    }
+    let account = account(fake.port);
+    let conn = Connection::open_in_memory().unwrap();
+    init_mail_tables(&conn).unwrap();
+    conn.execute("INSERT INTO mail_folders(account_id, name, unread, updated_at) VALUES(?1, 'INBOX', 700, 0)", [&account.config.session_id]).unwrap();
+    // Local history is incomplete and UID 1 has a stale unread flag.
+    for uid in [1, 700] {
+        conn.execute("INSERT INTO mail_messages(account_id, folder, uid, subject, updated_at) VALUES(?1, 'INBOX', ?2, 'cached', 0)", params![account.config.session_id, uid]).unwrap();
+    }
+    let db = Arc::new(Mutex::new(conn));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = read_actions::mark_read_cached(
+        &MailImapPool::new(),
+        &account,
+        runtime.handle(),
+        &db,
+        "INBOX",
+        vec![],
+        true,
+    )
+    .unwrap();
+    assert_eq!(result.marked, 699);
+    assert_eq!(result.unread, Some(0));
+    assert!((1..=700).all(|uid| fake.flags("INBOX", uid).contains(&"\\Seen".into())));
+    assert!(
+        unread_cached_uids(&db.lock().unwrap(), &account.config.session_id, "INBOX")
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        fake.log()
+            .iter()
+            .filter(|line| line.starts_with("LOGIN"))
+            .count(),
+        2
+    );
+    assert_eq!(
+        fake.log()
+            .iter()
+            .filter(|line| line.starts_with("UID STORE"))
+            .count(),
+        4
+    );
+}
+
+#[test]
 fn interactive_body_completes_while_background_imap_is_busy() {
     let fake = fake_imap::FakeImap::start(false);
     let uid = fake.deliver("INBOX", 1, "interactive")[0];

@@ -265,6 +265,8 @@ export interface MailSyncOptions {
 export interface MailMarkReadResult {
   folder: string;
   marked: number;
+  /** Current server count after marking a whole IMAP folder. */
+  unread?: number;
 }
 
 export interface MailFlagResult {

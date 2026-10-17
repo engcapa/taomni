@@ -51,6 +51,10 @@ pub struct FakeState {
     pub log: Vec<String>,
     /// Folders not reported by LSUB (everything else is subscribed).
     pub unsubscribed: std::collections::BTreeSet<String>,
+    /// Simulate providers that close the socket on an oversized command line.
+    pub max_command_bytes: Option<usize>,
+    /// Drop the next STORE response after applying it (an ambiguous network loss).
+    pub drop_store_response_once: bool,
 }
 
 #[derive(Clone)]
@@ -77,6 +81,8 @@ impl FakeImap {
             highest_modseq: 1,
             log: Vec::new(),
             unsubscribed: Default::default(),
+            max_command_bytes: None,
+            drop_store_response_once: false,
         }));
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake imap");
         let port = listener.local_addr().unwrap().port();
@@ -348,6 +354,9 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
         let upper = rest.to_ascii_uppercase();
         let mut state = shared.lock().unwrap();
         state.log.push(rest.clone());
+        if state.max_command_bytes.is_some_and(|max| line.len() > max) {
+            return Ok(());
+        }
         let mut out = String::new();
         let mut ok = format!("{tag} OK done\r\n");
         if upper.starts_with("LOGIN") || upper.starts_with("NOOP") {
@@ -612,6 +621,10 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     message.flags = flags.clone();
                 }
                 message.modseq = modseq;
+            }
+            if state.drop_store_response_once {
+                state.drop_store_response_once = false;
+                return Ok(());
             }
         } else if upper.starts_with("UID COPY") || upper.starts_with("UID MOVE") {
             let is_move = upper.starts_with("UID MOVE");

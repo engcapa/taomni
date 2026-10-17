@@ -18,6 +18,7 @@ import {
   stubMailRecordSent,
   stubMailTransfer,
   stubMailUpdateCachedFlags,
+  stubMailMarkRead,
   type Seed as MailStubSeed,
   type StubMailSearchQuery,
 } from "./mailServerStub";
@@ -1410,6 +1411,7 @@ const MAIL_STUB_FOLDERS = [
   { name: "INBOX", displayName: "INBOX", total: 3, unread: 1 },
   { name: "Sent", displayName: "Sent", total: 1, unread: 0 },
   { name: "Archive", displayName: "Archive", total: 8, unread: 0 },
+  { name: "Trash", displayName: "Trash", total: 0, unread: 0 },
 ];
 
 function stubMailAccountId(args?: InvokeArgs): string {
@@ -1418,6 +1420,7 @@ function stubMailAccountId(args?: InvokeArgs): string {
 }
 
 function stubMailMessages(accountId: string, folder: string) {
+  if (folder === "Trash") return [];
   const now = Math.floor(Date.now() / 1000);
   const inbox = [
     {
@@ -4336,8 +4339,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
       const all = Boolean(invokeArgs?.all);
-      stubMailUpdateCachedFlags(stubMailAccountId(invokeArgs), folder, uids, ["\\Seen"], []);
-      return { folder, marked: all ? 1 : uids.length } as T;
+      return stubMailMarkRead(stubMailAccountId(invokeArgs), mailStubSeed, folder, uids, all) as T;
     }
     case "mail_send_message": {
       const invokeArgs = args as InvokeArgs | undefined;
