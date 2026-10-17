@@ -57,6 +57,13 @@ pub fn account_root(db: &Connection, account_id: &str) -> Result<PathBuf, String
     let parent = Path::new(path)
         .parent()
         .ok_or("Invalid mail storage path")?;
+    // tempfile publishes with raw Win32 APIs, unlike std::fs which handles
+    // long paths itself. Canonicalize the existing parent before appending
+    // object names so both temporary and final paths retain the \\?\ prefix.
+    #[cfg(windows)]
+    let parent = parent
+        .canonicalize()
+        .map_err(|e| format!("Resolve mail storage directory: {e}"))?;
     Ok(parent.join(format!(
         "{}.mail",
         crate::state::mail_db_file_stem(account_id)
@@ -651,6 +658,41 @@ pub(super) fn relocate(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn default_storage_publishes_long_paths_and_preserves_complete_mime() {
+        let directory = tempfile::tempdir().unwrap();
+        let base = directory.path().to_path_buf();
+        // Start with the ordinary profile path, just like a Quick Connect
+        // mailbox. A pre-canonicalized test directory would mask the bug.
+        #[cfg(windows)]
+        let base = PathBuf::from(
+            base.to_str()
+                .unwrap()
+                .strip_prefix(r"\\?\")
+                .unwrap_or(base.to_str().unwrap()),
+        );
+        let padding = 145usize.saturating_sub(base.as_os_str().len() + 1);
+        let profile = base.join("p".repeat(padding.max(1)));
+        fs::create_dir_all(&profile).unwrap();
+        let account = format!("quick-mail-{}@example.test_993", "account".repeat(12));
+        let db_path = profile.join(format!("{}.db", crate::state::mail_db_file_stem(&account)));
+        #[cfg(windows)]
+        assert!(db_path.as_os_str().len() < 260);
+        let db = Connection::open(&db_path).unwrap();
+        super::super::init_mail_tables(&db).unwrap();
+        let raw = b"Subject: full MIME on long paths\r\nContent-Type: multipart/mixed; boundary=qa\r\n\r\n--qa\r\nContent-Type: text/plain\r\n\r\nbody\r\n--qa\r\nContent-Type: application/octet-stream\r\nContent-Transfer-Encoding: base64\r\n\r\nYXR0YWNobWVudA==\r\n--qa--\r\n";
+        let stored = store(&db, &account, "INBOX", 1, 10, raw.as_slice()).unwrap();
+        let path = object_path(&account_root(&db, &account).unwrap(), &stored.hash).unwrap();
+        assert!(path.as_os_str().len() > 260);
+        assert!(path.exists());
+        assert_eq!(read(&db, &account, "INBOX", 1).unwrap().unwrap(), raw);
+        let duplicate = store(&db, &account, "INBOX", 2, 10, raw.as_slice()).unwrap();
+        assert_eq!(duplicate.hash, stored.hash);
+        db.execute("DELETE FROM mail_full_messages", []).unwrap();
+        assert_eq!(collect_garbage(&db, &account).unwrap(), 1);
+        assert!(!path.exists());
+    }
+
     #[test]
     fn full_mime_round_trip_deduplicates_and_physically_removes_last_reference() {
         let directory = tempfile::tempdir().unwrap();
