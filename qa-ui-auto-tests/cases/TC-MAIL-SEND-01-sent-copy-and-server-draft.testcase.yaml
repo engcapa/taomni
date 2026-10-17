@@ -16,6 +16,7 @@ description: 'TASK-06 (docs-feature/mail-thunderbird-parity-design.md AC-20/AC-2
 covers:
 - F-MAIL-6
 - F-MAIL-2
+- F-MAIL-23
 tags:
 - mail
 - p1
@@ -38,6 +39,9 @@ steps:
     value: ${fixture.mail_quick_connect}
 - click: '[data-testid="qc-submit"]'
 - wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_expunge_newest:
+    folder: Sent
+    count: 1000000
 - click: '[data-testid="mail-compose-open"]'
 - wait_for: '[data-testid="mail-compose-dialog"]'
 - fill:
@@ -63,15 +67,27 @@ steps:
     selector: '[data-testid="mail-compose-dialog"]'
     state: detached
 - assert_text:
-    selector: '[data-testid="mail-client-tab"]'
+    selector: '[data-testid="mail-sent-copy-status"]'
     contains: copy saved to Sent
     timeout_sec: 30
 - mail_server_assert_folder_count:
     folder: Sent
-    min: 1
+    equals: 1
 - mail_server_assert_folder_count:
     folder: Drafts
     equals: 0
+- click: '[data-testid="mail-sync-button"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Synced
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="mail-sent-copy-status"]'
+    contains: copy saved to Sent
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
 - screenshot: mail-send-01-sent-copy.png
 verification:
   review: reviewed
@@ -84,41 +100,56 @@ verification:
     - 3
     - 5
     - 6
-    - 8
-    - 10
+    - 9
     - 11
     - 12
     - 13
     - 14
+    - 15
     checkpoints:
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
-    - step: 9
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"mail-compose-dialog\"]"}'
-    - step: 15
-      expectation: '{"assert_text": {"contains": "Draft saved to Drafts"}}'
     - step: 16
+      expectation: '{"assert_text": {"contains": "Draft saved to Drafts"}}'
+    - step: 17
       expectation: '{"mail_server_assert_folder_count": {"folder": "Drafts", "equals": 1}}'
     results:
-    - 15
     - 16
+    - 17
   - id: R2
     requirement: 发送后服务器 Sent 收到副本、服务器草稿被移除（AC-20/AC-21）。
     actions:
-    - 17
+    - 18
+    - 23
     checkpoints:
-    - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached"}}'
     - step: 19
-      expectation: '{"assert_text": {"contains": "copy saved to Sent"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached"}}'
     - step: 20
-      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1}}'
+      expectation: '{"assert_text": {"contains": "copy saved to Sent"}}'
     - step: 21
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "equals": 1}}'
+    - step: 22
       expectation: '{"mail_server_assert_folder_count": {"folder": "Drafts", "equals": 0}}'
+    - step: 25
+      expectation: A later mailbox refresh does not overwrite the Sent-copy result.
     results:
-    - 19
+    - 25
     - 20
     - 21
+    - 22
+  - id: R3
+    requirement: Quick Connect 默认目录的完整原件下载必须完成，不能在发送成功时遗漏后台归档发布错误；覆盖 Windows 长存储路径。
+    actions:
+    - 5
+    - 6
+    - 18
+    checkpoints:
+    - step: 26
+      expectation: Default-directory full MIME storage completes without a publication error, including Windows paths longer than MAX_PATH.
+    results:
+    - 26
   visual:
   - check: 截图中状态栏显示已保存 Sent 副本，写信窗口已关闭。
     method: manual

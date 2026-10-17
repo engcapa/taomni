@@ -15,6 +15,7 @@ pub struct DestinationResult {
 pub async fn backup_run_selected(
     app: tauri::AppHandle,
     scope: String,
+    include_mail: Option<bool>,
 ) -> Result<Vec<DestinationResult>, String> {
     let config = control::load(&app)?;
     if config.selected_target_ids.is_empty() {
@@ -43,7 +44,17 @@ pub async fn backup_run_selected(
     let mut results = vec![];
     for id in config.selected_target_ids {
         if id == "local" {
-            let outcome = super::backup_create(app.clone(), scope.clone(), None, None, None).await;
+            let outcome = super::backup_create(
+                app.clone(),
+                scope.clone(),
+                include_mail.map(|include_mail| super::engine::BackupCustomOptions {
+                    include_mail,
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .await;
             results.push(match outcome {
                 Ok(r) => DestinationResult {
                     target_id: id,

@@ -3588,6 +3588,11 @@ const dict = {
     }
   },
   backupSettings: {
+    includeMail: "Include mail (headers, complete originals and attachments)",
+    autoIncludeMail: "Include mail in automatic backups",
+    localIncludeMail: "Include mail in the selected local destination",
+    mailHint: "Includes custom mail directories and retained local archives. Incomplete downloads are resumed separately. Restores mail to this computer’s default mail directory.",
+
     badArchivePassword: "Incorrect archive password. Please try again.",
     status: "Status",
     actions: "Actions",

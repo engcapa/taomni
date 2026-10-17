@@ -51,6 +51,13 @@ pub struct FakeState {
     pub log: Vec<String>,
     /// Folders not reported by LSUB (everything else is subscribed).
     pub unsubscribed: std::collections::BTreeSet<String>,
+    /// Simulate providers that close the socket on an oversized command line.
+    pub max_command_bytes: Option<usize>,
+    /// Drop the next STORE response after applying it (an ambiguous network loss).
+    pub drop_store_response_once: bool,
+    /// Provider size estimates can disagree with the actual BODY[] literal.
+    pub reported_sizes: BTreeMap<(String, u32), usize>,
+    pub empty_bodies: std::collections::BTreeSet<(String, u32)>,
 }
 
 #[derive(Clone)]
@@ -77,6 +84,10 @@ impl FakeImap {
             highest_modseq: 1,
             log: Vec::new(),
             unsubscribed: Default::default(),
+            max_command_bytes: None,
+            drop_store_response_once: false,
+            reported_sizes: Default::default(),
+            empty_bodies: Default::default(),
         }));
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake imap");
         let port = listener.local_addr().unwrap().port();
@@ -348,6 +359,9 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
         let upper = rest.to_ascii_uppercase();
         let mut state = shared.lock().unwrap();
         state.log.push(rest.clone());
+        if state.max_command_bytes.is_some_and(|max| line.len() > max) {
+            return Ok(());
+        }
         let mut out = String::new();
         let mut ok = format!("{tag} OK done\r\n");
         if upper.starts_with("LOGIN") || upper.starts_with("NOOP") {
@@ -529,7 +543,12 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     parts.push(format!("MODSEQ ({})", message.modseq));
                 }
                 if items_upper.contains("RFC822.SIZE") {
-                    parts.push(format!("RFC822.SIZE {}", message.raw.len()));
+                    let size = state
+                        .reported_sizes
+                        .get(&(selected.clone().unwrap_or("INBOX".into()), *uid))
+                        .copied()
+                        .unwrap_or(message.raw.len());
+                    parts.push(format!("RFC822.SIZE {size}"));
                 }
                 if items_upper.contains("INTERNALDATE") {
                     parts.push(format!(
@@ -554,11 +573,33 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     );
                     bytes.extend_from_slice(header);
                 }
-                if items_upper.contains("BODY.PEEK[]") {
-                    bytes.extend_from_slice(
-                        format!(" BODY[] {{{}}}\r\n", message.raw.len()).as_bytes(),
-                    );
-                    bytes.extend_from_slice(&message.raw);
+                if let Some((_, tail)) = items_upper.split_once("BODY.PEEK[]") {
+                    let range = tail
+                        .strip_prefix('<')
+                        .and_then(|s| s.split_once('>'))
+                        .and_then(|(range, _)| range.split_once('.'))
+                        .and_then(|(offset, len)| {
+                            Some((offset.parse::<usize>().ok()?, len.parse::<usize>().ok()?))
+                        });
+                    if let Some((offset, len)) = range {
+                        let mut body = &message.raw[offset.min(message.raw.len())
+                            ..offset.saturating_add(len).min(message.raw.len())];
+                        if state
+                            .empty_bodies
+                            .contains(&(selected.clone().unwrap_or("INBOX".into()), *uid))
+                        {
+                            body = &[];
+                        }
+                        bytes.extend_from_slice(
+                            format!(" BODY[]<{offset}> {{{}}}\r\n", body.len()).as_bytes(),
+                        );
+                        bytes.extend_from_slice(body);
+                    } else {
+                        bytes.extend_from_slice(
+                            format!(" BODY[] {{{}}}\r\n", message.raw.len()).as_bytes(),
+                        );
+                        bytes.extend_from_slice(&message.raw);
+                    }
                 }
                 if let Some((_, sections)) = extra {
                     for (start, _) in items_upper.match_indices("BODY.PEEK[") {
@@ -612,6 +653,10 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     message.flags = flags.clone();
                 }
                 message.modseq = modseq;
+            }
+            if state.drop_store_response_once {
+                state.drop_store_response_once = false;
+                return Ok(());
             }
         } else if upper.starts_with("UID COPY") || upper.starts_with("UID MOVE") {
             let is_move = upper.starts_with("UID MOVE");

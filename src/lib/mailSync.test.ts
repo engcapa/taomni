@@ -119,6 +119,16 @@ describe("runFolderSyncLoop", () => {
 });
 
 describe("mergeSyncedMessages", () => {
+  it("keeps a bounded visible page while indexing thousands of new headers", () => {
+    const current = Array.from({ length: 200 }, (_, i) => header("INBOX", i + 1));
+    const incoming = Array.from({ length: 1200 }, (_, i) => header("INBOX", i + 201));
+    const merged = mergeSyncedMessages("INBOX", "INBOX", current, incoming, sortDesc, 200)!;
+    expect(merged).toHaveLength(200);
+    expect(merged[0].uid).toBe(1400);
+    expect(merged[199].uid).toBe(1201);
+    // User-requested pagination retains the existing unbounded merge contract.
+    expect(mergeSyncedMessages("INBOX", "INBOX", current, incoming, sortDesc)).toHaveLength(1400);
+  });
   it("does not rewrite the list after the user switched folders", () => {
     const current = [header("INBOX", 1), header("INBOX", 2)];
     expect(mergeSyncedMessages("INBOX", "Sent", current, [header("Sent", 10)], sortDesc)).toBeNull();

@@ -30,6 +30,9 @@ pub struct BackupPolicy {
     /// Default backup scope: "core" | "full".
     #[serde(default = "default_scope")]
     pub default_scope: String,
+    /// None preserves the legacy core/full default.
+    #[serde(default)]
+    pub include_mail: Option<bool>,
     /// Timestamp (ms) of the last successful backup.
     #[serde(default)]
     pub last_backup_at: Option<i64>,
@@ -55,6 +58,7 @@ impl Default for BackupPolicy {
             custom_backup_dir: None,
             max_retained_copies: default_max_copies(),
             default_scope: default_scope(),
+            include_mail: None,
             last_backup_at: None,
         }
     }
@@ -167,6 +171,7 @@ mod tests {
             custom_backup_dir: Some("/tmp/my_backups".into()),
             max_retained_copies: 10,
             default_scope: "full".into(),
+            include_mail: Some(true),
             last_backup_at: Some(1730000000),
         };
         let json = serde_json::to_string(&policy).unwrap();

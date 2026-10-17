@@ -121,8 +121,17 @@ jobs:
             if (-not (Test-Path -LiteralPath $gflags)) { throw 'mstsc heap verifier unavailable' }
             "QA_MSTSC_GFLAGS=$gflags" >> $env:GITHUB_ENV
           }
-          choco install tesseract --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'Tesseract installation failed' }
+          $tesseract = Join-Path $env:ProgramFiles 'Tesseract-OCR\tesseract.exe'
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install tesseract --yes --no-progress
+            $installExit = $LASTEXITCODE
+            if ($installExit -eq 0 -and (Test-Path -LiteralPath $tesseract)) { break }
+            if ($attempt -eq 3) {
+              throw "Tesseract installation failed after $attempt attempts (exit $installExit; executable: $tesseract)"
+            }
+            Write-Warning "Tesseract is unavailable after install attempt $attempt (exit $installExit); retrying in 15 seconds"
+            Start-Sleep -Seconds 15
+          }
           'C:\Program Files\Tesseract-OCR' >> $env:GITHUB_PATH
       # Hosted audio cases need a loopback device. BlackHole has no controller
       # app or microphone consent sheet to cover capture fixtures on macOS.

@@ -2,7 +2,7 @@ use super::crypto::{ERR_BACKUP_PASSWORD_REQUIRED, decrypt_payload, is_encrypted_
 use super::manifest::{BackupManifest, MANIFEST_FILE_NAME, file_sha256};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{Cursor, Read};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use zip::ZipArchive;
@@ -24,28 +24,41 @@ struct RestoreIntent {
     manifest: BackupManifest,
 }
 
-/// Extract and read bytes from archive, decrypting if necessary.
-fn read_archive_zip_bytes(archive_path: &Path, password: Option<&str>) -> Result<Vec<u8>, String> {
-    let mut file = File::open(archive_path)
-        .map_err(|e| format!("open archive file {}: {e}", archive_path.display()))?;
-    let mut data = Vec::new();
-    file.read_to_end(&mut data)
-        .map_err(|e| format!("read archive file: {e}"))?;
-
-    if is_encrypted_bytes(&data) {
-        let pw = password.unwrap_or_default().trim();
-        if pw.is_empty() {
-            return Err(ERR_BACKUP_PASSWORD_REQUIRED.into());
-        }
-        decrypt_payload(&data, pw)
-    } else {
-        Ok(data)
+/// New archives and V2 encryption are streamed through files, independent of
+/// mailbox size. V1 remains readable with its original 1 GiB format limit.
+fn archive_file(path: &Path, password: Option<&str>) -> Result<File, String> {
+    let mut file = File::open(path).map_err(|e| e.to_string())?;
+    let mut magic = [0u8; 13];
+    let n = file.read(&mut magic).map_err(|e| e.to_string())?;
+    file.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+    if !is_encrypted_bytes(&magic[..n]) {
+        return Ok(file);
     }
+    let password = password.unwrap_or_default().trim();
+    if password.is_empty() {
+        return Err(ERR_BACKUP_PASSWORD_REQUIRED.into());
+    }
+    let mut decoded = tempfile::tempfile().map_err(|e| e.to_string())?;
+    if &magic == super::crypto::BACKUP_ENC_STREAM_MAGIC {
+        super::crypto::decrypt_stream(file, password, &mut decoded)?;
+    } else {
+        if file.metadata().map_err(|e| e.to_string())?.len() > 1024 * 1024 * 1024 {
+            return Err("Legacy encrypted backup exceeds 1 GiB".into());
+        }
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).map_err(|e| e.to_string())?;
+        std::io::Write::write_all(&mut decoded, &decrypt_payload(&data, password)?)
+            .map_err(|e| e.to_string())?;
+    }
+    decoded
+        .seek(SeekFrom::Start(0))
+        .map_err(|e| e.to_string())?;
+    Ok(decoded)
 }
 
-const MAX_ARCHIVE_BYTES: u64 = 1024 * 1024 * 1024;
-const MAX_EXTRACTED_BYTES: u64 = 8 * 1024 * 1024 * 1024;
-const JOURNAL_FILE: &str = "restore_journal.json";
+const MAX_ARCHIVE_BYTES: u64 = 1024 * 1024 * 1024 * 1024;
+const MAX_EXTRACTED_BYTES: u64 = 2 * MAX_ARCHIVE_BYTES;
+pub(super) const JOURNAL_FILE: &str = "restore_journal.json";
 
 fn checked_path(name: &str) -> Result<(), String> {
     if name.is_empty()
@@ -76,6 +89,29 @@ fn checked_path(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn valid_mail_object_path(name: &str) -> bool {
+    let parts: Vec<_> = name.split('/').collect();
+    parts.len() == 5
+        && parts[0] == "mail-cache"
+        && parts[1].ends_with(".mail")
+        && parts[2] == "objects"
+        && parts[3].len() == 2
+        && parts[4].strip_suffix(".eml.gz").is_some_and(|hash| {
+            hash.len() == 64
+                && hash.starts_with(parts[3])
+                && hash
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        })
+}
+fn valid_mail_attachment_path(name: &str) -> bool {
+    let parts: Vec<_> = name.split('/').collect();
+    parts.len() == 5
+        && parts[0] == "mail-cache"
+        && parts[1] == "attachments"
+        && parts[4].ends_with(".bin")
+}
+
 fn destination(app_data: &Path, name: &str) -> Result<PathBuf, String> {
     checked_path(name)?;
     let target = match name {
@@ -101,6 +137,9 @@ fn destination(app_data: &Path, name: &str) -> Result<PathBuf, String> {
         {
             app_data.join(name)
         }
+        _ if valid_mail_object_path(name) || valid_mail_attachment_path(name) => {
+            app_data.join(name)
+        }
         _ => return Err(format!("Unsupported Taomni backup entry: {name}")),
     };
     Ok(target)
@@ -109,22 +148,22 @@ fn destination(app_data: &Path, name: &str) -> Result<PathBuf, String> {
 fn verified_archive(
     path: &Path,
     password: Option<&str>,
-) -> Result<(BackupManifest, ZipArchive<Cursor<Vec<u8>>>), String> {
+) -> Result<(BackupManifest, ZipArchive<File>), String> {
     if std::fs::metadata(path).map_err(|e| e.to_string())?.len() > MAX_ARCHIVE_BYTES {
-        return Err("Archive exceeds the supported 1 GiB limit".into());
+        return Err("Archive exceeds the supported 1 TiB limit".into());
     }
     let encrypted =
         super::crypto::is_encrypted_stream(File::open(path).map_err(|e| e.to_string())?);
-    let mut archive = ZipArchive::new(Cursor::new(read_archive_zip_bytes(path, password)?))
+    let mut archive = ZipArchive::new(archive_file(path, password)?)
         .map_err(|e| format!("Invalid archive: {e}"))?;
-    if archive.len() > 100_000 {
+    if archive.len() > 1_000_000 {
         return Err("Too many archive entries".into());
     }
     let manifest: BackupManifest = {
         let f = archive
             .by_name(MANIFEST_FILE_NAME)
             .map_err(|_| "Missing manifest.json")?;
-        if f.size() > 16 * 1024 * 1024 {
+        if f.size() > 256 * 1024 * 1024 {
             return Err("Manifest is too large".into());
         }
         serde_json::from_reader(f).map_err(|_| "Invalid backup manifest")?
@@ -154,7 +193,7 @@ fn verified_archive(
             .checked_add(entry.size_bytes)
             .ok_or("Backup size overflow")?;
         if total > MAX_EXTRACTED_BYTES {
-            return Err("Unpacked archive exceeds 8 GiB limit".into());
+            return Err("Unpacked archive exceeds 2 TiB limit".into());
         }
         entries.insert(entry.path.as_str(), entry);
     }
@@ -317,6 +356,25 @@ fn rollback(journal: &RestoreJournal) -> Result<(), String> {
     Ok(())
 }
 
+fn lock_mail_restore(
+    app_data: &Path,
+    paths: impl Iterator<Item = PathBuf>,
+) -> Result<Vec<crate::mail::coordination::ProcessLock>, String> {
+    use crate::mail::coordination::ProcessLock;
+    let paths: std::collections::BTreeSet<_> = paths
+        .filter(|path| {
+            path.parent() == Some(app_data.join("mail-cache").as_path())
+                && path.extension().is_some_and(|ext| ext == "db")
+        })
+        .collect();
+    let mut locks = Vec::new();
+    for path in paths {
+        locks.push(ProcessLock::access(&path)?);
+        locks.push(ProcessLock::try_at(&path, "archive")?.ok_or("Another instance is storing a mailbox being restored; pause its full storage before restarting")?);
+    }
+    Ok(locks)
+}
+
 /// Fail startup rather than opening a partially restored set of databases.
 pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
     let intent_path = app_data.join(RESTORE_INTENT_FILE);
@@ -326,6 +384,10 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
         let journal: RestoreJournal =
             serde_json::from_slice(&std::fs::read(&journal_path).map_err(|e| e.to_string())?)
                 .map_err(|_| "Invalid restore journal")?;
+        let _mail_locks = lock_mail_restore(
+            app_data,
+            journal.entries.iter().map(|entry| entry.path.clone()),
+        )?;
         if !journal.committed {
             rollback(&journal)?;
         }
@@ -347,6 +409,16 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
     if intent.manifest.format_version != 1 || intent.manifest.app_name != "Taomni" {
         return Err("Unsupported restore intent".into());
     }
+    let _mail_locks = lock_mail_restore(
+        app_data,
+        intent
+            .manifest
+            .files
+            .iter()
+            .map(|entry| destination(app_data, &entry.path))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter(),
+    )?;
     let safety = app_data
         .join("backups")
         .join(format!("restore-{}", uuid::Uuid::new_v4()));
@@ -370,6 +442,10 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
         if entry.path.ends_with(".db") || entry.path.ends_with(".sqlite") {
             paths.push(PathBuf::from(format!("{}-wal", dst.display())));
             paths.push(PathBuf::from(format!("{}-shm", dst.display())));
+        }
+        if entry.path.starts_with("mail-cache/") && entry.path.ends_with(".db") {
+            paths.push(crate::mail::coordination::redirect_path(&dst));
+            paths.push(dst.with_extension("generation"));
         }
         for path in paths {
             no_symlink_ancestors(&path)?;
@@ -396,12 +472,33 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
     let apply = (|| -> Result<(), String> {
         for (src, dst) in &mappings {
             replace_file(src, dst)?;
+            if dst.parent() == Some(app_data.join("mail-cache").as_path())
+                && dst.extension().is_some_and(|ext| ext == "db")
+            {
+                let redirect = crate::mail::coordination::redirect_path(dst);
+                if redirect.exists() {
+                    std::fs::remove_file(redirect).map_err(|e| e.to_string())?;
+                }
+                super::control::write_json(
+                    &dst.with_extension("generation"),
+                    &uuid::Uuid::new_v4().to_string(),
+                )?;
+            }
             for suffix in ["-wal", "-shm"] {
                 let aux = PathBuf::from(format!("{}{suffix}", dst.display()));
                 if aux.exists() {
                     std::fs::remove_file(aux).map_err(|e| e.to_string())?;
                 }
             }
+        }
+        if mappings
+            .iter()
+            .any(|(_, dst)| *dst == app_data.join("taomni.db"))
+        {
+            super::engine::portable_mail_paths(
+                &rusqlite::Connection::open(app_data.join("taomni.db"))
+                    .map_err(|e| e.to_string())?,
+            )?;
         }
         Ok(())
     })();

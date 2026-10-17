@@ -1,3 +1,4 @@
+import type { BackupCustomOptions } from "./backup";
 import { invoke } from "@tauri-apps/api/core";
 import type { AppProxyConfig } from "./ipc";
 
@@ -10,7 +11,7 @@ export interface BackupTarget {
   connectionId: string | null;
   rootToken: string;
   proxy: { mode: "app" | "custom" | "none"; custom: AppProxyConfig };
-  source: { kind: string; schemaVersion: number; scope: string; customOptions: null };
+  source: { kind: string; schemaVersion: number; scope: string; customOptions: BackupCustomOptions | null };
   writesPaused: boolean;
 }
 export interface BackupControlConfig {
@@ -73,7 +74,7 @@ export interface RemoteConfiguration {
   cache?: { usedBytes: number; limitBytes: number; retentionDays: number };
 }
 export const remoteBackup = {
-  runSelected: (scope: string) => invoke<{ targetId: string; jobId: string | null; localPath: string | null; error: string | null }[]>("backup_run_selected", { scope }),
+  runSelected: (scope: string, includeMail?: boolean) => invoke<{ targetId: string; jobId: string | null; localPath: string | null; error: string | null }[]>("backup_run_selected", { scope, includeMail: includeMail ?? null }),
   config: () => invoke<RemoteConfiguration>("backup_remote_get_config"),
   save: (config: BackupControlConfig, targetId?: string, archivePassword?: string) => invoke<void>("backup_remote_save_config", { config, targetId: targetId ?? null, archivePassword: archivePassword || null }),
   applications: () => invoke<FeishuApplication[]>("backup_feishu_apps"),

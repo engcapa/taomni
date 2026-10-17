@@ -6,13 +6,15 @@ description: 'TASK-08 (AC-25/AC-26/AC-27): 12 messages are delivered and synced;
 
   local index, the unread quick filter keeps it, and a server search of the
 
-  current folder returns it too. Browser mode drives the stub index/server;
+  current folder returns it too. Selecting and deleting the result moves it to
+  Trash and removes it from the search list. Browser mode drives the stub index/server;
 
   native mode exercises SQLite FTS5 and IMAP UID SEARCH on the fake server.
 
   '
 covers:
 - F-MAIL-7
+- F-MAIL-12
 tags:
 - mail
 - p1
@@ -65,6 +67,20 @@ steps:
     contains: Server search found 1 message
     timeout_sec: 30
 - screenshot: mail-search-01.png
+- click: '[aria-label="Select all visible messages"]'
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 1 selected
+- click: '[data-testid="mail-delete-selected"]'
+- wait_for:
+    selector: '[data-testid="mail-message-row"]'
+    state: detached
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 1
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 0 selected
 verification:
   review: reviewed
   requirements:
@@ -105,6 +121,25 @@ verification:
       expectation: '{"assert_text": {"contains": "Server search found 1 message"}}'
     results:
     - 19
+  - id: R3
+    requirement: 搜索结果可以选中并删除到 Trash，成功后从结果列表和选择中移除。
+    actions:
+    - 21
+    - 23
+    checkpoints:
+    - step: 22
+      expectation: 搜索行计入选择数量。
+    - step: 24
+      expectation: 删除的搜索行消失。
+    - step: 25
+      expectation: 服务器 Trash 收到一封邮件。
+    - step: 26
+      expectation: 操作完成后清空选择。
+    results:
+    - 22
+    - 24
+    - 25
+    - 26
   visual:
   - check: 截图中搜索框、范围、快捷过滤与结果行布局完整。
     method: manual

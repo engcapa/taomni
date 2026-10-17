@@ -95,6 +95,8 @@
           "parity009_ssr",
           "parity007_extract",
           "mail_server",
+          "mail_storage",
+          "mail_stress",
           "macos_updater",
           "rdp_server_required",
           "system_rdp_running",
@@ -309,6 +311,97 @@
       "maxProperties": 1,
       "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
       "properties": {
+        "mail_multi_instance_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["data_root", "storage_root", "expected"],
+          "properties": {
+            "data_root": {"type": "string"},
+            "storage_root": {"type": "string"},
+            "expected": {"type": "string"}
+          }
+        },
+        "mail_storage_assert": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "expected"
+          ],
+          "properties": {
+            "root": {
+              "type": "string"
+            },
+            "expected": {
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "storage",
+                "backup"
+              ]
+            },
+            "full": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "headers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "include_mail": {
+              "type": "boolean"
+            },
+            "objects": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "mail_performance_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "label"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "terminal",
+                "read",
+                "send",
+                "concurrency"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            "samples": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 20
+            },
+            "max_p95_ms": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "require_background": {
+              "type": "boolean"
+            }
+          }
+        },
         "native_about": { "type": "null" },
         "updater_fixture_mode": { "enum": ["correct", "broken", "slow"] },
         "updater_release": { "enum": [1, 2] },
@@ -1174,6 +1267,21 @@
               "minimum": 1
             }
           }
+        },
+        "mail_server_sparse_sync": {"type": ["null", "object"], "additionalProperties": false, "properties": {"configure_only": {"type": "boolean"}}},
+        "mail_server_assert_sync_transport": {"type": "null"},
+        "mail_server_archive_fault": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "folder": {"type": "string", "minLength": 1},
+            "size_delta": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+            "empty_newest": {"type": "boolean"}
+          }
+        },
+        "mail_server_delay_next_read": {
+          "type": "object", "additionalProperties": false,
+          "required": ["milliseconds"],
+          "properties": {"milliseconds": {"type": "integer", "minimum": 1, "maximum": 25000}}
         },
         "mail_server_deliver": {
           "type": "object",

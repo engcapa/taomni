@@ -63,6 +63,7 @@ from . import parity008_git
 from . import parity009_ssr
 from . import parity007_extract
 from . import editor_save_race
+from . import mail_storage, mail_stress
 from . import mail_server
 from . import macos_updater
 from . import rdp_server_required
@@ -94,6 +95,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "mail_stress": Fixture("mail_stress", mail_stress.setup),
     "model_inspector_gateway": Fixture("model_inspector_gateway", model_inspector_gateway.setup, model_inspector_gateway.teardown),
     "dual_display_required": Fixture("dual_display_required", dual_display_required.setup),
     "path_completion": Fixture("path_completion", path_completion.setup),
@@ -128,6 +130,7 @@ REGISTRY: dict[str, Fixture] = {
     "parity008_git": Fixture("parity008_git", parity008_git.setup, parity008_git.teardown),
     "parity009_ssr": Fixture("parity009_ssr", parity009_ssr.setup, parity009_ssr.teardown),
     "parity007_extract": Fixture("parity007_extract", parity007_extract.setup, parity007_extract.teardown),
+    "mail_storage": Fixture("mail_storage", mail_storage.setup),
     "mail_server": Fixture("mail_server", mail_server.setup, mail_server.teardown),
     "macos_updater": Fixture("macos_updater", macos_updater.setup, macos_updater.teardown),
     "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),

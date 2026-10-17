@@ -215,3 +215,28 @@ def mail_server_assert_list_matches(ctx: StepContext, args: Any) -> None:
             )
         time.sleep(0.25)
     raise StepError(f"mail_server_assert_list_matches: list does not match server: {last!r}")
+
+
+@verb("mail_storage_assert")
+def mail_storage_assert(ctx: StepContext, args: Any) -> None:
+    if ctx.dry_run:
+        return
+    raise StepError("mail_storage_assert requires native SQLite and MIME files; browser stubs cannot prove disk storage")
+
+
+@verb("mail_performance_probe")
+def mail_performance_probe(ctx: StepContext, args: Any) -> None:
+    from ..mail_performance import run
+    run(ctx, args)
+
+
+@verb("mail_server_delay_next_read")
+def mail_server_delay_next_read(ctx: StepContext, args: Any) -> None:
+    """Hold one folder-read response to exercise other actions while it is pending."""
+    milliseconds = (args or {}).get("milliseconds", 0)
+    if not isinstance(milliseconds, int) or not 1 <= milliseconds <= 25000:
+        raise StepError("mail_server_delay_next_read: milliseconds must be 1..25000")
+    if ctx.dry_run:
+        return
+    _require_control(ctx)
+    ctx.page.evaluate(f"(ms) => {_CONTROL}.delayNextFolderRead(ms)", milliseconds)

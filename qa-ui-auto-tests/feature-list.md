@@ -1695,6 +1695,18 @@ controls:
     selector: '[data-testid="session-proto-mail"]'
     kind: interactive
     optional: true
+  - id: session-section-mail
+    selector: '[data-testid="session-section-mail"]'
+    kind: interactive
+    optional: true
+  - id: mail-imap-port
+    selector: 'input[aria-label="IMAP port"]'
+    kind: interactive
+    optional: true
+  - id: mail-smtp-port
+    selector: 'input[aria-label="SMTP port"]'
+    kind: interactive
+    optional: true
   - id: mail-imap-server
     selector: 'input[aria-label="IMAP server"]'
     kind: interactive
@@ -5977,11 +5989,16 @@ controls:
     selector: '[data-testid="mail-body-warming-progress"]'
     kind: display
     optional: true       # only visible while recent uncached bodies are warming
+  - id: mark-folder-read
+    selector: '[data-testid="mail-mark-folder-read"]'
+    kind: interactive
 -->
 
 - 手工刷新、打开自动刷新和定时刷新默认只同步 headers；headers 写入缓存并重新加载列表后界面即可继续操作。
 - 最近正文缓存按 `bodyRecentLimit` 遍历已缓存 headers，逐封调用 `mail_prefetch_message_body` 写入原生磁盘缓存，并用独立进度显示；预取不向前端传输或渲染正文，手动打开邮件使用独立于同步的 IMAP 连接。
 - 邮件正文读取按 `folder:uid` 缓存在前端内存中；点击已缓存正文优先使用内存/SQLite，自动标记已读不再等待正文加载完成。
+- 整个 IMAP 文件夹标记已读先查询服务器 UNSEEN，涵盖未下载历史；每批最多 250 个 UID，批间释放账号连接锁，网络断连只重试幂等标记。
+- 标记、移动、删除的 SQLite 写入使用后台线程中的批量事务；本地搜索也在后台线程执行。
 - 同步缓存与联系人索引的数据库工作在阻塞线程池执行；新增历史邮件增量收集联系人，正文清理仅更新实际有正文的记录。
 - SMTP 接受后立即显示发送成功并关闭写信窗口；已发送副本由后台保存，通过 `mail-sent-copy` 事件单独提示保存成功或失败。TC-116 覆盖刷新后的阅读/回复，原生并发边界由 `mail::responsiveness_tests` 与隔离 QA 探针验证。
 
@@ -6104,10 +6121,14 @@ controls:
     selector: '[data-testid="mail-save-sent-copy"]'
     kind: interactive
     optional: true       # session editor mail settings; default automatic by provider
+  - id: sent-copy-status
+    selector: '[data-testid="mail-sent-copy-status"]'
+    kind: display
 -->
 
 - 回复/全部回复发送 `In-Reply-To` 与 `References`（转发开启新会话），Thunderbird/Gmail 可将回复归入原会话；同步时缓存每封邮件的 `In-Reply-To`/`References`（schema v3）。
 - 列表“Threads”切换按邮件头严格线程化（不按主题猜测），会话折叠为最新一封并显示数量与未读数，展开后按回复层级缩进；开关按查看者保存在 localStorage。
+- SMTP 接受后立即反馈，Sent 副本结果通过独立提示显示；事件先于发送响应到达、或随后刷新邮箱，都不会覆盖副本结果。
 - 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
 - 手工保存草稿会把草稿 APPEND 到服务器 Drafts（`\Draft \Seen`，按 Message-ID 找回 UID 并替换旧副本）；发送或删除草稿时移除服务器副本；自动保存仍只写本地。
 
@@ -6343,9 +6364,19 @@ controls:
   - id: folder-drop-target
     selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
     kind: interactive
+  - id: delete-selected
+    selector: '[data-testid="mail-delete-selected"]'
+    kind: interactive
+  - id: selection-count
+    selector: '[data-testid="mail-selection-count"]'
+    kind: display
+  - id: select-all-visible
+    selector: '[aria-label="Select all visible messages"]'
+    kind: interactive
 -->
 
 - Thunderbird 风格快捷键（列表焦点下，输入框/编辑器内不生效）：F/B 下一封/上一封，N 下一封未读，R 回复，Shift+R 或 Ctrl/Cmd+Shift+R 全部回复，Ctrl/Cmd+L 转发，M 切换已读，S 星标，A 归档，J/Shift+J 垃圾/非垃圾，Del 删除，Ctrl/Cmd+Shift+K 聚焦搜索。Ctrl+Shift+L（聊天）与 Ctrl+Shift+S（服务器）保持全局含义。
+- 列表支持复选框、Ctrl/Cmd 点击、Shift 范围选择；普通点击或键盘导航选择单封，可继续追加选择。列表内 Ctrl/Cmd+A 选择已显示的行，Escape 清空选择。独立工具条显示选中数量和 Delete selected，普通删除移入 Trash，永久删除须确认。标记整文件夹已读进行中仍可删除新选择，已读完成保留当前选择。批量请求按 250 封分批，成功批次立即更新界面；跨文件夹或未加载页面的搜索结果同样参与批量操作。
 - 邮件行可拖到文件夹树：默认移动，按住 Ctrl（macOS 为 Option）复制；勾选多封时拖动全部勾选项。
 - 长列表的行使用 `content-visibility: auto`，屏幕外的行跳过布局和绘制，同时保留在 DOM 中（查找、无障碍与选择不受影响）；未引入虚拟列表依赖。
 
@@ -6993,6 +7024,123 @@ controls:
 - 未完成：只读取第一个日历；不在应用内新建/编辑事件；不走会话代理；服务器不支持 `expand` 时，带 TZID 的时间按发件人时区的时刻显示（无时区库），重复事件只显示首个实例。
 
 ---
+
+### 13.23 完整邮件存储、本地归档与目录迁移
+
+<!-- feature
+id: F-MAIL-23
+status: partial
+area: mail/storage
+components: [MailStorageSettings, MailArchivePanel, SessionEditor, MailClientTab]
+files:
+  - src/components/mail/MailStorageSettings.tsx
+  - src/components/mail/MailArchivePanel.tsx
+  - src/components/session/SessionEditor.tsx
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mail.ts
+  - src/lib/mailFolders.ts
+  - src/stubs/mailArchiveStub.ts
+  - src-tauri/src/mail/storage.rs
+  - src-tauri/src/mail/archive.rs
+  - src-tauri/src/mail/coordination.rs
+  - src-tauri/src/state.rs
+  - src-tauri/src/session/mod.rs
+controls:
+  - id: mail-storage-settings
+    selector: '[data-testid="mail-storage-settings"]'
+    kind: display
+  - id: mail-storage-directory
+    selector: '[data-testid="mail-storage-directory"]'
+    kind: interactive
+  - id: mail-storage-browse
+    selector: '[data-testid="mail-storage-browse"]'
+    kind: interactive
+  - id: mail-storage-mode
+    selector: '[data-testid="mail-storage-mode"]'
+    kind: interactive
+  - id: mail-storage-folders
+    selector: '[data-testid="mail-storage-folders"]'
+    kind: interactive
+  - id: mail-storage-folder-names
+    selector: '[data-testid="mail-storage-folder-names"]'
+    kind: interactive
+  - id: mail-imap-security
+    selector: '[data-testid="mail-imap-security"]'
+    kind: interactive
+  - id: mail-smtp-security
+    selector: '[data-testid="mail-smtp-security"]'
+    kind: interactive
+  - id: mail-storage-progress
+    selector: '[data-testid="mail-storage-progress"]'
+    kind: display
+  - id: mail-storage-pause
+    selector: '[data-testid="mail-storage-pause"]'
+    kind: interactive
+  - id: mail-storage-resume
+    selector: '[data-testid="mail-storage-resume"]'
+    kind: interactive
+  - id: mail-archive-open
+    selector: '[data-testid="mail-archive-open"]'
+    kind: interactive
+  - id: mail-archive-dialog
+    selector: '[data-testid="mail-archive-dialog"]'
+    kind: display
+  - id: mail-archive-close
+    selector: '[data-testid="mail-archive-close"]'
+    kind: interactive
+  - id: mail-archive-refresh
+    selector: '[data-testid="mail-archive-refresh"]'
+    kind: interactive
+  - id: mail-archive-cleanup
+    selector: '[data-testid="mail-archive-cleanup"]'
+    kind: interactive
+  - id: mail-archive-prev
+    selector: '[data-testid="mail-archive-prev"]'
+    kind: interactive
+  - id: mail-archive-next
+    selector: '[data-testid="mail-archive-next"]'
+    kind: interactive
+  - id: mail-archive-confirm
+    selector: '[data-testid="mail-archive-confirm"]'
+    kind: display
+  - id: mail-archive-confirm-remove
+    selector: '[data-testid="mail-archive-confirm-remove"]'
+    kind: interactive
+  - id: mail-archive-confirm-cancel
+    selector: '[data-testid="mail-archive-confirm-cancel"]'
+    kind: interactive
+  - id: mail-archive-notice
+    selector: '[data-testid="mail-archive-notice"]'
+    kind: display
+  - id: mail-archive-entries
+    selector: '[data-testid="mail-archive-entries"]'
+    kind: display
+  - id: mail-archive-row
+    selector: '[data-testid="mail-archive-row"]'
+    kind: interactive
+  - id: mail-archive-read
+    selector: '[data-testid="mail-archive-read"]'
+    aliases:
+      - '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]'
+    kind: interactive
+  - id: mail-archive-preview
+    selector: '[data-testid="mail-archive-preview"]'
+    kind: display
+  - id: mail-archive-export
+    selector: '[data-testid="mail-archive-export"]'
+    kind: interactive
+  - id: mail-archive-attachment
+    selector: '[data-testid="mail-archive-attachment"]'
+    kind: interactive
+-->
+
+- 每会话可设置目录；默认仍为应用 mail-cache。完整原件按封 gzip 压缩，包含 MIME 正文、内联资源及附件，SHA-256 校验和去重。
+- IMAP 原件以实际字节范围与 EOF 确认完整性，兼容不准确的 RFC822.SIZE；空正文或错误范围保留明确的文件夹/UID 错误，不阻塞其它可读取邮件，也不把失败项永久跳过。`TC-MAIL-STORAGE-03` 通过真实 Retry 和独立 MIME/附件校验覆盖恢复流程。
+- IMAP 全部/仅选中/排除文件夹均保留其它文件夹的摘要。后台暂停保留可续传片段，普通删除/远端消失保留归档，主动清理才物理删除最后引用。
+- 本地归档独立于实时邮件列表，可以读取/导出服务器已消失的邮件。POP3 原始本地库保持兼容并保留压缩归档。
+- 文件夹候选只来自当前账号的本地同步缓存，离线仍可用；首次连接前为空并显示提示。复选框显示解码名称，保存完整的服务器原始键；切换账号丢弃旧候选和迟到回复。
+- `TC-MAIL-STORAGE-01` 为 browser；`TC-MAIL-STORAGE-02` 为 Linux/Windows/macOS native，分别验证 UI 和独立磁盘/备份字节。`TC-MAIL-PERF-01/02` 覆盖大量邮件、多个会话和终端并发；`TC-MAIL-PERF-03` 用两个真实 QA 进程共享邮箱目录，检查下载互斥、暂停、迁移和清理。用户已授权 Linux 本机执行，Windows/macOS 本轮只编写；具体运行证据及未验证边界见 `docs-feature/mail-complete-storage-design.md`。
+
 
 ## 14. SocksCap 网络流量路由
 
@@ -10608,6 +10756,12 @@ files:
   - src-tauri/src/backup/credentials.rs
   - src-tauri/src/backup/feishu/auth.rs
 controls:
+  - id: backup-selected-include-mail
+    selector: '[data-testid="backup-selected-include-mail"]'
+    kind: interactive
+  - id: backup-cloud-include-mail
+    selector: '[data-testid="backup-cloud-include-mail"]'
+    kind: interactive
   - id: cloud-panel
     selector: '[data-testid="backup-cloud-panel"]'
     kind: display
@@ -10707,6 +10861,15 @@ files:
   - src/stores/backupStore.ts
   - src/components/settings/BackupSettingsPanel.tsx
 controls:
+  - id: backup-scope
+    selector: '[data-testid="backup-scope"]'
+    kind: interactive
+  - id: backup-include-mail
+    selector: '[data-testid="backup-include-mail"]'
+    kind: interactive
+  - id: backup-auto-include-mail
+    selector: '[data-testid="backup-auto-include-mail"]'
+    kind: interactive
   - id: auto-toggle
     selector: '[data-testid="backup-auto-toggle"]'
     kind: interactive
@@ -10725,6 +10888,7 @@ controls:
 -->
 
 - 原生后台在启动时及运行中每分钟检查到期备份；daily/weekly 距上次成功备份满 24 小时/7 天触发，休眠恢复后补做一次当前快照，失败后下次检查重试。`on_exit` 在正常退出前完成备份。
+- 备份设置立即显示最新编辑，连续修改按顺序保存；旧策略回读及历史刷新不能覆盖新选择，失败恢复已保存策略并允许重试。
 - 手动与自动备份串行执行，自动备份使用配置范围、目录和保留数量；完成后设置页自动刷新历史和上次成功时间。策略更新保留后台最新时间戳。
 - 共用同一数据目录的实例以系统文件锁协调备份、策略更新、轮转、删除和恢复读取；获得锁后重读策略，daily/weekly 每个到期周期只生成一次。锁在进程退出或崩溃后自动释放。设置页打开期间每 15 秒读取共享历史和策略，显示其他实例的结果。
 
@@ -11542,3 +11706,5 @@ controls:
 > - Ribbon `Tools`（除 Tunneling 之外的网络工具）
 > - Ribbon `Packages`、`Macros`
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
+
+- TC-MAIL-SYNC-03: native sparse UID command limits, FETCH reconnect, gap-free catch-up and full remote deletion/flag reconciliation (F-MAIL-5/F-MAIL-3).

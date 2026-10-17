@@ -614,6 +614,9 @@ function sessionToMailTabInfo(
       bodyMaxBytes: mailNumberOption(opts, "mailBodyMaxBytes", 262144, 1024),
       attachmentCache: opts.mailAttachmentCache === true,
       saveDirectory: str("mailSaveDirectory") || null,
+      storageDirectory: str("mailStorageDirectory") || null,
+      fullMessageMode: opts.mailFullMessageMode === "include" || opts.mailFullMessageMode === "exclude" ? opts.mailFullMessageMode : "all",
+      fullMessageFolders: Array.isArray(opts.mailFullMessageFolders) ? opts.mailFullMessageFolders.filter((v): v is string => typeof v === "string") : [],
     },
     ai: {
       enabled: opts.mailAiEnabled !== false,

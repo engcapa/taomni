@@ -1,3 +1,4 @@
+import { mailArchiveStub } from "./mailArchiveStub";
 import { voiceStub } from "./voiceStub";
 import { goStubCatalog } from "./opencodeGoStub";
 import { inspectorStub, inspectorCheckStub } from "./modelInspectorStub";
@@ -18,6 +19,7 @@ import {
   stubMailRecordSent,
   stubMailTransfer,
   stubMailUpdateCachedFlags,
+  stubMailMarkRead,
   type Seed as MailStubSeed,
   type StubMailSearchQuery,
 } from "./mailServerStub";
@@ -1410,6 +1412,7 @@ const MAIL_STUB_FOLDERS = [
   { name: "INBOX", displayName: "INBOX", total: 3, unread: 1 },
   { name: "Sent", displayName: "Sent", total: 1, unread: 0 },
   { name: "Archive", displayName: "Archive", total: 8, unread: 0 },
+  { name: "Trash", displayName: "Trash", total: 0, unread: 0 },
 ];
 
 function stubMailAccountId(args?: InvokeArgs): string {
@@ -1418,6 +1421,7 @@ function stubMailAccountId(args?: InvokeArgs): string {
 }
 
 function stubMailMessages(accountId: string, folder: string) {
+  if (folder === "Trash") return [];
   const now = Math.floor(Date.now() / 1000);
   const inbox = [
     {
@@ -1760,6 +1764,18 @@ function stubSystemRdpStatus(): Record<string, unknown> {
 }
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (cmd === "backup_get_policy") {
+    return JSON.parse(localStorage.getItem("taomni.backup.policy") || JSON.stringify({
+      autoBackupEnabled: false, frequency: "weekly", maxRetainedCopies: 7,
+      defaultScope: "core", includeMail: null, lastBackupAt: null,
+    })) as T;
+  }
+  if (cmd === "backup_set_policy") {
+    localStorage.setItem("taomni.backup.policy", JSON.stringify((args as { policy: unknown }).policy));
+    return undefined as T;
+  }
+  if (cmd === "backup_list_history") return [] as T;
+  if (cmd === "backup_get_default_dir") return "/preview/backups" as T;
   if (cmd.startsWith("backup_remote_") || cmd.startsWith("backup_feishu_")) {
     return await (await import("./remoteBackupStub")).remoteBackupStub(cmd, args) as T;
   }
@@ -4230,6 +4246,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     // ---------- Mail client commands (browser preview stubs) ----------
+    case "mail_archive_start":
+    case "mail_archive_pause":
+    case "mail_archive_status":
+    case "mail_archive_list":
+    case "mail_archive_read":
+    case "mail_archive_export":
+    case "mail_archive_attachment":
+    case "mail_archive_remove":
+      return mailArchiveStub(cmd, (args ?? {}) as Record<string, unknown>, mailStubSeed, stubMailBody) as T;
     case "mail_list_cached_folders": {
       return stubMailListFolders(stubMailAccountId(args as InvokeArgs | undefined), mailStubSeed) as T;
     }
@@ -4336,8 +4361,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
       const all = Boolean(invokeArgs?.all);
-      stubMailUpdateCachedFlags(stubMailAccountId(invokeArgs), folder, uids, ["\\Seen"], []);
-      return { folder, marked: all ? 1 : uids.length } as T;
+      return await stubMailMarkRead(stubMailAccountId(invokeArgs), mailStubSeed, folder, uids, all) as T;
     }
     case "mail_send_message": {
       const invokeArgs = args as InvokeArgs | undefined;

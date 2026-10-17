@@ -445,3 +445,143 @@ fn test_backup_restore_replaces_mfa_db_and_keeps_safety_copy() {
         "safety copy keeps the pre-restore mfa.db"
     );
 }
+
+#[test]
+fn complete_mail_snapshot_survives_cleanup_and_restores_from_a_custom_directory() {
+    use super::engine::{pack_staged_archive, snapshot_mail};
+    use super::restore::{apply_pending_restore, stage_restore_to_dir};
+    use crate::mail::storage;
+    let custom = tempdir().unwrap();
+    let staging = tempdir().unwrap();
+    let restore = tempdir().unwrap();
+    let stem = crate::state::mail_db_file_stem("mail-qa");
+    let db = Connection::open(custom.path().join(format!("{stem}.db"))).unwrap();
+    crate::mail::init_mail_tables(&db).unwrap();
+    let raw = format!(
+        "Subject: retained original\r\n\r\n{}",
+        "mail with attachment\r\n".repeat(40_000)
+    )
+    .into_bytes();
+    storage::store(&db, "mail-qa", "INBOX", 1, 4, raw.as_slice()).unwrap();
+    let files = snapshot_mail(&db, Some("mail-qa"), staging.path()).unwrap();
+    assert_eq!(files.len(), 2);
+    let entries = storage::list(&db, "mail-qa", 0).unwrap();
+    storage::remove_entries(&db, "mail-qa", &entries).unwrap();
+    assert!(storage::list(&db, "mail-qa", 0).unwrap().is_empty());
+    let archive = staging.path().join("mail.taobak");
+    pack_staged_archive(&files, "test", "full", Some("qa-password"), &archive).unwrap();
+    let result = stage_restore_to_dir(restore.path(), &archive, Some("qa-password")).unwrap();
+    assert!(
+        result
+            .manifest
+            .files
+            .iter()
+            .any(|f| f.path.ends_with(".eml.gz"))
+    );
+    let target_db = restore.path().join("mail-cache").join(format!("{stem}.db"));
+    let cached = crate::mail::coordination::MailDatabase::new(target_db.clone());
+    drop(cached.lock().unwrap());
+    crate::mail::coordination::write_redirect(
+        &target_db,
+        &custom.path().join(format!("{stem}.db")),
+    )
+    .unwrap();
+    let worker = crate::mail::coordination::ProcessLock::try_at(&target_db, "archive")
+        .unwrap()
+        .unwrap();
+    assert!(
+        apply_pending_restore(restore.path())
+            .unwrap_err()
+            .contains("Another instance")
+    );
+    drop(worker);
+    apply_pending_restore(restore.path()).unwrap();
+    assert!(!crate::mail::coordination::redirect_path(&target_db).exists());
+    assert_eq!(
+        storage::read(&cached.lock().unwrap(), "mail-qa", "INBOX", 1)
+            .unwrap()
+            .unwrap(),
+        raw
+    );
+    let restored =
+        Connection::open(restore.path().join("mail-cache").join(format!("{stem}.db"))).unwrap();
+    assert_eq!(
+        storage::read(&restored, "mail-qa", "INBOX", 1)
+            .unwrap()
+            .unwrap(),
+        raw
+    );
+}
+
+#[test]
+fn mail_backup_choice_overrides_core_and_full_without_losing_other_scope_flags() {
+    use super::engine::{BackupCustomOptions, resolve_scope_flags};
+    let include = resolve_scope_flags(
+        "core",
+        Some(BackupCustomOptions {
+            include_mail: true,
+            ..Default::default()
+        }),
+    );
+    assert!(
+        include.mail
+            && include.sessions
+            && include.notes
+            && include.vault
+            && include.configs
+            && include.mfa
+    );
+    assert!(!include.lanchat);
+    let exclude = resolve_scope_flags(
+        "full",
+        Some(BackupCustomOptions {
+            include_mail: false,
+            ..Default::default()
+        }),
+    );
+    assert!(!exclude.mail);
+    assert!(exclude.lanchat && exclude.sessions && exclude.mfa);
+    assert!(resolve_scope_flags("full", None).mail);
+    assert!(!resolve_scope_flags("core", None).mail);
+}
+
+#[test]
+fn portable_mail_settings_never_restore_an_external_absolute_directory() {
+    let db = Connection::open_in_memory().unwrap();
+    crate::session::db::init_db(&db).unwrap();
+    db.execute("INSERT INTO sessions(id,name,session_type,options_json,created_at,updated_at) VALUES('qa','QA','Mail',?1,0,0)",[r#"{"mailStorageDirectory":"/another-machine/private","mailFullMessageMode":"include","mailFullMessageFolders":["INBOX"]}"#]).unwrap();
+    super::engine::portable_mail_paths(&db).unwrap();
+    let session = crate::session::db::get_session(&db, "qa").unwrap();
+    let options: serde_json::Value = serde_json::from_str(&session.options_json).unwrap();
+    assert!(options.get("mailStorageDirectory").is_none());
+    assert_eq!(
+        options["mailFullMessageFolders"],
+        serde_json::json!(["INBOX"])
+    );
+}
+
+#[test]
+fn streaming_encryption_rejects_truncation_reordering_and_trailing_frames() {
+    use super::crypto::{decrypt_stream, encrypt_stream};
+    let raw = vec![0x5a; 2 * 1024 * 1024 + 11];
+    let mut encrypted = vec![];
+    encrypt_stream(raw.as_slice(), "qa-stream", &mut encrypted).unwrap();
+    let mut decoded = vec![];
+    decrypt_stream(encrypted.as_slice(), "qa-stream", &mut decoded).unwrap();
+    assert_eq!(decoded, raw);
+    assert!(
+        decrypt_stream(
+            &encrypted[..encrypted.len() - 20],
+            "qa-stream",
+            std::io::sink()
+        )
+        .is_err()
+    );
+    let header = 13 + 16 + 12;
+    let frame = 4 + 1024 * 1024 + 16;
+    let mut swapped = encrypted.clone();
+    swapped[header..header + frame].copy_from_slice(&encrypted[header + frame..header + 2 * frame]);
+    assert!(decrypt_stream(swapped.as_slice(), "qa-stream", std::io::sink()).is_err());
+    encrypted.push(0);
+    assert!(decrypt_stream(encrypted.as_slice(), "qa-stream", std::io::sink()).is_err());
+}

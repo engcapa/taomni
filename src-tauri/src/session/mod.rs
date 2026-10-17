@@ -6,7 +6,7 @@ pub mod resume;
 
 use crate::state::AppState;
 use models::{SessionConfig, SessionGroup};
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]
 pub async fn list_sessions(
@@ -24,7 +24,18 @@ pub async fn get_session(id: String, state: State<'_, AppState>) -> Result<Sessi
 }
 
 #[tauri::command]
-pub async fn save_session(config: SessionConfig, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn save_session(
+    config: SessionConfig,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if config.session_type == models::SessionType::Mail {
+        return tokio::task::spawn_blocking(move || {
+            crate::mail::storage::save_mail_session(&app.state::<AppState>(), &config)
+        })
+        .await
+        .map_err(|e| format!("Save mail storage task failed: {e}"))?;
+    }
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db::save_session(&db, &config).map_err(|e| e.to_string())
 }

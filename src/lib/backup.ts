@@ -61,6 +61,7 @@ export interface BackupPolicy {
   customBackupDir?: string | null;
   maxRetainedCopies: number;
   defaultScope: string;
+  includeMail?: boolean | null;
   lastBackupAt?: number | null;
 }
 

@@ -265,6 +265,8 @@ export interface MailSyncOptions {
 export interface MailMarkReadResult {
   folder: string;
   marked: number;
+  /** Current server count after marking a whole IMAP folder. */
+  unread?: number;
 }
 
 export interface MailFlagResult {
@@ -834,3 +836,32 @@ export function mailDeleteFolder(config: MailTabInfo, name: string): Promise<Mai
     invoke<MailFolder[]>("mail_delete_folder", { config, name }),
   );
 }
+
+
+export interface MailArchiveStatus {
+  phase: "idle" | "connecting" | "headers" | "downloading" | "verifying" | "pausing" | "paused" | "completed" | "failed" | "shared";
+  folder?: string | null;
+  saved: number;
+  total: number;
+  bytes: number;
+  totalBytes?: number | null;
+  error?: string | null;
+}
+export interface MailArchiveEntry {
+  folder: string;
+  uid: number;
+  uidValidity: number;
+  subject: string;
+  rawSize: number;
+  storedSize: number;
+  storedAt: number;
+}
+export const mailArchiveStart = (config: MailTabInfo, resume = false) => invoke<void>("mail_archive_start", { config, resume });
+export const mailArchivePause = (accountId: string) => invoke<void>("mail_archive_pause", { accountId });
+export const mailArchiveStatus = (accountId: string) => invoke<MailArchiveStatus>("mail_archive_status", { accountId });
+export const mailArchiveList = (accountId: string, offset = 0) => invoke<MailArchiveEntry[]>("mail_archive_list", { accountId, offset });
+export const mailArchiveRead = (accountId: string, entry: MailArchiveEntry) => invoke<MailMessageBody>("mail_archive_read", { accountId, entry });
+export const mailArchiveExport = (accountId: string, entry: MailArchiveEntry, targetPath: string) => invoke<void>("mail_archive_export", { accountId, entry, targetPath });
+export const mailArchiveRemove = (accountId: string, entries: MailArchiveEntry[]) => invoke<number>("mail_archive_remove", { accountId, entries });
+
+export const mailArchiveAttachment = (accountId: string, entry: MailArchiveEntry, attachmentIndex: number, targetPath: string) => invoke<void>("mail_archive_attachment", { accountId, entry, attachmentIndex, targetPath });

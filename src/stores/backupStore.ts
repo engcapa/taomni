@@ -47,6 +47,9 @@ interface BackupStore {
 }
 
 let latestHistoryRequest = 0;
+let policyEditVersion = 0;
+let pendingPolicyWrites = 0;
+let policyWriteQueue: Promise<void> = Promise.resolve();
 
 export const useBackupStore = create<BackupStore>((set, get) => ({
   policy: null,
@@ -78,11 +81,15 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
   refreshHistory: async () => {
     const request = ++latestHistoryRequest;
     try {
+      while (pendingPolicyWrites > 0) await policyWriteQueue;
+      const editVersion = policyEditVersion;
       const [history, policy] = await Promise.all([
         listBackupHistory(),
         getBackupPolicy(),
       ]);
-      if (request === latestHistoryRequest) set({ history, policy });
+      if (request === latestHistoryRequest && editVersion === policyEditVersion && pendingPolicyWrites === 0) {
+        set({ history, policy });
+      }
     } catch (e) {
       if (request === latestHistoryRequest) {
         set({ error: e instanceof Error ? e.message : String(e) });
@@ -94,15 +101,31 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
     const current = get().policy;
     if (!current) return;
     const next: BackupPolicy = { ...current, ...patch };
-    try {
-      await setBackupPolicy(next);
-      // The backend preserves the latest timestamp from automatic backups.
-      const policy = await getBackupPolicy();
-      set({ policy });
-    } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) });
-      throw e;
-    }
+    const version = ++policyEditVersion;
+    pendingPolicyWrites += 1;
+    // Keep controlled inputs at the latest choice while IPC/disk is pending.
+    set({ policy: next, error: null });
+    const operation = policyWriteQueue.then(async () => {
+      try {
+        await setBackupPolicy(next);
+        // The backend preserves timestamps written by automatic backups.
+        const policy = await getBackupPolicy();
+        if (version === policyEditVersion) set({ policy });
+      } catch (e) {
+        if (version === policyEditVersion) {
+          const policy = await getBackupPolicy().catch(() => current);
+          if (version === policyEditVersion) {
+            set({ policy, error: e instanceof Error ? e.message : String(e) });
+          }
+        }
+        throw e;
+      } finally {
+        pendingPolicyWrites -= 1;
+      }
+    });
+    // A failed write must not prevent subsequent edits from being saved.
+    policyWriteQueue = operation.catch(() => {});
+    await operation;
   },
 
   triggerBackup: async (params) => {

@@ -121,6 +121,18 @@ class FakeMailState:
         # CalDAV resources: href -> (etag, iCalendar text).
         self.caldav: dict[str, tuple[str, str]] = {}
         self.caldav_etag = 0
+        self.advertise_condstore = True
+        self.max_command_bytes = 4096
+        self.drop_next_fetch = False
+        self.dropped_fetches = 0
+        self.rejected_commands = 0
+        self.next_seen_store_delay = 0.0
+        self.fetch_active = 0
+        self.fetch_max_parallel = 0
+        self.fetch_events: list[dict] = []
+        self.fetch_inflight: list[dict] = []
+        self.archive_reported_sizes: dict[tuple[str, int], int] = {}
+        self.archive_empty_bodies: set[tuple[str, int]] = set()
 
     def idle_clients(self) -> int:
         """Connections currently in IDLE (AC-37: zero after the tab closes)."""
@@ -251,7 +263,13 @@ def _uid_ranges(spec: str, maximum: int) -> list[tuple[int, int]]:
         except ValueError:
             continue
         ranges.append((min(lo, hi), max(lo, hi)))
-    return ranges
+    merged = []
+    for lo, hi in sorted(ranges):
+        if merged and lo <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], hi))
+        else:
+            merged.append((lo, hi))
+    return merged
 
 
 def _in(uid: int, ranges: list[tuple[int, int]]) -> bool:
@@ -365,6 +383,13 @@ class _ImapHandler(socketserver.StreamRequestHandler):
             upper = rest.upper()
             with state.lock:
                 state.log.append(rest)
+                if len(line) > state.max_command_bytes:
+                    state.rejected_commands += 1
+                    return
+                if state.drop_next_fetch and upper.startswith("UID FETCH") and upper.endswith("(UID FLAGS)"):
+                    state.drop_next_fetch = False
+                    state.dropped_fetches += 1
+                    return
             ok = f"{tag} OK done\r\n"
             out: list[bytes] = []
             with state.lock:
@@ -374,7 +399,8 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     self.send("* BYE bye\r\n" + ok)
                     return
                 elif upper.startswith("CAPABILITY"):
-                    out.append(b"* CAPABILITY IMAP4rev1 UIDPLUS MOVE IDLE CONDSTORE SPECIAL-USE\r\n")
+                    capabilities = "IMAP4rev1 UIDPLUS MOVE IDLE SPECIAL-USE" + (" CONDSTORE" if state.advertise_condstore else "")
+                    out.append(f"* CAPABILITY {capabilities}\r\n".encode())
                 elif upper.startswith(("LIST", "LSUB")):
                     lsub = upper.startswith("LSUB")
                     specials = {"Sent": "\\Sent", "Drafts": "\\Drafts", "Trash": "\\Trash", "Archive": "\\Archive"}
@@ -433,7 +459,7 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     items_upper = items.upper()
                     since_match = re.search(r"CHANGEDSINCE (\d+)", items_upper)
                     since = int(since_match.group(1)) if since_match else None
-                    peek = re.search(r"BODY\.PEEK\[\]<0\.(\d+)>", items_upper)
+                    peek = re.search(r"BODY\.PEEK\[\]<(\d+)\.(\d+)>", items_upper)
                     ranges = _uid_ranges(uid_spec, max(folder.messages, default=0))
                     for seq, (uid, message) in enumerate(sorted(folder.messages.items()), start=1):
                         if not _in(uid, ranges) or (since is not None and message.modseq <= since):
@@ -442,7 +468,8 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                         if since is not None:
                             parts.append(f"MODSEQ ({message.modseq})")
                         if "RFC822.SIZE" in items_upper:
-                            parts.append(f"RFC822.SIZE {len(message.raw)}")
+                            size = state.archive_reported_sizes.get((selected or "INBOX", uid), len(message.raw))
+                            parts.append(f"RFC822.SIZE {size}")
                         if "INTERNALDATE" in items_upper:
                             parts.append(f'INTERNALDATE "{_internal_date(message.internal_ts)}"')
                         chunk = f"* {seq} FETCH ({' '.join(parts)}".encode()
@@ -451,8 +478,11 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                             header = message.raw[: end + 4] if end >= 0 else message.raw
                             chunk += f" BODY[HEADER] {{{len(header)}}}\r\n".encode() + header
                         if peek:
-                            body = message.raw[: int(peek.group(1))]
-                            chunk += f" BODY[]<0> {{{len(body)}}}\r\n".encode() + body
+                            offset, length = int(peek.group(1)), int(peek.group(2))
+                            body = message.raw[offset:offset + length]
+                            if (selected or "INBOX", uid) in state.archive_empty_bodies:
+                                body = b""
+                            chunk += f" BODY[]<{offset}> {{{len(body)}}}\r\n".encode() + body
                         elif "BODY.PEEK[]" in items_upper or "RFC822)" in items_upper:
                             chunk += f" BODY[] {{{len(message.raw)}}}\r\n".encode() + message.raw
                         out.append(chunk + b")\r\n")
@@ -461,8 +491,9 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     uid_spec, _, spec = rest[10:].strip().partition(" ")
                     flags = re.findall(r"[\\$]?\w+", spec[spec.find("(") + 1: spec.rfind(")")]) if "(" in spec else []
                     modseq = state.bump()
+                    ranges = _uid_ranges(uid_spec, max(folder.messages, default=0))
                     for uid in list(folder.messages):
-                        if not _in(uid, _uid_ranges(uid_spec, max(folder.messages, default=0))):
+                        if not _in(uid, ranges):
                             continue
                         message = folder.messages[uid]
                         if spec.startswith("+"):
@@ -528,7 +559,34 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                 self.send("+ idling\r\n")
                 self._idle(waiter, tag)
                 continue
-            self.send(b"".join(out) + ok.encode())
+            if upper.startswith("UID FETCH"):
+                event = {"started": time.monotonic(), "thread": threading.get_ident(),
+                         "connection": self.client_address[1], "folder": selected,
+                         "command": rest, "bytes": sum(map(len, out))}
+                with state.lock:
+                    state.fetch_active += 1
+                    state.fetch_max_parallel = max(state.fetch_max_parallel, state.fetch_active)
+                    state.fetch_inflight.append(event)
+                try:
+                    if "BODY.PEEK[HEADER]" in upper:
+                        time.sleep(getattr(state, "header_fetch_delay", 0))
+                    elif "BODY.PEEK[]<" in upper:
+                        time.sleep(getattr(state, "archive_chunk_delay", 0))
+                    self.send(b"".join(out) + ok.encode())
+                finally:
+                    with state.lock:
+                        state.fetch_active -= 1
+                        state.fetch_inflight.remove(event)
+                        event["finished"] = time.monotonic()
+                        state.fetch_events.append(event)
+            else:
+                if upper.startswith("UID STORE") and "\\SEEN" in upper and "+FLAGS" in upper:
+                    with state.lock:
+                        delay = state.next_seen_store_delay
+                        state.next_seen_store_delay = 0.0
+                    # Delay the response without blocking other server connections.
+                    time.sleep(delay)
+                self.send(b"".join(out) + ok.encode())
 
     def _idle(self, waiter: threading.Event, tag: str) -> None:
         # select() instead of socket timeouts: a timed-out buffered makefile()

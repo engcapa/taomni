@@ -1,0 +1,110 @@
+id: TC-MAIL-SYNC-03
+title: Sparse UID sync reconnects without oversized commands and retains remote changes
+description: 'Real native IMAP: deliver 1100 sparse ten-digit UIDs, disconnect one synchronization FLAGS
+  FETCH, enforce a 4 KiB command limit. Sync releases its button while all pending headers finish; full
+  reconciliation retains remote deletions and read flags. Browser mocks cannot establish wire command
+  lengths or reconnects.'
+covers:
+- F-MAIL-5
+- F-MAIL-3
+tags:
+- mail
+- p0
+- concurrency
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- mail_server_sparse_sync:
+    configure_only: true
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_sparse_sync: null
+- click: '[data-testid="mail-sync-button"]'
+- wait_for:
+    selector: '[data-testid="mail-sync-button"]:enabled'
+    timeout_sec: 30
+- mail_server_assert_list_matches:
+    timeout_sec: 120
+- mail_server_expunge_newest:
+    count: 3
+- mail_server_set_flags_newest:
+    count: 2
+    flags:
+    - \Seen
+- click: '[data-testid="mail-sync-button"]'
+- wait_for:
+    selector: '[data-testid="mail-sync-button"]:enabled'
+    timeout_sec: 30
+- mail_server_assert_list_matches:
+    unread: true
+    timeout_sec: 120
+- mail_server_assert_sync_transport: null
+- screenshot: mail-sync-sparse-reconnect.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A transient FETCH disconnect recovers, all sparse UID headers arrive without oversized
+      commands, and subsequent full Sync applies remote deletions and flags.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 10
+    - 11
+    - 14
+    - 15
+    - 16
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
+    - step: 9
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-sync-button\"]:enabled", "timeout_sec":
+        30}}'
+    - step: 13
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-sync-button\"]:enabled", "timeout_sec":
+        30}}'
+    - step: 18
+      expectation: '{"mail_server_assert_list_matches": {"unread": true, "timeout_sec": 120}}'
+    - step: 19
+      expectation: '{"mail_server_assert_sync_transport": null}'
+    results:
+    - 13
+    - 18
+    - 19
+  visual:
+  - check: Sync button and reconciled list remain readable.
+    method: manual
+    reason: Inspect retained screenshot.
+  native:
+  - check: Real Tauri IMAP protocol command sizes, reconnect and SQLite continuation.
+    method: automated
+    reason: Browser stubs cannot prove these protocol and persistence boundaries.

@@ -268,6 +268,9 @@ export interface MailCacheSettings {
   bodyMaxBytes: number;
   attachmentCache: boolean;
   saveDirectory?: string | null;
+  storageDirectory?: string | null;
+  fullMessageMode?: "all" | "include" | "exclude";
+  fullMessageFolders?: string[];
 }
 
 export interface MailAiSettings {

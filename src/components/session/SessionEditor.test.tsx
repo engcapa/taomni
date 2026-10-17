@@ -1393,6 +1393,9 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     await user.type(screen.getByLabelText("Mail password or app password token"), "imap-secret");
     await user.type(screen.getByLabelText("SMTP server"), "smtp.example.com");
     await user.type(screen.getByLabelText("Mail save directory"), "D:\\mail-cache");
+    await user.type(screen.getByTestId("mail-storage-directory"), "D:\\complete-mail");
+    await user.selectOptions(screen.getByTestId("mail-storage-mode"), "include");
+    fireEvent.change(screen.getByTestId("mail-storage-folder-names"), { target: { value: "INBOX\nProjects/Work\nINBOX\n" } });
 
     await user.click(screen.getByRole("button", { name: /appearance/i }));
     expect(screen.getByTestId("mail-appearance-settings")).toBeInTheDocument();
@@ -1421,6 +1424,9 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(savedOptions.mailEmailAddress).toBeUndefined();
     expect(savedOptions.mailSmtpHost).toBe("smtp.example.com");
     expect(savedOptions.mailSaveDirectory).toBe("D:\\mail-cache");
+    expect(savedOptions.mailStorageDirectory).toBe("D:\\complete-mail");
+    expect(savedOptions.mailFullMessageMode).toBe("include");
+    expect(savedOptions.mailFullMessageFolders).toEqual(["INBOX", "Projects/Work"]);
     expect(savedOptions.passwordRef).toBe("vault:pwd");
     expect(savedOptions.terminalProfile).toMatchObject({
       theme: "code:dracula",

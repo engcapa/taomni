@@ -29,7 +29,7 @@ def is_check(step: dict) -> bool:
         return "phase" in args
     if verb in {"parity008_trace", "parity009_trace"}:
         return bool(args)
-    if verb in {"mail_server_assert_list_matches", "mail_server_assert_folder_count", "mail_server_assert_idle_clients",
+    if verb in {"mail_multi_instance_probe", "mail_storage_assert", "mail_performance_probe", "mail_server_assert_list_matches", "mail_server_assert_sync_transport", "mail_server_assert_folder_count", "mail_server_assert_idle_clients",
                 "mail_server_assert_smtp_contains", "mail_server_assert_caldav_contains"}:
         return True
     if verb == "parity007_trace":

@@ -55,6 +55,9 @@ export async function runFolderSyncLoop(options: FolderSyncLoopOptions): Promise
     if (!result.more) {
       return { ...progress, last, cancelled: false, exhausted: false };
     }
+    // Even an immediately resolved cache/stub response must leave room for
+    // input and paint between batches of a large catch-up.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
   return { ...progress, last, cancelled: false, exhausted: Boolean(last?.more) };
 }
@@ -98,6 +101,7 @@ export function mergeSyncedMessages(
   current: readonly MailMessageHeader[],
   synced: readonly MailMessageHeader[],
   sort: (messages: MailMessageHeader[]) => MailMessageHeader[],
+  visibleLimit?: number,
 ): MailMessageHeader[] | null {
   if (selectedFolderNow !== syncedFolder) return null;
   const byKey = new Map<string, MailMessageHeader>();
@@ -105,7 +109,8 @@ export function mergeSyncedMessages(
     if (message.folder === syncedFolder) byKey.set(`${message.folder}:${message.uid}`, message);
   }
   for (const message of synced) byKey.set(`${message.folder}:${message.uid}`, message);
-  return sort(Array.from(byKey.values()));
+  const merged = sort(Array.from(byKey.values()));
+  return visibleLimit == null ? merged : merged.slice(0, Math.max(1, visibleLimit));
 }
 
 /** Sum new unseen mail, skipping folders the caller excludes (Sent, Trash…). */

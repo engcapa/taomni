@@ -1,18 +1,19 @@
 use super::coordination::BackupProcessLock;
-use super::crypto::{encrypt_payload, is_encrypted_bytes};
+use super::crypto::{encrypt_stream, is_encrypted_bytes};
 use super::manifest::{BackupManifest, file_sha256};
 use super::policy::{BackupPolicy, load_policy, resolve_backup_dir, save_policy};
 use super::scheduler::{BackupCoordinator, BackupTrigger, is_backup_due};
 use crate::state::AppState;
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{Cursor, Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupCustomOptions {
     #[serde(default)]
@@ -48,6 +49,7 @@ pub struct BackupScopeFlags {
 }
 
 pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> BackupScopeFlags {
+    let mail_override = custom.as_ref().map(|opts| opts.include_mail);
     let core = BackupScopeFlags {
         sessions: true,
         notes: true,
@@ -79,6 +81,11 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
         },
         _ => core,
     };
+    if scope != "custom" {
+        if let Some(mail) = mail_override {
+            flags.mail = mail;
+        }
+    }
     if flags.mfa {
         flags.vault = true;
     }
@@ -165,7 +172,11 @@ pub fn create_scheduled_backup(
     }
     let state = app.state::<AppState>();
     let scope = policy.default_scope.clone();
-    create_backup_locked(&state, app, &scope, None, None, None, policy, true).map(Some)
+    let custom = policy.include_mail.map(|include_mail| BackupCustomOptions {
+        include_mail,
+        ..Default::default()
+    });
+    create_backup_locked(&state, app, &scope, custom, None, None, policy, true).map(Some)
 }
 
 pub fn create_cloud_snapshot(
@@ -241,11 +252,19 @@ fn create_backup_locked(
     // Determine what to include based on scope
     let flags = resolve_scope_flags(scope, custom_options);
 
+    let mail_paths = state
+        .mail_archive
+        .changes
+        .lock()
+        .map_err(|e| e.to_string())?;
+
     // 1. taomni.db
     if flags.sessions {
         let snap_dest = temp_staging_dir.join("taomni.db");
         let conn = state.db.lock().map_err(|e| e.to_string())?;
         hot_backup_conn(&conn, &snap_dest)?;
+        drop(conn);
+        portable_mail_paths(&rusqlite::Connection::open(&snap_dest).map_err(|e| e.to_string())?)?;
         staged_files.push(StagedFile {
             archive_path: "databases/taomni.db".into(),
             disk_path: snap_dest,
@@ -317,25 +336,56 @@ fn create_backup_locked(
         }
     }
 
-    // 6. Mail cache databases
+    // 6. Consistent per-account snapshots, including custom locations and
+    // immutable MIME objects pinned before releasing the account lock.
     if flags.mail {
-        let mail_dir = app_data.join("mail-cache");
-        if mail_dir.is_dir() {
-            if let Ok(entries) = std::fs::read_dir(&mail_dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file() && path.extension().is_some_and(|ext| ext == "db") {
-                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                            staged_files.push(StagedFile {
-                                archive_path: format!("mail-cache/{name}"),
-                                disk_path: path,
-                            });
-                        }
-                    }
+        let sessions = {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            crate::session::db::list_sessions(&db, None).map_err(|e| e.to_string())?
+        };
+        let mut covered = std::collections::HashSet::new();
+        for session in sessions
+            .into_iter()
+            .filter(|s| s.session_type == crate::session::models::SessionType::Mail)
+        {
+            let stem = crate::state::mail_db_file_stem(&session.id);
+            let directory = crate::mail::storage::configured_directory(
+                &session.options_json,
+                state.mail_cache_root(),
+            )?;
+            let configured_db = directory.join(format!("{stem}.db"));
+            if !configured_db.is_file()
+                && !crate::mail::coordination::redirect_path(&configured_db).is_file()
+            {
+                continue;
+            }
+            let handle = state.mail_db(&session.id)?;
+            let db = handle.lock().map_err(|e| e.to_string())?;
+            crate::mail::init_mail_tables(&db).map_err(|e| e.to_string())?;
+            staged_files.extend(snapshot_mail(&db, Some(&session.id), &temp_staging_dir)?);
+            covered.insert(format!("{stem}.db"));
+        }
+        // Older/local sessions may no longer be in the session tree.
+        if state.mail_cache_root().is_dir() {
+            for entry in std::fs::read_dir(state.mail_cache_root()).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if !path.is_file()
+                    || path.extension().is_none_or(|ext| ext != "db")
+                    || covered.contains(&name)
+                {
+                    continue;
                 }
+                let handle = crate::mail::coordination::MailDatabase::new(path);
+                let db = handle.lock()?;
+                let account:Option<String>=db.query_row("SELECT account_id FROM mail_messages UNION SELECT account_id FROM mail_full_messages LIMIT 1",[],|r|r.get(0)).optional().map_err(|e|e.to_string())?;
+                staged_files.extend(snapshot_mail(&db, account.as_deref(), &temp_staging_dir)?);
             }
         }
     }
+
+    drop(mail_paths);
 
     // 7. Local history snapshots
     if flags.local_history {
@@ -533,10 +583,11 @@ fn pack_staged_archive_with_provenance(
         BackupManifest::new(app_version.to_string(), scope.to_string(), is_encrypted);
     manifest.provenance = provenance;
 
-    // Build in-memory Zip archive
-    let mut zip_buffer = Cursor::new(Vec::new());
+    let parent = out_file_path.parent().ok_or("Invalid backup destination")?;
+    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let mut zip_buffer = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
     {
-        let mut zip = ZipWriter::new(&mut zip_buffer);
+        let mut zip = ZipWriter::new(zip_buffer.as_file_mut());
         let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
 
         for staged in staged_files {
@@ -548,8 +599,17 @@ fn pack_staged_archive_with_provenance(
 
             manifest.add_file(staged.archive_path.clone(), sha256, size);
 
-            zip.start_file(&staged.archive_path, options)
-                .map_err(|e| format!("start zip file {}: {e}", staged.archive_path))?;
+            zip.start_file(
+                &staged.archive_path,
+                options
+                    .large_file(size >= u32::MAX as u64)
+                    .compression_method(if staged.archive_path.ends_with(".eml.gz") {
+                        CompressionMethod::Stored
+                    } else {
+                        CompressionMethod::Deflated
+                    }),
+            )
+            .map_err(|e| format!("start zip file {}: {e}", staged.archive_path))?;
 
             let mut f = File::open(&staged.disk_path)
                 .map_err(|e| format!("open staged file {}: {e}", staged.disk_path.display()))?;
@@ -576,40 +636,146 @@ fn pack_staged_archive_with_provenance(
         zip.finish().map_err(|e| format!("finish zip: {e}"))?;
     }
 
-    let raw_zip_bytes = zip_buffer.into_inner();
-    let final_bytes = if let Some(pw) = password {
-        if !pw.trim().is_empty() {
-            encrypt_payload(&raw_zip_bytes, pw.trim())?
-        } else {
-            raw_zip_bytes
-        }
+    zip_buffer
+        .as_file_mut()
+        .seek(SeekFrom::Start(0))
+        .map_err(|e| e.to_string())?;
+    let mut output = if let Some(pw) = password.filter(|pw| !pw.trim().is_empty()) {
+        let mut encrypted = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+        encrypt_stream(zip_buffer.as_file_mut(), pw.trim(), encrypted.as_file_mut())?;
+        encrypted
     } else {
-        raw_zip_bytes
+        zip_buffer
     };
+    output.as_file_mut().sync_all().map_err(|e| e.to_string())?;
+    let file_size = output
+        .as_file()
+        .metadata()
+        .map_err(|e| e.to_string())?
+        .len();
+    let _cache_reservation = super::cache::reserve(out_file_path, file_size)?;
+    output
+        .persist(out_file_path)
+        .map_err(|e| format!("Publish backup: {}", e.error))?;
 
-    if let Some(parent) = out_file_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-
-    // Other instances can read history while this archive is being written.
-    // Publish the complete file with a rename in its destination directory.
-    let pending_path = out_file_path.with_file_name(format!(
-        ".backup_output_{}.tmp",
-        uuid::Uuid::new_v4().simple()
-    ));
-    let _cleanup = scopeguard::guard(pending_path.clone(), |path| {
-        let _ = std::fs::remove_file(path);
-    });
-    let _cache_reservation = super::cache::reserve(out_file_path, final_bytes.len() as u64)?;
-    std::fs::write(&pending_path, &final_bytes)
-        .map_err(|e| format!("write backup output file {}: {e}", out_file_path.display()))?;
-    std::fs::rename(&pending_path, out_file_path).map_err(|e| {
-        format!(
-            "publish backup output file {}: {e}",
-            out_file_path.display()
-        )
-    })?;
-
-    let file_size = final_bytes.len() as u64;
     Ok((manifest, file_size))
+}
+
+/// A backup is portable: it must never restore an old machine's external paths.
+pub(super) fn portable_mail_paths(db: &rusqlite::Connection) -> Result<(), String> {
+    let exists: bool = db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='sessions')",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if !exists {
+        return Ok(());
+    }
+    let columns: Vec<String> = db
+        .prepare("PRAGMA table_info(sessions)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |r| r.get(1))
+        .map_err(|e| e.to_string())?
+        .collect::<rusqlite::Result<_>>()
+        .map_err(|e| e.to_string())?;
+    if !["id", "session_type", "options_json"]
+        .iter()
+        .all(|name| columns.iter().any(|col| col == name))
+    {
+        return Ok(());
+    }
+    let sessions: Vec<(String, String)> = db
+        .prepare("SELECT id,options_json FROM sessions WHERE session_type='Mail'")
+        .map_err(|e| e.to_string())?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .map_err(|e| e.to_string())?
+        .collect::<rusqlite::Result<_>>()
+        .map_err(|e| e.to_string())?;
+    for (id, options) in sessions {
+        let mut options: serde_json::Value =
+            serde_json::from_str(&options).map_err(|e| e.to_string())?;
+        if let Some(obj) = options.as_object_mut() {
+            obj.remove("mailStorageDirectory");
+        }
+        db.execute(
+            "UPDATE sessions SET options_json=?1 WHERE id=?2",
+            rusqlite::params![options.to_string(), id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub(super) fn snapshot_mail(
+    db: &rusqlite::Connection,
+    account: Option<&str>,
+    staging: &Path,
+) -> Result<Vec<StagedFile>, String> {
+    let source = Path::new(db.path().ok_or("Mail DB has no path")?);
+    let filename = source
+        .file_name()
+        .and_then(|v| v.to_str())
+        .ok_or("Invalid mail DB name")?;
+    let target = staging.join("mail-cache").join(filename);
+    std::fs::create_dir_all(target.parent().unwrap()).map_err(|e| e.to_string())?;
+    hot_backup_conn(db, &target)?;
+    let mut files = vec![StagedFile {
+        archive_path: format!("mail-cache/{filename}"),
+        disk_path: target,
+    }];
+    if let Some(account) = account {
+        let stem = crate::state::mail_db_file_stem(account);
+        let prefix = format!("mail-cache/{stem}.mail");
+        for (relative, disk_path) in
+            crate::mail::storage::snapshot_objects(db, account, &staging.join(&prefix))?
+        {
+            files.push(StagedFile {
+                archive_path: format!("{prefix}/{}", relative.to_string_lossy().replace('\\', "/")),
+                disk_path,
+            });
+        }
+        let attachments = source.parent().unwrap().join("attachments").join(&stem);
+        snapshot_attachment_tree(
+            &attachments,
+            &format!("mail-cache/attachments/{stem}"),
+            staging,
+            &mut files,
+        )?;
+    }
+    Ok(files)
+}
+
+fn snapshot_attachment_tree(
+    source: &Path,
+    prefix: &str,
+    staging: &Path,
+    files: &mut Vec<StagedFile>,
+) -> Result<(), String> {
+    if !source.exists() {
+        return Ok(());
+    }
+    for entry in std::fs::read_dir(source).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        if kind.is_symlink() {
+            return Err("Cannot back up symbolic links in mail storage".into());
+        }
+        let path = format!("{prefix}/{}", entry.file_name().to_string_lossy());
+        if kind.is_dir() {
+            snapshot_attachment_tree(&entry.path(), &path, staging, files)?;
+        } else if kind.is_file() && entry.path().extension().is_some_and(|v| v == "bin") {
+            let target = staging.join(&path);
+            std::fs::create_dir_all(target.parent().unwrap()).map_err(|e| e.to_string())?;
+            if std::fs::hard_link(entry.path(), &target).is_err() {
+                std::fs::copy(entry.path(), &target).map_err(|e| e.to_string())?;
+            }
+            files.push(StagedFile {
+                archive_path: path,
+                disk_path: target,
+            });
+        }
+    }
+    Ok(())
 }

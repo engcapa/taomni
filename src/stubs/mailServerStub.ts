@@ -76,6 +76,8 @@ interface StubAccountState {
 }
 
 const accounts = new Map<string, StubAccountState>();
+let nextFolderReadDelayMs = 0;
+
 const deliveredTotals = new Map<string, number>();
 
 function nowTs(): number {
@@ -372,6 +374,20 @@ export function stubMailCachedHeaders(accountId: string, seed: Seed, folderName:
   return [...folderState(account(accountId, seed), folderName).cache.values()];
 }
 
+export async function stubMailMarkRead(accountId: string, seed: Seed, folder: string, uids: number[], all: boolean) {
+  if (all && nextFolderReadDelayMs) {
+    const milliseconds = nextFolderReadDelayMs;
+    nextFolderReadDelayMs = 0;
+    await new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+  const entry = account(accountId, seed).folders.get(folder);
+  const targets = all
+    ? [...(entry?.server.values() ?? [])].filter((message) => !message.flags.includes("\\Seen")).map((message) => message.uid)
+    : uids;
+  stubMailUpdateCachedFlags(accountId, folder, targets, ["\\Seen"], []);
+  return { folder, marked: targets.length, unread: all ? 0 : undefined };
+}
+
 export function stubMailUpdateCachedFlags(accountId: string, folder: string, uids: number[], add: string[], remove: string[]) {
   const state = accounts.get(accountId);
   const entry = state?.folders.get(folder);
@@ -437,6 +453,7 @@ function idleChanged(accountId: string, folder: string) {
 }
 
 export interface StubMailQaControl {
+  delayNextFolderRead: (milliseconds: number) => void;
   deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null, readReceipt?: boolean) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
@@ -474,6 +491,7 @@ function stubInvite(summary: string, uid: string): StubMailInvite {
 
 export function installStubMailQaControl(seed: Seed): void {
   const control: StubMailQaControl = {
+    delayNextFolderRead(milliseconds) { nextFolderReadDelayMs = milliseconds; },
     deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null, readReceipt = false) {
       const state = account(accountId, seed);
       const folder = folderState(state, folderName);

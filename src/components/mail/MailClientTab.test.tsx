@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { markRecoveryStartup } from "../../lib/runtimeRecovery";
@@ -71,6 +72,8 @@ const chatState = vi.hoisted(() => ({
 
 vi.mock("../../lib/mail", () => ({
   ...mailMocks,
+  mailArchiveStart: vi.fn(async () => undefined),
+  mailArchiveStatus: vi.fn(async () => ({ phase: "completed", saved: 0, total: 0, bytes: 0 })),
   MAIL_IDLE_EVENT: "mail://idle",
   MAIL_MDN_SENT: "$MDNSent",
   isMailCertificateError: (message: string | null | undefined) =>
@@ -309,6 +312,19 @@ describe("MailClientTab", () => {
     expect(screen.queryByText(message.snippet ?? "")).not.toBeInTheDocument();
   });
 
+  it("applies a successful auto-read result when the body finishes loading first", async () => {
+    let finishRead!: (value: { folder: string; marked: number }) => void;
+    mailMocks.mailListCachedMessages.mockResolvedValue([{ ...message, flags: [] }]);
+    mailMocks.mailMarkRead.mockReturnValue(new Promise((resolve) => { finishRead = resolve; }));
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    await waitFor(() => expect(mailMocks.mailMarkRead).toHaveBeenCalledWith(info, "INBOX", [101], false));
+    expect(screen.getByTestId("mail-message-row")).toHaveAttribute("data-unread", "true");
+    await act(async () => finishRead({ folder: "INBOX", marked: 1 }));
+    await waitFor(() => expect(screen.getByTestId("mail-message-row")).toHaveAttribute("data-unread", "false"));
+    expect(mailMocks.mailMarkRead).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the loaded body when opening the message popup", async () => {
     renderMailbox();
 
@@ -545,11 +561,18 @@ describe("MailClientTab", () => {
       const left = pages.reduce((sum, rest) => sum + rest.length, 0);
       return stepResult({ messages: page, fetched: page.length, newUnseen: page.length, remainingNew: left, more: left > 0 });
     });
-    mailMocks.mailListCachedMessages.mockImplementation(async () => cacheRows);
+    mailMocks.mailListCachedMessages.mockImplementation(async (_account, _folder, limit, offset) =>
+      cacheRows.slice(offset, offset + limit));
 
     render(<MailClientTab tabId="mail-tab" info={syncOnOpenInfo} visible />);
 
     await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(3));
+    // Index every arrival without growing the DOM beyond the first page.
+    await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "50"));
+    expect(cacheRows).toHaveLength(121);
+    fireEvent.click(screen.getByTestId("mail-load-more"));
+    await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "100"));
+    fireEvent.click(screen.getByTestId("mail-load-more"));
     await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "121"));
     expect(useTaoAlertStore.getState().mailNew).toMatchObject([{ count: 120, mailTabId: "mail-tab" }]);
   });
@@ -943,6 +966,25 @@ describe("MailClientTab", () => {
     expect(await screen.findByText(/copy saved to Sent/)).toBeInTheDocument();
   });
 
+  it.each(["before", "after"])("retains the Sent copy result when its event arrives %s SMTP completion", async (order) => {
+    let accept!: (result: { accepted: boolean; response: string }) => void;
+    mailMocks.mailSendMessage.mockReturnValue(new Promise((resolve) => { accept = resolve; }));
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    await screen.findByTestId("mail-compose-dialog");
+    fireEvent.click(screen.getByTestId("mail-compose-send"));
+    await waitFor(() => expect(mailMocks.mailSendMessage).toHaveBeenCalledTimes(1));
+    const copySaved = () => act(() => eventMocks.handlers.get("mail-sent-copy")?.({
+      payload: { accountId: info.sessionId, folder: "Sent" },
+    }));
+    if (order === "before") copySaved();
+    await act(async () => accept({ accepted: true, response: "accepted" }));
+    if (order === "after") copySaved();
+    expect(screen.queryByTestId("mail-compose-dialog")).not.toBeInTheDocument();
+    expect(screen.getByText(/copy saved to Sent/)).toBeInTheDocument();
+  });
+
   it("confirms SMTP acceptance before draft cleanup and reports asynchronous copy failures", async () => {
     useDraftStore();
     let finishCleanup!: () => void;
@@ -971,11 +1013,12 @@ describe("MailClientTab", () => {
     finishCleanup();
   });
 
-  it("searches the whole local index and the server (AC-25/AC-26)", async () => {
+  it("searches the whole local index and server, and bulk actions include search-only rows", async () => {
     const hit: MailMessageHeader = { ...uncachedMessage, uid: 7, folder: "Archive", subject: "Budget from archive" };
     const serverHit: MailMessageHeader = { ...uncachedMessage, uid: 8, subject: "Budget only on server" };
     mailMocks.mailSearchMessages.mockResolvedValue([hit]);
     mailMocks.mailSearchServer.mockResolvedValue([serverHit]);
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, { ...folder, name: "Trash", flags: ["\\Trash"] }]);
 
     renderMailbox();
     await screen.findByText(/Second line stays visible/);
@@ -993,6 +1036,16 @@ describe("MailClientTab", () => {
     fireEvent.click(screen.getByTestId("mail-search-server"));
     expect(await screen.findByText("Budget only on server")).toBeInTheDocument();
     expect(mailMocks.mailSearchServer).toHaveBeenCalledWith(info, "INBOX", expect.objectContaining({ text: "budget" }));
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select all visible messages" }));
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("2 selected");
+    fireEvent.keyDown(screen.getAllByTestId("mail-message-row")[0], { key: "s" });
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row").every((row) => row.dataset.flagged === "true")).toBe(true));
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    await waitFor(() => expect(mailMocks.mailMoveMessages).toHaveBeenCalledWith(info, "Archive", [7], "Trash"));
+    expect(mailMocks.mailMoveMessages).toHaveBeenCalledWith(info, "INBOX", [8], "Trash");
+    await waitFor(() => expect(screen.queryAllByTestId("mail-message-row")).toHaveLength(0));
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("0 selected");
   });
 
   it("quick filters narrow the list to unread messages", async () => {
@@ -1430,6 +1483,49 @@ describe("MailClientTab", () => {
     expect(mailMocks.mailSyncFolder.mock.calls.length).toBeGreaterThan(afterFirst);
   });
 
+  it("syncs the newly selected folder after an in-flight INBOX refresh finishes", async () => {
+    const trash = { ...folder, name: "Trash", flags: ["\\Trash"], total: 1 };
+    const moved = { ...message, folder: "Trash", subject: "Moved to trash" };
+    let finishInbox!: (value: MailFolderSyncResult) => void;
+    let trashSynced = false;
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, trash]);
+    mailMocks.mailListCachedMessages.mockImplementation(async (_id, name) => name === "Trash" ? (trashSynced ? [moved] : []) : [message]);
+    mailMocks.mailSyncFolder.mockImplementation(async (_info, name) => {
+      if (name === "Trash") {
+        trashSynced = true;
+        return stepResult({ folder: trash, messages: [moved], fetched: 1 });
+      }
+      return stepResult({});
+    });
+    mailMocks.mailSyncFolder.mockImplementationOnce(() => new Promise((resolve) => { finishInbox = resolve; }));
+    render(<MailClientTab tabId="mail-tab" info={{ ...info, sync: { ...info.sync, onOpen: true } }} visible />);
+    await waitFor(() => expect(finishInbox).toBeTypeOf("function"));
+    await waitFor(() => expect(document.querySelector('[data-testid="mail-folder-row"][data-folder-name="Trash"]')).not.toBeNull());
+    fireEvent.click(document.querySelector('[data-testid="mail-folder-row"][data-folder-name="Trash"]')!);
+    await waitFor(() => expect(mailMocks.mailListCachedMessages).toHaveBeenCalledWith(info.sessionId, "Trash", expect.any(Number), 0));
+    await act(async () => finishInbox(stepResult({})));
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledWith(expect.anything(), "Trash", expect.anything()), { timeout: 2500 });
+    await waitFor(() => expect(screen.getByTestId("mail-message-row")).toHaveTextContent("Moved to trash"));
+  });
+
+  it("does not replace the selected folder with a late cache reply from the previous folder", async () => {
+    const trash = { ...folder, name: "Trash", flags: ["\\Trash"] };
+    const moved = { ...message, folder: "Trash", subject: "Moved to trash" };
+    let finishOldCache!: (value: MailMessageHeader[]) => void;
+    mailMocks.mailSyncAllFolders.mockResolvedValue({ folders: [folder, trash], fetchedMessages: 0, pendingFolders: [] });
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, trash]);
+    mailMocks.mailListCachedMessages.mockImplementation(async (_id, name) => name === "Trash" ? [moved] : [message]);
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    mailMocks.mailListCachedMessages.mockImplementationOnce(() => new Promise((resolve) => { finishOldCache = resolve; }));
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await waitFor(() => expect(finishOldCache).toBeTypeOf("function"));
+    fireEvent.click(document.querySelector('[data-testid="mail-folder-row"][data-folder-name="Trash"]')!);
+    await waitFor(() => expect(screen.getByTestId("mail-message-row")).toHaveTextContent("Moved to trash"));
+    await act(async () => finishOldCache([message]));
+    expect(screen.getByTestId("mail-message-row")).toHaveTextContent("Moved to trash");
+  });
+
   it("holds an IDLE watcher while open and catches up on push (TASK-12)", async () => {
     const view = renderMailbox();
     await waitFor(() => expect(mailMocks.mailIdleStart).toHaveBeenCalledWith(info, "INBOX"));
@@ -1473,6 +1569,143 @@ describe("MailClientTab", () => {
     window.localStorage.clear();
   });
 
+  it("selects rows with Ctrl/Cmd and Shift and deletes the selected messages to Trash", async () => {
+    const rows = Array.from({ length: 4 }, (_, index) => ({
+      ...message, uid: 101 + index, subject: `Selection ${index + 1}`, dateTs: (message.dateTs ?? 0) - index,
+    }));
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, { ...folder, name: "Trash", flags: ["\\Trash"] }]);
+    mailMocks.mailListCachedMessages.mockResolvedValue(rows);
+    mailMocks.mailMoveMessages.mockResolvedValue({ count: 3 });
+    renderMailbox();
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(4));
+    const rendered = screen.getAllByTestId("mail-message-row");
+    fireEvent.click(rendered[0]);
+    fireEvent.click(rendered[1], { ctrlKey: true });
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("2 selected");
+    fireEvent.click(rendered[2], { shiftKey: true });
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("3 selected");
+    fireEvent.click(rendered[1], { metaKey: true });
+    expect(within(rendered[1]).getByRole("checkbox")).not.toBeChecked();
+    fireEvent.click(within(rendered[1]).getByRole("checkbox"));
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    await waitFor(() => expect(mailMocks.mailMoveMessages).toHaveBeenCalledWith(info, "INBOX", [101, 102, 103], "Trash"));
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(1));
+    expect(screen.getAllByTestId("mail-message-row")[0]).toHaveAttribute("data-uid", "104");
+    expect(mailMocks.mailDeleteMessages).not.toHaveBeenCalled();
+    expect(screen.getByTestId("mail-delete-selected")).toBeDisabled();
+  });
+
+  it("allows deleting a new selection while a folder read is pending", async () => {
+    let finishRead!: (value: { folder: string; marked: number }) => void;
+    mailMocks.mailMarkRead.mockImplementation(() => new Promise((resolve) => { finishRead = resolve; }));
+    mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }, { ...folder, name: "Trash", flags: ["\\Trash"] }]);
+    mailMocks.mailMoveMessages.mockResolvedValue({ count: 1 });
+    renderMailbox();
+    await screen.findByTestId("mail-message-row");
+    fireEvent.click(screen.getByTestId("mail-mark-folder-read"));
+    await waitFor(() => expect(mailMocks.mailMarkRead).toHaveBeenCalledWith(info, "INBOX", [], true));
+    fireEvent.click(within(screen.getByTestId("mail-message-row")).getByRole("checkbox"));
+    expect(screen.getByTestId("mail-delete-selected")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    await waitFor(() => expect(mailMocks.mailMoveMessages).toHaveBeenCalledWith(info, "INBOX", [101], "Trash"));
+    mailMocks.mailListCachedMessages.mockResolvedValue([]);
+    await act(async () => finishRead({ folder: "INBOX", marked: 1 }));
+    await waitFor(() => expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument());
+  });
+
+  it("does not restore deleted messages from a late folder-read cache reply", async () => {
+    let finishRead!: (value: { folder: string; marked: number }) => void;
+    let finishCache!: (value: MailMessageHeader[]) => void;
+    mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }, { ...folder, name: "Trash", flags: ["\\Trash"] }]);
+    mailMocks.mailMarkRead.mockImplementation(() => new Promise((resolve) => { finishRead = resolve; }));
+    mailMocks.mailMoveMessages.mockResolvedValue({ count: 1 });
+    renderMailbox();
+    await screen.findByTestId("mail-message-row");
+    fireEvent.click(screen.getByTestId("mail-mark-folder-read"));
+    mailMocks.mailListCachedMessages.mockImplementationOnce(() => new Promise((resolve) => { finishCache = resolve; }));
+    await act(async () => finishRead({ folder: "INBOX", marked: 1 }));
+    await waitFor(() => expect(finishCache).toBeDefined());
+    fireEvent.click(within(screen.getByTestId("mail-message-row")).getByRole("checkbox"));
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    await waitFor(() => expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument());
+    // The read query saw this row before the successful move committed.
+    await act(async () => finishCache([message]));
+    expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("0 selected");
+  });
+
+  it("keeps a user's selection when a folder read finishes", async () => {
+    let finishRead!: (value: { folder: string; marked: number }) => void;
+    mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }]);
+    mailMocks.mailMarkRead.mockImplementation(() => new Promise((resolve) => { finishRead = resolve; }));
+    renderMailbox();
+    await screen.findByTestId("mail-message-row");
+    fireEvent.click(screen.getByTestId("mail-mark-folder-read"));
+    await waitFor(() => expect(mailMocks.mailMarkRead).toHaveBeenCalled());
+    fireEvent.click(within(screen.getByTestId("mail-message-row")).getByRole("checkbox"));
+    await act(async () => finishRead({ folder: "INBOX", marked: 1 }));
+    await waitFor(() => expect(screen.getByTestId("mail-mark-folder-read")).toBeEnabled());
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("1 selected");
+  });
+
+  it("supports checkbox ranges and list-only select-all without stealing search input", async () => {
+    mailMocks.mailListCachedMessages.mockResolvedValue(Array.from({ length: 4 }, (_, index) => ({
+      ...message, uid: 101 + index, subject: `Select range ${index}`, dateTs: (message.dateTs ?? 0) - index,
+    })));
+    renderMailbox();
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(4));
+    const rows = screen.getAllByTestId("mail-message-row");
+    fireEvent.click(within(rows[1]).getByRole("checkbox"));
+    fireEvent.click(within(rows[3]).getByRole("checkbox"), { shiftKey: true });
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("3 selected");
+    expect(within(rows[0]).getByRole("checkbox")).not.toBeChecked();
+    fireEvent.keyDown(rows[0], { key: "a", ctrlKey: true });
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("4 selected");
+    fireEvent.keyDown(rows[0], { key: "Escape" });
+    fireEvent.keyDown(screen.getByTestId("mail-search-input"), { key: "a", metaKey: true });
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("0 selected");
+  });
+
+  it("keeps failed deletions selected and asks before permanently deleting", async () => {
+    mailMocks.mailMoveMessages.mockRejectedValue(new Error("IMAP unavailable"));
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, { ...folder, name: "Trash", flags: ["\\Trash"] }]);
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(within(screen.getByTestId("mail-message-row")).getByRole("checkbox"));
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    expect(await screen.findByText(/IMAP unavailable/)).toBeInTheDocument();
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("1 selected");
+    expect(screen.getByTestId("mail-message-row")).toBeInTheDocument();
+    cleanup();
+
+    // Without a Trash destination the destructive action needs confirmation.
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder]);
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(within(screen.getByTestId("mail-message-row")).getByRole("checkbox"));
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    expect(await screen.findByText("Delete permanently")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(mailMocks.mailDeleteMessages).not.toHaveBeenCalled();
+    expect(screen.getByTestId("mail-message-row")).toBeInTheDocument();
+  });
+
+  it("retains only unfinished selections when a later deletion batch fails", async () => {
+    mailMocks.mailListCachedMessages.mockResolvedValue(Array.from({ length: 251 }, (_, index) => ({
+      ...message, uid: 101 + index, dateTs: (message.dateTs ?? 0) - index,
+    })));
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, { ...folder, name: "Trash", flags: ["\\Trash"] }]);
+    mailMocks.mailMoveMessages.mockResolvedValueOnce({ count: 250 }).mockRejectedValueOnce(new Error("Second batch unavailable"));
+    render(<MailClientTab tabId="mail-tab" info={{ ...info, sync: { ...info.sync, maxFetchPerSync: 300 } }} visible />);
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(251));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select all visible messages" }));
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    expect(await screen.findByText(/Second batch unavailable/)).toBeInTheDocument();
+    expect(mailMocks.mailMoveMessages.mock.calls.map((call) => call[2].length)).toEqual([250, 1]);
+    expect(screen.getByTestId("mail-message-row")).toHaveAttribute("data-uid", "351");
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("1 selected");
+  });
+
   it("runs Thunderbird list shortcuts outside inputs (TASK-22)", async () => {
     const second: MailMessageHeader = { ...message, uid: 102, messageId: "message-102@example.com", subject: "Second", dateTs: (message.dateTs ?? 0) - 60 };
     mailMocks.mailListCachedMessages.mockResolvedValue([message, second]);
@@ -1486,6 +1719,8 @@ describe("MailClientTab", () => {
     await waitFor(() => expect(rowByUid(101)).toHaveAttribute("aria-pressed", "true"));
     fireEvent.keyDown(rowByUid(101), { key: "f" });
     await waitFor(() => expect(rowByUid(102)).toHaveAttribute("aria-pressed", "true"));
+    expect(rowByUid(102)).toHaveAttribute("data-checked", "true");
+    expect(rowByUid(101)).toHaveAttribute("data-checked", "false");
     fireEvent.keyDown(rowByUid(102), { key: "b" });
     await waitFor(() => expect(rowByUid(101)).toHaveAttribute("aria-pressed", "true"));
 
@@ -1553,6 +1788,53 @@ describe("MailClientTab", () => {
       resolveSync(stepResult({}));
     });
     await waitFor(() => expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1), { timeout: 3000 });
+  });
+
+  it("finishes every on-open catch-up batch across StrictMode effect replay", async () => {
+    mailMocks.mailSyncFolder
+      .mockResolvedValueOnce(stepResult({ more: true, remainingNew: 250 }))
+      .mockResolvedValueOnce(stepResult({ more: true, remainingNew: 50 }))
+      .mockResolvedValueOnce(stepResult({ more: false }));
+    const openInfo = { ...info, sync: { ...info.sync, onOpen: true } };
+    render(<StrictMode><MailClientTab tabId="mail-tab" info={openInfo} visible /></StrictMode>);
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(3));
+    expect(mailMocks.mailSyncFolder.mock.calls.every(([, name, options]) => name === "INBOX" && options.mode === "auto")).toBe(true);
+  });
+
+  it("keeps new-mail alerts when a manual Sync preempts a quiet poll", async () => {
+    vi.useFakeTimers();
+    let finish: (result: MailFolderSyncResult) => void = () => {};
+    mailMocks.mailSyncFolder.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const intervalInfo = { ...info, sync: { ...info.sync, onOpen: false, intervalMinutes: 1 } };
+    render(<MailClientTab tabId="mail-tab" info={intervalInfo} visible />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await act(async () => {
+      finish(stepResult({ newUnseen: 2 }));
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1);
+    expect(useTaoAlertStore.getState().mailNew).toEqual(expect.arrayContaining([
+      expect.objectContaining({ count: 2 }),
+    ]));
+  });
+
+  it("finishes the manual Sync spinner while gap-free pending catch-up continues in background", async () => {
+    let finish: (result: MailFolderSyncResult) => void = () => {};
+    const base = await mailMocks.mailSyncAllFolders.getMockImplementation()!(info, {});
+    mailMocks.mailSyncAllFolders.mockResolvedValue({ ...base, pendingFolders: ["INBOX"] });
+    mailMocks.mailSyncFolder.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    renderMailbox();
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(1));
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId("mail-sync-button")).not.toBeDisabled());
+    // Pending folders are drained in bounded steps, with no lost continuation.
+    mailMocks.mailSyncFolder.mockResolvedValueOnce(stepResult({ more: false }));
+    await act(async () => finish(stepResult({ more: true, remainingNew: 7 })));
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(3));
+    expect(mailMocks.mailSyncFolder).toHaveBeenLastCalledWith(info, "INBOX", expect.objectContaining({ mode: "reconcileFull" }));
   });
 });
 

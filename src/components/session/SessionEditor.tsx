@@ -1,3 +1,4 @@
+import { MailStorageSettings, mailStorageOptions, type MailStorageOptions } from "../mail/MailStorageSettings";
 import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
@@ -1379,6 +1380,7 @@ function MailSettings({
   oauthConnecting,
   oauthStatus,
   onOAuthConnect,
+  storage, setStorage, accountId,
   cacheEnabled, setCacheEnabled,
   saveDirectory, setSaveDirectory,
   onBrowseSaveDirectory,
@@ -1440,6 +1442,7 @@ function MailSettings({
   oauthConnecting: boolean;
   oauthStatus: { ok: boolean; msg: string } | null;
   onOAuthConnect: () => void;
+  storage: MailStorageOptions; setStorage: (v: MailStorageOptions) => void; accountId?: string;
   cacheEnabled: boolean; setCacheEnabled: (v: boolean) => void;
   saveDirectory: string; setSaveDirectory: (v: string) => void;
   onBrowseSaveDirectory: () => void;
@@ -1768,6 +1771,7 @@ function MailSettings({
       <Field label="IMAP security">
         <Select
           value={imapSecurity}
+          dataTestId="mail-imap-security"
           className="w-32"
           options={["TLS", "STARTTLS", "None"]}
           onChange={(value) => setImapSecurity(value as MailSecurityMode)}
@@ -1822,6 +1826,7 @@ function MailSettings({
       <Field label="SMTP security">
         <Select
           value={smtpSecurity}
+          dataTestId="mail-smtp-security"
           className="w-32"
           options={["TLS", "STARTTLS", "None"]}
           onChange={(value) => setSmtpSecurity(value as MailSecurityMode)}
@@ -2016,6 +2021,8 @@ function MailSettings({
         />
         <span className="ml-1 text-[var(--taomni-text-muted)]">agenda, accepted invitations and reminders</span>
       </Field>
+
+      <MailStorageSettings accountId={accountId} value={storage} onChange={setStorage} pop3={incoming === "pop3"} />
 
       <Field label="Cache">
         <label className="flex items-center gap-1.5">
@@ -2850,6 +2857,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailOauthConnecting, setMailOauthConnecting] = useState(false);
   const [mailOauthStatus, setMailOauthStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [mailCacheEnabled, setMailCacheEnabled] = useState(() => optionBoolean(initialOptions, "mailCacheEnabled", true));
+  const [mailStorage, setMailStorage] = useState(() => mailStorageOptions(initialOptions));
   const [mailSaveDirectory, setMailSaveDirectory] = useState(() => optionString(initialOptions, "mailSaveDirectory", ""));
   const [mailHeaderRetentionDays, setMailHeaderRetentionDays] = useState(() => String(mailHeaderLimitOption(initialOptions, "mailHeaderRetentionDays", 30)));
   const [mailHeaderLimitPerFolder, setMailHeaderLimitPerFolder] = useState(() => String(mailHeaderLimitOption(initialOptions, "mailHeaderLimitPerFolder", 2000)));
@@ -3221,6 +3229,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailSmtpPasswordRef: mailSmtpUseImapAuth ? "" : mailSmtpPasswordRefValue,
           mailCacheEnabled,
           mailSaveDirectory,
+          mailStorageDirectory: mailStorage.directory.trim(),
+          mailFullMessageMode: mailStorage.mode,
+          mailFullMessageFolders: Array.from(new Set(mailStorage.folders.map((v) => v.trim()).filter(Boolean))),
           mailHeaderRetentionDays,
           mailHeaderLimitPerFolder,
           [MAIL_HEADER_LIMITS_EXPLICIT_KEY]: true,
@@ -3808,6 +3819,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailOauthStatus(null);
     setMailCacheEnabled(optionBoolean(nextOptions, "mailCacheEnabled", true));
     setMailSaveDirectory(optionString(nextOptions, "mailSaveDirectory", ""));
+    setMailStorage(mailStorageOptions(nextOptions));
     setMailHeaderRetentionDays(String(mailHeaderLimitOption(nextOptions, "mailHeaderRetentionDays", 30)));
     setMailHeaderLimitPerFolder(String(mailHeaderLimitOption(nextOptions, "mailHeaderLimitPerFolder", 2000)));
     setMailBodyRecentLimit(optionString(nextOptions, "mailBodyRecentLimit", "200"));
@@ -5000,6 +5012,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 oauthStatus={mailOauthStatus}
                 onOAuthConnect={() => void handleMailOAuthConnect()}
                 cacheEnabled={mailCacheEnabled} setCacheEnabled={setMailCacheEnabled}
+                storage={mailStorage} setStorage={setMailStorage} accountId={session?.id}
                 saveDirectory={mailSaveDirectory} setSaveDirectory={setMailSaveDirectory}
                 onBrowseSaveDirectory={() => void handleBrowseMailSaveDirectory()}
                 headerRetentionDays={mailHeaderRetentionDays} setHeaderRetentionDays={setMailHeaderRetentionDays}

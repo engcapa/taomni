@@ -1,5 +1,57 @@
 import type { MailFolder } from "./mail";
 
+function decodeImapModifiedUtf7(value: string): string {
+  let out = "";
+  let index = 0;
+  while (index < value.length) {
+    if (value[index] !== "&") {
+      out += value[index];
+      index += 1;
+      continue;
+    }
+    const end = value.indexOf("-", index + 1);
+    if (end === -1) {
+      out += value.slice(index);
+      break;
+    }
+    const encoded = value.slice(index + 1, end);
+    if (!encoded) {
+      out += "&";
+      index = end + 1;
+      continue;
+    }
+    const decoded = decodeImapModifiedUtf7Segment(encoded);
+    out += decoded ?? value.slice(index, end + 1);
+    index = end + 1;
+  }
+  return out;
+}
+
+function decodeImapModifiedUtf7Segment(encoded: string): string | null {
+  if (typeof atob === "undefined") return null;
+  try {
+    let b64 = encoded.replace(/,/g, "/");
+    while (b64.length % 4 !== 0) b64 += "=";
+    const binary = atob(b64);
+    if (binary.length % 2 !== 0) return null;
+    let result = "";
+    for (let i = 0; i < binary.length; i += 2) {
+      result += String.fromCharCode((binary.charCodeAt(i) << 8) | binary.charCodeAt(i + 1));
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/** Display labels never replace the exact server key used by IMAP/storage. */
+export function folderLabel(folder: Pick<MailFolder, "name" | "displayName">): string {
+  const displayName = folder.displayName?.trim();
+  if (displayName && displayName !== folder.name) return displayName;
+  const name = folder.name || "INBOX";
+  return decodeImapModifiedUtf7(name) || name;
+}
+
 /** RFC 5258 attribute the backend adds for folders LSUB reports (TASK-10). */
 export const SUBSCRIBED_FLAG = "\\Subscribed";
 

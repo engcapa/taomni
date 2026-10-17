@@ -26,7 +26,7 @@ use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
 
-pub type MailDbHandle = Arc<Mutex<rusqlite::Connection>>;
+pub type MailDbHandle = Arc<crate::mail::coordination::MailDatabase>;
 
 pub struct WriteStreamHandle {
     pub path: PathBuf,
@@ -120,6 +120,7 @@ pub struct AppState {
     /// and any session-level proxy forwarder across mail commands. Never routes
     /// through the app global proxy.
     pub mail_imap_pool: Arc<MailImapPool>,
+    pub mail_archive: crate::mail::archive::ArchiveManager,
     pub vault: Arc<Vault>,
     /// Per-thread Claude Code process registry (v2.6).
     pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
@@ -234,6 +235,7 @@ impl AppState {
             mfa,
             mail_db_dir,
             mail_dbs: Arc::new(Mutex::new(HashMap::new())),
+            mail_archive: crate::mail::archive::ArchiveManager::default(),
             mail_imap_pool: Arc::new(MailImapPool::new()),
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
@@ -273,12 +275,21 @@ impl AppState {
             return Ok(Arc::clone(db));
         }
 
-        std::fs::create_dir_all(&self.mail_db_dir)
-            .map_err(|e| format!("create mail cache directory: {e}"))?;
-        let path = self.mail_db_dir.join(format!("{stem}.db"));
-        let conn = rusqlite::Connection::open(&path)
-            .map_err(|e| format!("open mail cache database {}: {e}", path.display()))?;
-        let handle = Arc::new(Mutex::new(conn));
+        let configured = {
+            let db = self.db.lock().map_err(|e| e.to_string())?;
+            crate::session::db::get_session(&db, account_id)
+                .ok()
+                .map(|session| {
+                    crate::mail::storage::configured_directory(
+                        &session.options_json,
+                        &self.mail_db_dir,
+                    )
+                })
+                .transpose()?
+                .unwrap_or_else(|| self.mail_db_dir.clone())
+        };
+        let path = configured.join(format!("{stem}.db"));
+        let handle = Arc::new(crate::mail::coordination::MailDatabase::new(path));
         dbs.insert(stem, Arc::clone(&handle));
         Ok(handle)
     }
