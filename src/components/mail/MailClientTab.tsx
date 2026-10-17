@@ -5381,13 +5381,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           Sync
         </button>
-        {idleEnabled && idleState && (
+        {idleEnabled && (
           <span
-            className="h-7 px-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]"
+            className="h-7 w-14 shrink-0 px-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]"
             data-testid="mail-idle-status"
-            data-state={idleState}
+            data-state={idleState ?? "connecting"}
             data-active={idleState === "ready" || idleState === "changed" ? "true" : "false"}
-            title={idleState === "ready" || idleState === "changed"
+            title={!idleState ? "Connecting IMAP IDLE" : idleState === "ready" || idleState === "changed"
               ? "Instant push (IMAP IDLE) active"
               : "Instant push unavailable; polling"}
           >
@@ -5397,40 +5397,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 ? "bg-[var(--taomni-success,#22c55e)]"
                 : "bg-[var(--taomni-text-muted)]"}`}
             />
-            {idleState === "ready" || idleState === "changed" ? "Push" : "Poll"}
-          </span>
-        )}
-        {syncProgress && (
-          <span
-            className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
-            data-testid="mail-sync-progress"
-            data-folder={syncProgress.folder}
-            title={`Catching up ${syncProgress.folder}`}
-          >
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Catching up {syncProgress.fetched}
-            {syncProgress.remaining > 0 ? ` / ${syncProgress.fetched + syncProgress.remaining}` : ""}
-          </span>
-        )}
-        {backfillProgress && (
-          <span
-            className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
-            data-testid="mail-backfill-progress"
-            data-folder={backfillProgress.folder}
-            title={`Downloading older headers of ${backfillProgress.folder}`}
-          >
-            <Loader2 className="w-3 h-3 animate-spin" />
-            History {backfillProgress.cached}/{backfillProgress.total}
-          </span>
-        )}
-        {bodyWarming.active && (
-          <span
-            className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
-            data-testid="mail-body-warming-progress"
-            title={bodyWarming.folder ? `Warming ${bodyWarming.folder}` : "Warming recent message bodies"}
-          >
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Bodies {bodyWarming.total > 0 ? `${bodyWarming.done}/${bodyWarming.total}` : "warming"}
+            {!idleState || idleState === "ready" || idleState === "changed" ? "Push" : "Poll"}
           </span>
         )}
         <button
@@ -5632,38 +5599,76 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           <button type="button" className="taomni-btn h-6 w-6 p-0 shrink-0 inline-flex items-center justify-center" aria-label="Dismiss Sent copy status" onClick={() => setSentCopyNotice(null)}><X className="w-3 h-3" /></button>
         </div>
       )}
-      {(error || status) && (
-        <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[11px] bg-[var(--taomni-sidebar-bg)]">
-          {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-          <span
-            className={error ? "text-red-500 truncate" : "text-[var(--taomni-text-muted)] truncate"}
-            title={error ?? status ?? undefined}
-          >
-            {error ?? status}
-          </span>
-          {error && isMailCertificateError(error) && (
-            <button
-              type="button"
-              className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
-              data-testid="mail-cert-review"
-              onClick={() => void openCertReview(/smtp/i.test(error) ? "smtp" : "imap")}
+      {/* Reserve the status strip so transient progress never moves the toolbar or message rows. */}
+      <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[11px] bg-[var(--taomni-sidebar-bg)]">
+        {(error || status) && (
+          <>
+            {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+            <span
+              className={`min-w-0 flex-1 truncate ${error ? "text-red-500" : "text-[var(--taomni-text-muted)]"}`}
+              title={error ?? status ?? undefined}
             >
-              <ShieldCheck className="w-3 h-3" />
-              Review certificate
-            </button>
+              {error ?? status}
+            </span>
+            {error && isMailCertificateError(error) && (
+              <button
+                type="button"
+                className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+                data-testid="mail-cert-review"
+                onClick={() => void openCertReview(/smtp/i.test(error) ? "smtp" : "imap")}
+              >
+                <ShieldCheck className="w-3 h-3" />
+                Review certificate
+              </button>
+            )}
+            {error && oauthReauthRequired && onEditSession && (
+              <button
+                type="button"
+                className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+                onClick={() => onEditSession(info.sessionId)}
+              >
+                <ShieldCheck className="w-3 h-3" />
+                Reauthorize
+              </button>
+            )}
+          </>
+        )}
+        <div className="ml-auto min-w-0 flex items-center gap-2 overflow-x-auto">
+          {syncProgress && (
+            <span
+              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+              data-testid="mail-sync-progress"
+              data-folder={syncProgress.folder}
+              title={`Catching up ${syncProgress.folder}`}
+            >
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Catching up {syncProgress.fetched}
+              {syncProgress.remaining > 0 ? ` / ${syncProgress.fetched + syncProgress.remaining}` : ""}
+            </span>
           )}
-          {error && oauthReauthRequired && onEditSession && (
-            <button
-              type="button"
-              className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
-              onClick={() => onEditSession(info.sessionId)}
+          {backfillProgress && (
+            <span
+              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+              data-testid="mail-backfill-progress"
+              data-folder={backfillProgress.folder}
+              title={`Downloading older headers of ${backfillProgress.folder}`}
             >
-              <ShieldCheck className="w-3 h-3" />
-              Reauthorize
-            </button>
+              <Loader2 className="w-3 h-3 animate-spin" />
+              History {backfillProgress.cached}/{backfillProgress.total}
+            </span>
+          )}
+          {bodyWarming.active && (
+            <span
+              className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+              data-testid="mail-body-warming-progress"
+              title={bodyWarming.folder ? `Warming ${bodyWarming.folder}` : "Warming recent message bodies"}
+            >
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Bodies {bodyWarming.total > 0 ? `${bodyWarming.done}/${bodyWarming.total}` : "warming"}
+            </span>
           )}
         </div>
-      )}
+      </div>
 
       <div className="flex-1 min-h-0 relative">
         {mailboxCollapsed && (
