@@ -1376,6 +1376,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   /** Tracks the live selected folder across awaits (folder switches ignore syncInFlight). */
   const selectedFolderRef = useRef(selectedFolder);
   const messagesRef = useRef<MailMessageHeader[]>([]);
+  const cacheRemovalVersionsRef = useRef(new Map<string, number>());
   // Sync batches and cache reloads can finish before React commits the prior
   // render. Publish one current list for both async work and rendering; a
   // delayed effect must never overwrite a newer cache reload with old rows.
@@ -2011,12 +2012,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setError(null);
     try {
       const limit = Math.max(pageSize, limitOverride ?? pageSize);
+      const removalVersion = cacheRemovalVersionsRef.current.get(folder) ?? 0;
       const cached = await mailListCachedMessages(info.sessionId, folder, limit + 1, offset);
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return { page: [] as MailMessageHeader[], hasMore: false };
       }
-      if (selectedFolderRef.current !== folder) {
+      if (selectedFolderRef.current !== folder
+        || (cacheRemovalVersionsRef.current.get(folder) ?? 0) !== removalVersion) {
+        // A snapshot started before a successful move/delete can still contain
+        // removed rows. Keep the current list until the next fresh query.
         return { page: [] as MailMessageHeader[], hasMore: false };
       }
       const page = cached.slice(0, limit);
@@ -4072,6 +4077,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   };
 
   const removeMessagesLocally = (folder: string, uids: number[], unreadRemoved: number) => {
+    cacheRemovalVersionsRef.current.set(folder, (cacheRemovalVersionsRef.current.get(folder) ?? 0) + 1);
     const removedKeys = new Set(uids.map((uid) => `${folder}:${uid}`));
     setMessages((current) => current.filter((message) => !removedKeys.has(messageKey(message))));
     setSearchResults((current) => current?.filter((message) => !removedKeys.has(messageKey(message))) ?? null);

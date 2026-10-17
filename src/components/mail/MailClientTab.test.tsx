@@ -1612,6 +1612,27 @@ describe("MailClientTab", () => {
     await waitFor(() => expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument());
   });
 
+  it("does not restore deleted messages from a late folder-read cache reply", async () => {
+    let finishRead!: (value: { folder: string; marked: number }) => void;
+    let finishCache!: (value: MailMessageHeader[]) => void;
+    mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }, { ...folder, name: "Trash", flags: ["\\Trash"] }]);
+    mailMocks.mailMarkRead.mockImplementation(() => new Promise((resolve) => { finishRead = resolve; }));
+    mailMocks.mailMoveMessages.mockResolvedValue({ count: 1 });
+    renderMailbox();
+    await screen.findByTestId("mail-message-row");
+    fireEvent.click(screen.getByTestId("mail-mark-folder-read"));
+    mailMocks.mailListCachedMessages.mockImplementationOnce(() => new Promise((resolve) => { finishCache = resolve; }));
+    await act(async () => finishRead({ folder: "INBOX", marked: 1 }));
+    await waitFor(() => expect(finishCache).toBeDefined());
+    fireEvent.click(within(screen.getByTestId("mail-message-row")).getByRole("checkbox"));
+    fireEvent.click(screen.getByTestId("mail-delete-selected"));
+    await waitFor(() => expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument());
+    // The read query saw this row before the successful move committed.
+    await act(async () => finishCache([message]));
+    expect(screen.queryByTestId("mail-message-row")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mail-selection-count")).toHaveTextContent("0 selected");
+  });
+
   it("keeps a user's selection when a folder read finishes", async () => {
     let finishRead!: (value: { folder: string; marked: number }) => void;
     mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }]);

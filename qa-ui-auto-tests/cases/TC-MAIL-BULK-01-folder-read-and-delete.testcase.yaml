@@ -6,7 +6,8 @@ description: Marks the folder read, selects three messages using Ctrl/Cmd and Sh
   lost STORE responses are covered by mail::responsiveness_tests. Background History/Bodies progress may
   finish while All read is clicked; the toolbar must keep its controls in place so native pointer input
   reaches the intended action. Selecting Trash while a prior sync finishes must queue its refresh;
-  late cache replies for INBOX must not overwrite the selected folder.
+  late cache replies for INBOX must not overwrite the selected folder. A mounted regression also delays
+  the read-completion cache snapshot until after deletion, verifying it cannot restore removed rows.
 covers:
 - F-MAIL-3
 - F-MAIL-12

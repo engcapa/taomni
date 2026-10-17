@@ -14,9 +14,11 @@
 - 删除按钮保留空选择与其他删除/修改操作的 busy 防重入，仅移除不必要的已读互斥条件。IMAP 交互仍由后端账号连接锁串行，文件夹已读以 250 UID 批次释放锁，删除可在批次之间执行。未增加危险的并行连接写入。
 - 文件夹已读完成不再清空用户当前选择；删除仍只移除成功批次对应的选择，失败保留待重试邮件。Trash、永久删除确认和取消保持原有行为。
 
+- 增补并发回归确认：已读操作发出的旧缓存快照可能在删除完成后晚到并恢复已删行。按文件夹记录成功移除版本，丢弃移除之前启动的旧查询；不丢弃其他文件夹的新查询。
+
 ## 回归与边界
 
-- 新增五个定向回归在原始源码上全部失败；修复后 MailClientTab、MailStorageSettings、mailFolders 连同 SessionEditor 共 124 项通过。另记录并修复 UI 用例暴露的空行问题。
+- 新增五个初始定向回归在原始源码上全部失败；修复后 MailClientTab、MailStorageSettings、mailFolders 连同 SessionEditor 共 125 项通过。另记录并修复 UI 用例暴露的空行问题。
 - 扩展 `TC-MAIL-STORAGE-01/02`：连接前无候选、缓存中文文件夹、原始键保存/重开、include/exclude 切换。browser 证明渲染，native 证明真实 IMAP LIST 解码与会话配置持久化。
 - 扩展 `TC-MAIL-BULK-01`：一次受控 20 秒已读响应，断言已读仍 busy 时 Delete 已启用，真实点击后核对原有/新增邮件计数、Trash 及未读状态。该延迟是夹具故障注入，不是放宽性能预算。原有取消永久删除与确认清理断言全部保留。
 - Linux browser 两个受影响用例通过，原始报告保留于 `qa-ui-auto-report/mail-ui-fix/browser/`。第一个运行暴露的空行失败也保留，未覆盖。
