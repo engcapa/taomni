@@ -3362,7 +3362,7 @@ def _do_mail_server_sparse_sync(ctx: NativeStepContext, args: Any) -> str:
             folder.uid_next += 1
         state.advertise_condstore = False
         state.drop_next_fetch = True
-    return "delivered 1100 sparse ten-digit UIDs; next FETCH disconnects; 4096-byte command limit"
+    return "delivered 1100 sparse ten-digit UIDs; next FLAGS FETCH disconnects; 4096-byte command limit"
 
 
 @_verb("mail_server_assert_sync_transport")
@@ -3371,4 +3371,8 @@ def _do_mail_server_assert_sync_transport(ctx: NativeStepContext, args: Any) -> 
     with state.lock:
         if state.dropped_fetches != 1 or state.rejected_commands != 0:
             raise StepError(f"sync transport: dropped={state.dropped_fetches}, rejected={state.rejected_commands}")
-    return "one injected disconnect recovered; no oversized IMAP commands"
+        batches = [command.split()[2].split(",") for command in state.log
+                   if command.startswith("UID FETCH ") and command.endswith("(UID FLAGS)")]
+        if not any(len(batch) > 200 for batch in batches):
+            raise StepError("sync transport: no large explicit UID flag batch was exercised")
+    return "one injected FLAGS disconnect recovered; large UID flag batches exercised; no oversized commands"

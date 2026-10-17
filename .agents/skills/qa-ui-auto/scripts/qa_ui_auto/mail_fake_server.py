@@ -386,7 +386,7 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                 if len(line) > state.max_command_bytes:
                     state.rejected_commands += 1
                     return
-                if state.drop_next_fetch and upper.startswith("UID FETCH"):
+                if state.drop_next_fetch and upper.startswith("UID FETCH") and upper.endswith("(UID FLAGS)"):
                     state.drop_next_fetch = False
                     state.dropped_fetches += 1
                     return

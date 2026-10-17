@@ -48,3 +48,5 @@ GitHub `39034904707` 的 Linux/macOS browser 原始报告发现 `TC-MAIL-SYNC-01
 首轮 Linux native 的新 `TC-MAIL-SYNC-03` 与原生并发性能 `PERF-02` 均通过。新 `STORAGE-03` 已通过全部协议失败/Retry/完整 MIME磁盘oracle，最后打开归档时立即 assert_count 与异步IPC加载竞争，观察为0行，失败快照实际已显示2行。补充等待真实 `[mail-archive-dialog][open]`（产品只在条目加载完成后打开），再保留原有精确2行及附件断言；不增加固定sleep、不降低断言。最终三端重跑包含此用例修正。
 
 首轮 macOS native 的 `PERF-03` 显示 primary 已实际 downloading，探针仍无条件点击已经被自动扫描替换的 Resume，导致 element not found（尚未进入 ownership 断言）。探针现允许“已在运行”状态，并在空闲时仍通过真实 Resume 控件启动；只接受该控件消失且 Pause 确认存在的特定竞态，其他 WebDriver 错误继续失败。单一 owner、两个真实连接、跨进程暂停/续传、固定终端预算、迁移/物理清理/不复活断言保持不变，额外记录阶段及自动/手工启动路径。新增4个工具回归；协议性能工具共7项通过。此为测试编排修复，不改变产品或性能门限。
+
+首轮 Windows `SYNC-03` 的故障注入被 full-MIME 归档连接消费，且精确同步提示被迟到的分页 Loaded 提示覆盖。故障现只命中无 CONDSTORE 的 `(UID FLAGS)` 同步请求；真实 fake-server 回归证明原件/HEADER活动不会消费故障。用例等待 Sync 按钮恢复并保留远端数量/未读数对账，增加服务器 oracle 要求确实发生大于200个显式UID的flags批次、恰好一次断连、零超长命令，替代不稳定的瞬时提示文本。未降低产品或延迟断言；24项邮件测试工具回归通过。

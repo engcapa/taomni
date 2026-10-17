@@ -1,8 +1,9 @@
 id: TC-MAIL-SYNC-03
 title: Sparse UID sync reconnects without oversized commands and retains remote changes
-description: 'Real native IMAP: deliver 1100 sparse ten-digit UIDs, disconnect one FETCH, enforce a 4
-  KiB command limit. Sync releases its button while all pending headers finish; full reconciliation retains
-  remote deletions and read flags. Browser mocks cannot establish wire command lengths or reconnects.'
+description: 'Real native IMAP: deliver 1100 sparse ten-digit UIDs, disconnect one synchronization FLAGS
+  FETCH, enforce a 4 KiB command limit. Sync releases its button while all pending headers finish; full
+  reconciliation retains remote deletions and read flags. Browser mocks cannot establish wire command
+  lengths or reconnects.'
 covers:
 - F-MAIL-5
 - F-MAIL-3
@@ -50,9 +51,8 @@ steps:
     flags:
     - \Seen
 - click: '[data-testid="mail-sync-button"]'
-- assert_text:
-    selector: '[data-testid="mail-client-tab"]'
-    contains: new headers across
+- wait_for:
+    selector: '[data-testid="mail-sync-button"]:enabled'
     timeout_sec: 30
 - mail_server_assert_list_matches:
     unread: true
@@ -90,8 +90,8 @@ verification:
     - step: 13
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
     - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "new
-        headers across", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-sync-button\"]:enabled", "timeout_sec":
+        30}}'
     - step: 18
       expectation: '{"mail_server_assert_list_matches": {"unread": true, "timeout_sec": 120}}'
     - step: 19

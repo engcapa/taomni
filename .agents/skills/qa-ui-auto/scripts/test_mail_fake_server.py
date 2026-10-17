@@ -84,6 +84,10 @@ class FakeMailServerTest(unittest.TestCase):
             return client
         client = connect()
         self.server.state.drop_next_fetch = True
+        # Archive/body activity must not consume the sync-specific fault.
+        self.assertEqual(client.uid("FETCH", "1", "(UID RFC822.SIZE BODY.PEEK[]<0.262144>)")[0], "OK")
+        self.assertEqual(client.uid("FETCH", "1", "(UID FLAGS BODY.PEEK[HEADER])")[0], "OK")
+        self.assertTrue(self.server.state.drop_next_fetch)
         with self.assertRaises(imaplib.IMAP4.abort):
             client.uid("FETCH", "1", "(UID FLAGS)")
         client.shutdown()
