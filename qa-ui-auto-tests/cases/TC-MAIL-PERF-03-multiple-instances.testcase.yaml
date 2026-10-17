@@ -3,7 +3,8 @@ title: 'Two native instances sharing one mailbox: ownership, pause, relocation a
   cleanup'
 description: Two QA binaries use separate disposable profiles and one shared account
   directory. Actual UI actions prove one archive owner, peer pause and byte-exact
-  resume, five PTY response samples, migration with an already-open connection in
+  resume, five PTY response samples after a real resumed chunk becomes active,
+  migration with an already-open connection in
   another process, and physical cleanup without redownload. No personal profile is
   accessed. Native concurrency is intentional for this case; both drivers and profiles
   remain run-owned.
@@ -145,7 +146,9 @@ verification:
     - step: 30
       expectation: Both native processes pass shared-directory ownership, peer pause/resume,
         migration and cleanup assertions; all five PTY samples meet the fixed p95
-        budget.
+        budget. A resumed chunk is active before sampling, and a matching chunk
+        overlaps a measured PTY sample and completes within the measurement window;
+        monotonic sample and protocol timestamps are retained.
     results:
     - 29
     - 30

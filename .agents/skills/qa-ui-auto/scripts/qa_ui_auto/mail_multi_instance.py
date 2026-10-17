@@ -81,7 +81,9 @@ def run(ctx, args):
             # Keep a chunk in flight long enough to distinguish the two owners.
             with server.lock:
                 raw = next(iter(server.folders["INBOX"].messages.values())).raw
-                raw = raw.replace(b"Subject: Complete INBOX 0", b"Subject: Shared instance original") + b"\r\n" * (2 * 1024 * 1024)
+                # Leave enough real chunks for terminal startup and all five
+                # samples, including the entire permitted 7.5s probe budget.
+                raw = raw.replace(b"Subject: Complete INBOX 0", b"Subject: Shared instance original") + b"\r\n" * (8 * 1024 * 1024)
                 uid = server.append_raw("INBOX", raw, [])
                 oracle = next(value for key, value in expected.items() if key.startswith("INBOX/"))
                 expected[f"INBOX/{uid}"] = {**oracle, "sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw)}
@@ -107,13 +109,16 @@ def run(ctx, args):
             assert partial and len(partial) < len(raw) and raw.startswith(partial), "Unsafe shared partial MIME"
             result["pausedPrefixBytes"] = len(partial)
             with server.lock:
+                previous_owners = sorted({event["connection"] for event in server.fetch_events[event_start:] + server.fetch_inflight
+                    if event["command"].startswith(f"UID FETCH {uid} ") and "BODY.PEEK[]<" in event["command"] and "HEADER" not in event["command"]})
                 server.archive_chunk_delay = .25
             primary.act("click", '[data-testid="mail-storage-resume"]')
             # The peer's PTY remains responsive while the owner's real chunks
             # continue. It uses the same 5-sample budget as the other case.
             peer.act("click", '[data-testid="new-local-terminal"]')
             peer.act("wait_for", '[data-testid="terminal-pane"][data-terminal-ready="true"]')
-            result["terminalReceipt"] = performance(peer_ctx, {"kind": "terminal", "label": "peer-loaded-terminal", "samples": 5, "max_p95_ms": 1500, "require_background": True})
+            result["terminalReceipt"] = performance(peer_ctx, {"kind": "terminal", "label": "peer-loaded-terminal", "samples": 5, "max_p95_ms": 1500, "require_background": True,
+                "background_fetch": {"folder": "INBOX", "uid": uid, "min_offset": len(partial), "exclude_connections": previous_owners}})
             primary.until(text(progress) + '.includes("completed")', 60)
             result["beforeMove"] = observe(root, expected, {"INBOX": 3}, {"INBOX": 3, "Archive": 2})
             with server.lock:

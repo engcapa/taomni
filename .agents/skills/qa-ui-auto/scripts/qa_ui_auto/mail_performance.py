@@ -47,15 +47,48 @@ def text(selector):
     return f"(document.querySelector({json.dumps(selector)})?.textContent || '')"
 
 
+def archive_fetch_matches(event, target):
+    command = event["command"].upper()
+    offset = re.search(r"BODY\.PEEK\[\]<(\d+)\.\d+>", command)
+    return (event["folder"] == target["folder"]
+            and command.startswith(f"UID FETCH {int(target['uid'])} ")
+            and event.get("connection") not in target.get("exclude_connections", [])
+            and "HEADER" not in command and offset is not None
+            and int(offset[1]) >= int(target["min_offset"]))
+
+
+def wait_for_archive_fetch(state, target, timeout=30):
+    """Start measurement only once the resumed owner is serving a real chunk."""
+    deadline = time.monotonic() + timeout
+    while True:
+        with state.lock:
+            active = [dict(event) for event in state.fetch_inflight if archive_fetch_matches(event, target)]
+        if active:
+            return {"observedAt": time.monotonic(), "target": target, "activeFetches": active}
+        if time.monotonic() >= deadline:
+            raise StepError(f"Resumed archive FETCH did not become active before measurement: {target}")
+        time.sleep(.01)
+
+
+def fetches_during_samples(events, intervals, target):
+    # A completion after the final probe must not make an idle window pass.
+    return [event for event in events if archive_fetch_matches(event, target)
+            and any(event["started"] < interval["finished"]
+                    and interval["started"] < event["finished"] <= intervals[-1]["finished"]
+                    for interval in intervals)]
+
+
 def native_observation():
     from . import mail_fake_server
     server = mail_fake_server.ACTIVE
     if server is None:
         raise StepError("mail_performance_probe requires mail_server")
     with server.state.lock:
-        result = {"messages": server.state.count("INBOX"), "activeFetches": server.state.fetch_active,
+        result = {"observedAt": time.monotonic(),
+                  "messages": server.state.count("INBOX"), "activeFetches": server.state.fetch_active,
                   "maxParallelFetches": server.state.fetch_max_parallel,
-                  "fetchCount": len(server.state.fetch_events), "smtpCount": len(server.state.smtp_messages)}
+                  "fetchCount": len(server.state.fetch_events), "smtpCount": len(server.state.smtp_messages),
+                  "inFlightFetches": [dict(event) for event in server.state.fetch_inflight]}
     result["processes"] = []
     # Linux resource samples are supplemental. Timing/protocol assertions are portable.
     for entry in Path("/proc").glob("[0-9]*"):
@@ -86,12 +119,17 @@ def run(ctx, args):
         return
     ui = UI(ctx)
     samples = []
+    intervals = []
     result = {"kind": kind, "label": label, "mode": "native" if ui.native else "browser",
               "platform": platform.platform(), "clock": "Python monotonic; UI dispatch to observed result, including automation overhead",
-              "samplesMs": samples, "maxP95Ms": budget, "warmup": "none; all samples retained"}
+              "samplesMs": samples, "sampleIntervals": intervals,
+              "maxP95Ms": budget, "warmup": "none; all samples retained"}
     path = ctx.case_dir / f"mail-performance-{label}.json"
     try:
         if ui.native:
+            if args.get("background_fetch"):
+                from . import mail_fake_server
+                result["backgroundReady"] = wait_for_archive_fetch(mail_fake_server.ACTIVE.state, args["background_fetch"])
             result["before"] = native_observation()
         if kind == "concurrency":
             if not ui.native:
@@ -148,7 +186,9 @@ def run(ctx, args):
                     started = time.monotonic()
                     ui.act("click", '[data-testid="mail-compose-send"]')
                     ui.until('!document.querySelector(\'[data-testid="mail-compose-dialog"]\') && ' + text('[data-testid="mail-client-tab"][data-active="true"]') + '.includes("Message sent")')
-                samples.append((time.monotonic() - started) * 1000)
+                finished = time.monotonic()
+                intervals.append({"started": started, "finished": finished})
+                samples.append((finished - started) * 1000)
             result["p50Ms"] = percentile(samples, .5)
             result["p95Ms"] = percentile(samples, .95)
             assert result["p95Ms"] <= budget, f"{label}: p95 {result['p95Ms']:.1f}ms exceeds {budget}ms"
@@ -157,6 +197,12 @@ def run(ctx, args):
             if args.get("require_background"):
                 assert result["after"]["fetchCount"] > result["before"]["fetchCount"], "Background FETCH made no progress during the UI probes"
                 assert result["after"]["maxParallelFetches"] >= 2, "No actual overlapping fetches"
+                if args.get("background_fetch"):
+                    from . import mail_fake_server
+                    with mail_fake_server.ACTIVE.state.lock:
+                        events = list(mail_fake_server.ACTIVE.state.fetch_events)
+                    result["backgroundProgressFetches"] = fetches_during_samples(events, intervals, args["background_fetch"])
+                    assert result["backgroundProgressFetches"], "Resumed archive did not progress during a measured UI sample"
             if kind == "send":
                 assert result["after"]["smtpCount"] - result["before"]["smtpCount"] == count, "SMTP accepted missing or duplicate sends"
         result["passed"] = True
@@ -166,7 +212,7 @@ def run(ctx, args):
         raise
     finally:
         if ui.native:
-            result["after"] = native_observation()
+            result["finalObservation"] = native_observation()
             from . import mail_fake_server
             with mail_fake_server.ACTIVE.state.lock:
                 result["fetchEvents"] = list(mail_fake_server.ACTIVE.state.fetch_events)

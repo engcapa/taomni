@@ -124,6 +124,7 @@ class FakeMailState:
         self.fetch_active = 0
         self.fetch_max_parallel = 0
         self.fetch_events: list[dict] = []
+        self.fetch_inflight: list[dict] = []
 
     def idle_clients(self) -> int:
         """Connections currently in IDLE (AC-37: zero after the tab closes)."""
@@ -546,6 +547,7 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                 with state.lock:
                     state.fetch_active += 1
                     state.fetch_max_parallel = max(state.fetch_max_parallel, state.fetch_active)
+                    state.fetch_inflight.append(event)
                 try:
                     if "BODY.PEEK[HEADER]" in upper:
                         time.sleep(getattr(state, "header_fetch_delay", 0))
@@ -555,6 +557,7 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                 finally:
                     with state.lock:
                         state.fetch_active -= 1
+                        state.fetch_inflight.remove(event)
                         event["finished"] = time.monotonic()
                         state.fetch_events.append(event)
             else:
