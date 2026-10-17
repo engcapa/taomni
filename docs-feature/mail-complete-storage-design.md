@@ -2,6 +2,8 @@
 
 日期：2026-10-17；基线 `cd6655e2`，分支 `feat/mail-complete-storage`。本次是实现任务，设计随验证结果更新。平台为 Windows、macOS、Linux；当前开发端为 Linux；本地阶段按当时指令仅执行 Linux browser/native；后续用户明确要求使用 GitHub `qa-ui-auto-platforms.yml` 执行三端全部邮件和本次受影响用例，结果见下方 GitHub 验证记录。所有写入使用临时数据及独立 QA 配置，未访问个人应用存储或重启正在运行的应用。
 
+后续手工反馈的文件夹名称、已读期间删除及备份保存竞争已修复；更新后的三端完整回归为 192/192，通过提交 `b0c2ed02`，见 [后续修复及最终验证](../docs-issue/mail-folder-label-selection-fix.md#最终验证与交付)。下文保留完整存储实现阶段的历史验证记录。
+
 ## 行为与决定
 
 | ID | 决定 | 来源与状态 |
