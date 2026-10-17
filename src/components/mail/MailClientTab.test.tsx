@@ -1482,6 +1482,49 @@ describe("MailClientTab", () => {
     expect(mailMocks.mailSyncFolder.mock.calls.length).toBeGreaterThan(afterFirst);
   });
 
+  it("syncs the newly selected folder after an in-flight INBOX refresh finishes", async () => {
+    const trash = { ...folder, name: "Trash", flags: ["\\Trash"], total: 1 };
+    const moved = { ...message, folder: "Trash", subject: "Moved to trash" };
+    let finishInbox!: (value: MailFolderSyncResult) => void;
+    let trashSynced = false;
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, trash]);
+    mailMocks.mailListCachedMessages.mockImplementation(async (_id, name) => name === "Trash" ? (trashSynced ? [moved] : []) : [message]);
+    mailMocks.mailSyncFolder.mockImplementation(async (_info, name) => {
+      if (name === "Trash") {
+        trashSynced = true;
+        return stepResult({ folder: trash, messages: [moved], fetched: 1 });
+      }
+      return stepResult({});
+    });
+    mailMocks.mailSyncFolder.mockImplementationOnce(() => new Promise((resolve) => { finishInbox = resolve; }));
+    render(<MailClientTab tabId="mail-tab" info={{ ...info, sync: { ...info.sync, onOpen: true } }} visible />);
+    await waitFor(() => expect(finishInbox).toBeTypeOf("function"));
+    await waitFor(() => expect(document.querySelector('[data-testid="mail-folder-row"][data-folder-name="Trash"]')).not.toBeNull());
+    fireEvent.click(document.querySelector('[data-testid="mail-folder-row"][data-folder-name="Trash"]')!);
+    await waitFor(() => expect(mailMocks.mailListCachedMessages).toHaveBeenCalledWith(info.sessionId, "Trash", expect.any(Number), 0));
+    await act(async () => finishInbox(stepResult({})));
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledWith(expect.anything(), "Trash", expect.anything()), { timeout: 2500 });
+    await waitFor(() => expect(screen.getByTestId("mail-message-row")).toHaveTextContent("Moved to trash"));
+  });
+
+  it("does not replace the selected folder with a late cache reply from the previous folder", async () => {
+    const trash = { ...folder, name: "Trash", flags: ["\\Trash"] };
+    const moved = { ...message, folder: "Trash", subject: "Moved to trash" };
+    let finishOldCache!: (value: MailMessageHeader[]) => void;
+    mailMocks.mailSyncAllFolders.mockResolvedValue({ folders: [folder, trash], fetchedMessages: 0, pendingFolders: [] });
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, trash]);
+    mailMocks.mailListCachedMessages.mockImplementation(async (_id, name) => name === "Trash" ? [moved] : [message]);
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    mailMocks.mailListCachedMessages.mockImplementationOnce(() => new Promise((resolve) => { finishOldCache = resolve; }));
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await waitFor(() => expect(finishOldCache).toBeTypeOf("function"));
+    fireEvent.click(document.querySelector('[data-testid="mail-folder-row"][data-folder-name="Trash"]')!);
+    await waitFor(() => expect(screen.getByTestId("mail-message-row")).toHaveTextContent("Moved to trash"));
+    await act(async () => finishOldCache([message]));
+    expect(screen.getByTestId("mail-message-row")).toHaveTextContent("Moved to trash");
+  });
+
   it("holds an IDLE watcher while open and catches up on push (TASK-12)", async () => {
     const view = renderMailbox();
     await waitFor(() => expect(mailMocks.mailIdleStart).toHaveBeenCalledWith(info, "INBOX"));

@@ -1419,6 +1419,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const bodyLoadSeqRef = useRef(0);
   const bodyWarmSeqRef = useRef(0);
   const syncInFlightRef = useRef(false);
+  const folderSelectSeqRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
   const lastSavedDraftJsonRef = useRef("");
   const foldersRef = useRef<MailFolder[]>([]);
@@ -1595,17 +1596,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     foldersRef.current = folders;
   }, [folders]);
 
-  useEffect(() => {
-    selectedFolderRef.current = selectedFolder;
-  }, [selectedFolder]);
-
   /** Keep selectedFolderRef in sync immediately (folder switches can race quiet poll awaits). */
   const updateSelectedFolder = useCallback((next: string | ((prev: string) => string)) => {
-    setSelectedFolder((prev) => {
-      const value = typeof next === "function" ? next(prev) : next;
-      selectedFolderRef.current = value;
-      return value;
-    });
+    const value = typeof next === "function" ? next(selectedFolderRef.current) : next;
+    selectedFolderRef.current = value;
+    setSelectedFolder(value);
   }, []);
 
   useEffect(() => {
@@ -2071,6 +2066,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         pendingCacheRefreshRef.current = true;
         return { page: [] as MailMessageHeader[], hasMore: false };
       }
+      if (selectedFolderRef.current !== folder) {
+        return { page: [] as MailMessageHeader[], hasMore: false };
+      }
       const page = cached.slice(0, limit);
       const loadedCount = offset + page.length;
       const hasMore = folderHasMoreToLoad(
@@ -2477,6 +2475,23 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   }, [isNewMailExcludedName, loadCachedFolders, notifyNewMail, runFolderSync]);
 
+  const syncSelectedFolder = useCallback(async (folder: string) => {
+    // A user folder switch must survive an existing poll/catch-up. Keep only
+    // the latest selection eligible so rapid switches do not queue old work.
+    const sequence = ++folderSelectSeqRef.current;
+    const current = () => folderSelectSeqRef.current === sequence
+      && visibleRef.current && selectedFolderRef.current === folder;
+    while (syncInFlightRef.current) {
+      if (!current()) return;
+      await delay(50);
+    }
+    if (!current()) return;
+    await syncFolderNow(folder, "none");
+    if (current()) startBackfill(folder);
+  }, [startBackfill, syncFolderNow]);
+
+  useEffect(() => () => { folderSelectSeqRef.current += 1; }, [info.sessionId]);
+
   /** Quiet background poll: catch up the selected folder and INBOX, reconcile flags. */
   const quietPollSelectedAndInbox = useCallback(async () => {
     if (syncInFlightRef.current) return;
@@ -2571,10 +2586,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         return result;
       }
       setFolders(foldersRef.current);
-      const nextFolder = foldersRef.current.some((folder) => folder.name === activeBeforeSync)
-        ? activeBeforeSync
-        : foldersRef.current[0]?.name ?? activeBeforeSync;
-      if (nextFolder !== activeBeforeSync) {
+      const currentFolder = selectedFolderRef.current;
+      const nextFolder = foldersRef.current.some((folder) => folder.name === currentFolder)
+        ? currentFolder
+        : foldersRef.current[0]?.name ?? currentFolder;
+      if (nextFolder !== currentFolder) {
         updateSelectedFolder(nextFolder);
       }
       const loaded = messagesRef.current.filter((message) => message.folder === nextFolder).length;
@@ -3010,7 +3026,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (changed) {
       backfillSeqRef.current += 1;
       setBackfillProgress(null);
-      void syncFolderNow(folder.name, "none").then(() => startBackfill(folder.name));
+      void syncSelectedFolder(folder.name);
     }
     setSelectedMessageKey(null);
     setCheckedMessageKeys(new Set());

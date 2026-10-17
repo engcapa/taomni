@@ -5,7 +5,8 @@ description: Marks the folder read, selects three messages using Ctrl/Cmd and Sh
   the mail stub; native uses real IMAP and SQLite in an isolated QA profile. Large command limits and
   lost STORE responses are covered by mail::responsiveness_tests. Background History/Bodies progress may
   finish while All read is clicked; the toolbar must keep its controls in place so native pointer input
-  reaches the intended action.
+  reaches the intended action. Selecting Trash while a prior sync finishes must queue its refresh;
+  late cache replies for INBOX must not overwrite the selected folder.
 covers:
 - F-MAIL-3
 - F-MAIL-12
@@ -158,6 +159,9 @@ verification:
     - 35
     - 36
     checkpoints:
+    - step: 28
+      expectation: Switching to Trash during background sync eventually shows all three moved messages
+        without requiring a second click or manual Sync.
     - step: 30
       expectation: Select-all selects the three displayed messages.
     - step: 34
@@ -167,6 +171,7 @@ verification:
     - step: 39
       expectation: The deleted messages disappear from the list.
     results:
+    - 28
     - 30
     - 34
     - 37
