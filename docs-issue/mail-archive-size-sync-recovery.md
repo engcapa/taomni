@@ -46,3 +46,5 @@ GitHub `39034904707` 的 Linux/macOS browser 原始报告发现 `TC-MAIL-SYNC-01
 当前本地结果：68 个 mounted 测试通过；Linux browser `TC-MAIL-SYNC-01/02`、`TC-MAIL-PERF-01` 三项实际执行通过，保留 receipt 和原始性能样本。133 个 Rust 邮件测试通过，1 个既有外网凭据用例 ignored；14 个 Python 假服务器协议测试通过；前端构建通过。最终三端结果仍需使用修复后的提交重新执行，不引用首轮部分通过作为最终通过。
 
 首轮 Linux native 的新 `TC-MAIL-SYNC-03` 与原生并发性能 `PERF-02` 均通过。新 `STORAGE-03` 已通过全部协议失败/Retry/完整 MIME磁盘oracle，最后打开归档时立即 assert_count 与异步IPC加载竞争，观察为0行，失败快照实际已显示2行。补充等待真实 `[mail-archive-dialog][open]`（产品只在条目加载完成后打开），再保留原有精确2行及附件断言；不增加固定sleep、不降低断言。最终三端重跑包含此用例修正。
+
+首轮 macOS native 的 `PERF-03` 显示 primary 已实际 downloading，探针仍无条件点击已经被自动扫描替换的 Resume，导致 element not found（尚未进入 ownership 断言）。探针现允许“已在运行”状态，并在空闲时仍通过真实 Resume 控件启动；只接受该控件消失且 Pause 确认存在的特定竞态，其他 WebDriver 错误继续失败。单一 owner、两个真实连接、跨进程暂停/续传、固定终端预算、迁移/物理清理/不复活断言保持不变，额外记录阶段及自动/手工启动路径。新增4个工具回归；协议性能工具共7项通过。此为测试编排修复，不改变产品或性能门限。

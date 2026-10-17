@@ -7,7 +7,7 @@ description: Two QA binaries use separate disposable profiles and one shared acc
   migration with an already-open connection in
   another process, and physical cleanup without redownload. No personal profile is
   accessed. Native concurrency is intentional for this case; both drivers and profiles
-  remain run-owned.
+  remain run-owned. Auto-started scans are observed as active instead of clicking a Resume button that has already become Pause; ownership and byte-exact continuation assertions remain mandatory.
 covers:
 - F-MAIL-23
 - F2.1

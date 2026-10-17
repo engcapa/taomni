@@ -30,6 +30,33 @@ def snapshot(source, destination):
             src.backup(dst)
 
 
+def request_scan(ui):
+    """Auto-scan may win the race with a manual Resume in either process.
+
+    Observe or click the normal UI; ownership and progress are still asserted
+    independently below. Never click Pause as a substitute for a missing Resume.
+    """
+    from tauri_webdriver import WebDriverError
+    resume = '[data-testid="mail-storage-resume"]'
+    pause = '[data-testid="mail-storage-pause"]'
+    active = f"!!document.querySelector({json.dumps(pause)})"
+    phase = ui.until(f"document.querySelector({json.dumps(resume)})?.matches(':enabled') ? 'idle' : ({active} ? 'active' : '')", 30)
+    if phase == "active":
+        return "already active"
+    try:
+        ui.act("click", resume)
+    except WebDriverError as error:
+        # The periodic poll can replace the button between the read and click.
+        # Only accept that specific transition; actual UI/driver errors still fail.
+        message = str(error).lower()
+        if "mail-storage-resume" not in message or not any(term in message for term in ("element not found", "no such element")):
+            raise
+        if not ui.read(active):
+            raise
+        return "auto-started before click"
+    return "manual resume"
+
+
 def run(ctx, args):
     from native_build import QA_APP_ID
     from tauri_webdriver import NativeHarness, native_isolation_env
@@ -89,11 +116,13 @@ def run(ctx, args):
                 expected[f"INBOX/{uid}"] = {**oracle, "sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw)}
                 server.archive_chunk_delay = 1
                 event_start = len(server.fetch_events)
-            primary.act("click", '[data-testid="mail-storage-resume"]')
+            result["stage"] = "start owner and observe follower"
+            result["primaryScan"] = request_scan(primary)
             primary.until(text(progress) + '.includes("downloading")', 30)
-            peer.act("click", '[data-testid="mail-storage-resume"]')
+            result["peerScan"] = request_scan(peer)
             peer.until(text(progress) + '.includes("syncing in another instance")', 15)
             result["singleOwnerVisible"] = True
+            result["stage"] = "peer pause and durable prefix"
             deadline = time.monotonic() + 20
             while not any(path.stat().st_size > 0 for path in root.glob("*.mail/partial/*.part")):
                 if time.monotonic() >= deadline:
@@ -112,6 +141,7 @@ def run(ctx, args):
                 previous_owners = sorted({event["connection"] for event in server.fetch_events[event_start:] + server.fetch_inflight
                     if event["command"].startswith(f"UID FETCH {uid} ") and "BODY.PEEK[]<" in event["command"] and "HEADER" not in event["command"]})
                 server.archive_chunk_delay = .25
+            result["stage"] = "resume and concurrent peer terminal"
             primary.act("click", '[data-testid="mail-storage-resume"]')
             # The peer's PTY remains responsive while the owner's real chunks
             # continue. It uses the same 5-sample budget as the other case.
@@ -129,6 +159,7 @@ def run(ctx, args):
             assert len(events) >= 3, "Full-message chunks did not run"
             assert len({event["connection"] for event in events}) == 2, "Expected exactly one owner before and one after pause"
             result["chunkEvents"] = events
+            result["stage"] = "relocate shared storage"
             # Move from the peer; the first process already has a cached DB
             # handle and must follow the durable redirect when reading again.
             peer.act("click", '[data-testid="tab-item"][data-tab-type="mail"]')
@@ -144,6 +175,7 @@ def run(ctx, args):
             primary.act("click", '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]')
             primary.until(text('[data-testid="mail-archive-preview"]') + '.includes("complete.bin")', 15)
             result["afterMove"] = observe(target, expected, {"INBOX": 3}, {"Archive": 2})
+            result["stage"] = "cleanup and rescan"
             # Physical cleanup in the second process must also be visible to
             # the first process and cannot resurrect after a subsequent scan.
             peer.act("click", '[data-testid="mail-archive-open"]')
@@ -162,6 +194,7 @@ def run(ctx, args):
             result["afterRescan"] = observe(target, expected, {}, {"INBOX": 3, "Archive": 2})
             peer_session.screenshot(peer_root / "peer-final.png")
             result["peerIdentity"] = json.loads((peer_root / "native-isolation.json").read_text())
+            result["stage"] = "completed"
             result["passed"] = True
             peer_session.close()
             peer_session = None

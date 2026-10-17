@@ -85,5 +85,50 @@ class MailPerformanceTest(unittest.TestCase):
         self.assertEqual(fetches_during_samples(rejected, intervals, target), [])
 
 
+
+
+
+class MultiInstanceScanTest(unittest.TestCase):
+    def test_manual_resume_uses_ui(self):
+        from unittest.mock import Mock
+        from qa_ui_auto.mail_multi_instance import request_scan
+        ui = Mock()
+        ui.until.return_value = "idle"
+        self.assertEqual(request_scan(ui), "manual resume")
+        ui.act.assert_called_once_with("click", '[data-testid="mail-storage-resume"]')
+
+    def test_automatic_scan_does_not_click_pause(self):
+        from unittest.mock import Mock
+        from qa_ui_auto.mail_multi_instance import request_scan
+        ui = Mock()
+        ui.until.return_value = "active"
+        self.assertEqual(request_scan(ui), "already active")
+        ui.act.assert_not_called()
+
+    def test_replaced_resume_is_accepted_only_if_scan_became_active(self):
+        from unittest.mock import Mock
+        from tauri_webdriver import WebDriverError
+        from qa_ui_auto.mail_multi_instance import request_scan
+        ui = Mock()
+        ui.until.return_value = "idle"
+        ui.act.side_effect = WebDriverError("element not found: [data-testid=mail-storage-resume]")
+        ui.read.return_value = True
+        self.assertEqual(request_scan(ui), "auto-started before click")
+        ui.read.return_value = False
+        with self.assertRaises(WebDriverError):
+            request_scan(ui)
+
+    def test_driver_error_is_not_masked_by_a_running_scan(self):
+        from unittest.mock import Mock
+        from tauri_webdriver import WebDriverError
+        from qa_ui_auto.mail_multi_instance import request_scan
+        ui = Mock()
+        ui.until.return_value = "idle"
+        ui.act.side_effect = WebDriverError("WebDriver request timed out")
+        ui.read.return_value = True
+        with self.assertRaisesRegex(WebDriverError, "timed out"):
+            request_scan(ui)
+
+
 if __name__ == "__main__":
     unittest.main()
