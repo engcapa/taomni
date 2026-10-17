@@ -16,6 +16,7 @@ description: 'TASK-06 (docs-feature/mail-thunderbird-parity-design.md AC-20/AC-2
 covers:
 - F-MAIL-6
 - F-MAIL-2
+- F-MAIL-23
 tags:
 - mail
 - p1
@@ -83,6 +84,10 @@ steps:
 - assert_text:
     selector: '[data-testid="mail-sent-copy-status"]'
     contains: copy saved to Sent
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
 - screenshot: mail-send-01-sent-copy.png
 verification:
   review: reviewed
@@ -134,6 +139,17 @@ verification:
     - 20
     - 21
     - 22
+  - id: R3
+    requirement: Quick Connect 默认目录的完整原件下载必须完成，不能在发送成功时遗漏后台归档发布错误；覆盖 Windows 长存储路径。
+    actions:
+    - 5
+    - 6
+    - 18
+    checkpoints:
+    - step: 26
+      expectation: Default-directory full MIME storage completes without a publication error, including Windows paths longer than MAX_PATH.
+    results:
+    - 26
   visual:
   - check: 截图中状态栏显示已保存 Sent 副本，写信窗口已关闭。
     method: manual
