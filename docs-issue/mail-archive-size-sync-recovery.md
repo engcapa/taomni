@@ -44,3 +44,5 @@
 GitHub `39034904707` 的 Linux/macOS browser 原始报告发现 `TC-MAIL-SYNC-01` 重开后只显示 203/453 封、hasMore=false。新增队列 effect 的 cleanup 错误地推进了所有同步循环共享的 generation；开发模式 StrictMode 重放 effect 时，第一条 on-open 追赶被取消，而第二次 setup 因 guard 占用没有启动替代追赶。改为仅清理队列自己拥有的 worker，不取消其他 folder loop。补充 StrictMode 三批追赶 mounted 回归。
 
 当前本地结果：68 个 mounted 测试通过；Linux browser `TC-MAIL-SYNC-01/02`、`TC-MAIL-PERF-01` 三项实际执行通过，保留 receipt 和原始性能样本。133 个 Rust 邮件测试通过，1 个既有外网凭据用例 ignored；14 个 Python 假服务器协议测试通过；前端构建通过。最终三端结果仍需使用修复后的提交重新执行，不引用首轮部分通过作为最终通过。
+
+首轮 Linux native 的新 `TC-MAIL-SYNC-03` 与原生并发性能 `PERF-02` 均通过。新 `STORAGE-03` 已通过全部协议失败/Retry/完整 MIME磁盘oracle，最后打开归档时立即 assert_count 与异步IPC加载竞争，观察为0行，失败快照实际已显示2行。补充等待真实 `[mail-archive-dialog][open]`（产品只在条目加载完成后打开），再保留原有精确2行及附件断言；不增加固定sleep、不降低断言。最终三端重跑包含此用例修正。

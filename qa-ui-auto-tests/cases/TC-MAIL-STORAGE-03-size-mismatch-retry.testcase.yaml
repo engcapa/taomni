@@ -1,9 +1,9 @@
 id: TC-MAIL-STORAGE-03
 title: Archive inaccurate MIME sizes and retry unavailable content without blocking other mail
-description: Real native IMAP partial FETCH and independent SQLite/gzip MIME checks. A newest message returns empty
-  chunks; the older message has an underestimated RFC822.SIZE and must still be saved completely. Repeated Retry
-  preserves saved originals and explicit failure. Restoring server content lets Retry finish without duplicates.
-  Browser stubs cannot prove protocol ranges or persisted bytes.
+description: Real native IMAP partial FETCH and independent SQLite/gzip MIME checks. A newest message
+  returns empty chunks; the older message has an underestimated RFC822.SIZE and must still be saved completely.
+  Repeated Retry preserves saved originals and explicit failure. Restoring server content lets Retry finish
+  without duplicates. Browser stubs cannot prove protocol ranges or persisted bytes.
 covers:
 - F-MAIL-23
 tags:
@@ -137,6 +137,7 @@ steps:
       INBOX: 2
       Archive: 2
 - click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-dialog"][open]'
 - assert_count:
     selector: '[data-testid="mail-archive-row"]'
     equal: 2
@@ -152,8 +153,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Incomplete content stays a contextual failure, other full MIME saves despite size mismatch, and
-      repeated UI Retry recovers exactly the pending original.
+    requirement: Incomplete content stays a contextual failure, other full MIME saves despite size mismatch,
+      and repeated UI Retry recovers exactly the pending original.
     actions:
     - 2
     - 3
@@ -177,50 +178,54 @@ verification:
     - 37
     - 38
     - 41
-    - 43
-    - 46
+    - 44
+    - 47
     checkpoints:
     - step: 16
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'': ''No
-        cached folders. Connect and sync this account first''}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains":
+        "No cached folders. Connect and sync this account first"}}'
     - step: 17
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-storage-folders"] input'', ''equal'':
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input", "equal":
         0}}'
     - step: 27
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''failed'',
-        ''timeout_sec'': 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "failed", "timeout_sec": 60}}'
     - step: 28
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''1/2''}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "1/2"}}'
     - step: 29
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-client-tab"]'', ''contains'': ''INBOX,
-        UID''}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "INBOX,
+        UID"}}'
     - step: 30
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-client-tab"]'', ''contains'': ''empty
-        full email chunk at offset 0''}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "empty
+        full email chunk at offset 0"}}'
     - step: 31
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'': ''${fixture.mail_expected}'',
-        ''full'': {''INBOX'': 1}, ''headers'': {''INBOX'': 2, ''Archive'': 2}}}'
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
+        "full": {"INBOX": 1}, "headers": {"INBOX": 2, "Archive": 2}}}'
     - step: 33
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''failed'',
-        ''timeout_sec'': 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "failed", "timeout_sec": 60}}'
     - step: 34
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''0/1''}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "0/1"}}'
     - step: 35
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'': ''${fixture.mail_expected}'',
-        ''full'': {''INBOX'': 1}, ''headers'': {''INBOX'': 2, ''Archive'': 2}}}'
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
+        "full": {"INBOX": 1}, "headers": {"INBOX": 2, "Archive": 2}}}'
     - step: 39
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''completed'',
-        ''timeout_sec'': 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
     - step: 40
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'': ''${fixture.mail_expected}'',
-        ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 2, ''Archive'': 2}}}'
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
+        "full": {"INBOX": 2}, "headers": {"INBOX": 2, "Archive": 2}}}'
+    - step: 43
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 2}}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains":
+        "complete.bin", "timeout_sec": 30}}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
     - step: 42
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'': 2}}'
-    - step: 44
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'': ''complete.bin'',
-        ''timeout_sec'': 30}}'
-    - step: 47
-      expectation: Local archive dialog closes normally.
+      expectation: Archive dialog opens after the asynchronous persisted entry load completes.
     results:
     - 16
     - 17
@@ -234,9 +239,9 @@ verification:
     - 35
     - 39
     - 40
-    - 42
-    - 44
-    - 47
+    - 43
+    - 45
+    - 48
   visual:
   - check: Review failure with folder/UID and recovered archive.
     method: manual
