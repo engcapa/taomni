@@ -94,6 +94,37 @@ describe("BackupSettingsPanel", () => {
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("backup_set_policy", expect.objectContaining({ policy: expect.objectContaining({ includeMail: true }) })));
   });
 
+  it("keeps rapid frequency choices visible while their saves are pending", async () => {
+    let disk = { ...useBackupStore.getState().policy!, autoBackupEnabled: true, frequency: "daily" as "daily" | "weekly" | "on_exit" };
+    useBackupStore.setState({ policy: disk });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let writes = 0;
+    invokeMock.mockImplementation(async (cmd: string, args?: { policy: typeof disk }) => {
+      if (cmd === "backup_set_policy") {
+        if (++writes === 1) await held;
+        disk = { ...args!.policy };
+      }
+      if (cmd === "backup_get_policy") return { ...disk };
+      if (cmd === "backup_list_history") return [];
+      if (cmd === "backup_get_default_dir") return "/qa/backups";
+      return null;
+    });
+    render(<BackupSettingsPanel />);
+    const select = screen.getByTestId("backup-frequency");
+    try {
+      fireEvent.change(select, { target: { value: "weekly" } });
+      expect(select).toHaveValue("weekly");
+      fireEvent.change(select, { target: { value: "daily" } });
+      expect(select).toHaveValue("daily");
+    } finally {
+      await act(async () => release());
+    }
+    await waitFor(() => expect(writes).toBe(2));
+    expect(disk.frequency).toBe("daily");
+    expect(select).toHaveValue("daily");
+  });
+
   it("renders backup storage directory and default path badge", () => {
     render(<BackupSettingsPanel />);
 

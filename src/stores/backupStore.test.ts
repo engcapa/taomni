@@ -88,6 +88,70 @@ describe("useBackupStore", () => {
     expect(useBackupStore.getState().policy?.autoBackupEnabled).toBe(true);
   });
 
+  it("keeps rapid policy edits visible and serializes their persistence", async () => {
+    useBackupStore.setState({ policy: fakePolicy });
+    let release!: () => void;
+    const heldWrite = new Promise<void>((resolve) => { release = resolve; });
+    let disk = { ...fakePolicy };
+    let writes = 0;
+    invokeMock.mockImplementation(async (cmd: string, args?: { policy: BackupPolicy }) => {
+      if (cmd === "backup_set_policy") {
+        if (++writes === 1) await heldWrite;
+        disk = { ...args!.policy };
+      }
+      if (cmd === "backup_get_policy") return { ...disk };
+      return null;
+    });
+    const first = useBackupStore.getState().updatePolicy({ frequency: "daily" });
+    const second = useBackupStore.getState().updatePolicy({ includeMail: true });
+    try {
+      expect(useBackupStore.getState().policy).toMatchObject({ frequency: "daily", includeMail: true });
+    } finally {
+      release();
+      await Promise.all([first, second]);
+    }
+    expect(disk).toMatchObject({ frequency: "daily", includeMail: true });
+    expect(useBackupStore.getState().policy).toEqual(disk);
+  });
+
+  it("ignores an old policy refresh that finishes after an edit", async () => {
+    useBackupStore.setState({ policy: fakePolicy });
+    let finish!: (value: BackupPolicy) => void;
+    const oldPolicy = new Promise<BackupPolicy>((resolve) => { finish = resolve; });
+    let reads = 0;
+    invokeMock.mockImplementation(async (cmd: string) => {
+      if (cmd === "backup_get_policy") return ++reads === 1 ? oldPolicy : { ...fakePolicy, frequency: "daily" };
+      if (cmd === "backup_list_history") return fakeHistory;
+      return null;
+    });
+    const refresh = useBackupStore.getState().refreshHistory();
+    await useBackupStore.getState().updatePolicy({ frequency: "daily" });
+    finish(fakePolicy);
+    await refresh;
+    expect(useBackupStore.getState().policy?.frequency).toBe("daily");
+    expect(useBackupStore.getState().history).toEqual([]);
+  });
+
+  it("restores persisted policy on failure and accepts the next edit", async () => {
+    useBackupStore.setState({ policy: fakePolicy });
+    let disk = { ...fakePolicy };
+    let writes = 0;
+    invokeMock.mockImplementation(async (cmd: string, args?: { policy: BackupPolicy }) => {
+      if (cmd === "backup_get_policy") return { ...disk };
+      if (cmd === "backup_set_policy") {
+        if (++writes === 1) throw new Error("disk unavailable");
+        disk = { ...args!.policy };
+      }
+      return null;
+    });
+    await expect(useBackupStore.getState().updatePolicy({ frequency: "daily" })).rejects.toThrow("disk unavailable");
+    expect(useBackupStore.getState().policy).toEqual(fakePolicy);
+    expect(useBackupStore.getState().error).toBe("disk unavailable");
+    await useBackupStore.getState().updatePolicy({ includeMail: true });
+    expect(disk).toMatchObject({ frequency: "weekly", includeMail: true });
+    expect(useBackupStore.getState().error).toBeNull();
+  });
+
   it("triggers backup creation via triggerBackup", async () => {
     useBackupStore.setState({ policy: fakePolicy });
 
