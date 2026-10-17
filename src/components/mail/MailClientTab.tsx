@@ -1377,7 +1377,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     return () => {
       queue.disposed = true;
       queue.folders.clear();
-      syncGenerationRef.current += 1;
+      // The queue owns only its worker. Cancelling all folder loops here also
+      // cancels on-open catch-up during StrictMode's setup/cleanup replay.
       manualSyncPendingRef.current = false;
     };
   }, [info.sessionId]);
@@ -2512,9 +2513,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const activeFolder = selectedFolderRef.current;
     try {
       const selected = await runFolderSync(activeFolder, { maxSteps: 10 });
-      if (manualSyncPendingRef.current) return;
       let newUnseen = isNewMailExcludedName(activeFolder) ? 0 : selected.newUnseen;
-      if (activeFolder.trim().toUpperCase() !== "INBOX") {
+      if (!manualSyncPendingRef.current && activeFolder.trim().toUpperCase() !== "INBOX") {
         try {
           newUnseen += (await runFolderSync("INBOX", { maxSteps: 10 })).newUnseen;
         } catch (e) {

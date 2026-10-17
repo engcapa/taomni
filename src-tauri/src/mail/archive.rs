@@ -715,6 +715,11 @@ fn download_one(
     let mut expected: Option<u64> = fs::read(&metadata)
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok());
+    // A crash may leave metadata before the first byte, or after publication
+    // removed the partial. Without bytes there is no identity to resume.
+    if offset == 0 {
+        expected = None;
+    }
     // A partial without its identity metadata is not safe to append to.
     if offset > 0 && expected.is_none() {
         fs::remove_file(&path).map_err(|e| e.to_string())?;
@@ -986,6 +991,35 @@ mod tests {
                 .unwrap(),
             raw
         );
+    }
+
+    #[test]
+    fn orphaned_resume_metadata_does_not_trap_retry_after_size_changes() {
+        let fake = fake_imap::FakeImap::start(false);
+        let raw = fake_imap::raw_message("Orphaned metadata", "Tue, 14 Nov 2023 22:13:20 +0000");
+        let (_dir, account, handle, job, mut imap) = fixture(&fake);
+        let root = storage::account_root(&handle.lock().unwrap(), "qa").unwrap();
+        for empty_partial in [false, true] {
+            let uid = fake.deliver_raw("INBOX", raw.clone());
+            let path = root.join("partial").join(format!(
+                "{}-1000-{uid}.part",
+                hex::encode(Sha256::digest(b"INBOX"))
+            ));
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path.with_extension("json"), "1").unwrap();
+            if empty_partial {
+                fs::write(&path, []).unwrap();
+            }
+            download_one(&mut imap, &account, &handle, "INBOX", uid, 1000, &job).unwrap();
+            assert_eq!(
+                storage::read(&handle.lock().unwrap(), "qa", "INBOX", uid)
+                    .unwrap()
+                    .unwrap(),
+                raw
+            );
+            assert!(!path.exists());
+            assert!(!path.with_extension("json").exists());
+        }
     }
 
     #[test]

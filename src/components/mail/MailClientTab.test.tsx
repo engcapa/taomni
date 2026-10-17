@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { markRecoveryStartup } from "../../lib/runtimeRecovery";
@@ -1787,6 +1788,36 @@ describe("MailClientTab", () => {
       resolveSync(stepResult({}));
     });
     await waitFor(() => expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1), { timeout: 3000 });
+  });
+
+  it("finishes every on-open catch-up batch across StrictMode effect replay", async () => {
+    mailMocks.mailSyncFolder
+      .mockResolvedValueOnce(stepResult({ more: true, remainingNew: 250 }))
+      .mockResolvedValueOnce(stepResult({ more: true, remainingNew: 50 }))
+      .mockResolvedValueOnce(stepResult({ more: false }));
+    const openInfo = { ...info, sync: { ...info.sync, onOpen: true } };
+    render(<StrictMode><MailClientTab tabId="mail-tab" info={openInfo} visible /></StrictMode>);
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(3));
+    expect(mailMocks.mailSyncFolder.mock.calls.every(([, name, options]) => name === "INBOX" && options.mode === "auto")).toBe(true);
+  });
+
+  it("keeps new-mail alerts when a manual Sync preempts a quiet poll", async () => {
+    vi.useFakeTimers();
+    let finish: (result: MailFolderSyncResult) => void = () => {};
+    mailMocks.mailSyncFolder.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const intervalInfo = { ...info, sync: { ...info.sync, onOpen: false, intervalMinutes: 1 } };
+    render(<MailClientTab tabId="mail-tab" info={intervalInfo} visible />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await act(async () => {
+      finish(stepResult({ newUnseen: 2 }));
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1);
+    expect(useTaoAlertStore.getState().mailNew).toEqual(expect.arrayContaining([
+      expect.objectContaining({ count: 2 }),
+    ]));
   });
 
   it("finishes the manual Sync spinner while gap-free pending catch-up continues in background", async () => {

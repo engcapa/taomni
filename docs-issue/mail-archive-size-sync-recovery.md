@@ -15,10 +15,11 @@
 ## 修复和保留行为
 
 - 归档以 UID、UIDVALIDITY、实际 byte range、literal 与 EOF 验证完整性；RFC822.SIZE 用作进度和身份变化提示。满块继续探测 EOF，声明大小不符的短块再确认 EOF，允许正 offset 的 NIL EOF。拒绝空原件、冲突大小、错误 offset 和多个正文块；兼容旧断点元数据。
+- 若崩溃仅留下断点元数据而正文缺失或零字节，忽略旧 size hint 从零重新下载，避免 Retry 因删除不存在的 partial 反复失败。真实磁盘回归同时覆盖两种状态。
 - 单封内容不可读时保留明确的文件夹/UID错误并继续其他可读邮件，最后仍报告 failed；不写永久跳过标记，Retry 会重新尝试未完成原件。网络、磁盘和身份错误仍停止并保留安全断点。
 - headers、bodies 和 flags 的显式 UID 命令每批最多 250，保证稀疏十位 UID 也低于 4 KiB。保持排序、完整 header 集合、body cache 限额和未读状态。
 - 全账号扫描逐文件夹 checkout/retry、落库和释放后台连接；后续失败不丢前面进度，失败文件夹继续明确列出。每个文件夹开始读取最新持久化 watermark。
-- 手工 Sync 请求当前后台循环在一步后让出。扫描结束即恢复按钮，所有 pending 文件夹轮转执行单批追赶，结束后继续完整对账；不再截断为前六个文件夹。期间可继续打开详情、发邮件及使用其他 session。没有取消真实 IMAP 操作或隐藏网络错误。
+- 手工 Sync 请求当前后台循环在一步后让出；仍发送该轮已经收到的新邮件提醒，避免提前返回丢提醒（mounted 红→绿回归）。扫描结束即恢复按钮，所有 pending 文件夹轮转执行单批追赶，结束后继续完整对账；不再截断为前六个文件夹。期间可继续打开详情、发邮件及使用其他 session。没有取消真实 IMAP 操作或隐藏网络错误。
 - 保留手工完整远端删除/flags对账、后台 gap-free 追赶、分页深度、归档压缩结构、完整附件、暂停/断点、跨实例协调、备份以及显式本地清理后不自动复活原件等现有契约。
 
 ## 验证选择
@@ -37,3 +38,9 @@
 在目标远端文件夹的邮件列表内点击使其获得焦点，Ctrl+A（macOS Cmd+A）选择当前已经加载的邮件，点击 Delete selected，确认移入 Trash；需要时先用 Load older messages 增加本次加载范围，再全选删除。选择仅覆盖已加载行，不能宣称选中了服务器整个文件夹。数万封整文件夹处理目前优先使用邮箱服务商网页的“选择整个文件夹/全部结果”功能，随后 Taomni Sync 对账。
 
 普通删除会操作远端邮箱并更新本地摘要；按用户选择，完整本地归档仍保留。释放原件磁盘空间需要进入 Local archive、选中原件并使用 Remove local originals 确认清理；不会因此删除远端邮件。此轮未擅自添加或执行整文件夹清空操作。
+
+## 首轮 CI 回归修复
+
+GitHub `39034904707` 的 Linux/macOS browser 原始报告发现 `TC-MAIL-SYNC-01` 重开后只显示 203/453 封、hasMore=false。新增队列 effect 的 cleanup 错误地推进了所有同步循环共享的 generation；开发模式 StrictMode 重放 effect 时，第一条 on-open 追赶被取消，而第二次 setup 因 guard 占用没有启动替代追赶。改为仅清理队列自己拥有的 worker，不取消其他 folder loop。补充 StrictMode 三批追赶 mounted 回归。
+
+当前本地结果：68 个 mounted 测试通过；Linux browser `TC-MAIL-SYNC-01/02`、`TC-MAIL-PERF-01` 三项实际执行通过，保留 receipt 和原始性能样本。133 个 Rust 邮件测试通过，1 个既有外网凭据用例 ignored；14 个 Python 假服务器协议测试通过；前端构建通过。最终三端结果仍需使用修复后的提交重新执行，不引用首轮部分通过作为最终通过。
