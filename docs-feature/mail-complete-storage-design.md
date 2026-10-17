@@ -1,6 +1,6 @@
 # 邮件完整存储与可选备份
 
-日期：2026-10-17；基线 `cd6655e2`，分支 `feat/mail-complete-storage`。本次是实现任务，设计随验证结果更新。平台为 Windows、macOS、Linux；当前开发端为 Linux；用户最新指令允许本机 Linux browser/native 验证，Windows/macOS 只编写、暂不执行。所有写入使用临时数据及独立 QA 配置，未访问个人应用存储或重启正在运行的应用。
+日期：2026-10-17；基线 `cd6655e2`，分支 `feat/mail-complete-storage`。本次是实现任务，设计随验证结果更新。平台为 Windows、macOS、Linux；当前开发端为 Linux；本地阶段按当时指令仅执行 Linux browser/native；后续用户明确要求使用 GitHub `qa-ui-auto-platforms.yml` 执行三端全部邮件和本次受影响用例，结果见下方 GitHub 验证记录。所有写入使用临时数据及独立 QA 配置，未访问个人应用存储或重启正在运行的应用。
 
 ## 行为与决定
 
@@ -60,8 +60,8 @@
 - V-02：Vitest 邮件组件/同步最终 71 passed；跨实例 UI 改动后的归档/备份面板聚焦复测 13 passed；会话编辑器聚焦 8 passed。包含分页后仍可加载全部缓存、隐藏会话继续同步、批量选择、自动已读和发送副本反馈；不重复累计之前运行的同一批测试。
 - V-03：备份的 52 项 Rust 测试覆盖 core/full/custom 邮件选择、自定义目录快照、完整原件恢复、旧格式恢复、路径校验、流式加密截断/重排/篡改拒绝、传输取消时保留可恢复部分。QA 服务/独立校验器 Python 15 passed；原生断言工具 21 passed，包含异步保存复选框后的状态等待。
 - V-04：`TC-MAIL-STORAGE-01/02` 通过真实 UI 保存 session 设置；原生连接 loopback 服务，以独立 SQLite/gzip/ZIP 校验器核对原始字节、附件、文件夹范围、迁移、暂停恢复、远端消失后读取、主动清理、备份勾选与恢复文件检查。MAIL-SEND/BULK/SEARCH 和 BACKUP-CLOUD-001 同组通过。浏览器仅证明 UI 和桩行为；原生 case 未执行备份 apply/restart，恢复后的离线原件由 Rust 测试验证。
-- V-05：`TC-MAIL-PERF-03` 在同机启动两个真实 QA 应用，以不同测试配置共享同一邮箱目录。验证单一下载持有者、另一实例暂停、断点字节一致、另一进程 PTY 五次采样、已打开连接的目录迁移、另一进程读取和物理清理后不重现。Linux 已通过；Rust 子进程测试另覆盖同账号互斥、独立账号并行和崩溃释放。Windows/macOS 仅编写。
-- 三端兼容：复用 Rust/std/flate2/SQLite 与现有目录选择器。所有新增 native case 登记 Linux/Windows/macOS；Windows/macOS 未执行，不把 Linux 结果外推。
+- V-05：`TC-MAIL-PERF-03` 在同机启动两个真实 QA 应用，以不同测试配置共享同一邮箱目录。验证单一下载持有者、另一实例暂停、断点字节一致、另一进程 PTY 五次采样、已打开连接的目录迁移、另一进程读取和物理清理后不重现。本地 Linux 已通过；Rust 子进程测试另覆盖同账号互斥、独立账号并行和崩溃释放。后续 GitHub 三端执行结果另记。
+- 三端兼容：复用 Rust/std/flate2/SQLite 与现有目录选择器。所有新增 native case 登记 Linux/Windows/macOS；本地阶段未执行 Windows/macOS；后续 GitHub 逐平台验证，不把 Linux 结果外推。
 
 ## 已实现的存储与备份边界
 
@@ -98,3 +98,72 @@
 - 最终 `qa_ui_auto audit --gate` 通过（`_local/mail-final-audit.log`），九个聚焦用例的 Linux/Windows/macOS CI 计划通过（`_local/mail-final-ci-selection.json`）；20 个修改过的 Rust 文件 `rustfmt --check` 通过。开发契约检查命令为 `python3 -m qa_ui_auto.dev_contract --base cd6655e2 --head HEAD`。这些 `_local` 路径均在 `qa-ui-auto-report/` 中，不提交运行数据。
 
 验证中发现并修正的 QA 问题：双实例暂停场景原先可在首块返回前就暂停（没有部分文件属于正确行为），现先独立观察已落盘的非空前缀再点击暂停；每个存储 case 使用各自报告子目录，避免同一批次多个存储 case 共享夹具目录。`run-20261017-112914-374137147` 保留为诊断运行（期间调整 runner，因此 identity_stable=false，不作为最终交付门禁）。
+
+
+## GitHub 三端验证记录
+
+用户后续授权运行 `.github/workflows/qa-ui-auto-platforms.yml`，范围为所有邮件用例（含历史 TC-114/115/116/142）、全部备份用例及受影响的 TC-MFA-103，共 41 个精确 ID。按声明的模式分别执行每端 browser 33、native 31，总计 192 组组合；模式不适用与跳过分开记录。工作流不发布 issue，所有 native 使用独立 QA 身份和 runner 临时配置。
+
+第一轮 [39010748118](https://github.com/engcapa/taomni/actions/runs/39010748118) 固定提交 `1f1b68b475572409bcbddddc919df24a0521b34d`，官方聚合为 192 passed、0 failed、0 skipped，`report_ok=true`、无能力缺口。然而截图复核发现 Windows `TC-MAIL-SEND-01` 在 Sent 副本成功提示上方同时显示 `Full mail: failed`，错误为 `Publish full email: The system cannot find the path specified. (os error 3)`。该轮不能作为完整归档无错误的证据。
+
+- 测试缺口：原发送用例只断言 SMTP、服务器 Drafts/Sent 及提示保留，未检查默认目录完整归档。提交 `2895bb51` 在保留原断言的基础上新增归档 `completed` 断言，并登记 F-MAIL-23；改前 Windows native [39013391090](https://github.com/engcapa/taomni/actions/runs/39013391090) 使用与第一轮相同的 Windows 二进制哈希 `c39e2d17b97cd168e60b463aab1d9fe1a65b4067aea08ae1e360d4efb481e892`，在第 26 步按预期失败：60 秒后仍为 `Full mail: failed · INBOX · 0/30`，截图仍为相同 `os error 3`。聚合结果 0 passed / 1 failed，保留失败回执；执行 job 会继续上传结果，最终由聚合 job 判定失败，不能把单个执行 job 的成功状态等同用例通过。
+- 根因：默认 QA profile + Quick Connect 账号名 + SHA-256 原件名超过 Windows MAX_PATH。`std::fs` 会转换长路径，但 tempfile 发布直接调用 `SetFileAttributesW`/`MoveFileExW`，输入普通路径会失败。自定义目录迁移已规范化路径，因而此前存储用例未触发。
+- 修复：提交 `24b0490a` 在 Windows 从已存在的邮件数据库父目录派生原件目录前做 `canonicalize`，同时为临时源文件与最终目标保留扩展长度前缀，不改变对象布局或原子发布契约。新增 Rust 回归从普通路径构造小于 260 字符的 SQLite 路径和超过 260 字符的对象路径，检查完整正文/附件字节、去重和清理；Linux 存储聚焦 6 项通过。Windows 原生结果见第三轮；三端最终聚合另记。
+
+运行数据、截图、协议和原始采样保留在忽略目录 `qa-ui-auto-report/mail-hosted/run-<run id>/`，不提交测试数据库或用户数据。
+
+第二轮 [39013595697](https://github.com/engcapa/taomni/actions/runs/39013595697) 固定提交 `24b0490a`。三端 browser 共 99 项、Linux/macOS native 共 62 项全部通过；31 项 Windows native 在用例开始前被环境准备阻塞：Chocolatey 包源 HTTP 503，输出 0/0 packages 却返回 0，后续 OCR 校验找不到可执行文件。该轮聚合失败，未执行部分不计为通过。提交 `eec763a9` 为安装增加最多三次尝试、15 秒间隔，并同时校验退出码和程序实际存在；固定语言数据校验保持。相关 Python 工具 5 项及 YAML 解析通过，随后重跑三端完整范围。
+
+第三轮 [39014908851](https://github.com/engcapa/taomni/actions/runs/39014908851) 固定提交 `eec763a9`，191 passed / 1 failed / 0 skipped。Windows native 31/31，包括新增的默认目录归档完成断言；发送截图同时显示 `Full mail: completed` 与 `copy saved to Sent`，确认长路径修复生效。唯一失败为 Linux `TC-MAIL-BULK-01` 第 14 步。起初根据状态文本怀疑正文提示覆盖，进一步检查 `focus-failure.json` 的真实 pointerdown/up/click 发现目标实际是 `mail-search-input`，没有发送到“全部已读”，服务器/页面仍有 29 封未读；因此不能将此失败归因为 STORE 或通知文本。
+
+该布局问题来自工具栏中瞬时出现/消失的 `History/Bodies/Catching up` 徽标，按钮会被挤到另一行，造成点击过程中目标移动。修复将三种进度移至固定高度状态栏，并为 Push/Poll 预留固定宽度，避免后台事件使操作区和列表重新排布；保留全部进度数字和错误入口。BULK 用例保留原有结果与服务器旗标断言，并增加已读后的截图供三端检查。该修改属于布局调整，复用 56 项 MailClientTab 行为测试及原有 browser/native 工作流，不添加仅验证 DOM 搬移的单元测试。
+
+
+第四轮 [39016421779](https://github.com/engcapa/taomni/actions/runs/39016421779) 固定提交 `1424b03c`，191 passed / 1 failed / 0 skipped。三端 browser、Linux/macOS native 全通过，上一轮 Linux 批量已读失败已消除；唯一失败是 Windows 双实例性能用例的“探测期间后台 FETCH 无进展”。五次 PTY 为 375/266/265/250/250 ms，均低于 1,500 ms；开始观测 activeFetches=0，结束为 1，而已完成请求数均为 22，说明采样窗口落在恢复点击与实际下载恢复之间，不能作为负载下响应的证据。
+
+提交 `d8178d75` 为该用例增加协议就绪条件：等待同一 folder/UID、偏移至少为已保存前缀的真实完整邮件 FETCH 正在进行，并排除暂停前旧持有者的连接。夹具保留约 16 MiB 的实际下载量，足够终端启动及全部五次允许的采样时长。记录每次采样的 monotonic 起止时间、就绪请求和最终观测；保留断言时的 after 数据，避免 finally 覆盖。除原有进度与最大并发断言外，再要求恢复后的匹配请求与至少一个真实 UI 采样重叠，并在最后一个采样结束前完成。未降低延迟预算、减少样本或移除断点/迁移/清理断言。
+
+对应 QA 工具检查 18 项通过；加入旧连接排除后又复测 3 项。新增检查覆盖空闲时必须等待、已结束请求不算就绪、无关 UID/文件夹/旧偏移/头部预热/旧持有者不能算完整下载、采样间隙或采样结束后的进展不能误算并发。`audit --gate`、三端 PERF-03 计划及 `git diff --check` 均通过。第五轮使用上述提交重新运行全部 41 个 ID。
+
+
+第五轮 [39017954565](https://github.com/engcapa/taomni/actions/runs/39017954565) 固定提交 `d8178d75`。聚合为 188 passed / 4 failed / 0 skipped，三端 browser 99 项全通过。macOS `TC-MAIL-BULK-01` 第 28 步发现另一处实际竞争：已将 3 封邮件移至服务器 Trash，点击 Trash 后本地仍显示 0/0。原同步函数在其它同步占用 guard 时直接返回，因而文件夹切换刷新被丢弃；截图和 pointer 记录确认 Trash 已选中，不是点击失准。
+
+提交 `b2cad73d` 为最新选择排队等待当前同步完成；再次切换、账号改变或卸载会作废旧请求。选择 ref 在状态更新前立即发布；旧文件夹的迟到缓存响应不再写入当前列表；全文件夹扫描完成后按实时选择重新加载，而非使用开始扫描时的文件夹。新增两个确定性挂载回归均先复现失败再通过，全部 58 项 MailClientTab 测试通过；BULK 用例保留真实服务器、取消永久删除和最终物理删除断言，并明确无需第二次点击/手动 Sync 即展示 Trash。Node 22 生产构建、QA audit 与开发契约通过。
+
+扩大后的双实例用例在三端均通过真实后台就绪、FETCH/PTY 时间重叠和五次延迟预算，但随后下载收尾仍沿用旧约 4 MiB 夹具的 60 秒等待，导致超时；macOS 截图显示 10.25/16.80 MiB 且协议持续前进，单个持久块之间有约 1 秒的 `sync_data` 成本。提交 `1419a92e` 仅将采样之后的后台下载收尾改为 180 秒、完整双实例生命周期改为 420 秒，匹配至少 64 个持久块的夹具工作量；所有 UI 响应预算、原始样本、并发进展、完整性、迁移与清理断言不变。此等待不用于声称产品性能提升。第六轮固定该提交再次运行全部 192 组组合。
+
+
+## 最终三端结果
+
+第六轮 [39018901525](https://github.com/engcapa/taomni/actions/runs/39018901525) 固定产品/用例/runner 提交 `1419a92ee1c74943d2fc9370a3b9baf56ab4895e`。工作流和聚合 job 均为 success，`passed=true`、`report_ok=true`；192 passed / 0 failed / 0 skipped，0 能力缺口、0 未评审用例、0 基础设施错误。随后仅提交本验证文档，不修改已验证的产品、用例或 runner。
+
+| 平台 | Browser | Native | 失败/跳过 |
+| --- | --- | --- | --- |
+| Linux | 33/33 | 31/31 | 0/0 |
+| Windows | 33/33 | 31/31 | 0/0 |
+| macOS | 33/33 | 31/31 | 0/0 |
+
+- 已检查 15 份原始 summary 及匹配 receipt，所有 `identity_stable=true`、`dry_run=false`、receipt exitCode=0，选择集与实际执行 ID 一致。三端源码/runner 指纹一致，同一平台四个 native 分片使用同一二进制哈希；native 身份均为 `com.taomni.app.qa`，数据、配置、缓存路径均在各 runner 的 QA 报告目录内。三端本轮均构建一个 debug Rust + production frontend QA 应用，分片复用对应产物，没有为单个用例重建。
+- 原生用例验证实际 IMAP/SMTP、SQLite、文件系统、PTY 和跨进程锁；browser 证明对应主机 Chromium UI/stub 行为。平台不适用的模式由 selection 单列，不当作跳过或通过。可选的通用 tool/native-contract job 本轮按计划未选择，不包含在 192 次用例通过中；本地聚焦 Rust、Vitest、Python 结果见前文。
+- 复核三端发送截图：均同时显示 `Full mail: completed` 和 `copy saved to Sent`，未出现首轮 Windows 长路径发布错误。复核三端全部已读和三封选中截图，工具栏按钮位置稳定、已读状态与选择高亮正确；macOS Trash 切换、取消永久删除和确认删除均通过独立服务器结果断言。
+- 复核三端完整存储清理、并发终端和双实例页面。Linux `peer-final.png` 保留了较早的两封选中画面，未据此声称最终空归档截图通过；清理结果以实时 DOM 等待、主实例刷新和独立 SQLite/gzip/文件计数 oracle 为依据。Windows/macOS peer 最终画面显示清理完成、归档为空。
+- 三端 `TC-MAIL-PERF-03` 均保存 262,144 字节一致前缀，暂停前后恰好两个完整下载连接；恢复后的目标 UID 请求与采样真实重叠并在最后一个样本结束前完成。迁移前后均为 3 个原件、5 条摘要；另一进程主动清理和再次扫描后均为 0 个原件、5 条摘要，没有复活或重复下载。
+
+原生性能 p95（毫秒；每项均保留全部 5 次采样，包含自动化开销）：
+
+| 平台 | 读信账号 1 | 读信账号 2 | 发送 | 空闲 PTY | 负载 PTY | 另一实例 PTY |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Linux | 457.22 | 484.45 | 248.68 | 404.03 | 467.40 | 352.83 |
+| Windows | 578.00 | 625.00 | 156.00 | 422.00 | 360.00 | 1000.00 |
+| macOS | 591.75 | 587.70 | 243.97 | 407.33 | 300.37 | 436.02 |
+| 固定预算 | 2,500 | 2,500 | 3,000 | 1,500 | 1,500 | 1,500 |
+
+两个账号各有大量邮件的原生场景验证 33,913 封索引和 313 封较大正文；三端均观察到最多 4 个并行 FETCH、6 个服务连接和 6 个服务工作线程。五次发送均恰好接收五封 SMTP 邮件。浏览器两会话场景每账号新增 1,200 封，全部读信/发送采样同样满足原预算。上述数据是本轮绝对预算验收，没有匹配硬件/噪声基线，不声称加速倍数或真实公网延迟。
+
+最终源码指纹为 `7041a42f73ab17bd95237c80e1a2ca0ae829ecfd9b2a11173f50cbdf27e490d5`，runner 指纹为 `81a4a3a20b76fbbe389eb2041fe46d3eb30e1206b0f4aaea11fbd78f136c1d80`。各平台 QA 二进制 SHA-256：
+
+- `native-build-linux-x64-debug`: `5118d07c7b51ceae09b6b568f468ea130bde1464a337cae9ed3d7823a1cd5633`
+- `native-build-windows-x64-debug`: `572d3d4326b492175045379f9d0d043e3a7c5dd37376dcc8cd771d56d0a87429`
+- `native-build-macos-arm64-debug`: `951134329a1809dd9cc45d3506e770a4e67ce864f067cf3c73d883b4b0d6bcbd`
+
+最终证据位于 `qa-ui-auto-report/mail-hosted/run-39018901525/`，汇总为 `aggregate/ci-summary.json` 和 `aggregate/summary.md`，逐项复核记录位于上级 `mail-hosted/review-39018901525.log/json`；GitHub artifact 后缀为 `886c4b972fec437ea688682766477d44`。前五轮及区分性 red 运行均保留，不用后续通过覆盖早先失败。实际备份 apply/restart 后离线读取仍由 Rust 恢复测试支持，本轮 native UI 验证至备份恢复检查页面，未扩大声称完整 UI 重启恢复已实测。个人 Taomni 进程、存储目录和 SQLite 均未访问或修改。
