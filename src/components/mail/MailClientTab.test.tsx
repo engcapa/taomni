@@ -71,6 +71,8 @@ const chatState = vi.hoisted(() => ({
 
 vi.mock("../../lib/mail", () => ({
   ...mailMocks,
+  mailArchiveStart: vi.fn(async () => undefined),
+  mailArchiveStatus: vi.fn(async () => ({ phase: "completed", saved: 0, total: 0, bytes: 0 })),
   MAIL_IDLE_EVENT: "mail://idle",
   MAIL_MDN_SENT: "$MDNSent",
   isMailCertificateError: (message: string | null | undefined) =>
@@ -309,6 +311,19 @@ describe("MailClientTab", () => {
     expect(screen.queryByText(message.snippet ?? "")).not.toBeInTheDocument();
   });
 
+  it("applies a successful auto-read result when the body finishes loading first", async () => {
+    let finishRead!: (value: { folder: string; marked: number }) => void;
+    mailMocks.mailListCachedMessages.mockResolvedValue([{ ...message, flags: [] }]);
+    mailMocks.mailMarkRead.mockReturnValue(new Promise((resolve) => { finishRead = resolve; }));
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    await waitFor(() => expect(mailMocks.mailMarkRead).toHaveBeenCalledWith(info, "INBOX", [101], false));
+    expect(screen.getByTestId("mail-message-row")).toHaveAttribute("data-unread", "true");
+    await act(async () => finishRead({ folder: "INBOX", marked: 1 }));
+    await waitFor(() => expect(screen.getByTestId("mail-message-row")).toHaveAttribute("data-unread", "false"));
+    expect(mailMocks.mailMarkRead).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the loaded body when opening the message popup", async () => {
     renderMailbox();
 
@@ -545,11 +560,18 @@ describe("MailClientTab", () => {
       const left = pages.reduce((sum, rest) => sum + rest.length, 0);
       return stepResult({ messages: page, fetched: page.length, newUnseen: page.length, remainingNew: left, more: left > 0 });
     });
-    mailMocks.mailListCachedMessages.mockImplementation(async () => cacheRows);
+    mailMocks.mailListCachedMessages.mockImplementation(async (_account, _folder, limit, offset) =>
+      cacheRows.slice(offset, offset + limit));
 
     render(<MailClientTab tabId="mail-tab" info={syncOnOpenInfo} visible />);
 
     await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(3));
+    // Index every arrival without growing the DOM beyond the first page.
+    await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "50"));
+    expect(cacheRows).toHaveLength(121);
+    fireEvent.click(screen.getByTestId("mail-load-more"));
+    await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "100"));
+    fireEvent.click(screen.getByTestId("mail-load-more"));
     await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "121"));
     expect(useTaoAlertStore.getState().mailNew).toMatchObject([{ count: 120, mailTabId: "mail-tab" }]);
   });

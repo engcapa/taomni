@@ -2,7 +2,7 @@ pub mod batch;
 pub mod cache;
 pub mod commands;
 pub mod control;
-mod coordination;
+pub(crate) mod coordination;
 pub mod credentials;
 pub mod crypto;
 pub mod engine;

@@ -563,11 +563,27 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     );
                     bytes.extend_from_slice(header);
                 }
-                if items_upper.contains("BODY.PEEK[]") {
-                    bytes.extend_from_slice(
-                        format!(" BODY[] {{{}}}\r\n", message.raw.len()).as_bytes(),
-                    );
-                    bytes.extend_from_slice(&message.raw);
+                if let Some((_, tail)) = items_upper.split_once("BODY.PEEK[]") {
+                    let range = tail
+                        .strip_prefix('<')
+                        .and_then(|s| s.split_once('>'))
+                        .and_then(|(range, _)| range.split_once('.'))
+                        .and_then(|(offset, len)| {
+                            Some((offset.parse::<usize>().ok()?, len.parse::<usize>().ok()?))
+                        });
+                    if let Some((offset, len)) = range {
+                        let body = &message.raw[offset.min(message.raw.len())
+                            ..offset.saturating_add(len).min(message.raw.len())];
+                        bytes.extend_from_slice(
+                            format!(" BODY[]<{offset}> {{{}}}\r\n", body.len()).as_bytes(),
+                        );
+                        bytes.extend_from_slice(body);
+                    } else {
+                        bytes.extend_from_slice(
+                            format!(" BODY[] {{{}}}\r\n", message.raw.len()).as_bytes(),
+                        );
+                        bytes.extend_from_slice(&message.raw);
+                    }
                 }
                 if let Some((_, sections)) = extra {
                     for (start, _) in items_upper.match_indices("BODY.PEEK[") {

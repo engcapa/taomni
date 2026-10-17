@@ -25,6 +25,7 @@ from tauri_webdriver import WebDriverError, native_isolation_env
 LOCAL_STORAGE_KEYS = [
     "qa.recovery.bootstrap",
     "taomni.qa.backup.v1",
+    "taomni.backup.policy",
     "taomni.welcome.directoryUsage.v1",
     "taomni.welcome.sessionResume.v1",
     "taomni.welcome.sessionResumeRevision.v1",
@@ -40,6 +41,7 @@ LOCAL_STORAGE_KEYS = [
     "taomni.ai.config.v1",
 ]
 LOCAL_STORAGE_PREFIXES = [
+    "taomni.mail.archive.",
     "taomni.sftp.",
     "taomni.tab.",
     "taomni.recent.",

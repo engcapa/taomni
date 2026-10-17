@@ -55,8 +55,8 @@ pub use vnc::keyboard_hook::{
 };
 mod structural_search;
 mod voice;
-mod windowing;
 mod webview_recovery;
+mod windowing;
 mod workspace;
 mod workspace_execution;
 mod workspace_fs;
@@ -184,8 +184,8 @@ pub fn run() {
             // Runs before the app-data dir is created so the directory rename
             // targets a non-existent destination on every platform.
             migrate::run(&app_data);
-            backup::restore::apply_pending_restore(&app_data)
-                .map_err(std::io::Error::other)?;
+            app.manage(backup::coordination::ProfileLease::prepare(&app_data)
+                .map_err(std::io::Error::other)?);
 
             std::fs::create_dir_all(&app_data).ok();
 
@@ -983,6 +983,14 @@ pub fn run() {
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,
             mail::mail_prefetch_message_body,
+            mail::archive::mail_archive_start,
+            mail::archive::mail_archive_pause,
+            mail::archive::mail_archive_status,
+            mail::archive::mail_archive_list,
+            mail::archive::mail_archive_read,
+            mail::archive::mail_archive_export,
+            mail::archive::mail_archive_attachment,
+            mail::archive::mail_archive_remove,
             mail::mail_download_attachment,
             mail::mail_send_message,
             mail::mail_list_drafts,

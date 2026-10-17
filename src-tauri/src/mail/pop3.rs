@@ -379,7 +379,9 @@ pub(super) fn refresh_counts(conn: &Connection, account_id: &str, folder: &str) 
 fn next_uid(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<u32> {
     conn.query_row(
         "SELECT MAX(COALESCE((SELECT MAX(uid) FROM mail_messages WHERE account_id = ?1 AND folder = ?2), 0),
-                    COALESCE((SELECT MAX(uid) FROM mail_local_raw WHERE account_id = ?1 AND folder = ?2), 0)) + 1",
+                    COALESCE((SELECT MAX(uid) FROM mail_local_raw WHERE account_id = ?1 AND folder = ?2), 0),
+                    COALESCE((SELECT MAX(uid) FROM mail_full_messages WHERE account_id=?1 AND folder=?2 AND uid_validity=1),0),
+                    COALESCE((SELECT MAX(uid) FROM mail_archive_skipped WHERE account_id=?1 AND folder=?2 AND uid_validity=1),0)) + 1",
         params![account_id, folder],
         |row| row.get::<_, i64>(0),
     )
@@ -503,6 +505,21 @@ pub(super) fn delete_local(
         }
     };
     for uid in &targets {
+        // Retain the original before permanent local deletion, even when the
+        // background archive has not reached this newly received message yet.
+        if conn.path().is_some_and(|p| !p.is_empty()) {
+            let skipped:bool=conn.query_row("SELECT EXISTS(SELECT 1 FROM mail_archive_skipped WHERE account_id=?1 AND folder=?2 AND uid=?3 AND uid_validity=1)",params![account_id,folder,uid],|r|r.get(0))?;
+            if !skipped
+                && super::storage::lookup(conn, account_id, folder, *uid)
+                    .map_err(super::storage::as_sql_error)?
+                    .is_none()
+            {
+                if let Some(raw) = local_raw(conn, account_id, folder, *uid)? {
+                    super::storage::store(conn, account_id, folder, *uid, 1, raw.as_slice())
+                        .map_err(super::storage::as_sql_error)?;
+                }
+            }
+        }
         delete_rows(conn, account_id, folder, *uid)?;
     }
     refresh_counts(conn, account_id, folder)?;
@@ -890,5 +907,33 @@ mod tests {
         rename_local_folder(&conn, "pop", "Projects", "Work").unwrap();
         assert!(local_raw(&conn, "pop", "Work", 1).unwrap().is_some());
         assert!(has_local_store(&conn, "pop").unwrap());
+    }
+
+    #[test]
+    fn permanent_delete_retains_original_and_cleanup_never_reuses_its_uid() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = Connection::open(dir.path().join("qa-pop3.db")).unwrap();
+        super::super::init_mail_tables(&conn).unwrap();
+        ensure_local_folders(&conn, "pop").unwrap();
+        let original = raw("retained");
+        let first = insert_local(&conn, "pop", "INBOX", &original, &[]).unwrap();
+        delete_local(&conn, "pop", "INBOX", Some(&[first.header.uid])).unwrap();
+        let entries = super::super::storage::list(&conn, "pop", 0).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            super::super::storage::read_entry(&conn, "pop", &entries[0]).unwrap(),
+            original
+        );
+        super::super::storage::remove_entries(&conn, "pop", &entries).unwrap();
+        let next = insert_local(&conn, "pop", "INBOX", &raw("next"), &[]).unwrap();
+        assert!(next.header.uid > first.header.uid);
+        delete_local(&conn, "pop", "INBOX", Some(&[next.header.uid])).unwrap();
+        let retained = super::super::storage::list(&conn, "pop", 0).unwrap();
+        assert_eq!(
+            retained.len(),
+            1,
+            "cleaning an old UID must not suppress a new email"
+        );
+        assert_eq!(retained[0].uid, next.header.uid);
     }
 }

@@ -50,6 +50,7 @@ export function BackupSettingsPanel() {
 
   // Create backup form state
   const [scope, setScope] = useState<BackupScope>("core");
+  const [includeMail, setIncludeMail] = useState(false);
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -133,6 +134,7 @@ export function BackupSettingsPanel() {
     try {
       await triggerBackup({
         scope,
+        customOptions: { includeMail },
         password: usePassword && password.trim() ? password.trim() : undefined,
       });
       setActionSuccess(t("backupSettings.createSuccess"));
@@ -156,6 +158,7 @@ export function BackupSettingsPanel() {
 
       await triggerBackup({
         scope,
+        customOptions: { includeMail },
         targetPath: target,
         password: usePassword && password.trim() ? password.trim() : undefined,
       });
@@ -368,12 +371,15 @@ export function BackupSettingsPanel() {
             </label>
             <select
               value={scope}
-              onChange={(e) => setScope(e.target.value as BackupScope)}
+              data-testid="backup-scope"
+              onChange={(e) => { setScope(e.target.value as BackupScope); setIncludeMail(e.target.value === "full"); }}
               className="w-full px-3 py-1.5 text-xs bg-theme-bg border border-theme-border rounded text-theme-text focus:border-accent outline-none"
             >
               <option value="core">{t("backupSettings.scopeCore")}</option>
               <option value="full">{t("backupSettings.scopeFull")}</option>
             </select>
+            <label className="flex items-center gap-2 text-xs text-theme-text"><input data-testid="backup-include-mail" type="checkbox" checked={includeMail} onChange={(e) => setIncludeMail(e.target.checked)} />{t("backupSettings.includeMail")}</label>
+            <p className="text-xs text-theme-muted">{t("backupSettings.mailHint")}</p>
           </div>
 
           <div className="space-y-1.5">
@@ -540,6 +546,8 @@ export function BackupSettingsPanel() {
               </div>
             </div>
           )}
+
+          <label className="flex items-center gap-2 text-xs text-theme-text"><input id="backup-auto-include-mail" data-testid="backup-auto-include-mail" type="checkbox" checked={policy.includeMail ?? policy.defaultScope === "full"} onChange={(e) => void updatePolicy({ includeMail: e.target.checked })} />{t("backupSettings.autoIncludeMail")}</label>
 
           <div className="text-xs text-theme-muted flex items-center justify-between pt-1">
             <span>{t("backupSettings.lastBackupLabel")}:</span>

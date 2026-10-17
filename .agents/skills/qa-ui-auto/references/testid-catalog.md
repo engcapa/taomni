@@ -1370,6 +1370,38 @@
 - `input[aria-label="Mail background hex"]` — interactive — F-MAIL-4.mail-background
 - `input[aria-label="Mail foreground hex"]` — interactive — F-MAIL-4.mail-foreground
 
+## mail/storage (F-MAIL-23)
+
+- `[data-testid="mail-storage-settings"]` — display — F-MAIL-23.mail-storage-settings
+- `[data-testid="mail-storage-directory"]` — interactive — F-MAIL-23.mail-storage-directory
+- `[data-testid="mail-storage-browse"]` — interactive — F-MAIL-23.mail-storage-browse
+- `[data-testid="mail-storage-mode"]` — interactive — F-MAIL-23.mail-storage-mode
+- `[data-testid="mail-storage-folders"]` — interactive — F-MAIL-23.mail-storage-folders
+- `[data-testid="mail-storage-folder-names"]` — interactive — F-MAIL-23.mail-storage-folder-names
+- `[data-testid="mail-imap-security"]` — interactive — F-MAIL-23.mail-imap-security
+- `[data-testid="mail-smtp-security"]` — interactive — F-MAIL-23.mail-smtp-security
+- `[data-testid="mail-storage-progress"]` — display — F-MAIL-23.mail-storage-progress
+- `[data-testid="mail-storage-pause"]` — interactive — F-MAIL-23.mail-storage-pause
+- `[data-testid="mail-storage-resume"]` — interactive — F-MAIL-23.mail-storage-resume
+- `[data-testid="mail-archive-open"]` — interactive — F-MAIL-23.mail-archive-open
+- `[data-testid="mail-archive-dialog"]` — display — F-MAIL-23.mail-archive-dialog
+- `[data-testid="mail-archive-close"]` — interactive — F-MAIL-23.mail-archive-close
+- `[data-testid="mail-archive-refresh"]` — interactive — F-MAIL-23.mail-archive-refresh
+- `[data-testid="mail-archive-cleanup"]` — interactive — F-MAIL-23.mail-archive-cleanup
+- `[data-testid="mail-archive-prev"]` — interactive — F-MAIL-23.mail-archive-prev
+- `[data-testid="mail-archive-next"]` — interactive — F-MAIL-23.mail-archive-next
+- `[data-testid="mail-archive-confirm"]` — display — F-MAIL-23.mail-archive-confirm
+- `[data-testid="mail-archive-confirm-remove"]` — interactive — F-MAIL-23.mail-archive-confirm-remove
+- `[data-testid="mail-archive-confirm-cancel"]` — interactive — F-MAIL-23.mail-archive-confirm-cancel
+- `[data-testid="mail-archive-notice"]` — display — F-MAIL-23.mail-archive-notice
+- `[data-testid="mail-archive-entries"]` — display — F-MAIL-23.mail-archive-entries
+- `[data-testid="mail-archive-row"]` — interactive — F-MAIL-23.mail-archive-row
+- `[data-testid="mail-archive-read"]` — interactive — F-MAIL-23.mail-archive-read
+  ↳ `[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]` — alias
+- `[data-testid="mail-archive-preview"]` — display — F-MAIL-23.mail-archive-preview
+- `[data-testid="mail-archive-export"]` — interactive — F-MAIL-23.mail-archive-export
+- `[data-testid="mail-archive-attachment"]` — interactive — F-MAIL-23.mail-archive-attachment
+
 ## mail/sync (F-MAIL-10)
 
 - `[data-testid="mail-idle-status"]` — display — F-MAIL-10.idle-status
@@ -2026,6 +2058,9 @@
 - `[data-testid="session-proto-redis"]` — interactive [optional] — F6.3.proto-redis
 - `[data-testid="session-proto-hbaseshell"]` — interactive [optional] — F6.3.proto-hbaseshell
 - `[data-testid="session-proto-mail"]` — interactive [optional] — F6.3.proto-mail
+- `[data-testid="session-section-mail"]` — interactive [optional] — F6.3.session-section-mail
+- `input[aria-label="IMAP port"]` — interactive [optional] — F6.3.mail-imap-port
+- `input[aria-label="SMTP port"]` — interactive [optional] — F6.3.mail-smtp-port
 - `input[aria-label="IMAP server"]` — interactive [optional] — F6.3.mail-imap-server
 - `input[aria-label="SMTP server"]` — interactive [optional] — F6.3.mail-smtp-server
 - `input[aria-label="Mail email or username"]` — interactive [optional] — F6.3.mail-email-user
@@ -2222,6 +2257,9 @@
 
 ## settings/backup (F-BACKUP-1)
 
+- `[data-testid="backup-scope"]` — interactive — F-BACKUP-1.backup-scope
+- `[data-testid="backup-include-mail"]` — interactive — F-BACKUP-1.backup-include-mail
+- `[data-testid="backup-auto-include-mail"]` — interactive — F-BACKUP-1.backup-auto-include-mail
 - `[data-testid="backup-auto-toggle"]` — interactive — F-BACKUP-1.auto-toggle
 - `[data-testid="backup-frequency"]` — interactive — F-BACKUP-1.frequency
 - `[data-testid="backup-retained-copies"]` — interactive — F-BACKUP-1.retained-copies
@@ -2230,6 +2268,8 @@
 
 ## settings/backup (F-BACKUP-2)
 
+- `[data-testid="backup-selected-include-mail"]` — interactive — F-BACKUP-2.backup-selected-include-mail
+- `[data-testid="backup-cloud-include-mail"]` — interactive — F-BACKUP-2.backup-cloud-include-mail
 - `[data-testid="backup-cloud-panel"]` — display — F-BACKUP-2.cloud-panel
 - `[data-testid="backup-feishu-add"]` — interactive — F-BACKUP-2.feishu-add
 - `[data-testid="backup-cloud-target"]` — interactive — F-BACKUP-2.cloud-target

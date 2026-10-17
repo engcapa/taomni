@@ -39,11 +39,13 @@ use tokio::task::JoinHandle;
 use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 
+pub mod archive;
 pub mod autoconfig;
 pub mod caldav;
 pub mod calendar;
 pub mod certs;
 pub mod contacts;
+pub(crate) mod coordination;
 #[cfg(test)]
 mod fake_imap;
 pub mod filters;
@@ -60,6 +62,7 @@ pub mod receipts;
 #[cfg(test)]
 mod responsiveness_tests;
 pub mod search;
+pub(crate) mod storage;
 mod sync;
 mod vcard;
 mod webdav;
@@ -319,6 +322,12 @@ pub struct MailCacheSettings {
     pub attachment_cache: bool,
     #[serde(default)]
     pub save_directory: Option<String>,
+    #[serde(default)]
+    pub storage_directory: Option<String>,
+    #[serde(default)]
+    pub full_message_mode: storage::FullMessageMode,
+    #[serde(default)]
+    pub full_message_folders: Vec<String>,
 }
 
 impl Default for MailCacheSettings {
@@ -331,6 +340,9 @@ impl Default for MailCacheSettings {
             body_max_bytes: default_body_max_bytes(),
             attachment_cache: false,
             save_directory: None,
+            storage_directory: None,
+            full_message_mode: storage::FullMessageMode::All,
+            full_message_folders: Vec::new(),
         }
     }
 }
@@ -1552,6 +1564,7 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
             ON mail_drafts(account_id, updated_at DESC);",
     )?;
     sync::migrate_mail_tables(conn)?;
+    storage::init_tables(conn)?;
     pop3::migrate_local_tables(conn)?;
     filters::migrate_filter_tables(conn)?;
     contacts::migrate_contact_tables(conn)?;
@@ -1565,7 +1578,6 @@ fn with_mail_db<T>(
 ) -> Result<T, String> {
     let db = state.mail_db(account_id)?;
     let db = db.lock().map_err(|e| e.to_string())?;
-    init_mail_tables(&db).map_err(|e| e.to_string())?;
     f(&db).map_err(|e| e.to_string())
 }
 
@@ -1581,6 +1593,27 @@ async fn with_mail_db_async<T: Send + 'static>(
     mail_db_task(db, account_id.to_string(), f).await
 }
 
+/// Locate/open an immutable original under the DB lock, but perform all file
+/// work and MIME decoding after releasing it on the blocking pool.
+async fn with_mail_original<T: Send + 'static>(
+    state: &State<'_, AppState>,
+    account_id: &str,
+    locate: impl FnOnce(&Connection, &str) -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    with_mail_db_async(state, account_id, move |db, account| {
+        locate(db, account).map_err(storage::as_sql_error)
+    })
+    .await
+}
+
+async fn decode_mail_original<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|e| format!("Saved email task failed: {e}"))?
+}
+
 async fn mail_db_task<T: Send + 'static>(
     db: crate::state::MailDbHandle,
     account_id: String,
@@ -1588,7 +1621,6 @@ async fn mail_db_task<T: Send + 'static>(
 ) -> Result<T, String> {
     tokio::task::spawn_blocking(move || {
         let db = db.lock().map_err(|e| e.to_string())?;
-        init_mail_tables(&db).map_err(|e| e.to_string())?;
         f(&db, &account_id).map_err(|e| e.to_string())
     })
     .await
@@ -2278,6 +2310,18 @@ pub async fn mail_prefetch_message_body(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     if config.cache.enabled {
+        let saved_folder = folder.clone();
+        let saved = with_mail_db_async(&state, &config.session_id, move |db, account| {
+            storage::lookup(db, account, &saved_folder, uid)
+                .map(|entry| entry.is_some())
+                .map_err(storage::as_sql_error)
+        })
+        .await?;
+        // A complete original already supplies offline reading. Background
+        // warming must not repeatedly decompress and parse its attachments.
+        if saved {
+            return Ok(());
+        }
         get_message_body(config, folder, uid, true, state).await?;
     }
     Ok(())
@@ -2294,21 +2338,45 @@ async fn get_message_body(
         return local_cmds::get_body(&state, &config.session_id, folder.trim(), uid);
     }
     let account_id = config.session_id.clone();
-    if config.cache.enabled {
-        let cache_folder = folder.clone();
-        let cached = with_mail_db_async(&state, &account_id, move |db, account_id| {
-            get_cached_body(db, account_id, &cache_folder, uid)
+    let cache_folder = folder.clone();
+    let cache_enabled = config.cache.enabled;
+    let (original, cached) = with_mail_db_async(&state, &account_id, move |db, account| {
+        let original =
+            storage::open(db, account, &cache_folder, uid).map_err(storage::as_sql_error)?;
+        let cached = if original.is_none() && cache_enabled {
+            get_cached_body(db, account, &cache_folder, uid)?
+        } else {
+            None
+        };
+        Ok((original, cached))
+    })
+    .await?;
+    if let Some(original) = original {
+        return decode_mail_original(move || {
+            let raw = original.read()?;
+            Ok(cached_to_body(
+                parse_body_message(
+                    &account_id,
+                    &folder,
+                    uid,
+                    Some(raw.len() as u32),
+                    &raw,
+                    raw.len(),
+                ),
+                "archive",
+            ))
         })
-        .await?;
-        if let Some(body) = cached {
-            return Ok(body);
-        }
+        .await;
+    }
+    if let Some(body) = cached {
+        return Ok(body);
     }
 
     let account = resolve_config(&state, config)?;
     let cache_enabled = account.config.cache.enabled;
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
+    let observed_at = sync::now_ms();
     let mut message = tokio::task::spawn_blocking(move || {
         with_imap_session(
             &pool,
@@ -2327,7 +2395,7 @@ async fn get_message_body(
 
     if cache_enabled {
         message = with_mail_db_async(&state, &account_id, move |db, _| {
-            upsert_message(db, &message)?;
+            upsert_message_at(db, &message, Some(observed_at))?;
             Ok(message)
         })
         .await?;
@@ -2360,32 +2428,87 @@ pub async fn mail_download_attachment(
     if target_path.is_empty() {
         return Err("attachment download path is required".into());
     }
+    let saved_folder = folder.clone();
+    let saved_target = target_path.clone();
+    let saved_section = section.clone();
+    let original = with_mail_original(&state, &config.session_id, move |db, account| {
+        storage::open(db, account, &saved_folder, uid)
+    })
+    .await?;
+    if let Some(original) = original {
+        return decode_mail_original(move || {
+            let raw = original.read()?;
+            let attachment = match saved_section
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                Some(section) => extract_attachment_section(&raw, section),
+                None => extract_attachment(&raw, attachment_index),
+            }?;
+            let path = write_attachment_file(&saved_target, &attachment.bytes)?;
+            Ok(MailDownloadAttachmentResult {
+                path,
+                name: attachment.name,
+                content_type: attachment.content_type,
+                size: attachment.bytes.len(),
+            })
+        })
+        .await;
+    }
     let account = resolve_config(&state, config)?;
     let section = section
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-    // AC-46: with the attachment cache on, a second open is a local copy.
-    let cache_path = account.config.cache.attachment_cache.then(|| {
-        let key = section
+    // Resolve cache paths from the shared DB handle on each I/O operation,
+    // including after a concurrent storage relocation. File copies run off Tokio.
+    let cache_key = account.config.cache.attachment_cache.then(|| {
+        section
             .clone()
-            .unwrap_or_else(|| format!("i{attachment_index}"));
-        parts::attachment_cache_path(
-            state.mail_cache_root(),
-            &crate::state::mail_db_file_stem(&account.config.session_id),
-            &folder,
-            uid,
-            &key,
-        )
+            .unwrap_or_else(|| format!("i{attachment_index}"))
     });
-    if let Some(cached) = cache_path.as_ref().filter(|path| path.is_file()) {
-        if let Ok(bytes) = std::fs::read(cached) {
-            let path = write_attachment_file(&target_path, &bytes)?;
-            return Ok(MailDownloadAttachmentResult {
-                path,
-                name: None,
-                content_type: None,
-                size: bytes.len(),
-            });
+    let cache_account = account.config.session_id.clone();
+    let cache_folder = folder.clone();
+    if let Some(key) = cache_key.clone() {
+        let folder = cache_folder.clone();
+        let cached = with_mail_db_async(&state, &cache_account, move |db, id| {
+            let root = Path::new(db.path().unwrap_or(""))
+                .parent()
+                .unwrap_or(Path::new("."));
+            let path = parts::attachment_cache_path(
+                root,
+                &crate::state::mail_db_file_stem(id),
+                &folder,
+                uid,
+                &key,
+            );
+            Ok(std::fs::File::open(path).ok())
+        })
+        .await?;
+        if let Some(mut cached) = cached {
+            // The open descriptor survives relocation/cleanup. Copying a large
+            // attachment must not keep every other mailbox operation waiting.
+            return decode_mail_original(move || {
+                let target = Path::new(&target_path);
+                let parent = target
+                    .parent()
+                    .filter(|p| !p.as_os_str().is_empty())
+                    .unwrap_or(Path::new("."));
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+                let mut temp =
+                    tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+                let size =
+                    std::io::copy(&mut cached, temp.as_file_mut()).map_err(|e| e.to_string())?;
+                temp.as_file().sync_all().map_err(|e| e.to_string())?;
+                temp.persist(target).map_err(|e| e.error.to_string())?;
+                Ok(MailDownloadAttachmentResult {
+                    path: target_path,
+                    name: None,
+                    content_type: None,
+                    size: size as usize,
+                })
+            })
+            .await;
         }
     }
     let pool = Arc::clone(&state.mail_imap_pool);
@@ -2410,10 +2533,49 @@ pub async fn mail_download_attachment(
     })
     .await
     .map_err(|e| format!("mail attachment download task failed: {e}"))??;
-    if let Some(cache) = cache_path {
-        if let Ok(bytes) = std::fs::read(&result.path) {
-            parts::write_cache_file(&cache, &bytes);
-        }
+    if let Some(key) = cache_key {
+        let source = result.path.clone();
+        let temp = with_mail_db_async(&state, &cache_account, |db, _| {
+            Ok(
+                tempfile::NamedTempFile::new_in(Path::new(db.path().unwrap()).parent().unwrap())
+                    .ok(),
+            )
+        })
+        .await?;
+        let prepared = decode_mail_original(move || {
+            let Some(mut temp) = temp else {
+                return Ok(None);
+            };
+            let Ok(mut source) = std::fs::File::open(source) else {
+                return Ok(None);
+            };
+            if std::io::copy(&mut source, temp.as_file_mut()).is_err() {
+                return Ok(None);
+            }
+            Ok(Some(temp))
+        })
+        .await?;
+        with_mail_db_async(&state, &cache_account, move |db, id| {
+            let root = Path::new(db.path().unwrap_or(""))
+                .parent()
+                .unwrap_or(Path::new("."));
+            let path = parts::attachment_cache_path(
+                root,
+                &crate::state::mail_db_file_stem(id),
+                &cache_folder,
+                uid,
+                &key,
+            );
+            if let Some(temp) = prepared {
+                if std::fs::create_dir_all(path.parent().unwrap()).is_ok() {
+                    // A concurrent move to another filesystem can make rename
+                    // fail; optional caching must not fail the saved download.
+                    let _ = temp.persist(&path);
+                }
+            }
+            Ok(())
+        })
+        .await?;
     }
     Ok(result)
 }
@@ -2927,6 +3089,17 @@ pub async fn mail_fetch_raw(
     if folder.is_empty() {
         return Err("mail folder is required".into());
     }
+    let saved_folder = folder.clone();
+    if let Some(original) = with_mail_original(&state, &config.session_id, move |db, account| {
+        storage::open(db, account, &saved_folder, uid)
+    })
+    .await?
+    {
+        return decode_mail_original(move || {
+            Ok(String::from_utf8_lossy(&original.read()?).into_owned())
+        })
+        .await;
+    }
     let account = resolve_config(&state, config)?;
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
@@ -2968,6 +3141,21 @@ pub async fn mail_save_raw(
     }
     if target_path.trim().is_empty() {
         return Err("target path is required".into());
+    }
+    let saved_folder = folder.clone();
+    let saved_target = target_path.clone();
+    if let Some(original) = with_mail_original(&state, &config.session_id, move |db, account| {
+        storage::open(db, account, &saved_folder, uid)
+    })
+    .await?
+    {
+        let size = decode_mail_original(move || original.export(Path::new(&saved_target))).await?;
+        return Ok(MailDownloadAttachmentResult {
+            path: target_path,
+            name: None,
+            content_type: Some("message/rfc822".into()),
+            size: size as usize,
+        });
     }
     let account = resolve_config(&state, config)?;
     let pool = Arc::clone(&state.mail_imap_pool);
@@ -5489,6 +5677,14 @@ fn upsert_folder(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
 }
 
 fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<()> {
+    upsert_message_at(conn, message, None)
+}
+
+fn upsert_message_at(
+    conn: &Connection,
+    message: &MailMessageCached,
+    observed_at: Option<i64>,
+) -> SqlResult<()> {
     let header = &message.header;
     let to_json = serde_json::to_string(&header.to).unwrap_or_else(|_| "[]".into());
     let cc_json = serde_json::to_string(&header.cc).unwrap_or_else(|_| "[]".into());
@@ -5511,7 +5707,8 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
             to_json = CASE WHEN excluded.to_json != '[]' THEN excluded.to_json ELSE mail_messages.to_json END,
             cc_json = CASE WHEN excluded.cc_json != '[]' THEN excluded.cc_json ELSE mail_messages.cc_json END,
             date_ts = COALESCE(excluded.date_ts, mail_messages.date_ts),
-            flags_json = CASE WHEN ?22 = 1 OR excluded.flags_json != '[]' THEN excluded.flags_json ELSE mail_messages.flags_json END,
+            flags_json = CASE WHEN ?27 IS NOT NULL AND COALESCE(mail_messages.flags_local_at, 0) >= ?27 THEN mail_messages.flags_json
+                              WHEN ?22 = 1 OR excluded.flags_json != '[]' THEN excluded.flags_json ELSE mail_messages.flags_json END,
             internal_ts = COALESCE(excluded.internal_ts, mail_messages.internal_ts),
             in_reply_to = COALESCE(excluded.in_reply_to, mail_messages.in_reply_to),
             references_json = CASE WHEN excluded.references_json != '[]'
@@ -5565,6 +5762,7 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
                 .as_ref()
                 .and_then(|list| serde_json::to_string(list).ok()),
             header.receipt_to,
+            observed_at,
         ],
     )?;
     Ok(())
@@ -5586,7 +5784,11 @@ fn contact_email(address: &MailAddress) -> Option<String> {
 /// Sync plans normally contain only missing UIDs. Index their contacts once,
 /// instead of rebuilding all accounts' cached addresses after every page.
 /// Replayed/replaced rows request a rebuild so counts stay idempotent.
-fn cache_synced_messages(conn: &Connection, messages: &[MailMessageCached]) -> SqlResult<bool> {
+fn cache_synced_messages(
+    conn: &Connection,
+    messages: &[MailMessageCached],
+    started_ms: i64,
+) -> SqlResult<bool> {
     let mut replaced = false;
     let mut exists = conn.prepare_cached(
         "SELECT EXISTS(SELECT 1 FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3)",
@@ -5597,7 +5799,7 @@ fn cache_synced_messages(conn: &Connection, messages: &[MailMessageCached]) -> S
             params![header.account_id, header.folder, header.uid],
             |row| row.get(0),
         )?;
-        upsert_message(conn, message)?;
+        upsert_message_at(conn, message, Some(started_ms))?;
         if known {
             replaced = true;
         } else {
@@ -5997,7 +6199,12 @@ fn prune_mail_cache(
     // Retention uses the server arrival time (INTERNALDATE), not the sender's
     // `Date:` header, so a freshly delivered but back-dated message survives.
     let mut cut: Option<u32> = None;
-    if cache.header_limit_per_folder > 0 {
+    let retain_headers: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM mail_archive_preferences WHERE account_id=?1)",
+        [account_id],
+        |r| r.get(0),
+    )?;
+    if !retain_headers && cache.header_limit_per_folder > 0 {
         let first_dropped: Option<u32> = conn
             .query_row(
                 "SELECT uid FROM mail_messages
@@ -6010,7 +6217,7 @@ fn prune_mail_cache(
             .optional()?;
         cut = first_dropped.map(|uid| uid.saturating_add(1));
     }
-    if cache.header_retention_days > 0 {
+    if !retain_headers && cache.header_retention_days > 0 {
         let cutoff = now_ts() - (cache.header_retention_days as i64 * 86_400);
         let (oldest_recent, max_uid): (Option<u32>, Option<u32>) = conn.query_row(
             "SELECT
@@ -6432,7 +6639,7 @@ fn attachment_info(part: &mail_parser::MessagePart<'_>) -> MailAttachmentInfo {
     let size = match &part.body {
         PartType::Text(s) | PartType::Html(s) => Some(s.len()),
         PartType::Binary(b) | PartType::InlineBinary(b) => Some(b.len()),
-        PartType::Message(message) => Some(message.raw_message.len()),
+        PartType::Message(message) => Some(message.raw_message().len()),
         PartType::Multipart(_) => None,
     };
     let content_type = part.content_type().map(|ct| match ct.c_subtype.as_ref() {
@@ -6458,11 +6665,56 @@ fn extract_attachment(
     let part = attachments
         .nth(attachment_index)
         .ok_or_else(|| format!("attachment #{} not found", attachment_index + 1))?;
+    decoded_attachment(part)
+}
+
+/// Resolve IMAP section numbering against the MIME tree, independent of the
+/// parser's attachment list (which can order inline/alternative parts differently).
+fn extract_attachment_section(
+    body: &[u8],
+    section: &str,
+) -> Result<DownloadedMailAttachment, String> {
+    fn locate<'a, 'b>(
+        message: &'b mail_parser::Message<'a>,
+        index: usize,
+        path: &[usize],
+        root: bool,
+    ) -> Option<&'b mail_parser::MessagePart<'a>> {
+        let part = message.parts.get(index)?;
+        if path.is_empty() {
+            return Some(part);
+        }
+        match &part.body {
+            PartType::Multipart(children) => {
+                let child = *children.get(path[0].checked_sub(1)?)? as usize;
+                locate(message, child, &path[1..], false)
+            }
+            PartType::Message(nested) => locate(nested, 0, path, true),
+            _ if root && path == [1] => Some(part),
+            _ => None,
+        }
+    }
+    let path = section
+        .split('.')
+        .map(str::parse::<usize>)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| "Invalid attachment section".to_string())?;
+    let message = MessageParser::default()
+        .parse(body)
+        .ok_or_else(|| "failed to parse message attachments".to_string())?;
+    let part = locate(&message, 0, &path, true)
+        .ok_or_else(|| format!("attachment section {section} not found in local original"))?;
+    decoded_attachment(part)
+}
+
+fn decoded_attachment(
+    part: &mail_parser::MessagePart<'_>,
+) -> Result<DownloadedMailAttachment, String> {
     let info = attachment_info(part);
     let bytes = match &part.body {
         PartType::Text(s) | PartType::Html(s) => s.as_ref().as_bytes().to_vec(),
         PartType::Binary(b) | PartType::InlineBinary(b) => b.as_ref().to_vec(),
-        PartType::Message(message) => message.raw_message.to_vec(),
+        PartType::Message(message) => message.raw_message().to_vec(),
         PartType::Multipart(_) => {
             return Err("selected attachment is a multipart container".into());
         }
@@ -7502,6 +7754,34 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             "cid reference should be rewritten for display"
         );
         assert!(html.contains("alt=\"logo\""));
+    }
+
+    #[test]
+    fn saved_mime_attachment_sections_handle_nested_parts_and_embedded_messages() {
+        let raw = b"Content-Type: multipart/mixed; boundary=a\r\n\r\n--a\r\nContent-Type: multipart/alternative; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nplain\r\n--b\r\nContent-Type: text/html\r\n\r\n<b>html</b>\r\n--b--\r\n--a\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=payload.bin\r\nContent-Transfer-Encoding: base64\r\n\r\nAAECAw==\r\n--a\r\nContent-Type: message/rfc822\r\nContent-Disposition: attachment; filename=inner.eml\r\n\r\nSubject: Inner\r\nContent-Type: text/plain\r\n\r\nembedded\r\n--a--\r\n";
+        assert_eq!(
+            extract_attachment_section(raw, "1.2").unwrap().bytes,
+            b"<b>html</b>"
+        );
+        let binary = extract_attachment_section(raw, "2").unwrap();
+        assert_eq!(binary.name.as_deref(), Some("payload.bin"));
+        assert_eq!(binary.bytes, [0, 1, 2, 3]);
+        assert!(
+            extract_attachment_section(raw, "3")
+                .unwrap()
+                .bytes
+                .starts_with(b"Subject: Inner")
+        );
+        assert_eq!(
+            extract_attachment_section(raw, "3.1").unwrap().bytes,
+            b"embedded"
+        );
+        for invalid in ["0", "4", "1", "1.1.1", "2.1", "1.MIME", ""] {
+            assert!(
+                extract_attachment_section(raw, invalid).is_err(),
+                "{invalid}"
+            );
+        }
     }
 
     #[test]

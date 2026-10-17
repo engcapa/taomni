@@ -158,9 +158,24 @@ where
     let mut stream = response.bytes_stream();
     let mut received = 0u64;
     loop {
-        let chunk = tokio::select! { _ = ctx.cancel.cancelled() => return Err("BACKUP_CANCELLED".into()), next = stream.next() => next };
+        let chunk = tokio::select! {
+            _ = ctx.cancel.cancelled() => {
+                // Tokio's file writes may still be buffered when write_all
+                // resolves. Finish them before exposing the resumable prefix.
+                output.flush().await.map_err(|e| e.to_string())?;
+                output.sync_data().await.map_err(|e| e.to_string())?;
+                return Err("BACKUP_CANCELLED".into());
+            },
+            next = stream.next() => next
+        };
         let Some(chunk) = chunk else { break };
-        let bytes = chunk.map_err(network::network_error)?;
+        let bytes = match chunk {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                output.flush().await.map_err(|e| e.to_string())?;
+                return Err(network::network_error(error));
+            }
+        };
         let _chunk_reservation = if expected_response_bytes.is_none() {
             super::cache::reserve(path, bytes.len() as u64)?
         } else {

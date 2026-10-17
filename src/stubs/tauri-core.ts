@@ -1,3 +1,4 @@
+import { mailArchiveStub } from "./mailArchiveStub";
 import { voiceStub } from "./voiceStub";
 import { goStubCatalog } from "./opencodeGoStub";
 import { inspectorStub, inspectorCheckStub } from "./modelInspectorStub";
@@ -1763,6 +1764,18 @@ function stubSystemRdpStatus(): Record<string, unknown> {
 }
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (cmd === "backup_get_policy") {
+    return JSON.parse(localStorage.getItem("taomni.backup.policy") || JSON.stringify({
+      autoBackupEnabled: false, frequency: "weekly", maxRetainedCopies: 7,
+      defaultScope: "core", includeMail: null, lastBackupAt: null,
+    })) as T;
+  }
+  if (cmd === "backup_set_policy") {
+    localStorage.setItem("taomni.backup.policy", JSON.stringify((args as { policy: unknown }).policy));
+    return undefined as T;
+  }
+  if (cmd === "backup_list_history") return [] as T;
+  if (cmd === "backup_get_default_dir") return "/preview/backups" as T;
   if (cmd.startsWith("backup_remote_") || cmd.startsWith("backup_feishu_")) {
     return await (await import("./remoteBackupStub")).remoteBackupStub(cmd, args) as T;
   }
@@ -4233,6 +4246,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     // ---------- Mail client commands (browser preview stubs) ----------
+    case "mail_archive_start":
+    case "mail_archive_pause":
+    case "mail_archive_status":
+    case "mail_archive_list":
+    case "mail_archive_read":
+    case "mail_archive_export":
+    case "mail_archive_attachment":
+    case "mail_archive_remove":
+      return mailArchiveStub(cmd, (args ?? {}) as Record<string, unknown>, mailStubSeed, stubMailBody) as T;
     case "mail_list_cached_folders": {
       return stubMailListFolders(stubMailAccountId(args as InvokeArgs | undefined), mailStubSeed) as T;
     }

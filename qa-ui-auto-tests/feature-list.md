@@ -1695,6 +1695,18 @@ controls:
     selector: '[data-testid="session-proto-mail"]'
     kind: interactive
     optional: true
+  - id: session-section-mail
+    selector: '[data-testid="session-section-mail"]'
+    kind: interactive
+    optional: true
+  - id: mail-imap-port
+    selector: 'input[aria-label="IMAP port"]'
+    kind: interactive
+    optional: true
+  - id: mail-smtp-port
+    selector: 'input[aria-label="SMTP port"]'
+    kind: interactive
+    optional: true
   - id: mail-imap-server
     selector: 'input[aria-label="IMAP server"]'
     kind: interactive
@@ -7013,6 +7025,120 @@ controls:
 
 ---
 
+### 13.23 完整邮件存储、本地归档与目录迁移
+
+<!-- feature
+id: F-MAIL-23
+status: partial
+area: mail/storage
+components: [MailStorageSettings, MailArchivePanel, SessionEditor, MailClientTab]
+files:
+  - src/components/mail/MailStorageSettings.tsx
+  - src/components/mail/MailArchivePanel.tsx
+  - src/components/session/SessionEditor.tsx
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mail.ts
+  - src/stubs/mailArchiveStub.ts
+  - src-tauri/src/mail/storage.rs
+  - src-tauri/src/mail/archive.rs
+  - src-tauri/src/mail/coordination.rs
+  - src-tauri/src/state.rs
+  - src-tauri/src/session/mod.rs
+controls:
+  - id: mail-storage-settings
+    selector: '[data-testid="mail-storage-settings"]'
+    kind: display
+  - id: mail-storage-directory
+    selector: '[data-testid="mail-storage-directory"]'
+    kind: interactive
+  - id: mail-storage-browse
+    selector: '[data-testid="mail-storage-browse"]'
+    kind: interactive
+  - id: mail-storage-mode
+    selector: '[data-testid="mail-storage-mode"]'
+    kind: interactive
+  - id: mail-storage-folders
+    selector: '[data-testid="mail-storage-folders"]'
+    kind: interactive
+  - id: mail-storage-folder-names
+    selector: '[data-testid="mail-storage-folder-names"]'
+    kind: interactive
+  - id: mail-imap-security
+    selector: '[data-testid="mail-imap-security"]'
+    kind: interactive
+  - id: mail-smtp-security
+    selector: '[data-testid="mail-smtp-security"]'
+    kind: interactive
+  - id: mail-storage-progress
+    selector: '[data-testid="mail-storage-progress"]'
+    kind: display
+  - id: mail-storage-pause
+    selector: '[data-testid="mail-storage-pause"]'
+    kind: interactive
+  - id: mail-storage-resume
+    selector: '[data-testid="mail-storage-resume"]'
+    kind: interactive
+  - id: mail-archive-open
+    selector: '[data-testid="mail-archive-open"]'
+    kind: interactive
+  - id: mail-archive-dialog
+    selector: '[data-testid="mail-archive-dialog"]'
+    kind: display
+  - id: mail-archive-close
+    selector: '[data-testid="mail-archive-close"]'
+    kind: interactive
+  - id: mail-archive-refresh
+    selector: '[data-testid="mail-archive-refresh"]'
+    kind: interactive
+  - id: mail-archive-cleanup
+    selector: '[data-testid="mail-archive-cleanup"]'
+    kind: interactive
+  - id: mail-archive-prev
+    selector: '[data-testid="mail-archive-prev"]'
+    kind: interactive
+  - id: mail-archive-next
+    selector: '[data-testid="mail-archive-next"]'
+    kind: interactive
+  - id: mail-archive-confirm
+    selector: '[data-testid="mail-archive-confirm"]'
+    kind: display
+  - id: mail-archive-confirm-remove
+    selector: '[data-testid="mail-archive-confirm-remove"]'
+    kind: interactive
+  - id: mail-archive-confirm-cancel
+    selector: '[data-testid="mail-archive-confirm-cancel"]'
+    kind: interactive
+  - id: mail-archive-notice
+    selector: '[data-testid="mail-archive-notice"]'
+    kind: display
+  - id: mail-archive-entries
+    selector: '[data-testid="mail-archive-entries"]'
+    kind: display
+  - id: mail-archive-row
+    selector: '[data-testid="mail-archive-row"]'
+    kind: interactive
+  - id: mail-archive-read
+    selector: '[data-testid="mail-archive-read"]'
+    aliases:
+      - '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]'
+    kind: interactive
+  - id: mail-archive-preview
+    selector: '[data-testid="mail-archive-preview"]'
+    kind: display
+  - id: mail-archive-export
+    selector: '[data-testid="mail-archive-export"]'
+    kind: interactive
+  - id: mail-archive-attachment
+    selector: '[data-testid="mail-archive-attachment"]'
+    kind: interactive
+-->
+
+- 每会话可设置目录；默认仍为应用 mail-cache。完整原件按封 gzip 压缩，包含 MIME 正文、内联资源及附件，SHA-256 校验和去重。
+- IMAP 全部/仅选中/排除文件夹均保留其它文件夹的摘要。后台暂停保留可续传片段，普通删除/远端消失保留归档，主动清理才物理删除最后引用。
+- 本地归档独立于实时邮件列表，可以读取/导出服务器已消失的邮件。POP3 原始本地库保持兼容并保留压缩归档。
+- `TC-MAIL-STORAGE-01` 为 browser；`TC-MAIL-STORAGE-02` 为 Linux/Windows/macOS native，分别验证 UI 和独立磁盘/备份字节。`TC-MAIL-PERF-01/02` 覆盖大量邮件、多个会话和终端并发；`TC-MAIL-PERF-03` 用两个真实 QA 进程共享邮箱目录，检查下载互斥、暂停、迁移和清理。用户已授权 Linux 本机执行，Windows/macOS 本轮只编写；具体运行证据及未验证边界见 `docs-feature/mail-complete-storage-design.md`。
+
+
 ## 14. SocksCap 网络流量路由
 
 ### 14.1 SocksCap 控制面板 🟡
@@ -10627,6 +10753,12 @@ files:
   - src-tauri/src/backup/credentials.rs
   - src-tauri/src/backup/feishu/auth.rs
 controls:
+  - id: backup-selected-include-mail
+    selector: '[data-testid="backup-selected-include-mail"]'
+    kind: interactive
+  - id: backup-cloud-include-mail
+    selector: '[data-testid="backup-cloud-include-mail"]'
+    kind: interactive
   - id: cloud-panel
     selector: '[data-testid="backup-cloud-panel"]'
     kind: display
@@ -10726,6 +10858,15 @@ files:
   - src/stores/backupStore.ts
   - src/components/settings/BackupSettingsPanel.tsx
 controls:
+  - id: backup-scope
+    selector: '[data-testid="backup-scope"]'
+    kind: interactive
+  - id: backup-include-mail
+    selector: '[data-testid="backup-include-mail"]'
+    kind: interactive
+  - id: backup-auto-include-mail
+    selector: '[data-testid="backup-auto-include-mail"]'
+    kind: interactive
   - id: auto-toggle
     selector: '[data-testid="backup-auto-toggle"]'
     kind: interactive

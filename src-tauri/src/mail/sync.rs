@@ -326,7 +326,7 @@ pub(super) fn apply_folder_step(
         reset_folder_cache(&tx, account_id, folder_name)?;
     }
     upsert_folder(&tx, &outcome.folder)?;
-    let replaced = cache_synced_messages(&tx, &outcome.messages)?;
+    let replaced = cache_synced_messages(&tx, &outcome.messages, started_ms)?;
     if !outcome.vanished.is_empty() {
         let mut stmt = tx.prepare(
             "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
@@ -356,19 +356,21 @@ pub(super) fn apply_folder_step(
         }
     }
     let wm = outcome.watermark;
-    // Only an initial sync or a backfill may lower the span's low end or clear
-    // completeness; every other step keeps what a prune in an earlier step of
-    // the same batch already moved (the span never grows downward silently).
+    // Concurrent tabs/processes can apply older snapshots after a newer batch.
+    // Backfill only lowers the watermark; completion cannot regress. Retention
+    // still advances the boundary below, and UIDVALIDITY reset clears it above.
     let can_lower = matches!(outcome.mode, MailSyncMode::Initial | MailSyncMode::Backfill);
     tx.execute(
         "UPDATE mail_folders
-         SET sync_low_uid = CASE WHEN ?10 = 1 OR sync_low_uid IS NULL THEN ?3
+         SET sync_low_uid = CASE WHEN sync_low_uid IS NULL THEN ?3
+                                 WHEN ?10 = 1 THEN MIN(sync_low_uid, COALESCE(?3, sync_low_uid))
                                  ELSE MAX(sync_low_uid, COALESCE(?3, 0)) END,
              sync_high_uid = CASE WHEN ?4 IS NULL THEN sync_high_uid
                                   ELSE MAX(COALESCE(sync_high_uid, 0), ?4) END,
-             sync_complete = CASE WHEN ?10 = 1 THEN ?5 ELSE MAX(sync_complete, ?5) END,
+             sync_complete = MAX(sync_complete, ?5),
              sync_needs_repair = ?6, last_error = NULL,
-             highest_modseq = COALESCE(?7, highest_modseq),
+             highest_modseq = CASE WHEN ?7 IS NULL THEN highest_modseq
+                                   ELSE MAX(COALESCE(highest_modseq, 0), ?7) END,
              last_reconcile_at = CASE WHEN ?8 = 1 THEN ?9 ELSE last_reconcile_at END
          WHERE account_id = ?1 AND name = ?2",
         params![
@@ -1261,6 +1263,35 @@ mod tests {
     }
 
     /// AC-07/AC-12: backfill walks older history down to UID 1.
+    #[test]
+    fn late_concurrent_backfill_does_not_regress_progress() {
+        let fake = FakeImap::start(false);
+        let conn = db();
+        let account = account(serde_json::json!({}));
+        fake.deliver("INBOX", 130, "msg");
+        step(&fake, &conn, &account, MailSyncRequestMode::Auto, 40);
+        let snapshot = load_folder_sync_state(&conn, "acct", "INBOX").unwrap();
+        let delayed = imap_sync_folder_step(
+            &mut fake.session(),
+            &account,
+            "INBOX",
+            &snapshot,
+            &StepParams {
+                request: MailSyncRequestMode::Backfill,
+                limit: 40,
+                include_bodies: false,
+                condstore: false,
+            },
+        )
+        .unwrap();
+        drain(&fake, &conn, &account, MailSyncRequestMode::Backfill, 40);
+        apply_folder_step(&conn, "acct", &delayed, &account.config.cache, now_ms()).unwrap();
+        let final_state = load_folder_sync_state(&conn, "acct", "INBOX").unwrap();
+        assert_eq!(final_state.low, Some(1));
+        assert!(final_state.complete);
+        assert_eq!(final_state.cached_uids, fake.uids("INBOX"));
+    }
+
     #[test]
     fn backfill_reaches_the_oldest_message() {
         let fake = FakeImap::start(false);

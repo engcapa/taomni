@@ -3565,6 +3565,11 @@ export const zhCN: DeepPartial<typeof en> = {
     }
   },
   backupSettings: {
+    includeMail: "包含邮件（摘要、完整原件和附件）",
+    autoIncludeMail: "自动备份包含邮件",
+    localIncludeMail: "选中的本地备份目标包含邮件",
+    mailHint: "包含自定义邮件目录和保留的本地归档；未完成下载另行续传。恢复到本机默认邮件目录。",
+
     badArchivePassword: "归档密码错误，请重新输入。",
     status: "状态",
     actions: "操作",

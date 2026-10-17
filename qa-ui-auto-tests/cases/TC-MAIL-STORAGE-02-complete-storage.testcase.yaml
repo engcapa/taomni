@@ -1,0 +1,368 @@
+id: TC-MAIL-STORAGE-02
+title: Native complete MIME, resumable storage, relocation, backup selection and physical cleanup
+description: Uses only a disposable QA profile, loopback IMAP/SMTP, independent MIME checksums and read-only
+  SQLite/gzip/ZIP observations. Runs on Linux/WebKitGTK, Windows/WebView2 and macOS/WKWebView. Restore
+  inspection is exercised; restart/apply and encrypted backup compatibility are covered by Rust tests
+  and require follow-up native restore execution. Linux native is exercised with a separate QA profile;
+  Windows/macOS remain pending.
+covers:
+- F-MAIL-23
+- F-BACKUP-1
+tags:
+- mail
+- backup
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- mail_server
+- mail_storage
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- select_option:
+    selector: '[data-testid="mail-storage-mode"]'
+    value: include
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: INBOX
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA complete mail
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- wait_for: '[data-testid="mail-storage-pause"]'
+- click: '[data-testid="mail-storage-pause"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: paused
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-resume"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 2
+    headers:
+      INBOX: 2
+      Archive: 2
+- click: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-mail"]'
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_b}
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_storage_b}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 2
+    headers:
+      INBOX: 2
+      Archive: 2
+- mail_server_expunge_newest:
+    folder: INBOX
+    count: 2
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-open"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-row"]'
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 2
+- click: '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-preview"]'
+    contains: complete.bin
+    timeout_sec: 30
+- click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-preview"]'
+    contains: Offline body
+    timeout_sec: 30
+- click: '[data-testid="mail-archive-close"]'
+- mail_storage_assert:
+    root: ${fixture.mail_storage_b}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 2
+    headers:
+      INBOX: 0
+      Archive: 2
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- set_check:
+    selector: '[data-testid="backup-include-mail"]'
+    checked: true
+- click: '[data-testid="backup-create-now"]'
+- wait_for:
+    selector: '[data-testid="backup-action-success"]'
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_qa_data}/backups
+    expected: ${fixture.mail_expected}
+    kind: backup
+    include_mail: true
+    objects: 2
+- click: '[data-testid="backup-history-restore"]'
+- wait_for: '[data-testid="backup-restore-files"]'
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: .eml.gz
+    timeout_sec: 30
+- click: '[data-testid="backup-restore-cancel"]'
+- set_check:
+    selector: '[data-testid="backup-include-mail"]'
+    checked: false
+- click: '[data-testid="backup-create-now"]'
+- wait_for:
+    selector: '[data-testid="backup-action-success"]'
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_qa_data}/backups
+    expected: ${fixture.mail_expected}
+    kind: backup
+    include_mail: false
+    objects: 0
+- set_check:
+    selector: '[data-testid="backup-auto-include-mail"]'
+    checked: true
+- assert_file_contains:
+    path: ${fixture.mail_qa_data}/backup_policy.json
+    contains: '"includeMail": true'
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- click: '[data-testid="mail-archive-open"]'
+- click: '[data-testid="mail-archive-row"]:nth-child(1) input[type="checkbox"]'
+- click: '[data-testid="mail-archive-row"]:nth-child(2) input[type="checkbox"]'
+- click: '[data-testid="mail-archive-cleanup"]'
+- click: '[data-testid="mail-archive-confirm-cancel"]'
+- mail_storage_assert:
+    root: ${fixture.mail_storage_b}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 2
+    headers:
+      Archive: 2
+- click: '[data-testid="mail-archive-cleanup"]'
+- click: '[data-testid="mail-archive-confirm-remove"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-notice"]'
+    contains: Local originals removed
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 0
+- mail_storage_assert:
+    root: ${fixture.mail_storage_b}
+    expected: ${fixture.mail_expected}
+    full: {}
+    headers:
+      Archive: 2
+- click: '[data-testid="mail-archive-close"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: paused
+    timeout_sec: 30
+- screenshot: mail-native-complete-storage.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Selected INBOX downloads complete MIME and attachments, Archive keeps summaries, pause/resume
+      and directory relocation retain exact bytes.
+    actions:
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 23
+    - 25
+    - 27
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+    checkpoints:
+    - step: 26
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
+        ''paused'', ''timeout_sec'': 60}}'
+    - step: 28
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
+        ''completed'', ''timeout_sec'': 120}}'
+    - step: 29
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'':
+        ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 2, ''Archive'':
+        2}}}'
+    - step: 37
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'':
+        ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 2, ''Archive'':
+        2}}}'
+    results:
+    - 26
+    - 28
+    - 29
+    - 37
+  - id: R2
+    requirement: Server expunge retains readable originals; backups include/exclude mail as selected;
+      explicit cleanup frees gzip objects and preserves other-folder summaries.
+    actions:
+    - 20
+    - 39
+    - 41
+    - 44
+    - 48
+    - 50
+    - 51
+    - 52
+    - 53
+    - 56
+    - 59
+    - 60
+    - 61
+    - 64
+    - 66
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 73
+    - 74
+    - 78
+    - 46
+    checkpoints:
+    - step: 40
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 60}}'
+    - step: 43
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'':
+        2}}'
+    - step: 45
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'':
+        ''complete.bin'', ''timeout_sec'': 30}}'
+    - step: 47
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'':
+        ''Offline body'', ''timeout_sec'': 30}}'
+    - step: 49
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'':
+        ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 0, ''Archive'':
+        2}}}'
+    - step: 55
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_qa_data}/backups'', ''expected'':
+        ''${fixture.mail_expected}'', ''kind'': ''backup'', ''include_mail'': True, ''objects'': 2}}'
+    - step: 58
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="backup-restore-files"]'', ''contains'':
+        ''.eml.gz'', ''timeout_sec'': 30}}'
+    - step: 63
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_qa_data}/backups'', ''expected'':
+        ''${fixture.mail_expected}'', ''kind'': ''backup'', ''include_mail'': False, ''objects'': 0}}'
+    - step: 65
+      expectation: '{''assert_file_contains'': {''path'': ''${fixture.mail_qa_data}/backup_policy.json'',
+        ''contains'': ''"includeMail": true''}}'
+    - step: 72
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'':
+        ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''Archive'': 2}}}'
+    - step: 75
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'', ''contains'':
+        ''Local originals removed'', ''timeout_sec'': 30}}'
+    - step: 76
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'':
+        0}}'
+    - step: 77
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'':
+        ''${fixture.mail_expected}'', ''full'': {}, ''headers'': {''Archive'': 2}}}'
+    - step: 79
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
+        ''paused'', ''timeout_sec'': 30}}'
+    results:
+    - 40
+    - 43
+    - 45
+    - 47
+    - 49
+    - 55
+    - 58
+    - 63
+    - 65
+    - 72
+    - 75
+    - 76
+    - 77
+    - 79
+  visual:
+  - check: Storage settings, progress and archive list remain readable without clipping.
+    method: manual
+    reason: Review screenshots on each OS after the user executes this case.
+  native:
+  - check: Independent SQLite, gzip MIME/attachments and backup ZIP checks.
+    method: automated
+    reason: Native oracle reads only retained QA fixture paths.
+native_platforms:
+- Linux
+- Windows
+- macOS

@@ -1,0 +1,142 @@
+id: TC-MAIL-PERF-02
+title: Native 33,913-mail concurrency with 313 large bodies and other-session responsiveness
+description: Two independent mail accounts run real IMAP header/body/full-original
+  workers against 33,913 messages, including 313 larger bodies, while a local PTY
+  remains open. Five cold/warm mixed samples each for reading, sending and idle/loaded
+  terminal echo; protocol receipts prove multi-connection overlap. Absolute p95 guardrails
+  include automation overhead. No baseline revision speedup is claimed.
+covers:
+- F-MAIL-23
+- F-MAIL-3
+- F-MAIL-2
+- F2.1
+- F2.2
+modes:
+- native
+tags:
+- mail
+- performance
+- concurrency
+- p1
+fixtures:
+- reset_db
+- mail_server
+- mail_stress
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- mail_performance_probe:
+    kind: terminal
+    label: idle-terminal
+    samples: 5
+    max_p95_ms: 1500
+    require_background: false
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for:
+    selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]'
+    timeout_sec: 60
+- mail_performance_probe:
+    kind: read
+    label: first-mail
+    samples: 5
+    max_p95_ms: 2500
+    require_background: true
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_second_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for:
+    selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]'
+    timeout_sec: 60
+- mail_performance_probe:
+    kind: read
+    label: second-mail
+    samples: 5
+    max_p95_ms: 2500
+    require_background: true
+- mail_performance_probe:
+    kind: send
+    label: loaded-send
+    samples: 5
+    max_p95_ms: 3000
+    require_background: true
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- mail_performance_probe:
+    kind: terminal
+    label: loaded-terminal
+    samples: 5
+    max_p95_ms: 1500
+    require_background: true
+- mail_performance_probe:
+    kind: concurrency
+    label: protocol-overlap
+    samples: 5
+    max_p95_ms: 2000
+    require_background: false
+- screenshot: mail-concurrency.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Mail details and sending remain responsive while two sessions process
+      many messages; native additionally proves continued PTY output and overlapping
+      worker requests.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 8
+    - 9
+    - 12
+    - 13
+    - 17
+    checkpoints:
+    - step: 7
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    - step: 11
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    - step: 15
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    - step: 16
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    - step: 19
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    - step: 20
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    results:
+    - 7
+    - 11
+    - 15
+    - 16
+    - 19
+    - 20
+  visual:
+  - check: Two mail tabs and the active view remain readable.
+    method: manual
+    reason: Review the retained screenshot separately from timings.
+  native:
+  - check: Real concurrent IMAP workers, SMTP acceptance and PTY response.
+    method: automated
+    reason: Native server receipts and real PTY output are required; browser only
+      verifies renderer behavior.
+native_platforms:
+- Linux
+- Windows
+- macOS

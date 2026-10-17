@@ -47,10 +47,11 @@ class NativeAssertionsTest(TestCase):
             run_native_step(ctx, "set_check", {"selector": "#check", "checked": False})
         ctx.session.click.assert_not_called()
         ctx.session.execute.side_effect = [False, False]
-        with self.assertRaisesRegex(StepError, "did not become"):
+        with patch("qa_ui_auto.native_steps.time.monotonic", side_effect=[0, 11]), self.assertRaisesRegex(StepError, "did not become"):
             run_native_step(ctx, "set_check", {"selector": "#check", "checked": True})
-        ctx.session.execute.side_effect = [False, True]
-        run_native_step(ctx, "set_check", {"selector": "#check", "checked": True})
+        ctx.session.execute.side_effect = [False, False, True]
+        with patch("qa_ui_auto.native_steps.time.sleep"):
+            run_native_step(ctx, "set_check", {"selector": "#check", "checked": True})
 
     def test_menu_click_uses_webdriver_and_rejects_ambiguous_label(self):
         ctx = Mock()

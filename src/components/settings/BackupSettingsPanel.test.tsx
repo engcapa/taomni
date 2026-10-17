@@ -81,6 +81,19 @@ describe("BackupSettingsPanel", () => {
     vi.useRealTimers();
   });
 
+  it("sends the explicit mail selection and persists automatic inclusion", async () => {
+    render(<BackupSettingsPanel />);
+    fireEvent.click(screen.getByTestId("backup-include-mail"));
+    fireEvent.click(screen.getByTestId("backup-create-now"));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("backup_create", expect.objectContaining({ scope: "core", customOptions: { includeMail: true } })));
+    fireEvent.change(screen.getByTestId("backup-scope"), { target: { value: "full" } });
+    fireEvent.click(screen.getByTestId("backup-include-mail"));
+    fireEvent.click(screen.getByTestId("backup-create-now"));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("backup_create", expect.objectContaining({ scope: "full", customOptions: { includeMail: false } })));
+    fireEvent.click(screen.getByTestId("backup-auto-include-mail"));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("backup_set_policy", expect.objectContaining({ policy: expect.objectContaining({ includeMail: true }) })));
+  });
+
   it("renders backup storage directory and default path badge", () => {
     render(<BackupSettingsPanel />);
 

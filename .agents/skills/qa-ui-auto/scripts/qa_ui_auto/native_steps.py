@@ -1823,8 +1823,11 @@ def _do_set_check(ctx: NativeStepContext, args: Any) -> str:
         raise StepError(f"set_check: missing checkbox/radio {args['selector']}")
     if actual != desired:
         ctx.session.click(str(args["selector"]))
-    if ctx.session.execute(probe) != desired:
-        raise StepError(f"set_check: {args['selector']} did not become checked={desired}")
+    deadline = time.monotonic() + 10
+    while ctx.session.execute(probe) != desired:
+        if time.monotonic() >= deadline:
+            raise StepError(f"set_check: {args['selector']} did not become checked={desired}")
+        time.sleep(0.05)
     return f"checkbox ok: {args['selector']}"
 
 
@@ -3293,3 +3296,24 @@ def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
 # them in VERBS (it imports `_verb`/`NativeStepContext` defined above).
 from . import rdp_steps  # noqa: E402,F401
 from . import updater_steps  # noqa: E402,F401
+
+
+@_verb("mail_storage_assert")
+def _do_mail_storage_assert(ctx: NativeStepContext, args: Any) -> str:
+    from .mail_storage_oracle import check
+    try:
+        return check(ctx, args)
+    except Exception as error:
+        raise StepError(str(error)) from error
+
+
+@_verb("mail_performance_probe")
+def _do_mail_performance_probe(ctx: NativeStepContext, args: Any) -> str:
+    from .mail_performance import run
+    return run(ctx, args)
+
+
+@_verb("mail_multi_instance_probe")
+def _do_mail_multi_instance_probe(ctx: NativeStepContext, args: Any) -> str:
+    from .mail_multi_instance import run
+    return run(ctx, args)

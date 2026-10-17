@@ -1,0 +1,132 @@
+id: TC-MAIL-PERF-01
+title: Browser large mail lists and concurrent session read/send responsiveness
+description: Renderer-only 1,200-message additions per account, two independent mail
+  sessions, five detail and send timing samples. Stub services cannot establish native
+  threads, disk or network latency; TC-MAIL-PERF-02 owns those boundaries.
+covers:
+- F-MAIL-23
+- F-MAIL-3
+- F-MAIL-2
+modes:
+- browser
+tags:
+- mail
+- performance
+- concurrency
+- p1
+fixtures:
+- reset_db
+- mail_server
+- mail_stress
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for:
+    selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]'
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 1200
+    prefix: Stress
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-sync-button"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-list"]'
+    contains: Stress 1200
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]'
+    max: 200
+    min: 5
+- mail_performance_probe:
+    kind: read
+    label: first-mail
+    samples: 5
+    max_p95_ms: 2500
+    require_background: false
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_second_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for:
+    selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]'
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 1200
+    prefix: Stress
+- click: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-sync-button"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-list"]'
+    contains: Stress 1200
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mail-client-tab"][data-active="true"] [data-testid="mail-message-row"]'
+    max: 200
+    min: 5
+- mail_performance_probe:
+    kind: read
+    label: second-mail
+    samples: 5
+    max_p95_ms: 2500
+    require_background: false
+- mail_performance_probe:
+    kind: send
+    label: loaded-send
+    samples: 5
+    max_p95_ms: 3000
+    require_background: false
+- screenshot: mail-concurrency.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Mail details and sending remain responsive while two sessions process
+      many messages; native additionally proves continued PTY output and overlapping
+      worker requests.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 13
+    - 14
+    - 16
+    - 17
+    checkpoints:
+    - step: 10
+      expectation: Two independent mail sessions show synced fixture messages.
+    - step: 12
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    - step: 18
+      expectation: Two independent mail sessions show synced fixture messages.
+    - step: 20
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    - step: 21
+      expectation: Measured samples meet the fixed latency budget; all raw samples
+        are retained.
+    results:
+    - 10
+    - 12
+    - 18
+    - 20
+    - 21
+  visual:
+  - check: Two mail tabs and the active view remain readable.
+    method: manual
+    reason: Review the retained screenshot separately from timings.
+  native:
+  - check: Real concurrent IMAP workers, SMTP acceptance and PTY response.
+    method: not-applicable
+    reason: Native server receipts and real PTY output are required; browser only
+      verifies renderer behavior.

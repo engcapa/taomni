@@ -1,6 +1,35 @@
 //! Real SQLite and loopback IMAP checks; all data is disposable.
 use super::*;
-use std::sync::{Mutex, mpsc};
+use std::sync::mpsc;
+
+#[test]
+fn delayed_body_and_header_fetches_preserve_newer_local_flags() {
+    let db = Connection::open_in_memory().unwrap();
+    init_mail_tables(&db).unwrap();
+    let mut message = empty_cached_message("qa", "INBOX", 1);
+    message.flags_authoritative = true;
+    upsert_message(&db, &message).unwrap();
+    let started = sync::now_ms() - 1;
+    mark_cached_messages_read(&db, "qa", "INBOX", &[1]).unwrap();
+    message.body_text = Some("body fetched before STORE completed".into());
+    upsert_message_at(&db, &message, Some(started)).unwrap();
+    cache_synced_messages(&db, &[message.clone()], started).unwrap();
+    let header = cached_header(&db, "qa", "INBOX", 1).unwrap().unwrap();
+    assert!(header.flags.iter().any(|flag| flag == "\\Seen"));
+    let body: String = db
+        .query_row("SELECT body_text FROM mail_messages", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(body, "body fetched before STORE completed");
+    // A later server observation can still report an externally unread message.
+    upsert_message_at(&db, &message, Some(sync::now_ms() + 1)).unwrap();
+    assert!(
+        cached_header(&db, "qa", "INBOX", 1)
+            .unwrap()
+            .unwrap()
+            .flags
+            .is_empty()
+    );
+}
 
 fn account(port: u16) -> ResolvedMailAccount {
     ResolvedMailAccount {
@@ -53,14 +82,17 @@ fn folder_read_includes_uncached_mail_and_recovers_a_lost_store_response() {
         state.drop_store_response_once = true;
     }
     let account = account(fake.port);
-    let conn = Connection::open_in_memory().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("read.db");
+    let conn = Connection::open(&path).unwrap();
     init_mail_tables(&conn).unwrap();
     conn.execute("INSERT INTO mail_folders(account_id, name, unread, updated_at) VALUES(?1, 'INBOX', 700, 0)", [&account.config.session_id]).unwrap();
     // Local history is incomplete and UID 1 has a stale unread flag.
     for uid in [1, 700] {
         conn.execute("INSERT INTO mail_messages(account_id, folder, uid, subject, updated_at) VALUES(?1, 'INBOX', ?2, 'cached', 0)", params![account.config.session_id, uid]).unwrap();
     }
-    let db = Arc::new(Mutex::new(conn));
+    drop(conn);
+    let db = Arc::new(coordination::MailDatabase::new(path));
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let result = read_actions::mark_read_cached(
         &MailImapPool::new(),
@@ -163,7 +195,10 @@ fn interactive_body_completes_while_background_imap_is_busy() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn cache_lock_wait_does_not_block_runtime_timers() {
-    let db = Arc::new(Mutex::new(Connection::open_in_memory().unwrap()));
+    let directory = tempfile::tempdir().unwrap();
+    let db = Arc::new(coordination::MailDatabase::new(
+        directory.path().join("timers.db"),
+    ));
     let (locked_tx, locked_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel();
     let holder = {

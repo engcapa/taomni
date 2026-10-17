@@ -1,0 +1,160 @@
+id: TC-MAIL-PERF-03
+title: 'Two native instances sharing one mailbox: ownership, pause, relocation and
+  cleanup'
+description: Two QA binaries use separate disposable profiles and one shared account
+  directory. Actual UI actions prove one archive owner, peer pause and byte-exact
+  resume, five PTY response samples, migration with an already-open connection in
+  another process, and physical cleanup without redownload. No personal profile is
+  accessed. Native concurrency is intentional for this case; both drivers and profiles
+  remain run-owned.
+covers:
+- F-MAIL-23
+- F2.1
+- F2.2
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+tags:
+- mail
+- performance
+- concurrency
+- p1
+fixtures:
+- reset_db
+- mail_server
+- mail_storage
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- select_option:
+    selector: '[data-testid="mail-storage-mode"]'
+    value: include
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: INBOX
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA complete mail
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- wait_for: '[data-testid="mail-storage-pause"]'
+- click: '[data-testid="mail-storage-pause"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: paused
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-resume"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 2
+    headers:
+      INBOX: 2
+      Archive: 2
+- mail_multi_instance_probe:
+    data_root: ${fixture.mail_qa_data}
+    storage_root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+- screenshot: mail-two-instances.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Multiple app instances can safely share one mailbox without duplicate
+      downloads, stale writes or resurrection after cleanup. Peer terminal remains
+      responsive.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    checkpoints:
+    - step: 29
+      expectation: Initial full MIME and attachments match independent hashes.
+    - step: 30
+      expectation: Both native processes pass shared-directory ownership, peer pause/resume,
+        migration and cleanup assertions; all five PTY samples meet the fixed p95
+        budget.
+    results:
+    - 29
+    - 30
+  visual:
+  - check: The primary mail view remains usable after peer migration and cleanup.
+    method: manual
+    reason: Inspect mail-two-instances.png and peer-final.png.
+  native:
+  - check: Real processes coordinate the same SQLite and compressed MIME files.
+    method: automated
+    reason: Browser stubs cannot prove OS locks or live connection relocation; the
+      probe records both QA identities and real chunk receipts.

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type UIEvent } from "react";
+import { MailArchivePanel } from "./MailArchivePanel";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type SetStateAction, type UIEvent } from "react";
 import { isRecoveryStartup } from "../../lib/runtimeRecovery";
 import {
   Group as PanelGroup,
@@ -765,26 +766,27 @@ function withFlagsMutation(
   return { ...message, flags };
 }
 
+// Reuse ICU formatters across rows and progress updates. Constructing one per
+// row repeatedly allocates locale data while large accounts are synchronizing.
+const shortDateFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+});
+const fullDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium", timeStyle: "short",
+});
+
 function formatShortDate(ts: number | null | undefined): string {
   if (!ts) return "";
   const date = new Date(ts * 1000);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return shortDateFormatter.format(date);
 }
 
 function formatFullDate(ts: number | null | undefined): string {
   if (!ts) return "";
   const date = new Date(ts * 1000);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return fullDateFormatter.format(date);
 }
 
 function formatBytes(value: number | null | undefined): string {
@@ -1178,11 +1180,152 @@ function aiPrompt(action: AiAction, message: MailMessageHeader, body: MailMessag
   return `Summarize this email for a busy operator. Include the purpose, key facts, urgency, and suggested next step.\n\n${header}\n\nEmail body:\n${bodyText}`;
 }
 
+type MailRowActions = {
+  selectListMessage: (message: MailMessageHeader) => void;
+  openMessageTab: (message: MailMessageHeader) => void;
+  toggleMessageChecked: (message: MailMessageHeader, checked: boolean, range?: boolean) => void;
+  toggleThreadExpanded: (key: string) => void;
+  contextMenu: (event: ReactMouseEvent, message: MailMessageHeader) => void;
+  dragStart: (event: ReactDragEvent, message: MailMessageHeader) => void;
+  dragEnd: () => void;
+};
+
+// Body/progress changes should not rebuild every message row. Event handlers
+// consult the current actions so menus and multi-selection never use stale state.
+const MailListRow = memo(function MailListRow({ message, threadKey, depth, isRoot, threadSize, threadUnread, expanded, active, checked, threadView, selectedFolder, displayFolders, actions }: MailThreadRow & {
+  active: boolean;
+  checked: boolean;
+  threadView: boolean;
+  selectedFolder: string;
+  displayFolders: MailFolder[];
+  actions: { current: MailRowActions | null };
+}) {
+  const unread = isUnread(message);
+  return (
+    <div
+      data-thread-key={threadView ? threadKey : undefined}
+      data-thread-depth={threadView ? depth : undefined}
+      style={{
+        // Offscreen rows skip layout/paint (TASK-22) while
+        // staying in the DOM for find, a11y and selection.
+        contentVisibility: "auto",
+        containIntrinsicSize: "auto 82px",
+        ...(threadView && depth > 0 ? { paddingLeft: `${12 + depth * 16}px` } : {}),
+      }}
+      draggable
+      onDragStart={(event) => {
+        actions.current!.dragStart(event, message);
+      }}
+      onDragEnd={() => {
+        actions.current!.dragEnd();
+      }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={active}
+      data-testid="mail-message-row"
+      data-uid={message.uid}
+      data-checked={checked ? "true" : "false"}
+      data-unread={unread ? "true" : "false"}
+      data-flagged={isFlagged(message) ? "true" : "false"}
+      className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] cursor-pointer ${active || checked ? "bg-[var(--taomni-selected)]" : ""}`}
+      onClick={(event) => {
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+          actions.current!.toggleMessageChecked(message, event.shiftKey || !checked, event.shiftKey);
+        } else {
+          actions.current!.selectListMessage(message);
+        }
+      }}
+      onDoubleClick={() => actions.current!.openMessageTab(message)}
+      onContextMenu={(event) => actions.current!.contextMenu(event, message)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        actions.current!.selectListMessage(message);
+      }}
+    >
+      <div className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          className="taomni-checkbox mt-1 shrink-0"
+          aria-label={`Select ${message.subject || "message"}`}
+          checked={checked}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === " " || event.key === "Enter") event.stopPropagation();
+          }}
+          onChange={(event) => actions.current!.toggleMessageChecked(message, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey)}
+        />
+        {threadView && isRoot && threadSize > 1 && (
+          <button
+            type="button"
+            className="mt-0.5 shrink-0 inline-flex items-center gap-0.5 rounded px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+            data-testid="mail-thread-expand"
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "Collapse" : "Expand"} conversation of ${threadSize} messages`}
+            onClick={(event) => {
+              event.stopPropagation();
+              actions.current!.toggleThreadExpanded(threadKey);
+            }}
+          >
+            <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "" : "-rotate-90"}`} />
+            <span data-testid="mail-thread-size">{threadSize}</span>
+            {threadUnread > 0 && !expanded && (
+              <span className="text-[var(--taomni-accent)]">({threadUnread})</span>
+            )}
+          </button>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex items-center gap-1.5">
+            {isJunk(message) && (
+              <span title="Junk" data-testid="mail-message-junk" className="shrink-0 text-[var(--taomni-text-muted)]">
+                <Ban className="w-3 h-3" />
+              </span>
+            )}
+            <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
+              {message.subject || "(no subject)"}
+            </div>
+            {messageTags(message).map((tag) => (
+              <span
+                key={tag.keyword}
+                className="shrink-0 inline-block w-2 h-2 rounded-full"
+                style={{ background: tag.color }}
+                title={tag.label}
+                data-testid="mail-message-tag"
+                data-tag={tag.keyword}
+              />
+            ))}
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-[12px] leading-4">
+            <span className={`min-w-0 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}>
+              {addressLabel(message.from) || "(unknown)"}
+            </span>
+            {message.folder !== selectedFolder && (
+              <span
+                className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[10px] text-[var(--taomni-text-muted)]"
+                data-testid="mail-message-folder"
+              >
+                {decodeFolderLabel(message.folder, displayFolders)}
+              </span>
+            )}
+            {message.hasAttachments && <Paperclip className="w-3 h-3 text-[var(--taomni-text-muted)] shrink-0" />}
+            {message.bodyCached && <FileText className="w-3 h-3 text-[var(--taomni-accent)] shrink-0" />}
+          </div>
+          <div className="text-[11px] text-[var(--taomni-text-muted)] line-clamp-2 mt-1.5">
+            {message.snippet || "No preview"}
+          </div>
+        </div>
+        <span className="text-[11px] text-[var(--taomni-text-muted)] shrink-0 leading-5">{formatShortDate(message.dateTs)}</span>
+      </div>
+    </div>
+  );
+});
+
 export function MailClientTab({ tabId, info, visible, onEditSession }: MailClientTabProps) {
+  const rowActionsRef = useRef<MailRowActions | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [folders, setFolders] = useState<MailFolder[]>([]);
   const [selectedFolder, setSelectedFolder] = useState("INBOX");
-  const [messages, setMessages] = useState<MailMessageHeader[]>([]);
+  const [messages, setMessagesState] = useState<MailMessageHeader[]>([]);
   const [selectedMessageKey, setSelectedMessageKey] = useState<string | null>(null);
   const [mailViewKey, setMailViewKey] = useState("mailbox");
   const [messageTabs, setMessageTabs] = useState<OpenMailMessageTab[]>([]);
@@ -1282,6 +1425,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   /** Tracks the live selected folder across awaits (folder switches ignore syncInFlight). */
   const selectedFolderRef = useRef(selectedFolder);
   const messagesRef = useRef<MailMessageHeader[]>([]);
+  // Sync batches and cache reloads can finish before React commits the prior
+  // render. Publish one current list for both async work and rendering; a
+  // delayed effect must never overwrite a newer cache reload with old rows.
+  const setMessages = useCallback((next: SetStateAction<MailMessageHeader[]>) => {
+    const value = typeof next === "function" ? next(messagesRef.current) : next;
+    messagesRef.current = value;
+    setMessagesState(value);
+  }, []);
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
   const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
@@ -1447,10 +1598,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   useEffect(() => {
     selectedFolderRef.current = selectedFolder;
   }, [selectedFolder]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
 
   /** Keep selectedFolderRef in sync immediately (folder switches can race quiet poll awaits). */
   const updateSelectedFolder = useCallback((next: string | ((prev: string) => string)) => {
@@ -1934,7 +2081,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       setHasMoreMessages(hasMore);
       // Update the ref synchronously: concurrent sync steps merge against it.
       const next = append ? mergeMessagePages(messagesRef.current, page) : sortMessages(page);
-      messagesRef.current = next;
       setMessages(next);
       if (!quiet) {
         setStatus(
@@ -2056,6 +2202,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
       setBodyWarming({ active: true, done: 0, total: candidates.length, folder: candidates[0]?.folder ?? null });
       let done = 0;
+      let lastProgressAt = Date.now();
       for (const message of candidates) {
         if (bodyWarmSeqRef.current !== seq || !visibleRef.current) return;
         try {
@@ -2067,12 +2214,19 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         }
         done += 1;
         if (bodyWarmSeqRef.current !== seq || !visibleRef.current) return;
-        setBodyWarming({
-          active: done < candidates.length,
-          done,
-          total: candidates.length,
-          folder: message.folder,
-        });
+        const now = Date.now();
+        if (done === candidates.length || now - lastProgressAt >= 250) {
+          lastProgressAt = now;
+          setBodyWarming({
+            active: done < candidates.length,
+            done,
+            total: candidates.length,
+            folder: message.folder,
+          });
+        }
+        // Cached IPC can settle synchronously. Give input/paint a task turn
+        // without rebuilding every visible row once per warmed body.
+        if (done % 8 === 0) await delay(0);
       }
     } finally {
       if (bodyWarmSeqRef.current === seq) {
@@ -2197,9 +2351,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
             messagesRef.current,
             result.messages,
             sortMessages,
+            // Sync indexes all messages, but must not expand the rendered page.
+            // Preserve explicitly loaded depth; older rows remain available via
+            // Load older messages after the final cache refresh.
+            Math.max(pageSize, messagesRef.current.length),
           );
           if (merged) {
-            messagesRef.current = merged;
             setMessages(merged);
           }
           if (result.uidValidityReset) {
@@ -2218,7 +2375,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     } finally {
       if (indicator !== "none" && visibleRef.current) setSyncProgress(null);
     }
-  }, [applySyncedFolder, catchupBatchSize, info, reloadVisibleFromCache]);
+  }, [applySyncedFolder, catchupBatchSize, info, pageSize, reloadVisibleFromCache]);
 
   /**
    * Fetch older history for the selected folder in the background (full
@@ -2822,7 +2979,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     void (async () => {
       try {
         const result = await mailMarkRead(info, selectedMessage.folder, [selectedMessage.uid], false);
-        if (!cancelled && result.marked > 0) {
+        // Body completion or a header refresh reruns this effect while STORE
+        // is in flight. Its confirmed result still applies to these UIDs even
+        // if the reader has moved on; dropping it leaves stale unread rows.
+        if (result.marked > 0) {
           markMessagesReadLocally(selectedMessage.folder, [selectedMessage.uid], result.marked);
         }
       } catch (e) {
@@ -2914,7 +3074,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         const result = await mailSyncHeaders(info, folder, { limit: pageSize, offset: loaded, refreshFolders: false });
         const merged = mergeSyncedMessages(selectedFolderRef.current, folder, messagesRef.current, result.messages, sortMessages);
         if (merged) {
-          messagesRef.current = merged;
           setMessages(merged);
         }
         setHasMoreMessages(result.hasMore);
@@ -3774,6 +3933,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         className="h-full min-h-0 bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
         style={mailAppearance}
         data-testid="mail-client-tab"
+      data-active={visible ? "true" : "false"}
         aria-hidden="true"
       />
     );
@@ -5155,13 +5315,30 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     );
   };
 
+  const rowActions: MailRowActions = {
+    selectListMessage, openMessageTab, toggleMessageChecked, toggleThreadExpanded,
+    contextMenu: (event, message) => mailMenu.show(event, messageMenuItems(message)),
+    dragStart: (event, message) => {
+      draggedMessagesRef.current = dragTargetsFor(message);
+      event.dataTransfer.effectAllowed = "copyMove";
+      event.dataTransfer.setData(MAIL_DRAG_TYPE, String(draggedMessagesRef.current.length));
+    },
+    dragEnd: () => {
+      draggedMessagesRef.current = [];
+      setDropFolder(null);
+    },
+  };
+  rowActionsRef.current = rowActions;
+
   return (
     <div
       ref={rootRef}
       className="h-full min-h-0 flex flex-col bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
       style={mailAppearance}
       data-testid="mail-client-tab"
+      data-active={visible ? "true" : "false"}
     >
+      <MailArchivePanel info={info} />
       <div className="min-h-9 shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]">
         <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5" data-testid="mail-compose-open" onClick={() => openCompose()}>
           <MailIcon className="w-3.5 h-3.5" />
@@ -5755,133 +5932,18 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   </div>
                 ) : (
                   <>
-                    {listRows.map((row) => {
-                      const { message } = row;
-                      const active = messageKey(message) === selectedMessageKey;
-                      const checked = checkedMessageKeys.has(messageKey(message));
-                      const unread = isUnread(message);
-                      return (
-                        <div
-                          key={messageKey(message)}
-                          data-thread-key={threadView ? row.threadKey : undefined}
-                          data-thread-depth={threadView ? row.depth : undefined}
-                          style={{
-                            // Offscreen rows skip layout/paint (TASK-22) while
-                            // staying in the DOM for find, a11y and selection.
-                            contentVisibility: "auto",
-                            containIntrinsicSize: "auto 82px",
-                            ...(threadView && row.depth > 0 ? { paddingLeft: `${12 + row.depth * 16}px` } : {}),
-                          }}
-                          draggable
-                          onDragStart={(event) => {
-                            draggedMessagesRef.current = dragTargetsFor(message);
-                            event.dataTransfer.effectAllowed = "copyMove";
-                            event.dataTransfer.setData(MAIL_DRAG_TYPE, String(draggedMessagesRef.current.length));
-                          }}
-                          onDragEnd={() => {
-                            draggedMessagesRef.current = [];
-                            setDropFolder(null);
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          aria-pressed={active}
-                          data-testid="mail-message-row"
-                          data-uid={message.uid}
-                          data-checked={checked ? "true" : "false"}
-                          data-unread={unread ? "true" : "false"}
-                          data-flagged={isFlagged(message) ? "true" : "false"}
-                          className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] cursor-pointer ${active || checked ? "bg-[var(--taomni-selected)]" : ""}`}
-                          onClick={(event) => {
-                            if (event.shiftKey || event.ctrlKey || event.metaKey) {
-                              toggleMessageChecked(message, event.shiftKey || !checked, event.shiftKey);
-                            } else {
-                              selectListMessage(message);
-                            }
-                          }}
-                          onDoubleClick={() => openMessageTab(message)}
-                          onContextMenu={(event) => mailMenu.show(event, messageMenuItems(message))}
-                          onKeyDown={(event) => {
-                            if (event.key !== "Enter" && event.key !== " ") return;
-                            event.preventDefault();
-                            selectListMessage(message);
-                          }}
-                        >
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="checkbox"
-                              className="taomni-checkbox mt-1 shrink-0"
-                              aria-label={`Select ${message.subject || "message"}`}
-                              checked={checked}
-                              onClick={(event) => event.stopPropagation()}
-                              onKeyDown={(event) => {
-                                if (event.key === " " || event.key === "Enter") event.stopPropagation();
-                              }}
-                              onChange={(event) => toggleMessageChecked(message, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey)}
-                            />
-                            {threadView && row.isRoot && row.threadSize > 1 && (
-                              <button
-                                type="button"
-                                className="mt-0.5 shrink-0 inline-flex items-center gap-0.5 rounded px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
-                                data-testid="mail-thread-expand"
-                                aria-expanded={row.expanded}
-                                aria-label={`${row.expanded ? "Collapse" : "Expand"} conversation of ${row.threadSize} messages`}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  toggleThreadExpanded(row.threadKey);
-                                }}
-                              >
-                                <ChevronDown className={`w-3 h-3 transition-transform ${row.expanded ? "" : "-rotate-90"}`} />
-                                <span data-testid="mail-thread-size">{row.threadSize}</span>
-                                {row.threadUnread > 0 && !row.expanded && (
-                                  <span className="text-[var(--taomni-accent)]">({row.threadUnread})</span>
-                                )}
-                              </button>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="min-w-0 flex items-center gap-1.5">
-                                {isJunk(message) && (
-                                  <span title="Junk" data-testid="mail-message-junk" className="shrink-0 text-[var(--taomni-text-muted)]">
-                                    <Ban className="w-3 h-3" />
-                                  </span>
-                                )}
-                                <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
-                                  {message.subject || "(no subject)"}
-                                </div>
-                                {messageTags(message).map((tag) => (
-                                  <span
-                                    key={tag.keyword}
-                                    className="shrink-0 inline-block w-2 h-2 rounded-full"
-                                    style={{ background: tag.color }}
-                                    title={tag.label}
-                                    data-testid="mail-message-tag"
-                                    data-tag={tag.keyword}
-                                  />
-                                ))}
-                              </div>
-                              <div className="mt-1 flex items-center gap-1.5 text-[12px] leading-4">
-                                <span className={`min-w-0 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}>
-                                  {addressLabel(message.from) || "(unknown)"}
-                                </span>
-                                {message.folder !== selectedFolder && (
-                                  <span
-                                    className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[10px] text-[var(--taomni-text-muted)]"
-                                    data-testid="mail-message-folder"
-                                  >
-                                    {decodeFolderLabel(message.folder, displayFolders)}
-                                  </span>
-                                )}
-                                {message.hasAttachments && <Paperclip className="w-3 h-3 text-[var(--taomni-text-muted)] shrink-0" />}
-                                {message.bodyCached && <FileText className="w-3 h-3 text-[var(--taomni-accent)] shrink-0" />}
-                              </div>
-                              <div className="text-[11px] text-[var(--taomni-text-muted)] line-clamp-2 mt-1.5">
-                                {message.snippet || "No preview"}
-                              </div>
-                            </div>
-                            <span className="text-[11px] text-[var(--taomni-text-muted)] shrink-0 leading-5">{formatShortDate(message.dateTs)}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {listRows.map((row) => (
+                      <MailListRow
+                        key={messageKey(row.message)}
+                        {...row}
+                        active={messageKey(row.message) === selectedMessageKey}
+                        checked={checkedMessageKeys.has(messageKey(row.message))}
+                        threadView={threadView}
+                        selectedFolder={selectedFolder}
+                        displayFolders={displayFolders}
+                        actions={rowActionsRef}
+                      />
+                    ))}
                     {!query.trim() && !quickFilterActive && (hasMoreMessages || loadingMoreMessages) && (
                       <div className="p-2">
                         <button
