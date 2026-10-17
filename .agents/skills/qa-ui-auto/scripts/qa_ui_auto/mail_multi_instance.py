@@ -119,7 +119,9 @@ def run(ctx, args):
             peer.act("wait_for", '[data-testid="terminal-pane"][data-terminal-ready="true"]')
             result["terminalReceipt"] = performance(peer_ctx, {"kind": "terminal", "label": "peer-loaded-terminal", "samples": 5, "max_p95_ms": 1500, "require_background": True,
                 "background_fetch": {"folder": "INBOX", "uid": uid, "min_offset": len(partial), "exclude_connections": previous_owners}})
-            primary.until(text(progress) + '.includes("completed")', 60)
+            # 16 MiB needs 64 durable chunks; macOS sync_data can take ~1s
+            # per chunk. This drain is outside the fixed UI latency samples.
+            primary.until(text(progress) + '.includes("completed")', 180)
             result["beforeMove"] = observe(root, expected, {"INBOX": 3}, {"INBOX": 3, "Archive": 2})
             with server.lock:
                 events = [event for event in server.fetch_events[event_start:]

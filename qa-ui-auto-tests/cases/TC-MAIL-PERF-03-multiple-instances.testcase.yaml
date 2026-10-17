@@ -27,7 +27,7 @@ fixtures:
 - reset_db
 - mail_server
 - mail_storage
-timeout_sec: 300
+timeout_sec: 420
 steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="session-new"]'
