@@ -29,7 +29,8 @@ use super::{
 /// cannot report changes via CONDSTORE.
 pub(super) const FLAG_RECONCILE_WINDOW: usize = 500;
 /// UIDs per `UID FETCH (FLAGS)` command.
-const FLAG_FETCH_CHUNK: usize = 1000;
+// Bound sparse ten-digit UID commands as well as contiguous mailboxes.
+const FLAG_FETCH_CHUNK: usize = 250;
 const MAIL_SCHEMA_VERSION: i64 = 7;
 
 /// Which work a `mail_sync_folder` call should do.
@@ -1102,6 +1103,36 @@ mod tests {
     // -----------------------------------------------------------------
     // End-to-end steps against the in-process fake IMAP server + SQLite.
     // -----------------------------------------------------------------
+
+    #[test]
+    fn full_reconcile_handles_sparse_uids_under_server_command_limit() {
+        let fake = FakeImap::start(false);
+        fake.burn_uids("INBOX", 1_000_000_000);
+        for _ in 0..1100 {
+            fake.deliver("INBOX", 1, "sparse");
+            fake.burn_uids("INBOX", 1);
+        }
+        let conn = db();
+        let account = account(serde_json::json!({}));
+        fake.state.lock().unwrap().max_command_bytes = Some(4096);
+        drain(&fake, &conn, &account, MailSyncRequestMode::Auto, 2000);
+        drain(&fake, &conn, &account, MailSyncRequestMode::Backfill, 2000);
+        let state = load_folder_sync_state(&conn, "acct", "INBOX").unwrap();
+        let outcome = imap_sync_folder_step(
+            &mut fake.session(),
+            &account,
+            "INBOX",
+            &state,
+            &StepParams {
+                request: MailSyncRequestMode::ReconcileFull,
+                limit: 200,
+                include_bodies: false,
+                condstore: false,
+            },
+        )
+        .unwrap();
+        assert_eq!(outcome.flag_updates.len(), 1100);
+    }
 
     use super::super::fake_imap::FakeImap;
     use super::super::{MailAccountConfig, init_mail_tables, upsert_message};

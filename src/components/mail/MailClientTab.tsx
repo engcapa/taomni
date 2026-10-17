@@ -1369,6 +1369,18 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const bodyLoadSeqRef = useRef(0);
   const bodyWarmSeqRef = useRef(0);
   const syncInFlightRef = useRef(false);
+  const manualSyncPendingRef = useRef(false);
+  const pendingCatchupsRef = useRef({ folders: new Map<string, { mode: MailSyncRequestMode; reconcile: MailSyncRequestMode }>(), running: false, disposed: false });
+  useEffect(() => {
+    const queue = { folders: new Map<string, { mode: MailSyncRequestMode; reconcile: MailSyncRequestMode }>(), running: false, disposed: false };
+    pendingCatchupsRef.current = queue;
+    return () => {
+      queue.disposed = true;
+      queue.folders.clear();
+      syncGenerationRef.current += 1;
+      manualSyncPendingRef.current = false;
+    };
+  }, [info.sessionId]);
   const folderSelectSeqRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
   const lastSavedDraftJsonRef = useRef("");
@@ -2330,6 +2342,52 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   }, [applySyncedFolder, catchupBatchSize, info, pageSize, reloadVisibleFromCache]);
 
+  // A manual scan must not wait for up to 120 additional history batches.
+  // Drain every pending folder fairly in the background, releasing the guard
+  // between steps so another Sync/folder switch can get its turn.
+  const queueFolderCatchups = useCallback((names: string[], reconcile: MailSyncRequestMode) => {
+    const queue = pendingCatchupsRef.current;
+    for (const name of names) queue.folders.set(name, { mode: "auto", reconcile });
+    if (queue.running || queue.disposed || queue.folders.size === 0) return;
+    queue.running = true;
+    void (async () => {
+      try {
+        while (!queue.disposed && queue.folders.size > 0) {
+          if (syncInFlightRef.current || manualSyncPendingRef.current) {
+            await delay(50);
+            continue;
+          }
+          const [name, task] = queue.folders.entries().next().value!;
+          queue.folders.delete(name);
+          syncInFlightRef.current = true;
+          try {
+            const result = await runFolderSync(name, { mode: task.mode, maxSteps: 1 });
+            if (queue.disposed) return;
+            if (result.last?.more) queue.folders.set(name, task);
+            else if (task.mode === "auto") {
+              // A scan with a pending catch-up cannot reconcile the older range
+              // yet. Do it after the final header batch, including remote deletes.
+              queue.folders.set(name, { ...task, mode: task.reconcile });
+            }
+            if (!isNewMailExcludedName(name)) notifyNewMail(result.newUnseen);
+          } catch (e) {
+            // Do not spin indefinitely on an unavailable folder. Its durable
+            // watermark survives, and the next scan/Retry resumes it.
+            if (!queue.disposed && visibleRef.current) {
+              setError(`${name}: ${mailClientErrorMessage(e)}`);
+              void loadCachedFolders();
+            }
+          } finally {
+            syncInFlightRef.current = false;
+          }
+          await delay(50);
+        }
+      } finally {
+        queue.running = false;
+      }
+    })();
+  }, [isNewMailExcludedName, loadCachedFolders, notifyNewMail, runFolderSync]);
+
   /**
    * Fetch older history for the selected folder in the background (full
    * header index). Yields to user-triggered syncs and stops on folder switch,
@@ -2346,7 +2404,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       try {
         for (let round = 0; round < 1000; round += 1) {
           if (!active()) return;
-          if (syncInFlightRef.current) {
+          if (syncInFlightRef.current || manualSyncPendingRef.current) {
             await delay(800);
             continue;
           }
@@ -2403,7 +2461,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       const primary = await runFolderSync(folder, { indicator });
       let fetched = primary.fetched;
       let newUnseen = isNewMailExcludedName(folder) ? 0 : primary.newUnseen;
-      if (folder.trim().toUpperCase() !== "INBOX") {
+      if (!manualSyncPendingRef.current && folder.trim().toUpperCase() !== "INBOX") {
         try {
           const inbox = await runFolderSync("INBOX");
           fetched += inbox.fetched;
@@ -2436,7 +2494,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const sequence = ++folderSelectSeqRef.current;
     const current = () => folderSelectSeqRef.current === sequence
       && visibleRef.current && selectedFolderRef.current === folder;
-    while (syncInFlightRef.current) {
+    while (syncInFlightRef.current || manualSyncPendingRef.current) {
       if (!current()) return;
       await delay(50);
     }
@@ -2449,11 +2507,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   /** Quiet background poll: catch up the selected folder and INBOX, reconcile flags. */
   const quietPollSelectedAndInbox = useCallback(async () => {
-    if (syncInFlightRef.current) return;
+    if (syncInFlightRef.current || manualSyncPendingRef.current) return;
     syncInFlightRef.current = true;
     const activeFolder = selectedFolderRef.current;
     try {
       const selected = await runFolderSync(activeFolder, { maxSteps: 10 });
+      if (manualSyncPendingRef.current) return;
       let newUnseen = isNewMailExcludedName(activeFolder) ? 0 : selected.newUnseen;
       if (activeFolder.trim().toUpperCase() !== "INBOX") {
         try {
@@ -2463,7 +2522,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           console.debug("quiet INBOX poll failed", e);
         }
       }
-      if (info.cache.enabled) {
+      if (info.cache.enabled && !manualSyncPendingRef.current) {
         try {
           await runFolderSync(activeFolder, { mode: "reconcile", maxSteps: 3 });
         } catch (e) {
@@ -2486,6 +2545,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const limit = Math.max(1, options.limit ?? batchSize);
     const includeBodies = options.includeBodies ?? false;
     const activeBeforeSync = selectedFolderRef.current;
+    const manual = !quiet && indicator !== "none";
+    if (manual) {
+      manualSyncPendingRef.current = true;
+      // Existing catch-up loops yield after their current bounded step.
+      syncGenerationRef.current += 1;
+    }
 
     if (syncInFlightRef.current) {
       // Background work (open catch-up, backfill, quiet poll) holds the lock.
@@ -2499,12 +2564,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         await delay(150);
       }
       if (syncInFlightRef.current) {
+        manualSyncPendingRef.current = false;
         if (indicator === "sync" && visibleRef.current) setSyncing(false);
         if (visibleRef.current) setStatus("Mail sync already running");
         return null;
       }
     }
     syncInFlightRef.current = true;
+    manualSyncPendingRef.current = false;
 
     if (indicator === "sync") {
       setSyncing(true);
@@ -2519,19 +2586,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         { limit, includeBodies, fullReconcile: !quiet },
       );
       foldersRef.current = result.folders;
-      let newMessages = countNewMail(result.newUnseenByFolder, result.folders, isNewMailExcludedFolder);
+      const newMessages = countNewMail(result.newUnseenByFolder, result.folders, isNewMailExcludedFolder);
       const pending = (result.pendingFolders ?? [])
         .slice()
-        .sort((a, b) => Number(b === activeBeforeSync) - Number(a === activeBeforeSync))
-        .slice(0, 6);
-      for (const name of pending) {
-        try {
-          const loop = await runFolderSync(name, { maxSteps: 20 });
-          if (!isNewMailExcludedName(name)) newMessages += loop.newUnseen;
-        } catch (e) {
-          console.debug(`mail catch-up for ${name} failed`, e);
-        }
-      }
+        .sort((a, b) => Number(b === activeBeforeSync) - Number(a === activeBeforeSync));
+      queueFolderCatchups(pending, quiet ? "reconcile" : "reconcileFull");
       if (indicator === "none") notifyNewMail(newMessages);
       // New INBOX mail from the full scan goes through the incoming filters
       // (a cheap cache query when nothing is new or no filter is enabled).
@@ -2554,7 +2613,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       if (indicator !== "none") {
         setStatus(
           `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`
-          + (failed.length > 0 ? `; ${failed.length} folder${failed.length === 1 ? "" : "s"} failed` : ""),
+          + (failed.length > 0 ? `; ${failed.length} folder${failed.length === 1 ? "" : "s"} failed` : "")
+          + (pending.length > 0 ? "; remaining headers syncing in background" : ""),
         );
       }
       void warmRecentBodies(foldersRef.current, nextFolder);
@@ -2573,11 +2633,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     batchSize,
     info,
     isNewMailExcludedFolder,
-    isNewMailExcludedName,
     loadCachedMessages,
     notifyNewMail,
     pageSize,
-    runFolderSync,
+    queueFolderCatchups,
     startBackfill,
     updateSelectedFolder,
     warmRecentBodies,

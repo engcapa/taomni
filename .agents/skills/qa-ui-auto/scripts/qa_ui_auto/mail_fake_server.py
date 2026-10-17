@@ -121,11 +121,18 @@ class FakeMailState:
         # CalDAV resources: href -> (etag, iCalendar text).
         self.caldav: dict[str, tuple[str, str]] = {}
         self.caldav_etag = 0
+        self.advertise_condstore = True
+        self.max_command_bytes = 4096
+        self.drop_next_fetch = False
+        self.dropped_fetches = 0
+        self.rejected_commands = 0
         self.next_seen_store_delay = 0.0
         self.fetch_active = 0
         self.fetch_max_parallel = 0
         self.fetch_events: list[dict] = []
         self.fetch_inflight: list[dict] = []
+        self.archive_reported_sizes: dict[tuple[str, int], int] = {}
+        self.archive_empty_bodies: set[tuple[str, int]] = set()
 
     def idle_clients(self) -> int:
         """Connections currently in IDLE (AC-37: zero after the tab closes)."""
@@ -376,6 +383,13 @@ class _ImapHandler(socketserver.StreamRequestHandler):
             upper = rest.upper()
             with state.lock:
                 state.log.append(rest)
+                if len(line) > state.max_command_bytes:
+                    state.rejected_commands += 1
+                    return
+                if state.drop_next_fetch and upper.startswith("UID FETCH"):
+                    state.drop_next_fetch = False
+                    state.dropped_fetches += 1
+                    return
             ok = f"{tag} OK done\r\n"
             out: list[bytes] = []
             with state.lock:
@@ -385,7 +399,8 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     self.send("* BYE bye\r\n" + ok)
                     return
                 elif upper.startswith("CAPABILITY"):
-                    out.append(b"* CAPABILITY IMAP4rev1 UIDPLUS MOVE IDLE CONDSTORE SPECIAL-USE\r\n")
+                    capabilities = "IMAP4rev1 UIDPLUS MOVE IDLE SPECIAL-USE" + (" CONDSTORE" if state.advertise_condstore else "")
+                    out.append(f"* CAPABILITY {capabilities}\r\n".encode())
                 elif upper.startswith(("LIST", "LSUB")):
                     lsub = upper.startswith("LSUB")
                     specials = {"Sent": "\\Sent", "Drafts": "\\Drafts", "Trash": "\\Trash", "Archive": "\\Archive"}
@@ -453,7 +468,8 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                         if since is not None:
                             parts.append(f"MODSEQ ({message.modseq})")
                         if "RFC822.SIZE" in items_upper:
-                            parts.append(f"RFC822.SIZE {len(message.raw)}")
+                            size = state.archive_reported_sizes.get((selected or "INBOX", uid), len(message.raw))
+                            parts.append(f"RFC822.SIZE {size}")
                         if "INTERNALDATE" in items_upper:
                             parts.append(f'INTERNALDATE "{_internal_date(message.internal_ts)}"')
                         chunk = f"* {seq} FETCH ({' '.join(parts)}".encode()
@@ -464,6 +480,8 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                         if peek:
                             offset, length = int(peek.group(1)), int(peek.group(2))
                             body = message.raw[offset:offset + length]
+                            if (selected or "INBOX", uid) in state.archive_empty_bodies:
+                                body = b""
                             chunk += f" BODY[]<{offset}> {{{len(body)}}}\r\n".encode() + body
                         elif "BODY.PEEK[]" in items_upper or "RFC822)" in items_upper:
                             chunk += f" BODY[] {{{len(message.raw)}}}\r\n".encode() + message.raw

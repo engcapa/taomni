@@ -285,3 +285,10 @@ Relative paths resolve from the repository root.
 ### `mail_server_delay_next_read`
 
 `{milliseconds: 1..25000}` delays one read-flag response on the disposable mail fixture. Browser delays the next explicit folder read; native delays the next `UID STORE +FLAGS` containing `\Seen`, after applying flags and outside the server lock. Use checkboxes/modifier selection to avoid consuming it with auto-read. Assert the read action remains busy when testing concurrent availability; the finite delay is fault injection, not a relaxed latency budget. Supports browser and native on Linux, Windows and macOS.
+
+### `mail_server_archive_fault`
+
+Native only (Linux/Windows/macOS): `{folder?: INBOX, size_delta?: 0, empty_newest?: false}` changes only the disposable IMAP fixture. All existing messages in the folder advertise their actual byte length plus `size_delta` (integer within +/-1,000,000, clamped at zero). `empty_newest` makes the newest message return empty BODY[] chunks despite its nonempty original; false restores its body. No messages or bytes are removed. Used to prove exact MIME preservation despite inaccurate size estimates, continued progress past unavailable content, and recovery through the real Retry button. Browser stubs cannot validate this wire protocol and do not support the verb.
+
+- `mail_server_sparse_sync: {configure_only: true}` disables CONDSTORE before connecting; `mail_server_sparse_sync: null` (native-only, Linux/Windows/macOS): deliver 1,100 sparse ten-digit INBOX UIDs and disconnect the next FETCH; fake IMAP enforces a 4 KiB command limit.
+- `mail_server_assert_sync_transport: null` (native-only): require exactly one injected FETCH disconnect and zero rejected oversized commands, independently of UI counts.

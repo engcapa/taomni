@@ -1,0 +1,247 @@
+id: TC-MAIL-STORAGE-03
+title: Archive inaccurate MIME sizes and retry unavailable content without blocking other mail
+description: Real native IMAP partial FETCH and independent SQLite/gzip MIME checks. A newest message returns empty
+  chunks; the older message has an underestimated RFC822.SIZE and must still be saved completely. Repeated Retry
+  preserves saved originals and explicit failure. Restoring server content lets Retry finish without duplicates.
+  Browser stubs cannot prove protocol ranges or persisted bytes.
+covers:
+- F-MAIL-23
+tags:
+- mail
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+fixtures:
+- reset_db
+- mail_server
+- mail_storage
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- mail_server_archive_fault:
+    folder: INBOX
+    size_delta: -27
+    empty_newest: true
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- select_option:
+    selector: '[data-testid="mail-storage-mode"]'
+    value: include
+- assert_text:
+    selector: '[data-testid="mail-storage-settings"]'
+    contains: No cached folders. Connect and sync this account first
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input'
+    equal: 0
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: INBOX
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA complete mail
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA complete mail"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: failed
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: 1/2
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: INBOX, UID
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: empty full email chunk at offset 0
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 1
+    headers:
+      INBOX: 2
+      Archive: 2
+- click: '[data-testid="mail-storage-resume"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: failed
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: 0/1
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 1
+    headers:
+      INBOX: 2
+      Archive: 2
+- screenshot: mail-archive-incomplete-content.png
+- mail_server_archive_fault:
+    folder: INBOX
+    size_delta: -27
+    empty_newest: false
+- click: '[data-testid="mail-storage-resume"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 2
+    headers:
+      INBOX: 2
+      Archive: 2
+- click: '[data-testid="mail-archive-open"]'
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 2
+- click: '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-preview"]'
+    contains: complete.bin
+    timeout_sec: 30
+- screenshot: mail-archive-recovered.png
+- click: '[data-testid="mail-archive-close"]'
+- assert_not_visible: '[data-testid="mail-archive-dialog"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Incomplete content stays a contextual failure, other full MIME saves despite size mismatch, and
+      repeated UI Retry recovers exactly the pending original.
+    actions:
+    - 2
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 18
+    - 19
+    - 20
+    - 21
+    - 26
+    - 32
+    - 37
+    - 38
+    - 41
+    - 43
+    - 46
+    checkpoints:
+    - step: 16
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'': ''No
+        cached folders. Connect and sync this account first''}}'
+    - step: 17
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-storage-folders"] input'', ''equal'':
+        0}}'
+    - step: 27
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''failed'',
+        ''timeout_sec'': 60}}'
+    - step: 28
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''1/2''}}'
+    - step: 29
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-client-tab"]'', ''contains'': ''INBOX,
+        UID''}}'
+    - step: 30
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-client-tab"]'', ''contains'': ''empty
+        full email chunk at offset 0''}}'
+    - step: 31
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'': ''${fixture.mail_expected}'',
+        ''full'': {''INBOX'': 1}, ''headers'': {''INBOX'': 2, ''Archive'': 2}}}'
+    - step: 33
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''failed'',
+        ''timeout_sec'': 60}}'
+    - step: 34
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''0/1''}}'
+    - step: 35
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'': ''${fixture.mail_expected}'',
+        ''full'': {''INBOX'': 1}, ''headers'': {''INBOX'': 2, ''Archive'': 2}}}'
+    - step: 39
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''completed'',
+        ''timeout_sec'': 60}}'
+    - step: 40
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'': ''${fixture.mail_expected}'',
+        ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 2, ''Archive'': 2}}}'
+    - step: 42
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'': 2}}'
+    - step: 44
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'': ''complete.bin'',
+        ''timeout_sec'': 30}}'
+    - step: 47
+      expectation: Local archive dialog closes normally.
+    results:
+    - 16
+    - 17
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+    - 39
+    - 40
+    - 42
+    - 44
+    - 47
+  visual:
+  - check: Review failure with folder/UID and recovered archive.
+    method: manual
+    reason: Retain screenshots; use wire and disk assertions for correctness.
+  native:
+  - check: Real IMAP literals, retry command execution and exact stored MIME/attachment hashes.
+    method: automated
+    reason: Disposable loopback service and independent disk oracle on each OS.

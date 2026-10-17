@@ -1788,6 +1788,23 @@ describe("MailClientTab", () => {
     });
     await waitFor(() => expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1), { timeout: 3000 });
   });
+
+  it("finishes the manual Sync spinner while gap-free pending catch-up continues in background", async () => {
+    let finish: (result: MailFolderSyncResult) => void = () => {};
+    const base = await mailMocks.mailSyncAllFolders.getMockImplementation()!(info, {});
+    mailMocks.mailSyncAllFolders.mockResolvedValue({ ...base, pendingFolders: ["INBOX"] });
+    mailMocks.mailSyncFolder.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    renderMailbox();
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(1));
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId("mail-sync-button")).not.toBeDisabled());
+    // Pending folders are drained in bounded steps, with no lost continuation.
+    mailMocks.mailSyncFolder.mockResolvedValueOnce(stepResult({ more: false }));
+    await act(async () => finish(stepResult({ more: true, remainingNew: 7 })));
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(3));
+    expect(mailMocks.mailSyncFolder).toHaveBeenLastCalledWith(info, "INBOX", expect.objectContaining({ mode: "reconcileFull" }));
+  });
 });
 
 function stepResult(overrides: Partial<MailFolderSyncResult>): MailFolderSyncResult {

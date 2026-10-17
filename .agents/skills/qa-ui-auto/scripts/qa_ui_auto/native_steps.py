@@ -3328,3 +3328,47 @@ def _do_mail_server_delay_next_read(ctx: NativeStepContext, args: Any) -> str:
     with state.lock:
         state.next_seen_store_delay = milliseconds / 1000
     return f"next Seen STORE response delayed {milliseconds} ms"
+
+
+@_verb("mail_server_archive_fault")
+def _do_mail_server_archive_fault(ctx: NativeStepContext, args: Any) -> str:
+    folder = (args or {}).get("folder", "INBOX")
+    delta = (args or {}).get("size_delta", 0)
+    empty = (args or {}).get("empty_newest", False)
+    if not isinstance(folder, str) or not isinstance(delta, int) or isinstance(delta, bool) or abs(delta) > 1000000 or not isinstance(empty, bool):
+        raise StepError("mail_server_archive_fault: expected folder, integer size_delta within +/-1000000 and boolean empty_newest")
+    state = _mail_server().state
+    with state.lock:
+        messages = state.folders[folder].messages
+        for uid, message in messages.items():
+            state.archive_reported_sizes[(folder, uid)] = max(0, len(message.raw) + delta)
+            state.archive_empty_bodies.discard((folder, uid))
+        if empty and messages:
+            state.archive_empty_bodies.add((folder, max(messages)))
+    return f"{folder}: size delta {delta}, newest empty body {empty}"
+
+
+@_verb("mail_server_sparse_sync")
+def _do_mail_server_sparse_sync(ctx: NativeStepContext, args: Any) -> str:
+    state = _mail_server().state
+    with state.lock:
+        state.advertise_condstore = False
+        if (args or {}).get("configure_only", False):
+            return "CONDSTORE disabled before account connections open"
+        folder = state.folders["INBOX"]
+        folder.uid_next = max(folder.uid_next, 1_000_000_000)
+        for _ in range(1100):
+            state.deliver("INBOX", 1, prefix="Sparse")
+            folder.uid_next += 1
+        state.advertise_condstore = False
+        state.drop_next_fetch = True
+    return "delivered 1100 sparse ten-digit UIDs; next FETCH disconnects; 4096-byte command limit"
+
+
+@_verb("mail_server_assert_sync_transport")
+def _do_mail_server_assert_sync_transport(ctx: NativeStepContext, args: Any) -> str:
+    state = _mail_server().state
+    with state.lock:
+        if state.dropped_fetches != 1 or state.rejected_commands != 0:
+            raise StepError(f"sync transport: dropped={state.dropped_fetches}, rejected={state.rejected_commands}")
+    return "one injected disconnect recovered; no oversized IMAP commands"

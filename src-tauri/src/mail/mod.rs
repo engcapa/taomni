@@ -2052,165 +2052,201 @@ pub async fn mail_sync_all_folders(
         MailSyncRequestMode::Reconcile
     };
     let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
-    let sync_states: HashMap<String, FolderSyncState> = if cache_enabled {
-        with_mail_db_async(&state, &account_id, |db, account_id| {
-            let mut states = HashMap::new();
-            for folder in list_cached_folders(db, &account_id)? {
-                let folder_state = sync::load_folder_sync_state(db, &account_id, &folder.name)?;
-                states.insert(folder.name, folder_state);
-            }
-            Ok(states)
-        })
-        .await?
-    } else {
-        HashMap::new()
-    };
-
-    let started_ms = sync::now_ms();
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    let result = tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::background(),
-            |imap| {
-                let mut listed = imap.list_folders(&account.config.session_id)?;
-                let condstore = imap.has_capability("CONDSTORE");
-                let subscribed_only = account.config.sync.subscribed_only;
-                let mut outcomes: Vec<FolderStepOutcome> = Vec::new();
-                let mut failed: Vec<MailFolderError> = Vec::new();
-                let mut pending: Vec<String> = Vec::new();
-                let mut skipped: Vec<String> = Vec::new();
-                for folder in listed.iter_mut() {
-                    if folder_is_noselect(folder)
-                        || !folders::folder_visible(folder, subscribed_only)
-                    {
-                        continue;
-                    }
-                    let name = folder.name.clone();
-                    let mut folder_state = sync_states.get(&name).cloned().unwrap_or_default();
-                    // Periodic scans: one STATUS round trip proves an idle
-                    // folder unchanged (AC-33); manual syncs always reconcile.
-                    if skip_unchanged && condstore {
-                        if let Some(status) = imap.folder_status(&name, condstore) {
-                            if folders::folder_unchanged(&folder_state, &status) {
-                                folder.total = status.messages;
-                                folder.unread = status.unseen;
-                                folder.uid_next = status.uid_next;
-                                folder.uid_validity = status.uid_validity;
-                                skipped.push(name);
-                                continue;
-                            }
-                        }
-                    }
-                    let mut folder_outcomes = Vec::new();
-                    let mut error = None;
-                    // A repair (pre-watermark cache) is followed by the real catch-up.
-                    for _ in 0..2 {
-                        let params = StepParams {
-                            request: MailSyncRequestMode::Auto,
-                            limit,
-                            include_bodies,
-                            condstore,
-                        };
-                        match imap.sync_folder_step(&account, &name, &folder_state, &params) {
-                            Ok(outcome) => {
-                                folder_state = sync::advance_state(&folder_state, &outcome);
-                                let repaired = outcome.mode == sync::MailSyncMode::Repair
-                                    && !outcome.watermark.needs_repair;
-                                let more = outcome.more;
-                                folder_outcomes.push(outcome);
-                                if !repaired {
-                                    if more {
-                                        pending.push(name.clone());
-                                    }
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                error = Some(e);
-                                break;
-                            }
-                        }
-                    }
-                    let caught_up = error.is_none()
-                        && folder_outcomes
-                            .last()
-                            .is_some_and(|outcome: &FolderStepOutcome| !outcome.more);
-                    if caught_up && folder_state.high.is_some() {
-                        let params = StepParams {
-                            request: reconcile_mode,
-                            limit,
-                            include_bodies,
-                            condstore,
-                        };
-                        match imap.sync_folder_step(&account, &name, &folder_state, &params) {
-                            Ok(outcome) => {
-                                if outcome.more {
-                                    pending.push(name.clone());
-                                }
-                                folder_outcomes.push(outcome);
-                            }
-                            Err(e) => error = Some(e),
-                        }
-                    }
-                    if let Some(e) = error {
-                        if is_imap_transport_error(&e) {
-                            // Let the pool reconnect and retry the whole batch.
-                            return Err(e);
-                        }
-                        failed.push(MailFolderError {
-                            name: name.clone(),
-                            error: e,
-                        });
-                    }
-                    outcomes.extend(folder_outcomes);
-                }
-                pending.dedup();
-                Ok((listed, outcomes, failed, pending, skipped))
-            },
-        )
-    })
-    .await
-    .map_err(|e| format!("mail sync all task failed: {e}"))??;
-    let (listed, outcomes, failed, pending, skipped) = result;
-
+    let listed = {
+        let pool = Arc::clone(&pool);
+        let account = account.clone();
+        let handle = handle.clone();
+        tokio::task::spawn_blocking(move || {
+            with_imap_session(
+                &pool,
+                &account,
+                &handle,
+                ImapSessionOpts::background(),
+                |imap| imap.list_folders(&account.config.session_id),
+            )
+        })
+        .await
+        .map_err(|e| format!("mail folder listing task failed: {e}"))??
+    };
+    if cache_enabled {
+        let tree = listed.clone();
+        with_mail_db_async(&state, &account_id, move |db, account_id| {
+            sync_folder_tree(db, account_id, &tree)
+        })
+        .await?;
+    }
+    let mut folders = listed;
+    let mut failed = Vec::new();
+    let mut pending = Vec::new();
+    let mut skipped = Vec::new();
     let mut new_unseen_by_folder: HashMap<String, usize> = HashMap::new();
     let mut fetched_messages = 0usize;
     let mut cached_bodies = 0usize;
-    for outcome in &outcomes {
-        fetched_messages += outcome.messages.len();
-        cached_bodies += outcome
-            .messages
-            .iter()
-            .filter(|m| m.body_cached_at.is_some())
-            .count();
-        if outcome.new_unseen > 0 {
-            *new_unseen_by_folder
-                .entry(outcome.folder.name.clone())
-                .or_default() += outcome.new_unseen;
+    for folder in &mut folders {
+        if folder_is_noselect(folder)
+            || !folders::folder_visible(folder, account.config.sync.subscribed_only)
+        {
+            continue;
         }
+        let name = folder.name.clone();
+        let folder_state = if cache_enabled {
+            let name = name.clone();
+            with_mail_db_async(&state, &account_id, move |db, account_id| {
+                sync::load_folder_sync_state(db, account_id, &name)
+            })
+            .await?
+        } else {
+            FolderSyncState::default()
+        };
+        let started_ms = sync::now_ms();
+        // Release the account's background lane between folders. A transient
+        // disconnect retries only this folder; already committed progress is
+        // visible immediately and is never replayed as a whole-account batch.
+        let result = {
+            let pool = Arc::clone(&pool);
+            let account = account.clone();
+            let handle = handle.clone();
+            let name = name.clone();
+            let listed_folder = folder.clone();
+            tokio::task::spawn_blocking(move || {
+                with_imap_session(
+                    &pool,
+                    &account,
+                    &handle,
+                    ImapSessionOpts::background(),
+                    |imap| {
+                        let condstore = imap.has_capability("CONDSTORE");
+                        let mut folder_state = folder_state.clone();
+                        if skip_unchanged && condstore {
+                            if let Some(status) = imap.folder_status(&name, condstore) {
+                                if folders::folder_unchanged(&folder_state, &status) {
+                                    let mut folder = listed_folder.clone();
+                                    folder.total = status.messages;
+                                    folder.unread = status.unseen;
+                                    folder.uid_next = status.uid_next;
+                                    folder.uid_validity = status.uid_validity;
+                                    return Ok((Vec::new(), Vec::new(), Some(folder), None));
+                                }
+                            }
+                        }
+                        let mut folder_outcomes = Vec::new();
+                        let mut pending = Vec::new();
+                        let mut error = None;
+                        // A repair (pre-watermark cache) is followed by the real catch-up.
+                        for _ in 0..2 {
+                            let params = StepParams {
+                                request: MailSyncRequestMode::Auto,
+                                limit,
+                                include_bodies,
+                                condstore,
+                            };
+                            match imap.sync_folder_step(&account, &name, &folder_state, &params) {
+                                Ok(outcome) => {
+                                    folder_state = sync::advance_state(&folder_state, &outcome);
+                                    let repaired = outcome.mode == sync::MailSyncMode::Repair
+                                        && !outcome.watermark.needs_repair;
+                                    let more = outcome.more;
+                                    folder_outcomes.push(outcome);
+                                    if !repaired {
+                                        if more {
+                                            pending.push(name.clone());
+                                        }
+                                        break;
+                                    }
+                                }
+                                Err(e) => {
+                                    error = Some(e);
+                                    break;
+                                }
+                            }
+                        }
+                        let caught_up = error.is_none()
+                            && folder_outcomes
+                                .last()
+                                .is_some_and(|outcome: &FolderStepOutcome| !outcome.more);
+                        if caught_up && folder_state.high.is_some() {
+                            let params = StepParams {
+                                request: reconcile_mode,
+                                limit,
+                                include_bodies,
+                                condstore,
+                            };
+                            match imap.sync_folder_step(&account, &name, &folder_state, &params) {
+                                Ok(outcome) => {
+                                    if outcome.more {
+                                        pending.push(name.clone());
+                                    }
+                                    folder_outcomes.push(outcome);
+                                }
+                                Err(e) => error = Some(e),
+                            }
+                        }
+                        if let Some(ref e) = error {
+                            if is_imap_transport_error(e) {
+                                return Err(e.clone());
+                            }
+                        }
+                        Ok((folder_outcomes, pending, None, error))
+                    },
+                )
+            })
+            .await
+            .map_err(|e| format!("mail folder sync task failed: {e}"))?
+        };
+        let (outcomes, folder_pending, unchanged, error) = match result {
+            Ok(result) => result,
+            Err(error) => (Vec::new(), Vec::new(), None, Some(error)),
+        };
+        if let Some(unchanged) = unchanged {
+            *folder = unchanged;
+            skipped.push(name.clone());
+        }
+        pending.extend(folder_pending);
+        for outcome in &outcomes {
+            fetched_messages += outcome.messages.len();
+            cached_bodies += outcome
+                .messages
+                .iter()
+                .filter(|m| m.body_cached_at.is_some())
+                .count();
+            if outcome.new_unseen > 0 {
+                *new_unseen_by_folder.entry(name.clone()).or_default() += outcome.new_unseen;
+            }
+            *folder = outcome.folder.clone();
+        }
+        if let Some(error) = &error {
+            failed.push(MailFolderError {
+                name: name.clone(),
+                error: error.clone(),
+            });
+        }
+        if cache_enabled {
+            let cache_settings = cache_settings.clone();
+            let metadata = folder.clone();
+            with_mail_db_async(&state, &account_id, move |db, account_id| {
+                upsert_folder(db, &metadata)?;
+                for outcome in &outcomes {
+                    sync::apply_folder_step(db, account_id, outcome, &cache_settings, started_ms)?;
+                }
+                if let Some(error) = error {
+                    sync::record_folder_error(db, account_id, &name, &error)?;
+                }
+                Ok(())
+            })
+            .await?;
+        }
+        tokio::task::yield_now().await;
     }
+    pending.sort();
+    pending.dedup();
     let folders = if cache_enabled {
-        let failures = failed.clone();
-        with_mail_db_async(&state, &account_id, move |db, account_id| {
-            sync_folder_tree(db, account_id, &listed)?;
-            for outcome in &outcomes {
-                sync::apply_folder_step(db, &account_id, outcome, &cache_settings, started_ms)?;
-            }
-            for failure in &failures {
-                sync::record_folder_error(db, &account_id, &failure.name, &failure.error)?;
-            }
+        with_mail_db_async(&state, &account_id, |db, account_id| {
             list_cached_folders(db, account_id)
         })
         .await?
     } else {
-        let mut folders = listed;
-        for outcome in &outcomes {
-            merge_selected_folder(&mut folders, outcome.folder.clone());
-        }
         folders
     };
 
@@ -4517,17 +4553,20 @@ fn imap_fetch_messages_for_uids<T: Read + Write>(
         return Ok(Vec::new());
     }
     let account_id = &account.config.session_id;
-    let uid_set = uid_set_string(fetch_uids);
-    let fetches = session
-        .uid_fetch(
-            &uid_set,
-            "(UID FLAGS RFC822.SIZE INTERNALDATE BODY.PEEK[HEADER])",
-        )
-        .map_err(|e| format!("IMAP UID FETCH headers failed: {e}"))?;
     let mut messages = Vec::new();
-    for fetch in fetches.iter() {
-        if let Some(message) = parse_fetch_header(account_id, folder, fetch) {
-            messages.push(message);
+    // Even sparse ten-digit UIDs fit comfortably under a 4 KiB command limit.
+    for chunk in fetch_uids.chunks(250) {
+        let uid_set = uid_set_string(chunk);
+        let fetches = session
+            .uid_fetch(
+                &uid_set,
+                "(UID FLAGS RFC822.SIZE INTERNALDATE BODY.PEEK[HEADER])",
+            )
+            .map_err(|e| format!("IMAP UID FETCH headers failed: {e}"))?;
+        for fetch in fetches.iter() {
+            if let Some(message) = parse_fetch_header(account_id, folder, fetch) {
+                messages.push(message);
+            }
         }
     }
     messages.sort_by(|a, b| {
@@ -4547,7 +4586,6 @@ fn imap_fetch_messages_for_uids<T: Read + Write>(
             .collect::<Vec<_>>();
         let mut body_uids = body_uids;
         body_uids.sort_unstable();
-        let body_uid_set = uid_set_string(&body_uids);
         let raw_limit = account
             .config
             .cache
@@ -4555,18 +4593,23 @@ fn imap_fetch_messages_for_uids<T: Read + Write>(
             .max(1024)
             .min(10 * 1024 * 1024) as usize;
         let body_query = format!("(UID RFC822.SIZE BODY.PEEK[]<0.{raw_limit}>)");
-        let body_fetches = session
-            .uid_fetch(&body_uid_set, &body_query)
-            .map_err(|e| format!("IMAP UID FETCH bodies failed: {e}"))?;
         let mut bodies = HashMap::new();
-        for fetch in body_fetches.iter() {
-            if let Some(uid) = fetch.uid {
-                if let Some(body) = fetch.body() {
-                    save_raw_message(account, folder, uid, body)?;
-                    bodies.insert(
-                        uid,
-                        parse_body_message(account_id, folder, uid, fetch.size, body, raw_limit),
-                    );
+        for chunk in body_uids.chunks(250) {
+            let body_uid_set = uid_set_string(chunk);
+            let body_fetches = session
+                .uid_fetch(&body_uid_set, &body_query)
+                .map_err(|e| format!("IMAP UID FETCH bodies failed: {e}"))?;
+            for fetch in body_fetches.iter() {
+                if let Some(uid) = fetch.uid {
+                    if let Some(body) = fetch.body() {
+                        save_raw_message(account, folder, uid, body)?;
+                        bodies.insert(
+                            uid,
+                            parse_body_message(
+                                account_id, folder, uid, fetch.size, body, raw_limit,
+                            ),
+                        );
+                    }
                 }
             }
         }

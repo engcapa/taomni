@@ -55,6 +55,9 @@ pub struct FakeState {
     pub max_command_bytes: Option<usize>,
     /// Drop the next STORE response after applying it (an ambiguous network loss).
     pub drop_store_response_once: bool,
+    /// Provider size estimates can disagree with the actual BODY[] literal.
+    pub reported_sizes: BTreeMap<(String, u32), usize>,
+    pub empty_bodies: std::collections::BTreeSet<(String, u32)>,
 }
 
 #[derive(Clone)]
@@ -83,6 +86,8 @@ impl FakeImap {
             unsubscribed: Default::default(),
             max_command_bytes: None,
             drop_store_response_once: false,
+            reported_sizes: Default::default(),
+            empty_bodies: Default::default(),
         }));
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake imap");
         let port = listener.local_addr().unwrap().port();
@@ -538,7 +543,12 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     parts.push(format!("MODSEQ ({})", message.modseq));
                 }
                 if items_upper.contains("RFC822.SIZE") {
-                    parts.push(format!("RFC822.SIZE {}", message.raw.len()));
+                    let size = state
+                        .reported_sizes
+                        .get(&(selected.clone().unwrap_or("INBOX".into()), *uid))
+                        .copied()
+                        .unwrap_or(message.raw.len());
+                    parts.push(format!("RFC822.SIZE {size}"));
                 }
                 if items_upper.contains("INTERNALDATE") {
                     parts.push(format!(
@@ -572,8 +582,14 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                             Some((offset.parse::<usize>().ok()?, len.parse::<usize>().ok()?))
                         });
                     if let Some((offset, len)) = range {
-                        let body = &message.raw[offset.min(message.raw.len())
+                        let mut body = &message.raw[offset.min(message.raw.len())
                             ..offset.saturating_add(len).min(message.raw.len())];
+                        if state
+                            .empty_bodies
+                            .contains(&(selected.clone().unwrap_or("INBOX".into()), *uid))
+                        {
+                            body = &[];
+                        }
                         bytes.extend_from_slice(
                             format!(" BODY[]<{offset}> {{{}}}\r\n", body.len()).as_bytes(),
                         );

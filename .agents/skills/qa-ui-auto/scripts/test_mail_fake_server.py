@@ -55,6 +55,46 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertEqual(self.server.state.count("INBOX"), 4)
         client.logout()
 
+    def test_archive_fault_preserves_raw_bytes_and_restores_empty_body(self) -> None:
+        state = self.server.state
+        raw = state.folders["INBOX"].messages[5].raw
+        state.archive_reported_sizes[("INBOX", 5)] = 1
+        client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
+        client.login("qa", "x")
+        client.select("INBOX", readonly=True)
+        typ, data = client.uid("FETCH", "5", "(UID RFC822.SIZE BODY.PEEK[]<0.262144>)")
+        self.assertEqual(typ, "OK")
+        literal = next(part for part in data if isinstance(part, tuple))
+        self.assertIn(b"RFC822.SIZE 1 ", literal[0])
+        self.assertEqual(literal[1], raw)
+        state.archive_empty_bodies.add(("INBOX", 5))
+        typ, data = client.uid("FETCH", "5", "(UID RFC822.SIZE BODY.PEEK[]<0.262144>)")
+        self.assertEqual(next(part[1] for part in data if isinstance(part, tuple)), b"")
+        state.archive_empty_bodies.clear()
+        typ, data = client.uid("FETCH", "5", "(UID RFC822.SIZE BODY.PEEK[]<0.262144>)")
+        self.assertEqual(next(part[1] for part in data if isinstance(part, tuple)), raw)
+        self.assertEqual(state.count("INBOX"), 5)
+        client.logout()
+
+    def test_sync_disconnect_is_once_and_command_limit_is_enforced(self) -> None:
+        def connect():
+            client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
+            client.login("qa", "x")
+            client.select("INBOX", readonly=True)
+            return client
+        client = connect()
+        self.server.state.drop_next_fetch = True
+        with self.assertRaises(imaplib.IMAP4.abort):
+            client.uid("FETCH", "1", "(UID FLAGS)")
+        client.shutdown()
+        client = connect()
+        self.assertEqual(client.uid("FETCH", "1", "(UID FLAGS)")[0], "OK")
+        with self.assertRaises(imaplib.IMAP4.abort):
+            client.uid("FETCH", ",".join(["1000000001"] * 1000), "(UID FLAGS)")
+        client.shutdown()
+        self.assertEqual(self.server.state.dropped_fetches, 1)
+        self.assertEqual(self.server.state.rejected_commands, 1)
+
     def test_text_and_header_search(self) -> None:
         uids = self.server.state.deliver("INBOX", 3, prefix="Needle", thread=True)
         client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)

@@ -64,3 +64,22 @@ it("reports archive read errors while allowing streaming original export", async
   fireEvent.click(screen.getByTestId("mail-archive-export"));
   await waitFor(() => expect(ipc.invoke).toHaveBeenCalledWith("mail_archive_export", expect.objectContaining({ entry })));
 });
+
+it("shows contextual incomplete content and retries through the account-owned job", async () => {
+  let resumed = false;
+  const previous = ipc.invoke.getMockImplementation()!;
+  ipc.invoke.mockImplementation((cmd: string, args: { resume?: boolean }) => {
+    if (cmd === "mail_archive_start" && args.resume) resumed = true;
+    if (cmd === "mail_archive_status") return Promise.resolve(resumed
+      ? { phase: "completed", saved: 1, total: 1, bytes: 537, totalBytes: 537 }
+      : { phase: "failed", saved: 1, total: 2, error: "INBOX, UID 7: empty full email chunk at offset 0" });
+    return previous(cmd, args);
+  });
+  render(<MailArchivePanel info={info} />);
+  await screen.findByText("INBOX, UID 7: empty full email chunk at offset 0");
+  expect(screen.getByTestId("mail-storage-progress")).toHaveTextContent("1/2");
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await waitFor(() => expect(ipc.invoke).toHaveBeenCalledWith("mail_archive_start", { config: info, resume: true }));
+  await waitFor(() => expect(screen.getByTestId("mail-storage-progress")).toHaveTextContent("completed"));
+  expect(screen.queryByText("INBOX, UID 7: empty full email chunk at offset 0")).not.toBeInTheDocument();
+});

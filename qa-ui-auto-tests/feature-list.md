@@ -7135,6 +7135,7 @@ controls:
 -->
 
 - 每会话可设置目录；默认仍为应用 mail-cache。完整原件按封 gzip 压缩，包含 MIME 正文、内联资源及附件，SHA-256 校验和去重。
+- IMAP 原件以实际字节范围与 EOF 确认完整性，兼容不准确的 RFC822.SIZE；空正文或错误范围保留明确的文件夹/UID 错误，不阻塞其它可读取邮件，也不把失败项永久跳过。`TC-MAIL-STORAGE-03` 通过真实 Retry 和独立 MIME/附件校验覆盖恢复流程。
 - IMAP 全部/仅选中/排除文件夹均保留其它文件夹的摘要。后台暂停保留可续传片段，普通删除/远端消失保留归档，主动清理才物理删除最后引用。
 - 本地归档独立于实时邮件列表，可以读取/导出服务器已消失的邮件。POP3 原始本地库保持兼容并保留压缩归档。
 - 文件夹候选只来自当前账号的本地同步缓存，离线仍可用；首次连接前为空并显示提示。复选框显示解码名称，保存完整的服务器原始键；切换账号丢弃旧候选和迟到回复。
@@ -11705,3 +11706,5 @@ controls:
 > - Ribbon `Tools`（除 Tunneling 之外的网络工具）
 > - Ribbon `Packages`、`Macros`
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
+
+- TC-MAIL-SYNC-03: native sparse UID command limits, FETCH reconnect, gap-free catch-up and full remote deletion/flag reconciliation (F-MAIL-5/F-MAIL-3).

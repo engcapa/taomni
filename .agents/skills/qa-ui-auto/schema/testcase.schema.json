@@ -1268,6 +1268,16 @@
             }
           }
         },
+        "mail_server_sparse_sync": {"type": ["null", "object"], "additionalProperties": false, "properties": {"configure_only": {"type": "boolean"}}},
+        "mail_server_assert_sync_transport": {"type": "null"},
+        "mail_server_archive_fault": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "folder": {"type": "string", "minLength": 1},
+            "size_delta": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+            "empty_newest": {"type": "boolean"}
+          }
+        },
         "mail_server_delay_next_read": {
           "type": "object", "additionalProperties": false,
           "required": ["milliseconds"],
