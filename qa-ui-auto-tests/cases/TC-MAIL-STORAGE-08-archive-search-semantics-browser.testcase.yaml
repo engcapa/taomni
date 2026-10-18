@@ -1,0 +1,377 @@
+id: TC-MAIL-STORAGE-08
+title: Literal, short and non-Latin archive search with range selection and filter states
+description: Whole-archive search treats text literally for short, wildcard-like and non-Latin
+  queries, scopes searches to recipients and senders, keeps shift range selection exact and
+  reports the filtered-empty and active-filter states. Browser renderer and stub workflow;
+  indexed SQLite search semantics are covered by TC-MAIL-STORAGE-09.
+covers:
+- F-MAIL-23
+tags:
+- mail
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- mail_server
+- mail_storage
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- assert_attribute:
+    selector: input[aria-label="Mail save directory"]
+    name: placeholder
+    equals: Optional directory for extra .eml copies
+- assert_text:
+    selector: '[data-testid="session-editor"]'
+    contains: does not change the cache location
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA archive search
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA archive search"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA archive search"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_server_deliver:
+    folder: INBOX
+    count: 12
+    prefix: Literal
+- mail_server_deliver:
+    folder: INBOX
+    count: 3
+    prefix: 发票
+- mail_server_deliver:
+    folder: INBOX
+    count: 1
+    prefix: 100%
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    folder: INBOX
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-resume"]'
+- wait_for:
+    selector: '[data-testid="mail-storage-resume"]:enabled'
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-open"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-folder"]'
+    value: INBOX
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: Literal
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 12 messages
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: literal
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 12 messages
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: '00'
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 16 messages
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: '%'
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 1 messages
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-entries"]'
+    contains: 100% 0001
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: _
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 0 messages
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-entries"]'
+    contains: No saved mail matches these filters.
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: '"'
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 0 messages
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: 100%
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 1 messages
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: 发票
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 3 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-search-field"]'
+    value: to
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: user@example.com
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 19 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-search-field"]'
+    value: all
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: 发票
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 3 messages
+    timeout_sec: 60
+- screenshot: archive-search-literal-and-unicode.png
+- click: '[data-testid="mail-archive-reset"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-folder"]'
+    value: INBOX
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 19 messages
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-row"]:first-child input[type="checkbox"]'
+- click:
+    selector: '[data-testid="mail-archive-row"]:nth-child(4) input[type="checkbox"]'
+    modifiers:
+    - Shift
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 4 selected
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-advanced"] summary'
+- fill:
+    selector: '[data-testid="mail-archive-min-size"]'
+    value: '0.0001'
+- assert_text:
+    selector: '[data-testid="mail-archive-advanced"]'
+    contains: 1 active
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 19 messages
+    timeout_sec: 60
+- screenshot: archive-search-range-and-badge.png
+- click: '[data-testid="mail-archive-reset"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 0 selected
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-close"]'
+- assert_not_visible: '[data-testid="mail-archive-dialog"]'
+verification:
+  native:
+  - check: Indexed SQLite/FTS search, stored-byte accounting and disk integrity
+    method: manual
+    reason: Native boundary belongs to TC-MAIL-STORAGE-09.
+  requirements:
+  - actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 23
+    - 25
+    - 26
+    - 27
+    - 28
+    - 30
+    - 32
+    - 34
+    - 35
+    - 37
+    - 39
+    - 41
+    - 44
+    - 47
+    - 49
+    - 51
+    - 53
+    - 54
+    - 56
+    - 57
+    - 60
+    - 62
+    - 64
+    - 65
+    - 67
+    - 68
+    - 72
+    - 75
+    checkpoints:
+    - expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Mail save directory\"]", "name":
+        "placeholder", "equals": "Optional directory for extra .eml copies"}}'
+      step: 13
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"session-editor\"]", "contains": "does
+        not change the cache location"}}'
+      step: 14
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+      step: 24
+    - expectation: '{"mail_server_assert_list_matches": {"folder": "INBOX", "timeout_sec": 60}}'
+      step: 29
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 12 messages", "timeout_sec": 60}}'
+      step: 36
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 12 messages", "timeout_sec": 60}}'
+      step: 38
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 16 messages", "timeout_sec": 60}}'
+      step: 40
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 1 messages", "timeout_sec": 60}}'
+      step: 42
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-entries\"]", "contains":
+        "100% 0001", "timeout_sec": 60}}'
+      step: 43
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 0 messages", "timeout_sec": 60}}'
+      step: 45
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-entries\"]", "contains":
+        "No saved mail matches these filters.", "timeout_sec": 60}}'
+      step: 46
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 0 messages", "timeout_sec": 60}}'
+      step: 48
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 1 messages", "timeout_sec": 60}}'
+      step: 50
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 3 messages", "timeout_sec": 60}}'
+      step: 52
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 19 messages", "timeout_sec": 60}}'
+      step: 55
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 3 messages", "timeout_sec": 60}}'
+      step: 58
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 19 messages", "timeout_sec": 60}}'
+      step: 63
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "4 selected", "timeout_sec": 60}}'
+      step: 66
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-advanced\"]", "contains":
+        "1 active", "timeout_sec": 60}}'
+      step: 69
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 19 messages", "timeout_sec": 60}}'
+      step: 70
+    - expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "0 selected", "timeout_sec": 60}}'
+      step: 74
+    - expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+      step: 76
+    id: R1
+    requirement: Literal whole-archive search stays exact for short, wildcard-like, quoted and non-Latin
+      queries, and field scoping selects recipients only. Browser renderer and stub workflow; the indexed
+      SQLite path is covered by TC-MAIL-STORAGE-09.
+    results:
+    - 13
+    - 14
+    - 24
+    - 29
+    - 36
+    - 38
+    - 40
+    - 42
+    - 43
+    - 45
+    - 46
+    - 48
+    - 50
+    - 52
+    - 55
+    - 58
+    - 63
+    - 66
+    - 69
+    - 70
+    - 74
+    - 76
+  review: reviewed
+  visual:
+  - check: Filtered-empty copy and the active-filter count in the advanced summary
+    method: automated
+    reason: The case asserts both texts in the rendered dialog.
