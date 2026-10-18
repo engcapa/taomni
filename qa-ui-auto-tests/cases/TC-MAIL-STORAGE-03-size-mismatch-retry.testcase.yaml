@@ -65,6 +65,7 @@ steps:
 - assert_count:
     selector: '[data-testid="mail-storage-folders"] input'
     equal: 0
+- click: '[data-testid="mail-storage-edit-folders"]'
 - fill:
     selector: '[data-testid="mail-storage-folder-names"]'
     value: INBOX
@@ -137,7 +138,7 @@ steps:
       INBOX: 2
       Archive: 2
 - click: '[data-testid="mail-archive-open"]'
-- wait_for: '[data-testid="mail-archive-dialog"][open]'
+- wait_for: '[data-testid="mail-archive-refresh"]:enabled'
 - assert_count:
     selector: '[data-testid="mail-archive-row"]'
     equal: 2
@@ -169,17 +170,17 @@ verification:
     - 13
     - 14
     - 15
-    - 18
     - 19
     - 20
     - 21
-    - 26
-    - 32
-    - 37
+    - 22
+    - 27
+    - 33
     - 38
-    - 41
-    - 44
-    - 47
+    - 39
+    - 42
+    - 45
+    - 48
     checkpoints:
     - step: 16
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains":
@@ -187,61 +188,61 @@ verification:
     - step: 17
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input", "equal":
         0}}'
-    - step: 27
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
-        "failed", "timeout_sec": 60}}'
     - step: 28
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
-        "1/2"}}'
+        "failed", "timeout_sec": 60}}'
     - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "1/2"}}'
+    - step: 30
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "INBOX,
         UID"}}'
-    - step: 30
+    - step: 31
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "empty
         full email chunk at offset 0"}}'
-    - step: 31
+    - step: 32
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
         "full": {"INBOX": 1}, "headers": {"INBOX": 2, "Archive": 2}}}'
-    - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
-        "failed", "timeout_sec": 60}}'
     - step: 34
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
-        "0/1"}}'
+        "failed", "timeout_sec": 60}}'
     - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "0/1"}}'
+    - step: 36
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
         "full": {"INBOX": 1}, "headers": {"INBOX": 2, "Archive": 2}}}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
         "completed", "timeout_sec": 60}}'
-    - step: 40
+    - step: 41
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
         "full": {"INBOX": 2}, "headers": {"INBOX": 2, "Archive": 2}}}'
-    - step: 43
+    - step: 44
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 2}}'
-    - step: 45
+    - step: 46
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains":
         "complete.bin", "timeout_sec": 30}}'
-    - step: 48
+    - step: 49
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
-    - step: 42
+    - step: 43
       expectation: Archive dialog opens after the asynchronous persisted entry load completes.
     results:
     - 16
     - 17
-    - 27
     - 28
     - 29
     - 30
     - 31
-    - 33
+    - 32
     - 34
     - 35
-    - 39
+    - 36
     - 40
-    - 43
-    - 45
-    - 48
+    - 41
+    - 44
+    - 46
+    - 49
   visual:
   - check: Review failure with folder/UID and recovered archive.
     method: manual

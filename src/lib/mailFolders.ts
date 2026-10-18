@@ -52,6 +52,13 @@ export function folderLabel(folder: Pick<MailFolder, "name" | "displayName">): s
   return decodeImapModifiedUtf7(name) || name;
 }
 
+/** Storage selections accept either a server key or its decoded full path. */
+export function mailFolderSelectionMatches(selection: string, serverName: string): boolean {
+  const name = selection.trim();
+  return name === serverName || name === decodeImapModifiedUtf7(serverName)
+    || (name.toUpperCase() === "INBOX" && serverName.toUpperCase() === "INBOX");
+}
+
 /** RFC 5258 attribute the backend adds for folders LSUB reports (TASK-10). */
 export const SUBSCRIBED_FLAG = "\\Subscribed";
 

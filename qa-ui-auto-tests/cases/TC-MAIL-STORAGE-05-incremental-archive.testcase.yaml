@@ -1,0 +1,293 @@
+id: TC-MAIL-STORAGE-05
+title: Publish complete originals before large mailbox history finishes and resume safely
+description: Native loopback IMAP with 350 messages, multiple header pages, and controlled FETCH latency.
+  Independent SQLite/gzip observations require readable complete originals while the header watermark
+  is still incomplete. Pause, read an original, reopen the tab, resume, verify every original and attachment,
+  and rescan without duplicates. Renderer progress checks are also covered by browser TC-MAIL-STORAGE-04;
+  browser stubs cannot prove IMAP batch ordering or persisted bytes. The independent header sync may continue
+  after full-original storage is paused; incomplete history is asserted at the first publication observation.
+covers:
+- F-MAIL-23
+tags:
+- mail
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- mail_server
+- mail_archive_batches
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- select_option:
+    selector: '[data-testid="mail-storage-mode"]'
+    value: include
+- assert_text:
+    selector: '[data-testid="mail-storage-settings"]'
+    contains: No cached folders. Connect and sync this account first
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input'
+    equal: 0
+- click: '[data-testid="mail-storage-edit-folders"]'
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: INBOX
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA incremental mail
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA incremental mail"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA incremental mail"]'
+- mail_storage_assert:
+    kind: incremental
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    timeout_sec: 30
+- click: '[data-testid="mail-storage-pause"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: paused
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-header-progress"]'
+    contains: /350
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-original-progress"]'
+    contains: 'Saved this scan:'
+    timeout_sec: 60
+- screenshot: mail-incremental-paused-progress.png
+- click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-row"]'
+- click: '[data-testid="mail-archive-row"]:first-child [data-testid="mail-archive-read"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-preview"]'
+    contains: batch.bin
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-preview"] [data-testid="mail-body-mode-plain"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-preview"]'
+    contains: Readable before history completes
+    timeout_sec: 60
+- screenshot: mail-incremental-readable-original.png
+- click: '[data-testid="mail-archive-close"]'
+- assert_not_visible: '[data-testid="mail-archive-dialog"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA incremental mail"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: paused
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-header-progress"]'
+    contains: /350
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-resume"]'
+- wait_for:
+    selector: '[data-testid="mail-storage-resume"]:enabled'
+    timeout_sec: 120
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 350
+    headers:
+      INBOX: 350
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-row"]'
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 200
+- click: '[data-testid="mail-archive-next"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 150
+- click: '[data-testid="mail-archive-close"]'
+- assert_not_visible: '[data-testid="mail-archive-dialog"]'
+- click: '[data-testid="mail-storage-resume"]'
+- wait_for:
+    selector: '[data-testid="mail-storage-resume"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-original-progress"]'
+    contains: 'Saved this scan: 0'
+    timeout_sec: 60
+- mail_storage_assert:
+    root: ${fixture.mail_storage_a}
+    expected: ${fixture.mail_expected}
+    full:
+      INBOX: 350
+    headers:
+      INBOX: 350
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Complete MIME is published while history is incomplete; paused progress and original
+      reading survive tab reopen; resume completes every message exactly once and repeat scans preserve
+      originals.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 26
+    - 28
+    - 33
+    - 35
+    - 37
+    - 40
+    - 42
+    - 43
+    - 46
+    - 50
+    - 53
+    - 56
+    - 58
+    checkpoints:
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains":
+        "No cached folders. Connect and sync this account first"}}'
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input", "equal":
+        0}}'
+    - step: 27
+      expectation: '{"mail_storage_assert": {"kind": "incremental", "root": "${fixture.mail_storage_a}",
+        "expected": "${fixture.mail_expected}", "timeout_sec": 30}}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "paused", "timeout_sec": 60}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-header-progress\"]", "contains":
+        "/350", "timeout_sec": 60}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-original-progress\"]", "contains":
+        "Saved this scan:", "timeout_sec": 60}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains":
+        "batch.bin", "timeout_sec": 60}}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains":
+        "Readable before history completes", "timeout_sec": 60}}'
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "paused", "timeout_sec": 60}}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-header-progress\"]", "contains":
+        "/350", "timeout_sec": 60}}'
+    - step: 48
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+    - step: 49
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
+        "full": {"INBOX": 350}, "headers": {"INBOX": 350}, "timeout_sec": 60}}'
+    - step: 52
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 200}}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 150}}'
+    - step: 57
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+    - step: 61
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-original-progress\"]", "contains":
+        "Saved this scan: 0", "timeout_sec": 60}}'
+    - step: 62
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
+        "full": {"INBOX": 350}, "headers": {"INBOX": 350}}}'
+    results:
+    - 15
+    - 16
+    - 27
+    - 29
+    - 30
+    - 31
+    - 36
+    - 38
+    - 41
+    - 44
+    - 45
+    - 48
+    - 49
+    - 52
+    - 55
+    - 57
+    - 60
+    - 61
+    - 62
+  visual:
+  - check: Retained paused header progress, scan counts, and a readable early saved original
+    method: manual
+    reason: Inspect retained progress and archive screenshots.
+  native:
+  - check: Incremental publication, retained state, pause/resume and complete MIME integrity
+    method: automated
+    reason: Real Tauri commands, loopback IMAP and independent read-only SQLite/gzip/attachment verification.
