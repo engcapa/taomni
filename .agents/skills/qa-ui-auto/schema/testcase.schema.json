@@ -1281,6 +1281,17 @@
             "empty_newest": {"type": "boolean"}
           }
         },
+        "mail_server_mutation_fault": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "supports_move": {"type": "boolean"}, "uidplus": {"type": "boolean"},
+            "max_count": {"type": ["integer", "null"], "minimum": 1},
+            "fail_after": {"type": ["integer", "null"], "minimum": 0},
+            "reject_store_once": {"type": "boolean"}, "drop_copy_response_once": {"type": "boolean"}
+          }
+        },
+        "mail_server_assert_mutations": {"type": "object", "additionalProperties": false,
+          "properties": {"no_move": {"type": "boolean"}, "count_rejected": {"type": "boolean"}, "copied": {"type": "integer", "minimum": 0}}},
         "mail_server_delay_next_read": {
           "type": "object", "additionalProperties": false,
           "required": ["milliseconds"],

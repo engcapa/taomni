@@ -56,6 +56,7 @@ pub mod idle;
 pub mod lists;
 mod local_cmds;
 pub mod mbox;
+mod mutations;
 pub mod outgoing;
 mod parts;
 mod pop3;
@@ -852,6 +853,7 @@ pub struct MailMoveResult {
     pub folder: String,
     pub target: String,
     pub count: usize,
+    pub mutation: Option<mutations::Progress>,
 }
 
 #[derive(Debug, Serialize)]
@@ -859,6 +861,7 @@ pub struct MailMoveResult {
 pub struct MailDeleteResult {
     pub folder: String,
     pub deleted: usize,
+    pub mutation: Option<mutations::Progress>,
 }
 
 enum ActiveImapSession {
@@ -1010,20 +1013,6 @@ impl ActiveImapSession {
         }
     }
 
-    fn move_messages(&mut self, folder: &str, uids: &[u32], target: &str) -> Result<usize, String> {
-        match self {
-            Self::Tls { session, .. } => imap_move_messages(session, folder, uids, target),
-            Self::Plain { session, .. } => imap_move_messages(session, folder, uids, target),
-        }
-    }
-
-    fn copy_messages(&mut self, folder: &str, uids: &[u32], target: &str) -> Result<usize, String> {
-        match self {
-            Self::Tls { session, .. } => imap_copy_messages(session, folder, uids, target),
-            Self::Plain { session, .. } => imap_copy_messages(session, folder, uids, target),
-        }
-    }
-
     fn delete_messages(&mut self, folder: &str, uids: &[u32], all: bool) -> Result<usize, String> {
         match self {
             Self::Tls { session, .. } => imap_delete_messages(session, folder, uids, all),
@@ -1126,6 +1115,7 @@ fn retire_imap_session(mut session: ActiveImapSession) {
 /// session-level proxy forwarder across mail commands. Does not consult the
 /// app global proxy.
 pub struct MailImapPool {
+    mutation_gates: std::sync::Mutex<HashMap<String, Arc<std::sync::Mutex<()>>>>,
     entries: std::sync::Mutex<HashMap<ImapPoolKey, LiveImapEntry>>,
     /// Each lane owns its connection and proxy forwarder. Never interleave
     /// commands on one stream, but keep interactive work independent of sync.
@@ -1178,9 +1168,19 @@ impl ImapSessionOpts {
 }
 
 impl MailImapPool {
+    fn mutation_gate(&self, account: &str) -> Arc<std::sync::Mutex<()>> {
+        self.mutation_gates
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(account.to_string())
+            .or_insert_with(|| Arc::new(std::sync::Mutex::new(())))
+            .clone()
+    }
+
     pub fn new() -> Self {
         Self {
             entries: std::sync::Mutex::new(HashMap::new()),
+            mutation_gates: std::sync::Mutex::new(HashMap::new()),
             account_gates: std::sync::Mutex::new(HashMap::new()),
         }
     }
@@ -2926,6 +2926,7 @@ pub async fn mail_move_messages(
     folder: String,
     uids: Vec<u32>,
     target_folder: String,
+    operation_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<MailMoveResult, String> {
     if pop3::is_pop3(&config) {
@@ -2938,55 +2939,19 @@ pub async fn mail_move_messages(
             false,
         );
     }
-    let folder = folder.trim().to_string();
-    let target_folder = target_folder.trim().to_string();
-    if folder.is_empty() || target_folder.is_empty() {
-        return Err("source and target folders are required".into());
-    }
-    if folder == target_folder {
+    if folder.trim() == target_folder.trim() {
         return Err("source and target folders must differ".into());
     }
-    let target_uids = uids.into_iter().filter(|uid| *uid > 0).collect::<Vec<_>>();
-    if target_uids.is_empty() {
-        return Ok(MailMoveResult {
-            folder,
-            target: target_folder,
-            count: 0,
-        });
-    }
-
-    let account_id = config.session_id.clone();
-    let account = resolve_config(&state, config)?;
-    let folder_for_task = folder.clone();
-    let target_for_task = target_folder.clone();
-    let uids_for_task = target_uids.clone();
-    let pool = Arc::clone(&state.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| imap.move_messages(&folder_for_task, &uids_for_task, &target_for_task),
-        )
-    })
-    .await
-    .map_err(|e| format!("mail move task failed: {e}"))??;
-
-    let count = target_uids.len();
-    let cached_folder = folder.clone();
-    with_mail_db_async(&state, &account_id, move |db, account_id| {
-        let tx = db.unchecked_transaction()?;
-        remove_cached_messages(&tx, account_id, &cached_folder, &target_uids)?;
-        tx.commit()
-    })
-    .await?;
-    Ok(MailMoveResult {
+    transfer_messages(
+        config,
         folder,
-        target: target_folder,
-        count,
-    })
+        uids,
+        target_folder,
+        operation_id,
+        mutations::Kind::Move,
+        state,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -2995,6 +2960,7 @@ pub async fn mail_copy_messages(
     folder: String,
     uids: Vec<u32>,
     target_folder: String,
+    operation_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<MailMoveResult, String> {
     if pop3::is_pop3(&config) {
@@ -3007,42 +2973,48 @@ pub async fn mail_copy_messages(
             true,
         );
     }
+    transfer_messages(
+        config,
+        folder,
+        uids,
+        target_folder,
+        operation_id,
+        mutations::Kind::Copy,
+        state,
+    )
+    .await
+}
+
+async fn transfer_messages(
+    config: MailAccountConfig,
+    folder: String,
+    uids: Vec<u32>,
+    target: String,
+    operation_id: Option<String>,
+    kind: mutations::Kind,
+    state: State<'_, AppState>,
+) -> Result<MailMoveResult, String> {
     let folder = folder.trim().to_string();
-    let target_folder = target_folder.trim().to_string();
-    if folder.is_empty() || target_folder.is_empty() {
+    let target = target.trim().to_string();
+    if folder.is_empty() || target.is_empty() {
         return Err("source and target folders are required".into());
     }
-    let target_uids = uids.into_iter().filter(|uid| *uid > 0).collect::<Vec<_>>();
-    if target_uids.is_empty() {
-        return Ok(MailMoveResult {
-            folder,
-            target: target_folder,
-            count: 0,
-        });
-    }
-
-    let account = resolve_config(&state, config)?;
-    let folder_for_task = folder.clone();
-    let target_for_task = target_folder.clone();
-    let uids_for_task = target_uids.clone();
-    let pool = Arc::clone(&state.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
-        with_imap_session(
-            &pool,
-            &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| imap.copy_messages(&folder_for_task, &uids_for_task, &target_for_task),
-        )
-    })
-    .await
-    .map_err(|e| format!("mail copy task failed: {e}"))??;
-
+    let mutation = run_mail_mutation(
+        config,
+        folder.clone(),
+        uids,
+        target.clone(),
+        kind,
+        false,
+        operation_id,
+        state,
+    )
+    .await?;
     Ok(MailMoveResult {
         folder,
-        target: target_folder,
-        count: target_uids.len(),
+        target,
+        count: mutation.completed_uids.len(),
+        mutation: Some(mutation),
     })
 }
 
@@ -3052,6 +3024,7 @@ pub async fn mail_delete_messages(
     folder: String,
     uids: Option<Vec<u32>>,
     all: Option<bool>,
+    operation_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<MailDeleteResult, String> {
     if pop3::is_pop3(&config) {
@@ -3067,49 +3040,54 @@ pub async fn mail_delete_messages(
     if folder.is_empty() {
         return Err("mail folder is required".into());
     }
-    let all = all.unwrap_or(false);
-    let target_uids = uids
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|uid| *uid > 0)
-        .collect::<Vec<_>>();
-    if !all && target_uids.is_empty() {
-        return Ok(MailDeleteResult { folder, deleted: 0 });
-    }
+    let mutation = run_mail_mutation(
+        config,
+        folder.clone(),
+        uids.unwrap_or_default(),
+        String::new(),
+        mutations::Kind::Delete,
+        all.unwrap_or(false),
+        operation_id,
+        state,
+    )
+    .await?;
+    Ok(MailDeleteResult {
+        folder,
+        deleted: mutation.completed_uids.len(),
+        mutation: Some(mutation),
+    })
+}
 
-    let account_id = config.session_id.clone();
+async fn run_mail_mutation(
+    config: MailAccountConfig,
+    folder: String,
+    uids: Vec<u32>,
+    target: String,
+    kind: mutations::Kind,
+    all: bool,
+    operation_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<mutations::Progress, String> {
     let account = resolve_config(&state, config)?;
-    let folder_for_task = folder.clone();
-    let uids_for_task = target_uids.clone();
+    let db = state.mail_db(&account.config.session_id)?;
     let pool = Arc::clone(&state.mail_imap_pool);
-    let handle = tokio::runtime::Handle::current();
-    let deleted = tokio::task::spawn_blocking(move || {
-        with_imap_session(
+    let runtime = tokio::runtime::Handle::current();
+    tokio::task::spawn_blocking(move || {
+        mutations::run_cached(
             &pool,
             &account,
-            &handle,
-            ImapSessionOpts::default(),
-            |imap| imap.delete_messages(&folder_for_task, &uids_for_task, all),
+            &runtime,
+            &db,
+            &folder,
+            uids,
+            &target,
+            kind,
+            all,
+            operation_id,
         )
     })
     .await
-    .map_err(|e| format!("mail delete task failed: {e}"))??;
-
-    let cached_folder = folder.clone();
-    with_mail_db_async(&state, &account_id, move |db, account_id| {
-        let tx = db.unchecked_transaction()?;
-        if all {
-            tx.execute(
-                "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
-                params![account_id, cached_folder],
-            )?;
-        } else {
-            remove_cached_messages(&tx, account_id, &cached_folder, &target_uids)?;
-        }
-        tx.commit()
-    })
-    .await?;
-    Ok(MailDeleteResult { folder, deleted })
+    .map_err(|e| format!("mail mutation task failed: {e}"))?
 }
 
 #[tauri::command]
@@ -4797,58 +4775,6 @@ fn imap_set_flags<T: Read + Write>(
     Ok(uids.len())
 }
 
-fn imap_move_messages<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-    uids: &[u32],
-    target: &str,
-) -> Result<usize, String> {
-    if uids.is_empty() {
-        return Ok(0);
-    }
-    session
-        .select(folder)
-        .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
-    let uid_set = uid_set_string(uids);
-    // Prefer server-side MOVE (RFC 6851). Servers without the MOVE capability
-    // fall back to COPY + \Deleted + EXPUNGE. uid_expunge (UIDPLUS) only removes
-    // the copied UIDs; plain EXPUNGE is the last resort and clears every
-    // \Deleted message in the mailbox.
-    if let Err(move_err) = session.uid_mv(&uid_set, target) {
-        session.uid_copy(&uid_set, target).map_err(|e| {
-            format!("IMAP UID COPY to {target} failed: {e} (after MOVE error: {move_err})")
-        })?;
-        session
-            .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
-            .map_err(|e| format!("IMAP UID STORE \\Deleted failed: {e}"))?;
-        if session.uid_expunge(&uid_set).is_err() {
-            session
-                .expunge()
-                .map_err(|e| format!("IMAP EXPUNGE failed: {e}"))?;
-        }
-    }
-    Ok(uids.len())
-}
-
-fn imap_copy_messages<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-    uids: &[u32],
-    target: &str,
-) -> Result<usize, String> {
-    if uids.is_empty() {
-        return Ok(0);
-    }
-    session
-        .select(folder)
-        .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
-    let uid_set = uid_set_string(uids);
-    session
-        .uid_copy(&uid_set, target)
-        .map_err(|e| format!("IMAP UID COPY to {target} failed: {e}"))?;
-    Ok(uids.len())
-}
-
 fn imap_delete_messages<T: Read + Write>(
     session: &mut imap::Session<T>,
     folder: &str,
@@ -4870,14 +4796,20 @@ fn imap_delete_messages<T: Read + Write>(
     if uid_list.is_empty() {
         return Ok(0);
     }
-    let uid_set = uid_set_string(&uid_list);
-    session
-        .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
-        .map_err(|e| format!("IMAP UID STORE \\Deleted failed: {e}"))?;
-    if session.uid_expunge(&uid_set).is_err() {
+    let caps = session
+        .capabilities()
+        .map_err(|e| format!("IMAP CAPABILITY failed: {e}"))?;
+    if !caps.has_str("UIDPLUS") {
+        return Err("Server cannot safely delete only these messages (UIDPLUS unavailable)".into());
+    }
+    for batch in uid_list.chunks(50) {
+        let uid_set = uid_set_string(batch);
         session
-            .expunge()
-            .map_err(|e| format!("IMAP EXPUNGE failed: {e}"))?;
+            .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
+            .map_err(|e| format!("IMAP UID STORE failed: {e}"))?;
+        session
+            .uid_expunge(&uid_set)
+            .map_err(|e| format!("IMAP UID EXPUNGE failed: {e}"))?;
     }
     Ok(uid_list.len())
 }

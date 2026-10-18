@@ -925,16 +925,22 @@ async fn execute_plans(
             .flat_map(|(h, p)| p.copies.iter().map(move |f| (f.clone(), h.uid))),
     );
     for (target, uids) in copies {
-        if let Err(e) = super::mail_copy_messages(
+        match super::mail_copy_messages(
             config.clone(),
             folder.to_string(),
             uids,
             target.clone(),
+            None,
             state.clone(),
         )
         .await
         {
-            result.errors.push(format!("copy to {target}: {e}"));
+            Ok(outcome) => {
+                if let Some(error) = outcome.mutation.and_then(|m| m.error) {
+                    result.errors.push(format!("copy to {target}: {error}"));
+                }
+            }
+            Err(e) => result.errors.push(format!("copy to {target}: {e}")),
         }
     }
 
@@ -957,34 +963,44 @@ async fn execute_plans(
             .map(|target| (target, h.uid))
     }));
     for (target, uids) in moves {
-        let count = uids.len();
         match super::mail_move_messages(
             config.clone(),
             folder.to_string(),
             uids,
             target.clone(),
+            None,
             state.clone(),
         )
         .await
         {
-            Ok(_) => result.moved += count,
+            Ok(outcome) => {
+                result.moved += outcome.count;
+                if let Some(error) = outcome.mutation.and_then(|m| m.error) {
+                    result.errors.push(format!("move to {target}: {error}"));
+                }
+            }
             Err(e) => result.errors.push(format!("move to {target}: {e}")),
         }
     }
     if trash.is_none() {
         let purge = uids_where(&|p| p.delete && p.move_to.is_none());
         if !purge.is_empty() {
-            let count = purge.len();
             match super::mail_delete_messages(
                 config.clone(),
                 folder.to_string(),
                 Some(purge),
                 Some(false),
+                None,
                 state.clone(),
             )
             .await
             {
-                Ok(_) => result.moved += count,
+                Ok(outcome) => {
+                    result.moved += outcome.deleted;
+                    if let Some(error) = outcome.mutation.and_then(|m| m.error) {
+                        result.errors.push(format!("delete: {error}"));
+                    }
+                }
                 Err(e) => result.errors.push(format!("delete: {e}")),
             }
         }

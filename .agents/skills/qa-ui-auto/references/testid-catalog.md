@@ -1332,6 +1332,9 @@
 - `[data-testid="mail-delete-selected"]` — interactive — F-MAIL-12.delete-selected
 - `[data-testid="mail-selection-count"]` — display — F-MAIL-12.selection-count
 - `[aria-label="Select all visible messages"]` — interactive — F-MAIL-12.select-all-visible
+- `[data-testid="mail-mutation-progress"]` — display — F-MAIL-12.mutation-progress
+- `[data-testid="mail-mutation-retry"]` — interactive — F-MAIL-12.mutation-retry
+- `[data-testid="mail-mutation-details"]` — interactive — F-MAIL-12.mutation-details
 
 ## mail/lists (F-MAIL-14)
 

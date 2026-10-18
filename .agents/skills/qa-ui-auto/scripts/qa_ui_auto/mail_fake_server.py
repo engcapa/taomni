@@ -126,6 +126,9 @@ class FakeMailState:
         self.drop_next_fetch = False
         self.dropped_fetches = 0
         self.rejected_commands = 0
+        self.mutation_fault: dict[str, Any] = {}
+        self.mutation_events: list[dict[str, Any]] = []
+        self.mutation_transferred = 0
         self.next_seen_store_delay = 0.0
         self.fetch_active = 0
         self.fetch_max_parallel = 0
@@ -399,7 +402,9 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     self.send("* BYE bye\r\n" + ok)
                     return
                 elif upper.startswith("CAPABILITY"):
-                    capabilities = "IMAP4rev1 UIDPLUS MOVE IDLE SPECIAL-USE" + (" CONDSTORE" if state.advertise_condstore else "")
+                    capabilities = "IMAP4rev1 IDLE SPECIAL-USE" + (" CONDSTORE" if state.advertise_condstore else "")
+                    if state.mutation_fault.get("supports_move", True): capabilities += " MOVE"
+                    if state.mutation_fault.get("uidplus", True): capabilities += " UIDPLUS"
                     out.append(f"* CAPABILITY {capabilities}\r\n".encode())
                 elif upper.startswith(("LIST", "LSUB")):
                     lsub = upper.startswith("LSUB")
@@ -487,6 +492,9 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                             chunk += f" BODY[] {{{len(message.raw)}}}\r\n".encode() + message.raw
                         out.append(chunk + b")\r\n")
                 elif upper.startswith("UID STORE"):
+                    if "\\DELETED" in upper and state.mutation_fault.pop("reject_store_once", False):
+                        self.send(f"{tag} NO temporarily unable to store flags\r\n")
+                        continue
                     folder = state.folders[selected or "INBOX"]
                     uid_spec, _, spec = rest[10:].strip().partition(" ")
                     flags = re.findall(r"[\\$]?\w+", spec[spec.find("(") + 1: spec.rfind(")")]) if "(" in spec else []
@@ -510,9 +518,22 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     dest = state.folders.get(target)
                     ranges = _uid_ranges(uid_spec, max(folder.messages, default=0))
                     moving = [uid for uid in sorted(folder.messages) if _in(uid, ranges)]
-                    if dest is None:
+                    limit = state.mutation_fault.get("max_count")
+                    fail_after = state.mutation_fault.get("fail_after")
+                    event = {"command": "MOVE" if upper.startswith("UID MOVE") else "COPY", "folder": selected or "INBOX", "target": target, "uids": moving, "success": False}
+                    state.mutation_events.append(event)
+                    if upper.startswith("UID MOVE") and not state.mutation_fault.get("supports_move", True):
+                        ok = f"{tag} BAD Could not parse command\r\n"
+                    elif limit is not None and len(moving) > limit:
+                        event["count_rejected"] = True
+                        ok = f"{tag} NO COPY copy mail count over limit\r\n"
+                    elif fail_after is not None and state.mutation_transferred >= fail_after:
+                        ok = f"{tag} NO destination unavailable\r\n"
+                    elif dest is None:
                         ok = f"{tag} NO [TRYCREATE] no such mailbox\r\n"
                     else:
+                        event["success"] = True
+                        state.mutation_transferred += len(moving)
                         for uid in moving:
                             message = folder.messages[uid]
                             new_uid = dest.uid_next
@@ -520,9 +541,15 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                             dest.messages[new_uid] = FakeMessage(raw=message.raw, flags=list(message.flags), internal_ts=message.internal_ts, modseq=state.bump())
                             if upper.startswith("UID MOVE"):
                                 del folder.messages[uid]
+                        if upper.startswith("UID COPY") and state.mutation_fault.pop("drop_copy_response_once", False):
+                            return
                 elif upper.startswith(("UID EXPUNGE", "EXPUNGE")):
                     folder = state.folders[selected or "INBOX"]
-                    for uid in [uid for uid, m in folder.messages.items() if "\\Deleted" in m.flags]:
+                    if upper.startswith("UID EXPUNGE") and not state.mutation_fault.get("uidplus", True):
+                        self.send(f"{tag} BAD UIDPLUS unavailable\r\n")
+                        continue
+                    ranges = _uid_ranges(rest[11:].strip(), max(folder.messages, default=0)) if upper.startswith("UID EXPUNGE") else [(1, 2**32-1)]
+                    for uid in [uid for uid, m in folder.messages.items() if "\\Deleted" in m.flags and _in(uid, ranges)]:
                         del folder.messages[uid]
                     state.bump()
                 elif upper.startswith("APPEND"):

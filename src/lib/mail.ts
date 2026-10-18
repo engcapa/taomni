@@ -274,15 +274,28 @@ export interface MailFlagResult {
   updated: number;
 }
 
+export interface MailMutationProgress {
+  operationId: string;
+  completedUids: number[];
+  pendingUids: number[];
+  uncertainUids: number[];
+  error: string | null;
+  detail: string | null;
+  retryable: boolean;
+  batchSize: number;
+}
+
 export interface MailMoveResult {
   folder: string;
   target: string;
   count: number;
+  mutation?: MailMutationProgress | null;
 }
 
 export interface MailDeleteResult {
   folder: string;
   deleted: number;
+  mutation?: MailMutationProgress | null;
 }
 
 export interface MailTestConnectionResult {
@@ -693,9 +706,10 @@ export function mailMoveMessages(
   folder: string,
   uids: number[],
   targetFolder: string,
+  operationId?: string,
 ): Promise<MailMoveResult> {
   return withVaultLockedNotice(() =>
-    invoke<MailMoveResult>("mail_move_messages", { config, folder, uids, targetFolder }),
+    invoke<MailMoveResult>("mail_move_messages", { config, folder, uids, targetFolder, operationId }),
   );
 }
 
@@ -704,9 +718,10 @@ export function mailCopyMessages(
   folder: string,
   uids: number[],
   targetFolder: string,
+  operationId?: string,
 ): Promise<MailMoveResult> {
   return withVaultLockedNotice(() =>
-    invoke<MailMoveResult>("mail_copy_messages", { config, folder, uids, targetFolder }),
+    invoke<MailMoveResult>("mail_copy_messages", { config, folder, uids, targetFolder, operationId }),
   );
 }
 
@@ -715,9 +730,10 @@ export function mailDeleteMessages(
   folder: string,
   uids: number[],
   all = false,
+  operationId?: string,
 ): Promise<MailDeleteResult> {
   return withVaultLockedNotice(() =>
-    invoke<MailDeleteResult>("mail_delete_messages", { config, folder, uids, all }),
+    invoke<MailDeleteResult>("mail_delete_messages", { config, folder, uids, all, operationId }),
   );
 }
 

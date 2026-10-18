@@ -17,6 +17,21 @@ from . import StepContext, StepError, verb
 _CONTROL = "window.__taomniQaMail"
 
 
+@verb("mail_server_mutation_fault")
+def mail_server_mutation_fault(ctx: StepContext, args: Any) -> None:
+    """Inject native-receipt outcomes in the browser model for renderer checks."""
+    if ctx.dry_run:
+        return
+    _require_control(ctx)
+    ctx.page.evaluate(f"(fault) => {_CONTROL}.mutationFault(fault)", args)
+
+
+@verb("mail_server_assert_mutations")
+def mail_server_assert_mutations(ctx: StepContext, args: Any) -> None:
+    if not ctx.dry_run:
+        raise StepError("mail_server_assert_mutations requires native IMAP command evidence")
+
+
 def _require_control(ctx: StepContext) -> None:
     ok = ctx.page.evaluate(f"Boolean({_CONTROL})")  # type: ignore[attr-defined]
     if not ok:

@@ -3365,6 +3365,34 @@ def _do_mail_server_sparse_sync(ctx: NativeStepContext, args: Any) -> str:
     return "delivered 1100 sparse ten-digit UIDs; next FLAGS FETCH disconnects; 4096-byte command limit"
 
 
+@_verb("mail_server_mutation_fault")
+def _do_mail_server_mutation_fault(ctx: NativeStepContext, args: Any) -> str:
+    state = _mail_server().state
+    with state.lock:
+        state.mutation_fault.update(args)
+    return f"configured disposable IMAP mutation faults: {args}"
+
+
+@_verb("mail_server_assert_mutations")
+def _do_mail_server_assert_mutations(ctx: NativeStepContext, args: Any) -> str:
+    state = _mail_server().state
+    with state.lock:
+        events = list(state.mutation_events)
+        if any(command == "EXPUNGE" for command in state.log):
+            raise StepError("mail mutations used unsafe mailbox-wide EXPUNGE")
+        if args.get("no_move") and any(event["command"] == "MOVE" for event in events):
+            raise StepError("MOVE was sent despite the server not advertising it")
+        if args.get("count_rejected") and not any(event.get("count_rejected") for event in events):
+            raise StepError("provider count rejection was not exercised")
+        copied = [(event["folder"], event["target"], uid) for event in events
+                  if event["command"] == "COPY" and event["success"] for uid in event["uids"]]
+        if len(copied) != len(set(copied)):
+            raise StepError("source messages were copied more than once")
+        if "copied" in args and len(copied) != args["copied"]:
+            raise StepError(f"copied {len(copied)}, expected {args['copied']}")
+    return f"verified {len(events)} transfer attempts, {len(copied)} unique copies, no plain EXPUNGE"
+
+
 @_verb("mail_server_assert_sync_transport")
 def _do_mail_server_assert_sync_transport(ctx: NativeStepContext, args: Any) -> str:
     state = _mail_server().state

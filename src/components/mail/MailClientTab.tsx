@@ -1,3 +1,4 @@
+import { MailMutationError, MailMutationSession } from "../../lib/mailMutations";
 import { MailArchivePanel } from "./MailArchivePanel";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type SetStateAction, type UIEvent } from "react";
 import { isRecoveryStartup } from "../../lib/runtimeRecovery";
@@ -965,7 +966,7 @@ function dedupeMessages(messages: readonly MailMessageHeader[]): MailMessageHead
   return unique;
 }
 
-function* messageBatchesByFolder(messages: readonly MailMessageHeader[]): Generator<[string, MailMessageHeader[]]> {
+function* messageBatchesByFolder(messages: readonly MailMessageHeader[], batchSize = 250): Generator<[string, MailMessageHeader[]]> {
   const map = new Map<string, MailMessageHeader[]>();
   for (const message of messages) {
     const list = map.get(message.folder) ?? [];
@@ -975,8 +976,8 @@ function* messageBatchesByFolder(messages: readonly MailMessageHeader[]): Genera
   // Bound UID command length and update the UI after each successful batch.
   // An error leaves already completed batches removed and the rest selected.
   for (const [folder, group] of map) {
-    for (let offset = 0; offset < group.length; offset += 250) {
-      yield [folder, group.slice(offset, offset + 250)];
+    for (let offset = 0; offset < group.length; offset += batchSize) {
+      yield [folder, group.slice(offset, offset + batchSize)];
     }
   }
 }
@@ -1410,6 +1411,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [sourceView, setSourceView] = useState<{ subject: string; content: string } | null>(null);
   const [busyAction, setBusyAction] = useState(false);
+  const mutationSessionRef = useRef(new MailMutationSession());
+  const retryMailActionRef = useRef<(() => Promise<void>) | null>(null);
+  const [mutationFailure, setMutationFailure] = useState<{ message: string; retryable: boolean; detail: string | null } | null>(null);
+  const [mutationProgress, setMutationProgress] = useState<string | null>(null);
   const { resolvedTheme } = useAppTheme();
   const appPrefersDark = resolvedTheme === "dark";
 
@@ -4158,16 +4163,30 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }));
   };
 
-  const runMailAction = async (action: () => Promise<void>) => {
+  const runMailAction = async (action: () => Promise<void>, retry = false) => {
+    if (!retry) {
+      mutationSessionRef.current = new MailMutationSession();
+      setMutationProgress(null);
+    }
+    retryMailActionRef.current = action;
+    setMutationFailure(null);
     setBusyAction(true);
     setError(null);
     try {
       await action();
     } catch (e) {
       setError(mailClientErrorMessage(e));
+      if (mutationSessionRef.current.used) {
+        setMutationFailure({ message: mailClientErrorMessage(e), retryable: !(e instanceof MailMutationError) || e.retryable,
+          detail: e instanceof MailMutationError ? e.detail : null });
+      }
     } finally {
       setBusyAction(false);
     }
+  };
+
+  const reportMutationProgress = (completed: number, total: number) => {
+    setMutationProgress(`Processed ${completed}/${total} messages`);
   };
 
   const resolveSpecialFolder = (kind: SpecialFolderKind): string | null =>
@@ -4291,13 +4310,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   });
 
   const moveTargetsTo = async (targets: MailMessageHeader[], target: string): Promise<number> => {
+    const unique = dedupeMessages(targets).filter((message) => message.folder !== target);
+    const operation = mutationSessionRef.current;
+    operation.total = unique.length;
+    reportMutationProgress(operation.completed, operation.total);
     let moved = 0;
-    for (const [folder, group] of messageBatchesByFolder(dedupeMessages(targets))) {
-      if (folder === target) continue;
+    for (const [folder, group] of messageBatchesByFolder(unique, 50)) {
       const uids = group.map((message) => message.uid);
-      await mailMoveMessages(info, folder, uids, target);
-      removeMessagesLocally(folder, uids, group.filter(isUnread).length);
-      moved += uids.length;
+      moved += await operation.execute(JSON.stringify(["move", folder, target, uids]), uids,
+        (id) => mailMoveMessages(info, folder, uids, target, id),
+        (done) => removeMessagesLocally(folder, done, group.filter((m) => done.includes(m.uid) && isUnread(m)).length),
+        reportMutationProgress);
     }
     return moved;
   };
@@ -4308,11 +4331,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   });
 
   const handleCopyMessages = (targets: MailMessageHeader[], target: string) => runMailAction(async () => {
+    const unique = dedupeMessages(targets);
+    const operation = mutationSessionRef.current;
+    operation.total = unique.length;
+    reportMutationProgress(operation.completed, operation.total);
     let copied = 0;
-    for (const [folder, group] of messageBatchesByFolder(dedupeMessages(targets))) {
+    for (const [folder, group] of messageBatchesByFolder(unique, 50)) {
       const uids = group.map((message) => message.uid);
-      await mailCopyMessages(info, folder, uids, target);
-      copied += uids.length;
+      copied += await operation.execute(JSON.stringify(["copy", folder, target, uids]), uids,
+        (id) => mailCopyMessages(info, folder, uids, target, id), () => {}, reportMutationProgress);
     }
     setStatus(copied > 0 ? `Copied ${copied} message${copied === 1 ? "" : "s"} to ${target}` : "Nothing to copy");
   });
@@ -4358,10 +4385,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         danger: true,
       });
       if (!confirmed) return;
-      for (const [folder, group] of messageBatchesByFolder(unique)) {
+      const operation = mutationSessionRef.current;
+      operation.total = unique.length;
+      reportMutationProgress(operation.completed, operation.total);
+      for (const [folder, group] of messageBatchesByFolder(unique, 50)) {
         const uids = group.map((message) => message.uid);
-        await mailDeleteMessages(info, folder, uids, false);
-        removeMessagesLocally(folder, uids, group.filter(isUnread).length);
+        await operation.execute(JSON.stringify(["delete", folder, uids]), uids,
+          (id) => mailDeleteMessages(info, folder, uids, false, id),
+          (done) => removeMessagesLocally(folder, done, group.filter((m) => done.includes(m.uid) && isUnread(m)).length),
+          reportMutationProgress);
       }
       setStatus(`Deleted ${unique.length} message${unique.length === 1 ? "" : "s"}`);
       return;
@@ -4543,7 +4575,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       danger: true,
     });
     if (!confirmed) return;
-    const result = await mailDeleteMessages(info, folder.name, [], true);
+    const deleted = await mutationSessionRef.current.execute(JSON.stringify(["empty", folder.name]), [],
+      (id) => mailDeleteMessages(info, folder.name, [], true, id),
+      (done) => removeMessagesLocally(folder.name, done, messages.filter((m) => m.folder === folder.name && done.includes(m.uid) && isUnread(m)).length),
+      reportMutationProgress);
     if (selectedFolder === folder.name) {
       setMessages([]);
       setSelectedMessageKey(null);
@@ -4555,7 +4590,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         ? { ...entry, total: 0, unread: 0, updatedAt: Math.floor(Date.now() / 1000) }
         : entry
     )));
-    setStatus(`Emptied ${result.deleted} message${result.deleted === 1 ? "" : "s"} from ${folderLabel(folder)}`);
+    setStatus(`Emptied ${deleted} message${deleted === 1 ? "" : "s"} from ${folderLabel(folder)}`);
   });
 
   /** A pending read receipt request of `message` (not yet answered, not mine). */
@@ -5634,15 +5669,27 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       )}
       {/* Reserve the status strip so transient progress never moves the toolbar or message rows. */}
       <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[11px] bg-[var(--taomni-sidebar-bg)]">
-        {(error || status) && (
+        {(mutationFailure?.message || error || status) && (
           <>
-            {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+            {(mutationFailure?.message || error) ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
             <span
-              className={`min-w-0 flex-1 truncate ${error ? "text-red-500" : "text-[var(--taomni-text-muted)]"}`}
-              title={error ?? status ?? undefined}
+              className={`min-w-0 flex-1 truncate ${(mutationFailure?.message || error) ? "text-red-500" : "text-[var(--taomni-text-muted)]"}`}
+              title={(mutationFailure?.message || error) ?? status ?? undefined}
             >
-              {error ?? status}
+              {(mutationFailure?.message || error) ?? status}
             </span>
+            {mutationFailure?.retryable && (
+              <button type="button" className="taomni-btn h-5 px-2 shrink-0" data-testid="mail-mutation-retry"
+                disabled={busyAction} onClick={() => { if (retryMailActionRef.current) void runMailAction(retryMailActionRef.current, true); }}>
+                Retry remaining
+              </button>
+            )}
+            {mutationFailure?.detail && (
+              <button type="button" className="taomni-btn h-5 px-2 shrink-0" data-testid="mail-mutation-details"
+                onClick={() => void confirmDialog.confirm({ title: "Mail operation details", message: mutationFailure.detail ?? "", confirmLabel: "Close" })}>
+                Details
+              </button>
+            )}
             {error && isMailCertificateError(error) && (
               <button
                 type="button"
@@ -5667,6 +5714,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           </>
         )}
         <div className="ml-auto min-w-0 flex items-center gap-2 overflow-x-auto">
+          {mutationProgress && (
+            <span className="shrink-0" role="status" data-testid="mail-mutation-progress" aria-busy={busyAction}>{mutationProgress}</span>
+          )}
           {syncProgress && (
             <span
               className="h-5 shrink-0 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"

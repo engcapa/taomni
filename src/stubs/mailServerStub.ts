@@ -9,6 +9,7 @@
 
 import { emit } from "./tauri-event";
 import { stubAgendaTexts } from "./mailCalendarStub";
+import type { MailMutationProgress } from "../lib/mail";
 
 type StubMailHeader = {
   accountId: string;
@@ -77,6 +78,10 @@ interface StubAccountState {
 
 const accounts = new Map<string, StubAccountState>();
 let nextFolderReadDelayMs = 0;
+type MutationFault = { supports_move?: boolean; uidplus?: boolean; max_count?: number | null; fail_after?: number | null; reject_store_once?: boolean; drop_copy_response_once?: boolean };
+let mutationFault: MutationFault = {};
+let mutationTransferred = 0;
+const mutationJobs = new Map<string, { done: number[]; copied: number[]; uncertain: number[]; uids: number[] }>();
 
 const deliveredTotals = new Map<string, number>();
 
@@ -369,6 +374,58 @@ export function stubMailTransfer(
   return count;
 }
 
+/** Renderer fixture of the native receipt contract, not an IMAP implementation. */
+export function stubMailMutation(accountId: string, seed: Seed, folder: string, uids: number[], target: string | null, copy: boolean, all: boolean, id: string): MailMutationProgress {
+  const source = folderState(account(accountId, seed), folder);
+  let job = mutationJobs.get(id);
+  if (!job) {
+    job = { done: [], copied: [], uncertain: [], uids: all ? [...source.server.keys()] : [...uids] };
+    mutationJobs.set(id, job);
+  }
+  let error: string | null = null;
+  let detail: string | null = null;
+  const limit = Math.max(1, Math.min(50, mutationFault.max_count ?? 50));
+  for (let offset = 0; offset < job.uids.length; offset += limit) {
+    const batch = job.uids.slice(offset, offset + limit).filter((uid) => !job!.done.includes(uid));
+    if (!batch.length) continue;
+    if (job.uncertain.length) { error = "The server result needs verification. Automatic retry is stopped to prevent duplicate mail."; break; }
+    const pendingCopy = batch.filter((uid) => !job!.copied.includes(uid));
+    if (target && pendingCopy.length) {
+      if (mutationFault.fail_after != null && mutationTransferred >= mutationFault.fail_after) {
+        error = "Some messages could not be processed. Retry to continue from the last confirmed step.";
+        detail = "IMAP mail operation failed: No Response: destination unavailable";
+        break;
+      }
+      stubMailTransfer(accountId, seed, folder, pendingCopy, target, true);
+      job.copied.push(...pendingCopy);
+      mutationTransferred += pendingCopy.length;
+      if (mutationFault.drop_copy_response_once) {
+        mutationFault.drop_copy_response_once = false;
+        job.uncertain.push(...pendingCopy);
+        error = "The server result needs verification. Automatic retry is stopped to prevent duplicate mail.";
+        detail = "The server may have copied these messages but its reply was lost. Check the destination before taking further action.";
+        break;
+      }
+    }
+    if (!copy) {
+      if (mutationFault.reject_store_once) {
+        mutationFault.reject_store_once = false;
+        error = "Some messages could not be processed. Retry to continue from the last confirmed step.";
+        detail = "IMAP mail operation failed: No Response: temporarily unable to store flags";
+        break;
+      }
+      if (mutationFault.uidplus === false) {
+        error = detail = "Messages are marked for deletion, but this server cannot safely expunge only the selected messages (UIDPLUS unavailable). No other messages were expunged.";
+        break;
+      }
+      stubMailTransfer(accountId, seed, folder, batch, null, false);
+    }
+    job.done.push(...batch);
+  }
+  return { operationId: id, completedUids: [...job.done], pendingUids: job.uids.filter((uid) => !job!.done.includes(uid)),
+    uncertainUids: [...job.uncertain], error, detail, retryable: !!error && !job.uncertain.length, batchSize: limit };
+}
+
 /** Cached headers of a folder (what the filter engine sees). */
 export function stubMailCachedHeaders(accountId: string, seed: Seed, folderName: string): StubMailHeader[] {
   return [...folderState(account(accountId, seed), folderName).cache.values()];
@@ -453,6 +510,7 @@ function idleChanged(accountId: string, folder: string) {
 }
 
 export interface StubMailQaControl {
+  mutationFault: (fault: MutationFault) => void;
   delayNextFolderRead: (milliseconds: number) => void;
   deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null, readReceipt?: boolean) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
@@ -491,6 +549,7 @@ function stubInvite(summary: string, uid: string): StubMailInvite {
 
 export function installStubMailQaControl(seed: Seed): void {
   const control: StubMailQaControl = {
+    mutationFault(fault) { mutationFault = { ...mutationFault, ...fault }; },
     delayNextFolderRead(milliseconds) { nextFolderReadDelayMs = milliseconds; },
     deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null, readReceipt = false) {
       const state = account(accountId, seed);

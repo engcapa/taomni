@@ -17,7 +17,7 @@ import {
   stubMailSetSubscription,
   stubMailIdleStop,
   stubMailRecordSent,
-  stubMailTransfer,
+  stubMailMutation,
   stubMailUpdateCachedFlags,
   stubMailMarkRead,
   type Seed as MailStubSeed,
@@ -4458,15 +4458,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
       const target = (invokeArgs?.targetFolder as string | undefined) ?? null;
-      const count = stubMailTransfer(
-        stubMailAccountId(invokeArgs),
-        mailStubSeed,
-        folder,
-        uids,
+      const mutation = stubMailMutation(
+        stubMailAccountId(invokeArgs), mailStubSeed, folder, uids,
         cmd === "mail_delete_messages" ? null : target,
-        cmd === "mail_copy_messages",
+        cmd === "mail_copy_messages", invokeArgs?.all === true,
+        String(invokeArgs?.operationId ?? crypto.randomUUID()),
       );
-      return (cmd === "mail_delete_messages" ? { folder, deleted: count } : { folder, target, count }) as T;
+      const count = mutation.completedUids.length;
+      return (cmd === "mail_delete_messages" ? { folder, deleted: count, mutation } : { folder, target, count, mutation }) as T;
     }
     case "mail_search_messages": {
       const invokeArgs = args as InvokeArgs | undefined;

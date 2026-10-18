@@ -232,6 +232,7 @@ pub(super) fn move_or_copy(
         folder: folder.to_string(),
         target: target.to_string(),
         count,
+        mutation: None,
     })
 }
 
@@ -253,6 +254,7 @@ pub(super) fn delete(
     Ok(MailDeleteResult {
         folder: folder.to_string(),
         deleted,
+        mutation: None,
     })
 }
 

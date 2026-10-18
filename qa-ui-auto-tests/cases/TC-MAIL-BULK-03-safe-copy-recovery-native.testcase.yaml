@@ -1,0 +1,318 @@
+id: TC-MAIL-BULK-03
+title: Native COPY recovery avoids duplicates and unrelated expunges
+description: Exercise COPY success followed by STORE failure, loss of a successful COPY reply, and a server without
+  UIDPLUS. Check exact server counts and command history, retry/repeat actions, and preserve an unrelated deleted
+  sentinel. All services and storage are disposable.
+covers:
+- F-MAIL-3
+- F-MAIL-12
+tags:
+- mail
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+    unread: true
+- mail_server_expunge_newest:
+    folder: INBOX
+    count: 1000000
+- mail_server_deliver:
+    count: 3
+    prefix: Store recovery
+- mail_server_mutation_fault:
+    supports_move: false
+    max_count: 3
+    reject_store_once: true
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 30
+- click: '[aria-label="Select all visible messages"]'
+- click: '[data-testid="mail-delete-selected"]'
+- assert_text:
+    selector: '[data-testid="mail-mutation-progress"]'
+    contains: Processed 0/3 messages
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 3
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: INBOX
+    equals: 3
+    timeout_sec: 30
+- screenshot: mail-bulk-store-failed.png
+- click: '[data-testid="mail-mutation-retry"]'
+- mail_server_assert_folder_count:
+    folder: INBOX
+    equals: 0
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 3
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 0 selected
+- mail_server_assert_mutations:
+    no_move: true
+    copied: 3
+- mail_server_deliver:
+    count: 3
+    prefix: Ambiguous copy
+- mail_server_mutation_fault:
+    drop_copy_response_once: true
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 30
+- click: '[aria-label="Select all visible messages"]'
+- click: '[data-testid="mail-delete-selected"]'
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 3 selected
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: server result needs verification
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 6
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: INBOX
+    equals: 3
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mail-mutation-retry"]'
+    equal: 0
+- screenshot: mail-bulk-uncertain-copy.png
+- click: '[data-testid="mail-delete-selected"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: server result needs verification
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 6
+    timeout_sec: 30
+- mail_server_assert_mutations:
+    no_move: true
+    copied: 6
+- mail_server_deliver:
+    folder: Archive
+    count: 3
+    prefix: Safe cleanup
+- mail_server_deliver:
+    folder: Archive
+    count: 1
+    prefix: Other deleted sentinel
+- mail_server_set_flags_newest:
+    folder: Archive
+    count: 1
+    flags:
+    - \Deleted
+- mail_server_mutation_fault:
+    uidplus: false
+- click: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- mail_server_assert_list_matches:
+    folder: Archive
+    timeout_sec: 30
+- click:
+    selector: '[data-testid="mail-message-row"]:nth-child(2)'
+    modifiers:
+    - Mod
+- click:
+    selector: '[data-testid="mail-message-row"]:nth-child(4)'
+    modifiers:
+    - Shift
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 3 selected
+- click: '[data-testid="mail-delete-selected"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: UIDPLUS unavailable
+- mail_server_assert_folder_count:
+    folder: Archive
+    equals: 4
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 9
+    timeout_sec: 30
+- screenshot: mail-bulk-no-uidplus.png
+- mail_server_mutation_fault:
+    uidplus: true
+- click: '[data-testid="mail-mutation-retry"]'
+- mail_server_assert_folder_count:
+    folder: Archive
+    equals: 1
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 9
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 0 selected
+- mail_server_assert_mutations:
+    no_move: true
+    copied: 9
+- screenshot: mail-bulk-sentinel-preserved.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A confirmed COPY resumes at STORE and is never copied twice.
+    actions:
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 20
+    checkpoints:
+    - step: 13
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 30}}'
+    - step: 16
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-mutation-progress"]'', ''contains'': ''Processed
+        0/3 messages''}}'
+    - step: 17
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 3, ''timeout_sec'':
+        30}}'
+    - step: 18
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 3, ''timeout_sec'':
+        30}}'
+    - step: 21
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 0, ''timeout_sec'':
+        30}}'
+    - step: 22
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 3, ''timeout_sec'':
+        30}}'
+    - step: 23
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'': ''0
+        selected''}}'
+    - step: 24
+      expectation: '{''mail_server_assert_mutations'': {''no_move'': True, ''copied'': 3}}'
+    results:
+    - 13
+    - 16
+    - 17
+    - 18
+    - 21
+    - 22
+    - 23
+    - 24
+  - id: R2
+    requirement: A lost COPY reply blocks automatic and repeated copying.
+    actions:
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 37
+    checkpoints:
+    - step: 28
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 30}}'
+    - step: 31
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'': ''3
+        selected''}}'
+    - step: 32
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-client-tab"]'', ''contains'': ''server
+        result needs verification''}}'
+    - step: 33
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 6, ''timeout_sec'':
+        30}}'
+    - step: 34
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 3, ''timeout_sec'':
+        30}}'
+    - step: 35
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-mutation-retry"]'', ''equal'': 0}}'
+    - step: 38
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-client-tab"]'', ''contains'': ''server
+        result needs verification''}}'
+    - step: 39
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 6, ''timeout_sec'':
+        30}}'
+    - step: 40
+      expectation: '{''mail_server_assert_mutations'': {''no_move'': True, ''copied'': 6}}'
+    results:
+    - 28
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 38
+    - 39
+    - 40
+  - id: R3
+    requirement: Missing UIDPLUS never triggers plain EXPUNGE; targeted cleanup later preserves other deleted mail.
+    actions:
+    - 41
+    - 42
+    - 44
+    - 45
+    - 47
+    - 48
+    - 50
+    - 55
+    - 56
+    checkpoints:
+    - step: 46
+      expectation: '{''mail_server_assert_list_matches'': {''folder'': ''Archive'', ''timeout_sec'': 30}}'
+    - step: 49
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'': ''3
+        selected''}}'
+    - step: 51
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-client-tab"]'', ''contains'': ''UIDPLUS
+        unavailable''}}'
+    - step: 52
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Archive'', ''equals'': 4, ''timeout_sec'':
+        30}}'
+    - step: 53
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 9, ''timeout_sec'':
+        30}}'
+    - step: 57
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Archive'', ''equals'': 1, ''timeout_sec'':
+        30}}'
+    - step: 58
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 9, ''timeout_sec'':
+        30}}'
+    - step: 59
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'': ''0
+        selected''}}'
+    - step: 60
+      expectation: '{''mail_server_assert_mutations'': {''no_move'': True, ''copied'': 9}}'
+    results:
+    - 46
+    - 49
+    - 51
+    - 52
+    - 53
+    - 57
+    - 58
+    - 59
+    - 60
+  visual:
+  - check: Progress, remaining selection, error, Retry and Details are legible without moving the toolbar.
+    method: manual
+    reason: Inspect the retained screenshots.
+  native:
+  - check: Native exercises real IPC, SQLite receipts and loopback IMAP; browser only proves renderer receipt handling.
+    method: automated
+    reason: Server folder counts are independent of UI success messages.

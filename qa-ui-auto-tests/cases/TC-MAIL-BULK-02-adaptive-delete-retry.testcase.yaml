@@ -1,0 +1,177 @@
+id: TC-MAIL-BULK-02
+title: Adaptive bulk delete preserves partial progress and retries the remainder
+description: Select 200 messages against a provider without MOVE and with a 25-message COPY limit. Fail after the
+  first successful batch, inspect error details, then resume. Native checks real provider effects; browser injects
+  equivalent receipts. Exactly 200 destination messages and no source messages must remain.
+covers:
+- F-MAIL-3
+- F-MAIL-12
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+    unread: true
+- mail_server_expunge_newest:
+    folder: INBOX
+    count: 1000000
+- mail_server_deliver:
+    count: 200
+    prefix: Bulk limit
+- mail_server_mutation_fault:
+    supports_move: false
+    max_count: 25
+    fail_after: 25
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="mail-message-row"]'
+    equal: 200
+- click: '[aria-label="Select all visible messages"]'
+- click: '[data-testid="mail-delete-selected"]'
+- assert_text:
+    selector: '[data-testid="mail-mutation-progress"]'
+    contains: Processed 25/200 messages
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 175 selected
+- mail_server_assert_folder_count:
+    folder: INBOX
+    equals: 175
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 25
+    timeout_sec: 30
+- assert_enabled: '[data-testid="mail-mutation-retry"]'
+- screenshot: mail-bulk-limit-partial.png
+- click: '[data-testid="mail-mutation-details"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog"]'
+    contains: destination unavailable
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_count:
+    selector: '[data-testid="confirm-dialog"]'
+    equal: 0
+- mail_server_mutation_fault:
+    fail_after: null
+- click: '[data-testid="mail-mutation-retry"]'
+- mail_server_assert_folder_count:
+    folder: INBOX
+    equals: 0
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Trash
+    equals: 200
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="mail-selection-count"]'
+    contains: 0 selected
+- assert_text:
+    selector: '[data-testid="mail-mutation-progress"]'
+    contains: Processed 200/200 messages
+- assert_count:
+    selector: '[data-testid="mail-message-row"]'
+    equal: 0
+- screenshot: mail-bulk-limit-complete.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A count-limited partial move preserves 175 selected messages and explains the failure.
+    actions:
+    - 10
+    - 11
+    - 12
+    - 15
+    - 16
+    - 23
+    - 25
+    checkpoints:
+    - step: 13
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 30}}'
+    - step: 14
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-message-row"]'', ''equal'': 200}}'
+    - step: 17
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-mutation-progress"]'', ''contains'': ''Processed
+        25/200 messages''}}'
+    - step: 18
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'': ''175
+        selected''}}'
+    - step: 19
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 175, ''timeout_sec'':
+        30}}'
+    - step: 20
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 25, ''timeout_sec'':
+        30}}'
+    - step: 21
+      expectation: '{''assert_enabled'': ''[data-testid="mail-mutation-retry"]''}'
+    - step: 24
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="confirm-dialog"]'', ''contains'': ''destination
+        unavailable''}}'
+    - step: 26
+      expectation: Closing the details dialog returns to the remaining selection.
+    results:
+    - 13
+    - 14
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 24
+    - 26
+  - id: R2
+    requirement: Retry completes the original action without duplicating the 25 completed messages.
+    actions:
+    - 27
+    - 28
+    checkpoints:
+    - step: 29
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 0, ''timeout_sec'':
+        30}}'
+    - step: 30
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 200, ''timeout_sec'':
+        30}}'
+    - step: 31
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'': ''0
+        selected''}}'
+    - step: 32
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-mutation-progress"]'', ''contains'': ''Processed
+        200/200 messages''}}'
+    - step: 33
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-message-row"]'', ''equal'': 0}}'
+    results:
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+  visual:
+  - check: Progress, remaining selection, error, Retry and Details are legible without moving the toolbar.
+    method: manual
+    reason: Inspect the retained screenshots.
+  native:
+  - check: Native exercises real IPC, SQLite receipts and loopback IMAP; browser only proves renderer receipt handling.
+    method: automated
+    reason: Server folder counts are independent of UI success messages.
