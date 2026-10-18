@@ -481,6 +481,7 @@ class NativeSessionFillTest(TestCase):
 
     def test_input_fill_keeps_blur_committing_control_focused(self) -> None:
         session = self.session(False)
+        session.execute = Mock(side_effect=[False, False, {"kind": "text", "value": "Taomni"}])
 
         result = session.fill("input[name=title]", "Taomni")
 
@@ -494,6 +495,46 @@ class NativeSessionFillTest(TestCase):
         session.focus.assert_called_once_with("input[name=title]")
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_called_once_with("Taomni")
+
+    def test_segmented_date_fill_repairs_a_locale_shuffled_value(self) -> None:
+        # WebKitGTK distributes typed digits across localized date segments in
+        # locale order, so key input alone can store a different date.
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, False, {"kind": "date", "value": "0001-12-01"}, "2024-01-01"])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}):
+            session.fill('input[type=date]', "2024-01-01")
+        session.type_text.assert_called_once_with("2024-01-01")
+        script = session.execute.call_args_list[-1].args[0]
+        self.assertIn("HTMLInputElement.prototype", script)
+        self.assertIn("new Event('input'", script)
+        self.assertIn('setter.call(el, "2024-01-01")', script)
+
+    def test_multiline_textarea_fill_repairs_a_dropped_newline(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[
+            False, False, {"kind": "textarea", "value": "台北&U,BTFw-"}, "台北\n&U,BTFw-"])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}):
+            session.fill("textarea[name=folders]", "台北\n&U,BTFw-")
+        script = session.execute.call_args_list[-1].args[0]
+        self.assertIn("HTMLTextAreaElement.prototype", script)
+
+    def test_single_line_text_fill_skips_value_repair(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, False, {"kind": "text", "value": "Taomni"}])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}):
+            session.fill("input[name=title]", "Taomni")
+        self.assertEqual(session.execute.call_count, 3)
+
+    def test_value_repair_rejects_a_control_that_keeps_the_wrong_value(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, False, {"kind": "date", "value": "0001-12-01"}, "0001-12-01"])
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch.dict(os.environ, {"GDK_BACKEND": "x11"}):
+            with self.assertRaisesRegex(WebDriverError, "did not retain the requested value"):
+                session.fill('input[type=date]', "2024-01-01")
 
     def test_input_fill_rejects_missing_focus_before_typing(self) -> None:
         session = self.session(False)
@@ -531,7 +572,7 @@ class NativeSessionFillTest(TestCase):
 
     def test_wayland_fill_retries_select_all_before_deleting_old_prefix(self) -> None:
         session = self.session(False)
-        session.execute = Mock(side_effect=[False, False, True, False])
+        session.execute = Mock(side_effect=[False, False, True, False, {"kind": "text", "value": "Taomni"}])
         with patch("tauri_webdriver.platform.system", return_value="Linux"), \
                 patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
                 patch("tauri_webdriver.time.monotonic", side_effect=[0, 0.6, 1]):

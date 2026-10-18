@@ -1044,7 +1044,42 @@ class NativeSession:
                 self._paste_linux_password(selector, text, check)
         else:
             self.type_text(text)
+            self._keep_control_value_exact(selector, text)
         return f"filled {selector}"
+
+    def _keep_control_value_exact(self, selector: str, text: str) -> None:
+        """Keep values exact for controls whose key input is lossy.
+
+        Localized date segments distribute typed digits in locale order and
+        multi-line text drops newlines, so real key input can store a
+        different string than the requested one without failing anything.
+        Compare the observed value and, only when it differs, apply the exact
+        text through the control's native setter with ordinary input/change
+        events; a value that still differs afterwards fails the step.
+        """
+        observed = self.execute(
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "if (!el || !('value' in el)) return null;"
+            "const kind = el instanceof HTMLTextAreaElement ? 'textarea' : (el.type || '');"
+            "return {kind: kind, value: el.value};"
+        )
+        if not isinstance(observed, dict) or observed.get("kind") not in {"date", "textarea"}:
+            return
+        if observed.get("value") == text:
+            return
+        if self.execute(
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "if (!el || !('value' in el)) return null;"
+            "const proto = el instanceof HTMLTextAreaElement"
+            " ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;"
+            "const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;"
+            "if (!setter) return null;"
+            f"setter.call(el, {json.dumps(text)});"
+            "el.dispatchEvent(new Event('input', {bubbles: true}));"
+            "el.dispatchEvent(new Event('change', {bubbles: true}));"
+            "return el.value;"
+        ) != text:
+            raise WebDriverError(f"control did not retain the requested value: {selector}")
 
     def _select_wayland_fill_input(self, selector: str) -> None:
         # A successful /actions response can precede GTK's focus/selection
