@@ -3,7 +3,7 @@ import { Camera, ChevronDown } from "lucide-react";
 import { useT } from "../../lib/i18n";
 import { useAppDialogs, formatUnknownError } from "../../lib/appDialogs";
 import { openScreenshotOverlay } from "../../lib/screenshot";
-import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
+import { CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL, screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
 import { ScreenshotFavorites } from "./ScreenshotFavorites";
 
 /** Unified screen capture entry shared by the main and detached windows. */
@@ -131,7 +131,7 @@ export function ScreenshotMenuButton() {
             className="absolute right-0 top-7 z-50 min-w-48 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"
           >
             <button type="button" data-testid="system-screenshot-current-window" role="menuitem" onClick={() => void handleScreenshot(true)}
-              className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]">{t("screenshot.currentWindow")}</button>
+              className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]">{t("screenshot.currentWindow")} ({CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL})</button>
             <p data-testid="system-screenshot-default-hint" className="px-3 pb-1 text-[11px] text-[var(--taomni-text-muted)]">{t("screenshot.defaultHide")}</p>
             {[3, 5, 10].map((s) => (
               <button

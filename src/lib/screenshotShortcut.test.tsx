@@ -125,6 +125,34 @@ describe("screenshot shortcut store", () => {
 });
 
 describe("useScreenshotAppShortcut", () => {
+  it.each([false, true])("captures a focused modal input before its key trap (global registered=%s)", async (registered) => {
+    mocks.native = true;
+    mocks.invoke.mockImplementation(async (command) => command === "screenshot_shortcut_status" ? { ...fallback, registered } : undefined);
+    const modalHandler = vi.fn((event: React.KeyboardEvent) => event.stopPropagation());
+    render(<div role="dialog" aria-modal="true" onKeyDown={modalHandler}><input aria-label="modal field" defaultValue="keep me" /></div>);
+    const input = screen.getByRole("textbox");
+    input.focus();
+    const { unmount } = await mountShortcut();
+    fireEvent.keyDown(input, { code: "KeyA", key: "a", altKey: true });
+    expect(openCalls()).toEqual([["screenshot_open_overlay", { displayId: null, includeCurrentWindow: true }]]);
+    expect(modalHandler).not.toHaveBeenCalled();
+    expect(input).toHaveValue("keep me");
+    expect(screen.getByRole("dialog")).toBeVisible();
+    fireEvent.keyDown(input, { code: "KeyA", altKey: true, repeat: true });
+    fireEvent.keyDown(input, { code: "KeyA", altKey: true, isComposing: true });
+    expect(openCalls()).toHaveLength(1);
+    unmount();
+    fireEvent.keyDown(input, { code: "KeyA", altKey: true });
+    expect(openCalls()).toHaveLength(1);
+  });
+
+  it("keeps current-window capture available when the global shortcut is disabled", async () => {
+    useScreenshotShortcutStore.setState({ status: { ...fallback, enabled: false, accelerator: "" } });
+    await mountShortcut();
+    fireEvent.keyDown(document.body, { code: "KeyA", altKey: true });
+    expect(openCalls()).toEqual([["screenshot_open_overlay", { displayId: null, includeCurrentWindow: true }]]);
+  });
+
   it.each([false, true])("opens once for a matching fallback chord (native=%s) and prevents the key event", async (native) => {
     mocks.native = native;
     await mountShortcut();
@@ -156,6 +184,7 @@ describe("useScreenshotAppShortcut", () => {
     mocks.windowLabel = label;
     await mountShortcut();
     fireEvent.keyDown(document.body, chord);
+    fireEvent.keyDown(document.body, { code: "KeyA", altKey: true });
     expect(openCalls()).toHaveLength(0);
   });
 

@@ -49,7 +49,7 @@ async fn run(app: &AppHandle) -> anyhow::Result<Value> {
             .map_err(anyhow::Error::msg)?;
         let region = initial
             .window_region
-            .context("current window was not selected")?;
+            .context("current window bounds unavailable")?;
         let plan = super::super::screenshot_scroll_plan(
             app.clone(),
             Some(display.id.clone()),
@@ -71,13 +71,27 @@ async fn run(app: &AppHandle) -> anyhow::Result<Value> {
             r#"
           const q = id => document.querySelector('[data-testid="'+id+'"]');
           const sleep = ms => new Promise(r=>setTimeout(r,ms));
+          for(let i=0;i<100&&!q('screenshot-select-layer');i++) await sleep(100);
+          const layer=q('screenshot-select-layer');
+          if(!layer || q('screenshot-selection')) throw new Error('capture must start unselected');
+          const fire=(type,x,y)=>layer.dispatchEvent(new MouseEvent(type,{{bubbles:true,button:0,clientX:x,clientY:y}}));
+          const x={x}*innerWidth/{width}, y={y}*innerHeight/{height};
+          fire('mousedown',x,y);
+          fire('mousemove',x+{w}*innerWidth/{width},y+{h}*innerHeight/{height});
+          fire('mouseup',x+{w}*innerWidth/{width},y+{h}*innerHeight/{height});
           for(let i=0;i<100&&!q('screenshot-scroll-capture');i++) await sleep(100);
           q('screenshot-scroll-capture').click();
           for(let i=0;i<100&&(!q('screenshot-scroll-start')||q('screenshot-scroll-start').disabled);i++) await sleep(100);
           q('screenshot-scroll-mode-{mode}').click(); await sleep(100);
           q('screenshot-scroll-start').click(); return true;
         "#,
-            mode = if manual { "manual" } else { "auto" }
+            mode = if manual { "manual" } else { "auto" },
+            x = region.x,
+            y = region.y,
+            w = region.width,
+            h = region.height,
+            width = initial.width,
+            height = initial.height,
         );
         run_js(&overlay, &script, Duration::from_secs(20)).await?;
         wait_frames(app, if manual { 1 } else { 2 }).await?;

@@ -31,6 +31,10 @@ const IS_MAC = getAppPlatform() === "macos";
 /** Mirrors `DEFAULT_SHORTCUT` in src-tauri/src/screenshot/shortcut.rs. */
 export const DEFAULT_SCREENSHOT_SHORTCUT = IS_MAC ? "Control+Super+A" : "Control+Alt+A";
 
+/** App-local: keep the invoking window and its dialogs in the capture. */
+export const CURRENT_WINDOW_SCREENSHOT_SHORTCUT = "Alt+A";
+export const CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL = formatAccelerator(CURRENT_WINDOW_SCREENSHOT_SHORTCUT, IS_MAC);
+
 const BROWSER_STATUS: ShortcutStatus = {
   accelerator: DEFAULT_SCREENSHOT_SHORTCUT,
   defaultAccelerator: DEFAULT_SCREENSHOT_SHORTCUT,
@@ -127,6 +131,23 @@ export function useScreenshotAppShortcut(): void {
       disposed = true;
       unlisten?.();
     };
+  }, [showOpenError]);
+
+  useEffect(() => {
+    if (isScreenshotOverlayWindow() || isScreenshotRecorderWindow() || isScreenshotPinWindow() || isScreenshotScrollWindow() || isScreenshotBoundaryWindow()) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.isComposing || event.defaultPrevented) return;
+      if (!eventMatchesAccelerator(event, CURRENT_WINDOW_SCREENSHOT_SHORTCUT)) return;
+      const target = event.target as HTMLElement | null;
+      // Let the shortcut recorder validate the chord instead of taking a shot.
+      if (target?.closest('[data-screenshot-shortcut-recording="true"]')) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void openScreenshotOverlay(undefined, true).catch((error) => void showOpenError(error));
+    };
+    // Capture before modal focus traps and editor/terminal input handlers.
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [showOpenError]);
 
   useEffect(() => {

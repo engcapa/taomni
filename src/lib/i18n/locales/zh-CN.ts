@@ -2444,6 +2444,8 @@ export const zhCN: DeepPartial<typeof en> = {
     welcomeHistoryLimitHint: "默认 20 个。欢迎页的全部恢复、过滤后恢复与多选打开都会使用这个数量上限。",
     screenshotTitle: "截图与录屏",
     screenshotSubtitle: "截图工具的系统级快捷键",
+    screenshotCurrentWindowHint: "保留当前窗口截图：{shortcut}（应用内有效，支持弹窗和输入框，按下后手动框选区域）",
+    screenshotCurrentWindowReserved: "Alt+A 已用于保留当前窗口截图，请选择其他组合。",
     screenshotShortcut: "快捷键",
     screenshotPressKeys: "请按下组合键…",
     screenshotDisabled: "已关闭",

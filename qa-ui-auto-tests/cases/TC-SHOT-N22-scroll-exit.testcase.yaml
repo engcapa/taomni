@@ -15,7 +15,7 @@ verification:
   review: reviewed
   requirements:
   - id: scroll-exit
-    requirement: Exact current-window selection and full-screen selections preserve their dimensions without a registered screenshot hotkey. Automatic and manual capture keep original body pixels, and the native bottom scrollbar button and thumb occur once. Moving outside pauses automatic input. Escape and right-click finish without losing the preview; Start does not act as Stop.
+    requirement: Manually drawn exact current-window and full-screen selections preserve their dimensions without a registered screenshot hotkey. Automatic and manual capture keep original body pixels, and the native bottom scrollbar button and thumb occur once. Moving outside pauses automatic input. Escape and right-click finish without losing the preview; Start does not act as Stop.
     actions: [1, 3]
     checkpoints:
     - step: 3
