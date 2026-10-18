@@ -96,6 +96,7 @@
           "parity007_extract",
           "mail_server",
           "mail_storage",
+          "mail_archive_batches",
           "mail_stress",
           "macos_updater",
           "rdp_server_required",
@@ -338,7 +339,8 @@
             "kind": {
               "enum": [
                 "storage",
-                "backup"
+                "backup",
+                "incremental"
               ]
             },
             "full": {

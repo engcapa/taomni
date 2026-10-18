@@ -5,7 +5,7 @@ import { mailFolderSelectionMatches } from "../lib/mailFolders";
 import { stubMailListFolders, stubMailCachedHeaders, type Seed } from "./mailServerStub";
 
 type Saved = { entry: MailArchiveEntry; body: MailMessageBody };
-type State = { paused: boolean; saved: Saved[]; skipped: string[] };
+type State = { paused: boolean; saved: Saved[]; skipped: string[]; folder?: string; headersSynced?: number; headersTotal?: number };
 const idOf = (e: MailArchiveEntry) => `${e.folder}/${e.uidValidity}/${e.uid}`;
 export function mailArchiveStub(cmd: string, args: Record<string, unknown>, seed: Seed, read: (id: string, folder: string, uid: number) => MailMessageBody): unknown {
   const config = args.config as MailTabInfo | undefined;
@@ -19,6 +19,9 @@ export function mailArchiveStub(cmd: string, args: Record<string, unknown>, seed
       if (args.resume) state.paused = false;
       if (!state.paused && config) {
         for (const folder of stubMailListFolders(account, seed)) {
+          state.folder = folder.name;
+          state.headersSynced = stubMailCachedHeaders(account, seed, folder.name).length;
+          state.headersTotal = folder.total ?? state.headersSynced;
           const matched = config.cache.fullMessageFolders?.some((name) => mailFolderSelectionMatches(name, folder.name)) ?? false;
           if (config.cache.fullMessageMode === "include" && !matched || config.cache.fullMessageMode === "exclude" && matched) continue;
           for (const message of stubMailCachedHeaders(account, seed, folder.name)) {
@@ -29,7 +32,7 @@ export function mailArchiveStub(cmd: string, args: Record<string, unknown>, seed
       }
       break;
     case "mail_archive_pause": state.paused = true; break;
-    case "mail_archive_status": return { phase: state.paused ? "paused" : "completed", saved: state.saved.length, total: state.saved.length, bytes: 4096, totalBytes: 4096 } satisfies MailArchiveStatus;
+    case "mail_archive_status": return { phase: state.paused ? "paused" : "completed", folder: state.folder, headersSynced: state.headersSynced, headersTotal: state.headersTotal, saved: state.saved.length, total: state.saved.length, bytes: 4096, totalBytes: 4096 } satisfies MailArchiveStatus;
     case "mail_archive_list": return state.saved.slice(Number(args.offset) || 0, (Number(args.offset) || 0) + 200).map((item) => item.entry);
     case "mail_archive_read": return state.saved.find((item) => idOf(item.entry) === idOf(args.entry as MailArchiveEntry))?.body ?? null;
     case "mail_archive_remove": {

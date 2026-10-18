@@ -7082,6 +7082,12 @@ controls:
   - id: mail-storage-progress
     selector: '[data-testid="mail-storage-progress"]'
     kind: display
+  - id: mail-storage-header-progress
+    selector: '[data-testid="mail-storage-header-progress"]'
+    kind: display
+  - id: mail-storage-original-progress
+    selector: '[data-testid="mail-storage-original-progress"]'
+    kind: display
   - id: mail-storage-pause
     selector: '[data-testid="mail-storage-pause"]'
     kind: interactive

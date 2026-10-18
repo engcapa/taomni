@@ -1,5 +1,6 @@
 """Independent storage-oracle and real concurrent protocol fixture regressions."""
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 import gzip
 import hashlib
 import imaplib
@@ -9,7 +10,7 @@ import tempfile
 import threading
 import unittest
 from qa_ui_auto.mail_fake_server import FakeMailServer
-from qa_ui_auto.mail_storage_oracle import observe
+from qa_ui_auto.mail_storage_oracle import observe, observe_incremental
 from qa_ui_auto.mail_performance import percentile
 
 
@@ -19,7 +20,7 @@ class MailStorageOracleTest(unittest.TestCase):
             root = Path(tmp)
             raw = b'Content-Type: multipart/mixed; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nbody\r\n--b\r\nContent-Disposition: attachment; filename=a.bin\r\nContent-Transfer-Encoding: base64\r\n\r\nAAECAw==\r\n--b--\r\n'
             digest = hashlib.sha256(raw).hexdigest()
-            with sqlite3.connect(root / "qa.db") as db:
+            with closing(sqlite3.connect(root / "qa.db")) as db, db:
                 db.executescript('CREATE TABLE mail_full_messages(folder,uid,sha256,raw_size); CREATE TABLE mail_messages(folder,uid);')
                 db.execute('INSERT INTO mail_full_messages VALUES(?,?,?,?)', ('INBOX', 7, digest, len(raw)))
                 db.executemany('INSERT INTO mail_messages VALUES(?,?)', [('INBOX', 7), ('Archive', 8)])
@@ -28,12 +29,25 @@ class MailStorageOracleTest(unittest.TestCase):
             file.write_bytes(gzip.compress(raw))
             expected = {'INBOX/7': {'sha256': digest, 'rawSize':len(raw), 'attachmentSha256':hashlib.sha256(bytes([0,1,2,3])).hexdigest()}}
             self.assertEqual(observe(root, expected, {'INBOX':1}, {'Archive':1})['objects'], 1)
+            with closing(sqlite3.connect(root / 'qa.db')) as db, db:
+                db.executescript("CREATE TABLE mail_folders(name,total,sync_complete); INSERT INTO mail_folders VALUES('INBOX',350,0);")
+            self.assertEqual(observe_incremental(root, expected)['full'], 1)
+            with closing(sqlite3.connect(root / 'qa.db')) as db, db:
+                db.execute('UPDATE mail_folders SET sync_complete=1')
+            with self.assertRaisesRegex(AssertionError, 'History must still be incomplete'):
+                observe_incremental(root, expected)
+            with closing(sqlite3.connect(root / 'qa.db')) as db, db:
+                db.execute('UPDATE mail_folders SET sync_complete=0')
             file.write_bytes(gzip.compress(raw.replace(b'body', b'lost')))
+            with self.assertRaisesRegex(AssertionError, 'integrity'):
+                observe_incremental(root, expected)
             with self.assertRaisesRegex(AssertionError, 'integrity'):
                 observe(root, expected, {'INBOX':1}, {'Archive':1})
             file.write_bytes(gzip.compress(raw))
-            with sqlite3.connect(root / 'qa.db') as db:
+            with closing(sqlite3.connect(root / 'qa.db')) as db, db:
                 db.execute('DELETE FROM mail_full_messages')
+            with self.assertRaisesRegex(AssertionError, 'No complete originals'):
+                observe_incremental(root, expected)
             with self.assertRaisesRegex(AssertionError, 'Unreferenced'):
                 observe(root, expected, {}, {'Archive':1})
             file.unlink()

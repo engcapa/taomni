@@ -842,6 +842,8 @@ export interface MailArchiveStatus {
   phase: "idle" | "connecting" | "headers" | "downloading" | "verifying" | "pausing" | "paused" | "completed" | "failed" | "shared";
   folder?: string | null;
   saved: number;
+  headersSynced?: number;
+  headersTotal?: number | null;
   total: number;
   bytes: number;
   totalBytes?: number | null;

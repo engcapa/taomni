@@ -1384,6 +1384,8 @@
 - `[data-testid="mail-imap-security"]` — interactive — F-MAIL-23.mail-imap-security
 - `[data-testid="mail-smtp-security"]` — interactive — F-MAIL-23.mail-smtp-security
 - `[data-testid="mail-storage-progress"]` — display — F-MAIL-23.mail-storage-progress
+- `[data-testid="mail-storage-header-progress"]` — display — F-MAIL-23.mail-storage-header-progress
+- `[data-testid="mail-storage-original-progress"]` — display — F-MAIL-23.mail-storage-original-progress
 - `[data-testid="mail-storage-pause"]` — interactive — F-MAIL-23.mail-storage-pause
 - `[data-testid="mail-storage-resume"]` — interactive — F-MAIL-23.mail-storage-resume
 - `[data-testid="mail-archive-open"]` — interactive — F-MAIL-23.mail-archive-open

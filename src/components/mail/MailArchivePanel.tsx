@@ -3,6 +3,7 @@ import type { MailTabInfo } from "../../types";
 import { mailArchiveExport, mailArchiveList, mailArchivePause, mailArchiveRead, mailArchiveRemove, mailArchiveStart, mailArchiveStatus, mailArchiveAttachment, type MailArchiveEntry, type MailArchiveStatus, type MailMessageBody } from "../../lib/mail";
 import { selectSaveFilePath } from "../../lib/ipc";
 import { MailMessageBodyView } from "./MailMessageBodyView";
+import { folderLabel } from "../../lib/mailFolders";
 
 const activePhases = new Set(["connecting", "headers", "downloading", "verifying", "pausing", "shared"]);
 const keyOf = (e: MailArchiveEntry) => `${e.folder}/${e.uidValidity}/${e.uid}`;
@@ -78,8 +79,10 @@ export function MailArchivePanel({ info }: { info: MailTabInfo }) {
   };
   const running = activePhases.has(status?.phase || "");
   const progress = <span data-testid="mail-storage-progress" role="status">
-    Full mail: {status?.phase === "shared" ? "syncing in another instance" : status?.phase || "connecting"}{status?.folder ? ` · ${status.folder}` : ""} · {status?.saved || 0}/{status?.total || 0}
-    {status?.totalBytes != null && ` · ${bytes(status.bytes)} / ${bytes(status.totalBytes)} (${Math.floor(status.bytes / Math.max(1, status.totalBytes) * 100)}%)`}
+    Full mail: {status?.phase === "shared" ? "syncing in another instance" : status?.phase || "connecting"}{status?.folder ? ` · ${folderLabel({ name: status.folder })}` : ""}
+    {info.incoming === "imap" && status?.folder && status.headersSynced != null && <span data-testid="mail-storage-header-progress"> · Headers: {status.headersSynced}/{status.headersTotal ?? "…"}</span>}
+    <span data-testid="mail-storage-original-progress"> · Saved this scan: {status?.saved || 0}{status?.total ? `/${status.total}` : ""}</span>
+    {status?.phase !== "headers" && status?.totalBytes != null && ` · Current message: ${bytes(status.bytes)} / ${bytes(status.totalBytes)} (${Math.floor(status.bytes / Math.max(1, status.totalBytes) * 100)}%)`}
   </span>;
   return <div className="flex flex-wrap items-center gap-2 px-2 py-1 text-xs border-b border-[var(--taomni-divider)]">
     <button data-testid="mail-archive-open" className="taomni-btn" onClick={() => void action(async () => { await load(0); setOpen(true); })}>Local archive</button>

@@ -43,3 +43,27 @@ def setup(ctx: Any) -> None:
                 uid = server.state.append_raw(folder_name, raw, [])
                 expected[f"{folder_name}/{uid}"] = {"sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw), "attachmentSha256": hashlib.sha256(attachment).hexdigest()}
     (root / "expected.json").write_text(json.dumps(expected), encoding="utf-8")
+
+
+def setup_batched(ctx: Any) -> None:
+    """Several header pages with small originals and observable per-message latency."""
+    setup(ctx)
+    if (ctx.cfg.get("app") or {}).get("mode") != "native":
+        raise RuntimeError("mail_archive_batches requires native IMAP and disk observations")
+    server = mail_fake_server.ACTIVE
+    server.state.header_fetch_delay = 0.1
+    server.state.archive_chunk_delay = 0.05
+    expected = {}
+    attachment = b"batched-archive-attachment"
+    with server.state.lock:
+        for folder in server.state.folders.values():
+            folder.messages.clear()
+        for index in range(350):
+            raw = (f"From: qa@example.com\r\nTo: reader@example.com\r\nSubject: Batch mail {index:04d}\r\n"
+                   "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=batch\r\n\r\n"
+                   f"--batch\r\nContent-Type: text/plain\r\n\r\nReadable before history completes {index:04d}\r\n"
+                   "--batch\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=batch.bin\r\n"
+                   "Content-Transfer-Encoding: base64\r\n\r\n").encode() + base64.b64encode(attachment) + b"\r\n--batch--\r\n"
+            uid = server.state.append_raw("INBOX", raw, [])
+            expected[f"INBOX/{uid}"] = {"sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw), "attachmentSha256": hashlib.sha256(attachment).hexdigest()}
+    Path(ctx.values["mail_expected"]).write_text(json.dumps(expected), encoding="utf-8")

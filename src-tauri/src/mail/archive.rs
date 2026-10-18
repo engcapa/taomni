@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 
 const CHUNK: usize = 256 * 1024;
+const ARCHIVE_BATCH: usize = 100;
 const CONTENT_ERROR: &str = "MAIL_ARCHIVE_CONTENT: ";
 
 #[derive(Default)]
@@ -33,6 +34,8 @@ pub struct ArchiveStatus {
     pub phase: String,
     pub folder: Option<String>,
     pub saved: usize,
+    pub headers_synced: usize,
+    pub headers_total: Option<u32>,
     pub total: usize,
     pub bytes: u64,
     pub total_bytes: Option<u64>,
@@ -118,7 +121,7 @@ pub async fn mail_archive_status(
         Ok((paused, shared))
     })
     .await?;
-    if !paused && !shared {
+    if !shared {
         if let Some(job) = state
             .mail_archive
             .jobs
@@ -131,7 +134,13 @@ pub async fn mail_archive_status(
                     .is_ok_and(|status| status.phase != "shared")
             })
         {
-            return Ok(job.status.lock().map_err(|e| e.to_string())?.clone());
+            let mut status = job.status.lock().map_err(|e| e.to_string())?.clone();
+            // Keep the current scan's folder and counters when a persisted
+            // pause stops the worker, including after the mail tab reopens.
+            if paused {
+                status.phase = "paused".into();
+            }
+            return Ok(status);
         }
     }
     Ok(ArchiveStatus {
@@ -401,70 +410,12 @@ fn run(
         .into_iter()
         .filter(|folder| !folder_is_noselect(folder))
     {
-        update(job, |status| {
-            status.phase = "headers".into();
-            status.folder = Some(folder.name.clone());
-        })?;
-        let mut request = MailSyncRequestMode::Auto;
-        loop {
-            update(job, |_| {})?;
-            let snapshot = {
-                let db = handle.lock().map_err(|e| e.to_string())?;
-                sync::load_folder_sync_state(&db, id, &folder.name).map_err(|e| e.to_string())?
-            };
-            let started = sync::now_ms();
-            let step = imap.sync_folder_step(
-                account,
-                &folder.name,
-                &snapshot,
-                &StepParams {
-                    request,
-                    limit: 100,
-                    include_bodies: false,
-                    condstore,
-                },
-            )?;
-            let more = step.more;
-            let complete = step.watermark.complete;
-            {
-                let db = handle.lock().map_err(|e| e.to_string())?;
-                // The archive's index is complete regardless of recent-body cache limits.
-                let settings = MailCacheSettings {
-                    header_limit_per_folder: 0,
-                    header_retention_days: 0,
-                    ..account.config.cache.clone()
-                };
-                sync::apply_folder_step(&db, id, &step, &settings, started)
-                    .map_err(|e| e.to_string())?;
-            }
-            if more {
-                continue;
-            }
-            if complete {
-                break;
-            }
-            request = MailSyncRequestMode::Backfill;
-        }
-        if !storage::stores_full(&account.config.cache, &folder.name) {
-            continue;
-        }
-        let (validity, targets) = {
-            let db = handle.lock().map_err(|e| e.to_string())?;
-            let validity:u32=db.query_row("SELECT COALESCE(uid_validity,0) FROM mail_folders WHERE account_id=?1 AND name=?2",params![id,folder.name],|row|row.get(0)).map_err(|e|e.to_string())?;
-            let targets:Vec<u32>=db.prepare("SELECT m.uid FROM mail_messages m WHERE m.account_id=?1 AND m.folder=?2 AND NOT EXISTS
-                (SELECT 1 FROM mail_full_messages a WHERE a.account_id=m.account_id AND a.folder=m.folder AND a.uid=m.uid AND a.uid_validity=?3)
-                AND NOT EXISTS(SELECT 1 FROM mail_archive_skipped s WHERE s.account_id=m.account_id AND s.folder=m.folder AND s.uid=m.uid AND s.uid_validity=?3)
-                ORDER BY m.uid DESC").map_err(|e|e.to_string())?.query_map(params![id,folder.name,validity],|row|row.get(0)).map_err(|e|e.to_string())?.collect::<SqlResult<_>>().map_err(|e|e.to_string())?;
-            (validity, targets)
-        };
-        update(job, |status| status.total += targets.len())?;
-        download_targets(
+        run_folder(
             &mut imap,
             account,
             &handle,
             &folder.name,
-            validity,
-            targets,
+            condstore,
             job,
             &mut failures,
         )?;
@@ -474,6 +425,118 @@ fn run(
     } else {
         Err(failures.message())
     }
+}
+
+/// Alternate bounded header and MIME batches so a large history cannot delay
+/// the first readable original. Failed content is attempted once per scan.
+#[allow(clippy::too_many_arguments)]
+fn run_folder(
+    imap: &mut ActiveImapSession,
+    account: &ResolvedMailAccount,
+    handle: &crate::state::MailDbHandle,
+    folder: &str,
+    condstore: bool,
+    job: &ArchiveJob,
+    failures: &mut ContentFailures,
+) -> Result<(), String> {
+    let id = &account.config.session_id;
+    let stores_full = storage::stores_full(&account.config.cache, folder);
+    let mut request = MailSyncRequestMode::Auto;
+    let mut headers_complete = false;
+    let mut discovered = HashSet::new();
+    let mut attempted = HashSet::new();
+    update(job, |status| {
+        status.folder = Some(folder.into());
+        status.headers_synced = 0;
+        status.headers_total = None;
+        status.bytes = 0;
+        status.total_bytes = None;
+    })?;
+    loop {
+        update(job, |_| {})?;
+        if !headers_complete {
+            let snapshot = {
+                let db = handle.lock().map_err(|e| e.to_string())?;
+                sync::load_folder_sync_state(&db, id, folder).map_err(|e| e.to_string())?
+            };
+            update(job, |status| {
+                status.phase = "headers".into();
+                status.headers_synced = snapshot.cached_uids.len();
+                status.bytes = 0;
+                status.total_bytes = None;
+            })?;
+            let started = sync::now_ms();
+            let step = imap.sync_folder_step(
+                account,
+                folder,
+                &snapshot,
+                &StepParams {
+                    request,
+                    limit: ARCHIVE_BATCH,
+                    include_bodies: false,
+                    condstore,
+                },
+            )?;
+            headers_complete = !step.more && step.watermark.complete;
+            if !step.more && !step.watermark.complete {
+                request = MailSyncRequestMode::Backfill;
+            }
+            let synced = {
+                let db = handle.lock().map_err(|e| e.to_string())?;
+                // The archive's index is complete regardless of recent-body cache limits.
+                let settings = MailCacheSettings {
+                    header_limit_per_folder: 0,
+                    header_retention_days: 0,
+                    ..account.config.cache.clone()
+                };
+                sync::apply_folder_step(&db, id, &step, &settings, started)
+                    .map_err(|e| e.to_string())?;
+                db.query_row(
+                    "SELECT COUNT(*) FROM mail_messages WHERE account_id=?1 AND folder=?2",
+                    params![id, folder],
+                    |row| row.get::<_, u32>(0),
+                )
+                .map_err(|e| e.to_string())?
+            };
+            update(job, |status| {
+                status.headers_synced = synced as usize;
+                status.headers_total = step.folder.total;
+            })?;
+        }
+        if !stores_full {
+            if headers_complete {
+                break;
+            }
+            continue;
+        }
+        let (validity, targets) = {
+            let db = handle.lock().map_err(|e| e.to_string())?;
+            let validity:u32=db.query_row("SELECT COALESCE(uid_validity,0) FROM mail_folders WHERE account_id=?1 AND name=?2",params![id,folder],|row|row.get(0)).map_err(|e|e.to_string())?;
+            let targets:Vec<u32>=db.prepare("SELECT m.uid FROM mail_messages m WHERE m.account_id=?1 AND m.folder=?2 AND NOT EXISTS
+                (SELECT 1 FROM mail_full_messages a WHERE a.account_id=m.account_id AND a.folder=m.folder AND a.uid=m.uid AND a.uid_validity=?3)
+                AND NOT EXISTS(SELECT 1 FROM mail_archive_skipped s WHERE s.account_id=m.account_id AND s.folder=m.folder AND s.uid=m.uid AND s.uid_validity=?3)
+                ORDER BY m.uid DESC").map_err(|e|e.to_string())?.query_map(params![id,folder,validity],|row|row.get(0)).map_err(|e|e.to_string())?.collect::<SqlResult<_>>().map_err(|e|e.to_string())?;
+            (validity, targets)
+        };
+        let newly_discovered = targets
+            .iter()
+            .filter(|uid| discovered.insert((validity, **uid)))
+            .count();
+        update(job, |status| status.total += newly_discovered)?;
+        let batch: Vec<u32> = targets
+            .into_iter()
+            .filter(|uid| !attempted.contains(&(validity, *uid)))
+            .take(ARCHIVE_BATCH)
+            .collect();
+        if batch.is_empty() && headers_complete {
+            break;
+        }
+        attempted.extend(batch.iter().map(|uid| (validity, *uid)));
+        download_targets(
+            imap, account, handle, folder, validity, batch, job, failures,
+        )?;
+    }
+    Ok(())
 }
 
 // Content errors belong to a specific message, not the connection. The command
@@ -830,6 +893,114 @@ mod tests {
             forward_task: None,
         };
         (dir, account, handle, job, imap)
+    }
+
+    #[test]
+    fn archive_publishes_first_batch_before_backfilling_history_and_drains_cached_mail() {
+        let fake = fake_imap::FakeImap::start(false);
+        fake.deliver("INBOX", 201, "Batched archive");
+        let (_dir, account, handle, job, mut imap) = fixture(&fake);
+        let mut failures = ContentFailures::default();
+        run_folder(
+            &mut imap,
+            &account,
+            &handle,
+            "INBOX",
+            false,
+            &job,
+            &mut failures,
+        )
+        .unwrap();
+        let commands = fake.log();
+        let first_raw = commands
+            .iter()
+            .position(|cmd| cmd.contains("BODY.PEEK[]<"))
+            .unwrap();
+        let second_headers = commands
+            .iter()
+            .enumerate()
+            .filter(|(_, cmd)| cmd.contains("BODY.PEEK[HEADER]"))
+            .nth(1)
+            .unwrap()
+            .0;
+        assert!(
+            first_raw < second_headers,
+            "complete originals must precede history backfill"
+        );
+        assert_eq!(failures.count, 0);
+        let status = job.status.lock().unwrap();
+        assert_eq!(
+            (
+                status.saved,
+                status.total,
+                status.headers_synced,
+                status.headers_total
+            ),
+            (201, 201, 201, Some(201))
+        );
+        drop(status);
+        let db = handle.lock().unwrap();
+        assert_eq!(storage::list(&db, "qa", 0).unwrap().len(), 200);
+        assert_eq!(storage::list(&db, "qa", 200).unwrap().len(), 1);
+        assert!(
+            sync::load_folder_sync_state(&db, "qa", "INBOX")
+                .unwrap()
+                .complete
+        );
+        // Simulate an existing complete header cache with no originals. A new
+        // scan must drain every cached message, not just its first MIME batch.
+        db.execute("DELETE FROM mail_full_messages", []).unwrap();
+        drop(db);
+        let retry_job = ArchiveJob {
+            status: Mutex::new(ArchiveStatus::default()),
+            ..job
+        };
+        run_folder(
+            &mut imap,
+            &account,
+            &handle,
+            "INBOX",
+            false,
+            &retry_job,
+            &mut failures,
+        )
+        .unwrap();
+        assert_eq!(retry_job.status.lock().unwrap().saved, 201);
+    }
+
+    #[test]
+    fn batched_archive_attempts_unavailable_content_once_per_scan() {
+        let fake = fake_imap::FakeImap::start(false);
+        let uids = fake.deliver("INBOX", 101, "Batched failure");
+        let bad = *uids.last().unwrap();
+        fake.state
+            .lock()
+            .unwrap()
+            .empty_bodies
+            .insert(("INBOX".into(), bad));
+        let (_dir, account, handle, job, mut imap) = fixture(&fake);
+        let mut failures = ContentFailures::default();
+        run_folder(
+            &mut imap,
+            &account,
+            &handle,
+            "INBOX",
+            false,
+            &job,
+            &mut failures,
+        )
+        .unwrap();
+        assert_eq!(failures.count, 1);
+        let status = job.status.lock().unwrap();
+        assert_eq!((status.saved, status.total), (100, 101));
+        assert_eq!(
+            fake.log()
+                .iter()
+                .filter(|cmd| cmd.contains(&format!("UID FETCH {bad} "))
+                    && cmd.contains("BODY.PEEK[]<0."))
+                .count(),
+            1
+        );
     }
 
     #[test]

@@ -131,6 +131,7 @@ REGISTRY: dict[str, Fixture] = {
     "parity009_ssr": Fixture("parity009_ssr", parity009_ssr.setup, parity009_ssr.teardown),
     "parity007_extract": Fixture("parity007_extract", parity007_extract.setup, parity007_extract.teardown),
     "mail_storage": Fixture("mail_storage", mail_storage.setup),
+    "mail_archive_batches": Fixture("mail_archive_batches", mail_storage.setup_batched),
     "mail_server": Fixture("mail_server", mail_server.setup, mail_server.teardown),
     "macos_updater": Fixture("macos_updater", macos_updater.setup, macos_updater.teardown),
     "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),
