@@ -184,7 +184,9 @@ def run(ctx, args):
                 peer.act("click", f'[data-testid="mail-archive-row"]:nth-child({index}) input[type="checkbox"]')
             peer.act("click", '[data-testid="mail-archive-cleanup"]')
             peer.act("click", '[data-testid="mail-archive-confirm-remove"]')
-            peer.until(text('[data-testid="mail-archive-notice"]') + '.includes("Local originals removed")', 20)
+            # The cleanup notice reports the exact count of removed originals.
+            peer.until(text('[data-testid="mail-archive-notice"]')
+                       + '.includes("Removed 3 local originals. Server messages kept.")', 20)
             primary.act("click", '[data-testid="mail-archive-refresh"]')
             primary.until('document.querySelectorAll(\'[data-testid="mail-archive-row"]\').length === 0', 10)
             result["afterCleanup"] = observe(target, expected, {}, {"INBOX": 3, "Archive": 2})
