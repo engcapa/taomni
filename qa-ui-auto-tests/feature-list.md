@@ -7064,6 +7064,15 @@ controls:
   - id: mail-storage-folder-names
     selector: '[data-testid="mail-storage-folder-names"]'
     kind: interactive
+  - id: mail-storage-edit-folders
+    selector: '[data-testid="mail-storage-edit-folders"]'
+    kind: interactive
+  - id: mail-storage-selected-folders
+    selector: '[data-testid="mail-storage-selected-folders"]'
+    kind: display
+  - id: mail-message-list
+    selector: '[data-testid="mail-message-list"]'
+    kind: display
   - id: mail-imap-security
     selector: '[data-testid="mail-imap-security"]'
     kind: interactive

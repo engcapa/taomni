@@ -1378,6 +1378,9 @@
 - `[data-testid="mail-storage-mode"]` — interactive — F-MAIL-23.mail-storage-mode
 - `[data-testid="mail-storage-folders"]` — interactive — F-MAIL-23.mail-storage-folders
 - `[data-testid="mail-storage-folder-names"]` — interactive — F-MAIL-23.mail-storage-folder-names
+- `[data-testid="mail-storage-edit-folders"]` — interactive — F-MAIL-23.mail-storage-edit-folders
+- `[data-testid="mail-storage-selected-folders"]` — display — F-MAIL-23.mail-storage-selected-folders
+- `[data-testid="mail-message-list"]` — display — F-MAIL-23.mail-message-list
 - `[data-testid="mail-imap-security"]` — interactive — F-MAIL-23.mail-imap-security
 - `[data-testid="mail-smtp-security"]` — interactive — F-MAIL-23.mail-smtp-security
 - `[data-testid="mail-storage-progress"]` — display — F-MAIL-23.mail-storage-progress

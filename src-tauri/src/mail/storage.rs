@@ -17,8 +17,13 @@ pub enum FullMessageMode {
 }
 
 pub fn stores_full(settings: &super::MailCacheSettings, folder: &str) -> bool {
+    // Keep old exact server keys working, and accept the full readable path
+    // entered before the account has ever connected or cached its folders.
+    let readable_folder = super::decode_imap_modified_utf7(folder);
     let selected = settings.full_message_folders.iter().any(|name| {
+        let name = name.trim();
         name == folder
+            || name == readable_folder
             || (name.eq_ignore_ascii_case("INBOX") && folder.eq_ignore_ascii_case("INBOX"))
     });
     match settings.full_message_mode {
@@ -847,6 +852,40 @@ mod tests {
             .is_err()
         );
     }
+    #[test]
+    fn readable_folder_selection_matches_imap_keys_for_include_and_exclude() {
+        for (selection, folder, selected) in [
+            ("台北", "&U,BTFw-", true),
+            ("&U,BTFw-", "&U,BTFw-", true),
+            ("  台北  ", "&U,BTFw-", true),
+            ("Projects/台北", "Projects/&U,BTFw-", true),
+            ("台北", "Projects/&U,BTFw-", false),
+            ("projects/台北", "Projects/&U,BTFw-", false),
+            ("A & B", "A &- B", true),
+            ("中文", "中文", true),
+            ("inbox", "INBOX", true),
+            ("archive", "Archive", false),
+            ("Other", "&U,BTFw-", false),
+        ] {
+            let mut settings = super::super::MailCacheSettings {
+                full_message_mode: FullMessageMode::Include,
+                full_message_folders: vec![selection.into()],
+                ..Default::default()
+            };
+            assert_eq!(
+                stores_full(&settings, folder),
+                selected,
+                "include {selection} / {folder}"
+            );
+            settings.full_message_mode = FullMessageMode::Exclude;
+            assert_eq!(
+                stores_full(&settings, folder),
+                !selected,
+                "exclude {selection} / {folder}"
+            );
+        }
+    }
+
     fn directory_default() -> &'static Path {
         Path::new("/unused-test-default")
     }

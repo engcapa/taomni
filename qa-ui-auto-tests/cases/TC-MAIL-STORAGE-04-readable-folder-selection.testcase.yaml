@@ -1,0 +1,437 @@
+id: TC-MAIL-STORAGE-04
+title: Readable folder names drive include/exclude storage and survive save/reopen
+description: Enter a Chinese name before folder discovery, match the encoded IMAP folder, deduplicate
+  mixed names and uncheck both aliases. Switch to exclusion and verify newly arrived excluded mail has
+  headers but no local original while prior originals remain. Browser proves renderer/preview behavior;
+  native proves persisted session settings and real Rust archive selection against a disposable loopback
+  IMAP server.
+covers:
+- F-MAIL-23
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+- mail_storage
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- select_option:
+    selector: '[data-testid="mail-storage-mode"]'
+    value: include
+- assert_text:
+    selector: '[data-testid="mail-storage-settings"]'
+    contains: No cached folders. Connect and sync this account first
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input'
+    equal: 0
+- click: '[data-testid="mail-storage-edit-folders"]'
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: 台北
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA readable folders
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA readable folders"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA readable folders"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_server_deliver:
+    folder: '&U,BTFw-'
+    count: 1
+    prefix: Readable included
+- mail_server_deliver:
+    folder: Projects/&U,BTFw-
+    count: 1
+    prefix: Different full path
+- click: '[data-testid="mail-sync-button"]'
+- wait_for: '[data-testid="mail-folder-row"][data-folder-name="&U,BTFw-"]'
+- click: '[data-testid="mail-storage-resume"]'
+- wait_for:
+    selector: '[data-testid="mail-storage-resume"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: 1/1
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-row"]'
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="mail-archive-entries"]'
+    contains: Readable included 0001
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-read"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-preview"]'
+    contains: Readable included 0001
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-close"]'
+- assert_not_visible: '[data-testid="mail-archive-dialog"]'
+- click: '[data-testid="session-tree-item"][data-session-name="QA readable folders"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-mail"]'
+- assert_attribute:
+    selector: '[data-testid="mail-storage-mode"]'
+    name: value
+    equals: include
+- assert_attribute:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    name: value
+    equals: 台北
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input[aria-label="台北"]:checked'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input[aria-label="台北"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="mail-storage-selected-folders"]'
+    contains: 台北
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-edit-folders"]'
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: '台北
+
+      &U,BTFw-'
+- assert_count:
+    selector: '[data-testid="mail-storage-selected-folders"] li'
+    equal: 1
+- set_check:
+    selector: '[data-testid="mail-storage-folders"] input[aria-label="台北"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    name: value
+    equals: ''
+- set_check:
+    selector: '[data-testid="mail-storage-folders"] input[aria-label="台北"]'
+    checked: true
+- assert_attribute:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    name: value
+    equals: '&U,BTFw-'
+- fill:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    value: 台北
+- select_option:
+    selector: '[data-testid="mail-storage-mode"]'
+    value: exclude
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input[aria-label="台北"]:checked'
+    equal: 1
+- screenshot: mail-readable-folder-settings.png
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- click: '[data-testid="session-tree-item"][data-session-name="QA readable folders"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-mail"]'
+- assert_attribute:
+    selector: '[data-testid="mail-storage-mode"]'
+    name: value
+    equals: exclude
+- assert_attribute:
+    selector: '[data-testid="mail-storage-folder-names"]'
+    name: value
+    equals: 台北
+- assert_count:
+    selector: '[data-testid="mail-storage-folders"] input[aria-label="台北"]:checked'
+    equal: 1
+- click: '[data-testid="session-cancel"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA readable folders"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_server_deliver:
+    folder: '&U,BTFw-'
+    count: 1
+    prefix: Readable excluded
+- mail_server_deliver:
+    folder: Projects/&U,BTFw-
+    count: 1
+    prefix: Other folder allowed
+- click: '[data-testid="mail-sync-button"]'
+- click: '[data-testid="mail-folder-row"][data-folder-name="&U,BTFw-"]'
+- assert_text:
+    selector: '[data-testid="mail-message-list"]'
+    contains: Readable excluded 0001
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-resume"]'
+- wait_for:
+    selector: '[data-testid="mail-storage-resume"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-open"]'
+- wait_for: '[data-testid="mail-archive-row"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-entries"]'
+    contains: Other folder allowed 0001
+    timeout_sec: 60
+- eval_readonly:
+    expression: '!document.querySelector("dialog").textContent.includes("Readable excluded 0001")'
+    expect_truthy: true
+- eval_readonly:
+    expression: (document.querySelector("dialog").textContent.match(/Readable included 0001/g) || []).length
+      === 1
+    expect_truthy: true
+- screenshot: mail-readable-folder-exclusion.png
+- click: '[data-testid="mail-archive-close"]'
+- assert_not_visible: '[data-testid="mail-archive-dialog"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Readable include selection entered before first sync saves the matching encoded folder
+      only, not another folder with the same leaf name.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 26
+    - 28
+    - 29
+    - 30
+    - 32
+    - 36
+    - 40
+    - 42
+    checkpoints:
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains":
+        "No cached folders. Connect and sync this account first"}}'
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input", "equal":
+        0}}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+    - step: 38
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 1}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-entries\"]", "contains":
+        "Readable included 0001", "timeout_sec": 60}}'
+    - step: 41
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains":
+        "Readable included 0001", "timeout_sec": 60}}'
+    - step: 43
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "1/1", "timeout_sec": 60}}'
+    results:
+    - 15
+    - 16
+    - 27
+    - 35
+    - 38
+    - 39
+    - 41
+    - 43
+    - 34
+  - id: R2
+    requirement: Cached checkboxes match readable names, duplicate encoded/readable aliases collapse and
+      unchecking removes both; encoded selection and readable exclusion survive editing/save/reopen.
+    actions:
+    - 44
+    - 45
+    - 47
+    - 53
+    - 54
+    - 56
+    - 58
+    - 60
+    - 61
+    - 64
+    - 66
+    - 67
+    - 69
+    - 73
+    - 74
+    - 75
+    checkpoints:
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-mode\"]", "name": "value",
+        "equals": "include"}}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name":
+        "value", "equals": "台北"}}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input[aria-label=\"台北\"]:checked",
+        "equal": 1}}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input[aria-label=\"台北\"]",
+        "equal": 1}}'
+    - step: 52
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-selected-folders\"]", "contains":
+        "台北", "timeout_sec": 60}}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-selected-folders\"] li",
+        "equal": 1}}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name":
+        "value", "equals": ""}}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name":
+        "value", "equals": "&U,BTFw-"}}'
+    - step: 62
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input[aria-label=\"台北\"]:checked",
+        "equal": 1}}'
+    - step: 70
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-mode\"]", "name": "value",
+        "equals": "exclude"}}'
+    - step: 71
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name":
+        "value", "equals": "台北"}}'
+    - step: 72
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input[aria-label=\"台北\"]:checked",
+        "equal": 1}}'
+    - step: 76
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+    results:
+    - 48
+    - 49
+    - 50
+    - 51
+    - 52
+    - 55
+    - 57
+    - 59
+    - 62
+    - 70
+    - 71
+    - 72
+    - 76
+  - id: R3
+    requirement: Readable exclusion prevents saving newly delivered messages while keeping their headers
+      and previously saved originals; a different full path remains included.
+    actions:
+    - 77
+    - 78
+    - 79
+    - 80
+    - 83
+    - 86
+    - 92
+    checkpoints:
+    - step: 81
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-message-list\"]", "contains": "Readable
+        excluded 0001", "timeout_sec": 60}}'
+    - step: 82
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+    - step: 85
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+    - step: 88
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-entries\"]", "contains":
+        "Other folder allowed 0001", "timeout_sec": 60}}'
+    - step: 89
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(\"dialog\").textContent.includes(\"Readable
+        excluded 0001\")", "expect_truthy": true}}'
+    - step: 90
+      expectation: '{"eval_readonly": {"expression": "(document.querySelector(\"dialog\").textContent.match(/Readable
+        included 0001/g) || []).length === 1", "expect_truthy": true}}'
+    - step: 93
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+    results:
+    - 81
+    - 82
+    - 85
+    - 88
+    - 89
+    - 90
+    - 93
+  visual:
+  - check: Readable folder settings and exclusion results
+    method: manual
+    reason: Inspect retained screenshots for readable names and usable advanced editing.
+  native:
+  - check: Persisted settings and Rust IMAP archive inclusion/exclusion
+    method: automated
+    reason: Run this workflow through real Tauri IPC with an isolated QA profile and loopback IMAP server;
+      preview stubs cannot establish backend matching.

@@ -1,6 +1,7 @@
 // Renderer-only preview; disk, compression and IMAP are verified by native cases.
 import type { MailTabInfo } from "../types";
 import type { MailArchiveEntry, MailArchiveStatus, MailMessageBody } from "../lib/mail";
+import { mailFolderSelectionMatches } from "../lib/mailFolders";
 import { stubMailListFolders, stubMailCachedHeaders, type Seed } from "./mailServerStub";
 
 type Saved = { entry: MailArchiveEntry; body: MailMessageBody };
@@ -18,7 +19,7 @@ export function mailArchiveStub(cmd: string, args: Record<string, unknown>, seed
       if (args.resume) state.paused = false;
       if (!state.paused && config) {
         for (const folder of stubMailListFolders(account, seed)) {
-          const matched = config.cache.fullMessageFolders?.includes(folder.name) ?? false;
+          const matched = config.cache.fullMessageFolders?.some((name) => mailFolderSelectionMatches(name, folder.name)) ?? false;
           if (config.cache.fullMessageMode === "include" && !matched || config.cache.fullMessageMode === "exclude" && matched) continue;
           for (const message of stubMailCachedHeaders(account, seed, folder.name)) {
             const entry: MailArchiveEntry = { folder: folder.name, uid: message.uid, uidValidity: 1, subject: message.subject, rawSize: 4096, storedSize: 1024, storedAt: Math.floor(Date.now() / 1000) };

@@ -3,6 +3,7 @@ import type { MailFolder } from "./mail";
 import {
   isSelectable,
   loadSubscribedOnly,
+  mailFolderSelectionMatches,
   parseSpecialFolders,
   saveSubscribedOnly,
   visibleFolders,
@@ -14,6 +15,22 @@ function folder(name: string, flags: string[] = []): MailFolder {
 
 describe("mailFolders", () => {
   afterEach(() => window.localStorage.clear());
+
+  it.each([
+    ["台北", "&U,BTFw-", true],
+    ["&U,BTFw-", "&U,BTFw-", true],
+    ["  台北  ", "&U,BTFw-", true],
+    ["Projects/台北", "Projects/&U,BTFw-", true],
+    ["台北", "Projects/&U,BTFw-", false],
+    ["projects/台北", "Projects/&U,BTFw-", false],
+    ["A & B", "A &- B", true],
+    ["中文", "中文", true],
+    ["inbox", "INBOX", true],
+    ["archive", "Archive", false],
+    ["Other", "&U,BTFw-", false],
+  ])("matches storage selection %s against %s: %s", (selection, serverName, expected) => {
+    expect(mailFolderSelectionMatches(selection, serverName)).toBe(expected);
+  });
 
   it("hides unsubscribed folders but keeps INBOX", () => {
     const folders = [folder("INBOX"), folder("Work", ["\\Subscribed"]), folder("Old")];

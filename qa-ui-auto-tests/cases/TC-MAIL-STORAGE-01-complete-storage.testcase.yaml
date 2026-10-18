@@ -1,8 +1,8 @@
 id: TC-MAIL-STORAGE-01
 title: Configure complete storage and explicitly clean retained local originals
-description: Renderer-only workflow with preview mail. Native file migration, MIME
-  integrity, backup contents and cleanup are separately asserted by TC-MAIL-STORAGE-02.
-  Linux browser is exercised locally; Windows/macOS remain pending.
+description: Renderer-only workflow with preview mail. Native file migration, MIME integrity, backup contents
+  and cleanup are separately asserted by TC-MAIL-STORAGE-02. Linux browser is exercised locally; Windows/macOS
+  remain pending.
 covers:
 - F-MAIL-23
 - F-BACKUP-1
@@ -62,6 +62,7 @@ steps:
 - assert_count:
     selector: '[data-testid="mail-storage-folders"] input'
     equal: 0
+- click: '[data-testid="mail-storage-edit-folders"]'
 - fill:
     selector: '[data-testid="mail-storage-folder-names"]'
     value: INBOX
@@ -110,6 +111,7 @@ steps:
 - select_option:
     selector: '[data-testid="mail-storage-mode"]'
     value: exclude
+- click: '[data-testid="mail-storage-edit-folders"]'
 - fill:
     selector: '[data-testid="mail-storage-folder-names"]'
     value: Archive
@@ -241,6 +243,7 @@ steps:
 - select_option:
     selector: '[data-testid="mail-storage-mode"]'
     value: include
+- click: '[data-testid="mail-storage-edit-folders"]'
 - fill:
     selector: '[data-testid="mail-storage-folder-names"]'
     value: ''
@@ -277,6 +280,7 @@ steps:
     selector: '[data-testid="mail-storage-folder-names"]'
     name: value
     equals: '&U,BTFw-'
+- click: '[data-testid="mail-storage-edit-folders"]'
 - click: '[data-testid="mail-storage-folder-names"]'
 - screenshot: mail-storage-decoded-folders.png
 - click: '[data-testid="session-cancel"]'
@@ -285,8 +289,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Save/reopen directory and include/exclude settings; read saved originals;
-      cancellation preserves them and confirmed cleanup pauses storage.
+    requirement: Save/reopen directory and include/exclude settings; read saved originals; cancellation
+      preserves them and confirmed cleanup pauses storage.
     actions:
     - 2
     - 4
@@ -301,136 +305,133 @@ verification:
     - 14
     - 15
     - 16
-    - 19
     - 20
     - 21
     - 22
-    - 24
-    - 27
+    - 23
+    - 25
     - 28
-    - 30
-    - 34
-    - 36
-    - 38
+    - 29
+    - 31
+    - 35
+    - 37
     - 39
-    - 40
     - 41
+    - 42
     - 43
-    - 44
+    - 45
     - 46
-    - 50
-    - 51
-    - 54
+    - 48
+    - 52
+    - 53
     - 56
-    - 59
+    - 58
     - 61
-    - 64
+    - 63
     - 66
-    - 67
+    - 68
     - 69
     - 71
-    - 72
+    - 73
     - 74
     - 76
     - 78
-    - 79
+    - 80
     - 81
-    - 82
     - 83
+    - 84
     - 85
     - 87
     - 89
-    - 90
     - 91
     - 92
     - 93
     - 94
     - 95
+    - 96
+    - 97
     checkpoints:
-    - step: 31
+    - step: 32
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-directory"]'',
         ''name'': ''value'', ''equals'': ''${fixture.mail_storage_a}''}}'
-    - step: 32
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-mode"]'',
-        ''name'': ''value'', ''equals'': ''include''}}'
     - step: 33
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-mode"]'', ''name'':
+        ''value'', ''equals'': ''include''}}'
+    - step: 34
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
         ''name'': ''value'', ''equals'': ''INBOX''}}'
-    - step: 47
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-mode"]'',
-        ''name'': ''value'', ''equals'': ''exclude''}}'
-    - step: 48
+    - step: 49
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-mode"]'', ''name'':
+        ''value'', ''equals'': ''exclude''}}'
+    - step: 50
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
         ''name'': ''value'', ''equals'': ''Archive''}}'
-    - step: 49
+    - step: 51
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-directory"]'',
         ''name'': ''value'', ''equals'': ''${fixture.mail_storage_b}''}}'
-    - step: 53
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'',
-        ''contains'': ''completed'', ''timeout_sec'': 30}}'
-    - step: 57
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'',
-        ''contains'': ''Save original EML''}}'
-    - step: 70
+    - step: 55
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
+        ''completed'', ''timeout_sec'': 30}}'
+    - step: 59
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'':
+        ''Save original EML''}}'
+    - step: 72
       expectation: '{''assert_not_visible'': ''[data-testid="mail-archive-confirm"]''}'
-    - step: 73
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'',
-        ''contains'': ''Local originals removed'', ''timeout_sec'': 30}}'
     - step: 75
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'',
-        ''contains'': ''paused'', ''timeout_sec'': 30}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'', ''contains'':
+        ''Local originals removed'', ''timeout_sec'': 30}}'
     - step: 77
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'',
-        ''contains'': ''completed'', ''timeout_sec'': 30}}'
-    - step: 97
-      expectation: Automatic mail inclusion remains checked after changing the manual
-        scope.
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
+        ''paused'', ''timeout_sec'': 30}}'
+    - step: 79
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
+        ''completed'', ''timeout_sec'': 30}}'
+    - step: 99
+      expectation: Automatic mail inclusion remains checked after changing the manual scope.
     - step: 15
       expectation: Browse fills the chosen directory.
-    - step: 35
+    - step: 36
       expectation: Unchecking INBOX updates the exact folder-name list.
-    - step: 37
+    - step: 38
       expectation: Checking INBOX restores the selected folder.
-    - step: 60
-      expectation: The original export UI reports the chosen filename; real bytes
-        are a native boundary.
-    - step: 65
-      expectation: The attachment save UI completes; MIME integrity is checked in
-        the native case.
-    - step: 80
+    - step: 62
+      expectation: The original export UI reports the chosen filename; real bytes are a native boundary.
+    - step: 67
+      expectation: The attachment save UI completes; MIME integrity is checked in the native case.
+    - step: 82
       expectation: The 205 new messages enter the summary cache.
-    - step: 84
-      expectation: Archive pages are bounded to 200 originals.
     - step: 86
-      expectation: Next displays the remaining originals.
+      expectation: Archive pages are bounded to 200 originals.
     - step: 88
+      expectation: Next displays the remaining originals.
+    - step: 90
       expectation: Previous restores the first page.
     results:
-    - 31
     - 32
     - 33
-    - 47
-    - 48
+    - 34
     - 49
-    - 53
-    - 57
-    - 70
-    - 73
+    - 50
+    - 51
+    - 55
+    - 59
+    - 72
     - 75
     - 77
-    - 97
+    - 79
+    - 99
     - 15
-    - 35
-    - 37
-    - 60
-    - 65
-    - 80
-    - 84
+    - 36
+    - 38
+    - 62
+    - 67
+    - 82
     - 86
     - 88
+    - 90
   - id: R3
-    requirement: A new unconnected session has no discovered folders and explains how to populate the local
-      cache; manual exact names remain supported by the main flow.
+    requirement: A new unconnected session has no discovered folders and explains how to populate the
+      local cache; manual exact names remain supported by the main flow.
     actions:
     - 16
     checkpoints:
@@ -442,49 +443,49 @@ verification:
     - 17
     - 18
   - id: R4
-    requirement: After syncing, encoded IMAP names display decoded labels; selected exact server keys persist
-      when saved and reopened, and survive switching include/exclude mode.
+    requirement: After syncing, encoded IMAP names display decoded labels; selected exact server keys
+      persist when saved and reopened, and survive switching include/exclude mode.
     actions:
-    - 98
-    - 99
     - 100
+    - 101
     - 102
-    - 103
+    - 104
     - 105
-    - 106
     - 107
-    - 109
-    - 111
-    - 113
+    - 108
+    - 110
+    - 112
     - 114
-    - 115
+    - 116
+    - 117
     - 118
-    - 122
+    - 121
+    - 126
     checkpoints:
-    - step: 108
+    - step: 111
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'':
         ''Folders from the last sync; available offline''}}'
-    - step: 110
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
-        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
-    - step: 116
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folders"] input[aria-label="台北"]'',
-        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
-    - step: 117
+    - step: 113
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
         ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
     - step: 119
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folders"] input[aria-label="台北"]'',
+        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
+    - step: 120
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
         ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
-    - step: 123
+    - step: 122
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
+        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
+    - step: 127
       expectation: Settings close normally after inspecting cached folder selections.
     results:
-    - 108
-    - 110
-    - 116
-    - 117
+    - 111
+    - 113
     - 119
-    - 123
+    - 120
+    - 122
+    - 127
   visual:
   - check: Storage settings, progress and archive list remain readable without clipping.
     method: manual
@@ -492,5 +493,5 @@ verification:
   native:
   - check: Independent SQLite, gzip MIME/attachments and backup ZIP checks.
     method: not-applicable
-    reason: This case verifies renderer controls and preview behavior only; TC-MAIL-STORAGE-02
-      covers native bytes.
+    reason: This case verifies renderer controls and preview behavior only; TC-MAIL-STORAGE-02 covers
+      native bytes.
