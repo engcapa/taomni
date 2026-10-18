@@ -495,11 +495,6 @@ export function ScreenshotOverlay() {
       if (data.document) {
         const size = { w: loaded.img.naturalWidth, h: loaded.img.naturalHeight };
         setScrollResult({ frames: 0, ...size }); setSel({ x: 0, y: 0, ...size }); setTool("move"); setPhase("preview");
-      } else if (data.windowRegion) {
-        const s = data.windowRegion;
-        setSel({ x: s.x * window.innerWidth / data.width, y: s.y * window.innerHeight / data.height,
-          w: s.width * window.innerWidth / data.width, h: s.height * window.innerHeight / data.height });
-        setPhase("annotate");
       } else setPhase("select");
     })().catch((e: unknown) => {
       if (!cancelled) setLoadError(formatUnknownError(e));

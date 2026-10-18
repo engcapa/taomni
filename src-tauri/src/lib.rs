@@ -1205,6 +1205,7 @@ pub fn run() {
             screenshot::qa::screenshot_qa_overlay_copy,
             screenshot::qa::screenshot_qa_recorder,
             screenshot::qa::screenshot_qa_controls,
+            screenshot::qa::current_window::screenshot_qa_current_window,
             screenshot::qa::screenshot_qa_scroll_permission_error,
             screenshot::qa::screenshot_qa_capture_permission_error,
             screenshot::qa::screenshot_qa_full_recorder,

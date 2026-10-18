@@ -1,0 +1,26 @@
+id: TC-SHOT-N26
+title: Current-window menu and Alt+A from a focused modal start with manual selection
+covers: [F27.1]
+tags: [screenshot, shortcut, modal, native, regression, p1]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: current-window}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: manual-selection
+    requirement: The menu and real Alt+A with a session-modal text field focused preserve the main window, start without a region or toolbar, and accept a manually drawn 300 by 220 CSS pixel region.
+    actions: [1, 3]
+    checkpoints:
+    - {step: 3, expectation: Both entries start in select phase without selection; DOM drag yields the exact requested rectangle; native main window stays visible; modal remains mounted; captured window pixels differ from the pre-shortcut reference by at most 3 intensity levels on average; real Escape resets then closes the overlay.}
+    - {step: 4, expectation: Main camera is available after overlay cleanup.}
+    results: [3, 4]
+  visual:
+  - {check: The modal is included in the captured desktop, method: automated, reason: Native captured pixels are compared with a pre-shortcut reference within the invoking window; both PNGs are retained.}
+  native:
+  - {check: Alt+A input and window lifecycle, method: automated, reason: Enigo sends real OS keys to the focused modal input; selection uses DOM mouse events in the real WebView; visibility and capture artifacts come from Tauri.}

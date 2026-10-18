@@ -23,6 +23,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow};
 use super::capture::{self, DisplayInfo};
 use super::qa_oracle;
 pub mod colors;
+pub mod current_window;
 pub mod displays;
 #[cfg(target_os = "macos")]
 mod macos_save_dialog;
@@ -1857,7 +1858,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
             .await
             .map_err(|e| e.to_string())?;
-        let selected = run_js(&overlay, "for (let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase !== 'annotate';i++) await new Promise(r=>setTimeout(r,100)); return !!document.querySelector('[data-testid=\"screenshot-selection\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
+        let selected = run_js(&overlay, "for (let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase !== 'select';i++) await new Promise(r=>setTimeout(r,100)); return document.querySelector('[data-testid=\"screenshot-overlay\"]')?.dataset.phase === 'select' && !document.querySelector('[data-testid=\"screenshot-selection\"]');", Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
         let current_region = super::screenshot_overlay_init().await?.window_region;
         let window_artifact = keep_artifact(
             std::path::Path::new(&super::screenshot_overlay_init().await?.path),
@@ -1885,6 +1886,31 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?;
     let overlay = begin_scroll_ui(&app, &display, region, false, true).await?;
+    // MouseEvent coordinates are integer CSS pixels. At fractional desktop
+    // scale the renderer can select a neighbouring physical pixel; compare
+    // borders and original pixels against that actual user selection.
+    let requested_region = region;
+    let selected_region = run_js(&overlay, r#"
+      const rect=document.querySelector('[data-testid="screenshot-selection"]').getBoundingClientRect();
+      const image=document.querySelector('[data-testid="screenshot-base-image"]');
+      return [Math.round(rect.x*image.naturalWidth/innerWidth),Math.round(rect.y*image.naturalHeight/innerHeight),
+        Math.round(rect.width*image.naturalWidth/innerWidth),Math.round(rect.height*image.naturalHeight/innerHeight)];
+    "#, Duration::from_secs(5)).await.map_err(|e| e.to_string())?;
+    let coordinates: Vec<u32> = serde_json::from_value(selected_region).map_err(|e| e.to_string())?;
+    let [x, y, width, height] = coordinates.as_slice() else {
+        return Err("manual selection coordinates unavailable".into());
+    };
+    let region = (*x, *y, *width, *height);
+    let tolerance = display.scale_factor.ceil() as u32;
+    for (actual, requested) in [region.0, region.1, region.2, region.3]
+        .into_iter()
+        .zip([requested_region.0, requested_region.1, requested_region.2, requested_region.3])
+    {
+        if actual.abs_diff(requested) > tolerance {
+            return Err("manual selection differs beyond CSS pixel rounding".into());
+        }
+    }
+    let (fixture_origin, _) = observed_inner_rect(&fixture).await.map_err(|e| e.to_string())?;
     let bar = wait_window(&app, super::surfaces::SCROLL_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| e.to_string())?;
@@ -1994,8 +2020,14 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             .ok_or("original page unavailable")?,
     )
     .map_err(|e| e.to_string())?;
-    let full_expected = source_crop(&source, &original).map_err(|e| e.to_string())?;
-    let expected = capture::crop(&full_expected, 0, 0, full_expected.width(), output.height());
+    let source_x = region.0 as i64 + display.x as i64 - fixture_origin.x as i64;
+    let source_y = region.1 as i64 + display.y as i64 - fixture_origin.y as i64;
+    if source_x < 0 || source_y < 0
+        || source_x + region.2 as i64 > original.width() as i64
+        || source_y + output.height() as i64 > original.height() as i64 {
+        return Err("manual crop lies outside the original fixture pixels".into());
+    }
+    let expected = capture::crop(&original, source_x as u32, source_y as u32, region.2, output.height());
     let comparison = qa_oracle::compare(&output, &expected, false);
     let artifact = keep_artifact(std::path::Path::new(&result.path), "scroll-stopped.png");
     let original_artifact = keep_image(&original, "scroll-stop-original.png");
@@ -2074,8 +2106,8 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             && cancelled == json!(true)
             && cleanup
             && artifact.is_some(),
-        json!({"currentWindowVisible":current_visible,"currentWindowSelected":selected,"currentWindowUnsupported":current_window_unsupported,"currentRegion":current_region,
-            "defaultHidesWindows":default_hidden,"scrollCompleted":completed,"scrollProgress":progress,"geometry":geometry,"comparison":comparison,
+        json!({"currentWindowVisible":current_visible,"currentWindowReadyToSelect":selected,"currentWindowUnsupported":current_window_unsupported,"currentRegion":current_region,
+            "defaultHidesWindows":default_hidden,"requestedRegion":requested_region,"selectedRegion":region,"scrollCompleted":completed,"scrollProgress":progress,"geometry":geometry,"comparison":comparison,
             "markedClipboard":marked_clipboard,"redLinePixels":red,"greenLinePixels":green,"annotatedArtifact":annotated_artifact,
             "scrollCancelledPreservesAnnotations":cancelled,"controlsCleaned":cleanup,"artifact":artifact,
             "originalArtifact":original_artifact,"differenceArtifact":difference,"windowArtifact":window_artifact}),

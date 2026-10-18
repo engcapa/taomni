@@ -3,8 +3,8 @@ import { Camera } from "lucide-react";
 import { useT } from "../../lib/i18n";
 import { formatUnknownError } from "../../lib/appDialogs";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
-import { acceleratorFromEvent, formatAccelerator, probeScreenshot, type ScreenshotProbe } from "../../lib/screenshot";
-import { useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
+import { acceleratorFromEvent, eventMatchesAccelerator, formatAccelerator, probeScreenshot, type ScreenshotProbe } from "../../lib/screenshot";
+import { CURRENT_WINDOW_SCREENSHOT_SHORTCUT, CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
 
 const IS_MAC = getAppPlatform() === "macos";
 
@@ -48,6 +48,10 @@ export function ScreenshotSettings() {
     }
     const accelerator = acceleratorFromEvent(e);
     if (!accelerator) return;
+    if (eventMatchesAccelerator(e, CURRENT_WINDOW_SCREENSHOT_SHORTCUT)) {
+      setError(t("settings.screenshotCurrentWindowReserved"));
+      return;
+    }
     if (!e.ctrlKey && !e.altKey && !e.metaKey && !/^F\d+$/.test(e.code)) {
       setError(t("settings.screenshotNeedsModifier"));
       return;
@@ -79,6 +83,7 @@ export function ScreenshotSettings() {
           data-testid="settings-screenshot-shortcut"
           aria-labelledby="screenshot-shortcut-label"
           aria-pressed={recording}
+          data-screenshot-shortcut-recording={recording}
           onClick={() => {
             setError(null);
             setRecording((v) => !v);
@@ -127,6 +132,9 @@ export function ScreenshotSettings() {
           {probe.summary}
         </p>
       )}
+      <p className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+        {t("settings.screenshotCurrentWindowHint", { shortcut: CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL })}
+      </p>
     </section>
   );
 }

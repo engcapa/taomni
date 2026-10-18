@@ -106,6 +106,7 @@ describe("ControlBar settings button", () => {
   it("closes capture options and includes the current window when requested", () => {
     renderControlBar(vi.fn());
     fireEvent.click(screen.getByTestId("system-screenshot-delay-toggle"));
+    expect(screen.getByTestId("system-screenshot-current-window")).toHaveTextContent("Alt+A");
     fireEvent.click(screen.getByTestId("system-screenshot-current-window"));
     expect(captureMocks.open).toHaveBeenCalledWith(undefined, true);
     expect(screen.queryByTestId("system-screenshot-delay-menu")).not.toBeInTheDocument();

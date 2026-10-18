@@ -2467,6 +2467,8 @@ const dict = {
     welcomeHistoryLimitHint: "Default is 20. The Welcome page uses this limit for restore-all, filtered restore, and multi-select actions.",
     screenshotTitle: "Screenshot & recording",
     screenshotSubtitle: "System-wide hotkey for the screenshot tool",
+    screenshotCurrentWindowHint: "Capture with current window: {shortcut} (app only, including dialogs and text fields; drag to select a region)",
+    screenshotCurrentWindowReserved: "Alt+A is reserved for capturing with the current window. Choose another shortcut.",
     screenshotShortcut: "Hotkey",
     screenshotPressKeys: "Press a key combination…",
     screenshotDisabled: "Disabled",

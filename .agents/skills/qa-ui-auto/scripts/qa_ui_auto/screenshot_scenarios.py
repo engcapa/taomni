@@ -29,6 +29,7 @@ SCENARIOS = {
     "freehand": "screenshot_qa_freehand",
     "hotkey": "screenshot_qa_hotkey",
     "controls": "screenshot_qa_controls",
+    "current-window": "screenshot_qa_current_window",
     "full-recorder": "screenshot_qa_full_recorder",
     "macos-capture-source": "screenshot_qa_macos_capture_source",
     "scroll-permission-error": "screenshot_qa_scroll_permission_error",

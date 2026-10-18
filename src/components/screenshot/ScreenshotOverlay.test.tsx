@@ -167,13 +167,17 @@ describe("ScreenshotOverlay", () => {
     expect(ctx.strokeStyle).toBe("#ff4d4f");
     expect(shapes()).toBe("1");
   });
-  it("preselects the current window without hiding it in a new full-display selection", async () => {
+  it("starts current-window capture unselected and accepts a manually drawn region", async () => {
     api.fetchOverlayInit.mockResolvedValueOnce({ path: "window.png", displayId: "0,0", width: 2048, height: 1152, scaleFactor: 2,
       windowRegion: { x: 200, y: 150, width: 800, height: 600 } });
     render(<ScreenshotOverlay />);
-    await screen.findByTestId("screenshot-toolbar");
-    expect(screen.getByTestId("screenshot-selection")).toHaveStyle({ left: "100px", top: "100px", width: "400px", height: "400px" });
-    expect(screen.getByTestId("screenshot-size-hint")).toHaveTextContent("800 × 600");
+    await screen.findByTestId("screenshot-hint");
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+    expect(screen.queryByTestId("screenshot-selection")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("screenshot-toolbar")).not.toBeInTheDocument();
+    drag("screenshot-select-layer", [120, 130], [320, 330]);
+    expect(screen.getByTestId("screenshot-selection")).toHaveStyle({ left: "120px", top: "130px", width: "200px", height: "200px" });
+    expect(screen.getByTestId("screenshot-size-hint")).toHaveTextContent("400 × 300");
   });
 
   it("selects, moves, resizes, restyles and deletes a mark with independent undo steps", async () => {

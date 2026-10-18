@@ -68,6 +68,16 @@ async function renderSettings() {
 // Mounted renderer/store contracts with fake IPC replies only. These do not
 // establish real shortcut registration, permissions, or capture capability.
 describe("ScreenshotSettings", () => {
+  it("explains the current-window shortcut and prevents assigning it to hiding capture", async () => {
+    await renderSettings();
+    expect(screen.getByText(/settings.screenshotCurrentWindowHint/)).toHaveTextContent("Alt+A");
+    const button = screen.getByTestId("settings-screenshot-shortcut");
+    fireEvent.click(button);
+    fireEvent.keyDown(button, { key: "a", code: "KeyA", altKey: true });
+    expect(screen.getByRole("alert")).toHaveTextContent("settings.screenshotCurrentWindowReserved");
+    expect(useScreenshotShortcutStore.getState().status).toEqual(fallback);
+    expect(button).toHaveAttribute("aria-pressed", "true");
+  });
   it("shows the browser fallback chord and app-only status without native probing", async () => {
     await renderSettings();
     expect(screen.getByTestId("settings-screenshot-shortcut")).toHaveTextContent("Ctrl+Alt+A");
