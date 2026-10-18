@@ -17,9 +17,9 @@ steps:
     height: 750
 - wait_for: '[data-testid="system-screenshot"]'
 - click: '[data-testid="system-screenshot-delay-toggle"]'
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="system-screenshot-current-window"]'
-    contains: Alt+A
+    regex: '.*\((?:Alt\+A|⌥A)\).*'
 - assert_text:
     selector: '[data-testid="system-screenshot-default-hint"]'
     contains: Default capture hides Taomni
@@ -104,7 +104,7 @@ verification:
     - step: 3
       expectation: '[data-testid="system-screenshot"]'
     - step: 5
-      expectation: '{''selector'': ''[data-testid="system-screenshot-current-window"]'', ''contains'': ''Alt+A''}'
+      expectation: '{''selector'': ''[data-testid="system-screenshot-current-window"]'', ''regex'': ''.*\((?:Alt\+A|⌥A)\).*''}'
     - step: 6
       expectation: '{''selector'': ''[data-testid="system-screenshot-default-hint"]'', ''contains'': ''Default capture hides Taomni''}'
     - step: 8
