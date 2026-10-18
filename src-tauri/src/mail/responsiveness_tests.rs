@@ -3,6 +3,40 @@ use super::*;
 use std::sync::mpsc;
 
 #[test]
+fn moving_200_messages_adapts_to_provider_copy_count_limit() {
+    let fake = fake_imap::FakeImap::start(false);
+    fake.add_folder("Trash", 2000);
+    let uids = fake.deliver("INBOX", 200, "copy-limit");
+    {
+        let mut state = fake.state.lock().unwrap();
+        state.supports_move = false;
+        state.max_transfer_count = Some(20);
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let db = Arc::new(coordination::MailDatabase::new(
+        directory.path().join("mutation.db"),
+    ));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = mutations::run_cached(
+        &MailImapPool::new(),
+        &account(fake.port),
+        runtime.handle(),
+        &db,
+        "INBOX",
+        uids,
+        "Trash",
+        mutations::Kind::Move,
+        false,
+        None,
+    )
+    .unwrap();
+    assert_eq!(result.error, None);
+    assert_eq!(result.completed_uids.len(), 200);
+    assert!(fake.uids("INBOX").is_empty());
+    assert_eq!(fake.uids("Trash").len(), 200);
+}
+
+#[test]
 fn delayed_body_and_header_fetches_preserve_newer_local_flags() {
     let db = Connection::open_in_memory().unwrap();
     init_mail_tables(&db).unwrap();

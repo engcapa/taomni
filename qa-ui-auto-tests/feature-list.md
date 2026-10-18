@@ -6357,6 +6357,8 @@ components: [MailClientTab]
 files:
   - src/components/mail/MailClientTab.tsx
   - src/lib/mailShortcuts.ts
+  - src/lib/mailMutations.ts
+  - src-tauri/src/mail/mutations.rs
 controls:
   - id: message-row-shortcuts
     selector: '[data-testid="mail-message-row"][aria-pressed="true"]'
@@ -6373,10 +6375,19 @@ controls:
   - id: select-all-visible
     selector: '[aria-label="Select all visible messages"]'
     kind: interactive
+  - id: mutation-progress
+    selector: '[data-testid="mail-mutation-progress"]'
+    kind: display
+  - id: mutation-retry
+    selector: '[data-testid="mail-mutation-retry"]'
+    kind: interactive
+  - id: mutation-details
+    selector: '[data-testid="mail-mutation-details"]'
+    kind: interactive
 -->
 
 - Thunderbird 风格快捷键（列表焦点下，输入框/编辑器内不生效）：F/B 下一封/上一封，N 下一封未读，R 回复，Shift+R 或 Ctrl/Cmd+Shift+R 全部回复，Ctrl/Cmd+L 转发，M 切换已读，S 星标，A 归档，J/Shift+J 垃圾/非垃圾，Del 删除，Ctrl/Cmd+Shift+K 聚焦搜索。Ctrl+Shift+L（聊天）与 Ctrl+Shift+S（服务器）保持全局含义。
-- 列表支持复选框、Ctrl/Cmd 点击、Shift 范围选择；普通点击或键盘导航选择单封，可继续追加选择。列表内 Ctrl/Cmd+A 选择已显示的行，Escape 清空选择。独立工具条显示选中数量和 Delete selected，普通删除移入 Trash，永久删除须确认。标记整文件夹已读进行中仍可删除新选择，已读完成保留当前选择。批量请求按 250 封分批，成功批次立即更新界面；跨文件夹或未加载页面的搜索结果同样参与批量操作。
+- 列表支持复选框、Ctrl/Cmd 点击、Shift 范围选择；普通点击或键盘导航选择单封，可继续追加选择。列表内 Ctrl/Cmd+A 选择已显示的行，Escape 清空选择。独立工具条显示选中数量和 Delete selected，普通删除移入 Trash，永久删除须确认。标记整文件夹已读进行中仍可删除新选择，已读完成保留当前选择。移动、复制及删除按 50 封更新进度，后端按服务器数量限制自动缩小批次；成功部分立即更新界面，失败保留未完成选择并可续做。持久化 COPY 阶段和请求 ID 防止重试重复复制；响应不明时停止自动重发；不使用全文件夹 EXPUNGE。标记操作仍按 250 封分批；跨文件夹或未加载页面的搜索结果同样参与批量操作。
 - 邮件行可拖到文件夹树：默认移动，按住 Ctrl（macOS 为 Option）复制；勾选多封时拖动全部勾选项。
 - 长列表的行使用 `content-visibility: auto`，屏幕外的行跳过布局和绘制，同时保留在 DOM 中（查找、无障碍与选择不受影响）；未引入虚拟列表依赖。
 

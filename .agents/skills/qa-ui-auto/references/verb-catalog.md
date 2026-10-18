@@ -284,6 +284,19 @@ Relative paths resolve from the repository root.
 
 `mail_multi_instance_probe` (native only, Linux/Windows/macOS) accepts `{data_root, storage_root, expected}` under the run report. Requires the `mail_storage` fixture and its saved QA mail session. Snapshots only the disposable main/vault databases into a second QA profile and launches a second verified QA binary/driver on free ports. Both instances share one mail directory; UI actions assert one full-storage owner, peer pause with a byte-exact resumable prefix, five peer PTY latency samples, relocation with a live cached connection, archive read and physical cleanup without resurrection on rescan. Records both profile/build identities, chunk events and retained results; closes only its own peer. Concurrent native sessions are intentional in this case. No IPC shortcut or personal profile is used.
 
+### `mail_server_mutation_fault`
+
+Configure the disposable mail service with `supports_move`, `uidplus`, `max_count`,
+`fail_after`, `reject_store_once`, or `drop_copy_response_once`. Null clears a count
+limit/failure threshold. Native changes the actual loopback IMAP server; browser
+injects equivalent receipt outcomes and only proves renderer handling.
+
+### `mail_server_assert_mutations`
+
+Native-only protocol oracle. Optional `no_move`, `count_rejected`, and `copied`
+assert capability routing, a real provider count rejection, and unique COPY count.
+Always rejects duplicate source copies or mailbox-wide EXPUNGE.
+
 ### `mail_server_delay_next_read`
 
 `{milliseconds: 1..25000}` delays one read-flag response on the disposable mail fixture. Browser delays the next explicit folder read; native delays the next `UID STORE +FLAGS` containing `\Seen`, after applying flags and outside the server lock. Use checkboxes/modifier selection to avoid consuming it with auto-read. Assert the read action remains busy when testing concurrent availability; the finite delay is fault injection, not a relaxed latency budget. Supports browser and native on Linux, Windows and macOS.

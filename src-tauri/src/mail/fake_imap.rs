@@ -55,6 +55,13 @@ pub struct FakeState {
     pub max_command_bytes: Option<usize>,
     /// Drop the next STORE response after applying it (an ambiguous network loss).
     pub drop_store_response_once: bool,
+    pub supports_move: bool,
+    pub supports_uidplus: bool,
+    pub max_transfer_count: Option<usize>,
+    pub reject_deleted_store_once: bool,
+    pub drop_copy_response_once: bool,
+    pub reject_transfer_after: Option<usize>,
+    pub transferred: usize,
     /// Provider size estimates can disagree with the actual BODY[] literal.
     pub reported_sizes: BTreeMap<(String, u32), usize>,
     pub empty_bodies: std::collections::BTreeSet<(String, u32)>,
@@ -86,6 +93,13 @@ impl FakeImap {
             unsubscribed: Default::default(),
             max_command_bytes: None,
             drop_store_response_once: false,
+            supports_move: true,
+            supports_uidplus: true,
+            max_transfer_count: None,
+            reject_deleted_store_once: false,
+            drop_copy_response_once: false,
+            reject_transfer_after: None,
+            transferred: 0,
             reported_sizes: Default::default(),
             empty_bodies: Default::default(),
         }));
@@ -409,7 +423,13 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
             writer.write_all(format!("{tag} OK idle done\r\n").as_bytes())?;
             continue;
         } else if upper.starts_with("CAPABILITY") {
-            out.push_str("* CAPABILITY IMAP4rev1 UIDPLUS MOVE IDLE");
+            out.push_str("* CAPABILITY IMAP4rev1 IDLE");
+            if state.supports_move {
+                out.push_str(" MOVE");
+            }
+            if state.supports_uidplus {
+                out.push_str(" UIDPLUS");
+            }
             if state.condstore {
                 out.push_str(" CONDSTORE");
             }
@@ -621,6 +641,13 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
             writer.write_all(ok.as_bytes())?;
             continue;
         } else if upper.starts_with("UID STORE") {
+            if upper.contains("\\DELETED") && state.reject_deleted_store_once {
+                state.reject_deleted_store_once = false;
+                writer.write_all(
+                    format!("{tag} NO temporarily unable to store flags\r\n").as_bytes(),
+                )?;
+                continue;
+            }
             let name = selected.clone().unwrap_or_else(|| "INBOX".into());
             let args = rest[10..].trim().to_string();
             let (set, spec) = args.split_once(' ').unwrap_or((&args, ""));
@@ -660,6 +687,10 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
             }
         } else if upper.starts_with("UID COPY") || upper.starts_with("UID MOVE") {
             let is_move = upper.starts_with("UID MOVE");
+            if is_move && !state.supports_move {
+                writer.write_all(format!("{tag} BAD Could not parse command\r\n").as_bytes())?;
+                continue;
+            }
             let name = selected.clone().unwrap_or_else(|| "INBOX".into());
             let args = rest[9..].trim().to_string();
             let (set, target) = args.split_once(' ').unwrap_or((&args, ""));
@@ -673,6 +704,22 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                 .filter(|(uid, _)| in_set(**uid, &ranges))
                 .map(|(uid, m)| (*uid, m.clone()))
                 .collect();
+            if state
+                .max_transfer_count
+                .is_some_and(|limit| moved.len() > limit)
+            {
+                writer.write_all(
+                    format!("{tag} NO COPY copy mail count over limit\r\n").as_bytes(),
+                )?;
+                continue;
+            }
+            if state
+                .reject_transfer_after
+                .is_some_and(|limit| state.transferred >= limit)
+            {
+                writer.write_all(format!("{tag} NO destination unavailable\r\n").as_bytes())?;
+                continue;
+            }
             match state.folders.get_mut(&target) {
                 Some(dest) => {
                     for (_, message) in &moved {
@@ -683,18 +730,32 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                 }
                 None => ok = format!("{tag} NO [TRYCREATE] no such mailbox\r\n"),
             }
+            if ok.contains(" OK ") {
+                state.transferred += moved.len();
+            }
             if is_move && ok.contains(" OK ") {
                 let folder = state.folders.get_mut(&name).unwrap();
                 for (uid, _) in moved {
                     folder.messages.remove(&uid);
                 }
             }
+            if !is_move && state.drop_copy_response_once {
+                state.drop_copy_response_once = false;
+                return Ok(());
+            }
         } else if upper.starts_with("UID EXPUNGE") || upper.starts_with("EXPUNGE") {
+            if upper.starts_with("UID EXPUNGE") && !state.supports_uidplus {
+                writer.write_all(format!("{tag} BAD UIDPLUS unavailable\r\n").as_bytes())?;
+                continue;
+            }
             let name = selected.clone().unwrap_or_else(|| "INBOX".into());
             let folder = state.folders.get_mut(&name).unwrap();
-            folder
-                .messages
-                .retain(|_, message| !message.flags.iter().any(|flag| flag == "\\Deleted"));
+            let max = folder.messages.keys().next_back().copied().unwrap_or(0);
+            let ranges = parse_uid_set(rest.get(11..).unwrap_or("1:*").trim(), max);
+            folder.messages.retain(|uid, message| {
+                !(message.flags.iter().any(|flag| flag == "\\Deleted")
+                    && (!upper.starts_with("UID EXPUNGE") || in_set(*uid, &ranges)))
+            });
         } else if upper.starts_with("APPEND") {
             let (name, tail) = split_first_arg(&rest[6..]);
             let flags: Vec<String> = tail

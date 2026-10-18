@@ -229,6 +229,29 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertEqual(self.server.state.subjects("Archive"), ["Moved 0001", "Moved 0002"])
         self.assertEqual(self.server.state.subjects("Missing"), [])
 
+    def test_copy_limits_failures_and_uid_expunge_are_observable(self) -> None:
+        state = self.server.state
+        state.mutation_fault.update(supports_move=False, max_count=2)
+        client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
+        client.login("qa", "x")
+        self.assertNotIn(b"MOVE", client.capability()[1][0].split())
+        client.select("INBOX")
+        self.assertEqual(client.uid("COPY", "1:3", "Trash")[0], "NO")
+        self.assertEqual(state.count("Trash"), 0)
+        self.assertTrue(state.mutation_events[-1]["count_rejected"])
+        self.assertEqual(client.uid("COPY", "1:2", "Trash")[0], "OK")
+        state.mutation_fault["reject_store_once"] = True
+        self.assertEqual(client.uid("STORE", "1:2", "+FLAGS.SILENT", "(\\Deleted)")[0], "NO")
+        self.assertEqual(client.uid("STORE", "1:3", "+FLAGS.SILENT", "(\\Deleted)")[0], "OK")
+        self.assertEqual(client.uid("EXPUNGE", "1:2")[0], "OK")
+        self.assertIn(3, state.folders["INBOX"].messages)
+        self.assertEqual(state.count("INBOX"), 3)
+        state.mutation_fault["drop_copy_response_once"] = True
+        with self.assertRaises(imaplib.IMAP4.abort):
+            client.uid("COPY", "4", "Trash")
+        self.assertEqual(state.count("Trash"), 3)
+        client.shutdown()
+
     def test_invite_delivery(self) -> None:
         (uid,) = self.server.state.deliver("INBOX", 1, prefix="Invite", invite="QA standup")
         raw = self.server.state.folders["INBOX"].messages[uid].raw
