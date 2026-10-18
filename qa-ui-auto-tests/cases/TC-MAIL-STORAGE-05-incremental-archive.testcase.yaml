@@ -142,6 +142,9 @@ steps:
     selector: '[data-testid="mail-archive-row"]'
     equal: 200
 - click: '[data-testid="mail-archive-next"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
 - assert_count:
     selector: '[data-testid="mail-archive-row"]'
     equal: 150
@@ -204,8 +207,8 @@ verification:
     - 46
     - 50
     - 53
-    - 55
-    - 57
+    - 56
+    - 58
     checkpoints:
     - step: 15
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains":
@@ -247,17 +250,17 @@ verification:
         "full": {"INBOX": 350}, "headers": {"INBOX": 350}, "timeout_sec": 60}}'
     - step: 52
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 200}}'
-    - step: 54
+    - step: 55
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 150}}'
-    - step: 56
+    - step: 57
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
-    - step: 59
+    - step: 60
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
         "completed", "timeout_sec": 60}}'
-    - step: 60
+    - step: 61
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-original-progress\"]", "contains":
         "Saved this scan: 0", "timeout_sec": 60}}'
-    - step: 61
+    - step: 62
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
         "full": {"INBOX": 350}, "headers": {"INBOX": 350}}}'
     results:
@@ -275,11 +278,11 @@ verification:
     - 48
     - 49
     - 52
-    - 54
-    - 56
-    - 59
+    - 55
+    - 57
     - 60
     - 61
+    - 62
   visual:
   - check: Retained paused header progress, scan counts, and a readable early saved original
     method: manual

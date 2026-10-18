@@ -7031,10 +7031,11 @@ controls:
 id: F-MAIL-23
 status: partial
 area: mail/storage
-components: [MailStorageSettings, MailArchivePanel, SessionEditor, MailClientTab]
+components: [MailStorageSettings, MailArchivePanel, MailArchiveDialog, SessionEditor, MailClientTab]
 files:
   - src/components/mail/MailStorageSettings.tsx
   - src/components/mail/MailArchivePanel.tsx
+  - src/components/mail/MailArchiveDialog.tsx
   - src/components/session/SessionEditor.tsx
   - src/components/mail/MailClientTab.tsx
   - src/lib/mail.ts
@@ -7042,6 +7043,8 @@ files:
   - src/stubs/mailArchiveStub.ts
   - src-tauri/src/mail/storage.rs
   - src-tauri/src/mail/archive.rs
+  - src-tauri/src/mail/archive_query.rs
+  - src-tauri/src/mail/archive_metadata.rs
   - src-tauri/src/mail/coordination.rs
   - src-tauri/src/state.rs
   - src-tauri/src/session/mod.rs
@@ -7147,6 +7150,63 @@ controls:
   - id: mail-archive-attachment
     selector: '[data-testid="mail-archive-attachment"]'
     kind: interactive
+  - id: mail-archive-search
+    selector: '[data-testid="mail-archive-search"]'
+    kind: interactive
+  - id: mail-archive-search-field
+    selector: '[data-testid="mail-archive-search-field"]'
+    kind: interactive
+  - id: mail-archive-folder
+    selector: '[data-testid="mail-archive-folder"]'
+    kind: interactive
+  - id: mail-archive-attachments
+    selector: '[data-testid="mail-archive-attachments"]'
+    kind: interactive
+  - id: mail-archive-reset
+    selector: '[data-testid="mail-archive-reset"]'
+    kind: interactive
+  - id: mail-archive-advanced
+    selector: '[data-testid="mail-archive-advanced"]'
+    kind: interactive
+  - id: mail-archive-date-from
+    selector: '[data-testid="mail-archive-date-from"]'
+    kind: interactive
+  - id: mail-archive-date-to
+    selector: '[data-testid="mail-archive-date-to"]'
+    kind: interactive
+  - id: mail-archive-stored-from
+    selector: '[data-testid="mail-archive-stored-from"]'
+    kind: interactive
+  - id: mail-archive-stored-to
+    selector: '[data-testid="mail-archive-stored-to"]'
+    kind: interactive
+  - id: mail-archive-min-size
+    selector: '[data-testid="mail-archive-min-size"]'
+    kind: interactive
+  - id: mail-archive-max-size
+    selector: '[data-testid="mail-archive-max-size"]'
+    kind: interactive
+  - id: mail-archive-select-page
+    selector: '[data-testid="mail-archive-select-page"]'
+    kind: interactive
+  - id: mail-archive-select-all
+    selector: '[data-testid="mail-archive-select-all"]'
+    kind: interactive
+  - id: mail-archive-clear-selection
+    selector: '[data-testid="mail-archive-clear-selection"]'
+    kind: interactive
+  - id: mail-archive-selection-count
+    selector: '[data-testid="mail-archive-selection-count"]'
+    kind: display
+  - id: mail-archive-sort
+    selector: '[data-testid="mail-archive-sort"]'
+    kind: interactive
+  - id: mail-archive-cleanup-estimate
+    selector: '[data-testid="mail-archive-cleanup-estimate"]'
+    kind: display
+  - id: mail-archive-results
+    selector: '[data-testid="mail-archive-results"]'
+    kind: display
 -->
 
 - 每会话可设置目录；默认仍为应用 mail-cache。完整原件按封 gzip 压缩，包含 MIME 正文、内联资源及附件，SHA-256 校验和去重。

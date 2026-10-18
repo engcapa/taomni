@@ -206,7 +206,7 @@ steps:
 - click: '[data-testid="mail-archive-confirm-remove"]'
 - assert_text:
     selector: '[data-testid="mail-archive-notice"]'
-    contains: Local originals removed
+    contains: Removed 2 local originals
     timeout_sec: 30
 - assert_count:
     selector: '[data-testid="mail-archive-row"]'
@@ -392,7 +392,7 @@ verification:
         ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''Archive'': 2}}}'
     - step: 78
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'', ''contains'':
-        ''Local originals removed'', ''timeout_sec'': 30}}'
+        ''Removed 2 local originals'', ''timeout_sec'': 30}}'
     - step: 79
       expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'':
         0}}'

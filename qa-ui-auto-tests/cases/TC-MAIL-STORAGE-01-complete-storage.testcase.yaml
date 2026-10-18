@@ -175,7 +175,7 @@ steps:
 - click: '[data-testid="mail-archive-confirm-remove"]'
 - assert_text:
     selector: '[data-testid="mail-archive-notice"]'
-    contains: Local originals removed
+    contains: Removed 1 local originals
     timeout_sec: 30
 - click: '[data-testid="mail-archive-close"]'
 - assert_text:
@@ -379,7 +379,7 @@ verification:
       expectation: '{''assert_not_visible'': ''[data-testid="mail-archive-confirm"]''}'
     - step: 75
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'', ''contains'':
-        ''Local originals removed'', ''timeout_sec'': 30}}'
+        ''Removed 1 local originals'', ''timeout_sec'': 30}}'
     - step: 77
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
         ''paused'', ''timeout_sec'': 30}}'

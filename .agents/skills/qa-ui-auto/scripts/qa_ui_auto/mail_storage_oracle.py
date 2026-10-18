@@ -29,7 +29,10 @@ def observe(root: Path, expected: dict, full: dict, headers: dict) -> dict:
         assert digest == oracle["sha256"] and size == oracle["rawSize"], "Full MIME differs from fixture original"
         parsed = email.message_from_bytes(raw)
         attachments = [part.get_payload(decode=True) for part in parsed.walk() if part.get_filename()]
-        assert any(hashlib.sha256(data).hexdigest() == oracle["attachmentSha256"] for data in attachments), "Attachment bytes missing"
+        if oracle["attachmentSha256"] is None:
+            assert not attachments, "Unexpected attachment in plain original"
+        else:
+            assert any(hashlib.sha256(data).hexdigest() == oracle["attachmentSha256"] for data in attachments), "Attachment bytes missing"
     assert actual == {k: v for k, v in full.items() if v}, f"Full objects: {actual}, expected {full}"
     for folder, count in headers.items():
         assert summary.get(folder, 0) == count, f"Summary count {folder}: {summary}"

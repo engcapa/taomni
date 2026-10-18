@@ -51,7 +51,8 @@ pub fn init_tables(db: &Connection) -> rusqlite::Result<()> {
          CREATE TRIGGER IF NOT EXISTS mail_full_object_unreferenced AFTER DELETE ON mail_full_messages BEGIN
             INSERT OR IGNORE INTO mail_archive_gc(sha256) VALUES(old.sha256);
          END;",
-    )
+    )?;
+    super::archive_query::init_index(db)
 }
 
 pub fn account_root(db: &Connection, account_id: &str) -> Result<PathBuf, String> {
@@ -73,6 +74,28 @@ pub fn account_root(db: &Connection, account_id: &str) -> Result<PathBuf, String
         "{}.mail",
         crate::state::mail_db_file_stem(account_id)
     )))
+}
+
+pub(super) fn legacy_attachment_flag(
+    db: &Connection,
+    account: &str,
+    hash: &str,
+) -> Result<bool, String> {
+    let path = object_path(&account_root(db, account)?, hash)?;
+    let mut reader = GzDecoder::new(File::open(path).map_err(|e| e.to_string())?);
+    let mut scan = super::archive_metadata::AttachmentScan::default();
+    let mut buffer = [0u8; 65536];
+    loop {
+        let n = reader.read(&mut buffer).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        scan.feed(&buffer[..n]);
+        if scan.found {
+            break;
+        }
+    }
+    Ok(scan.found)
 }
 
 fn object_path(root: &Path, hash: &str) -> Result<PathBuf, String> {
@@ -116,6 +139,7 @@ pub struct PreparedMessage {
     temp: tempfile::NamedTempFile,
     hash: String,
     raw_size: u64,
+    has_attachments: bool,
 }
 
 pub fn store(
@@ -147,6 +171,7 @@ pub fn prepare(
         tempfile::NamedTempFile::new_in(root.join("objects")).map_err(|e| e.to_string())?;
     let mut hash = Sha256::new();
     let mut raw_size = 0u64;
+    let mut attachments = super::archive_metadata::AttachmentScan::default();
     {
         let mut encoder = GzEncoder::new(temp.as_file_mut(), Compression::new(3));
         let mut buffer = [0u8; 128 * 1024];
@@ -158,6 +183,7 @@ pub fn prepare(
             if n == 0 {
                 break;
             }
+            attachments.feed(&buffer[..n]);
             hash.update(&buffer[..n]);
             raw_size += n as u64;
             encoder
@@ -179,6 +205,7 @@ pub fn prepare(
         temp,
         hash,
         raw_size,
+        has_attachments: attachments.found,
     })
 }
 
@@ -194,6 +221,7 @@ pub fn publish(
         temp,
         hash,
         raw_size,
+        has_attachments,
     } = prepared;
     let root = account_root(db, account)?;
     let path = object_path(&root, &hash)?;
@@ -204,7 +232,10 @@ pub fn publish(
     } // Existing immutable content was verified during preparation.
     let stored_size = fs::metadata(&path).map_err(|e| e.to_string())?.len();
     let tx = db.unchecked_transaction().map_err(|e| e.to_string())?;
-    let header = super::cached_header(&tx, account, folder, uid).map_err(|e| e.to_string())?;
+    let mut header = super::cached_header(&tx, account, folder, uid).map_err(|e| e.to_string())?;
+    if let Some(header) = &mut header {
+        header.has_attachments = has_attachments;
+    }
     let header_json = serde_json::to_string(&header).map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM mail_full_messages WHERE account_id=?1 AND folder=?2 AND uid=?3 AND uid_validity=?4", params![account,folder,uid,uid_validity]).map_err(|e|e.to_string())?;
     tx.execute(

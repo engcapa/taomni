@@ -17,9 +17,10 @@ beforeEach(() => {
   ipc.save.mockResolvedValue("/qa/original.eml");
   ipc.invoke.mockImplementation(async (cmd: string) => {
     if (cmd === "mail_archive_status") return { phase: "completed", saved: 1, total: 1, bytes: 600000, totalBytes: 600000 };
-    if (cmd === "mail_archive_list") return saved;
+    if (cmd === "mail_archive_query") return { entries: saved, total: saved.length, storedBytes: 1000, folders: ["INBOX"], offset: 0 };
+    if (cmd === "mail_archive_preview_cleanup") return { token: "preview", count: saved.length, storedBytes: 1000, reclaimableBytes: 1000 };
     if (cmd === "mail_archive_read") return { subject: entry.subject, text: "Offline original body", attachments: [{ name: "large.bin" }] };
-    if (cmd === "mail_archive_remove") { saved = []; return 1; }
+    if (cmd === "mail_archive_cleanup") { saved = []; return 1; }
     return undefined;
   });
 });
@@ -50,7 +51,7 @@ it("keeps header progress visible while a batch saves complete originals", async
   expect(screen.getByTestId("mail-storage-progress")).toHaveTextContent("Current message:");
   fireEvent.click(screen.getByTestId("mail-archive-open"));
   await waitFor(() => expect(screen.getByTestId("mail-archive-read")).toBeDefined());
-  fireEvent.click(screen.getByTestId("mail-archive-read"));
+  fireEvent.click(await screen.findByTestId("mail-archive-read"));
   await screen.findByText("Offline original body");
 });
 
@@ -75,7 +76,7 @@ it("reads retained originals, exports attachments, and cleans up only after conf
   render(<MailArchivePanel info={info} />);
   fireEvent.click(screen.getByTestId("mail-archive-open"));
   await waitFor(() => expect(screen.getByTestId("mail-archive-read")).toBeDefined());
-  fireEvent.click(screen.getByTestId("mail-archive-read"));
+  fireEvent.click(await screen.findByTestId("mail-archive-read"));
   await screen.findByText("Offline original body");
   fireEvent.click(screen.getByTestId("mail-archive-export"));
   await waitFor(() => expect(ipc.invoke).toHaveBeenCalledWith("mail_archive_export", { accountId: "qa", entry, targetPath: "/qa/original.eml" }));
@@ -85,11 +86,11 @@ it("reads retained originals, exports attachments, and cleans up only after conf
   fireEvent.click(screen.getByLabelText("Select Retained original"));
   await waitFor(() => expect(screen.getByTestId("mail-archive-cleanup")).not.toBeDisabled());
   fireEvent.click(screen.getByTestId("mail-archive-cleanup"));
-  fireEvent.click(screen.getByTestId("mail-archive-confirm-cancel"));
-  expect(ipc.invoke.mock.calls.some(([cmd]) => cmd === "mail_archive_remove")).toBe(false);
+  fireEvent.click(await screen.findByTestId("mail-archive-confirm-cancel"));
+  expect(ipc.invoke.mock.calls.some(([cmd]) => cmd === "mail_archive_cleanup")).toBe(false);
   fireEvent.click(screen.getByTestId("mail-archive-cleanup"));
-  fireEvent.click(screen.getByTestId("mail-archive-confirm-remove"));
-  await waitFor(() => expect(ipc.invoke).toHaveBeenCalledWith("mail_archive_remove", { accountId: "qa", entries: [entry] }));
+  fireEvent.click(await screen.findByTestId("mail-archive-confirm-remove"));
+  await waitFor(() => expect(ipc.invoke).toHaveBeenCalledWith("mail_archive_cleanup", { accountId: "qa", token: "preview" }));
   await screen.findByText("No complete messages stored yet.");
 });
 
@@ -98,7 +99,7 @@ it("reports archive read errors while allowing streaming original export", async
   ipc.invoke.mockImplementation((cmd: string, args: unknown) => cmd === "mail_archive_read" ? Promise.reject("Saved email exceeds the reader limit") : previous(cmd, args));
   render(<MailArchivePanel info={info} />);
   await act(async () => fireEvent.click(screen.getByTestId("mail-archive-open")));
-  fireEvent.click(screen.getByTestId("mail-archive-read"));
+  fireEvent.click(await screen.findByTestId("mail-archive-read"));
   await screen.findByText("Saved email exceeds the reader limit");
   fireEvent.click(screen.getByTestId("mail-archive-export"));
   await waitFor(() => expect(ipc.invoke).toHaveBeenCalledWith("mail_archive_export", expect.objectContaining({ entry })));

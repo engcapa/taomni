@@ -1,0 +1,726 @@
+id: TC-MAIL-STORAGE-06
+title: Search, filter and bulk clean local archive across pages
+description: Whole-archive search, combined filters, sorting, retained cross-page selection, keyboard
+  shortcuts and frozen cleanup preview. Browser renderer and stub workflow; native storage and shared-object
+  accounting are covered by TC-MAIL-STORAGE-07.
+covers:
+- F-MAIL-23
+tags:
+- mail
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- mail_server
+- mail_storage
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- fill:
+    selector: input[aria-label="IMAP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-imap-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="IMAP port"]
+    value: ${fixture.mail_imap_port}
+- fill:
+    selector: input[aria-label="Mail email or username"]
+    value: qa@example.com
+- fill:
+    selector: input[aria-label="Mail password or app password token"]
+    value: qa-pass
+- fill:
+    selector: input[aria-label="SMTP server"]
+    value: ${fixture.mail_host}
+- select_option:
+    selector: '[data-testid="mail-smtp-security"]'
+    value: None
+- fill:
+    selector: input[aria-label="SMTP port"]
+    value: ${fixture.mail_smtp_port}
+- fill:
+    selector: '[data-testid="mail-storage-directory"]'
+    value: ${fixture.mail_storage_a}
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA archive manager
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-mail-storage-password
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 60
+- wait_for: '[data-testid="session-tree-item"][data-session-name="QA archive manager"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA archive manager"]'
+- assert_text:
+    selector: '[data-testid="mail-storage-progress"]'
+    contains: completed
+    timeout_sec: 60
+- mail_server_deliver:
+    folder: INBOX
+    count: 210
+    prefix: Manager
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    folder: INBOX
+    timeout_sec: 60
+- click: '[data-testid="mail-storage-resume"]'
+- wait_for:
+    selector: '[data-testid="mail-storage-resume"]:enabled'
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-open"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-folder"]'
+    value: INBOX
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: Manager
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 200
+- screenshot: archive-manager-overview.png
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: Manager 0001
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 1 messages
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: Manager
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- set_check:
+    selector: '[data-testid="mail-archive-row"]:first-child input[type="checkbox"]'
+    checked: true
+- click: '[data-testid="mail-archive-next"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: 201–210 of 210
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 10
+- set_check:
+    selector: '[data-testid="mail-archive-row"]:first-child input[type="checkbox"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 2 selected
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-prev"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: 1–200 of 210
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="mail-archive-row"] input:checked'
+    equal: 1
+- click: '[data-testid="mail-archive-cleanup"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-confirm"]'
+    contains: Remove 2 local originals?
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-cleanup-estimate"]'
+    contains: reclaimable
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-confirm-cancel"]'
+- assert_not_visible: '[data-testid="mail-archive-confirm"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 2 selected
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-clear-selection"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 0 selected
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-search-field"]'
+    value: from
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: qa-sender@example.com
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-search-field"]'
+    value: to
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: user@example.com
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 213 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-search-field"]'
+    value: subject
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: Manager
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-attachments"]'
+    value: 'yes'
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 0 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-attachments"]'
+    value: 'no'
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-advanced"] summary'
+- fill:
+    selector: '[data-testid="mail-archive-date-from"]'
+    value: '2000-01-01'
+- fill:
+    selector: '[data-testid="mail-archive-date-to"]'
+    value: '2099-12-31'
+- fill:
+    selector: '[data-testid="mail-archive-stored-from"]'
+    value: '2000-01-01'
+- fill:
+    selector: '[data-testid="mail-archive-stored-to"]'
+    value: '2099-12-31'
+- fill:
+    selector: '[data-testid="mail-archive-min-size"]'
+    value: '0.0001'
+- fill:
+    selector: '[data-testid="mail-archive-max-size"]'
+    value: '1'
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-archive-min-size"]'
+    value: '2'
+- assert_text:
+    selector: '[data-testid="mail-archive-dialog"]'
+    contains: Enter a valid size range
+    timeout_sec: 60
+- assert_disabled: '[data-testid="mail-archive-select-all"]'
+- fill:
+    selector: '[data-testid="mail-archive-min-size"]'
+    value: '0.0001'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-sort"]'
+    value: savedOldest
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-sort"]'
+    value: dateNewest
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-sort"]'
+    value: dateOldest
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-sort"]'
+    value: smallest
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-sort"]'
+    value: largest
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-sort"]'
+    value: savedNewest
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- set_check:
+    selector: '[data-testid="mail-archive-select-page"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 200 selected
+    timeout_sec: 60
+- set_check:
+    selector: '[data-testid="mail-archive-select-page"]'
+    checked: false
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 0 selected
+    timeout_sec: 60
+- press:
+    key: Control+f
+    selector: '[data-testid="mail-archive-entries"]'
+- eval_readonly:
+    expression: document.activeElement.dataset.testid === "mail-archive-search"
+    expect_truthy: true
+- press:
+    key: Control+a
+    selector: '[data-testid="mail-archive-entries"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 200 selected
+    timeout_sec: 60
+- press:
+    key: End
+    selector: '[data-testid="mail-archive-search"]'
+- press:
+    key: Delete
+    selector: '[data-testid="mail-archive-search"]'
+- assert_not_visible: '[data-testid="mail-archive-confirm"]'
+- press:
+    key: Delete
+    selector: '[data-testid="mail-archive-entries"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-confirm"]'
+    contains: Remove 200 local originals?
+    timeout_sec: 60
+- press: Escape
+- assert_not_visible: '[data-testid="mail-archive-confirm"]'
+- click: '[data-testid="mail-archive-reset"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 0 selected
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-folder"]'
+    value: INBOX
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: Manager
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 210 messages
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-sort"]'
+    value: largest
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-select-all"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 210 selected across all pages
+    timeout_sec: 60
+- set_check:
+    selector: '[data-testid="mail-archive-row"]:first-child input[type="checkbox"]'
+    checked: false
+- assert_text:
+    selector: '[data-testid="mail-archive-selection-count"]'
+    contains: 209 selected across all pages
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-cleanup"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-confirm"]'
+    contains: Remove 209 local originals?
+    timeout_sec: 60
+- screenshot: archive-manager-cleanup-preview.png
+- click: '[data-testid="mail-archive-confirm-remove"]'
+- assert_text:
+    selector: '[data-testid="mail-archive-notice"]'
+    contains: Removed 209 local originals. Server messages kept.
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 1 messages
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="mail-archive-row"]'
+    equal: 1
+- click: '[data-testid="mail-archive-reset"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-folder"]'
+    value: Archive
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: does-not-exist
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 0 messages
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-close"]'
+- assert_not_visible: '[data-testid="mail-archive-dialog"]'
+- mail_server_assert_folder_count:
+    folder: INBOX
+    min: 210
+- click: '[data-testid="mail-storage-resume"]'
+- wait_for:
+    selector: '[data-testid="mail-storage-resume"]:enabled'
+    timeout_sec: 90
+- click: '[data-testid="mail-archive-open"]'
+- wait_for:
+    selector: '[data-testid="mail-archive-refresh"]:enabled'
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-archive-folder"]'
+    value: INBOX
+- fill:
+    selector: '[data-testid="mail-archive-search"]'
+    value: Manager
+- assert_text:
+    selector: '[data-testid="mail-archive-results"]'
+    contains: of 1 messages
+    timeout_sec: 60
+- click: '[data-testid="mail-archive-close"]'
+- assert_not_visible: '[data-testid="mail-archive-dialog"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Whole-archive search, combined filters, sorting, retained cross-page selection, keyboard
+      shortcuts and frozen cleanup preview. Browser renderer and stub workflow; native storage and shared-object
+      accounting are covered by TC-MAIL-STORAGE-07.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 21
+    - 23
+    - 24
+    - 26
+    - 28
+    - 30
+    - 31
+    - 35
+    - 38
+    - 40
+    - 41
+    - 44
+    - 46
+    - 49
+    - 52
+    - 55
+    - 57
+    - 58
+    - 60
+    - 61
+    - 63
+    - 64
+    - 66
+    - 68
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 75
+    - 76
+    - 78
+    - 81
+    - 83
+    - 86
+    - 89
+    - 92
+    - 95
+    - 98
+    - 101
+    - 103
+    - 105
+    - 107
+    - 109
+    - 110
+    - 112
+    - 114
+    - 116
+    - 119
+    - 120
+    - 122
+    - 124
+    - 126
+    - 128
+    - 131
+    - 135
+    - 137
+    - 138
+    - 140
+    - 143
+    - 145
+    - 147
+    - 148
+    - 150
+    checkpoints:
+    - step: 22
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
+        "completed", "timeout_sec": 60}}'
+    - step: 25
+      expectation: '{"mail_server_assert_list_matches": {"folder": "INBOX", "timeout_sec": 60}}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 33
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 200}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 1 messages", "timeout_sec": 60}}'
+    - step: 37
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 1}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "201–210 of 210", "timeout_sec": 60}}'
+    - step: 43
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 10}}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "2 selected", "timeout_sec": 60}}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "1–200 of 210", "timeout_sec": 60}}'
+    - step: 48
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"] input:checked",
+        "equal": 1}}'
+    - step: 50
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains":
+        "Remove 2 local originals?", "timeout_sec": 60}}'
+    - step: 51
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-cleanup-estimate\"]", "contains":
+        "reclaimable", "timeout_sec": 60}}'
+    - step: 53
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-confirm\"]"}'
+    - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "2 selected", "timeout_sec": 60}}'
+    - step: 56
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "0 selected", "timeout_sec": 60}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 62
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 213 messages", "timeout_sec": 60}}'
+    - step: 65
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 67
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 0 messages", "timeout_sec": 60}}'
+    - step: 69
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 77
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 79
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-dialog\"]", "contains":
+        "Enter a valid size range", "timeout_sec": 60}}'
+    - step: 80
+      expectation: '{"assert_disabled": "[data-testid=\"mail-archive-select-all\"]"}'
+    - step: 85
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 88
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 91
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 94
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 97
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 100
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 102
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "200 selected", "timeout_sec": 60}}'
+    - step: 104
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "0 selected", "timeout_sec": 60}}'
+    - step: 106
+      expectation: '{"eval_readonly": {"expression": "document.activeElement.dataset.testid === \"mail-archive-search\"",
+        "expect_truthy": true}}'
+    - step: 108
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "200 selected", "timeout_sec": 60}}'
+    - step: 111
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-confirm\"]"}'
+    - step: 113
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains":
+        "Remove 200 local originals?", "timeout_sec": 60}}'
+    - step: 115
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-confirm\"]"}'
+    - step: 118
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "0 selected", "timeout_sec": 60}}'
+    - step: 121
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 210 messages", "timeout_sec": 60}}'
+    - step: 125
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "210 selected across all pages", "timeout_sec": 60}}'
+    - step: 127
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains":
+        "209 selected across all pages", "timeout_sec": 60}}'
+    - step: 129
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains":
+        "Remove 209 local originals?", "timeout_sec": 60}}'
+    - step: 132
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-notice\"]", "contains":
+        "Removed 209 local originals. Server messages kept.", "timeout_sec": 60}}'
+    - step: 133
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 1 messages", "timeout_sec": 60}}'
+    - step: 134
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 1}}'
+    - step: 139
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 0 messages", "timeout_sec": 60}}'
+    - step: 141
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+    - step: 142
+      expectation: '{"mail_server_assert_folder_count": {"folder": "INBOX", "min": 210}}'
+    - step: 149
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains":
+        "of 1 messages", "timeout_sec": 60}}'
+    - step: 151
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+    results:
+    - 22
+    - 25
+    - 32
+    - 33
+    - 36
+    - 37
+    - 39
+    - 42
+    - 43
+    - 45
+    - 47
+    - 48
+    - 50
+    - 51
+    - 53
+    - 54
+    - 56
+    - 59
+    - 62
+    - 65
+    - 67
+    - 69
+    - 77
+    - 79
+    - 80
+    - 85
+    - 88
+    - 91
+    - 94
+    - 97
+    - 100
+    - 102
+    - 104
+    - 106
+    - 108
+    - 111
+    - 113
+    - 115
+    - 118
+    - 121
+    - 125
+    - 127
+    - 129
+    - 132
+    - 133
+    - 134
+    - 139
+    - 141
+    - 142
+    - 149
+    - 151
+  visual:
+  - check: Archive manager layout, readable results, selection and cleanup estimate
+    method: manual
+    reason: Inspect retained overview and cleanup preview screenshots.
+  native:
+  - check: Indexed queries, original cleanup and shared-object integrity
+    method: manual
+    reason: Native boundary belongs to TC-MAIL-STORAGE-07.

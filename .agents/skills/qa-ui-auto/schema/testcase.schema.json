@@ -97,6 +97,7 @@
           "mail_server",
           "mail_storage",
           "mail_archive_batches",
+          "mail_archive_manager",
           "mail_stress",
           "macos_updater",
           "rdp_server_required",

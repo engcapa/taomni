@@ -4249,6 +4249,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "mail_archive_start":
     case "mail_archive_pause":
     case "mail_archive_status":
+    case "mail_archive_query":
+    case "mail_archive_preview_cleanup":
+    case "mail_archive_cleanup":
     case "mail_archive_list":
     case "mail_archive_read":
     case "mail_archive_export":

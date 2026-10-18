@@ -67,3 +67,33 @@ def setup_batched(ctx: Any) -> None:
             uid = server.state.append_raw("INBOX", raw, [])
             expected[f"INBOX/{uid}"] = {"sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw), "attachmentSha256": hashlib.sha256(attachment).hexdigest()}
     Path(ctx.values["mail_expected"]).write_text(json.dumps(expected), encoding="utf-8")
+
+def setup_manager(ctx: Any) -> None:
+    """Many searchable originals plus a shared copy and a plain retained message."""
+    setup(ctx)
+    server = mail_fake_server.ACTIVE
+    if server is None:
+        raise RuntimeError("mail_archive_manager requires native mail_server")
+    server.state.archive_chunk_delay = 0
+    expected = {}
+    attachment = b"archive-management-attachment"
+    with server.state.lock:
+        for folder in server.state.folders.values():
+            folder.messages.clear()
+        first = None
+        for index in range(210):
+            raw = (f"From: Archive Team <archive-team@example.com>\r\nTo: Billing <billing@example.com>\r\nSubject: Invoice {index:04d}\r\n"
+                   "Date: Mon, 15 Jan 2024 10:00:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=manage\r\n\r\n"
+                   f"--manage\r\nContent-Type: text/plain\r\n\r\nInvoice body {index:04d} {'detail ' * index}\r\n"
+                   "--manage\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=invoice.bin\r\n"
+                   "Content-Transfer-Encoding: base64\r\n\r\n").encode() + base64.b64encode(attachment) + b"\r\n--manage--\r\n"
+            if first is None:
+                first = raw
+            uid = server.state.append_raw("INBOX", raw, [])
+            expected[f"INBOX/{uid}"] = {"sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw), "attachmentSha256": hashlib.sha256(attachment).hexdigest()}
+        uid = server.state.append_raw("Archive", first, [])
+        expected[f"Archive/{uid}"] = {"sha256": hashlib.sha256(first).hexdigest(), "rawSize": len(first), "attachmentSha256": hashlib.sha256(attachment).hexdigest()}
+        raw = b"From: Personal <personal@example.com>\r\nTo: reader@example.com\r\nSubject: Keep plain memo\r\nDate: Thu, 15 Jan 2026 10:00:00 +0000\r\nContent-Type: text/plain\r\n\r\nKeep this plain original.\r\n"
+        uid = server.state.append_raw("Archive", raw, [])
+        expected[f"Archive/{uid}"] = {"sha256": hashlib.sha256(raw).hexdigest(), "rawSize": len(raw), "attachmentSha256": None}
+    Path(ctx.values["mail_expected"]).write_text(json.dumps(expected), encoding="utf-8")

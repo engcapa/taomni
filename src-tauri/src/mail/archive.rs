@@ -579,6 +579,47 @@ fn download_targets(
 }
 
 #[tauri::command]
+pub async fn mail_archive_query(
+    account_id: String,
+    query: archive_query::ArchiveQuery,
+    offset: Option<u32>,
+    state: State<'_, AppState>,
+) -> Result<archive_query::ArchivePage, String> {
+    with_mail_db_async(&state, &account_id, move |db, account| {
+        archive_query::query(db, account, &query, offset.unwrap_or(0))
+            .map_err(storage::as_sql_error)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn mail_archive_preview_cleanup(
+    account_id: String,
+    selection: archive_query::ArchiveSelection,
+    state: State<'_, AppState>,
+) -> Result<archive_query::CleanupPreview, String> {
+    with_mail_db_async(&state, &account_id, move |db, account| {
+        archive_query::preview(db, account, &selection).map_err(storage::as_sql_error)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn mail_archive_cleanup(
+    account_id: String,
+    token: String,
+    state: State<'_, AppState>,
+) -> Result<u64, String> {
+    // Stop publication before deleting the frozen preview; skip markers prevent
+    // other instances from publishing these originals again.
+    state.mail_archive.pause_account(&account_id)?;
+    with_mail_db_async(&state, &account_id, move |db, account| {
+        archive_query::remove_preview(db, account, &token).map_err(storage::as_sql_error)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn mail_archive_list(
     account_id: String,
     offset: Option<u32>,

@@ -1406,6 +1406,25 @@
 - `[data-testid="mail-archive-preview"]` — display — F-MAIL-23.mail-archive-preview
 - `[data-testid="mail-archive-export"]` — interactive — F-MAIL-23.mail-archive-export
 - `[data-testid="mail-archive-attachment"]` — interactive — F-MAIL-23.mail-archive-attachment
+- `[data-testid="mail-archive-search"]` — interactive — F-MAIL-23.mail-archive-search
+- `[data-testid="mail-archive-search-field"]` — interactive — F-MAIL-23.mail-archive-search-field
+- `[data-testid="mail-archive-folder"]` — interactive — F-MAIL-23.mail-archive-folder
+- `[data-testid="mail-archive-attachments"]` — interactive — F-MAIL-23.mail-archive-attachments
+- `[data-testid="mail-archive-reset"]` — interactive — F-MAIL-23.mail-archive-reset
+- `[data-testid="mail-archive-advanced"]` — interactive — F-MAIL-23.mail-archive-advanced
+- `[data-testid="mail-archive-date-from"]` — interactive — F-MAIL-23.mail-archive-date-from
+- `[data-testid="mail-archive-date-to"]` — interactive — F-MAIL-23.mail-archive-date-to
+- `[data-testid="mail-archive-stored-from"]` — interactive — F-MAIL-23.mail-archive-stored-from
+- `[data-testid="mail-archive-stored-to"]` — interactive — F-MAIL-23.mail-archive-stored-to
+- `[data-testid="mail-archive-min-size"]` — interactive — F-MAIL-23.mail-archive-min-size
+- `[data-testid="mail-archive-max-size"]` — interactive — F-MAIL-23.mail-archive-max-size
+- `[data-testid="mail-archive-select-page"]` — interactive — F-MAIL-23.mail-archive-select-page
+- `[data-testid="mail-archive-select-all"]` — interactive — F-MAIL-23.mail-archive-select-all
+- `[data-testid="mail-archive-clear-selection"]` — interactive — F-MAIL-23.mail-archive-clear-selection
+- `[data-testid="mail-archive-selection-count"]` — display — F-MAIL-23.mail-archive-selection-count
+- `[data-testid="mail-archive-sort"]` — interactive — F-MAIL-23.mail-archive-sort
+- `[data-testid="mail-archive-cleanup-estimate"]` — display — F-MAIL-23.mail-archive-cleanup-estimate
+- `[data-testid="mail-archive-results"]` — display — F-MAIL-23.mail-archive-results
 
 ## mail/sync (F-MAIL-10)
 

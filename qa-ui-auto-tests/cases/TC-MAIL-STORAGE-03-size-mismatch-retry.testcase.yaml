@@ -138,7 +138,7 @@ steps:
       INBOX: 2
       Archive: 2
 - click: '[data-testid="mail-archive-open"]'
-- wait_for: '[data-testid="mail-archive-dialog"][open]'
+- wait_for: '[data-testid="mail-archive-refresh"]:enabled'
 - assert_count:
     selector: '[data-testid="mail-archive-row"]'
     equal: 2

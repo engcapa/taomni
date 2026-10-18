@@ -421,6 +421,18 @@ class NativeSessionTransportTest(TestCase):
 
 
 class NativeSessionFillTest(TestCase):
+    def test_windows_date_fill_uses_localized_segments_and_checks_iso_value(self) -> None:
+        session = self.session(False)
+        session.request = Mock(side_effect=lambda method, path, *args: "date" if path.endswith("/property/type") else None)
+        session.execute = Mock(side_effect=[["year", "month", "day"], True])
+        with patch("tauri_webdriver.platform.system", return_value="Windows"):
+            session.fill("input[type=date]", "2024-01-15")
+        session.type_text.assert_has_calls([call("2024"), call("01"), call("15")])
+        session.press_combo.assert_has_calls([call("ArrowLeft"), call("ArrowLeft"), call("ArrowLeft"), call("ArrowRight"), call("Tab")])
+        session.execute = Mock(side_effect=[["month", "day", "year"], False])
+        with patch("tauri_webdriver.platform.system", return_value="Windows"), self.assertRaisesRegex(WebDriverError, "ISO value"):
+            session.fill("input[type=date]", "2024-01-15")
+
     def session(self, contenteditable: bool, focus_results: list[bool] | None = None) -> NativeSession:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"
