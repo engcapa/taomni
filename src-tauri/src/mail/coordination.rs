@@ -219,8 +219,12 @@ mod tests {
                 )
                 .unwrap();
             assert_eq!(
-                Path::new(connection.path().unwrap()).parent().unwrap(),
-                root.join("new")
+                Path::new(connection.path().unwrap())
+                    .parent()
+                    .unwrap()
+                    .canonicalize()
+                    .unwrap(),
+                root.join("new").canonicalize().unwrap()
             );
         }
         drop(lease);

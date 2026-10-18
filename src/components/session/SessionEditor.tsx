@@ -2035,12 +2035,12 @@ function MailSettings({
         </label>
       </Field>
 
-      <Field label="Save directory">
+      <Field label="Extra .eml copies">
         <input
           className="taomni-input w-[420px]"
           value={saveDirectory}
           aria-label="Mail save directory"
-          placeholder="Optional folder for fetched .eml files"
+          placeholder="Optional directory for extra .eml copies"
           onChange={(e) => setSaveDirectory(e.target.value)}
         />
         <button
@@ -2051,6 +2051,10 @@ function MailSettings({
           Browse
         </button>
       </Field>
+
+      <div className="col-span-12 text-xs text-[var(--taomni-text-muted)]">
+        Saves extra .eml files during IMAP body fetching; these may be partial due to body size limits. This does not change the cache location. Leave blank if you only need Complete mail storage above.
+      </div>
 
       <Field label="Cache limits">
         <span className="text-[var(--taomni-text-muted)]">Headers</span>

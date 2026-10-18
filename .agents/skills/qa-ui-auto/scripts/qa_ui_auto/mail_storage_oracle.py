@@ -1,6 +1,7 @@
 """Read-only independent SQLite/gzip/ZIP validation for native mail cases."""
 from __future__ import annotations
 import email
+from contextlib import closing
 import gzip
 import hashlib
 import json
@@ -15,7 +16,7 @@ def observe(root: Path, expected: dict, full: dict, headers: dict) -> dict:
     dbs = list(root.glob("*.db"))
     if len(dbs) != 1:
         raise AssertionError(f"Expected one mailbox DB in {root}, got {len(dbs)}")
-    with sqlite3.connect(dbs[0].as_uri() + "?mode=ro", uri=True) as db:
+    with closing(sqlite3.connect(dbs[0].as_uri() + "?mode=ro", uri=True)) as db:
         rows = db.execute("SELECT folder,uid,sha256,raw_size FROM mail_full_messages").fetchall()
         summary = dict(db.execute("SELECT folder,count(*) FROM mail_messages GROUP BY folder"))
     actual = {}
@@ -28,13 +29,34 @@ def observe(root: Path, expected: dict, full: dict, headers: dict) -> dict:
         assert digest == oracle["sha256"] and size == oracle["rawSize"], "Full MIME differs from fixture original"
         parsed = email.message_from_bytes(raw)
         attachments = [part.get_payload(decode=True) for part in parsed.walk() if part.get_filename()]
-        assert any(hashlib.sha256(data).hexdigest() == oracle["attachmentSha256"] for data in attachments), "Attachment bytes missing"
+        if oracle["attachmentSha256"] is None:
+            assert not attachments, "Unexpected attachment in plain original"
+        else:
+            assert any(hashlib.sha256(data).hexdigest() == oracle["attachmentSha256"] for data in attachments), "Attachment bytes missing"
     assert actual == {k: v for k, v in full.items() if v}, f"Full objects: {actual}, expected {full}"
     for folder, count in headers.items():
         assert summary.get(folder, 0) == count, f"Summary count {folder}: {summary}"
     objects = list(root.glob("*.mail/objects/*/*.eml.gz"))
     assert len(objects) == len({row[2] for row in rows}), "Unreferenced objects remain after explicit cleanup"
     return {"full": actual, "headers": summary, "objects": len(objects)}
+
+
+def observe_incremental(root: Path, expected: dict) -> dict:
+    dbs = list(root.glob("*.db"))
+    assert len(dbs) == 1, "Expected one mailbox DB"
+    with closing(sqlite3.connect(dbs[0].as_uri() + "?mode=ro", uri=True)) as db:
+        synced = db.execute("SELECT COUNT(*) FROM mail_messages WHERE folder='INBOX'").fetchone()[0]
+        folder = db.execute("SELECT total,sync_complete FROM mail_folders WHERE name='INBOX'").fetchone()
+        assert folder is not None, "INBOX has not been indexed yet"
+        total, complete = folder
+        rows = db.execute("SELECT uid,sha256,raw_size FROM mail_full_messages WHERE folder='INBOX'").fetchall()
+    assert total == 350 and 0 < synced < total and not complete, f"History must still be incomplete: {synced}/{total}, complete={complete}"
+    assert 0 < len(rows) <= synced, "No complete originals before history completes"
+    for uid, digest, size in rows:
+        raw = gzip.decompress((root / f"{dbs[0].stem}.mail" / "objects" / digest[:2] / f"{digest}.eml.gz").read_bytes())
+        assert hashlib.sha256(raw).hexdigest() == digest == expected[f"INBOX/{uid}"]["sha256"], "Early original integrity failed"
+        assert len(raw) == size == expected[f"INBOX/{uid}"]["rawSize"], "Early original truncated"
+    return {"headers": synced, "server_total": total, "sync_complete": complete, "full": len(rows), "verified_originals": len(rows)}
 
 
 def check(ctx: Any, args: dict) -> str:
@@ -48,7 +70,9 @@ def check(ctx: Any, args: dict) -> str:
     last = None
     while time.monotonic() < deadline:
         try:
-            if args.get("kind", "storage") == "backup":
+            if args.get("kind") == "incremental":
+                result = observe_incremental(root, expected)
+            elif args.get("kind", "storage") == "backup":
                 archives = sorted(root.glob("*.taobak"), key=lambda p: p.stat().st_mtime_ns)
                 assert archives, "No backup archive"
                 with zipfile.ZipFile(archives[-1]) as archive:

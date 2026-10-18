@@ -842,6 +842,8 @@ export interface MailArchiveStatus {
   phase: "idle" | "connecting" | "headers" | "downloading" | "verifying" | "pausing" | "paused" | "completed" | "failed" | "shared";
   folder?: string | null;
   saved: number;
+  headersSynced?: number;
+  headersTotal?: number | null;
   total: number;
   bytes: number;
   totalBytes?: number | null;
@@ -855,7 +857,31 @@ export interface MailArchiveEntry {
   rawSize: number;
   storedSize: number;
   storedAt: number;
+  from?: string;
+  to?: string;
+  dateTs?: number | null;
+  hasAttachments?: boolean;
 }
+export interface MailArchiveQuery {
+  text?: string;
+  field?: "all" | "subject" | "from" | "to";
+  folder?: string | null;
+  hasAttachments?: boolean | null;
+  dateFrom?: number | null;
+  dateBefore?: number | null;
+  storedFrom?: number | null;
+  storedBefore?: number | null;
+  minSize?: number | null;
+  maxSize?: number | null;
+  sort?: "savedNewest" | "savedOldest" | "dateNewest" | "dateOldest" | "largest" | "smallest";
+}
+export type MailArchiveKey = Pick<MailArchiveEntry, "folder" | "uid" | "uidValidity">;
+export interface MailArchivePage { entries: MailArchiveEntry[]; total: number; storedBytes: number; folders: string[]; offset: number }
+export interface MailArchiveSelection { query?: MailArchiveQuery; keys?: MailArchiveKey[]; excluded?: MailArchiveKey[] }
+export interface MailCleanupPreview { token: string; count: number; storedBytes: number; reclaimableBytes: number }
+export const mailArchiveQuery = (accountId: string, query: MailArchiveQuery, offset = 0) => invoke<MailArchivePage>("mail_archive_query", { accountId, query, offset });
+export const mailArchivePreviewCleanup = (accountId: string, selection: MailArchiveSelection) => invoke<MailCleanupPreview>("mail_archive_preview_cleanup", { accountId, selection });
+export const mailArchiveCleanup = (accountId: string, token: string) => invoke<number>("mail_archive_cleanup", { accountId, token });
 export const mailArchiveStart = (config: MailTabInfo, resume = false) => invoke<void>("mail_archive_start", { config, resume });
 export const mailArchivePause = (accountId: string) => invoke<void>("mail_archive_pause", { accountId });
 export const mailArchiveStatus = (accountId: string) => invoke<MailArchiveStatus>("mail_archive_status", { accountId });

@@ -40,6 +40,8 @@ use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 
 pub mod archive;
+mod archive_metadata;
+pub(crate) mod archive_query;
 pub mod autoconfig;
 pub mod caldav;
 pub mod calendar;
