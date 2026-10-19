@@ -704,6 +704,62 @@ fn screen_capture() -> Result<String, String> {
     Err("screen capture is only available on macOS".into())
 }
 
+/// One WKWebView snapshot attempt. `takeSnapshotWithConfiguration` silently
+/// drops its completion handler when the WebView is not painting (for example
+/// while the app's window sits in a background console session), so the caller
+/// retries before reporting a failure.
+#[cfg(target_os = "macos")]
+async fn webview_snapshot<R: Runtime>(
+    window: &WebviewWindow<R>,
+    wait: Duration,
+) -> Result<String, String> {
+    use block2::RcBlock;
+    use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
+    use objc2_foundation::NSData;
+
+    let (tx, rx) = oneshot::channel::<Result<String, String>>();
+    let sender = Arc::new(StdMutex::new(Some(tx)));
+    let started = window.with_webview(move |webview| unsafe {
+        let completion = RcBlock::new(move |image: *mut AnyObject, err: *mut AnyObject| {
+            let result = (|| {
+                if image.is_null() || !err.is_null() {
+                    return Err("WKWebView snapshot did not return an image".to_string());
+                }
+                let tiff: Option<Retained<NSData>> = msg_send![&*image, TIFFRepresentation];
+                let tiff = tiff.ok_or("snapshot TIFF conversion failed")?;
+                let bitmap: Option<Retained<AnyObject>> =
+                    msg_send![class!(NSBitmapImageRep), imageRepWithData: &*tiff];
+                let bitmap = bitmap.ok_or("snapshot bitmap conversion failed")?;
+                let properties: Retained<AnyObject> =
+                    msg_send![class!(NSDictionary), dictionary];
+                let png: Option<Retained<NSData>> = msg_send![&*bitmap,
+                    representationUsingType: 4usize, properties: &*properties];
+                let png = png.ok_or("snapshot PNG conversion failed")?;
+                let bytes = png.as_bytes_unchecked();
+                if bytes.len() < 8 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
+                    return Err("snapshot is not a PNG".to_string());
+                }
+                Ok(BASE64.encode(bytes))
+            })();
+            if let Some(tx) = sender.lock().expect("snapshot sender lock").take() {
+                let _ = tx.send(result);
+            }
+        });
+        let view = &*(webview.inner() as *mut AnyObject);
+        let _: () = msg_send![view,
+            takeSnapshotWithConfiguration: std::ptr::null::<AnyObject>(),
+            completionHandler: &*completion];
+    });
+    if let Err(err) = started {
+        return Err(format!("WKWebView snapshot could not start: {err}"));
+    }
+    match tokio::time::timeout(wait, rx).await {
+        Ok(Ok(result)) => result,
+        Ok(Err(_)) => Err("WKWebView snapshot callback was dropped".into()),
+        Err(_) => Err("WKWebView snapshot timed out".into()),
+    }
+}
+
 async fn screenshot<R: Runtime>(
     State(state): State<DriverState<R>>,
     Path(session_id): Path<String>,
@@ -715,51 +771,23 @@ async fn screenshot<R: Runtime>(
     // require Screen Recording consent on an unattended hosted runner.
     #[cfg(target_os = "macos")]
     {
-        use block2::RcBlock;
-        use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
-        use objc2_foundation::NSData;
-
-        let (tx, rx) = oneshot::channel::<Result<String, String>>();
-        let sender = Arc::new(StdMutex::new(Some(tx)));
-        let started = state.window.with_webview(move |webview| unsafe {
-            let completion = RcBlock::new(move |image: *mut AnyObject, err: *mut AnyObject| {
-                let result = (|| {
-                    if image.is_null() || !err.is_null() {
-                        return Err("WKWebView snapshot did not return an image".to_string());
+        // The hosted ARD case answered the bridge in 26-50s while the app's
+        // window was in a background console session; the previous single 20s
+        // attempt failed the whole case on evidence capture alone. Retry once
+        // with a longer bound; product assertions still own the outcome.
+        let mut last = "WKWebView snapshot failed".to_string();
+        for attempt in 0..2 {
+            match webview_snapshot(&state.window, Duration::from_secs(30)).await {
+                Ok(encoded) => return ok(Value::String(encoded)),
+                Err(message) => {
+                    if attempt == 0 {
+                        tokio::time::sleep(Duration::from_millis(500)).await;
                     }
-                    let tiff: Option<Retained<NSData>> = msg_send![&*image, TIFFRepresentation];
-                    let tiff = tiff.ok_or("snapshot TIFF conversion failed")?;
-                    let bitmap: Option<Retained<AnyObject>> =
-                        msg_send![class!(NSBitmapImageRep), imageRepWithData: &*tiff];
-                    let bitmap = bitmap.ok_or("snapshot bitmap conversion failed")?;
-                    let properties: Retained<AnyObject> =
-                        msg_send![class!(NSDictionary), dictionary];
-                    let png: Option<Retained<NSData>> = msg_send![&*bitmap,
-                        representationUsingType: 4usize, properties: &*properties];
-                    let png = png.ok_or("snapshot PNG conversion failed")?;
-                    let bytes = png.as_bytes_unchecked();
-                    if bytes.len() < 8 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
-                        return Err("snapshot is not a PNG".to_string());
-                    }
-                    Ok(BASE64.encode(bytes))
-                })();
-                if let Some(tx) = sender.lock().expect("snapshot sender lock").take() {
-                    let _ = tx.send(result);
+                    last = message;
                 }
-            });
-            let view = &*(webview.inner() as *mut AnyObject);
-            let _: () = msg_send![view,
-                takeSnapshotWithConfiguration: std::ptr::null::<AnyObject>(),
-                completionHandler: &*completion];
-        });
-        if let Err(err) = started {
-            return error(format!("WKWebView snapshot could not start: {err}"));
+            }
         }
-        return match tokio::time::timeout(Duration::from_secs(20), rx).await {
-            Ok(Ok(Ok(encoded))) => ok(Value::String(encoded)),
-            Ok(Ok(Err(message))) => error(message),
-            _ => error("WKWebView snapshot timed out or callback was dropped"),
-        };
+        return error(format!("{last} (2 attempts)"));
     }
     #[cfg(not(target_os = "macos"))]
     {
