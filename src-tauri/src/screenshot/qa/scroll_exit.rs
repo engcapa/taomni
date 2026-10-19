@@ -71,19 +71,38 @@ async fn run(app: &AppHandle) -> anyhow::Result<Value> {
             r#"
           const q = id => document.querySelector('[data-testid="'+id+'"]');
           const sleep = ms => new Promise(r=>setTimeout(r,ms));
-          for(let i=0;i<100&&!q('screenshot-select-layer');i++) await sleep(100);
-          const layer=q('screenshot-select-layer');
-          if(!layer || q('screenshot-selection')) throw new Error('capture must start unselected');
+          const phase = () => q('screenshot-overlay')?.dataset.phase ?? 'missing';
+          const control = id => {{
+            const element = q(id);
+            return element && !element.disabled ? element : null;
+          }};
+          const waitFor = async (label, probe, tries) => {{
+            for (let i=0;i<(tries||100);i++) {{ const value = probe(); if (value) return value; await sleep(100); }}
+            // The overlay used to render its select layer while the capture image
+            // was still loading; a drag then is ignored and every later control
+            // stays missing. Name the phase and controls so the next failure is
+            // diagnosable instead of a bare null dereference.
+            throw new Error(label + ' unavailable (phase=' + phase()
+              + ', toolbar=' + (q('screenshot-toolbar') ? 'yes' : 'no')
+              + ', selection=' + (q('screenshot-selection') ? 'yes' : 'no')
+              + ', confirm=' + (q('screenshot-scroll-confirm') ? 'yes' : 'no') + ')');
+          }};
+          await waitFor('overlay select phase', () => phase() === 'select' ? true : null);
+          const layer = q('screenshot-select-layer');
+          if (!layer) throw new Error('select layer missing');
+          if (q('screenshot-selection')) throw new Error('capture must start unselected');
           const fire=(type,x,y)=>layer.dispatchEvent(new MouseEvent(type,{{bubbles:true,button:0,clientX:x,clientY:y}}));
           const x={x}*innerWidth/{width}, y={y}*innerHeight/{height};
           fire('mousedown',x,y);
           fire('mousemove',x+{w}*innerWidth/{width},y+{h}*innerHeight/{height});
           fire('mouseup',x+{w}*innerWidth/{width},y+{h}*innerHeight/{height});
-          for(let i=0;i<100&&!q('screenshot-scroll-capture');i++) await sleep(100);
-          q('screenshot-scroll-capture').click();
-          for(let i=0;i<100&&(!q('screenshot-scroll-start')||q('screenshot-scroll-start').disabled);i++) await sleep(100);
-          q('screenshot-scroll-mode-{mode}').click(); await sleep(100);
-          q('screenshot-scroll-start').click(); return true;
+          await waitFor('drawn selection', () => q('screenshot-selection') ? true : null);
+          await waitFor('scroll capture button', () => control('screenshot-scroll-capture')).then(b => b.click());
+          await waitFor('scroll start button', () => control('screenshot-scroll-start'));
+          await waitFor('scroll mode radio', () => q('screenshot-scroll-mode-{mode}')).then(b => b.click());
+          await sleep(100);
+          await waitFor('scroll start enabled', () => control('screenshot-scroll-start')).then(b => b.click());
+          return true;
         "#,
             mode = if manual { "manual" } else { "auto" },
             x = region.x,
