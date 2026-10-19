@@ -8,6 +8,16 @@ description: 'Opens the real JDT LS sample and edits a member prefix after its a
 
   documentation panel must not cover the candidate list.
 
+  The remaining prefix is typed one character per step with a settle wait: a
+
+  burst of native keys delivered while JDT LS re-filters the popup was observed
+
+  to apply the last characters at a stale caret position (Windows recorded
+
+  "System.out.plnrint" and "System.out.pintlnr"), which no longer proves this
+
+  case''s acceptance behavior. Pacing does not relax any assertion.
+
   '
 covers:
 - F25.5
@@ -57,7 +67,18 @@ steps:
 - wait_for:
     selector: .cm-tooltip-autocomplete li.cm-completion-type-method
     timeout_sec: 90
-- type: rintln
+- type: r
+- wait: 0.6
+- type: i
+- wait: 0.6
+- type: n
+- wait: 0.6
+- type: t
+- wait: 0.6
+- type: l
+- wait: 0.6
+- type: n
+- wait: 0.6
 - wait: 1
 - assert_text:
     selector: .cm-tooltip-autocomplete
@@ -128,15 +149,16 @@ verification:
     - 11
     - 12
     - 14
-    - 17
-    - 21
-    - 23
-    - 25
-    - 27
+    - 24
     - 28
-    - 29
     - 32
     - 34
+    - 36
+    - 38
+    - 39
+    - 40
+    - 43
+    - 45
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -148,28 +170,28 @@ verification:
     - step: 13
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
         90}}'
-    - step: 16
+    - step: 27
       expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "println("}}'
-    - step: 19
-      expectation: '{"wait_for": ".cm-tooltip-autocomplete .cm-completionInfo"}'
-    - step: 22
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
-    - step: 24
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
-        "expect_truthy": true}}'
-    - step: 26
-      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelectorAll(\".cm-content\")[0]",
-        "expect_truthy": true}}'
     - step: 30
-      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
-        90}}'
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete .cm-completionInfo"}'
     - step: 33
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
     - step: 35
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
         "expect_truthy": true}}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelectorAll(\".cm-content\")[0]",
+        "expect_truthy": true}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
+        90}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
+    - step: 46
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
+        "expect_truthy": true}}'
     results:
-    - 35
+    - 46
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

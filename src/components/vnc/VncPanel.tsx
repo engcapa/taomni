@@ -269,6 +269,11 @@ export default function VncPanel({
   const credentialOverrideRef = useRef<{ username: string; password: string } | null>(null);
   // The user accepted the unencrypted-connection warning for the next attempt.
   const unencryptedConfirmedRef = useRef(false);
+  // The user accepted the unencrypted-connection warning for this session. An
+  // automatic reconnect after a dropped connection repeats the same connection
+  // the user already approved, so it must not stop on that dialog again while
+  // AutoReconnect is doing the reconnecting.
+  const unencryptedAcceptedRef = useRef(false);
   // DEC-VNC-21: the attempt that stopped to ask for credentials had already
   // passed the unencrypted warning, so the retry with them does not ask again.
   const credentialsRetryConfirmedRef = useRef(false);
@@ -920,6 +925,10 @@ export default function VncPanel({
     const attempt = reconnectAttemptRef.current;
     reconnectAttemptRef.current += 1;
     const delay = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
+    // Reconnecting to the host the user already approved stays approved: the
+    // automatic attempt that follows a drop only fails-safe on the warning
+    // dialog when the user has not accepted it for this session.
+    if (unencryptedAcceptedRef.current) unencryptedConfirmedRef.current = true;
     setLifecycle({ kind: "reconnecting", attempt: attempt + 1, at: Date.now() + delay, reason: reason ?? null });
     setClockNow(Date.now());
     reconnectTimerRef.current = window.setTimeout(() => {
@@ -940,6 +949,8 @@ export default function VncPanel({
   const stopConnecting = useCallback(() => {
     clearReconnectTimer();
     suppressReconnectRef.current = true;
+    // Stopping ends this session's approval; a later connection asks again.
+    unencryptedAcceptedRef.current = false;
     const attemptId = attemptIdRef.current;
     attemptIdRef.current = null;
     if (attemptId) void vncCancelConnect(attemptId).catch(() => false);
@@ -1933,9 +1944,11 @@ export default function VncPanel({
             continueUnencrypted: (dontWarnAgain) => {
               if (dontWarnAgain) updateViewer({ warnUnencrypted: false });
               unencryptedConfirmedRef.current = true;
+              unencryptedAcceptedRef.current = true;
               reconnectNow();
             },
             cancelUnencrypted: () => {
+              unencryptedAcceptedRef.current = false;
               setLifecycle(null);
               store.setDisconnected(tabId, tr("vnc.unencryptedCancelled"));
             },

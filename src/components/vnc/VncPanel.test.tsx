@@ -493,6 +493,55 @@ describe("VncPanel connection lifecycle (VNC-SESS-003)", () => {
     expect(connectCalls()[1][1]).toMatchObject({ allowUnencrypted: false });
   });
 
+  it("keeps the accepted unencrypted warning across an automatic reconnect", async () => {
+    let calls = 0;
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.reject(structured("unencrypted-confirmation-required", "security", false, "unencrypted connection requires confirmation"));
+        }
+        if (calls === 2) {
+          return Promise.reject(structured("credentials-required", "authentication", false, "credentials required: the server asks for a password"));
+        }
+        if (calls === 3) {
+          // A slow Apple Remote Desktop login expires the authentication
+          // deadline; AutoReconnect retries the connection the user approved.
+          return Promise.reject(structured("authentication-timeout", "authentication", true, "VNC authentication timed out while waiting for the security result"));
+        }
+        return Promise.resolve({ session_id: "s", ws_port: 41000, ws_token: "t", width: 0, height: 0, name: "" });
+      }
+      return Promise.resolve("");
+    });
+    render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} username="ops" visible />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-unencrypted-continue"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.change(screen.getByTestId("vnc-auth-password"), { target: { value: "secret12" } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-auth-ok"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(connectCalls()).toHaveLength(3);
+    expect(connectCalls()[2][1]).toMatchObject({ allowUnencrypted: true });
+    // The timed-out attempt schedules AutoReconnect without re-asking.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId("vnc-overlay-reconnecting")).toBeInTheDocument();
+    expect(screen.queryByTestId("vnc-overlay-unencrypted")).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16_000);
+    });
+    expect(connectCalls()).toHaveLength(4);
+    expect(connectCalls()[3][1]).toMatchObject({ allowUnencrypted: true });
+    expect(screen.queryByTestId("vnc-overlay-unencrypted")).toBeNull();
+  });
+
   it("Stop cancels the attempt in flight", async () => {
     mocks.invoke.mockImplementation((command: string) => {
       if (command === "vnc_connect") return new Promise(() => {});

@@ -27,6 +27,17 @@ steps:
 - click: '[data-testid="system-screenshot-delay-toggle"]'
 - assert_visible: '[data-testid="system-screenshot-current-window"]'
 - click: '[data-testid="system-screenshot-current-window"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- assert_not_visible: '[data-testid="screenshot-toolbar"]'
+- drag_to:
+    from: '[data-testid="screenshot-select-layer"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position:
+      x: 120
+      y: 140
+    to_position:
+      x: 520
+      y: 420
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - click: '[data-testid="screenshot-cancel"]'
 - wait_for: '[data-testid="terminal-pane"]'
@@ -57,23 +68,31 @@ verification:
     - 8
     - 9
   - id: replace
-    requirement: The unified screenshot entry works from the terminal and restores it after cancel.
+    requirement: The unified screenshot entry starts an unselected current-window capture, accepts a drawn region,
+      and restores the terminal after cancel.
     actions:
     - 10
     - 11
     - 13
-    - 15
+    - 16
+    - 18
     checkpoints:
     - step: 12
       expectation: 'assert_visible: [data-testid="system-screenshot-current-window"]'
     - step: 14
+      expectation: 'wait_for: [data-testid="screenshot-overlay"][data-phase="select"]'
+    - step: 15
+      expectation: 'assert_not_visible: [data-testid="screenshot-toolbar"]'
+    - step: 17
       expectation: 'wait_for: [data-testid="screenshot-toolbar"]'
-    - step: 16
+    - step: 19
       expectation: 'wait_for: [data-testid="terminal-pane"]'
     results:
     - 12
     - 14
-    - 16
+    - 15
+    - 17
+    - 19
   visual:
   - check: Observable capture UI and operation results
     method: automated

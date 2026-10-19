@@ -51,8 +51,16 @@ def setup_batched(ctx: Any) -> None:
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("mail_archive_batches requires native IMAP and disk observations")
     server = mail_fake_server.ACTIVE
-    server.state.header_fetch_delay = 0.1
-    server.state.archive_chunk_delay = 0.05
+    # The incremental observation requires the header history to still be
+    # incomplete while the first complete originals are published. With the
+    # old 0.1s per header page the whole 350-message history finished inside
+    # ~1s, so the window existed only for a harness that polled within the same
+    # second (macOS native observed 350/350, complete=1 at its first read while
+    # 171 originals were still being published). A per-page header delay keeps
+    # the window open for the slowest native bridge without changing what the
+    # case asserts; archive downloads stay fast so originals appear early.
+    server.state.header_fetch_delay = 8.0
+    server.state.archive_chunk_delay = 0.02
     expected = {}
     attachment = b"batched-archive-attachment"
     with server.state.lock:

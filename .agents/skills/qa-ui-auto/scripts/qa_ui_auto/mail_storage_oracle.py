@@ -50,7 +50,9 @@ def observe_incremental(root: Path, expected: dict) -> dict:
         assert folder is not None, "INBOX has not been indexed yet"
         total, complete = folder
         rows = db.execute("SELECT uid,sha256,raw_size FROM mail_full_messages WHERE folder='INBOX'").fetchall()
-    assert total == 350 and 0 < synced < total and not complete, f"History must still be incomplete: {synced}/{total}, complete={complete}"
+    assert total == 350 and 0 < synced < total and not complete, (
+        "History must still be incomplete: "
+        f"{synced}/{total}, complete={complete}, published={len(rows)}")
     assert 0 < len(rows) <= synced, "No complete originals before history completes"
     for uid, digest, size in rows:
         raw = gzip.decompress((root / f"{dbs[0].stem}.mail" / "objects" / digest[:2] / f"{digest}.eml.gz").read_bytes())
