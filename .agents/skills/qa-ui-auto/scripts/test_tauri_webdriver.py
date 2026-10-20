@@ -429,9 +429,14 @@ class NativeSessionFillTest(TestCase):
             session.fill("input[type=date]", "2024-01-15")
         session.type_text.assert_has_calls([call("2024"), call("01"), call("15")])
         session.press_combo.assert_has_calls([call("ArrowLeft"), call("ArrowLeft"), call("ArrowLeft"), call("ArrowRight"), call("Tab")])
-        session.execute = Mock(side_effect=[["month", "day", "year"], False])
+        # A mistimed segment entry is re-entered before the fill fails, and the
+        # error names the value that actually landed.
+        session.type_text.reset_mock()
+        session.execute = Mock(
+            side_effect=lambda script, *args: ["month", "day", "year"] if "formatToParts" in script else False)
         with patch("tauri_webdriver.platform.system", return_value="Windows"), self.assertRaisesRegex(WebDriverError, "ISO value"):
             session.fill("input[type=date]", "2024-01-15")
+        self.assertEqual(session.type_text.call_count, 9)
 
     def session(self, contenteditable: bool, focus_results: list[bool] | None = None) -> NativeSession:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))

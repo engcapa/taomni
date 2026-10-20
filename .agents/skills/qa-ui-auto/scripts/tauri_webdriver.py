@@ -938,33 +938,44 @@ class NativeSession:
         ) == "date":
             # WebView2 date editors have localized, segmented keyboard fields;
             # even /value types into those fields instead of accepting ISO.
-            self.request("POST", self.element_path(element, "/clear"), {})
-            if text:
-                import datetime
-                parsed = datetime.date.fromisoformat(text)
-                order = self.execute(
-                    "return new Intl.DateTimeFormat(navigator.language).formatToParts(new Date(2024,0,15))"
-                    ".map(p => p.type).filter(p => ['year','month','day'].includes(p));"
+            # Segment navigation is asynchronous: a keystroke that arrives before
+            # the caret settles lands in the previous segment and corrupts the
+            # value (observed "0024-10-12" for 2024-01-01), so re-enter the whole
+            # date instead of failing the case on one mistimed attempt.
+            last_value = None
+            for _ in range(3):
+                self.request("POST", self.element_path(element, "/clear"), {})
+                if text:
+                    import datetime
+                    parsed = datetime.date.fromisoformat(text)
+                    order = self.execute(
+                        "return new Intl.DateTimeFormat(navigator.language).formatToParts(new Date(2024,0,15))"
+                        ".map(p => p.type).filter(p => ['year','month','day'].includes(p));"
+                    )
+                    if sorted(order or []) != ["day", "month", "year"]:
+                        raise WebDriverError("cannot determine native date field order")
+                    self.focus(selector)
+                    for _ in range(3):
+                        self.press_combo("ArrowLeft")
+                    values = {"year": f"{parsed.year:04d}", "month": f"{parsed.month:02d}", "day": f"{parsed.day:02d}"}
+                    for index, field in enumerate(order):
+                        self.type_text(values[field])
+                        # Two-digit month/day fields advance automatically. The
+                        # year permits six digits and needs explicit navigation.
+                        if field == "year" and index < 2:
+                            self.press_combo("ArrowRight")
+                    self.press_combo("Tab")
+                if self.execute(
+                    f"const el = document.querySelector({json.dumps(selector)});"
+                    f"return !!el && el.value === {json.dumps(text)} && !el.validity.badInput;"
+                ) is True:
+                    return f"filled {selector}"
+                last_value = self.execute(
+                    f"const el = document.querySelector({json.dumps(selector)});"
+                    "return el ? el.value : null;"
                 )
-                if sorted(order or []) != ["day", "month", "year"]:
-                    raise WebDriverError("cannot determine native date field order")
-                self.focus(selector)
-                for _ in range(3):
-                    self.press_combo("ArrowLeft")
-                values = {"year": f"{parsed.year:04d}", "month": f"{parsed.month:02d}", "day": f"{parsed.day:02d}"}
-                for index, field in enumerate(order):
-                    self.type_text(values[field])
-                    # Two-digit month/day fields advance automatically. The
-                    # year permits six digits and needs explicit navigation.
-                    if field == "year" and index < 2:
-                        self.press_combo("ArrowRight")
-                self.press_combo("Tab")
-            if self.execute(
-                f"const el = document.querySelector({json.dumps(selector)});"
-                f"return !!el && el.value === {json.dumps(text)} && !el.validity.badInput;"
-            ) is not True:
-                raise WebDriverError(f"date input did not retain the requested ISO value: {selector}")
-            return f"filled {selector}"
+            raise WebDriverError(
+                f"date input did not retain the requested ISO value: {selector} (last {last_value!r})")
         contenteditable = self.execute(
             f"const el = document.querySelector({json.dumps(selector)});"
             "return !!el?.isContentEditable;"
