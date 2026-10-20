@@ -21,7 +21,7 @@ function run() {
   // Force the accessibility connection before reporting readiness.
   events.processes.name();
   console.log("Python fixture network consent monitor ready");
-  while (true) {
+  function scanOnce() {
     for (const owner of ["UserNotificationCenter", "CoreServicesUIAgent"]) {
       const process = events.processes.byName(owner);
       if (!process.exists()) continue;
@@ -43,6 +43,16 @@ function run() {
           console.log("Accepted Python fixture local-network prompt in " + owner);
         }
       }
+    }
+  }
+  while (true) {
+    try {
+      scanOnce();
+    } catch (error) {
+      // Accessibility queries race with the dialog being rebuilt and can throw
+      // "Can't get object" (-1728). A monitor that exits aborts the whole
+      // shard before its cases run, so a failed scan is skipped, not fatal.
+      console.log("consent scan skipped: " + error);
     }
     delay(0.5);
   }
