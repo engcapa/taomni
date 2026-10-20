@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import platform
+import random
 import secrets
 import socket
 import subprocess
@@ -26,8 +27,23 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# Ports below every platform's ephemeral range (Linux 32768-60999,
+# Windows/macOS 49152-65535). Asking the kernel for an ephemeral port and then
+# closing the probe socket lets any later client connection reuse that number
+# before the app binds it; run 39393565657 lost an RDP case to exactly that
+# ("bind listen address: Address already in use").
+_TEST_PORT_BAND = range(20000, 30000)
+
 
 def _free_port() -> int:
+    for port in random.sample(_TEST_PORT_BAND, 64):
+        with socket.socket() as sock:
+            try:
+                sock.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
+    # The band is exhausted: fall back to the kernel's ephemeral allocation.
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
