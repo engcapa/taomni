@@ -925,15 +925,17 @@ export default function VncPanel({
     const attempt = reconnectAttemptRef.current;
     reconnectAttemptRef.current += 1;
     const delay = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
-    // Reconnecting to the host the user already approved stays approved: the
-    // automatic attempt that follows a drop only fails-safe on the warning
-    // dialog when the user has not accepted it for this session.
-    if (unencryptedAcceptedRef.current) unencryptedConfirmedRef.current = true;
     setLifecycle({ kind: "reconnecting", attempt: attempt + 1, at: Date.now() + delay, reason: reason ?? null });
     setClockNow(Date.now());
     reconnectTimerRef.current = window.setTimeout(() => {
       reconnectTimerRef.current = null;
-      if (!destroyedRef.current) doConnect();
+      if (destroyedRef.current) return;
+      // Only this automatic attempt inherits the warning the user accepted for
+      // the session. An explicit Reconnect (or any other user-driven attempt)
+      // must ask again, so the confirmation is set immediately before the
+      // automatic connect and never left pending for later attempts.
+      if (unencryptedAcceptedRef.current) unencryptedConfirmedRef.current = true;
+      doConnect();
     }, delay);
   };
 

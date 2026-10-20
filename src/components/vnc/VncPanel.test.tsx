@@ -560,6 +560,45 @@ describe("VncPanel connection lifecycle (VNC-SESS-003)", () => {
     expect(screen.getByTestId("vnc-overlay-disconnected")).toBeInTheDocument();
   });
 
+  it("asks the unencrypted warning again when the user reconnects manually", async () => {
+    let calls = 0;
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") {
+        calls += 1;
+        if (calls === 1 || calls === 3) {
+          return Promise.reject(structured("unencrypted-confirmation-required", "security", false, "unencrypted connection requires confirmation"));
+        }
+        return Promise.resolve({ session_id: "s", ws_port: 41000, ws_token: "t", width: 0, height: 0, name: "" });
+      }
+      return Promise.resolve("");
+    });
+    render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} visible />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-unencrypted-continue"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(connectCalls()).toHaveLength(2);
+    // The fixture drops the connection; AutoReconnect offers a manual retry.
+    const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    act(() => {
+      socket.onmessage?.({
+        data: JSON.stringify({ type: "disconnected", code: "connection-lost", stage: "runtime", retryable: true, reason: "lost" }),
+      } as MessageEvent);
+    });
+    expect(screen.getByTestId("vnc-overlay-reconnecting")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-reconnect"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // A user-driven attempt is a new approval: it asks before connecting.
+    expect(connectCalls()).toHaveLength(3);
+    expect(connectCalls()[2][1]).toMatchObject({ allowUnencrypted: false });
+    expect(screen.getByTestId("vnc-overlay-unencrypted")).toBeInTheDocument();
+  });
+
   it("keeps reconnecting a dropped session with backoff", async () => {
     mocks.invoke.mockImplementation((command: string) => {
       if (command === "vnc_connect") {
