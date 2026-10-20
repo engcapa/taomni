@@ -98,6 +98,7 @@ steps:
     folder: Trash
     equals: 3
 - click: '[data-testid="mail-delete-selected"]'
+- wait_for: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
 - mail_server_assert_folder_count:
     folder: Trash
@@ -204,7 +205,7 @@ verification:
     - 31
     - 33
     - 35
-    - 36
+    - 37
     checkpoints:
     - step: 28
       expectation: Switching to Trash during background sync eventually shows all three moved messages
@@ -213,62 +214,62 @@ verification:
       expectation: Select-all selects the three displayed messages.
     - step: 34
       expectation: Cancellation leaves the three messages on the server.
-    - step: 37
+    - step: 38
       expectation: Confirmation removes the three messages from Trash.
-    - step: 39
+    - step: 40
       expectation: The deleted messages disappear from the list.
     results:
     - 28
     - 30
     - 34
-    - 37
-    - 39
+    - 38
+    - 40
   - id: R4
     requirement: A pending folder-read operation must allow deleting a new selection, move exactly those
       three messages and retain all remaining mail.
     actions:
-    - 41
     - 42
     - 43
-    - 45
+    - 44
     - 46
-    - 48
+    - 47
     - 49
-    - 54
+    - 50
+    - 55
     checkpoints:
-    - step: 44
+    - step: 45
       expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 30, ''unread'': True}}'
-    - step: 47
+    - step: 48
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-mark-folder-read"]'', ''name'':
         ''aria-busy'', ''equals'': ''true''}}'
-    - step: 50
+    - step: 51
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
         ''3 selected''}}'
-    - step: 51
-      expectation: '{''assert_enabled'': ''[data-testid="mail-delete-selected"]''}'
     - step: 52
+      expectation: '{''assert_enabled'': ''[data-testid="mail-delete-selected"]''}'
+    - step: 53
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-mark-folder-read"]'', ''name'':
         ''aria-busy'', ''equals'': ''true''}}'
-    - step: 55
+    - step: 56
       expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 3, ''timeout_sec'':
         40}}'
-    - step: 56
-      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 30}}'
     - step: 57
-      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 40, ''unread'': True}}'
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 30}}'
     - step: 58
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 40, ''unread'': True}}'
+    - step: 59
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
         ''0 selected''}}'
     results:
-    - 44
-    - 47
-    - 50
+    - 45
+    - 48
     - 51
     - 52
-    - 55
+    - 53
     - 56
     - 57
     - 58
+    - 59
   visual:
   - check: Selected rows, selection count and Delete selected button are visible without clipping.
     method: manual
