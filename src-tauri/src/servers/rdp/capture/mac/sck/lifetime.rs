@@ -19,6 +19,7 @@ use dispatch2::DispatchQoS;
 use dispatch2::DispatchQueue;
 use dispatch2::DispatchQueueAttr;
 use dispatch2::DispatchRetained;
+use objc2::AnyThread;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_core_graphics::CGDisplayPixelsHigh;

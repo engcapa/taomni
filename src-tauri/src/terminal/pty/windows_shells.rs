@@ -1,5 +1,7 @@
 use super::shells::ShellLaunch;
 use super::shells::resolve_shell;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
 
