@@ -11,7 +11,7 @@ scripts/configure-release-signing.mjs	tooling	mjs	tool-script	209	7	6	0		开发�
 scripts/configure-release-signing.test.mjs	tooling	mjs	test	187	8	0	0		自动化测试/QA 集成测试
 scripts/editor_performance_browser.py	frontend	py	frontend-lib	162	6	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/macos-runtime-paths.test.mjs	tooling	mjs	test	99	7	0	0		自动化测试/QA 集成测试
-scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	100	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	101	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/refactor-contracts.mjs	frontend	mjs	frontend-lib	91	4	5	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/release-workflow.test.mjs	tooling	mjs	test	161	8	0	0		自动化测试/QA 集成测试
 scripts/resolve-release-build.mjs	tooling	mjs	tool-script	55	3	2	0		开发、QA、构建或性能工具脚本
@@ -1871,9 +1871,19 @@ src/components/settings/settingsSearch.ts	frontend	ts	frontend-feature-lib	357	1
 src/components/sidebar/ConfirmDialog.tsx	frontend	tsx	frontend-component	516	2	15	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/sidebar/FolderNameDialog.tsx	frontend	tsx	frontend-component	125	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/sidebar/SessionTree.test.tsx	frontend	tsx	test	505	6	0	0		自动化测试/QA 集成测试
-src/components/sidebar/SessionTree.tsx	frontend	tsx	frontend-component	1963	23	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/sidebar/SessionTree.tsx	frontend	tsx	frontend-component	399	27	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/sidebar/Sidebar.test.tsx	frontend	tsx	test	155	7	0	0		自动化测试/QA 集成测试
 src/components/sidebar/Sidebar.tsx	frontend	tsx	frontend-component	384	14	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/sidebar/sessionTree/FolderContents.tsx	frontend	tsx	frontend-component	273	7	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/sidebar/sessionTree/createFolderContextMenu.tsx	frontend	tsx	frontend-component	332	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/sidebar/sessionTree/createSessionExports.ts	frontend	ts	frontend-component	80	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/sidebar/sessionTree/createSessionImportSources.ts	frontend	ts	frontend-component	273	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/sidebar/sessionTree/model.ts	frontend	ts	frontend-component	124	4	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/sidebar/sessionTree/useExternalSessionSecrets.ts	frontend	ts	frontend-component	354	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/sidebar/sessionTree/useSessionFolders.ts	frontend	ts	frontend-component	97	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/sidebar/sessionTree/useSessionImportPreview.test.ts	frontend	ts	test	81	4	0	0		行为回归测试
+src/components/sidebar/sessionTree/useSessionImportPreview.ts	frontend	ts	frontend-component	121	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/sidebar/sessionTree/useSessionTreeNavigation.ts	frontend	ts	frontend-component	146	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/sockscap/SocksCapMacosSetupGuide.tsx	frontend	tsx	frontend-component	321	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/sockscap/SocksCapPanel.test.tsx	frontend	tsx	test	1273	6	0	0		自动化测试/QA 集成测试
 src/components/sockscap/SocksCapPanel.tsx	frontend	tsx	frontend-component	1344	29	2	0		SocksCap 配置、运行状态、进程启动、日志、诊断、恢复和平台能力 UI
