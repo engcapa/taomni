@@ -55,6 +55,13 @@ import {
   parseWorkspaceWriteError,
 } from "../../../lib/editor/workspace";
 import codeWorkspaceTabSource from "../CodeWorkspaceTab.tsx?raw";
+import ts from "typescript";
+
+const controllerSources = import.meta.glob<string>("./controller/*.{ts,tsx}", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
 
 /** Typed committed result satisfying the §8.19.1 closed-file hook contract. */
 function committedDiskResult(): SaveCommitResult {
@@ -535,26 +542,27 @@ describe("P0-A / N1.6 Write-Disk Byte Correctness Matrix", () => {
     });
   });
 
-  // 5. Grep guard test: writeTextSnapshot is the ONLY caller of workspaceWrite* in CodeWorkspaceTab.tsx
+  // 5. Preserve the single write boundary across the shell and extracted controllers.
   describe("Grep guard test for single write path", () => {
     it("ensures workspaceWriteFileEncoded / workspaceWriteLooseFileEncoded are only called inside writeTextSnapshot", () => {
-      const content = codeWorkspaceTabSource;
-
-      // Extract the body of writeTextSnapshot
-      const match = content.match(/const writeTextSnapshot = useCallback\(async \([\s\S]*?\n  \}, \[\]\);/);
-      expect(match).not.toBeNull();
-      const writeTextSnapshotBody = match![0];
-
-      // Remove writeTextSnapshot body and import statement from content
-      const contentWithoutWriteTextSnapshot = content
-        .replace(/import\s*\{[\s\S]*?\}\s*from\s*["'].*\/workspace["'];?/, "")
-        .replace(writeTextSnapshotBody, "");
-
-      // Assert no other calls to workspaceWriteFileEncoded or workspaceWriteLooseFileEncoded exist
-      expect(contentWithoutWriteTextSnapshot).not.toContain("workspaceWriteFileEncoded(");
-      expect(contentWithoutWriteTextSnapshot).not.toContain("workspaceWriteLooseFileEncoded(");
-      expect(contentWithoutWriteTextSnapshot).not.toContain("workspaceWriteFile(");
-      expect(contentWithoutWriteTextSnapshot).not.toContain("workspaceWriteLooseFile(");
+      const writerCalls: string[] = [];
+      const sources = { "CodeWorkspaceTab.tsx": codeWorkspaceTabSource, ...controllerSources };
+      expect(Object.keys(controllerSources).length).toBeGreaterThan(0);
+      expect(codeWorkspaceTabSource).toContain("useCallback(createWriteTextSnapshot(");
+      for (const [file, content] of Object.entries(sources)) {
+        const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+        const visit = (node: ts.Node, owner: string | null) => {
+          if (ts.isFunctionDeclaration(node)) owner = node.name?.text ?? null;
+          if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+            && /^workspaceWrite(?:Loose)?File(?:Encoded)?$/.test(node.expression.text)) {
+            expect(`${file}#${owner}`).toBe("./controller/bufferMutations.ts#createWriteTextSnapshot");
+            writerCalls.push(node.expression.text);
+          }
+          ts.forEachChild(node, (child) => visit(child, owner));
+        };
+        visit(source, null);
+      }
+      expect(writerCalls.sort()).toEqual(["workspaceWriteFileEncoded", "workspaceWriteLooseFileEncoded"]);
     });
   });
 });
