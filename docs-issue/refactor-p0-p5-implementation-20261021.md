@@ -184,3 +184,61 @@ Run [39557611607](https://github.com/engcapa/taomni/actions/runs/39557611607)，
 - `terminal-c-qa.log`：终端 QA 编译模式 **86 passed / 1 conditional skip**，与默认模式互补。
 - `audit-c.log`：全部静态 gates 通过。
 - `browser-c/run-20261021-165707-464696343`：Linux Chromium 原用例 **4 passed / 0 skipped**，TC-IDE-C4-01（80 步）、TC-IDE-C4-02（46 步）、TC-IDE-CW-LAYOUT-01-resize-and-split-browser（54 步）、TC-IDE-PARITY-017-02（82 步）。签名、summary 哈希及 identity_stable=true 核验通过。三端 native 仍需 GitHub 上本批次源码证据。
+
+
+## 2026-10-21 实施批次 D（继续处理全部大文件）
+
+用户明确要求所有大文件按相同标准处理。本批采用职责模块、状态 owner 与 retained workflow 共同验收；不以行数下降代替架构完成。
+
+- Git：工作区仓库 scope/model、branches/tags/settings 视图、操作确认与菜单分离；单仓库 changes/branches/tags/stash/settings、纯 model 与 actions 分离。
+- Debug：断点 state/ref/persistence、Watch 表达式 state/persistence 分别由 hook 拥有；断点同步、断点 actions、DAP 事件及 closing drain、launch group、execution、memory/variables/source inspection 分离。公共 hook 导出保留，内部模块直接依赖领域 types，禁止回引主 hook。
+- Code Workspace：173 个命令项（含 mnemonic spreads）按 13 个领域注册，保留顺序；一次 AST 对照确认每项实现与原注册顺序相同。AI 选区/改写草稿、恢复日志、reference sessions、buffer store teardown、UI actions 状态、completion、semantic navigation、local history、layout persistence、splits、run/build、encoding、bookmarks、comparisons、document sync、WorkspaceEdit snapshots、generate/intention、library sources、usages 等接入独立 hooks。
+- Main：terminal profile overrides、session resume waiters/snapshot refs、split sizing state 归属 hooks；protocol tabs、workspace/Git tabs、shell sessions、退出确认、控制工具监听独立编排。
+- Session：邮件、数据库、local shell/WSL 表单分域；序列化/校验与重置显式使用领域 form，保留协议切换、初值、持久化和 Vault 数据格式。
+- Terminal：搜索状态、延迟查询、焦点恢复归于单一 hook；clipboard/file-drop、recording/macro、快捷键、context menu、pointer selection 分离；继续复用 session lifecycle owner。
+- Mail：邮箱初始化/轮询/IDLE 生命周期、composer 附件与 native drop、读附件、导出/打印、文件夹变更、邀请、证书确认分离。
+- SocksCap：profile、upstream、rules、traffic、application scope 视图与 actions 分离；rootless application draft 的 state/reset/edit 由 hook 拥有，view 直接接收该领域对象。
+- Database：事务状态、query workspace hydration、query registry bridge、schema、grid changes、query panels、generated SQL、statement、AI actions 分离。
+
+这是保持行为的拆分，不为文件移动新增重复 testcase。原 TC-IDE-C4-01/02、TC-IDE-CW-LAYOUT-01、TC-IDE-PARITY-013-01/018-01/025-01/026-03、TC-018、TC-auto-F-Sockscap-1 以及 retained unit/mounted suites 继续验证真实入口；native 由三端 workflow 验证。
+
+| 入口/领域 | C 批次行数 | D 当前行数 |
+|---|---:|---:|
+| CodeWorkspaceTab | 10477 | 7955 |
+| useCodeDebugSession | 3312 | 697 |
+| commandCatalog | 2228 | 224 |
+| WorkspaceGitManager | 2499 | 1118 |
+| GitPanel | 2075 | 897 |
+| MainLayout | 2643 | 1615 |
+| SessionEditor | 2122 | 1633 |
+| TerminalPanel | 2575 | 1800 |
+| MailClientTab | 3638 | 3032 |
+| SocksCapPanel | 3391 | 1344 |
+| DbClientTab | 2082 | 1312 |
+
+新全文件清单 `source-code-inventory-refactor-current.tsv` 包含本次组合 2396 个代码文件，原始 TSV 保留用作基线。新增模块增加总行数，类型与依赖显式化有成本；不宣称性能提升。主 editor、Mail、CodeMirror、completion 和部分 Rust 系统模块仍需收敛，P0–P5 未全部完成。
+
+### D 验证记录
+
+- `git-d.log`：原 Git 27 tests passed。
+- `debug-d.log`：原 Debug 59 tests passed。
+- `editor-d-fixed.log`：Editor/Git/Debug/文件模板/保存字节 **365 passed**。
+- `clients-d-tests.log`：Mail/SocksCap 原 **103 passed**。
+- `d-shell-tests.log`：Main/Session/Terminal **190 passed / 1 conditional skip**；保留原条件跳过。
+- `d2-editor-db.log`：Editor/文件模板/保存字节/Db **319 passed**。
+- `build-d-node22-final.log`：使用独立临时 Node 22.23.3、pnpm 10，生产构建及契约/304 模块边界检查通过。
+- `browser-d/run-20261021-174233-547973156`：Linux Chromium **9 passed / 0 skipped，458 步**；receipt signature、summary sha256、identity_stable 核验通过。仅是浏览器证据，不替代 native。
+- 全量 Node 22 Vitest 在 `unit-d-node22-final.log`，结果待追加。
+- 初次 AI 状态归属迁移误删了 editor group 的 `setEditorAiSelection` 参数；类型检查与原文件模板 mounted tests 抓到，已补回，以上通过记录覆盖修复。失败日志 `editor-d-build.log` / `editor-d-probe.log` 保留。
+- `clients-d-types.log` 抓到拆分后的 sidebar cfg nullable 边界，改为调用方实际保证的非空配置；`clients-shell-d-types.log` / `d-integrated-build.log` 抓到 split class 字符串推断与漏导入，已修复。早期 Node 22 命令因 PATH 不含 pnpm 退出 127，未执行测试；最终使用继承 PATH 并前置 Node 22。
+
+### C 三端原始结果（下载/核查中）
+
+[39573498970](https://github.com/engcapa/taomni/actions/runs/39573498970) 绑定 `6e3a39b1e9dfaefd23498f4c9afb381d108f46b5`，不代表 D。本次已核查报告发现 Linux native 的 TC-BACKUP-CLOUD-001/002 在 fixture setup 的 `secret-tool clear` 失败，还没有执行应用步骤；当前调查凭据 fixture 原始失败，不能当通过。完整 aggregate 与 raw receipts 待下载完后追加。
+
+
+D 补充：`unit-d-node22-final.log` 全量 **540 files passed，5455 passed / 1 conditional skip**。最终组合生产构建/边界已通过。此批 frontend 纯重构，Rust 源码未在 D 修改，复用 B 的 Rust lib/integration 本地结果并继续执行 GitHub native build/contracts。
+
+C 凭据 fixture 诊断：Linux job 119139144468 的原日志显示 `secret-tool store` 激活了另一个 `gnome-keyring-daemon --start --foreground`，随后尝试 SystemPrompter 但无 DISPLAY，无法解锁。隔离 D-Bus + 临时 XDG 的本地 probe 复现旧命令返回后 NameHasOwner=false，随后才 true；增加 `--daemonize` 后返回即 true。提交 `b19a671c` 增加等待初始化的参数；store/lookup 失败时不再用 finally 的 clear 错误覆盖原始失败，成功 roundtrip 后清理失败仍使 fixture 失败。5 项 Python 回归通过，包括双重失败保留原错、成功后清理失败不放行。真实 native 应用用例仍需最终 workflow，不能用本地 D-Bus probe 代替。
+
+本批代码提交：`6965cea5`、`b4704fb7`、`23c1b523`，runner 修复 `b19a671c`。GitHub C 下载曾发生 artifact unexpected EOF，保留失败日志并仅补下缺失产物。
