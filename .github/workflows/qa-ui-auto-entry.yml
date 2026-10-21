@@ -392,6 +392,8 @@ jobs:
         if: (always()) && inputs.operation == 'run'
         with:
           name: qa-${{ matrix.id }}-${{ inputs.artifact_key }}
+          # Receipts include hidden fixture metadata and provider logs.
+          include-hidden-files: true
           # Authentic updater bundles and disposable installs are fixture data.
           # Keep staged manifests/signatures and host verification evidence.
           path: |
@@ -413,6 +415,7 @@ jobs:
           # Keep this outside the aggregate's qa-* pattern: these are copies
           # for diagnosis, not a second set of execution receipts.
           name: diagnostics-${{ matrix.id }}-${{ inputs.artifact_key }}
+          include-hidden-files: true
           path: |
             qa-ui-auto-report/${{ matrix.id }}/**/*.json
             qa-ui-auto-report/${{ matrix.id }}/**/*.jsonl

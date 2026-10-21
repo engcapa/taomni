@@ -703,3 +703,22 @@ Y补记：`y-build-final-3.log`完整build通过，契约761/328/39与868 implem
 
 
 `y-build-complete.log`最终完整build（含新增规模gate）通过。`y-jdtls-fixtures.log`在隔离fixture副本中用原入口执行，真实Java21/JDT LS1.61与Gradle9.5.1下 **5/5 fixtures green**：Maven单模块、多模块、broken classpath和Gradle单模块、多模块；原场景断言完整保留，原始trace位于`jdtls-y/traces/`，未覆盖仓库基线trace。
+
+
+## 2026-10-22 最终组合全量三端验收（运行中）
+
+产品完整提交 `7d9fbb208dbfa26b588a3b4413232ad5ebe5382c`，前置修复 `dd6b4736` 与格式规范 `750bed0f` 均已包含并推送。指定workflow [39678994785](https://github.com/engcapa/taomni/actions/runs/39678994785) 使用 **scope=all /linux,windows,macos /browser,native /native_release=true /run_rdp_unit_contracts=true /publish_issues=false**，未用selected替代全量。
+
+`final-catalog-audit.log` gate通过：560个YAML唯一ID，case与feature lint无错误，catalog_stale=false、无覆盖ratchet回退。静态审计仍有44个shallow、4个orphan与21个required control未映射，不能把gate通过称作全部产品功能已覆盖。原有外部clickhousecrud项目未分发的三平台能力缺口保持，不提供合成替代物冒充真实项目。
+
+当前入口物理行：CodeWorkspaceTab **152**、MainLayout64、SessionEditor51、TerminalPanel150、MailClientTab799、DbClientTab628、QueryResultGrid417、SocksCapPanel574。生成Thrift/locale/静态routing清单例外如上；schema与vendor按其维护边界处理。清单3883项逐一核对实际行数，并修正早期6项残留计数差异。
+
+验收尚未结束。最终需核对本run的编译结果、case而非job结论、各报告签名/hash/stable identity、head/aggregate及15%原始性能指标；历史S Windows rename与Q macOS性能失败原证据保留。
+
+### 原始报告工件完整性修复
+
+对全量运行逐项核对receipt登记文件时，发现`actions/upload-artifact@v4`默认排除隐藏文件：Linux native shard4有340个登记工件未上传，路径均包含隐藏段，包括Java fixture的`.classpath`、`.project`、`.mvn/maven.config`、`.settings/*.prefs`及JDT LS的`.metadata/.log`。原始遗漏清单保留于`github-y/omitted-hidden-artifacts.json`。这是工件打包和诊断证据缺失，不能据此称功能用例失败，也不能把receipt签名正确当作文件已完整留存。
+
+在`.github/workflows/qa-ui-auto-entry.yml`的主报告和compact diagnostics两个上传步骤启用`include-hidden-files: true`；保留全部原有应用数据、缓存、工作目录与一次性更新包的明确排除规则。该修复仅影响CI工件留存，不改变产品和用例断言。原运行继续保留，在修复后的完整提交重新执行scope=all三端browser/native，并逐一核对receipt中的路径、大小及SHA256；新运行结果单独记录，不覆盖原失败或缺失证据。
+
+修复后`python -m unittest test_ci_build_pipeline test_ci_report test_ci_native_artifact` **16 passed**；`pnpm check:refactor`的761/328/39契约、868模块依赖边界和3866文件规模检查通过。工件是否完整由新运行下载后的逐文件校验确认。

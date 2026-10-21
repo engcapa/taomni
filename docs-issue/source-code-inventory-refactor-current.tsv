@@ -247,12 +247,12 @@ src-tauri/src/bin/rdp-probe/scenarios/throughput_comparison_tests.rs	backend	rs	
 src-tauri/src/bin/rdp-probe/session.rs	backend	rs	rust-backend	28	1	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/rdp-probe/session/configuration.rs	backend	rs	rust-backend	135	12	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/bin/rdp-probe/session/framebuffer.rs	backend	rs	rust-backend	133	7	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
-src-tauri/src/bin/rdp-probe/session/input.rs	backend	rs	rust-backend	110	12	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/input.rs	backend	rs	rust-backend	111	12	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/bin/rdp-probe/session/model.rs	backend	rs	rust-backend	137	22	44	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
-src-tauri/src/bin/rdp-probe/session/pump.rs	backend	rs	rust-backend	167	13	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/pump.rs	backend	rs	rust-backend	168	13	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/bin/rdp-probe/session/startup.rs	backend	rs	rust-backend	142	22	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
-src-tauri/src/bin/rdp-probe/session/tests.rs	backend	rs	test	38	5	0	0		行为回归测试
-src-tauri/src/bin/rdp-probe/session/tls.rs	backend	rs	rust-backend	99	14	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/tests.rs	backend	rs	test	37	5	0	0		行为回归测试
+src-tauri/src/bin/rdp-probe/session/tls.rs	backend	rs	rust-backend	100	14	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/bin/rdp-probe/stats.rs	backend	rs	rust-backend	207	2	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/sockscap-helper/capture.rs	backend	rs	rust-backend	28	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/sockscap-helper/capture/address.rs	backend	rs	rust-backend	51	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -1487,7 +1487,7 @@ src/components/agent/CcAgentBridge.tsx	frontend	tsx	frontend-component	349	15	1	
 src/components/agent/QuickActions.tsx	frontend	tsx	frontend-component	153	5	1	3		React UI/交互组件，具体职责由目录和文件名定义
 src/components/agent/WebSearchConfirmCard.tsx	frontend	tsx	frontend-component	72	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/agent/bridge/arguments.ts	frontend	ts	frontend-component	16	0	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
-src/components/agent/bridge/formatting.tsx	frontend	tsx	frontend-component	95	2	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/agent/bridge/formatting.tsx	frontend	tsx	frontend-component	93	2	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/agent/bridge/safetyGate.tsx	frontend	tsx	frontend-component	172	2	11	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/agent/bridge/sftpSession.tsx	frontend	tsx	frontend-component	128	4	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/agent/bridge/toolCards.tsx	frontend	tsx	frontend-component	46	3	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -2680,7 +2680,7 @@ src/components/git/diff/interactions.tsx	frontend	tsx	frontend-component	525	3	8
 src/components/git/diff/layout.tsx	frontend	tsx	frontend-component	167	2	11	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/git/diff/notices.tsx	frontend	tsx	frontend-component	52	3	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/git/diff/preferences.tsx	frontend	tsx	frontend-component	43	1	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
-src/components/git/diff/styles.tsx	frontend	tsx	frontend-component	273	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/git/diff/styles.tsx	frontend	tsx	frontend-component	272	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/git/diffLanguage.ts	frontend	ts	frontend-feature-lib	66	1	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/git/panel/BranchesView.tsx	frontend	tsx	frontend-component	268	8	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/git/panel/ChangesView.tsx	frontend	tsx	frontend-component	172	9	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
