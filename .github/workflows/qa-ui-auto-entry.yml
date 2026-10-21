@@ -309,6 +309,22 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/ci_native_artifact.py \
             --selection qa-ui-auto-report/selection.json --build "$QA_BUILD_ID" \
             --archive qa-build-output/runtime.tar.gz 2>&1 | tee qa-build-output/build.log
+      - name: Windows capture helper contracts
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        env:
+          QA_RELEASE: ${{ contains(matrix.capabilities, 'release') }}
+        run: |
+          python - <<'PYTHON' 2>&1 | tee qa-build-output/capture-contracts.log
+          import os, subprocess
+          from native_build import ROOT, configured_environment
+          env = configured_environment()
+          env['CARGO_TARGET_DIR'] = str(ROOT / 'src-tauri' / 'target' / 'qa-ui-auto')
+          command = ['cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--bin', 'sockscap-helper']
+          if os.environ['QA_RELEASE'] == 'true':
+              env['CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS'] = 'true'
+              command.append('--release')
+          subprocess.run(command, cwd=ROOT, env=env, check=True)
+          PYTHON
       - name: Upload native runtime once per build
         if: inputs.operation == 'build'
         uses: actions/upload-artifact@v4
@@ -325,6 +341,7 @@ jobs:
           name: build-log-${{ matrix.id }}-${{ inputs.artifact_key }}
           path: |
             qa-build-output/build.log
+            qa-build-output/capture-contracts.log
             qa-ui-auto-report/${{ matrix.id }}/
           retention-days: 14
       - name: Download this invocation's verified native runtime

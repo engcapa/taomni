@@ -179,7 +179,20 @@ src-tauri/src/bin/rdp-probe/rfx_stats.rs	backend	rs	rust-backend	612	5	7	0		Rust
 src-tauri/src/bin/rdp-probe/scenarios.rs	backend	rs	rust-backend	1365	15	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/rdp-probe/session.rs	backend	rs	rust-backend	902	40	54	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/rdp-probe/stats.rs	backend	rs	rust-backend	207	2	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/bin/sockscap-helper/capture.rs	backend	rs	rust-backend	2177	17	22	0	>=2000	Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/sockscap-helper/capture.rs	backend	rs	rust-backend	28	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/sockscap-helper/capture/address.rs	backend	rs	rust-backend	51	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/classification.rs	backend	rs	rust-backend	274	22	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/engine.rs	backend	rs	rust-backend	397	30	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/filter.rs	backend	rs	rust-backend	83	4	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/flow_table.rs	backend	rs	rust-backend	254	5	35	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/maintenance.rs	backend	rs	rust-backend	131	17	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/packet.rs	backend	rs	rust-backend	217	3	20	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/packet_loop.rs	backend	rs	rust-backend	370	46	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/pid_map.rs	backend	rs	rust-backend	57	6	15	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/plan.rs	backend	rs	rust-backend	59	5	16	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/process_scope.rs	backend	rs	rust-backend	90	10	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/sockscap-helper/capture/process_tests.rs	backend	rs	test	33	3	0	0		行为回归测试
+src-tauri/src/bin/sockscap-helper/capture/tests.rs	backend	rs	test	340	27	0	0		行为回归测试
 src-tauri/src/bin/sockscap-helper/main.rs	backend	rs	rust-backend	645	16	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/sockscap-helper/proc_info.rs	backend	rs	rust-backend	640	13	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/sockscap-helper/windivert.rs	backend	rs	rust-backend	476	7	35	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -760,12 +773,13 @@ src-tauri/tests/integration/cloud_only_smoke.rs	backend	rs	test	44	2	0	0		自动
 src-tauri/tests/integration/concurrent_three_workloads.rs	backend	rs	test	107	5	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/fim_latency.rs	backend	rs	test	43	5	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/gpu_detect.rs	backend	rs	test	23	1	0	0		自动化测试/QA 集成测试
-src-tauri/tests/integration/main.rs	backend	rs	test	25	0	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/main.rs	backend	rs	test	26	0	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/models_downloader.rs	backend	rs	test	18	3	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/network_policy.rs	backend	rs	test	28	1	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/perf_baseline.rs	backend	rs	test	46	1	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/router_routing.rs	backend	rs	test	222	5	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/router_vault_lock.rs	backend	rs	test	172	5	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/sockscap_capture_contracts.rs	backend	rs	test	17	0	0	0		行为回归测试
 src-tauri/tests/integration/sockscap_win11_scenarios.rs	backend	rs	test	292	7	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/sockscap_xray_core.rs	backend	rs	test	417	8	0	0		自动化测试/QA 集成测试
 src-tauri/tests/integration/support/mock_provider.rs	backend	rs	test	96	6	7	0		自动化测试/QA 集成测试

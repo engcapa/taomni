@@ -341,3 +341,22 @@ F 补充：`f-rust-final.log` 组合源码 **1868 passed / 25 ignored**，`audit
 - Windows TC-IDE-PARITY-005-05：StringUti 补全 popup 未在 120s 内出现。
 
 原始报告 `github-e/`、核验 `github-e-verification.json`。将对失败场景执行同提交与 D 基线的定向对照；当前原因尚未证实，不能归为既有问题。原有 real Java project 三平台 capability gaps 仍不计通过。
+
+F 最终本地集成测试 `f-rust-integration.log` **62 passed**。第一次全量 dispatch [39601429854](https://github.com/engcapa/taomni/actions/runs/39601429854) 因输入短 SHA `430f339c` 被 actions/checkout 解释为分支名，在 checkout 失败，没有执行应用测试。后续只传完整 SHA，并将 G 与 F 组合验证。
+
+E 同提交定向对照 [39601436436](https://github.com/engcapa/taomni/actions/runs/39601436436)，D 基线对照 [39601444393](https://github.com/engcapa/taomni/actions/runs/39601444393)：相同 5 IDs、Linux/Windows native、release、单分片，respect 原有平台适用范围；测试源码分别为 `698b5cdee06790bb0fddd6b15ce923eabceaa447` 和 `b75c69f075378dfe5816836d27498bcb11ef27f8`。不能使用 run 顶层 workflow head（430f339c）误标实际 tested head。
+
+Linux 凭据诊断：临时目录解包 libsecret-tools（没有修改系统安装），在私有 dbus-run-session + run-owned XDG storage 下连续 12 次执行真实 credential fixture 全通过，日志 `f-keyring-probe-ready.log`。此实验未复现 hosted 失败，不能证明已修复。首次 probe 因本地缺 secret-tool 未执行完整 roundtrip，记录 `f-keyring-probe.log` 保留。
+
+## 2026-10-21 实施批次 G：Windows capture helper
+
+`bin/sockscap-helper/capture.rs` 2177 行拆为 28 行公共入口，以及 plan、flow table、PID map、filter、address、packet、classification、process scope、maintenance、packet loop、engine。engine 仍独占 WinDivert handles、stop flag、worker joins、live plan slot 和 shared tables；私有 fields 不暴露给其它领域。流表 expiry、port reuse、TCP reflection、QUIC 和 bypass 语义不变。
+
+54 个原函数 token 对照一致。原 tests 分成 portable 18 项和 Windows process selector 2 项，全部保留；integration suite 直接引用生产算法和原 portable tests，让 Linux/macOS 也能验证端口复用、TTL、过滤器、TCP/UDP 解析，无 mock 替代这些算法。Windows native build job 增加明确的 `cargo test --bin sockscap-helper` 并留存日志，覆盖原来 `test=false` 默认不跑的 helper tests；失败会阻断该平台 build。
+
+- `g-capture-contracts.log`：18 passed。仅证明 portable 算法，不证明 WinDivert 真实捕获。
+- Windows 目标交叉类型检查通过后记录结果；真正 Windows binary tests 以三端 job 为准。
+- `test_ci_build_pipeline` 3 项通过，workflow YAML/嵌入 Python 语法校验通过。
+- 本批不改用户行为，沿用已有 SocksCap browser/native 场景。真实 WinDivert/UAC 流量接管仍需要匹配具备驱动与权限的原生场景，不把纯算法测试计为真实网络接管验证。
+
+G 补充：`g-windows-typecheck-final.log` 使用临时最小 Cargo manifest 直接引用实际 helper `main.rs`，`cargo check --target x86_64-pc-windows-gnu --tests --offline` 通过，覆盖全部生产 helper 与 tests 的 Windows cfg/type/import 边界。它不是 Windows 可执行测试，后续 hosted Windows 会真正运行 binary unit tests。首次临时 manifest 漏列 tracing 导致检查失败，补齐后通过，未为此修改产品依赖。当前全文件清单 2502 项。
