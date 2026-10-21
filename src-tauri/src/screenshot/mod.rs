@@ -11,6 +11,75 @@
 //! `capture::temp_artifact_path`) read by the webview through
 //! [`screenshot_read_file`] and deleted when the capture session ends.
 
+use self::overlay_session::open_overlay_with_window;
+use self::overlay_session::watch_session_window;
+use self::pin_window::open_pin;
+use self::pin_window::open_pin_with_note;
+use self::recording_controls::open_recorder_bar;
+use self::recording_controls::recording_region;
+use self::runtime::NATIVE_WAYLAND;
+use self::runtime::OPENING;
+#[cfg(all(debug_assertions, target_os = "macos"))]
+use self::runtime::QA_WINDOW_HIDE_CALLS;
+use self::runtime::RecordingStartGuard;
+use self::runtime::SESSION_GENERATION;
+use self::runtime::STARTING_RECORDING;
+use self::runtime::blocking;
+use self::runtime::capture_lease;
+use self::runtime::internal_error;
+use self::runtime::tool_state;
+use self::scroll_controls::capture_control_position;
+use self::scroll_controls::open_scroll_bar;
+use self::scroll_controls::scroll_layout;
+use self::window_lifecycle::HIDE_SETTLE;
+use self::window_lifecycle::await_hidden_windows;
+use self::window_lifecycle::cover_display;
+use self::window_lifecycle::hide_app_windows;
+use self::window_lifecycle::restore_app_windows;
+use self::window_lifecycle::restore_app_windows_for_preview;
+use crate::screenshot::capture::DisplayInfo;
+use crate::screenshot::capture::ScreenshotFile;
+use crate::screenshot::scroll::ScrollCaptureResult;
+use crate::state::AppState;
+pub use model::OverlayInit;
+pub use model::PhysicalRegion;
+pub use model::PinInit;
+pub use model::RecordingFile;
+pub use model::RecordingStarted;
+pub use model::ScreenshotProbe;
+pub(crate) use overlay_session::close_session;
+pub use overlay_session::open_overlay;
+pub(crate) use recording_controls::recording_ended;
+pub use runtime::shutdown;
+pub(crate) use runtime::stop_orphaned_capture_controls;
+pub(crate) use runtime::wait_for_recovery_recording;
+use std::borrow::Cow;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
+use tauri::AppHandle;
+use tauri::Manager;
+use tauri::WebviewWindow;
+pub(crate) use window_lifecycle::focus_capture_window;
+pub(crate) use window_lifecycle::window_builder;
+mod window_lifecycle;
+
+mod model;
+
+mod runtime;
+
+mod scroll_controls;
+
+mod overlay_session;
+
+mod pin_window;
+
+mod recording_controls;
+
+#[cfg(test)]
+mod tests;
+
 pub mod capture;
 pub mod edit;
 pub mod favorites;
@@ -32,221 +101,9 @@ pub mod shortcut;
 mod surface_backend;
 pub mod surfaces;
 
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
-
-use serde::Serialize;
-use tauri::{
-    AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder,
-};
-
-use crate::state::AppState;
-use capture::{DisplayInfo, ScreenshotFile};
-use scroll::ScrollCaptureResult;
-
 pub const OVERLAY_LABEL: &str = "screenshot-overlay";
 pub const RECORDER_LABEL: &str = "screenshot-recorder";
 pub const PIN_LABEL_PREFIX: &str = "screenshot-pin-";
-
-/// Time for the compositor to remove hidden windows from the screen before
-/// the desktop is captured (Windows DWM and macOS fade animations).
-const HIDE_SETTLE: Duration = Duration::from_millis(250);
-
-/// Focus retry budget for capture surfaces. `show()` is asynchronous on Linux
-/// and Windows, and tao forwards a focus request only once its cached
-/// visibility flag is set, so a single `set_focus()` right after `show()` is a
-/// no-op there.
-const FOCUS_ATTEMPTS: usize = 20;
-const FOCUS_RETRY: Duration = Duration::from_millis(50);
-/// Attempts to keep re-asserting focus even after the window reports active.
-/// GTK refuses `grab_focus` on a widget that is not mapped yet, and the first
-/// attempts land while `show()` is still mapping the surface.
-const FOCUS_SETTLE_ATTEMPTS: usize = 4;
-
-/// Bring a capture surface to the foreground and hand keyboard focus to its
-/// webview, waiting until the platform window is actually mapped.
-///
-/// Without this the overlay opens without keyboard focus: every shortcut is
-/// dead (Escape cannot close it, Ctrl+C/Ctrl+S do nothing, annotation text
-/// cannot be typed) until the user clicks the surface once, which is what
-/// gives it focus by accident.
-pub(crate) async fn focus_capture_window(window: &WebviewWindow) {
-    #[cfg(target_os = "linux")]
-    let mut presented = false;
-    #[cfg(target_os = "linux")]
-    let mut claimed = false;
-    for attempt in 0..FOCUS_ATTEMPTS {
-        if window.is_visible().unwrap_or(false) {
-            // X11 focus-stealing prevention can refuse the timestamp-less
-            // activation tao sends for a window opened by a global shortcut;
-            // re-present once with a server timestamp as soon as it is mapped.
-            #[cfg(target_os = "linux")]
-            if !presented {
-                presented = true;
-                if let Err(error) = surface_backend::present_for_input(window) {
-                    log::debug!("capture activation skipped: {error}");
-                }
-            }
-            let _ = window.set_focus();
-            // Webview-level focus so WebKit/WebView2 route key events to the
-            // DOM (Ctrl+C, typing) and not only to the native window. Re-assert
-            // on every attempt: the first ones can land before the surface is
-            // mapped, where GTK drops the focus request.
-            let webview: &tauri::Webview<_> = window.as_ref();
-            let _ = webview.set_focus();
-            // Focus policies that refuse the polite activation (mutter/muffin
-            // "smart" mode after the app hid its own window) still leave the
-            // overlay unfocused; claim the input focus once the present had a
-            // chance to land. Claim once only: repeatedly stealing focus back
-            // would fight the user or another window.
-            #[cfg(target_os = "linux")]
-            if !claimed
-                && attempt + 1 >= FOCUS_SETTLE_ATTEMPTS
-                && !window.is_focused().unwrap_or(false)
-            {
-                claimed = true;
-                if let Err(error) = surface_backend::force_input_focus(window) {
-                    log::debug!("capture input focus fallback skipped: {error}");
-                }
-            }
-            if attempt + 1 >= FOCUS_SETTLE_ATTEMPTS && window.is_focused().unwrap_or(false) {
-                return;
-            }
-        }
-        if attempt + 1 < FOCUS_ATTEMPTS {
-            tokio::time::sleep(FOCUS_RETRY).await;
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OverlayInit {
-    pub path: String,
-    pub display_id: String,
-    /// Physical pixels.
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-    pub window_region: Option<PhysicalRegion>,
-    pub document: bool,
-    pub source_pin: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PhysicalRegion {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PinInit {
-    pub path: String,
-    pub width: u32,
-    pub height: u32,
-    pub favorite_id: Option<String>,
-    /// User caption shown on the pin (empty = none).
-    #[serde(default)]
-    pub note: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScreenshotProbe {
-    /// `granted`, `denied`, or `notRequired` — OS screen-capture permission.
-    pub permission: String,
-    /// Accessibility / input-injection permission (macOS scroll capture).
-    pub control_permission: String,
-    /// MP4 uses the bundled H.264 encoder, so it is always available.
-    pub mp4_available: bool,
-    pub ocr_available: bool,
-    /// `windows`, `vision` or `tesseract`; absent when none is usable.
-    pub ocr_engine: Option<String>,
-    /// How to enable OCR on this platform when no engine is usable.
-    pub ocr_hint: Option<String>,
-    pub summary: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RecordingStarted {
-    pub recording_id: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RecordingFile {
-    pub path: String,
-    pub width: u32,
-    pub height: u32,
-    pub frames: u32,
-    pub duration_ms: u64,
-}
-
-#[derive(Default)]
-struct ToolState {
-    session_lease: Option<Arc<session::SessionLease>>,
-    overlay: Option<OverlayInit>,
-    /// Labels of app windows hidden for the capture session.
-    hidden: Vec<String>,
-    recording: Option<String>,
-    recording_preview: Option<String>,
-    /// Remains true while the stopped clip is being previewed.
-    recorder_open: bool,
-    include_current_window: bool,
-    recording_region: Option<PhysicalRegion>,
-    scroll: Option<Arc<scroll::ScrollControl>>,
-    pins: HashMap<String, PinInit>,
-    pin_tools: HashMap<String, serde_json::Value>,
-}
-
-static STATE: OnceLock<Mutex<ToolState>> = OnceLock::new();
-static RECOVERY_FINALIZERS: OnceLock<recovery_file::Finalizers> = OnceLock::new();
-/// Serializes overlay opening (hotkey repeat, double clicks, StrictMode).
-static OPENING: AtomicBool = AtomicBool::new(false);
-static STARTING_RECORDING: AtomicBool = AtomicBool::new(false);
-static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
-static PIN_COUNTER: AtomicU64 = AtomicU64::new(1);
-static NATIVE_WAYLAND: AtomicBool = AtomicBool::new(false);
-#[cfg(all(debug_assertions, target_os = "macos"))]
-static QA_WINDOW_HIDE_CALLS: AtomicU64 = AtomicU64::new(0);
-
-struct RecordingStartGuard;
-
-impl Drop for RecordingStartGuard {
-    fn drop(&mut self) {
-        STARTING_RECORDING.store(false, Ordering::SeqCst);
-    }
-}
-
-fn tool_state() -> std::sync::MutexGuard<'static, ToolState> {
-    STATE
-        .get_or_init(|| Mutex::new(ToolState::default()))
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-fn capture_lease() -> Result<Arc<session::SessionLease>, String> {
-    if let Some(lease) = &tool_state().session_lease {
-        return Ok(lease.clone());
-    }
-    session::SessionLease::acquire()?
-        .map(Arc::new)
-        .ok_or_else(|| "another Taomni instance is already capturing the screen".into())
-}
-
-fn internal_error(e: anyhow::Error) -> String {
-    format!("{e:#}")
-}
 
 /// Startup: purge leftovers of earlier runs and register the hotkey.
 pub fn init(app: &AppHandle) {
@@ -273,127 +130,6 @@ pub async fn screenshot_read_file(path: String) -> Result<tauri::ipc::Response, 
         Ok(tauri::ipc::Response::new(std::fs::read(path)?))
     })
     .await
-}
-
-/// App exit: stop recordings and delete temp files.
-pub fn shutdown() {
-    RECOVERY_FINALIZERS.get_or_init(Default::default).wait();
-    record::cancel_all();
-    capture::purge_tracked();
-}
-
-pub(crate) async fn wait_for_recovery_recording() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        RECOVERY_FINALIZERS.get_or_init(Default::default).wait()
-    })
-    .await
-    .map_err(|_| "录屏安全收尾等待失败，请稍后重试退出。".to_owned())
-}
-
-/// A capture-control renderer died: stop input driving and finalize the clip
-/// through existing owners. Never purge files or destroy/rebuild overlay windows.
-pub(crate) fn stop_orphaned_capture_controls(app: &AppHandle) {
-    use tauri_plugin_dialog::DialogExt;
-    let finalizer = RECOVERY_FINALIZERS.get_or_init(Default::default).begin();
-    let generation = SESSION_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
-    let recording = {
-        let mut state = tool_state();
-        if let Some(control) = &state.scroll {
-            control.request_stop(false);
-        }
-        // Transfer ownership before any close handler can cancel or purge it.
-        state
-            .recording
-            .take()
-            .or_else(|| state.recording_preview.take())
-            .and_then(|id| record::take_for_recovery(&id))
-    };
-    if let Some(recording) = recording {
-        let handle = app.clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            let message = match recording.finish() {
-                Ok(info) => {
-                    let saved = handle
-                        .path()
-                        .app_local_data_dir()
-                        .map_err(|e| e.to_string())
-                        .and_then(|root| {
-                            recovery_file::preserve(
-                                &info.path,
-                                &root
-                                    .join("recovered-recordings")
-                                    .join(uuid::Uuid::new_v4().to_string()),
-                            )
-                            .map_err(|e| e.to_string())
-                        });
-                    match saved {
-                        Ok(path) => format!(
-                            "录屏已安全停止并保存，可使用文件管理器打开：\n{}\n关闭采集窗口或退出应用不会删除此文件。",
-                            path.display()
-                        ),
-                        Err(error) => format!(
-                            "录屏已停止，但持久保存失败：{error}\n临时文件位于：\n{}\n请尽快自行复制；系统临时目录清理后可能丢失。",
-                            info.path.display()
-                        ),
-                    }
-                }
-                Err(error) => format!("采集已停止，但录屏收尾失败，未能确认完整文件：\n{error}"),
-            };
-            // Exit may wait for file work, never for GTK/window callbacks.
-            drop(finalizer);
-            let ui = handle.clone();
-            let _ = handle.run_on_main_thread(move || {
-                // Copying a large finished clip can outlast this capture UI.
-                // Never close the borders or restore windows of a newer capture.
-                if SESSION_GENERATION.load(Ordering::SeqCst) == generation {
-                    surfaces::close_borders(&ui);
-                    restore_app_windows_for_preview(&ui);
-                }
-                ui.dialog()
-                    .message(message)
-                    .title("Taomni 采集控制中断")
-                    .show(|_| {});
-            });
-        });
-    } else {
-        app.dialog().message("采集控制界面已退出，已请求停止采集；没有可接管的录屏，未确认新文件已保存。不会自动重新采集。")
-            .title("Taomni 采集控制中断").show(|_| {});
-    }
-}
-
-async fn blocking<T: Send + 'static>(
-    what: &str,
-    f: impl FnOnce() -> anyhow::Result<T> + Send + 'static,
-) -> Result<T, String> {
-    tokio::task::spawn_blocking(f)
-        .await
-        .map_err(|e| format!("{what} task failed: {e}"))?
-        .map_err(internal_error)
-}
-
-pub(crate) fn window_builder<'a>(
-    app: &'a AppHandle,
-    label: &str,
-    url: WebviewUrl,
-) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
-    #[allow(unused_mut)]
-    let mut builder = WebviewWindowBuilder::new(app, label, url);
-    #[cfg(target_os = "windows")]
-    if cfg!(debug_assertions) && app.config().identifier == crate::QA_APP_ID {
-        // All QA WebViews must use the same isolated environment/profile and
-        // EdgeDriver arguments as main, never a personal/default profile.
-        if std::env::var_os("NEWMOB_DATA_DIR").is_some() {
-            if let Ok(data_dir) = crate::resolved_app_data_dir(app) {
-                builder = builder.data_directory(data_dir.join("webview"));
-            }
-            if let Ok(arguments) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
-                if !arguments.trim().is_empty() {
-                    builder = builder.additional_browser_args(&arguments);
-                }
-            }
-        }
-    }
-    builder
 }
 
 fn to_file(result: (PathBuf, u32, u32)) -> ScreenshotFile {
@@ -587,115 +323,6 @@ pub async fn screenshot_stop_scroll_capture(cancel: bool) -> Result<(), String> 
     Ok(())
 }
 
-/// Keep controls outside captured pixels. Platforms with session-owned stop
-/// input can hide them; Wayland reserves a strip so finishing remains possible.
-fn scroll_layout(
-    app: &AppHandle,
-    display: &DisplayInfo,
-    requested: (u32, u32, u32, u32),
-) -> Result<((u32, u32, u32, u32), Option<surfaces::ControlPosition>), String> {
-    let rect = surfaces::region_rect(display, requested);
-    let mut displays = capture::list_displays(app).map_err(internal_error)?;
-    displays.sort_by_key(|d| d.id != display.id);
-    // A full-display or near-full-display selection has no useful place for
-    // an auxiliary prompt. Keep every selected pixel and use the session-owned
-    // Esc/right-click stop input even when another monitor has spare space.
-    let near_full = (rect.w as i64 * 10 >= display.width as i64 * 9)
-        && (rect.h as i64 * 10 >= display.height as i64 * 9);
-    if near_full {
-        #[cfg(target_os = "linux")]
-        if crate::servers::rdp::capture::wayland::is_wayland_session() {
-            let (capture, controls) =
-                surfaces::inside_control_strip(display, rect, scroll::MIN_REGION_HEIGHT as i32)
-                    .ok_or_else(|| {
-                        "Select a taller region to leave room for scroll capture controls."
-                            .to_string()
-                    })?;
-            return Ok((
-                (
-                    (capture.x - display.x) as u32,
-                    (capture.y - display.y) as u32,
-                    capture.w as u32,
-                    capture.h as u32,
-                ),
-                Some(surfaces::ControlPosition {
-                    rect: controls,
-                    scale: display.scale_factor.max(1.0),
-                }),
-            ));
-        }
-        return Ok((requested, None));
-    }
-    Ok((
-        requested,
-        surfaces::control_placement(&displays, display, rect),
-    ))
-}
-
-fn capture_control_position(
-    app: &AppHandle,
-    display: &DisplayInfo,
-    region: surfaces::Rect,
-) -> Result<Option<surfaces::ControlPosition>, String> {
-    let mut displays = capture::list_displays(app).map_err(internal_error)?;
-    displays.sort_by_key(|d| d.id != display.id);
-    let position = surfaces::control_placement(&displays, display, region);
-    if position.is_none() && !shortcut::current_status().registered {
-        return Err("No room for controls outside the capture. Select a smaller region or enable the system screenshot hotkey before capturing the whole display.".into());
-    }
-    Ok(position)
-}
-
-fn open_scroll_bar(
-    app: &AppHandle,
-    display: &DisplayInfo,
-    position: Option<surfaces::ControlPosition>,
-    control: Arc<scroll::ScrollControl>,
-) -> Result<(), String> {
-    let window = window_builder(
-        app,
-        surfaces::SCROLL_LABEL,
-        WebviewUrl::App("index.html#screenshot-scroll".into()),
-    )
-    .title("Scroll capture")
-    .inner_size(surfaces::CONTROL_WIDTH, surfaces::CONTROL_HEIGHT)
-    .visible(false)
-    .decorations(false)
-    .resizable(false)
-    .shadow(false)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .content_protected(surfaces::PROTECT_CAPTURE_SURFACES)
-    .focused(false)
-    .build()
-    .map_err(|e| e.to_string())?;
-    crate::webview_recovery::install_capture_control(&window);
-    window.on_window_event(move |event| {
-        if matches!(event, tauri::WindowEvent::Destroyed) {
-            control.request_stop(true);
-        }
-    });
-    #[cfg(target_os = "linux")]
-    surface_backend::webview(&window)?;
-    if let Some(position) = position {
-        #[cfg(target_os = "linux")]
-        surface_backend::place_webview(&window, position)?;
-        #[cfg(not(target_os = "linux"))]
-        {
-            let rect = position.rect;
-            window
-                .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
-                .map_err(|e| e.to_string())?;
-            window
-                .set_position(PhysicalPosition::new(rect.x, rect.y))
-                .map_err(|e| e.to_string())?;
-        }
-        window.show().map_err(|e| e.to_string())?;
-    }
-    let _ = display;
-    Ok(())
-}
-
 /// Copy a screenshot artifact to the OS clipboard as an image. Uses the
 /// app-wide clipboard instance: on X11 the owner must outlive the call or
 /// the clipboard content disappears with it.
@@ -819,418 +446,6 @@ pub async fn screenshot_probe() -> Result<ScreenshotProbe, String> {
     .await
 }
 
-// ---------------------------------------------------------------------------
-// Overlay window
-// ---------------------------------------------------------------------------
-
-/// Hide every visible app window except the screenshot tool's own and remember
-/// them (merged with windows already hidden for this session).
-fn hide_app_windows(app: &AppHandle) -> bool {
-    let mut hid_any = false;
-    let mut state = tool_state();
-    for (label, window) in app.webview_windows() {
-        if label == OVERLAY_LABEL
-            || label == RECORDER_LABEL
-            || label == surfaces::SCROLL_LABEL
-            || label.starts_with(surfaces::BORDER_PREFIX)
-            || label.starts_with(PIN_LABEL_PREFIX)
-            || label == qa::QA_WINDOW_LABEL
-        {
-            continue;
-        }
-        if !window.is_visible().unwrap_or(false) {
-            continue;
-        }
-        #[cfg(target_os = "linux")]
-        if window.is_minimized().unwrap_or(false) {
-            continue;
-        }
-        #[cfg(all(debug_assertions, target_os = "macos"))]
-        QA_WINDOW_HIDE_CALLS.fetch_add(1, Ordering::SeqCst);
-        // GTK hide/show unmaps the toplevel: X11 resets its position and
-        // Wayland may place the new mapping on a different output. Iconifying
-        // removes it from capture while retaining the compositor's placement.
-        #[cfg(target_os = "linux")]
-        let hidden = window.minimize();
-        #[cfg(not(target_os = "linux"))]
-        let hidden = window.hide();
-        if hidden.is_ok() {
-            hid_any = true;
-            if !state.hidden.contains(&label) {
-                state.hidden.push(label);
-            }
-        }
-    }
-    hid_any
-}
-
-/// Wait for UI-thread hiding/minimization and compositor fade-out to complete.
-/// A queued request returning Ok is not proof of native visibility on GTK.
-async fn await_hidden_windows(app: &AppHandle) -> Result<(), String> {
-    let labels = tool_state().hidden.clone();
-    let until = std::time::Instant::now() + Duration::from_secs(3);
-    loop {
-        let mut visible = false;
-        for label in &labels {
-            if let Some(window) = app.get_webview_window(label) {
-                let mapped = window.is_visible().map_err(|e| e.to_string())?;
-                #[cfg(target_os = "linux")]
-                if pins::native_wayland() {
-                    // xdg-toplevel has no minimized state acknowledgement.
-                    // GTK/Tao's ICONIFIED cache therefore cannot establish
-                    // visibility here. Drain GTK below and allow compositor
-                    // suspension/fade; native QA observes Mutter and pixels.
-                    continue;
-                }
-                #[cfg(target_os = "linux")]
-                let mapped = mapped && !window.is_minimized().map_err(|e| e.to_string())?;
-                visible |= mapped;
-            }
-        }
-        if !visible {
-            break;
-        }
-        if std::time::Instant::now() >= until {
-            return Err("Screenshot cancelled: an application window did not hide".into());
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        app.run_on_main_thread(move || {
-            use gtk::prelude::*;
-            if let Some(display) = gtk::gdk::Display::default() {
-                display.sync();
-            }
-            let _ = tx.send(());
-        })
-        .map_err(|e| e.to_string())?;
-        tokio::time::timeout(Duration::from_secs(3), rx)
-            .await
-            .map_err(|_| "GTK hide barrier timed out")?
-            .map_err(|e| e.to_string())?;
-        // GNOME/KWin fade animations can exceed the old fixed 250ms delay.
-        tokio::time::sleep(Duration::from_millis(650)).await;
-    }
-    #[cfg(not(target_os = "linux"))]
-    tokio::time::sleep(HIDE_SETTLE).await;
-    Ok(())
-}
-
-fn restore_app_windows(app: &AppHandle) {
-    let hidden = std::mem::take(&mut tool_state().hidden);
-    restore_hidden_windows(app, hidden);
-}
-
-fn restore_app_windows_for_preview(app: &AppHandle) {
-    #[cfg(target_os = "linux")]
-    if pins::native_wayland() {
-        // Wayland does not acknowledge whether activation deiconified the
-        // window. Keep ownership through preview so its final user action
-        // can still restore the original windows before closing the source.
-        let hidden = tool_state().hidden.clone();
-        restore_hidden_windows(app, hidden);
-        return;
-    }
-    restore_app_windows(app);
-}
-
-fn restore_hidden_windows(app: &AppHandle, hidden: Vec<String>) {
-    #[cfg(target_os = "linux")]
-    if pins::native_wayland() {
-        log::info!("capture restoration: hidden={hidden:?}, GTK_thread={}", gtk::is_initialized_main_thread());
-    }
-    for label in hidden {
-        if let Some(window) = app.get_webview_window(&label) {
-            #[cfg(target_os = "linux")]
-            if pins::native_wayland() {
-                let target = window.clone();
-                let restore = move || {
-                    use gtk::prelude::*;
-                    if let Ok(gtk) = target.gtk_window() {
-                        let id = surface_backend::activation_id();
-                        log::info!("capture restoration: target={}, backend={}, mapped={}, startup_id={}",
-                            target.label(), gtk.display().type_().name(), gtk.is_mapped(), id.is_some());
-                        // Restore the retained GTK surface while the source
-                        // of the activation context still exists.
-                        gtk.deiconify();
-                        gtk.show();
-                        if let Some((id, surface)) = id.zip(gtk.window()) {
-                            // The X11 startup sequence was published on another
-                            // connection. Let the compositor dispatch it before
-                            // sending Wayland's activation request.
-                            gtk.display().sync();
-                            // Activate the existing surface directly. GTK's
-                            // startup property only forwards while mapped and
-                            // present() also creates a second activation token.
-                            surface.set_startup_id(&id);
-                        } else {
-                            gtk.present();
-                        }
-                        // Keep the source alive until the compositor has
-                        // processed activation of the target surface.
-                        gtk.display().sync();
-                    }
-                };
-                if gtk::is_initialized_main_thread() {
-                    restore();
-                } else {
-                    let _ = window.run_on_main_thread(restore);
-                }
-                continue;
-            }
-            #[cfg(target_os = "linux")]
-            let _ = window.unminimize();
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
-    }
-}
-
-/// Place a borderless window exactly over `display` (physical pixels).
-async fn cover_display(window: &WebviewWindow, display: &DisplayInfo) -> Result<(), String> {
-    let _ = window.set_position(PhysicalPosition::new(display.x, display.y));
-    #[cfg(target_os = "linux")]
-    if pins::native_wayland() {
-        // The hidden window still has the previous output's scale. A physical
-        // size request converted with that cache doubles GTK/WebKit's logical
-        // allocation when switching from 100% to 200% before output-enter.
-        let scale = display.scale_factor.max(1.0);
-        window.set_size(tauri::LogicalSize::new(
-            display.width as f64 / scale, display.height as f64 / scale,
-        )).map_err(|e| e.to_string())?;
-    } else {
-        window.set_size(PhysicalSize::new(display.width, display.height)).map_err(|e| e.to_string())?;
-    }
-    #[cfg(not(target_os = "linux"))]
-    window.set_size(PhysicalSize::new(display.width, display.height)).map_err(|e| e.to_string())?;
-    #[cfg(target_os = "macos")]
-    {
-        // Simple fullscreen hides the menu bar and Dock without the Space
-        // switch animation of native fullscreen.
-        let _ = window.set_simple_fullscreen(true);
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = window.set_fullscreen(true);
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let target = window.clone();
-        let rect = display.logical_rect();
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        window.run_on_main_thread(move || {
-            use gtk::prelude::*;
-            let result = (|| -> Result<(), String> {
-                let window = target.gtk_window().map_err(|e| e.to_string())?;
-                let display = window.display();
-                let index = (0..display.n_monitors()).find(|&index| {
-                    display.monitor(index).is_some_and(|monitor| {
-                        let g = monitor.geometry();
-                        (g.x(), g.y(), g.width(), g.height()) == rect
-                    })
-                }).ok_or("selected monitor is no longer available to GTK")?;
-                // Wayland ignores global set_position. Fullscreen must name
-                // the actual GDK output, using its logical geometry.
-                window.fullscreen_on_monitor(&display.default_screen(), index);
-                Ok(())
-            })();
-            let _ = tx.send(result);
-        }).map_err(|e| e.to_string())?;
-        tokio::time::timeout(Duration::from_secs(5), rx).await
-            .map_err(|_| "GTK monitor placement timed out")?
-            .map_err(|e| e.to_string())??;
-    }
-    // Ubuntu's X11 fractional scaling turns a monitor's scale off while a
-    // fullscreen window is unredirected, which re-applies the whole display
-    // configuration (visible as a display-settings change and layout jump).
-    // Ask the compositor to keep composing this surface; the property is read
-    // when the window is managed, so it must be set before it is shown.
-    #[cfg(target_os = "linux")]
-    if let Err(error) = surface_backend::keep_composited(window) {
-        // Visible in release logs: without this property Ubuntu's X11
-        // fractional scaling re-applies the whole display configuration
-        // whenever the overlay opens or closes.
-        log::warn!("capture surface compositor hint skipped: {error}");
-    }
-    Ok(())
-}
-
-/// Hide app windows, capture `display_id` (default: the display under the
-/// pointer) and open the annotation overlay on it. Re-entrant calls while an
-/// overlay is opening/open just focus the existing one; while a recording
-/// runs they focus the recorder bar.
-pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result<(), String> {
-    open_overlay_with_window(app, display_id, None).await
-}
-
-async fn open_overlay_with_window(
-    app: &AppHandle,
-    display_id: Option<String>,
-    current_window: Option<WebviewWindow>,
-) -> Result<(), String> {
-    if STARTING_RECORDING.load(Ordering::SeqCst) {
-        return Ok(());
-    }
-    let recording = {
-        let state = tool_state();
-        if state.scroll.is_some() {
-            // Start is not Stop. Another instance can own this global chord.
-            return Ok(());
-        }
-        state.recording.clone()
-    };
-    if let Some(id) = recording {
-        // Finish before showing any controls: full-display capture has no
-        // safe location for a visible bar, even when content protection is unavailable.
-        record::request_stop(&id).map_err(internal_error)?;
-        return Ok(());
-    }
-    if let Some(label) = {
-        let state = tool_state();
-        if state.recording.is_some() || state.recorder_open {
-            Some(RECORDER_LABEL)
-        } else if state.overlay.is_some() {
-            Some(OVERLAY_LABEL)
-        } else {
-            None
-        }
-    } {
-        if let Some(window) = app.get_webview_window(label) {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
-        return Ok(());
-    }
-    if OPENING.swap(true, Ordering::SeqCst) {
-        return Ok(());
-    }
-    let lease = session::SessionLease::acquire();
-    match lease {
-        Ok(Some(lease)) => tool_state().session_lease = Some(Arc::new(lease)),
-        Ok(None) => {
-            OPENING.store(false, Ordering::SeqCst);
-            return Ok(());
-        }
-        Err(error) => {
-            OPENING.store(false, Ordering::SeqCst);
-            return Err(error);
-        }
-    }
-    let result = open_overlay_inner(app, display_id, current_window).await;
-    OPENING.store(false, Ordering::SeqCst);
-    if result.is_err() {
-        // Never leave the user with no visible window.
-        tool_state().overlay = None;
-        if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
-            let _ = window.close();
-        }
-        restore_app_windows(app);
-        capture::purge_tracked();
-        tool_state().session_lease = None;
-    }
-    result
-}
-
-async fn open_overlay_inner(
-    app: &AppHandle,
-    display_id: Option<String>,
-    current_window: Option<WebviewWindow>,
-) -> Result<(), String> {
-    #[cfg(target_os = "linux")]
-    if current_window.is_some() && pins::native_wayland() {
-        // GDK returns a synthetic origin on Wayland. It must never be used
-        // as a crop of the first output (or rejected only on another output).
-        return Err("Wayland does not expose the current window's screen coordinates. Use Screen region and select the window on the desired display.".into());
-    }
-    let generation = SESSION_GENERATION.load(Ordering::SeqCst);
-    capture::request_capture_permission(app)
-        .await
-        .map_err(internal_error)?;
-    if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
-        return Err("screenshot opening was cancelled".into());
-    }
-    let display = {
-        let app = app.clone();
-        blocking("display lookup", move || match display_id {
-            Some(id) if !id.trim().is_empty() => capture::resolve_display(&app, Some(&id)),
-            _ => capture::display_at_cursor(&app),
-        })
-        .await?
-    };
-    let window_region = if let Some(window) = &current_window {
-        let pos = window.outer_position().map_err(|e| e.to_string())?;
-        let size = window.outer_size().map_err(|e| e.to_string())?;
-        let left = (pos.x - display.x).max(0) as u32;
-        let top = (pos.y - display.y).max(0) as u32;
-        let right = (pos.x as i64 + size.width as i64 - display.x as i64)
-            .clamp(0, display.width as i64) as u32;
-        let bottom = (pos.y as i64 + size.height as i64 - display.y as i64)
-            .clamp(0, display.height as i64) as u32;
-        if right <= left || bottom <= top {
-            return Err("current window is outside the selected display".into());
-        }
-        Some(PhysicalRegion {
-            x: left,
-            y: top,
-            width: right - left,
-            height: bottom - top,
-        })
-    } else {
-        None
-    };
-    tool_state().include_current_window = current_window.is_some();
-    if current_window.is_none() && hide_app_windows(app) {
-        await_hidden_windows(app).await?;
-    } else if current_window.is_some() {
-        // Let the invoking options menu disappear before freezing the window.
-        tokio::time::sleep(HIDE_SETTLE).await;
-    }
-    let (path, width, height) = {
-        let app = app.clone();
-        let display = display.clone();
-        blocking("capture", move || {
-            let image = capture::capture_display(&app, &display)?;
-            capture::save_png(&image, "shot")
-        })
-        .await?
-    };
-    if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
-        std::fs::remove_file(path).ok();
-        return Err("screenshot opening was cancelled".into());
-    }
-    tool_state().overlay = Some(OverlayInit {
-        path: path.to_string_lossy().into_owned(),
-        display_id: display.id.clone(),
-        width,
-        height,
-        scale_factor: display.scale_factor,
-        window_region,
-        document: false,
-        source_pin: None,
-    });
-
-    let url = WebviewUrl::App("index.html#screenshot-overlay".into());
-    let window = window_builder(app, OVERLAY_LABEL, url)
-        .title("Screenshot")
-        .visible(false)
-        .decorations(false)
-        .resizable(false)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .build()
-        .map_err(|e| format!("open overlay window: {e}"))?;
-    watch_session_window(&window);
-    cover_display(&window, &display).await?;
-    window
-        .show()
-        .map_err(|e| format!("show overlay window: {e}"))?;
-    focus_capture_window(&window).await;
-    Ok(())
-}
-
 /// Tauri command wrapper for [`open_overlay`].
 #[tauri::command]
 pub async fn screenshot_open_overlay(
@@ -1240,13 +455,20 @@ pub async fn screenshot_open_overlay(
     include_current_window: Option<bool>,
 ) -> Result<(), String> {
     #[cfg(target_os = "linux")]
-    let display_id = if display_id.as_ref().is_none_or(|id| id.trim().is_empty())
-        && pins::native_wayland()
-    {
-        let worker = app.clone();
-        let caller = window.clone();
-        Some(blocking("invoking display", move || capture::display_for_window(&worker, &caller)).await?.id)
-    } else { display_id };
+    let display_id =
+        if display_id.as_ref().is_none_or(|id| id.trim().is_empty()) && pins::native_wayland() {
+            let worker = app.clone();
+            let caller = window.clone();
+            Some(
+                blocking("invoking display", move || {
+                    capture::display_for_window(&worker, &caller)
+                })
+                .await?
+                .id,
+            )
+        } else {
+            display_id
+        };
     open_overlay_with_window(
         &app,
         display_id,
@@ -1267,27 +489,50 @@ pub async fn screenshot_overlay_init() -> Result<OverlayInit, String> {
 /// Switch the selection surface to another physical display without ending
 /// the screenshot session or requiring Taomni itself to move there.
 #[tauri::command]
-pub async fn screenshot_switch_display(app: AppHandle, window: WebviewWindow, display_id: String) -> Result<OverlayInit, String> {
+pub async fn screenshot_switch_display(
+    app: AppHandle,
+    window: WebviewWindow,
+    display_id: String,
+) -> Result<OverlayInit, String> {
     let _lease = capture_lease()?;
     {
         let state = tool_state();
-        if window.label() != OVERLAY_LABEL || state.overlay.as_ref().is_none_or(|o| o.document)
-            || state.scroll.is_some() { return Err("not a display selection session".into()); }
+        if window.label() != OVERLAY_LABEL
+            || state.overlay.as_ref().is_none_or(|o| o.document)
+            || state.scroll.is_some()
+        {
+            return Err("not a display selection session".into());
+        }
     }
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     let worker = app.clone();
-    let display = blocking("display lookup", move || capture::resolve_display(&worker, Some(&display_id))).await?;
+    let display = blocking("display lookup", move || {
+        capture::resolve_display(&worker, Some(&display_id))
+    })
+    .await?;
     window.hide().map_err(|e| e.to_string())?;
     tokio::time::sleep(HIDE_SETTLE).await;
     let worker = app.clone();
     let captured_display = display.clone();
     let captured = blocking("capture display", move || {
-        capture::save_png(&capture::capture_display(&worker, &captured_display)?, "shot")
-    }).await;
-    if SESSION_GENERATION.load(Ordering::SeqCst) != generation { return Err("screenshot opening was cancelled".into()); }
+        capture::save_png(
+            &capture::capture_display(&worker, &captured_display)?,
+            "shot",
+        )
+    })
+    .await;
+    if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
+        return Err("screenshot opening was cancelled".into());
+    }
     let result = captured.map(|(path, width, height)| OverlayInit {
-        path: path.to_string_lossy().into_owned(), display_id: display.id.clone(), width, height,
-        scale_factor: display.scale_factor, window_region: None, document: false, source_pin: None,
+        path: path.to_string_lossy().into_owned(),
+        display_id: display.id.clone(),
+        width,
+        height,
+        scale_factor: display.scale_factor,
+        window_region: None,
+        document: false,
+        source_pin: None,
     });
     if let Ok(init) = &result {
         edit::reset_hidden_surface(&window).await?;
@@ -1327,80 +572,6 @@ pub async fn screenshot_close_overlay(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn watch_session_window(window: &WebviewWindow) {
-    let app = window.app_handle().clone();
-    let label = window.label().to_string();
-    window.on_window_event(move |event| {
-        if !matches!(
-            event,
-            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
-        ) {
-            return;
-        }
-        let active = {
-            let state = tool_state();
-            if label == OVERLAY_LABEL {
-                state.overlay.is_some()
-            } else {
-                state.recorder_open
-            }
-        };
-        #[cfg(target_os = "linux")]
-        if matches!(event, tauri::WindowEvent::CloseRequested { .. }) && pins::native_wayland() {
-            let ends_session = label != OVERLAY_LABEL || active;
-            log::info!("capture close requested: label={label}, ends_session={ends_session}");
-            // GTK still has the focused source surface here. Destroyed is too
-            // late to authorize activation of a minimized Wayland toplevel.
-            // A selection overlay closed after starting recording has already
-            // transferred ownership to the recorder; it must not restore yet.
-            if ends_session {
-                restore_app_windows(&app);
-            }
-        }
-        if matches!(event, tauri::WindowEvent::Destroyed) {
-            if active {
-                let app = app.clone();
-                // Joining recorder threads must not block the event loop.
-                tauri::async_runtime::spawn_blocking(move || close_session(&app));
-            }
-        }
-    });
-}
-
-pub(crate) fn close_session(app: &AppHandle) {
-    SESSION_GENERATION.fetch_add(1, Ordering::SeqCst);
-    let recording = {
-        let mut state = tool_state();
-        state.overlay = None;
-        state.recorder_open = false;
-        state.recording_region = None;
-        state.include_current_window = false;
-        if let Some(control) = state.scroll.take() {
-            control.request_stop(true);
-        }
-        state
-            .recording
-            .take()
-            .or_else(|| state.recording_preview.take())
-    };
-    if let Some(id) = recording {
-        let _ = record::cancel_recording(&id);
-    }
-    // Wayland activation tokens need the currently focused selection surface.
-    // Request restoration before destroying that surface and its input serial.
-    #[cfg(target_os = "linux")]
-    if pins::native_wayland() { restore_app_windows(app); }
-    surfaces::close_borders(app);
-    for label in [OVERLAY_LABEL, RECORDER_LABEL, surfaces::SCROLL_LABEL] {
-        if let Some(window) = app.get_webview_window(label) {
-            let _ = window.close();
-        }
-    }
-    restore_app_windows(app);
-    capture::purge_tracked();
-    tool_state().session_lease = None;
-}
-
 // ---------------------------------------------------------------------------
 // Pin to screen
 // ---------------------------------------------------------------------------
@@ -1421,124 +592,10 @@ pub async fn screenshot_pin_to_screen(app: AppHandle, path: String) -> Result<St
     // selection surface. Restore main while that surface can still authorize
     // activation, then let the new pin receive focus as usual.
     #[cfg(target_os = "linux")]
-    if pins::native_wayland() { restore_app_windows(&app); }
+    if pins::native_wayland() {
+        restore_app_windows(&app);
+    }
     open_pin(&app, pinned, width, height, None)
-}
-
-fn open_pin(
-    app: &AppHandle,
-    pinned: PathBuf,
-    width: u32,
-    height: u32,
-    favorite_id: Option<String>,
-) -> Result<String, String> {
-    open_pin_with_note(app, pinned, width, height, favorite_id, String::new())
-}
-
-fn open_pin_with_note(
-    app: &AppHandle,
-    pinned: PathBuf,
-    width: u32,
-    height: u32,
-    favorite_id: Option<String>,
-    note: String,
-) -> Result<String, String> {
-    let overlay_display = tool_state().overlay.as_ref().map(|o| o.display_id.clone());
-    // Release the session lock before waiting for GTK monitor enumeration.
-    // Pins open on the captured display (or the one under the pointer).
-    let display = match overlay_display {
-        Some(id) => capture::resolve_display(app, Some(&id)).ok(),
-        None => capture::display_at_cursor(app).ok(),
-    };
-    let scale = display
-        .as_ref()
-        .map(|d| d.scale_factor)
-        .unwrap_or(1.0)
-        .max(0.5);
-    let origin = display
-        .as_ref()
-        .map(|d| (d.x as f64 / scale, d.y as f64 / scale))
-        .unwrap_or((0.0, 0.0));
-    // Logical size at 1:1 physical pixels, capped so huge shots stay usable.
-    const MAX_DIM: f64 = 720.0;
-    let (lw, lh) = (width as f64 / scale, height as f64 / scale);
-    let fit = (MAX_DIM / lw.max(lh)).min(1.0);
-    let label = format!(
-        "{PIN_LABEL_PREFIX}{}",
-        PIN_COUNTER.fetch_add(1, Ordering::Relaxed)
-    );
-    tool_state().pins.insert(
-        label.clone(),
-        PinInit {
-            path: pinned.to_string_lossy().into_owned(),
-            width,
-            height,
-            favorite_id,
-            note,
-        },
-    );
-
-    // New pins cascade from the previous one instead of stacking exactly on
-    // top of it; the user can tile them later from any pin's menu.
-    let open_pins = app
-        .webview_windows()
-        .keys()
-        .filter(|label| label.starts_with(PIN_LABEL_PREFIX))
-        .count() as f64;
-    let offset = 32.0 * (open_pins % 10.0);
-    let url = WebviewUrl::App("index.html#screenshot-pin".into());
-    let window = window_builder(app, &label, url)
-        .title("Pinned Screenshot")
-        .inner_size((lw * fit).round().max(240.0), (lh * fit).round().max(160.0))
-        .position(origin.0 + 96.0 + offset, origin.1 + 96.0 + offset)
-        .transparent(true)
-        .decorations(false)
-        // A native shadow darkens the desktop through translucent pin pixels on macOS.
-        .shadow(false)
-        .resizable(true)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .visible(false)
-        .build();
-    let window = match window {
-        Ok(window) => window,
-        Err(e) => {
-            tool_state().pins.remove(&label);
-            std::fs::remove_file(&pinned).ok();
-            return Err(format!("open pin window: {e}"));
-        }
-    };
-    #[cfg(target_os = "linux")]
-    if let Err(error) = surface_backend::webview(&window) {
-        let _ = window.close();
-        tool_state().pins.remove(&label);
-        std::fs::remove_file(&pinned).ok();
-        return Err(error);
-    }
-    window
-        .set_position(tauri::LogicalPosition::new(
-            origin.0 + 96.0 + offset,
-            origin.1 + 96.0 + offset,
-        ))
-        .map_err(|e| e.to_string())?;
-    window.show().map_err(|e| e.to_string())?;
-    let pin_label = label.clone();
-    let pin_app = app.clone();
-    window.on_window_event(move |event| {
-        use tauri::Emitter;
-        if let tauri::WindowEvent::Destroyed = event {
-            if let Some(pin) = tool_state().pins.remove(&pin_label) {
-                std::fs::remove_file(pin.path).ok();
-            }
-            let _ = pin_app.emit(pins::PINS_CHANGED_EVENT, ());
-            pins::close_pin_tools(&pin_app, &pin_label);
-        }
-    });
-    {
-        use tauri::Emitter;
-        let _ = app.emit(pins::PINS_CHANGED_EVENT, ());
-    }
-    Ok(label)
 }
 
 /// The calling pin window's payload.
@@ -1635,26 +692,6 @@ pub async fn screenshot_auto_redact(path: String) -> Result<ocr::RedactResult, S
     })
     .await
     .map_err(|e| format!("redact task failed: {e}"))?
-}
-
-// ---------------------------------------------------------------------------
-// Recording
-// ---------------------------------------------------------------------------
-
-fn recording_region(
-    x: Option<u32>,
-    y: Option<u32>,
-    width: Option<u32>,
-    height: Option<u32>,
-) -> Result<Option<(u32, u32, u32, u32)>, String> {
-    match (x, y, width, height) {
-        (None, None, None, None) => Ok(None),
-        (Some(x), Some(y), Some(w), Some(h)) if w >= 2 && h >= 2 => Ok(Some((x, y, w, h))),
-        (Some(_), Some(_), Some(_), Some(_)) => {
-            Err("recording region must be at least 2x2 pixels".into())
-        }
-        _ => Err("recording region requires x, y, width and height together".into()),
-    }
 }
 
 /// Start recording a display region (physical pixels; all of `x/y/w/h`
@@ -1854,171 +891,4 @@ pub async fn screenshot_recording_status() -> Result<Option<serde_json::Value>, 
         let (finished, stopped_by_user) = record::recording_status(&id);
         serde_json::json!({ "recordingId": id, "finished": finished, "stoppedByUser": stopped_by_user, "region": region })
     }))
-}
-
-pub(crate) fn recording_ended(app: &AppHandle, id: &str) {
-    if tool_state().recording.as_deref() != Some(id) {
-        return;
-    }
-    surfaces::close_borders(app);
-    if let Some(window) = app.get_webview_window(RECORDER_LABEL) {
-        let _ = window.show();
-        tauri::async_runtime::spawn(async move {
-            focus_capture_window(&window).await;
-        });
-    }
-}
-
-async fn open_recorder_bar(
-    app: &AppHandle,
-    display: &DisplayInfo,
-    region: (u32, u32, u32, u32),
-) -> Result<(), String> {
-    if let Some(existing) = app.get_webview_window(RECORDER_LABEL) {
-        let _ = existing.close();
-    }
-    let url = WebviewUrl::App("index.html#screenshot-recorder".into());
-    // Compact while recording; the bar grows itself for the preview.
-    let (lw, lh) = (surfaces::CONTROL_WIDTH, surfaces::CONTROL_HEIGHT);
-    let rect = surfaces::region_rect(
-        display,
-        capture::clamp_region(display.width, display.height, region),
-    );
-    let position = capture_control_position(app, display, rect)?;
-    surfaces::open_borders(app, display, rect)?;
-    let (loaded_tx, loaded_rx) = tokio::sync::oneshot::channel();
-    let loaded_tx = Mutex::new(Some(loaded_tx));
-    let window = window_builder(app, RECORDER_LABEL, url)
-        .title("Recording")
-        .inner_size(lw, lh)
-        .visible(false)
-        .decorations(false)
-        .resizable(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .content_protected(surfaces::PROTECT_CAPTURE_SURFACES)
-        .on_page_load(move |_, payload| {
-            if payload.event() == tauri::webview::PageLoadEvent::Finished {
-                if let Some(tx) = loaded_tx.lock().unwrap().take() {
-                    let _ = tx.send(());
-                }
-            }
-        })
-        .build()
-        .map_err(|e| format!("open recorder bar: {e}"))?;
-    crate::webview_recovery::install_capture_control(&window);
-    #[cfg(target_os = "linux")]
-    surface_backend::webview(&window)?;
-    watch_session_window(&window);
-    // Bottom-center of the recorded display.
-    let s = display.scale_factor.max(0.5);
-    let (pw, ph) = position
-        .map(|p| (p.rect.w, p.rect.h))
-        .unwrap_or(((lw * s) as i32, (lh * s) as i32));
-    let x = display.x + (display.width as i32 - pw) / 2;
-    // Leave room above for the grown preview (240 logical px).
-    let y = display.y + display.height as i32 - ph - (240.0 * s) as i32;
-    let (x, y) = position.map(|p| (p.rect.x, p.rect.y)).unwrap_or((x, y));
-    #[cfg(target_os = "linux")]
-    if let Some(position) = position {
-        surface_backend::place_webview(&window, position)?;
-    } else {
-        window
-            .set_size(PhysicalSize::new(pw as u32, ph as u32))
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        window
-            .set_position(PhysicalPosition::new(x, y))
-            .map_err(|e| format!("position recording controls: {e}"))?;
-        window
-            .set_size(PhysicalSize::new(pw as u32, ph as u32))
-            .map_err(|e| format!("size recording controls: {e}"))?;
-    }
-    // Finish loading and mapping the controls before the first recording
-    // snapshot. Creating a hidden WebView does not finish its navigation;
-    // showing it after capture starts can stall WindowServer and lose motion.
-    if position.is_some() {
-        window
-            .show()
-            .map_err(|e| format!("show recording controls: {e}"))?;
-    }
-    tokio::time::timeout(Duration::from_secs(15), loaded_rx)
-        .await
-        .map_err(|_| "recording controls did not load within 15 s".to_string())?
-        .map_err(|_| "recording controls closed before loading".to_string())?;
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn recording_requires_a_complete_nonempty_region() {
-        assert_eq!(recording_region(None, None, None, None).unwrap(), None);
-        assert_eq!(
-            recording_region(Some(1), Some(2), Some(10), Some(20)).unwrap(),
-            Some((1, 2, 10, 20))
-        );
-        assert!(recording_region(Some(1), None, Some(10), Some(20)).is_err());
-        assert!(recording_region(Some(1), Some(2), Some(0), Some(20)).is_err());
-    }
-
-    #[test]
-    fn clipboard_decodes_the_first_gif_frame_without_png_only_image_features() {
-        let file = tempfile::Builder::new().suffix(".GIF").tempfile().unwrap();
-        {
-            let mut encoder =
-                gif::Encoder::new(std::fs::File::create(file.path()).unwrap(), 4, 2, &[]).unwrap();
-            for color in [[240, 40, 20, 255], [20, 60, 220, 255]] {
-                let mut pixels = color.repeat(8);
-                let frame = gif::Frame::from_rgba_speed(4, 2, &mut pixels, 10);
-                encoder.write_frame(&frame).unwrap();
-            }
-        }
-        let first = clipboard_image(file.path()).unwrap();
-        assert_eq!(first.dimensions(), (4, 2));
-        assert!(first.pixels().all(|p| p[0] > 200 && p[1] < 70 && p[2] < 50));
-    }
-
-    #[test]
-    fn empty_gif_clipboard_image_is_rejected() {
-        let file = tempfile::Builder::new().suffix(".gif").tempfile().unwrap();
-        {
-            let encoder = gif::Encoder::new(
-                std::fs::File::create(file.path()).unwrap(),
-                4,
-                2,
-                &[0, 0, 0],
-            )
-            .unwrap();
-            drop(encoder);
-        }
-        assert!(clipboard_image(file.path()).is_err());
-    }
-
-    #[test]
-    fn close_session_state_resets_overlay_and_recording() {
-        {
-            let mut state = tool_state();
-            state.overlay = Some(OverlayInit {
-                path: "x".into(),
-                display_id: "0,0".into(),
-                width: 1,
-                height: 1,
-                scale_factor: 1.0,
-                window_region: None,
-                document: false,
-                source_pin: None,
-            });
-            state.hidden = vec!["main".into()];
-        }
-        // Without an app handle we can only exercise the state transitions.
-        let hidden = std::mem::take(&mut tool_state().hidden);
-        tool_state().overlay = None;
-        assert_eq!(hidden, vec!["main".to_string()]);
-        assert!(tool_state().overlay.is_none());
-    }
 }
