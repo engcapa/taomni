@@ -640,3 +640,16 @@ FilePanel 1036→298 行、WorkspaceGitManager 1118→416 行、RdpPanel 1127→
 - include_str 相对路径、Rust trait imports、FilePanel re-export 与 RdpStore 私有类型依赖遗漏已修，原失败日志保留。复用原有行为测试，没有删除断言或放宽性能门槛；native 系统副作用仍须最终三端验证。
 
 S selected 三端运行的 Windows release 构建已完成，四个 Windows native shard 正在执行；尚无完整 aggregate 结论。整体继续处理余下大文件及最终完整 SHA 的全量回归。
+
+## 2026-10-22 实施批次 W：捕获、邮件、恢复、代理与编辑器底层模块
+
+22 个 Rust 入口拆出 146 个模块，最大 VNC relay runtime 738 行：X11/Wayland/macOS SCK capture、POP3/cache/OAuth/fake IMAP、SocksCap recovery/helper/config、SDK runtime、session resume、screenshot commands、terminal network、LanChat commands、LLM router、LSP Java runtime/navigation、local servers 和 RDP probe session/scenarios。保留同一捕获 self/mailbox/portal session、POP3/IMAP connection、helper 队列、恢复锁和快照 revision、Zustand 外部接口与 cancellation/cleanup。macOS objc define_class 与其 ivars 保留原定义环境；RDP probe 按实际 binary crate module path 拆分，未更改测量或15%门槛。
+
+11 个前端入口拆出65个模块，最大 LSP session hook771行：workspace API、VNC wire/input/geometry、workspace stub、CodeMirror keymap、WorkspaceEdit apply、replace model、tab policy、clipboard session、virtual space、search panel 和 LSP session。保留同一 search panel WeakMap、history、clipboard workspace slot/session sequence、StateField/facet 与队列/过时结果保护。虚拟空格的纯列计算、overflow state、policy 与 controller 组合分开，解除初期循环依赖。当前清单3586项，新增/修改实现均≤800行。
+
+- `w-rust-final-2.log`：lib **1868 passed / 0 failed / 25 ignored**，integration **80 passed / 0 failed**，rdp-probe **15 passed / 0 failed**。599个生产函数（含全部cfg alternatives）规范化tokens一致。
+- `w-model-tests.log`：14 files / **312 passed**。`w-build-final-2.log` 完整类型检查、production build、761/328/39契约和792 implementation modules边界通过。11个公共API、394个原声明与全部top-level effects对照一致；重复interface的声明合并保持，未遗漏任一声明。
+- `browser-w/run-20261022-042627-074564613`：clipboard跨leaf/历史/undo/lease、可访问观察、virtual space、replace preview/exclude/cancel/commit/undo、Find/Replace、Find Action、VNC面板 **9 passed / 0 failed / 1 skipped**。VNC dialog场景缺fixture配置，require-pass正确失败。使用原有运行中的一次性VNC fixture，`browser-w-vnc/run-20261022-043050-395183303`补齐TC157 **1 passed / 0 failed / 0 skipped**。
+- 两轮receipt签名、summary hash、stable identity通过，source identity `56c9d74f4b27dd4c8518066750def3a1dd5a2b3a1b2518d674e78ee454b178a7`；summary SHA256分别为`d595e24c1fdc98ddeb636dce6e36829f18d0b1ad31d3569b08c8bb45a32ef319`、`731fd95d3b269e9f29a82ac7a0e30801cb69a1ae2ba55692f144196472ca6916`。最初wrapper使用了不完整case ID，runner执行前拒绝；原日志保留。Rust inherited cfg、serde default、X11/BufRead/FramedWrite/Decode traits、binary test路径与keymap type re-export遗漏已修，未删除测试断言。
+
+S三端最终运行[39659861812](https://github.com/engcapa/taomni/actions/runs/39659861812)的18份报告签名/hash/stable identity通过，head `209f134f58b2be8efbdd272fcb1053ee7a1ed535`，统一source identity `fe59d5f080736171eff4104ac337cbcb6822c5a568fdddf1322b1e5ca21ee9e2`。Linux browser31/native35、macOS browser31/native30、Windows browser31/native31 passed+1failed，总计**189passed /1failed /0skipped**。aggregate `report_ok=true/ passed=false`，无infra errors/gaps，另保留TC012和SocksCap旧用例unreviewed。Windows TC-IDE-PARITY-017-03在rename提交后未出现preview，失败DOM显示“Rename produced no edits”，editor焦点与greet定位正确；仅凭当前证据不能判定是provider索引或产品问题，保留原失败并继续诊断。此前Q的macOS性能失败不被S性能通过抹除。

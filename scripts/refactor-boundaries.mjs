@@ -6,6 +6,17 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/lib/editor/workspace", "src/lib/editor/workspace.ts"],
+  ["src/lib/vnc", "src/lib/vnc.ts"],
+  ["src/stubs/commands/workspace", "src/stubs/commands/workspace.ts"],
+  ["src/components/editor/workspace/keymap", "src/components/editor/workspace/workspaceCodeMirrorKeymap.ts"],
+  ["src/components/editor/workspace/editApply", "src/components/editor/workspace/workspaceEditApply.ts"],
+  ["src/components/editor/workspace/replaceModel", "src/components/editor/workspace/replaceInFilesModel.ts"],
+  ["src/components/editor/workspace/tabPolicy", "src/components/editor/workspace/workspaceTabPolicy.ts"],
+  ["src/components/editor/workspace/clipboardSession", "src/components/editor/workspace/workspaceClipboardSession.ts"],
+  ["src/components/editor/workspace/virtualSpace", "src/components/editor/workspace/workspaceVirtualSpace.ts"],
+  ["src/components/editor/workspace/searchPanel", "src/components/editor/workspace/editorSearchPanel.ts"],
+  ["src/components/editor/workspace/lspSession", "src/components/editor/workspace/useWorkspaceLspSession.ts"],
   ["src/components/rdp/panel", "src/components/rdp/RdpPanel.tsx"],
   ["src/components/filebrowser/filePanel", "src/components/filebrowser/FilePanel.tsx"],
   ["src/components/filebrowser/browser", "src/components/filebrowser/FileBrowser.tsx"],

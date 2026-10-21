@@ -11,7 +11,7 @@ scripts/configure-release-signing.mjs	tooling	mjs	tool-script	209	7	6	0		开发�
 scripts/configure-release-signing.test.mjs	tooling	mjs	test	187	8	0	0		自动化测试/QA 集成测试
 scripts/editor_performance_browser.py	frontend	py	frontend-lib	162	6	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/macos-runtime-paths.test.mjs	tooling	mjs	test	99	7	0	0		自动化测试/QA 集成测试
-scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	127	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	138	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/refactor-contracts.mjs	frontend	mjs	frontend-lib	91	4	5	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/release-workflow.test.mjs	tooling	mjs	test	161	8	0	0		自动化测试/QA 集成测试
 scripts/resolve-release-build.mjs	tooling	mjs	tool-script	55	3	2	0		开发、QA、构建或性能工具脚本
@@ -232,8 +232,26 @@ src-tauri/src/bin/rdp-probe/host_audio.rs	backend	rs	rust-backend	270	6	4	0		Rus
 src-tauri/src/bin/rdp-probe/main.rs	backend	rs	rust-backend	272	4	19	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/rdp-probe/pw_record.rs	backend	rs	rust-backend	105	12	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/rdp-probe/rfx_stats.rs	backend	rs	rust-backend	612	5	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/bin/rdp-probe/scenarios.rs	backend	rs	rust-backend	1365	15	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/bin/rdp-probe/session.rs	backend	rs	rust-backend	902	40	54	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/scenarios.rs	backend	rs	rust-backend	27	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/scenarios/audio.rs	backend	rs	rust-backend	225	21	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/autodetection.rs	backend	rs	rust-backend	52	11	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/clipboard_receive.rs	backend	rs	rust-backend	297	26	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/clipboard_send.rs	backend	rs	rust-backend	280	21	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/dispatch.rs	backend	rs	rust-backend	65	19	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/images.rs	backend	rs	rust-backend	64	10	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/latency.rs	backend	rs	rust-backend	169	15	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/readiness.rs	backend	rs	rust-backend	152	18	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/throughput.rs	backend	rs	rust-backend	163	15	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/scenarios/throughput_comparison_tests.rs	backend	rs	test	37	2	0	0		行为回归测试
+src-tauri/src/bin/rdp-probe/session.rs	backend	rs	rust-backend	28	1	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/session/configuration.rs	backend	rs	rust-backend	135	12	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/framebuffer.rs	backend	rs	rust-backend	133	7	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/input.rs	backend	rs	rust-backend	110	12	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/model.rs	backend	rs	rust-backend	137	22	44	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/pump.rs	backend	rs	rust-backend	167	13	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/startup.rs	backend	rs	rust-backend	142	22	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/bin/rdp-probe/session/tests.rs	backend	rs	test	38	5	0	0		行为回归测试
+src-tauri/src/bin/rdp-probe/session/tls.rs	backend	rs	rust-backend	99	14	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/bin/rdp-probe/stats.rs	backend	rs	rust-backend	207	2	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/sockscap-helper/capture.rs	backend	rs	rust-backend	28	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/bin/sockscap-helper/capture/address.rs	backend	rs	rust-backend	51	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -474,7 +492,15 @@ src-tauri/src/java_bundles.rs	backend	rs	rust-backend	758	5	19	0		Rust 后端模
 src-tauri/src/java_debug_adapter.rs	backend	rs	rust-backend	762	6	8	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/java_test.rs	backend	rs	test	336	7	16	2		自动化测试/QA 集成测试
 src-tauri/src/lanchat/beacon.rs	backend	rs	rust-backend	306	9	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/lanchat/commands.rs	backend	rs	rust-backend	868	12	71	44		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/commands.rs	backend	rs	rust-backend	115	14	14	44		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/commands/images.rs	backend	rs	rust-backend	92	8	3	3		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lanchat/commands/media.rs	backend	rs	rust-backend	197	5	9	9		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lanchat/commands/messages.rs	backend	rs	rust-backend	160	9	20	9		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lanchat/commands/profile.rs	backend	rs	rust-backend	148	9	19	6		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lanchat/commands/readiness.rs	backend	rs	rust-backend	6	2	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lanchat/commands/retention.rs	backend	rs	rust-backend	70	3	5	5		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lanchat/commands/service.rs	backend	rs	rust-backend	64	4	6	3		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lanchat/commands/transfers.rs	backend	rs	rust-backend	170	7	9	9		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lanchat/discovery.rs	backend	rs	rust-backend	377	11	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/lanchat/identity.rs	backend	rs	rust-backend	160	6	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/lanchat/media/audio.rs	backend	rs	rust-backend	290	11	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -532,7 +558,12 @@ src-tauri/src/llm/opencode_go/mod.rs	backend	rs	rust-backend	352	11	8	0		Rust �
 src-tauri/src/llm/opencode_go/responses.rs	backend	rs	rust-backend	102	4	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/llm/opencode_go/test_gateway.rs	backend	rs	rust-backend	35	2	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/llm/opencode_go/transport.rs	backend	rs	rust-backend	134	7	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/llm/router.rs	backend	rs	rust-backend	868	11	29	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/router.rs	backend	rs	rust-backend	19	3	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/router/capability_tests.rs	backend	rs	test	79	13	0	0		行为回归测试
+src-tauri/src/llm/router/construction.rs	backend	rs	rust-backend	244	11	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/llm/router/groups.rs	backend	rs	rust-backend	187	13	14	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/llm/router/rotation.rs	backend	rs	rust-backend	162	12	11	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/llm/router/routing.rs	backend	rs	rust-backend	255	16	30	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/local_history.rs	backend	rs	rust-backend	421	10	14	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/lsp.rs	backend	rs	rust-backend	252	62	21	0		LSP 进程/JSON-RPC、文档同步、文件监听、诊断、补全、导航、符号、重构和 Java 工具命令
 src-tauri/src/lsp/capabilities.rs	backend	rs	rust-backend	369	1	16	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -553,7 +584,13 @@ src-tauri/src/lsp/edits.rs	backend	rs	rust-backend	322	1	10	0		原生产入口�
 src-tauri/src/lsp/feature_model.rs	backend	rs	rust-backend	165	5	89	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lsp/java_model.rs	backend	rs	rust-backend	54	3	22	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lsp/java_project.rs	backend	rs	rust-backend	180	1	9	1		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
-src-tauri/src/lsp/java_runtime.rs	backend	rs	rust-backend	863	2	51	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/lsp/java_runtime.rs	backend	rs	rust-backend	59	13	13	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/lsp/java_runtime/command.rs	backend	rs	rust-backend	209	10	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lsp/java_runtime/data.rs	backend	rs	rust-backend	90	7	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lsp/java_runtime/probe.rs	backend	rs	rust-backend	121	11	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lsp/java_runtime/selection.rs	backend	rs	rust-backend	238	6	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lsp/java_runtime/settings.rs	backend	rs	rust-backend	155	7	19	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lsp/java_runtime/vmargs.rs	backend	rs	rust-backend	99	6	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lsp/java_sources.rs	backend	rs	rust-backend	591	1	26	4		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/lsp/lifetime_model.rs	backend	rs	rust-backend	183	28	79	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lsp/limits.rs	backend	rs	rust-backend	75	1	43	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -567,7 +604,11 @@ src-tauri/src/lsp/manager/status.rs	backend	rs	rust-backend	154	20	3	0		按职�
 src-tauri/src/lsp/manager/symbols.rs	backend	rs	rust-backend	267	27	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lsp/manager/watchers.rs	backend	rs	rust-backend	261	24	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lsp/navigation.rs	backend	rs	rust-backend	281	1	12	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
-src-tauri/src/lsp/navigation_commands.rs	backend	rs	rust-backend	806	1	19	16		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/lsp/navigation_commands.rs	backend	rs	rust-backend	53	10	10	16		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/lsp/navigation_commands/hierarchy.rs	backend	rs	rust-backend	331	16	8	6		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lsp/navigation_commands/hover.rs	backend	rs	rust-backend	115	14	1	1		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lsp/navigation_commands/locations.rs	backend	rs	rust-backend	277	14	7	6		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/lsp/navigation_commands/symbols.rs	backend	rs	rust-backend	138	12	3	3		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lsp/navigation_model.rs	backend	rs	rust-backend	91	5	42	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/lsp/paths.rs	backend	rs	rust-backend	484	1	27	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/lsp/presets.rs	backend	rs	rust-backend	625	2	18	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -602,7 +643,14 @@ src-tauri/src/mail/archive_metadata.rs	backend	rs	rust-backend	97	2	3	0		Rust �
 src-tauri/src/mail/archive_query.rs	backend	rs	rust-backend	654	4	43	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/mail/attachment_files.rs	backend	rs	rust-backend	70	2	4	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/mail/autoconfig.rs	backend	rs	rust-backend	493	6	11	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/mail/cache.rs	backend	rs	rust-backend	891	1	27	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/mail/cache.rs	backend	rs	rust-backend	34	7	7	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/mail/cache/contacts.rs	backend	rs	rust-backend	255	12	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/cache/flags.rs	backend	rs	rust-backend	111	6	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/cache/mapping.rs	backend	rs	rust-backend	67	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/cache/pruning.rs	backend	rs	rust-backend	139	9	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/cache/reading.rs	backend	rs	rust-backend	155	10	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/cache/synchronization.rs	backend	rs	rust-backend	106	19	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/cache/upsert.rs	backend	rs	rust-backend	130	6	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/mail/cache_access.rs	backend	rs	rust-backend	146	1	6	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/mail/caldav.rs	backend	rs	rust-backend	607	9	27	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/mail/calendar.rs	backend	rs	rust-backend	506	11	37	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -619,7 +667,11 @@ src-tauri/src/mail/contacts/suggestions.rs	backend	rs	rust-backend	66	5	2	0		按
 src-tauri/src/mail/contacts/tests.rs	backend	rs	test	409	24	0	0		行为回归测试
 src-tauri/src/mail/coordination.rs	backend	rs	rust-backend	300	10	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/mail/drafts.rs	backend	rs	rust-backend	217	1	9	5		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
-src-tauri/src/mail/fake_imap.rs	backend	rs	rust-backend	823	5	45	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/fake_imap.rs	backend	rs	rust-backend	20	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/fake_imap/lifetime.rs	backend	rs	rust-backend	214	10	18	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/fake_imap/model.rs	backend	rs	rust-backend	55	1	28	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/fake_imap/server.rs	backend	rs	rust-backend	498	16	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/fake_imap/syntax.rs	backend	rs	rust-backend	68	0	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/mail/filters.rs	backend	rs	rust-backend	61	10	10	5		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/mail/filters/actions.rs	backend	rs	rust-backend	235	11	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/mail/filters/cache.rs	backend	rs	rust-backend	188	9	10	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -646,12 +698,23 @@ src-tauri/src/mail/mod.rs	backend	rs	rust-backend	250	51	32	0		邮件命令入�
 src-tauri/src/mail/mutation_commands.rs	backend	rs	rust-backend	434	1	11	9		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/mail/mutations.rs	backend	rs	rust-backend	494	2	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/mail/mutations/tests.rs	backend	rs	rust-backend	294	1	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/mail/oauth.rs	backend	rs	rust-backend	859	1	30	3		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/mail/oauth.rs	backend	rs	rust-backend	45	7	7	3		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/mail/oauth/callback.rs	backend	rs	rust-backend	128	8	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/oauth/commands.rs	backend	rs	rust-backend	181	23	3	3		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/oauth/endpoints.rs	backend	rs	rust-backend	58	5	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/oauth/exchange.rs	backend	rs	rust-backend	223	16	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/oauth/http.rs	backend	rs	rust-backend	110	6	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/oauth/tokens.rs	backend	rs	rust-backend	239	19	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/mail/oauth_model.rs	backend	rs	rust-backend	137	4	65	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/mail/outgoing.rs	backend	rs	rust-backend	565	9	15	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/mail/outgoing_model.rs	backend	rs	rust-backend	191	2	76	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/mail/parts.rs	backend	rs	rust-backend	427	6	21	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/mail/pop3.rs	backend	rs	rust-backend	939	14	34	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/pop3.rs	backend	rs	rust-backend	160	18	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/pop3/connection.rs	backend	rs	rust-backend	241	16	18	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/pop3/limits.rs	backend	rs	rust-backend	13	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/pop3/local_store.rs	backend	rs	rust-backend	310	14	15	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/pop3/synchronization.rs	backend	rs	rust-backend	117	10	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/mail/pop3/tests.rs	backend	rs	test	196	20	0	0		行为回归测试
 src-tauri/src/mail/read_actions.rs	backend	rs	rust-backend	104	2	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/mail/receipts.rs	backend	rs	rust-backend	204	7	5	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/mail/responsiveness_tests.rs	backend	rs	rust-backend	450	3	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -823,15 +886,22 @@ src-tauri/src/screenshot/capture/pixels.rs	backend	rs	rust-backend	85	3	5	0		按
 src-tauri/src/screenshot/capture/snapshot.rs	backend	rs	rust-backend	108	14	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/capture/source.rs	backend	rs	rust-backend	242	13	18	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/capture/tests.rs	backend	rs	test	125	11	0	0		行为回归测试
+src-tauri/src/screenshot/capture_commands.rs	backend	rs	rust-backend	93	8	6	5		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/edit.rs	backend	rs	rust-backend	280	8	6	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/favorites.rs	backend	rs	rust-backend	253	9	13	5		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/initialization.rs	backend	rs	rust-backend	19	6	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/screenshot/labels.rs	backend	rs	rust-backend	3	0	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/mac_snapshot.rs	backend	rs	rust-backend	97	5	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/screenshot/mod.rs	backend	rs	rust-backend	894	54	59	30		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/mod.rs	backend	rs	rust-backend	277	69	41	30		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/model.rs	backend	rs	rust-module	68	1	36	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/ocr.rs	backend	rs	rust-backend	592	4	28	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/ocr_commands.rs	backend	rs	rust-backend	35	3	2	2		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/ocr_macos.rs	backend	rs	rust-backend	75	5	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/ocr_windows.rs	backend	rs	rust-backend	131	6	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/output_commands.rs	backend	rs	rust-backend	106	9	4	3		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/screenshot/overlay_commands.rs	backend	rs	rust-backend	146	20	5	5		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/overlay_session.rs	backend	rs	rust-module	277	28	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/screenshot/pin_commands.rs	backend	rs	rust-backend	102	13	4	4		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/pin_window.rs	backend	rs	rust-module	129	15	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/pins.rs	backend	rs	rust-backend	538	4	32	9		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/qa.rs	backend	rs	rust-backend	161	17	13	0		截图 QA 驱动、窗口/显示/滚动/Pin 工具和证据采集命令
@@ -864,6 +934,7 @@ src-tauri/src/screenshot/record/lifetime.rs	backend	rs	rust-backend	308	22	28	0	
 src-tauri/src/screenshot/record/model.rs	backend	rs	rust-backend	57	2	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/record/mp4.rs	backend	rs	rust-backend	181	10	10	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/record/tests.rs	backend	rs	test	296	26	0	0		行为回归测试
+src-tauri/src/screenshot/recording_commands.rs	backend	rs	rust-backend	226	27	5	5		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/recording_controls.rs	backend	rs	rust-module	132	17	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/recovery_file.rs	backend	rs	rust-backend	144	3	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/runtime.rs	backend	rs	rust-module	169	19	28	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -878,6 +949,7 @@ src-tauri/src/screenshot/scroll/matching.rs	backend	rs	rust-backend	166	5	10	0		
 src-tauri/src/screenshot/scroll/sampling.rs	backend	rs	rust-backend	66	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/scroll/stitching.rs	backend	rs	rust-backend	148	8	18	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/scroll/tests.rs	backend	rs	test	604	13	0	0		行为回归测试
+src-tauri/src/screenshot/scroll_commands.rs	backend	rs	rust-backend	165	21	6	6		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/scroll_controls.rs	backend	rs	rust-module	122	13	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/scroll_input.rs	backend	rs	rust-backend	282	15	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/session.rs	backend	rs	rust-backend	46	3	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -908,17 +980,30 @@ src-tauri/src/sdk/persistence.rs	backend	rs	rust-backend	133	6	7	0		按职责拆
 src-tauri/src/sdk/probe.rs	backend	rs	rust-backend	548	7	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sdk/registry_policy.rs	backend	rs	rust-backend	66	4	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/sdk/resolve.rs	backend	rs	rust-backend	680	11	15	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/sdk/runtime.rs	backend	rs	rust-backend	916	10	22	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sdk/runtime.rs	backend	rs	rust-backend	18	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sdk/runtime/environment.rs	backend	rs	rust-backend	163	19	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sdk/runtime/fingerprint.rs	backend	rs	rust-backend	11	2	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sdk/runtime/java.rs	backend	rs	rust-backend	81	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sdk/runtime/model.rs	backend	rs	rust-backend	79	6	22	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sdk/runtime/paths.rs	backend	rs	rust-backend	97	5	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sdk/runtime/selection.rs	backend	rs	rust-backend	169	13	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sdk/runtime/tests.rs	backend	rs	test	376	17	0	0		行为回归测试
 src-tauri/src/sdk/tests.rs	backend	rs	test	225	16	0	0		行为回归测试
 src-tauri/src/serial/mod.rs	backend	rs	rust-backend	1	0	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/autostart.rs	backend	rs	rust-backend	67	10	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/credentials.rs	backend	rs	rust-backend	110	2	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/servers/cron.rs	backend	rs	rust-backend	324	8	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/db.rs	backend	rs	rust-backend	81	2	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/engine.rs	backend	rs	rust-backend	111	4	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/ftp.rs	backend	rs	rust-backend	619	8	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/http.rs	backend	rs	rust-backend	506	7	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/iperf.rs	backend	rs	rust-backend	63	2	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/servers/mod.rs	backend	rs	rust-backend	850	13	58	13		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/lifetime.rs	backend	rs	rust-backend	234	17	6	4		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/mod.rs	backend	rs	rust-backend	127	24	23	13		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/model.rs	backend	rs	rust-backend	165	2	25	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/servers/nfs.rs	backend	rs	rust-backend	94	2	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/persistence.rs	backend	rs	rust-backend	68	9	2	2		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/probes.rs	backend	rs	rust-backend	58	2	3	3		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/servers/process.rs	backend	rs	rust-backend	82	4	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/rdp.rs	backend	rs	rust-backend	151	26	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/rdp/approval.rs	backend	rs	rust-backend	240	10	33	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -927,12 +1012,33 @@ src-tauri/src/servers/rdp/auth.rs	backend	rs	rust-backend	81	2	6	0		Rust 后端�
 src-tauri/src/servers/rdp/builder.rs	backend	rs	rust-backend	185	26	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/servers/rdp/bulk_loopback_tests.rs	backend	rs	rust-backend	613	19	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/rdp/capture/mac.rs	backend	rs	rust-backend	343	7	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/servers/rdp/capture/mac/sck.rs	backend	rs	rust-backend	809	24	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/mac/sck.rs	backend	rs	rust-backend	155	23	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/mac/sck/configuration.rs	backend	rs	rust-backend	181	16	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/mac/sck/frames.rs	backend	rs	rust-backend	85	11	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/mac/sck/lifetime.rs	backend	rs	rust-backend	215	34	10	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/mac/sck/limits.rs	backend	rs	rust-backend	21	1	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/mac/sck/mailbox.rs	backend	rs	rust-backend	99	5	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/mac/sck/tests.rs	backend	rs	test	161	7	0	0		行为回归测试
 src-tauri/src/servers/rdp/capture/mod.rs	backend	rs	rust-backend	646	13	37	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/servers/rdp/capture/wayland.rs	backend	rs	rust-backend	907	24	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/wayland.rs	backend	rs	rust-backend	28	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/wayland/frames.rs	backend	rs	rust-backend	34	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/wayland/lifetime.rs	backend	rs	rust-backend	154	16	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/wayland/limits.rs	backend	rs	rust-backend	10	1	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/wayland/mailbox.rs	backend	rs	rust-backend	69	6	13	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/wayland/pipewire.rs	backend	rs	rust-backend	311	34	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/wayland/portal.rs	backend	rs	rust-backend	189	15	11	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/wayland/startup.rs	backend	rs	rust-backend	70	4	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/wayland/tests.rs	backend	rs	test	121	8	0	0		行为回归测试
 src-tauri/src/servers/rdp/capture/win.rs	backend	rs	rust-backend	519	7	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/rdp/capture/win_wgc.rs	backend	rs	rust-backend	369	19	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/servers/rdp/capture/x11.rs	backend	rs	rust-backend	988	15	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/x11.rs	backend	rs	rust-backend	48	1	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/x11/damage.rs	backend	rs	rust-backend	238	16	13	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/x11/lifetime.rs	backend	rs	rust-backend	173	16	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/x11/limits.rs	backend	rs	rust-backend	16	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/x11/model.rs	backend	rs	rust-backend	15	3	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/x11/shared_memory.rs	backend	rs	rust-backend	39	3	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/x11/startup.rs	backend	rs	rust-backend	275	21	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/servers/rdp/capture/x11/tests.rs	backend	rs	test	267	14	0	0		行为回归测试
 src-tauri/src/servers/rdp/capture/xcap_backend.rs	backend	rs	rust-backend	82	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/rdp/clipboard.rs	backend	rs	rust-backend	54	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/rdp/clipboard/backend.rs	backend	rs	rust-backend	395	37	11	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -986,6 +1092,7 @@ src-tauri/src/servers/rdp/sound_macos.rs	backend	rs	rust-backend	356	17	1	0		Rus
 src-tauri/src/servers/rdp/system_rdp.rs	backend	rs	rust-backend	339	12	21	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/rdp/tests.rs	backend	rs	test	43	1	0	0		行为回归测试
 src-tauri/src/servers/rdp/tls.rs	backend	rs	rust-backend	147	7	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/registry.rs	backend	rs	rust-backend	92	11	19	3		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/servers/ssh.rs	backend	rs	rust-backend	53	1	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/ssh/authentication.rs	backend	rs	rust-backend	127	8	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/servers/ssh/connection.rs	backend	rs	rust-backend	110	14	26	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -998,6 +1105,7 @@ src-tauri/src/servers/ssh/sftp_handler.rs	backend	rs	rust-backend	357	18	15	0		�
 src-tauri/src/servers/ssh/sftp_paths.rs	backend	rs	rust-backend	51	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/servers/ssh/tests.rs	backend	rs	test	143	12	0	0		行为回归测试
 src-tauri/src/servers/telnet.rs	backend	rs	rust-backend	271	8	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/tests.rs	backend	rs	test	71	5	0	0		行为回归测试
 src-tauri/src/servers/tftp.rs	backend	rs	rust-backend	315	6	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/servers/vnc.rs	backend	rs	rust-backend	142	3	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/session/db.rs	backend	rs	rust-backend	209	2	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -1017,7 +1125,15 @@ src-tauri/src/session/import_secrets/securecrt.rs	backend	rs	rust-backend	467	9	
 src-tauri/src/session/import_secrets/tabby.rs	backend	rs	rust-backend	380	10	9	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/session/mod.rs	backend	rs	rust-backend	79	3	13	8		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/session/models.rs	backend	rs	rust-backend	267	2	28	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/session/resume.rs	backend	rs	rust-backend	896	6	29	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/resume.rs	backend	rs	rust-backend	51	9	9	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/resume/clearing.rs	backend	rs	rust-backend	42	7	2	1		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/session/resume/commit.rs	backend	rs	rust-backend	165	17	2	1		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/session/resume/legacy.rs	backend	rs	rust-backend	43	3	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/session/resume/metadata.rs	backend	rs	rust-backend	56	4	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/session/resume/model.rs	backend	rs	rust-backend	84	2	25	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/session/resume/reading.rs	backend	rs	rust-backend	112	12	3	1		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/session/resume/tests.rs	backend	rs	test	381	8	0	0		行为回归测试
+src-tauri/src/session/resume/validation.rs	backend	rs	rust-backend	88	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/sockscap/capture/linux/cgroup.rs	backend	rs	rust-backend	740	7	15	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/capture/linux/exec.rs	backend	rs	rust-backend	6	1	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/capture/linux/launched.rs	backend	rs	rust-backend	27	3	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -1046,7 +1162,15 @@ src-tauri/src/sockscap/capture/linux/tracer/tests.rs	backend	rs	test	187	20	0	0	
 src-tauri/src/sockscap/capture/linux/tunnel.rs	backend	rs	rust-backend	681	6	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/capture/macos/mod.rs	backend	rs	rust-backend	35	6	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/capture/mod.rs	backend	rs	rust-backend	279	4	12	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/sockscap/config.rs	backend	rs	rust-backend	881	5	110	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/config.rs	backend	rs	rust-backend	32	7	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/config/applications.rs	backend	rs	rust-backend	81	4	22	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/config/gfwlist.rs	backend	rs	rust-backend	37	2	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/config/launch.rs	backend	rs	rust-backend	111	4	14	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/config/rules.rs	backend	rs	rust-backend	74	8	18	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/config/scope.rs	backend	rs	rust-backend	31	2	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/config/settings.rs	backend	rs	rust-backend	218	14	23	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/config/tests.rs	backend	rs	test	206	10	0	0		行为回归测试
+src-tauri/src/sockscap/config/upstream.rs	backend	rs	rust-backend	158	2	32	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/sockscap/configuration_commands.rs	backend	rs	rust-backend	263	1	11	10		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/sockscap/core/config_gen.rs	backend	rs	rust-backend	400	3	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/core/mod.rs	backend	rs	rust-backend	523	12	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -1059,7 +1183,15 @@ src-tauri/src/sockscap/egress/socks5.rs	backend	rs	rust-backend	198	5	2	0		Rust 
 src-tauri/src/sockscap/egress/ssh_pool.rs	backend	rs	rust-backend	204	6	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/elevate.rs	backend	rs	rust-backend	230	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/flow.rs	backend	rs	rust-backend	14	2	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/sockscap/helper.rs	backend	rs	rust-backend	882	19	47	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/helper.rs	backend	rs	rust-backend	45	10	10	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/helper/capture_commands.rs	backend	rs	rust-backend	77	7	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/helper/client.rs	backend	rs	rust-backend	162	17	14	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/helper/model.rs	backend	rs	rust-backend	39	3	23	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/helper/original_destination.rs	backend	rs	rust-backend	46	5	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/helper/registry.rs	backend	rs	rust-backend	54	4	10	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/helper/requests.rs	backend	rs	rust-backend	76	9	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/helper/startup.rs	backend	rs	rust-backend	371	20	7	1		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/helper/status.rs	backend	rs	rust-backend	106	6	4	3		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/sockscap/ingress/http.rs	backend	rs	rust-backend	206	4	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/ingress/mod.rs	backend	rs	rust-backend	236	9	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/ingress/socks5.rs	backend	rs	rust-backend	283	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -1074,7 +1206,13 @@ src-tauri/src/sockscap/paths.rs	backend	rs	rust-backend	396	2	13	0		Rust 后端�
 src-tauri/src/sockscap/policy.rs	backend	rs	rust-backend	670	10	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/process.rs	backend	rs	rust-backend	495	27	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/recovery.rs	backend	rs	rust-backend	246	6	23	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/sockscap/recovery_service.rs	backend	rs	rust-backend	923	3	15	3		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/sockscap/recovery_service.rs	backend	rs	rust-backend	50	16	16	3		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/sockscap/recovery_service/privileged_files.rs	backend	rs	rust-backend	68	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/recovery_service/recovery.rs	backend	rs	rust-backend	172	11	3	1		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/recovery_service/repair.rs	backend	rs	rust-backend	277	11	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/recovery_service/stop.rs	backend	rs	rust-backend	71	8	2	1		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/recovery_service/teardown.rs	backend	rs	rust-backend	229	11	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/sockscap/recovery_service/update.rs	backend	rs	rust-backend	168	12	3	1		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/sockscap/redirector/app_identity.rs	backend	rs	rust-backend	752	12	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/redirector/bridge_process.rs	backend	rs	rust-backend	634	15	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sockscap/redirector/bridge_protocol.rs	backend	rs	rust-backend	120	2	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -1148,7 +1286,13 @@ src-tauri/src/terminal/local_directories/schema.rs	backend	rs	rust-backend	75	3	
 src-tauri/src/terminal/local_directories/tests.rs	backend	rs	test	372	19	0	0		行为回归测试
 src-tauri/src/terminal/local_start.rs	backend	rs	rust-backend	273	16	9	2		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/terminal/mod.rs	backend	rs	rust-backend	143	39	29	17		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/terminal/network.rs	backend	rs	rust-backend	889	7	29	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/network.rs	backend	rs	rust-backend	25	3	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/network/endpoint.rs	backend	rs	rust-backend	31	0	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/terminal/network/http.rs	backend	rs	rust-backend	54	5	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/terminal/network/model.rs	backend	rs	rust-backend	131	4	31	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/terminal/network/socks.rs	backend	rs	rust-backend	112	3	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/terminal/network/tests.rs	backend	rs	test	421	9	0	0		行为回归测试
+src-tauri/src/terminal/network/transport.rs	backend	rs	rust-backend	151	5	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/terminal/output.rs	backend	rs	rust-backend	116	10	10	2		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/terminal/pty.rs	backend	rs	rust-backend	37	6	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/terminal/pty/command_pty_environment_tests.rs	backend	rs	test	30	3	0	0		行为回归测试
@@ -1227,7 +1371,9 @@ src-tauri/src/vnc/ws.rs	backend	rs	rust-backend	357	30	22	0		VNC WebSocket/会�
 src-tauri/src/vnc/ws/clipboard.rs	backend	rs	rust-backend	156	1	6	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/vnc/ws/frame_flow.rs	backend	rs	rust-backend	251	1	12	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/vnc/ws/input.rs	backend	rs	rust-backend	200	1	8	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
-src-tauri/src/vnc/ws/relay.rs	backend	rs	rust-backend	864	1	3	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/vnc/ws/relay.rs	backend	rs	rust-backend	9	3	3	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src-tauri/src/vnc/ws/relay/runtime.rs	backend	rs	rust-backend	738	59	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/vnc/ws/relay/startup.rs	backend	rs	rust-backend	205	21	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/vnc/ws/tests.rs	backend	rs	rust-backend	658	6	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/vnc/ws/transport.rs	backend	rs	rust-backend	120	1	3	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src-tauri/src/voice/capture.rs	backend	rs	rust-backend	272	4	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -1604,6 +1750,11 @@ src/components/editor/workspace/buildReplaceEdits.ts	frontend	ts	frontend-featur
 src/components/editor/workspace/capabilityEvidence.ts	frontend	ts	frontend-feature-lib	107	1	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/clipboardObservationContract.test.ts	frontend	ts	test	207	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/clipboardObservationContract.ts	frontend	ts	frontend-feature-lib	196	1	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/clipboardSession/context.ts	frontend	ts	frontend-component	8	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/clipboardSession/lifetime.ts	frontend	ts	frontend-component	370	4	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/clipboardSession/model.ts	frontend	ts	frontend-component	164	3	17	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/clipboardSession/permissions.ts	frontend	ts	frontend-component	73	3	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/clipboardSession/store.ts	frontend	ts	frontend-component	211	2	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/codeActionExecution.test.ts	frontend	ts	test	138	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/codeActionExecution.ts	frontend	ts	frontend-feature-lib	172	2	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/codeActionProviderAdapter.test.ts	frontend	ts	test	1176	6	0	0		自动化测试/QA 集成测试
@@ -1714,6 +1865,11 @@ src/components/editor/workspace/diagnosticScopeModel.test.ts	frontend	ts	test	31
 src/components/editor/workspace/diagnosticScopeModel.ts	frontend	ts	frontend-feature-lib	23	0	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/doubleShift.test.ts	frontend	ts	test	97	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/doubleShift.ts	frontend	ts	frontend-feature-lib	55	0	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editApply/application.ts	frontend	ts	frontend-component	183	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/editApply/model.ts	frontend	ts	frontend-component	225	3	10	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/editApply/result.ts	frontend	ts	frontend-component	141	3	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/editApply/resume.ts	frontend	ts	frontend-component	186	2	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/editApply/text.ts	frontend	ts	frontend-component	142	4	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/editorAiPreferences.test.ts	frontend	ts	test	54	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/editorAiPreferences.ts	frontend	ts	frontend-feature-lib	53	1	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/editorAiPrompts.test.ts	frontend	ts	test	340	4	0	0		自动化测试/QA 集成测试
@@ -1745,7 +1901,7 @@ src/components/editor/workspace/editorPerformance.test.tsx	frontend	tsx	test	367
 src/components/editor/workspace/editorReleaseScope.test.ts	frontend	ts	test	101	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/editorReleaseScope.ts	frontend	ts	frontend-feature-lib	224	0	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/editorSearchPanel.test.ts	frontend	ts	test	390	8	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/editorSearchPanel.ts	frontend	ts	frontend-feature-lib	1071	4	19	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorSearchPanel.ts	frontend	ts	frontend-feature-lib	16	0	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/editorTabScroll.test.ts	frontend	ts	test	104	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/editorTabScroll.ts	frontend	ts	frontend-feature-lib	110	0	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/errorStripe.test.ts	frontend	ts	test	103	5	0	0		自动化测试/QA 集成测试
@@ -1906,6 +2062,10 @@ src/components/editor/workspace/javaSemanticEvidence.test.ts	frontend	ts	test	12
 src/components/editor/workspace/javaSemanticEvidence.ts	frontend	ts	frontend-feature-lib	310	2	21	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/javaSyntaxOutline.test.ts	frontend	ts	test	38	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/javaSyntaxOutline.ts	frontend	ts	frontend-feature-lib	114	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/keymap/actions.ts	frontend	ts	frontend-component	599	7	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/keymap/availability.ts	frontend	ts	frontend-component	17	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/keymap/bindings.ts	frontend	ts	frontend-component	231	9	13	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/keymap/model.ts	frontend	ts	frontend-component	57	2	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/languageServiceReadiness.test.ts	frontend	ts	test	45	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/languageServiceReadiness.ts	frontend	ts	frontend-feature-lib	60	1	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/largeFile.test.ts	frontend	ts	test	31	2	0	0		自动化测试/QA 集成测试
@@ -1932,6 +2092,10 @@ src/components/editor/workspace/lspHyperlink.ts	frontend	ts	frontend-feature-lib
 src/components/editor/workspace/lspIntelligenceChrome.test.ts	frontend	ts	test	122	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/lspIntelligenceChrome.ts	frontend	ts	frontend-feature-lib	272	4	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/lspPositions.ts	frontend	ts	frontend-feature-lib	17	2	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/lspSession/java.ts	frontend	ts	frontend-component	23	2	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/lspSession/model.ts	frontend	ts	frontend-component	63	4	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/lspSession/state.ts	frontend	ts	frontend-component	80	2	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/lspSession/useWorkspaceLspSession.ts	frontend	ts	frontend-component	771	10	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/lspSyncGate.test.ts	frontend	ts	test	81	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/lspTextEdits.test.ts	frontend	ts	test	193	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/lspTextEdits.ts	frontend	ts	frontend-feature-lib	221	1	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
@@ -2062,7 +2226,14 @@ src/components/editor/workspace/renderedDocCommentsExtension.ts	frontend	ts	fron
 src/components/editor/workspace/renderedDocCommentsModel.test.ts	frontend	ts	test	116	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/renderedDocCommentsModel.ts	frontend	ts	frontend-feature-lib	214	2	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/replaceInFilesModel.test.ts	frontend	ts	test	1454	4	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/replaceInFilesModel.ts	frontend	ts	frontend-feature-lib	871	6	38	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/replaceInFilesModel.ts	frontend	ts	frontend-feature-lib	39	0	7	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/replaceModel/coordinates.ts	frontend	ts	frontend-component	96	2	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/replaceModel/model.ts	frontend	ts	frontend-component	181	2	19	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/replaceModel/planning.ts	frontend	ts	frontend-component	166	5	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/replaceModel/preflight.ts	frontend	ts	frontend-component	100	2	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/replaceModel/preimages.ts	frontend	ts	frontend-component	156	3	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/replaceModel/report.ts	frontend	ts	frontend-component	55	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/replaceModel/selection.ts	frontend	ts	frontend-component	127	4	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/runConfigurationPersistence.test.ts	frontend	ts	test	413	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/runConfigurationPersistence.ts	frontend	ts	frontend-feature-lib	614	1	20	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/runGutter.ts	frontend	ts	frontend-feature-lib	123	2	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
@@ -2078,6 +2249,12 @@ src/components/editor/workspace/saveOrganizeImportsAdapter.test.ts	frontend	ts	t
 src/components/editor/workspace/saveOrganizeImportsAdapter.ts	frontend	ts	frontend-feature-lib	201	3	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/saveRaceProbe.test.ts	frontend	ts	test	252	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/saveRaceProbe.ts	frontend	ts	frontend-feature-lib	427	1	13	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/searchPanel/controls.ts	frontend	ts	frontend-component	52	2	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/searchPanel/filtering.ts	frontend	ts	frontend-component	113	4	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/searchPanel/history.ts	frontend	ts	frontend-component	51	0	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/searchPanel/panel.ts	frontend	ts	frontend-component	528	6	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/searchPanel/replacement.ts	frontend	ts	frontend-component	183	2	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/searchPanel/style.ts	frontend	ts	frontend-component	157	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/semanticQueryBehaviorCase.test.ts	frontend	ts	test	178	5	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/semanticQueryEnvelope.test.ts	frontend	ts	test	118	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/semanticQueryEnvelope.ts	frontend	ts	frontend-feature-lib	141	2	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
@@ -2091,6 +2268,12 @@ src/components/editor/workspace/structuralSearchTemplates.ts	frontend	ts	fronten
 src/components/editor/workspace/symbolKinds.ts	frontend	ts	frontend-feature-lib	26	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/syntaxContext.test.ts	frontend	ts	test	46	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/syntaxContext.ts	frontend	ts	frontend-feature-lib	63	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/tabPolicy/migration.ts	frontend	ts	frontend-component	83	1	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/tabPolicy/model.ts	frontend	ts	frontend-component	267	0	19	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/tabPolicy/ordering.ts	frontend	ts	frontend-component	97	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/tabPolicy/planning.ts	frontend	ts	frontend-component	159	4	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/tabPolicy/reopening.ts	frontend	ts	frontend-component	98	2	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/tabPolicy/transaction.ts	frontend	ts	frontend-component	155	2	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/templates/catalog/index.ts	frontend	ts	frontend-component	39	8	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/templates/catalog/java.ts	frontend	ts	frontend-component	312	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/templates/catalog/javascript.ts	frontend	ts	frontend-component	190	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -2152,7 +2335,7 @@ src/components/editor/workspace/useWorkspaceGitSnapshots.ts	frontend	ts	frontend
 src/components/editor/workspace/useWorkspaceLspClientEvents.test.ts	frontend	ts	test	221	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/useWorkspaceLspClientEvents.ts	frontend	ts	frontend-feature-lib	308	3	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/useWorkspaceLspSession.test.tsx	frontend	tsx	test	842	8	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/useWorkspaceLspSession.ts	frontend	ts	frontend-feature-lib	927	8	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceLspSession.ts	frontend	ts	frontend-feature-lib	5	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/useWorkspaceNavigation.test.tsx	frontend	tsx	test	386	7	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/useWorkspaceNavigation.ts	frontend	ts	frontend-feature-lib	472	7	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/useWorkspaceProjectAnalysis.ts	frontend	ts	frontend-feature-lib	258	5	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
@@ -2176,6 +2359,13 @@ src/components/editor/workspace/views/createWorkspaceShellProps.ts	frontend	ts	f
 src/components/editor/workspace/views/createWorkspaceSideContents.tsx	frontend	tsx	frontend-component	203	21	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/views/editorGroupView.tsx	frontend	tsx	frontend-component	643	36	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/views/toolWindowChrome.tsx	frontend	tsx	frontend-component	240	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/virtualSpace/columns.ts	frontend	ts	frontend-component	65	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/virtualSpace/controller.ts	frontend	ts	frontend-component	13	3	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/virtualSpace/geometry.ts	frontend	ts	frontend-component	137	6	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/virtualSpace/input.ts	frontend	ts	frontend-component	359	5	13	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/virtualSpace/overflow.ts	frontend	ts	frontend-component	102	4	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/virtualSpace/policy.ts	frontend	ts	frontend-component	50	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/virtualSpace/vertical.ts	frontend	ts	frontend-component	128	5	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/windowResizeSession.test.ts	frontend	ts	test	52	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/windowResizeSession.ts	frontend	ts	frontend-feature-lib	54	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workflow/actionValidation.ts	frontend	ts	frontend-component	216	3	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
@@ -2195,8 +2385,8 @@ src/components/editor/workspace/workspaceChrome.tsx	frontend	tsx	frontend-compon
 src/components/editor/workspace/workspaceClipboardHistory.test.ts	frontend	ts	test	278	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceClipboardPastePlan.test.ts	frontend	ts	test	61	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceClipboardSession.test.ts	frontend	ts	test	697	2	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/workspaceClipboardSession.ts	frontend	ts	frontend-feature-lib	825	4	29	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
-src/components/editor/workspace/workspaceCodeMirrorKeymap.ts	frontend	ts	frontend-feature-lib	935	9	12	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceClipboardSession.ts	frontend	ts	frontend-feature-lib	51	2	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceCodeMirrorKeymap.ts	frontend	ts	frontend-feature-lib	16	0	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceCodeStyleScheme.ts	frontend	ts	frontend-feature-lib	415	0	27	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceCodeStyleSchemes.test.ts	frontend	ts	test	265	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceCodeStyleSchemes.ts	frontend	ts	frontend-feature-lib	282	2	16	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
@@ -2207,7 +2397,7 @@ src/components/editor/workspace/workspaceCopyReference.ts	frontend	ts	frontend-f
 src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts	frontend	ts	test	507	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceDocumentTransactionOwner.ts	frontend	ts	frontend-feature-lib	556	1	13	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceEditApply.test.ts	frontend	ts	test	1394	5	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/workspaceEditApply.ts	frontend	ts	frontend-feature-lib	875	5	19	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceEditApply.ts	frontend	ts	frontend-feature-lib	24	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceEditHistory.test.ts	frontend	ts	test	171	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceEditHistory.ts	frontend	ts	frontend-feature-lib	268	2	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceEditPreview.test.ts	frontend	ts	test	132	3	0	0		自动化测试/QA 集成测试
@@ -2250,10 +2440,10 @@ src/components/editor/workspace/workspaceStyleController.ts	frontend	ts	frontend
 src/components/editor/workspace/workspaceSyntaxFacts.test.ts	frontend	ts	test	94	5	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceSyntaxFacts.ts	frontend	ts	frontend-feature-lib	127	5	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceTabPolicy.test.ts	frontend	ts	test	589	3	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/workspaceTabPolicy.ts	frontend	ts	frontend-feature-lib	853	1	31	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceTabPolicy.ts	frontend	ts	frontend-feature-lib	30	0	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceTabPolicyV3.test.ts	frontend	ts	test	77	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceVirtualSpace.test.ts	frontend	ts	test	1381	9	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/workspaceVirtualSpace.ts	frontend	ts	frontend-feature-lib	812	4	42	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceVirtualSpace.ts	frontend	ts	frontend-feature-lib	53	0	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/writeDiskByteCorrectness.test.ts	frontend	ts	test	568	10	0	0		自动化测试/QA 集成测试
 src/components/filebrowser/ChmodDialog.test.tsx	frontend	tsx	test	143	5	0	0		自动化测试/QA 集成测试
 src/components/filebrowser/ChmodDialog.tsx	frontend	tsx	frontend-component	230	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
@@ -2925,7 +3115,16 @@ src/lib/editor/searchLineHighlight.test.ts	frontend	ts	test	60	2	0	0		自动化�
 src/lib/editor/searchLineHighlight.ts	frontend	ts	frontend-lib	221	2	8	0		前端领域模型、IPC 适配、工具或副作用服务
 src/lib/editor/structuralSearch.ts	frontend	ts	frontend-lib	136	2	18	3		前端领域模型、IPC 适配、工具或副作用服务
 src/lib/editor/workspace.test.ts	frontend	ts	test	94	2	0	0		自动化测试/QA 集成测试
-src/lib/editor/workspace.ts	frontend	ts	frontend-lib	893	2	63	25		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/workspace.ts	frontend	ts	frontend-lib	71	0	8	25		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/workspace/decoding.ts	frontend	ts	frontend-component	75	1	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/editor/workspace/execution.ts	frontend	ts	frontend-component	83	2	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/editor/workspace/executionModel.ts	frontend	ts	frontend-component	277	0	22	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/editor/workspace/model.ts	frontend	ts	frontend-component	54	0	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/editor/workspace/reading.ts	frontend	ts	frontend-component	63	3	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/editor/workspace/resources.ts	frontend	ts	frontend-component	78	2	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/editor/workspace/tree.ts	frontend	ts	frontend-component	59	3	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/editor/workspace/writeModel.ts	frontend	ts	frontend-component	142	1	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/editor/workspace/writing.ts	frontend	ts	frontend-component	81	3	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/lib/editor/workspaceSearch.ts	frontend	ts	frontend-lib	81	2	8	2		前端领域模型、IPC 适配、工具或副作用服务
 src/lib/editor/workspaceTooling.test.ts	frontend	ts	test	115	2	0	0		自动化测试/QA 集成测试
 src/lib/editor/workspaceTooling.ts	frontend	ts	frontend-lib	93	1	10	2		前端领域模型、IPC 适配、工具或副作用服务
@@ -3229,7 +3428,14 @@ src/lib/updateService.ts	frontend	ts	frontend-lib	303	3	12	3		前端领域模型
 src/lib/vaultGate.test.tsx	frontend	tsx	test	107	4	0	0		自动化测试/QA 集成测试
 src/lib/vaultGate.tsx	frontend	tsx	frontend-lib	149	4	3	0		前端领域模型、IPC 适配、工具或副作用服务
 src/lib/vnc.test.ts	frontend	ts	test	347	2	0	0		自动化测试/QA 集成测试
-src/lib/vnc.ts	frontend	ts	frontend-lib	821	1	46	6		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/vnc.ts	frontend	ts	frontend-lib	45	0	7	6		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/vnc/connection.ts	frontend	ts	frontend-component	86	2	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/vnc/keyboard.ts	frontend	ts	frontend-component	148	0	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/vnc/model.ts	frontend	ts	frontend-component	138	0	10	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/vnc/pointer.ts	frontend	ts	frontend-component	137	0	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/vnc/scaling.ts	frontend	ts	frontend-component	89	0	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/vnc/validation.ts	frontend	ts	frontend-component	88	1	13	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/lib/vnc/wire.ts	frontend	ts	frontend-component	147	2	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/lib/vncFramePainter.test.ts	frontend	ts	test	104	2	0	0		自动化测试/QA 集成测试
 src/lib/vncFramePainter.ts	frontend	ts	frontend-lib	220	1	5	0		前端领域模型、IPC 适配、工具或副作用服务
 src/lib/vncOptions.test.ts	frontend	ts	test	59	2	0	0		自动化测试/QA 集成测试
@@ -3328,7 +3534,12 @@ src/stubs/commands/sockscap.ts	frontend	ts	frontend-lib	266	0	1	0		原生产入�
 src/stubs/commands/terminal.ts	frontend	ts	frontend-lib	253	4	6	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/stubs/commands/tunnel.ts	frontend	ts	frontend-lib	152	1	7	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/stubs/commands/vault.ts	frontend	ts	frontend-lib	152	0	6	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
-src/stubs/commands/workspace.ts	frontend	ts	frontend-lib	924	5	20	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/stubs/commands/workspace.ts	frontend	ts	frontend-lib	9	0	5	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/stubs/commands/workspace/dispatch.ts	frontend	ts	frontend-component	485	9	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/stubs/commands/workspace/encoding.ts	frontend	ts	frontend-component	116	2	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/stubs/commands/workspace/paths.ts	frontend	ts	frontend-component	25	1	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/stubs/commands/workspace/resources.ts	frontend	ts	frontend-component	115	2	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/stubs/commands/workspace/search.ts	frontend	ts	frontend-component	193	1	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/stubs/localVfs.ts	frontend	ts	frontend-stub	322	1	16	0		浏览器环境下的 Tauri/原生能力模拟
 src/stubs/mailArchiveStub.ts	frontend	ts	frontend-stub	91	4	1	0		浏览器环境下的 Tauri/原生能力模拟
 src/stubs/mailCalendarStub.ts	frontend	ts	frontend-stub	51	2	4	0		浏览器环境下的 Tauri/原生能力模拟

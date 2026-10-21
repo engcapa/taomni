@@ -1,0 +1,498 @@
+use super::model::FakeFolder;
+use super::model::FakeMessage;
+use super::model::FakeState;
+use super::syntax::format_internal_date;
+use super::syntax::in_set;
+use super::syntax::parse_uid_set;
+use super::syntax::quote;
+use super::syntax::split_first_arg;
+use super::syntax::unquote;
+use std::io::BufRead as _;
+use std::io::BufReader;
+use std::io::Read;
+use std::io::Write;
+use std::net::TcpStream;
+use std::sync::Arc;
+use std::sync::Mutex;
+
+pub(super) fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()> {
+    let mut writer = stream.try_clone()?;
+    let mut reader = BufReader::new(stream);
+    writer.write_all(b"* OK fake IMAP ready\r\n")?;
+    let mut selected: Option<String> = None;
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line)? == 0 {
+            return Ok(());
+        }
+        let mut command = line.trim_end_matches(['\r', '\n']).to_string();
+        // Literal (APPEND): `{n}` at end of line.
+        let mut literal: Option<Vec<u8>> = None;
+        if let Some(open) = command.rfind('{') {
+            if command.ends_with('}') {
+                if let Ok(len) = command[open + 1..command.len() - 1].parse::<usize>() {
+                    writer.write_all(b"+ go ahead\r\n")?;
+                    let mut bytes = vec![0; len];
+                    reader.read_exact(&mut bytes)?;
+                    let mut rest = String::new();
+                    reader.read_line(&mut rest)?;
+                    literal = Some(bytes);
+                    command.truncate(open);
+                }
+            }
+        }
+        let (tag, rest) = command.split_once(' ').unwrap_or((command.as_str(), ""));
+        let tag = tag.to_string();
+        let rest = rest.to_string();
+        let upper = rest.to_ascii_uppercase();
+        let mut state = shared.lock().unwrap();
+        state.log.push(rest.clone());
+        if state.max_command_bytes.is_some_and(|max| line.len() > max) {
+            return Ok(());
+        }
+        let mut out = String::new();
+        let mut ok = format!("{tag} OK done\r\n");
+        if upper.starts_with("LOGIN") || upper.starts_with("NOOP") {
+        } else if upper.starts_with("LOGOUT") {
+            out.push_str("* BYE bye\r\n");
+            writer.write_all(out.as_bytes())?;
+            writer.write_all(ok.as_bytes())?;
+            return Ok(());
+        } else if upper.starts_with("IDLE") {
+            let name = selected.clone().unwrap_or_else(|| "INBOX".into());
+            let baseline = state.highest_modseq;
+            drop(state);
+            writer.write_all(b"+ idling\r\n")?;
+            reader
+                .get_ref()
+                .set_read_timeout(Some(std::time::Duration::from_millis(100)))?;
+            let mut notified = baseline;
+            loop {
+                {
+                    let state = shared.lock().unwrap();
+                    if state.highest_modseq != notified {
+                        notified = state.highest_modseq;
+                        let exists = state
+                            .folders
+                            .get(&name)
+                            .map(|f| f.messages.len())
+                            .unwrap_or(0);
+                        writer.write_all(format!("* {exists} EXISTS\r\n").as_bytes())?;
+                    }
+                }
+                let mut done = String::new();
+                match reader.read_line(&mut done) {
+                    Ok(0) => return Ok(()),
+                    Ok(_) if done.trim().eq_ignore_ascii_case("DONE") => break,
+                    Ok(_) => {}
+                    Err(e)
+                        if matches!(
+                            e.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                        ) => {}
+                    Err(e) => return Err(e),
+                }
+            }
+            reader.get_ref().set_read_timeout(None)?;
+            writer.write_all(format!("{tag} OK idle done\r\n").as_bytes())?;
+            continue;
+        } else if upper.starts_with("CAPABILITY") {
+            out.push_str("* CAPABILITY IMAP4rev1 IDLE");
+            if state.supports_move {
+                out.push_str(" MOVE");
+            }
+            if state.supports_uidplus {
+                out.push_str(" UIDPLUS");
+            }
+            if state.condstore {
+                out.push_str(" CONDSTORE");
+            }
+            out.push_str("\r\n");
+        } else if upper.starts_with("LSUB") {
+            for name in state.folders.keys() {
+                if !state.unsubscribed.contains(name) {
+                    out.push_str(&format!("* LSUB () \"/\" {}\r\n", quote(name)));
+                }
+            }
+        } else if upper.starts_with("UNSUBSCRIBE") || upper.starts_with("SUBSCRIBE") {
+            let unsubscribe = upper.starts_with("UNSUBSCRIBE");
+            let offset = if unsubscribe { 11 } else { 9 };
+            let (name, _) = split_first_arg(&rest[offset..]);
+            if unsubscribe {
+                state.unsubscribed.insert(name);
+            } else {
+                state.unsubscribed.remove(&name);
+            }
+        } else if upper.starts_with("LIST") {
+            for name in state.folders.keys() {
+                out.push_str(&format!(
+                    "* LIST (\\HasNoChildren) \"/\" {}\r\n",
+                    quote(name)
+                ));
+            }
+        } else if upper.starts_with("EXAMINE") || upper.starts_with("SELECT") {
+            let (name, tail) =
+                split_first_arg(rest.split_once(' ').map(|(_, args)| args).unwrap_or(""));
+            let condstore = tail.to_ascii_uppercase().contains("CONDSTORE");
+            let highest = state.highest_modseq;
+            match state.folders.get(&name) {
+                Some(folder) => {
+                    out.push_str("* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft)\r\n");
+                    out.push_str(&format!("* {} EXISTS\r\n", folder.messages.len()));
+                    out.push_str("* 0 RECENT\r\n");
+                    out.push_str(&format!(
+                        "* OK [UIDVALIDITY {}] ok\r\n",
+                        folder.uid_validity
+                    ));
+                    out.push_str(&format!("* OK [UIDNEXT {}] ok\r\n", folder.uid_next));
+                    if condstore {
+                        out.push_str(&format!("* OK [HIGHESTMODSEQ {highest}] ok\r\n"));
+                    }
+                    selected = Some(name);
+                }
+                None => ok = format!("{tag} NO no such mailbox\r\n"),
+            }
+        } else if upper.starts_with("UID SEARCH") || upper.starts_with("SEARCH") {
+            let folder = &state.folders[selected.as_deref().unwrap_or("INBOX")];
+            let max = folder.messages.keys().next_back().copied().unwrap_or(0);
+            let criteria = upper
+                .trim_start_matches("UID ")
+                .trim_start_matches("SEARCH")
+                .trim()
+                .to_string();
+            let hits: Vec<u32> = if criteria == "ALL" {
+                folder.messages.keys().copied().collect()
+            } else if criteria == "UNSEEN" {
+                folder
+                    .messages
+                    .iter()
+                    .filter(|(_, m)| !m.flags.iter().any(|f| f == "\\Seen"))
+                    .map(|(uid, _)| *uid)
+                    .collect()
+            } else if let Some(rest) = criteria.strip_prefix("HEADER MESSAGE-ID ") {
+                let wanted = unquote(rest).to_ascii_lowercase();
+                folder
+                    .messages
+                    .iter()
+                    .filter(|(_, message)| {
+                        String::from_utf8_lossy(&message.raw).lines().any(|line| {
+                            line.to_ascii_lowercase()
+                                .strip_prefix("message-id:")
+                                .is_some_and(|value| value.trim() == wanted)
+                        })
+                    })
+                    .map(|(uid, _)| *uid)
+                    .collect()
+            } else if let Some(set) = criteria.strip_prefix("UID ") {
+                // `UID <set>` optionally followed by `BODY "<needle>"` (filters).
+                let (set, rest) = set.trim().split_once(' ').unwrap_or((set.trim(), ""));
+                let ranges = parse_uid_set(set, max);
+                let needle = rest
+                    .trim()
+                    .strip_prefix("BODY ")
+                    .map(|value| unquote(value.trim()).to_uppercase());
+                folder
+                    .messages
+                    .iter()
+                    .filter(|(uid, _)| in_set(**uid, &ranges))
+                    .filter(|(_, message)| {
+                        needle.as_ref().is_none_or(|needle| {
+                            let raw = String::from_utf8_lossy(&message.raw).to_uppercase();
+                            let body = raw.split_once("\r\n\r\n").map_or("", |(_, b)| b);
+                            body.contains(needle.as_str())
+                        })
+                    })
+                    .map(|(uid, _)| *uid)
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            out.push_str("* SEARCH");
+            for uid in hits {
+                out.push_str(&format!(" {uid}"));
+            }
+            out.push_str("\r\n");
+        } else if upper.starts_with("UID FETCH") {
+            let folder = state.folders[selected.as_deref().unwrap_or("INBOX")].clone();
+            let args = rest[10..].trim();
+            let (set, items) = args.split_once(' ').unwrap_or((args, ""));
+            let items_upper = items.to_ascii_uppercase();
+            let changed_since = items_upper
+                .split("CHANGEDSINCE ")
+                .nth(1)
+                .and_then(|tail| tail.trim_end_matches(')').trim().parse::<u64>().ok());
+            let max = folder.messages.keys().next_back().copied().unwrap_or(0);
+            let ranges = parse_uid_set(set, max);
+            let mut bytes: Vec<u8> = Vec::new();
+            for (index, (uid, message)) in folder.messages.iter().enumerate() {
+                if !in_set(*uid, &ranges) {
+                    continue;
+                }
+                if changed_since.is_some_and(|since| message.modseq <= since) {
+                    continue;
+                }
+                let mut parts = vec![format!("UID {uid}")];
+                parts.push(format!("FLAGS ({})", message.flags.join(" ")));
+                if changed_since.is_some() {
+                    parts.push(format!("MODSEQ ({})", message.modseq));
+                }
+                if items_upper.contains("RFC822.SIZE") {
+                    let size = state
+                        .reported_sizes
+                        .get(&(selected.clone().unwrap_or("INBOX".into()), *uid))
+                        .copied()
+                        .unwrap_or(message.raw.len());
+                    parts.push(format!("RFC822.SIZE {size}"));
+                }
+                if items_upper.contains("INTERNALDATE") {
+                    parts.push(format!(
+                        "INTERNALDATE \"{}\"",
+                        format_internal_date(message.internal_ts)
+                    ));
+                }
+                let extra = folder.structures.get(uid);
+                if items_upper.contains("BODYSTRUCTURE") {
+                    if let Some((structure, _)) = extra {
+                        parts.push(format!("BODYSTRUCTURE {structure}"));
+                    }
+                }
+                let head = format!("* {} FETCH ({}", index + 1, parts.join(" "));
+                bytes.extend_from_slice(head.as_bytes());
+                if items_upper.contains("BODY.PEEK[HEADER]") {
+                    let text = String::from_utf8_lossy(&message.raw).to_string();
+                    let header_end = text.find("\r\n\r\n").map(|i| i + 4).unwrap_or(text.len());
+                    let header = &message.raw[..header_end];
+                    bytes.extend_from_slice(
+                        format!(" BODY[HEADER] {{{}}}\r\n", header.len()).as_bytes(),
+                    );
+                    bytes.extend_from_slice(header);
+                }
+                if let Some((_, tail)) = items_upper.split_once("BODY.PEEK[]") {
+                    let range = tail
+                        .strip_prefix('<')
+                        .and_then(|s| s.split_once('>'))
+                        .and_then(|(range, _)| range.split_once('.'))
+                        .and_then(|(offset, len)| {
+                            Some((offset.parse::<usize>().ok()?, len.parse::<usize>().ok()?))
+                        });
+                    if let Some((offset, len)) = range {
+                        let mut body = &message.raw[offset.min(message.raw.len())
+                            ..offset.saturating_add(len).min(message.raw.len())];
+                        if state
+                            .empty_bodies
+                            .contains(&(selected.clone().unwrap_or("INBOX".into()), *uid))
+                        {
+                            body = &[];
+                        }
+                        bytes.extend_from_slice(
+                            format!(" BODY[]<{offset}> {{{}}}\r\n", body.len()).as_bytes(),
+                        );
+                        bytes.extend_from_slice(body);
+                    } else {
+                        bytes.extend_from_slice(
+                            format!(" BODY[] {{{}}}\r\n", message.raw.len()).as_bytes(),
+                        );
+                        bytes.extend_from_slice(&message.raw);
+                    }
+                }
+                if let Some((_, sections)) = extra {
+                    for (start, _) in items_upper.match_indices("BODY.PEEK[") {
+                        let tail = &items_upper[start + 10..];
+                        let Some(end) = tail.find(']') else { continue };
+                        let name = &tail[..end];
+                        if let Some(data) = sections.get(name) {
+                            bytes.extend_from_slice(
+                                format!(" BODY[{name}] {{{}}}\r\n", data.len()).as_bytes(),
+                            );
+                            bytes.extend_from_slice(data);
+                        }
+                    }
+                }
+                bytes.extend_from_slice(b")\r\n");
+            }
+            drop(state);
+            writer.write_all(&bytes)?;
+            writer.write_all(ok.as_bytes())?;
+            continue;
+        } else if upper.starts_with("UID STORE") {
+            if upper.contains("\\DELETED") && state.reject_deleted_store_once {
+                state.reject_deleted_store_once = false;
+                writer.write_all(
+                    format!("{tag} NO temporarily unable to store flags\r\n").as_bytes(),
+                )?;
+                continue;
+            }
+            let name = selected.clone().unwrap_or_else(|| "INBOX".into());
+            let args = rest[10..].trim().to_string();
+            let (set, spec) = args.split_once(' ').unwrap_or((&args, ""));
+            let spec_upper = spec.to_ascii_uppercase();
+            let flags: Vec<String> = spec
+                .find('(')
+                .map(|open| spec[open + 1..spec.rfind(')').unwrap_or(spec.len())].to_string())
+                .unwrap_or_default()
+                .split_whitespace()
+                .map(ToOwned::to_owned)
+                .collect();
+            state.highest_modseq += 1;
+            let modseq = state.highest_modseq;
+            let folder = state.folders.get_mut(&name).unwrap();
+            let max = folder.messages.keys().next_back().copied().unwrap_or(0);
+            let ranges = parse_uid_set(set, max);
+            for (uid, message) in folder.messages.iter_mut() {
+                if !in_set(*uid, &ranges) {
+                    continue;
+                }
+                if spec_upper.starts_with('+') {
+                    for flag in &flags {
+                        if !message.flags.contains(flag) {
+                            message.flags.push(flag.clone());
+                        }
+                    }
+                } else if spec_upper.starts_with('-') {
+                    message.flags.retain(|flag| !flags.contains(flag));
+                } else {
+                    message.flags = flags.clone();
+                }
+                message.modseq = modseq;
+            }
+            if state.drop_store_response_once {
+                state.drop_store_response_once = false;
+                return Ok(());
+            }
+        } else if upper.starts_with("UID COPY") || upper.starts_with("UID MOVE") {
+            let is_move = upper.starts_with("UID MOVE");
+            if is_move && !state.supports_move {
+                writer.write_all(format!("{tag} BAD Could not parse command\r\n").as_bytes())?;
+                continue;
+            }
+            let name = selected.clone().unwrap_or_else(|| "INBOX".into());
+            let args = rest[9..].trim().to_string();
+            let (set, target) = args.split_once(' ').unwrap_or((&args, ""));
+            let target = unquote(target);
+            let source = state.folders[&name].clone();
+            let max = source.messages.keys().next_back().copied().unwrap_or(0);
+            let ranges = parse_uid_set(set, max);
+            let moved: Vec<(u32, FakeMessage)> = source
+                .messages
+                .iter()
+                .filter(|(uid, _)| in_set(**uid, &ranges))
+                .map(|(uid, m)| (*uid, m.clone()))
+                .collect();
+            if state
+                .max_transfer_count
+                .is_some_and(|limit| moved.len() > limit)
+            {
+                writer.write_all(
+                    format!("{tag} NO COPY copy mail count over limit\r\n").as_bytes(),
+                )?;
+                continue;
+            }
+            if state
+                .reject_transfer_after
+                .is_some_and(|limit| state.transferred >= limit)
+            {
+                writer.write_all(format!("{tag} NO destination unavailable\r\n").as_bytes())?;
+                continue;
+            }
+            match state.folders.get_mut(&target) {
+                Some(dest) => {
+                    for (_, message) in &moved {
+                        let uid = dest.uid_next;
+                        dest.uid_next += 1;
+                        dest.messages.insert(uid, message.clone());
+                    }
+                }
+                None => ok = format!("{tag} NO [TRYCREATE] no such mailbox\r\n"),
+            }
+            if ok.contains(" OK ") {
+                state.transferred += moved.len();
+            }
+            if is_move && ok.contains(" OK ") {
+                let folder = state.folders.get_mut(&name).unwrap();
+                for (uid, _) in moved {
+                    folder.messages.remove(&uid);
+                }
+            }
+            if !is_move && state.drop_copy_response_once {
+                state.drop_copy_response_once = false;
+                return Ok(());
+            }
+        } else if upper.starts_with("UID EXPUNGE") || upper.starts_with("EXPUNGE") {
+            if upper.starts_with("UID EXPUNGE") && !state.supports_uidplus {
+                writer.write_all(format!("{tag} BAD UIDPLUS unavailable\r\n").as_bytes())?;
+                continue;
+            }
+            let name = selected.clone().unwrap_or_else(|| "INBOX".into());
+            let folder = state.folders.get_mut(&name).unwrap();
+            let max = folder.messages.keys().next_back().copied().unwrap_or(0);
+            let ranges = parse_uid_set(rest.get(11..).unwrap_or("1:*").trim(), max);
+            folder.messages.retain(|uid, message| {
+                !(message.flags.iter().any(|flag| flag == "\\Deleted")
+                    && (!upper.starts_with("UID EXPUNGE") || in_set(*uid, &ranges)))
+            });
+        } else if upper.starts_with("APPEND") {
+            let (name, tail) = split_first_arg(&rest[6..]);
+            let flags: Vec<String> = tail
+                .find('(')
+                .map(|open| tail[open + 1..tail.find(')').unwrap_or(tail.len())].to_string())
+                .unwrap_or_default()
+                .split_whitespace()
+                .map(ToOwned::to_owned)
+                .collect();
+            state.highest_modseq += 1;
+            let modseq = state.highest_modseq;
+            match state.folders.get_mut(&name) {
+                Some(folder) => {
+                    let uid = folder.uid_next;
+                    folder.uid_next += 1;
+                    let validity = folder.uid_validity;
+                    folder.messages.insert(
+                        uid,
+                        FakeMessage {
+                            flags,
+                            raw: literal.unwrap_or_default(),
+                            internal_ts: 1_700_000_000,
+                            modseq,
+                        },
+                    );
+                    ok = format!("{tag} OK [APPENDUID {validity} {uid}] done\r\n");
+                }
+                None => ok = format!("{tag} NO [TRYCREATE] no such mailbox\r\n"),
+            }
+        } else if upper.starts_with("CREATE") {
+            let (name, _) = split_first_arg(&rest[6..]);
+            state
+                .folders
+                .entry(name)
+                .or_insert_with(|| FakeFolder::new(2000));
+        } else if upper.starts_with("STATUS") {
+            let (name, _) = split_first_arg(&rest[6..]);
+            if let Some(folder) = state.folders.get(&name) {
+                let unseen = folder
+                    .messages
+                    .values()
+                    .filter(|m| !m.flags.iter().any(|f| f == "\\Seen"))
+                    .count();
+                let modseq = if state.condstore {
+                    format!(" HIGHESTMODSEQ {}", state.highest_modseq)
+                } else {
+                    String::new()
+                };
+                out.push_str(&format!(
+                    "* STATUS {} (MESSAGES {} UNSEEN {} UIDNEXT {} UIDVALIDITY {}{modseq})\r\n",
+                    quote(&name),
+                    folder.messages.len(),
+                    unseen,
+                    folder.uid_next,
+                    folder.uid_validity
+                ));
+            }
+        } else {
+            ok = format!("{tag} BAD unsupported\r\n");
+        }
+        drop(state);
+        writer.write_all(out.as_bytes())?;
+        writer.write_all(ok.as_bytes())?;
+    }
+}
