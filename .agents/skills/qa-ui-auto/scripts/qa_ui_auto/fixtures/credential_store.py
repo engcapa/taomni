@@ -21,7 +21,10 @@ def setup(ctx: Any) -> None:
     expected = native_isolation_env(Path(ctx.report_root))
     if any(os.environ.get(key) != value for key, value in expected.items()):
         raise RuntimeError("Credential fixture requires run-owned native storage")
-    subprocess.run(["gnome-keyring-daemon", "--replace", "--unlock", "--components=secrets"],
+    # Wait for daemon initialization before secret-tool can D-Bus-activate a
+    # competing locked service. Without --daemonize the parent can exit before
+    # org.freedesktop.secrets has acquired its name.
+    subprocess.run(["gnome-keyring-daemon", "--replace", "--daemonize", "--unlock", "--components=secrets"],
                    input="qa-disposable-backup-keyring\n", text=True,
                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=20)
     # A successful daemon exit does not prove that the default collection is
@@ -35,5 +38,13 @@ def setup(ctx: Any) -> None:
         actual = subprocess.run(probe + ["lookup", "qa-readiness", token], **kwargs)
         if actual.stdout.strip() != token:
             raise RuntimeError("Hosted Secret Service credential roundtrip differs")
-    finally:
+    except Exception as error:
+        try:
+            subprocess.run(probe + ["clear", "qa-readiness", token], **kwargs)
+        except Exception as cleanup_error:
+            # A failed store leaves nothing to clear. Keep the store/lookup
+            # failure as the cause instead of replacing it with cleanup exit 1.
+            error.add_note(f"Credential readiness cleanup also failed: {cleanup_error}")
+        raise
+    else:
         subprocess.run(probe + ["clear", "qa-readiness", token], **kwargs)
